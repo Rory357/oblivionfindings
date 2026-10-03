@@ -32,7 +32,9 @@ import {
     WizardSuccessPane,
 } from '@/components/wizard/shell';
 import { formatDateOnly, toDateInput, toDatetimeLocal } from '@/lib/datetime';
-import { useForm } from '@inertiajs/react';
+import { submitEmarMutation } from '@/lib/emar-offline';
+import { router, useForm } from '@inertiajs/react';
+import axios from 'axios';
 import {
     AlertCircle,
     Check,
@@ -42,7 +44,7 @@ import {
     ShieldCheck,
     User,
 } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { supportTimeCandidates } from './time';
 import {
     CHECKS,
@@ -57,6 +59,7 @@ import {
     type SupportMode,
     type SupportPlan,
 } from './types';
+import { firstAssessmentError } from './validation';
 
 function Field({
     id,
@@ -249,6 +252,28 @@ export function AssessmentDialog({
                 ?.find((p) => p.startsWith('Welfare guardian or EPOA: '))
                 ?.slice('Welfare guardian or EPOA: '.length) ?? '',
         );
+    const [focusRequest, setFocusRequest] = useState<{
+        field: string;
+        attempt: number;
+    } | null>(null);
+    const revealErrors = (errors: Record<string, string>) => {
+        const target = firstAssessmentError(errors);
+        setStep(target.step);
+        setFocusRequest((previous) => ({
+            field: target.field,
+            attempt: (previous?.attempt ?? 0) + 1,
+        }));
+    };
+    useEffect(() => {
+        if (!focusRequest) return;
+        const animation = requestAnimationFrame(() => {
+            const field =
+                document.getElementById(focusRequest.field) ??
+                document.getElementById('assessment-errors');
+            field?.focus();
+        });
+        return () => cancelAnimationFrame(animation);
+    }, [step, focusRequest]);
     const cap = assessmentCap(
         form.data.wishes_to_self_administer === true,
         form.data.willing_to_self_admin,
@@ -345,20 +370,7 @@ export function AssessmentDialog({
             }))
             .post('/emar/self-admin', {
                 preserveScroll: true,
-                onError: (e) => {
-                    setStep(
-                        Object.keys(e).some((k) =>
-                            SCORES.some((s) => s.key === k),
-                        )
-                            ? 1
-                            : Object.keys(e).some((k) =>
-                                    k.startsWith('med_scope'),
-                                )
-                              ? 2
-                              : 0,
-                    );
-                    focusError(e);
-                },
+                onError: revealErrors,
                 onSuccess: () => setSaved(true),
             });
     const save = () => {
@@ -367,12 +379,7 @@ export function AssessmentDialog({
         if (Object.keys(e).length) {
             for (const [k, v] of Object.entries(e))
                 form.setError(k as keyof AssessmentForm, v);
-            setStep(
-                Object.keys(e).some((k) => SCORES.some((s) => s.key === k))
-                    ? 1
-                    : 0,
-            );
-            focusError(e);
+            revealErrors(e);
             return;
         }
         if (loosens) setConfirm(true);
@@ -466,7 +473,9 @@ export function AssessmentDialog({
             >
                 <WizardStepPane>
                     <div className="space-y-5">
-                        <Errors errors={form.errors} />
+                        <div id="assessment-errors" tabIndex={-1}>
+                            <Errors errors={form.errors} />
+                        </div>
                         {step === 0 && (
                             <>
                                 {plan.reviews.length > 0 && (
@@ -614,7 +623,11 @@ export function AssessmentDialog({
                             </>
                         )}
                         {step === 2 && (
-                            <>
+                            <div
+                                id="med_scope"
+                                tabIndex={-1}
+                                className="space-y-5"
+                            >
                                 <Alert>
                                     <AlertTitle>
                                         Most independence allowed:{' '}
@@ -686,7 +699,7 @@ export function AssessmentDialog({
                                         support.
                                     </p>
                                 )}
-                            </>
+                            </div>
                         )}
                         {step === 3 && (
                             <>
@@ -1487,38 +1500,109 @@ export function ConsentDialog({
         said: '',
         occurred_at: toDatetimeLocal(new Date()),
     });
+    const [submitting, setSubmitting] = useState(false),
+        [queued, setQueued] = useState(false);
     const [discard, setDiscard] = useState(false),
         [occurrence, setOccurrence] = useState('');
     const candidates = supportTimeCandidates(form.data.occurred_at);
     const close = () => {
-        if (form.processing) return;
-        if (form.isDirty) setDiscard(true);
+        if (submitting) return;
+        if (form.isDirty && !queued) setDiscard(true);
         else onClose();
     };
-    const send = () => {
-        if (!navigator.onLine) {
-            form.setError(
-                'said',
-                'Not saved — your draft is kept. Connect and retry. Tell the house lead about this change now.',
-            );
-            return;
-        }
-        form.transform((data) => ({
-            ...data,
+    const send = async () => {
+        if (submitting) return;
+        const payload = {
+            ...form.data,
             client_medication_id:
-                data.client_medication_id === 'all'
+                form.data.client_medication_id === 'all'
                     ? null
-                    : Number(data.client_medication_id),
+                    : Number(form.data.client_medication_id),
             occurred_at:
                 candidates.length === 1
                     ? candidates[0]
-                    : occurrence || data.occurred_at,
-        })).post('/emar/self-admin/' + plan.assessment!.id + '/consent', {
-            preserveScroll: true,
-            onSuccess: onClose,
-            onError: focusError,
-        });
+                    : occurrence || form.data.occurred_at,
+        };
+        setSubmitting(true);
+        form.clearErrors();
+        try {
+            const result = await submitEmarMutation(
+                '/emar/self-admin/' + plan.assessment!.id + '/consent',
+                payload,
+                {
+                    action: 'support_consent',
+                    queuedMessage:
+                        'Saved on this device — waiting to send. Tell the house lead about this change now.',
+                    successMessage: 'Support change recorded.',
+                    duplicateMessage:
+                        'This support change was already recorded.',
+                },
+            );
+            if (result.status === 'queued') {
+                setQueued(true);
+                return;
+            }
+            if (['processed', 'synced', 'duplicate'].includes(result.status)) {
+                onClose();
+                router.reload({
+                    only: [
+                        'support',
+                        'changes',
+                        'history',
+                        'agreement_history',
+                    ],
+                    preserveScroll: true,
+                });
+                return;
+            }
+            form.setError(
+                'said',
+                'The change has not been confirmed by the server. Your draft is kept; review any sync notice and retry.',
+            );
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response?.data?.errors) {
+                const errors = Object.fromEntries(
+                    Object.entries(error.response.data.errors).map(
+                        ([key, value]) => [
+                            key,
+                            Array.isArray(value)
+                                ? String(value[0])
+                                : String(value),
+                        ],
+                    ),
+                );
+                form.setError(errors);
+                focusError(errors);
+            } else
+                form.setError(
+                    'said',
+                    'The change could not be saved. Your draft is kept. Retry when connected.',
+                );
+        } finally {
+            setSubmitting(false);
+        }
     };
+    if (queued)
+        return (
+            <Dialog open onOpenChange={(open) => !open && onClose()}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Saved on this device</DialogTitle>
+                        <DialogDescription>
+                            This change is waiting to send when you reconnect.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <p>
+                        Tell the house lead about the change now. The server
+                        support record will update only after the change is
+                        accepted. You can check its progress in saved actions.
+                    </p>
+                    <DialogFooter>
+                        <Button onClick={onClose}>Done</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        );
     return (
         <>
             <Dialog open onOpenChange={(open) => !open && close()}>
@@ -1623,12 +1707,12 @@ export function ConsentDialog({
                         <Button
                             variant="outline"
                             onClick={close}
-                            disabled={form.processing}
+                            disabled={submitting}
                         >
                             Cancel
                         </Button>
-                        <Button onClick={send} disabled={form.processing}>
-                            {form.processing ? 'Saving…' : 'Record change'}
+                        <Button onClick={send} disabled={submitting}>
+                            {submitting ? 'Saving…' : 'Record change'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

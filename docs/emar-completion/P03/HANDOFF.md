@@ -1,62 +1,40 @@
-# P03 support workflow handoff (in progress)
+# P03 implementation handoff
 
-Approved design: 9822d78b4, docs/emar-design/P03/v1, APPROVAL.md. Governing choices: Self-managed / Prompt / Assist / Administer; score is a cap; Self-managed/Prompt need a versioned agreement; controlled medicines are Assist/Administer; new medicines remain Administer; consent withdrawal immediately Administer; independence waits for reassessment; reviews preserve support.
+Approved design: 9822d78b4, docs/emar-design/P03/v1, APPROVAL.md. Single organisation, approved sites, roles, canonical ownership and per-person privacy govern every mutation. No new tenant boundary.
 
-Worktree: C:/Users/steph/.codex/worktrees/emar-p03-support/oblivionfindings
-Branch: codex/emar-p03-support. Base: 9747cf7cb654c2ef441e8f60c7ea1b5918081925. No push/merge/deploy.
+Owned checkout: C:/Users/steph/.codex/worktrees/emar-p03-support/oblivionfindings. Branch codex/emar-p03-support; base 9747cf7cb654c2ef441e8f60c7ea1b5918081925. No push, merge or deployment.
 
-## Dependency setup and cleanup
+## Review commits and prerequisites
 
-The node_modules junction was created only after this configuration proof. Exact paths:
-- Link: C:/Users/steph/.codex/worktrees/emar-p03-support/oblivionfindings/node_modules
-- Target: C:/Users/steph/Herd/oblivionfindings/node_modules (existing physical directory).
-- The shared target is treated as read-only; no install, update, removal, or recursive cleanup against it.
-- Cleanup must remove only the junction itself with a verified literal link path, never recurse through its target. Record actual creation below.
+Owned: 5212bb330 initial assessment/agreement/support/consent implementation; fe9d1a525 history menus and draft protection; next integration correction commit follows this note.
 
-PHP vendor is a PHYSICAL copy, not a junction. Source C:/Users/steph/Herd/oblivionfindings/vendor; destination C:/Users/steph/.codex/worktrees/emar-p03-support/oblivionfindings/vendor. The vendor classloader and Application::inferBasePath must resolve this exact worktree before PHP tests.
+Dependencies (Main integrates original sources once): P09 466ce69df (local 390632233); P08a 8d799fd36 (local a831bce09) and a5b12397f (local 14744f5b8). Local P08a scheduler conflict retained both its minute follow-up schedule and P03's daily review schedule. P04 c38250d91 supplies MedicationReconciliationApplied; listener uses its exact event name and clientId/reconciliationId contract. P04 source apply is tested in Main's combined checkout, not copied here.
 
-Configuration proof, read on 3 October 2026:
-- git rev-parse --show-toplevel resolves the exact worktree above.
-- vite.config.ts resolves @ to path.resolve(__dirname, resources/js), with local resources/css/app.css and resources/js/app.tsx inputs. Laravel's default build output is the checkout's public/build. No explicit external output path exists.
-- vitest.config.ts resolves @ with __dirname, and setupFiles/include are relative to the checkout.
-- tsconfig.json baseUrl is '.', @/* resolves ./resources/js/*; include contains only the checkout's resources/js tree.
-- No .env exists in this checkout. No live environment file or medication data will be copied.
-- Verification will pass this worktree as cwd and its config explicitly, with uniquely named logs. Heavy checks wait for Main's slot and the machine-wide FIFO wrapper.
+## Canonical contracts
 
-## Shared interfaces
+- MedicationSupport::summary(Client,User) and batched summaries(Collection,User) return permission-filtered current assessment, versioned agreement, effective per-medicine mode, desired mode awaiting agreement, concealed count, review state/reasons and role actions. Effective mode is authoritative: self_managed / prompted / assisted / staff_given. Score outcome is only the cap. New orders default Administer.
+- P02 imports MedicationSupportPanel from resources/js/pages/emar/support/support-panel.tsx; omitted callbacks make it read-only. AssessmentDialog, AgreementDialog, MedicineSupportDialog and ConsentDialog are exported from support/_dialogs.tsx. Staff picker is current, canonical site staff, excluding actor; server locks independent witness evidence.
+- P02 reading.tsx currently uses the older RecordSupportPlan shape (administer/assist/prompt/independent, legacy signed agreement fields). Main/P02 must map effective mode from MedicationSupport, and use the versioned agreement. Never present a desired Self-managed/Prompt choice as effective before an agreement. P03 did not edit P02-owned record/read-service files. The existing /self-admin?client_id link now resolves the authorised person instead of the whole register. Register uses EmarHubRail and common breadcrumbs; detail uses common record breadcrumbs and Inertia-preserving navigation.
+- P01 DoseSlotProjection/ScheduledDoseStates expose support_mode; historical recorded outcomes retain their support context, today's unrecorded owed doses read immediate withdrawal, Self-managed stays informational. The model saving hook follows the existing order lock and prevents fabricated Self-managed outcomes across recording paths. P01 owns taken-with-prompting/assistance recorder presentation.
+- P08a ensureForSource('support-reassessment', stable sourceId, ...) creates sole canonical work identity. Reassessment prelocks its owned workflows in id order, calls completeFromSource(sourceKey, User, 'reassessed', facts, auditEvents), collects its own event, and appendMany runs once LAST in the same transaction after domain writes and durable replay receipts. No second follow-up lifecycle ships.
+- Automatic order/error/refusal/date/reconciliation triggers persist a source outbox receipt before source commit. Every-minute emar:support-review-delivery retries P08a ensure without changing the source's successful outcome. Due time stays seven NZ days after the original trigger. Pending delivery is visible truthfully on the plan; newer reassessment covers the predecessor's delayed receipt. Failed receipt persistence rolls back canonical source transactions. This is the existing outbox delivery pattern, not a Task/workflow copy.
+- Consent uses the existing actor-bound secure IndexedDB queue; queued means saved on this device and waiting to send. Server returns explicit processed/duplicate sync acknowledgements, rejects stale or unauthorised replays, and durably binds UUIDs to canonical actor/person/action/details. Online withdrawal immediately Administer; a request for independence preserves support pending reassessment. Exact NZ minutes require explicit repeated-hour occurrence and reject gaps/future times.
+- Legacy DELETE retains soft archive semantics and creates restrictive support events so current independence cannot outlive the archived assessment. Earlier records remain available. Agreement staged attachments are removed when its governing transaction fails.
 
-P02 / Care & Support Plan: MedicationSupport::summary(Client, User) provides a permission-filtered payload. resources/js/pages/emar/support/support-panel.tsx exports MedicationSupportPanel. Omit callbacks for read-only summary. The panel never edits care-plan clinical prose. No P02-owned page/controller is edited here.
+## Verification
 
-P01: DoseSlotProjection rows and ScheduledDoseStates dose entries expose support_mode (stored compatible values self_managed/prompted/assisted/staff_given). listStatus preserves self_managed. Present taken with prompting/assistance for recorded given outcomes. P01 owns the board, round and recorder presentation.
+Initial 5212bb330 PHP snapshot: 15 tests, one failed assertion, 14 warning-marked tests, 129 assertions, 331.26 seconds. The controlled-order fixture changed classification through the normal order edit hook, invalidating its verified state; the fixture is corrected for the next snapshot. Warnings will be exposed on the focused rerun. Log storage/logs/p03-workflow-20261003-1.log.
 
-P04: MedicationSupport::mode(order, at) is the narrow support policy. A newly created order has no support change and defaults Administer. SupportReviewSources observes order creation and verification-sensitive changes. P04 must not copy medicine support to a replacement order without an explicit supported choice.
+Pure frontend checks: 8 tests passed across support/types.test.ts and support/offline.test.ts (policy caps/CD boundary, NZ gap/repeated minute, earliest invalid step, durable queue restart/replay, stale rejection, actor mismatch, storage failure). Seven prior source files parse without syntax diagnostics; targeted formatting passes. Added validation and queue sources are included in Main's combined frontend verification. Full frontend types/build/browser are reserved for Main.
 
-P08a: SupportFollowupAdapter uses the canonical MedicationFollowupService lifecycle. Required mappings are listed below. No duplicate review table/model ships.
+Next focused PHP snapshot includes MedicationSupportWorkflowTest and updated SelfAdminTest. It tests real P08a batch closure/rollback, durable replay, staged attachment cleanup, archive safety, canonical/privacy/stale boundaries, trigger receipt rollback/retry and the P04 named event seam. No readiness claim until its results and Main's integration/browser checks are recorded.
 
-## Current verification
+Hospital/health-ability changes use the explicit approved trigger bridge; this repository's DoseAwaySources states actual hospital admission/discharge event types are deferred. No hospital event is inferred from free text or planned leave. Main must tie the bridge to attributable canonical hospital/ability evidence when those sources are available.
 
-The pure support policy/time suite passes (3 tests). The focused backend workflow suite is queued through the machine-wide heavy wrapper (one command only). PHP Reflection and Application::inferBasePath resolve this owned worktree. Targeted formatting and syntax checks run locally; full frontend types/build/browser and cross-lane integration remain with Main.
+## Dependency paths and cleanup
 
-## Approved state checklist (implementation pending verification)
+Physical vendor copy: primary/vendor -> owned checkout/vendor. PHP Reflection of MedicationSelfAdminAssessment and Application::inferBasePath resolve this exact owned checkout. No live .env or medication data copied.
 
-- Register, filters, no-assessment residents, permissions, controlled conceal/count, pagination.
-- Person: By medicine / Assessment / Agreement / Changes.
-- Assessment: wishes, participants, five existing scores, six existing checks, support cap, per-medicine support, storage, 3/6/12 month cadence, review, destructive loosening, discard guard, saved pane.
-- Agreement: person/welfare guardian/activated EPOA, signed private attachment or verbal independent witness, ordering/person/staff/storage terms, version history, saved pane.
-- Medicine support: new order within cap; established medicine more staff support; controlled cap; server canonical ownership; stale save rejection.
-- Consent: one/all medicines, request direction, person’s words, NZ date/time, immediate restrictive change, unchanged support for independence request, reassessment follow-up.
-- Projection: historical support, immediate withdrawal on unrecorded doses today, self-managed informational state, recording guard.
+Only dependency junction: owned checkout/node_modules -> C:/Users/steph/Herd/oblivionfindings/node_modules. Shared target is read-only: no install/update/delete. Vite @ alias and inputs, Vitest alias/setup/include, and TS baseUrl/include resolve under the owned checkout; default build output is its public/build. Cleanup must verify the literal link path and remove only the junction itself, never recurse through the target.
 
-## Deliberate difference requiring Main review
-
-Consent offline retains an unsaved draft with a truthful retry/house-lead message. The mockup's simulated queued consent is not reported as saved without a supported canonical sync envelope. No clinical support is changed before server acknowledgement.
-
-Node dependency junction CREATED at the exact documented link/target above. Shared dependencies remain read-only. Build/source paths proven local before creation.
-
-## Follow-up contract revision
-
-Provisional P03 review table/model removed before commit. SupportFollowupAdapter calls canonical P08a ensure(type: reassess_support), visibleQuery and completeFromSource(sourceKey, actorId, context). P08a must add reassess_support to TYPES and LEAD_TYPES, and completeFromSource for source-authorised completion. The current service does not yet implement those two mappings. This is a declared prerequisite, not a second lifecycle. Context support_assessment_id is immutable source ownership; support_trigger and generic reason reveal no controlled medicine.
-
-P09 prerequisite cherry-picked as 390632233 (source 466ce69df). Main should integrate the source dependency once.
-
-Additional shared seam: one saving hook in ClientMedicationAdministration after its existing order lock. It prevents every recording path from fabricating self-managed outcomes. The provider's earlier global saving event was removed because it could run before the model's lock.
+All heavy tests use C:/Users/steph/.claude/heavy-lock.sh, one queued/running command per session and the machine-wide memory gate. Do not modify/bypass it or touch another worker's process.

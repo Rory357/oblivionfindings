@@ -13,6 +13,7 @@ final class MedicationSupportServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
+        Event::listen('App\Events\MedicationReconciliationApplied', fn ($event) => app(SupportReviewSources::class)->reconciliation($event->clientId, $event->reconciliationId));
         Event::listen('eloquent.created: '.ClientMedication::class, fn ($order) => app(SupportReviewSources::class)->order($order));
         Event::listen('eloquent.updated: '.ClientMedication::class, fn ($order) => app(SupportReviewSources::class)->order($order));
         Event::listen('eloquent.created: '.MedicationError::class, fn ($error) => app(SupportReviewSources::class)->error($error));

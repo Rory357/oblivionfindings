@@ -28,6 +28,7 @@ import { toast } from 'sonner';
 export type OfflineAction =
     | 'prn'
     | 'progress_note'
+    | 'support_consent'
     | 'round_admin'
     | 'administration'
     | 'correction'

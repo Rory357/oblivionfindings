@@ -1,5 +1,6 @@
 import {
     EntityContextMenu,
+    EntityKebab,
     useEntityContextMenu,
     type MenuItem,
 } from '@/components/lists/entity-menu';
@@ -220,10 +221,19 @@ export function MedicationSupportPanel({
                     </div>
                     <ul className="space-y-3 md:hidden">
                         {plan.medicines.map((m) => (
-                            <li key={m.id}>
+                            <li
+                                key={m.id}
+                                onContextMenu={(e) => ctx.open(e, m)}
+                            >
                                 <Card>
                                     <CardHeader>
-                                        <CardTitle>{m.name}</CardTitle>
+                                        <div className="flex items-start justify-between gap-3">
+                                            <CardTitle>{m.name}</CardTitle>
+                                            <EntityKebab
+                                                actions={actions(m)}
+                                                label={m.name + ' actions'}
+                                            />
+                                        </div>
                                         <p className="text-caption">
                                             {m.dosage ??
                                                 'Strength not recorded'}

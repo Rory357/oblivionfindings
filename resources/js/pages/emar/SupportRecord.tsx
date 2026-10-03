@@ -15,9 +15,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { useEmarRecordBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTime, toDateInput } from '@/lib/datetime';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     ClipboardList,
     FileSignature,
@@ -58,6 +59,11 @@ export default function SupportRecord({
     staff,
     agreement_history,
 }: Props) {
+    const recordUrl = `/emar/mar?client_id=${support.client_id}&section=support`;
+    const breadcrumbs = useEmarRecordBreadcrumbs({
+        title: support.client_name,
+        href: recordUrl,
+    });
     const [section, setSection] = useState<Section>(() => {
         const s = new URLSearchParams(window.location.search).get('section');
         return ['assessment', 'agreement', 'changes'].includes(s ?? '')
@@ -100,7 +106,11 @@ export default function SupportRecord({
         : null;
     const navigate = (s: Section) => {
         setSection(s);
-        window.history.replaceState(null, '', support.url + '?section=' + s);
+        router.replace({
+            url: support.url + '?section=' + s,
+            preserveState: true,
+            preserveScroll: true,
+        });
     };
     const reasons: Record<string, string> = {
         assessment: 'Assessment completed',
@@ -112,14 +122,8 @@ export default function SupportRecord({
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Home', href: '/dashboard' },
-                { title: 'Medication', href: '/emar' },
-                { title: 'MAR & medicines', href: '/emar/mar' },
-                {
-                    title: 'Support & self-administration',
-                    href: '/emar/self-admin',
-                },
-                { title: support.client_name, href: support.url },
+                ...breadcrumbs,
+                { title: 'Support & self-administration', href: support.url },
             ]}
         >
             <Head title={support.client_name + ' · Medication support'} />
@@ -127,7 +131,7 @@ export default function SupportRecord({
                 <PageHeader
                     variant="profile"
                     icon={User}
-                    backHref="/emar/self-admin"
+                    backHref={recordUrl}
                     title={support.client_name}
                     wrapTitle
                     titleChip={<PlanBadge plan={support} />}
@@ -582,11 +586,13 @@ export default function SupportRecord({
                                         label: 'Medicine',
                                         width: '1.4fr',
                                         cell: (c) =>
+                                            c.medicine_name ??
                                             support.medicines.find(
                                                 (m) =>
                                                     m.id ===
                                                     c.client_medication_id,
-                                            )?.name ?? 'Earlier medicine',
+                                            )?.name ??
+                                            'Earlier medicine',
                                     },
                                     {
                                         key: 'effect',

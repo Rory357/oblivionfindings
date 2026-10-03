@@ -6,9 +6,12 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationFollowup;
+use App\Models\MedicationFollowupEvent;
 use App\Models\MedicationSelfAdminAssessment;
 use App\Models\MedicationSupportAgreement;
 use App\Models\MedicationSupportChange;
+use App\Models\MedicationSupportTriggerOutbox;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -19,19 +22,23 @@ use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\Support\MedicationSupport;
 use App\Services\Medication\Support\SupportFollowupAdapter;
+use App\Services\Medication\Support\SupportReviewDelivery;
 use App\Services\Medication\Support\SupportTime;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use Mockery;
 use Tests\TestCase;
 
-/** Core P03 domain tests; canonical P08a adapter is mocked until Main integrates its prerequisite. */
+/** P03 policy regressions plus explicit real P08a batch integration and atomic rollback. */
 class MedicationSupportWorkflowTest extends TestCase
 {
     use RefreshDatabase;
@@ -56,6 +63,7 @@ class MedicationSupportWorkflowTest extends TestCase
         $this->person = Client::factory()->create(['site_id' => $this->site->id, 'status' => 'active']);
         $this->followups = Mockery::mock(SupportFollowupAdapter::class);
         $this->followups->shouldReceive('open')->andReturn(collect())->byDefault();
+        $this->followups->shouldReceive('openForClients')->andReturn(collect())->byDefault();
         $this->followups->shouldReceive('request')->andReturnNull()->byDefault();
         $this->followups->shouldReceive('completed')->andReturnNull()->byDefault();
         $this->app->instance(SupportFollowupAdapter::class, $this->followups);
@@ -155,7 +163,7 @@ class MedicationSupportWorkflowTest extends TestCase
             $low[$key] = 3;
         }
         $this->actingAs($this->actor)->post('/emar/self-admin', $low)->assertSessionHasErrors('med_scope');
-        $this->medicine->update(['controlled_drug' => true]);
+        $this->medicine->forceFill(['controlled_drug' => true])->saveQuietly(); // Synthetic verified controlled fixture, not an order-edit workflow.
         $this->actingAs($this->actor)->post('/emar/self-admin', $this->payload('prompted'))->assertSessionHasErrors('med_scope');
         $this->assertDatabaseCount('medication_self_admin_assessments', 0);
         $this->assertDatabaseCount('medication_support_changes', 0);
@@ -250,7 +258,7 @@ class MedicationSupportWorkflowTest extends TestCase
     public function test_audit_failure_rolls_back_assessment_and_support_changes(): void
     {
         $recorder = Mockery::mock(MedicationEventRecorder::class);
-        $recorder->shouldReceive('append')->once()->andThrow(new \RuntimeException('Synthetic audit failure'));
+        $recorder->shouldReceive('appendMany')->once()->andThrow(new \RuntimeException('Synthetic audit failure'));
         $this->app->instance(MedicationEventRecorder::class, $recorder);
         $this->withoutExceptionHandling();
         try {
@@ -261,6 +269,165 @@ class MedicationSupportWorkflowTest extends TestCase
         }
         $this->assertDatabaseCount('medication_self_admin_assessments', 0);
         $this->assertDatabaseCount('medication_support_changes', 0);
+    }
+
+    public function test_assessment_retry_is_durable_and_changed_retry_is_rejected(): void
+    {
+        $data = [...$this->payload(), 'client_request_uuid' => (string) Str::uuid()];
+        $this->actingAs($this->actor)->post('/emar/self-admin', $data)->assertSessionHasNoErrors();
+        $this->actingAs($this->actor)->post('/emar/self-admin', $data)->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('medication_self_admin_assessments', 1);
+        $this->assertDatabaseCount('medication_support_changes', 1);
+        $this->actingAs($this->actor)->post('/emar/self-admin', [...$data, 'wishes_to_self_administer' => false])->assertSessionHasErrors('client_request_uuid');
+        $this->assertDatabaseCount('medication_self_admin_assessments', 1);
+    }
+
+    public function test_real_followups_are_idempotent_and_reassessment_closes_the_owned_batch(): void
+    {
+        $this->app->forgetInstance(SupportFollowupAdapter::class);
+        $a = $this->assess('assisted');
+        DB::transaction(function () use ($a) {
+            Client::query()->whereKey($this->person->id)->lockForUpdate()->firstOrFail();
+            foreach (['hospital', 'hospital', 'decline'] as $kind) {
+                app(MedicationSupport::class)->trigger($a, $kind, 'synthetic-'.$kind, 'Reassess support.');
+            }
+        });
+        $this->assertDatabaseCount('medication_followups', 2);
+        $this->actingAs($this->actor)->get('/emar/self-admin/clients/'.$this->person->id)->assertInertia(fn (Assert $p) => $p->where('support.state', 'reassess')->has('support.reviews', 2));
+        $data = [...$this->payload('assisted'), 'supersedes_id' => $a->id, 'client_request_uuid' => (string) Str::uuid()];
+        $this->actingAs($this->actor)->post('/emar/self-admin', $data)->assertSessionHasNoErrors();
+        $this->actingAs($this->actor)->post('/emar/self-admin', $data)->assertSessionHasNoErrors();
+        $this->assertSame(2, MedicationFollowup::query()->whereNotNull('completed_at')->count());
+        $this->assertSame(2, MedicationFollowupEvent::query()->where('action', 'source_completed')->count());
+        $this->assertDatabaseCount('medication_self_admin_assessments', 2);
+    }
+
+    public function test_real_followup_closure_rolls_back_with_the_assessment_on_audit_failure(): void
+    {
+        $this->app->forgetInstance(SupportFollowupAdapter::class);
+        $a = $this->assess();
+        DB::transaction(function () use ($a) {
+            Client::query()->whereKey($this->person->id)->lockForUpdate()->firstOrFail();
+            app(MedicationSupport::class)->trigger($a, 'asked', 'synthetic-request', 'Reassess support.');
+        });
+        $recorder = Mockery::mock(MedicationEventRecorder::class);
+        $recorder->shouldReceive('appendMany')->once()->andThrow(new \RuntimeException('Synthetic batch failure'));
+        $this->app->instance(MedicationEventRecorder::class, $recorder);
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($this->actor)->post('/emar/self-admin', [...$this->payload(), 'supersedes_id' => $a->id]);
+            $this->fail('Expected atomic audit failure');
+        } catch (\RuntimeException $error) {
+            $this->assertSame('Synthetic batch failure', $error->getMessage());
+        }
+        $this->assertDatabaseCount('medication_self_admin_assessments', 1);
+        $this->assertSame(0, MedicationFollowup::query()->whereNotNull('completed_at')->count());
+        $this->assertSame(0, MedicationFollowupEvent::query()->where('action', 'source_completed')->count());
+    }
+
+    public function test_archiving_keeps_the_record_and_immediately_restores_staff_support(): void
+    {
+        $a = $this->assess('self_managed');
+        $this->agree($a);
+        $this->actingAs($this->actor)->delete('/emar/self-admin/'.$a->id)->assertSessionHasNoErrors();
+        $this->assertSoftDeleted('medication_self_admin_assessments', ['id' => $a->id]);
+        $this->assertSame('staff_given', app(MedicationSupport::class)->mode($this->medicine));
+        $this->assertNull(app(MedicationSupport::class)->current($this->person->id));
+    }
+
+    public function test_queued_consent_json_replay_does_not_duplicate_clinical_changes(): void
+    {
+        $a = $this->assess('self_managed');
+        $this->agree($a);
+        $data = ['direction' => 'less', 'said' => 'Staff please.', 'occurred_at' => '2026-10-03T06:59+13:00',
+            'client_request_uuid' => (string) Str::uuid(), 'queued_offline' => true];
+        $this->actingAs($this->actor)->postJson('/emar/self-admin/'.$a->id.'/consent', $data)->assertOk()->assertJsonPath('sync.status', 'processed');
+        $this->actingAs($this->actor)->postJson('/emar/self-admin/'.$a->id.'/consent', $data)->assertOk()->assertJsonPath('sync.status', 'duplicate');
+        $this->assertSame(1, MedicationSupportChange::query()->where('reason', 'consent_withdrawn')->count());
+        $this->assertSame('staff_given', app(MedicationSupport::class)->mode($this->medicine));
+    }
+
+    public function test_failed_agreement_audit_removes_only_the_staged_attachment(): void
+    {
+        Storage::fake('private');
+        $a = $this->assess('self_managed');
+        $recorder = Mockery::mock(MedicationEventRecorder::class);
+        $recorder->shouldReceive('appendMany')->once()->andThrow(new \RuntimeException('Synthetic agreement failure'));
+        $this->app->instance(MedicationEventRecorder::class, $recorder);
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($this->actor)->post('/emar/self-admin/'.$a->id.'/agreement', [
+                'agreed_by_role' => 'person', 'method' => 'signed', 'attachment' => UploadedFile::fake()->create('agreement.pdf', 1, 'application/pdf'),
+                'ordering_responsibility' => 'person', 'person_responsibilities' => 'Takes vitamin.', 'staff_responsibilities' => 'Checks supply.', 'confirm_loosening' => true]);
+            $this->fail('Expected agreement audit failure');
+        } catch (\RuntimeException $error) {
+            $this->assertSame('Synthetic agreement failure', $error->getMessage());
+        }
+        $this->assertDatabaseCount('medication_support_agreements', 0);
+        $this->assertNull($a->fresh()->support_agreement_id);
+        $this->assertSame([], Storage::disk('private')->allFiles());
+    }
+
+    public function test_trigger_delivery_failure_keeps_the_source_and_receipt_and_retries_once(): void
+    {
+        $a = $this->assess();
+        DB::transaction(function () {
+            Client::query()->whereKey($this->person->id)->lockForUpdate()->firstOrFail();
+            $this->medicine->update(['dosage' => '2 synthetic units']);
+        });
+        $receipt = MedicationSupportTriggerOutbox::query()->sole();
+        $this->followups->shouldReceive('request')->once()->andThrow(new \RuntimeException('Synthetic ledger unavailable'));
+        $delivery = app(SupportReviewDelivery::class);
+        $this->assertFalse($delivery->deliver($receipt->id));
+        $this->assertSame('2 synthetic units', $this->medicine->fresh()->dosage);
+        $this->assertNull($receipt->fresh()->delivered_at);
+        $this->assertSame(1, $receipt->fresh()->attempts);
+        $this->app->forgetInstance(SupportFollowupAdapter::class);
+        $this->assertTrue($delivery->deliver($receipt->id));
+        $this->assertTrue($delivery->deliver($receipt->id));
+        $this->assertDatabaseCount('medication_followups', 1);
+        $this->assertNotNull($receipt->fresh()->delivered_at);
+        $work = MedicationFollowup::query()->sole();
+        $this->assertTrue($work->due_at->equalTo($receipt->occurred_at->setTimezone('Pacific/Auckland')->addDays(7)->utc()));
+    }
+
+    public function test_trigger_receipt_failure_rolls_back_the_source_transaction(): void
+    {
+        $this->assess();
+        $old = $this->medicine->dosage;
+        $delivery = Mockery::mock(SupportReviewDelivery::class);
+        $delivery->shouldReceive('enqueue')->once()->andThrow(new \RuntimeException('Synthetic receipt unavailable'));
+        $this->app->instance(SupportReviewDelivery::class, $delivery);
+        try {
+            DB::transaction(function () {
+                Client::query()->whereKey($this->person->id)->lockForUpdate()->firstOrFail();
+                $this->medicine->update(['dosage' => '3 synthetic units']);
+            });
+            $this->fail('Expected receipt failure');
+        } catch (\RuntimeException $error) {
+            $this->assertSame('Synthetic receipt unavailable', $error->getMessage());
+        }
+        $this->assertSame($old, $this->medicine->fresh()->dosage);
+        $this->assertDatabaseCount('medication_support_trigger_outbox', 0);
+    }
+
+    public function test_reconciliation_event_retries_preserve_one_canonical_work_identity(): void
+    {
+        $this->app->forgetInstance(SupportFollowupAdapter::class);
+        $this->assess();
+        // The named event contract is the immutable P04 MedicationReconciliationApplied class.
+        // P04's full apply decision regression runs in Main's combined checkout.
+        DB::transaction(function () {
+            Client::query()->whereKey($this->person->id)->lockForUpdate()->firstOrFail();
+            $event = (object) ['clientId' => $this->person->id, 'reconciliationId' => 1001, 'actorId' => $this->actor->id];
+            Event::dispatch('App\\Events\\MedicationReconciliationApplied', [$event]);
+            Event::dispatch('App\\Events\\MedicationReconciliationApplied', [$event]);
+        });
+        $this->assertDatabaseCount('medication_support_trigger_outbox', 1);
+        $receipt = MedicationSupportTriggerOutbox::query()->sole();
+        $this->assertTrue(app(SupportReviewDelivery::class)->deliver($receipt->id));
+        $this->assertDatabaseCount('medication_followups', 1);
+        $this->assertSame($receipt->assessment_id, MedicationFollowup::query()->sole()->context['support_assessment_id']);
     }
 
     public function test_nz_dst_gap_and_ambiguous_minute_are_not_silently_shifted(): void

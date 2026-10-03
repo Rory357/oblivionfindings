@@ -2,7 +2,6 @@
 
 namespace App\Services\Medication\Support;
 
-use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationError;
@@ -18,7 +17,7 @@ final class SupportReviewSources
     {
         if ($order->wasRecentlyCreated || array_intersect(array_keys($order->getChanges()), ClientMedication::verificationSensitiveFields()) !== []) {
             $this->forClient((int) $order->client_id, function ($a) use ($order) {
-                app(MedicationSupport::class)->trigger($a, 'order', 'support-order:'.$order->id.':'.hash('sha256', json_encode([$order->getChanges(), $order->updated_at?->toIso8601String()])), 'A new or changed order — reassess support. New medicines stay Administer until set.');
+                app(SupportReviewDelivery::class)->enqueue($a, 'order', 'support-order:'.$order->id.':'.hash('sha256', json_encode([$order->getChanges(), $order->updated_at?->toIso8601String()])), 'A new or changed order — reassess support. New medicines stay Administer until set.');
             });
         }
     }
@@ -31,7 +30,7 @@ final class SupportReviewSources
         if ($error->client_medication_id && ! ClientMedication::withTrashed()->whereKey($error->client_medication_id)->where('client_id', $error->client_id)->exists()) {
             return;
         }
-        $this->forClient((int) $error->client_id, fn ($a) => app(MedicationSupport::class)->trigger($a, 'error', 'support-error:'.$error->id, 'A medication error or incident — reassess support.'));
+        $this->forClient((int) $error->client_id, fn ($a) => app(SupportReviewDelivery::class)->enqueue($a, 'error', 'support-error:'.$error->id, 'A medication error or incident — reassess support.'));
     }
 
     public function administration(ClientMedicationAdministration $record): void
@@ -44,7 +43,7 @@ final class SupportReviewSources
             $today = $now->setTimezone('Pacific/Auckland')->toDateString();
             $counts = app(DoseSlotProjection::class)->stateCounts(DoseSlotReaderScope::internal([(int) $a->client_id]), $now->setTimezone('Pacific/Auckland')->subDays(6)->toDateString(), $today, $now);
             if (($counts['refused'] ?? 0) + ($counts['missed'] ?? 0) + ($counts['not_recorded'] ?? 0) >= 3) {
-                app(MedicationSupport::class)->trigger($a, 'refusals', 'support-refusals:'.$a->id.':'.$today, 'Refusals or missed doses (3 in 7 days) — reassess support.');
+                app(SupportReviewDelivery::class)->enqueue($a, 'refusals', 'support-refusals:'.$a->id.':'.$today, 'Refusals or missed doses (3 in 7 days) — reassess support.');
             }
         });
     }
@@ -60,7 +59,7 @@ final class SupportReviewSources
                         if ($current->id !== $a->id) {
                             return;
                         }
-                        app(MedicationSupport::class)->trigger($current, 'review_date', 'support-review-date:'.$a->id.':'.$a->reassessment_date->toDateString(), 'The support plan review date passed — support stays as it is until reassessed.');
+                        app(SupportReviewDelivery::class)->enqueue($current, 'review_date', 'support-review-date:'.$a->id.':'.$a->reassessment_date->toDateString(), 'The support plan review date passed — support stays as it is until reassessed.');
                         $count++;
                     });
                 }
@@ -69,16 +68,25 @@ final class SupportReviewSources
         return $count;
     }
 
+    public function reconciliation(int $clientId, int $reconciliationId): void
+    {
+        $this->forClient($clientId, fn ($a) => app(SupportReviewDelivery::class)->enqueue($a, 'order', 'support-reconciliation:'.$reconciliationId, 'A medication reconciliation was applied — reassess support.'));
+    }
+
     private function forClient(int $clientId, \Closure $callback): void
     {
-        DB::afterCommit(fn () => DB::transaction(function () use ($clientId, $callback) {
-            if (! Client::query()->whereKey($clientId)->lockForUpdate()->first()) {
-                return;
-            }
-            $assessment = app(MedicationSupport::class)->current($clientId, true);
+        // Reuse the source transaction. No additional aggregate/head locks in a model observer.
+        // Synchronous receipt failure rolls back canonical dose/order/error/reconciliation writes.
+        $write = function () use ($clientId, $callback) {
+            $assessment = app(MedicationSupport::class)->current($clientId);
             if ($assessment) {
                 $callback($assessment);
             }
-        }, 3));
+        };
+        if (DB::transactionLevel() > 0) {
+            $write();
+        } else {
+            DB::transaction($write, 3);
+        }
     }
 }

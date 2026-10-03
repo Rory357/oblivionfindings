@@ -118,7 +118,12 @@ export type SupportPlan = {
     concealed_count: number;
     agreement: Agreement | null;
     agreement_needed: boolean;
-    reviews: { id: number; trigger: string; reason: string; due_at: string }[];
+    reviews: {
+        id: number | string;
+        trigger: string;
+        reason: string;
+        due_at: string;
+    }[];
     can_assess: boolean;
     can_set_controlled: boolean;
     can_record_consent: boolean;
@@ -138,6 +143,7 @@ export type SupportHistory = Pick<
         assessor_name: string | null;
     };
 export type Change = {
+    medicine_name: string | null;
     id: number;
     client_medication_id: number;
     mode: SupportMode;

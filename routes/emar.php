@@ -345,7 +345,7 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         // Self-Admin Assessments
         Route::post('/self-admin', [MedicationSupportController::class, 'store'])->name('emar.self_admin.store');
         Route::put('/self-admin/{assessment}', [MedicationSupportController::class, 'update'])->name('emar.self_admin.update');
-        Route::delete('/self-admin/{assessment}', [EmarController::class, 'destroySelfAdmin'])->name('emar.self_admin.destroy');
+        Route::delete('/self-admin/{assessment}', [MedicationSupportController::class, 'destroy'])->name('emar.self_admin.destroy');
 
         // Medications CRUD
         Route::post('/medications', [EmarController::class, 'storeMedication'])->name('emar.medications.store');

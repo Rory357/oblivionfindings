@@ -984,3 +984,4 @@ Illuminate\Support\Facades\Schedule::command('reports:run-schedules')->everyFive
 app(Schedule::class)->command('emar:workflow-followups')->everyMinute()->withoutOverlapping()->onOneServer();
 
 Illuminate\Support\Facades\Schedule::command('emar:support-reviews')->dailyAt('06:00')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
+Illuminate\Support\Facades\Schedule::command('emar:support-review-delivery')->everyMinute()->withoutOverlapping()->onOneServer();

@@ -50,26 +50,65 @@ final class MedicationSupport
     /** Public component/payload contract for P02 and the read-only care-plan summary. */
     public function summary(Client $client, User $viewer): array
     {
-        $a = $this->current((int) $client->id);
-        $all = ClientMedication::query()->active()->where('client_id', $client->id)->orderBy('name')->get();
+        return $this->summaries(collect([$client]), $viewer)->first();
+    }
+
+    /** One bounded query set for the register; no query per person or medicine. */
+    public function summaries(Collection $clients, User $viewer): Collection
+    {
+        if ($clients->isEmpty()) {
+            return collect();
+        }
+        (new \Illuminate\Database\Eloquent\Collection($clients->all()))->loadMissing('site:id,name');
+        $ids = $clients->pluck('id')->all();
+        $assessments = MedicationSelfAdminAssessment::query()->whereIn('client_id', $ids)
+            ->whereNotIn('id', MedicationSelfAdminAssessment::withTrashed()->whereIn('client_id', $ids)->whereNotNull('supersedes_id')->select('supersedes_id'))
+            ->get()->groupBy('client_id');
+        $all = ClientMedication::query()->active()->whereIn('client_id', $ids)->orderBy('name')->get();
+        $medicines = $all->groupBy('client_id');
+        $changes = MedicationSupportChange::query()->whereIn('client_id', $ids)->whereIn('client_medication_id', $all->pluck('id'))
+            ->where('effective_at', '<=', now('UTC'))
+            ->whereNotExists(fn ($newer) => $newer->selectRaw('1')->from('medication_support_changes as newer')
+                ->whereColumn('newer.client_id', 'medication_support_changes.client_id')
+                ->whereColumn('newer.client_medication_id', 'medication_support_changes.client_medication_id')
+                ->where('newer.effective_at', '<=', now('UTC'))->where(fn ($later) => $later
+                ->whereColumn('newer.effective_at', '>', 'medication_support_changes.effective_at')
+                ->orWhere(fn ($equal) => $equal->whereColumn('newer.effective_at', 'medication_support_changes.effective_at')
+                    ->whereColumn('newer.id', '>', 'medication_support_changes.id'))))
+            ->get()->groupBy('client_id');
+        $agreements = MedicationSupportAgreement::query()->whereIn('id', $assessments->flatten(1)->pluck('support_agreement_id')->filter())->get()->keyBy('id');
+        $reviews = app(SupportFollowupAdapter::class)->openForClients($ids, $viewer)->groupBy('client_id');
+
+        return $clients->map(function ($client) use ($viewer, $assessments, $medicines, $changes, $agreements, $reviews) {
+            $current = $assessments->get($client->id, collect());
+            abort_if($current->count() > 1, 409, 'This support record needs reconciliation before it can be used.');
+            $a = $current->first();
+            $agreement = $agreements->get($a?->support_agreement_id);
+            if ($agreement && (int) $agreement->client_id !== (int) $client->id) {
+                $agreement = null;
+            }
+
+            return $this->summaryFrom($client, $viewer, $a, $medicines->get($client->id, collect()),
+                $changes->get($client->id, collect())->keyBy('client_medication_id'), $agreement, $reviews->get($client->id, collect()));
+        });
+    }
+
+    private function summaryFrom(Client $client, User $viewer, ?MedicationSelfAdminAssessment $a, Collection $all, Collection $changes, ?MedicationSupportAgreement $agreement, Collection $reviews): array
+    {
         $visible = $all->filter(fn ($m) => ! $m->controlled_drug || $viewer->canDo('medications.controlled.view'));
         $scope = collect($a?->med_scope ?? [])->keyBy('med_id');
-        $changes = MedicationSupportChange::query()->where('client_id', $client->id)->whereIn('client_medication_id', $visible->pluck('id'))
-            ->where('effective_at', '<=', now('UTC'))->orderByDesc('effective_at')->orderByDesc('id')->get()->unique('client_medication_id')->keyBy('client_medication_id');
-        $agreement = $this->agreement($a);
-        $reviews = app(SupportFollowupAdapter::class)->open($client, $viewer);
         $today = now('Pacific/Auckland')->toDateString();
         $state = ! $a ? 'none' : ($reviews->isNotEmpty() ? 'reassess' : (! $a->reassessment_date ? 'unknown' : ($a->reassessment_date->toDateString() < $today ? 'overdue' : ($a->reassessment_date->toDateString() <= now('Pacific/Auckland')->addDays(30)->toDateString() ? 'soon' : 'current'))));
 
         return [
             'client_id' => $client->id, 'client_name' => trim($client->first_name.' '.$client->last_name),
             'site_id' => $client->site_id, 'site_name' => $client->site?->name,
-            'state' => $state, 'cap' => SupportMode::cap($a?->outcome), 'assessment' => $a ? $a->only([
+            'state' => $state, 'cap' => SupportMode::cap($a?->outcome), 'assessment' => $a ? [...$a->only([
                 'id', 'supersedes_id', 'outcome', 'wishes_to_self_administer', 'people_involved', ...self::SCORES,
                 'can_identify_medications', 'can_read_labels', 'can_open_packaging', 'can_manage_timing', 'can_store_safely',
                 'willing_to_self_admin', 'risk_factors', 'support_needed', 'support_adjustments', 'storage_location', 'safe_storage_notes',
                 'assessor_notes', 'assessment_date', 'reassessment_date', 'reassessment_interval_months', 'reassessment_trigger',
-            ]) : null,
+            ]), 'people_involved' => $a->people_involved ?? [], 'support_adjustments' => $a->support_adjustments ?? []] : null,
             'medicines' => $visible->map(fn ($m) => [
                 'id' => $m->id, 'name' => $m->name, 'dosage' => $m->dosage, 'controlled' => (bool) $m->controlled_drug,
                 'mode' => $changes->get($m->id)?->mode ?? 'staff_given', 'requested_mode' => $scope->get($m->id)['scope'] ?? null,
@@ -137,11 +176,20 @@ final class MedicationSupport
             $effective = SupportMode::needsAgreement($entry['scope']) && ! $agreement ? 'staff_given' : $entry['scope'];
             $this->change($order, $assessment, $actor, $effective, 'assessment');
         }
-        if ($prior) {
-            app(SupportFollowupAdapter::class)->completed($prior, $actor, (int) $assessment->id);
-        }
 
         return $assessment;
+    }
+
+    /** Preserve archive compatibility and immediately remove any current independence. */
+    public function archive(Client $client, User $actor, MedicationSelfAdminAssessment $assessment): void
+    {
+        $this->assertCurrent($client, $assessment);
+        $orders = ClientMedication::query()->active()->where('client_id', $client->id)->orderBy('id')->lockForUpdate()->get();
+        abort_if($orders->contains(fn ($m) => $m->controlled_drug) && ! $this->canSetControlled($actor), 404);
+        foreach ($orders as $order) {
+            $this->change($order, $assessment, $actor, 'staff_given', 'assessment_archived');
+        }
+        $assessment->delete();
     }
 
     public function setSupport(Client $client, User $actor, MedicationSelfAdminAssessment $assessment, array $entries, bool $confirm): void

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { supportTimeCandidates } from './time';
 import { allowedModes, assessmentCap } from './types';
+import { firstAssessmentError } from './validation';
 
 describe('approved medication support rules', () => {
     it('preserves the existing five-score boundaries and consent-first outcome', () => {
@@ -41,5 +42,29 @@ describe('approved medication support rules', () => {
         expect(supportTimeCandidates('2026-10-03T07:19')).toEqual([
             '2026-10-03T07:19+13:00',
         ]);
+    });
+});
+
+describe('assessment field routing', () => {
+    it('opens the earliest invalid step including nested server errors', () => {
+        expect(
+            firstAssessmentError({
+                storage_location: 'Choose',
+                confirmed_with_person: 'Confirm',
+            }),
+        ).toEqual({ step: 3, field: 'storage_location' });
+        expect(
+            firstAssessmentError({ reassessment_interval_months: 'Choose' })
+                .step,
+        ).toBe(3);
+        expect(
+            firstAssessmentError({ confirmed_with_person: 'Confirm' }).step,
+        ).toBe(4);
+        expect(
+            firstAssessmentError({
+                'med_scope.0.scope': 'Not allowed',
+                storage_location: 'Choose',
+            }),
+        ).toEqual({ step: 2, field: 'med_scope' });
     });
 });

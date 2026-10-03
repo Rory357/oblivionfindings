@@ -1,5 +1,7 @@
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import {
     EntityContextMenu,
+    EntityKebab,
     useEntityContextMenu,
     type MenuItem,
 } from '@/components/lists/entity-menu';
@@ -11,12 +13,12 @@ import {
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
-    PageHeaderRail,
 } from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTime, toDateInput } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
@@ -81,17 +83,7 @@ export default function SelfAdmin({
             : []),
     ];
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Home', href: '/dashboard' },
-                { title: 'Medication', href: '/emar' },
-                { title: 'MAR & medicines', href: '/emar/mar' },
-                {
-                    title: 'Support & self-administration',
-                    href: '/emar/self-admin',
-                },
-            ]}
-        >
+        <AppLayout breadcrumbs={useEmarBreadcrumbs()}>
             <Head title="Support & self-administration" />
             <div className="flex flex-col gap-5">
                 <PageHeader
@@ -215,19 +207,7 @@ export default function SelfAdmin({
                             </span>
                         </>
                     }
-                    rail={
-                        <PageHeaderRail
-                            items={[
-                                {
-                                    key: 'support',
-                                    label: 'Support & self-administration',
-                                },
-                            ]}
-                            value="support"
-                            onSelect={() => {}}
-                            showFind={false}
-                        />
-                    }
+                    rail={<EmarHubRail />}
                 />
                 <ListCaption
                     title="Support register"
@@ -341,12 +321,24 @@ export default function SelfAdmin({
                         </div>
                         <ul className="space-y-3 md:hidden">
                             {register.map((p) => (
-                                <li key={p.client_id}>
+                                <li
+                                    key={p.client_id}
+                                    onContextMenu={(e) => ctx.open(e, p)}
+                                >
                                     <Card>
                                         <CardHeader>
-                                            <CardTitle>
-                                                {p.client_name}
-                                            </CardTitle>
+                                            <div className="flex items-start justify-between gap-3">
+                                                <CardTitle>
+                                                    {p.client_name}
+                                                </CardTitle>
+                                                <EntityKebab
+                                                    actions={actions(p)}
+                                                    label={
+                                                        p.client_name +
+                                                        ' actions'
+                                                    }
+                                                />
+                                            </div>
                                             <p className="text-caption">
                                                 {p.site_name}
                                             </p>
