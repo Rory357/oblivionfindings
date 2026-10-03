@@ -77,7 +77,7 @@ it('requires a purpose and gives the auditor audit-only export rights', function
 it('rejects a multi-person PDF when an included person moves during rendering', function () {
     p09Medicine($this->person);
     $other = Site::factory()->create(['is_active' => true]);
-    $renderer = Mockery::mock();
+    $renderer = Mockery::mock(Barryvdh\DomPDF\PDF::class);
     Pdf::shouldReceive('setOption')->once()->andReturn($renderer);
     $renderer->shouldReceive('loadView')->once()->andReturnSelf();
     $renderer->shouldReceive('setPaper')->once()->andReturnSelf();

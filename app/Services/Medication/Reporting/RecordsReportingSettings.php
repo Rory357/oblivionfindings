@@ -27,9 +27,9 @@ final class RecordsReportingSettings
         return new MedicationSettingGroup('records', MedicationSettingsRegistry::VIEW_RULES, 'From the next error closed; existing records are kept', 'medications.records_reporting.updated', [
             $make('retention', self::RETENTION, 'Keep medication records for', ['y10' => '10 years after the person’s last service', 'y15' => '15 years after the person’s last service', 'y20' => '20 years after the person’s last service'], 'y10', ['y10', 'y15', 'y20']),
             $make('sac', self::SAC, 'Add SAC ratings when an error is closed', ['off' => 'Off', 'on' => 'On'], 'off', ['off', 'on']),
-            $make('sac_death', self::SAC.'.death', 'Death', $sacOptions, '1'),
-            $make('sac_moderate', self::SAC.'.moderate', 'Moderate harm', $sacOptions, '3'),
-            $make('sac_minor', self::SAC.'.minor', 'Minor or no harm', $sacOptions, '4'),
+            new Definition('records', 'sac_death', self::SAC.'.death', Definition::SCOPE_ORGANISATION, 'records', 'Death', $sacOptions, '1', pairedWith: 'sac'),
+            new Definition('records', 'sac_moderate', self::SAC.'.moderate', Definition::SCOPE_ORGANISATION, 'records', 'Moderate harm', $sacOptions, '3', pairedWith: 'sac'),
+            new Definition('records', 'sac_minor', self::SAC.'.minor', Definition::SCOPE_ORGANISATION, 'records', 'Minor or no harm', $sacOptions, '4', pairedWith: 'sac'),
         ]);
     }
 

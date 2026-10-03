@@ -17,7 +17,7 @@ export function RecordsReporting({ q, show }: { q: string; show: string }) {
             </SettingGroup>
             <SettingGroup icon={ShieldCheck} title="SAC ratings" caption="Confirmed by the person closing each error">
                 <GroupRow id="records.sac" label="Add SAC ratings when an error is closed" state={state('sac')} hidden={!shown(show, q, 'sac', 'SAC error rating')} control={<OnOff id="records.sac" checked={value('sac') === 'on'} onChange={(v) => edit('sac', v ? 'on' : 'off')} disabled={disabled} />} hint="Near misses have no SAC. A proposed mapping never replaces confirmation at close." />
-                {value('sac') === 'on' && ['sac_death', 'sac_moderate', 'sac_minor'].map((key) => <GroupRow key={key} id={`records.${key}`} label={def(key)?.label ?? key} state={state(key)}><Choice value={value(key)} onChange={(v) => edit(key, v)} options={options(key)} disabled={disabled} /></GroupRow>)}
+                {value('sac') === 'on' && ['sac_death', 'sac_moderate', 'sac_minor'].map((key) => <GroupRow key={key} id={`records.${key}`} label={def(key)?.label ?? key} state={state(key) === 'changed' ? 'changed' : state('sac')}><Choice value={value(key)} onChange={(v) => edit(key, v)} options={options(key)} disabled={disabled} /></GroupRow>)}
                 {value('sac') === 'on' && <GroupRow id="records.severe" label="Severe or permanent harm" hint="The closer chooses SAC 1 or SAC 2. Nothing is preselected." />}
             </SettingGroup>
         </GroupGrid>

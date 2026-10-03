@@ -61,6 +61,7 @@ class ClinicalGovernanceAutomationService
             'HCG-002' => ['target_direction' => 'below'],
             'HCG-003' => ['target_direction' => 'below'],
             'HCG-004' => ['target_direction' => 'below'],
+            'HCG-005' => ['target_direction' => 'below'],
         ];
     }
 
@@ -85,6 +86,7 @@ class ClinicalGovernanceAutomationService
             'HCG-002' => $clinical,
             'HCG-003' => $clinical,
             'HCG-004' => $clinical,
+            'HCG-005' => $emar,
         ];
     }
 
@@ -167,7 +169,7 @@ class ClinicalGovernanceAutomationService
                 'indicator_id' => $indicator->id,
                 'indicator_code' => $indicator->indicator_code,
                 'value' => $value,
-                'status' => $indicator->getStatus($value),
+                'status' => match ($indicator->indicator_code) { 'HCG-001' => app(\App\Services\Medication\Reporting\MedicationGovernanceReports::class)->status((int) $value), 'HCG-005' => 'reported', default => $indicator->getStatus($value) },
                 'trend' => $this->trend($value, $previousValue),
                 'previous_value' => $previousValue,
                 'source_href' => $definition['source_href'],
@@ -231,19 +233,22 @@ class ClinicalGovernanceAutomationService
             [
                 'indicator_code' => 'HCG-001',
                 'category' => 'medication_errors',
-                'name' => 'Medication errors',
-                'definition' => 'Medication errors reported in eMAR.',
+                'name' => 'Medication errors that reached the person',
+                'definition' => 'Recorded medication errors that reached the person, excluding accounts marked in error.',
                 'data_source' => 'eMAR',
                 'unit' => 'count',
-                'target_value' => 0,
-                'warning_threshold' => 1,
-                'critical_threshold' => 3,
+                'target_value' => app(\App\Services\Medication\Reporting\MedicationGovernanceReports::class)->target(),
+                'warning_threshold' => null,
+                'critical_threshold' => null,
                 'frequency' => self::PERIOD_TYPE_MONTHLY,
-                'source_href' => "/emar/errors?date_from={$dateFrom}&date_to={$dateTo}",
-                'source_label' => 'Open medication errors',
-                'resolver' => fn (CarbonImmutable $start, CarbonImmutable $end): int => MedicationError::query()
-                    ->whereBetween('reported_at', $this->utcBounds($start, $end))
-                    ->count(),
+                'source_href' => "/emar/reports?report=errors&period=custom&date_from={$dateFrom}&date_to={$dateTo}&reached=yes",
+                'source_label' => 'Open recorded errors',
+                'resolver' => fn (CarbonImmutable $start, CarbonImmutable $end): int => app(\App\Services\Medication\Reporting\MedicationGovernanceReports::class)->count($start, $end, 'yes'),
+            ],
+            [
+                'indicator_code' => 'HCG-005', 'category' => 'medication_errors', 'name' => 'Near misses reported', 'definition' => 'Medication errors stopped before reaching the person, excluding accounts marked in error.', 'data_source' => 'eMAR', 'unit' => 'count', 'target_value' => null, 'warning_threshold' => null, 'critical_threshold' => null, 'frequency' => self::PERIOD_TYPE_MONTHLY,
+                'source_href' => "/emar/reports?report=errors&period=custom&date_from={$dateFrom}&date_to={$dateTo}&reached=no", 'source_label' => 'Open recorded near misses',
+                'resolver' => fn (CarbonImmutable $start, CarbonImmutable $end): int => app(\App\Services\Medication\Reporting\MedicationGovernanceReports::class)->count($start, $end, 'no'),
             ],
             [
                 'indicator_code' => 'HCG-002',

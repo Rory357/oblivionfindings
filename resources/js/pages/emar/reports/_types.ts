@@ -1,10 +1,10 @@
 export type Row = Record<string, string | number | boolean | null | Record<string, unknown>>;
 export type Person = { id: number; name: string };
-export type Filters = { view: 'standard' | 'audit' | 'exports'; report: string; sub: string; period: string; date_from: string; date_to: string; site_id: number | null; client_id: number | null; kind: string; q: string };
+export type Filters = { view: 'standard' | 'audit' | 'exports'; report: string; sub: string; period: string; date_from: string; date_to: string; site_id: number | null; client_id: number | null; kind: string; q: string; reached?: string };
 export type ExportOption = { type: string; label: string; format: string; description: string; allowed: boolean };
 export type Props = {
     filters: Filters; reports: Record<string, string>; sites: Person[]; people: Person[];
-    data: { totals: Record<string, number | null>; notice: string | null }; page: { data: Row[]; total: number; last_page: number; links: { url: string | null; label: string; active: boolean }[] } | null;
+    data: { totals: Record<string, number | null>; notice: string | null; weeks?: Row[] }; page: { data: Row[]; total: number; last_page: number; links: { url: string | null; label: string; active: boolean }[] } | null;
     locked: string | null; finance: boolean; can: { audit: boolean; controlled: boolean; verify: boolean };
     exports: ExportOption[]; purposes: Record<string, string>; as_at: string;
 };

@@ -7,6 +7,10 @@ use App\Domain\Governance\Models\ClinicalGovernanceSnapshot;
 use App\Domain\Governance\Services\ClinicalGovernanceAutomationService;
 use App\Domain\Governance\Support\GovernanceLabels;
 use App\Http\Controllers\Controller;
+use App\Models\AppSetting;
+use App\Services\Medication\Reporting\MedicationGovernanceReports;
+use App\Services\Medication\Reporting\MedicationReportAccess;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -36,7 +40,10 @@ class ClinicalGovernanceController extends Controller
             'sourceHint' => $this->automationService->sourceHint(),
             'filters' => array_filter([
                 'status' => in_array($status, self::STATUS_FILTERS, true) ? $status : null,
+                'site_id' => $request->integer('site_id') ?: null,
             ]),
+            'medicationScope' => $this->medicationScope($request),
+            'canConfigureMedicationTarget' => $request->user()->canDo('governance.clinical.manage'),
         ]);
     }
 
@@ -123,6 +130,7 @@ class ClinicalGovernanceController extends Controller
                 ->values(),
             'indicators' => $this->mapIndicators($indicators),
             'sourceHint' => $this->automationService->sourceHint(),
+            'medicationScope' => $this->medicationScope($request),
         ]);
     }
 
@@ -154,9 +162,12 @@ class ClinicalGovernanceController extends Controller
      */
     protected function mapSnapshot(ClinicalGovernanceSnapshot $snapshot, Request $request, ?array $sourcesInUse = null): array
     {
+        $request->validate(['site_id' => ['nullable', 'integer', 'min:1']]);
+        $medication = $snapshot->period_start && $snapshot->period_end ? app(MedicationGovernanceReports::class)->values($request->user(), $snapshot->period_start->toDateString(), $snapshot->period_end->toDateString(), $request->integer('site_id') ?: null) : array_fill_keys(['HCG-001', 'HCG-005'], ['value' => null, 'status' => 'no_data', 'recorded' => false, 'source_href' => null]);
         $comparedWith = $snapshot->summary['compared_with'] ?? null;
         $compareStart = is_array($comparedWith) && ! empty($comparedWith['start']) ? CarbonImmutable::parse($comparedWith['start']) : null;
         $compareEnd = is_array($comparedWith) && ! empty($comparedWith['end']) ? CarbonImmutable::parse($comparedWith['end']) : null;
+        $previousMedication = $compareStart && $compareEnd ? app(MedicationGovernanceReports::class)->values($request->user(), $compareStart->toDateString(), $compareEnd->toDateString(), $request->integer('site_id') ?: null) : [];
         $isComplete = $snapshot->period_start !== null && $snapshot->period_end !== null
             && ClinicalGovernanceAutomationService::coversWholeMonth($snapshot->period_start, $snapshot->period_end);
 
@@ -170,12 +181,15 @@ class ClinicalGovernanceController extends Controller
             'compared_with_label' => $compareStart && $compareEnd
                 ? ($isComplete ? $compareStart->format('F Y') : ClinicalGovernanceAutomationService::dayRange($compareStart, $compareEnd))
                 : null,
-            'indicator_values' => collect($snapshot->indicator_values ?? [])->map(function (array $value) use ($request, $sourcesInUse) {
+            'indicator_values' => collect($snapshot->indicator_values ?? [])->map(function (array $value) use ($request, $sourcesInUse, $medication, $previousMedication) {
                 $sourceHref = $value['source_href'] ?? null;
                 $indicatorCode = $value['indicator_code'] ?? null;
 
-                if ($indicatorCode === 'HCG-001' && ! $request->user()?->canDo('medications.view')) {
-                    $sourceHref = null;
+                if (isset($medication[$indicatorCode])) {
+                    $value = array_replace($value, $medication[$indicatorCode]);
+                    $value['previous_value'] = $previousMedication[$indicatorCode]['value'] ?? null;
+                    $value['trend'] = $value['value'] === null || $value['previous_value'] === null ? 'stable' : ($value['value'] > $value['previous_value'] ? 'up' : ($value['value'] < $value['previous_value'] ? 'down' : 'stable'));
+                    $sourceHref = $value['source_href'];
                 }
 
                 if (in_array($indicatorCode, ['HCG-002', 'HCG-003', 'HCG-004'], true)
@@ -186,17 +200,39 @@ class ClinicalGovernanceController extends Controller
                 return [
                     'indicator_id' => (int) $value['indicator_id'],
                     'indicator_code' => $indicatorCode,
-                    'value' => (float) ($value['value'] ?? 0),
+                    'value' => $value['value'] === null ? null : (float) $value['value'],
                     'status' => $value['status'] ?? 'normal',
                     'trend' => $value['trend'] ?? 'stable',
                     'previous_value' => isset($value['previous_value']) ? (float) $value['previous_value'] : null,
                     // False only when nobody has recorded anything in the source yet.
-                    'recorded' => $sourcesInUse === null ? true : ($sourcesInUse[$indicatorCode] ?? true),
+                    'recorded' => $value['recorded'] ?? ($sourcesInUse === null ? true : ($sourcesInUse[$indicatorCode] ?? true)),
                     'source_href' => $sourceHref,
                     'source_label' => $sourceHref ? ($value['source_label'] ?? 'Open the records') : null,
                 ];
             })->values()->all(),
         ];
+    }
+
+    private function medicationScope(Request $request): array
+    {
+        $actor = $request->user();
+        $access = app(MedicationReportAccess::class);
+        $sites = $actor->canDo('medications.reports.view') && ! $access->financeOnly($actor) ? $access->siteIds($actor) : [];
+
+        return ['site_id' => $request->integer('site_id') ?: null, 'sites' => app(MedicationGovernanceScopeService::class)->sitePicker($sites)->map->only(['id', 'name'])->values()];
+    }
+
+    public function medicationTarget(Request $request)
+    {
+        abort_unless($request->user()->canDo('governance.clinical.manage'), 403);
+        $data = $request->validate(['target' => ['nullable', 'integer', 'min:0', 'max:2147483647']]);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($request, $data) {
+            $value = ['target' => isset($data['target']) ? (int) $data['target'] : null, 'reviewed_by' => $request->user()->id, 'reviewed_at' => now()->toIso8601String()];
+            AppSetting::updateOrCreate(['key' => MedicationGovernanceReports::TARGET_KEY], ['value' => $value]);
+            \App\Services\AuditLogger::logOrFail('medications.governance.target.updated', $request->user(), ['target' => $value['target']]);
+        }, 5);
+
+        return back()->with('success', 'Medication error target saved.');
     }
 
     protected function nextManualIndicatorCode(): string

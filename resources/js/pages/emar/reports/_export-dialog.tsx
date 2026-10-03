@@ -31,7 +31,7 @@ export function ExportDialog({ option, props, onClose, online }: { option: Expor
         if (!online || busy) return;
         setBusy(true); setError('');
         try {
-            const response = await reportRequest('/emar/reports/export', { type: option.type, site_id: site, client_id: person, medication_id: medicine || null, period: 'custom', date_from: from, date_to: to, purpose, purpose_detail: detail, include_in_error: includeInError, kind: props.filters.sub === 'exports' ? 'export.created' : props.filters.kind || null, q: props.filters.q });
+            const response = await reportRequest('/emar/reports/export', { type: option.type, site_id: site, client_id: person, medication_id: medicine || null, period: 'custom', date_from: from, date_to: to, purpose, purpose_detail: detail, include_in_error: includeInError, reached: props.filters.reached || null, kind: props.filters.sub === 'exports' ? 'export.created' : props.filters.kind || null, q: props.filters.q });
             const blob = await response.blob(); const url = URL.createObjectURL(blob);
             const anchor = document.createElement('a'); anchor.href = url; anchor.download = response.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] ?? `medication-${option.type}.${option.format.toLowerCase()}`;
             document.body.append(anchor); anchor.click(); anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 60_000); setDone(true);

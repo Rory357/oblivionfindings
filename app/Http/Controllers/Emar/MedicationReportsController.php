@@ -35,6 +35,7 @@ class MedicationReportsController extends Controller
         $period = MedicationReportPeriod::fromRequest($request);
         $filters = $request->validate(['view' => ['nullable', Rule::in(['standard', 'audit', 'exports'])], 'report' => ['nullable', Rule::in(array_keys(MedicationReportDataset::REPORTS))], 'sub' => ['nullable', Rule::in(['events', 'gaps', 'exports'])], 'site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'], 'kind' => ['nullable', 'string', 'max:100'], 'q' => ['nullable', 'string', 'max:80'], 'page' => ['nullable', 'integer', 'min:1']]);
         $finance = $this->access->financeOnly($actor);
+        $reach = $request->validate(['reached' => ['nullable', Rule::in(['yes', 'no', 'unknown'])]])['reached'] ?? '';
         $report = $filters['report'] ?? ($finance ? 'stock' : 'doses');
         $siteId = isset($filters['site_id']) ? (int) $filters['site_id'] : null;
         $clientId = isset($filters['client_id']) ? (int) $filters['client_id'] : null;
@@ -49,6 +50,11 @@ class MedicationReportsController extends Controller
             $locked = 'Named controlled-medicine reports need controlled-medicine access. Controlled doses remain included in the overall dose totals.';
         } elseif ($view === 'standard') {
             $data = $this->datasets->read($actor, $report, $period, $siteIds, $clientId);
+            if ($report === 'errors' && $reach !== '') {
+                $data['rows'] = array_values(array_filter($data['rows'], fn ($row) => $row['reached'] === $reach));
+                $effective = collect($data['rows'])->where('in_error', 0);
+                $data['totals'] = ['reached' => $effective->where('reached', 'yes')->count(), 'near_misses' => $effective->where('reached', 'no')->count(), 'with_harm' => $effective->whereIn('harm', ['minor', 'moderate', 'severe', 'severe_permanent', 'death'])->count(), 'open' => $effective->whereNotIn('status', ['closed', 'resolved'])->count()];
+            }
             if (($filters['q'] ?? '') !== '') {
                 $q = mb_strtolower($filters['q']);
                 $data['rows'] = array_values(array_filter($data['rows'], fn ($row) => str_contains(mb_strtolower(implode(' ', array_filter($row, 'is_scalar'))), $q)));
@@ -74,7 +80,7 @@ class MedicationReportsController extends Controller
         $people = $finance ? collect() : Client::query()->whereIn('id', $this->access->clientIds($actor, $siteIds))->orderBy('first_name')->orderBy('last_name')->limit(100)->get(['id', 'first_name', 'last_name'])->map(fn ($c) => ['id' => $c->id, 'name' => trim($c->first_name.' '.$c->last_name)]);
 
         return Inertia::render('emar/reports/hub', [
-            'filters' => ['view' => $view, 'report' => $report, 'sub' => $sub, 'period' => $period->key, 'date_from' => $period->from, 'date_to' => $period->to, 'site_id' => $siteId, 'client_id' => $clientId, 'kind' => $filters['kind'] ?? '', 'q' => $filters['q'] ?? ''],
+            'filters' => ['view' => $view, 'report' => $report, 'sub' => $sub, 'period' => $period->key, 'date_from' => $period->from, 'date_to' => $period->to, 'site_id' => $siteId, 'client_id' => $clientId, 'kind' => $filters['kind'] ?? '', 'q' => $filters['q'] ?? '', 'reached' => $reach],
             'reports' => $finance ? ['stock' => 'Stock'] : MedicationReportDataset::REPORTS,
             'sites' => app(MedicationGovernanceScopeService::class)->sitePicker($allSites)->map->only(['id', 'name'])->values(), 'people' => $people,
             'data' => $data, 'page' => $page, 'locked' => $locked, 'finance' => $finance,
@@ -117,6 +123,7 @@ class MedicationReportsController extends Controller
         $data = $request->validate(['type' => ['required', Rule::in(['mar', 'cd_register', 'round_sheet', 'doses', 'errors', 'stock', 'audit'])], 'site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1']]);
         $actor = $request->user();
         $type = $data['type'];
+        $data['reached'] = $request->validate(['reached' => ['nullable', Rule::in(['yes', 'no', 'unknown'])]])['reached'] ?? null;
         abort_unless($this->access->canExport($actor, $type), 403);
         $period = MedicationReportPeriod::fromRequest($request);
         $sites = $this->access->siteIds($actor, $request->integer('site_id') ?: null, $request->integer('client_id') ?: null, $type === 'stock' ? 'stock' : ($type === 'cd_register' ? 'controlled' : 'doses'));
@@ -149,6 +156,7 @@ class MedicationReportsController extends Controller
         abort_unless($this->access->canExport($actor, $type), 403);
         $period = MedicationReportPeriod::fromRequest($request);
         $purpose = app(MedicationExportAudit::class)->purpose($request);
+        $data['reached'] = $request->validate(['reached' => ['nullable', Rule::in(['yes', 'no', 'unknown'])]])['reached'] ?? null;
         $clientId = $request->integer('client_id') ?: null;
         $sites = $this->access->siteIds($actor, $request->integer('site_id') ?: null, $clientId, $type === 'stock' ? 'stock' : ($type === 'cd_register' ? 'controlled' : 'doses'));
         if (in_array($type, ['mar', 'cd_register', 'round_sheet'], true)) {
@@ -211,6 +219,9 @@ class MedicationReportsController extends Controller
             $rows = $this->datasets->read($actor, $type, $period, $sites, $clientId)['rows'];
             if ($type === 'errors' && ! $includeInError) {
                 $rows = array_values(array_filter($rows, fn ($row) => $row['in_error'] === 0));
+            }
+            if ($type === 'errors' && ! empty($data['reached'])) {
+                $rows = array_values(array_filter($rows, fn ($row) => $row['reached'] === $data['reached']));
             }
         }
         return $rows;
