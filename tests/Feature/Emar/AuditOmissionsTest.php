@@ -82,9 +82,8 @@ class AuditOmissionsTest extends TestCase
         $this->order('Iron', ['08:00']);                      // in its window at 08:30: not yet
         $given = $this->order('Vitamin D', ['07:15']);         // given
         $missed = $this->order('Calcium', ['06:30']);          // recorded as missed: a record
-        $changed = $this->order('Paracetamol', ['07:30']);     // waits for the order check
+        $this->order('Paracetamol', ['07:30'], ['approval_status' => 'pending_verification']); // never checked
         $this->at('2026-06-15 06:45');
-        $changed->update(['dosage' => '2 tablets']);
         $this->record($given, '2026-06-15 07:15', 'given');
         $this->record($missed, '2026-06-15 06:30', 'missed');
 
@@ -101,7 +100,7 @@ class AuditOmissionsTest extends TestCase
         $this->at('2026-06-15 08:30');
 
         $this->assertSame(['Metformin 2026-06-15 07:00', 'Morphine 2026-06-15 07:00'], $this->omissions($this->reader(controlled: true)));
-        $this->assertSame(['Metformin 2026-06-15 07:00'], $this->omissions($this->reader(controlled: false)));
+        $this->assertSame(['Controlled medicine 2026-06-15 07:00', 'Metformin 2026-06-15 07:00'], $this->omissions($this->reader(controlled: false)));
     }
 
     public function test_a_period_before_the_dose_record_says_so(): void
@@ -111,13 +110,13 @@ class AuditOmissionsTest extends TestCase
         $this->at('2026-06-15 08:30');
 
         $this->actingAs($this->reader())
-            ->get(route('emar.audit', ['date_from' => '2026-06-01', 'date_to' => '2026-06-15']))
+            ->get('/emar/reports?view=audit&sub=gaps&date_from=2026-06-01&date_to=2026-06-15')
             ->assertOk()
-            ->assertInertia(fn ($page) => $page->where('omissions_notice', 'Not available before 15 June 2026'));
+            ->assertInertia(fn ($page) => $page->where('data.notice', 'Not available before 15 June 2026'));
         $this->actingAs($this->reader())
-            ->get(route('emar.audit', ['date_from' => '2026-06-15', 'date_to' => '2026-06-15']))
+            ->get('/emar/reports?view=audit&sub=gaps&date_from=2026-06-15&date_to=2026-06-15')
             ->assertOk()
-            ->assertInertia(fn ($page) => $page->where('omissions_notice', null));
+            ->assertInertia(fn ($page) => $page->where('data.notice', null));
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────
@@ -134,14 +133,14 @@ class AuditOmissionsTest extends TestCase
     private function omissions(User $reader, array $query = []): array
     {
         $events = $this->actingAs($reader)
-            ->get(route('emar.audit', [...$query, 'event_types' => 'omission']))
+            ->get('/emar/reports?'.http_build_query($query + ['view' => 'audit', 'sub' => 'gaps', 'period' => isset($query['date_from']) ? 'custom' : 'today']))
             ->assertOk()
-            ->inertiaProps('events');
+            ->inertiaProps('page.data');
 
         return collect($events)
-            ->where('event_type', 'omission')
-            ->map(fn (array $event): string => $event['details']['medication'].' '
-                .Carbon::parse($event['details']['scheduled_for'])->timezone('Pacific/Auckland')->format('Y-m-d H:i'))
+            ->where('status', 'not_recorded')
+            ->map(fn (array $event): string => $event['medicine'].' '
+                .Carbon::parse($event['due_at'])->timezone('Pacific/Auckland')->format('Y-m-d H:i'))
             ->sort()
             ->values()
             ->all();

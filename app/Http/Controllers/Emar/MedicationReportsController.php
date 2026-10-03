@@ -68,6 +68,7 @@ class MedicationReportsController extends Controller
             if (! $actor->canDo('medications.audit.view') || $finance) {
                 $locked = 'The audit trail is for clinical leads, coordinators, provider managers and auditors.';
             } elseif ($sub === 'gaps') {
+                $data['notice'] = app(\App\Services\Medication\DoseSlots\DoseSlotProjection::class)->coverage($period->from, CarbonImmutable::now('UTC'))['notice'];
                 $rows = array_values(array_filter($this->datasets->doseRows($actor, $period, $siteIds, $clientId), fn ($r) => in_array($r['status'], ['late', 'not_recorded'], true)));
                 $page = $this->paginate($rows, $request);
                 $data['totals'] = ['not_recorded' => count($rows)];
