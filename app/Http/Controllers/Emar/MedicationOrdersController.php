@@ -24,6 +24,7 @@ use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Medication\OrderAllergyMatcher;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -406,19 +407,28 @@ final class MedicationOrdersController extends Controller
     public function revokeCovert(Request $request, int $authorisation)
     {
         $submitted = MedicationCovertAuthorisation::query()->findOrFail($authorisation);
-        $this->orders->forOfficeMedication($request->user(), $submitted->client_medication_id, function (Client $client, ClientMedication $order, User $actor) use ($request, $submitted) {
-            $record = MedicationCovertAuthorisation::query()->whereKey($submitted->id)->where('client_id', $client->id)->where('client_medication_id', $order->id)->lockForUpdate()->firstOrFail();
-            $this->access->assertReadable($actor, $client);
-            $this->orders->assertControlled($actor, $order);
-            $reason = $this->orders->reason((string) $request->input('reason', ''));
-            if ($record->status !== 'active') {
-                return;
-            }
-            $record->forceFill(['status' => 'revoked', 'revoked_at' => now(), 'revoked_by' => $actor->id, 'revoke_reason' => $reason])->save();
-            $this->orders->action($actor, $order, 'covert_revoked', ['authorisation_id' => $record->id, 'reason' => $reason]);
-        });
+        DB::transaction(function () use ($request, $submitted) {
+            $action = $this->scope->forCovertAuthorisation($request->user(), $submitted,
+                function (Client $client, ClientMedication $order, MedicationCovertAuthorisation $record, User $actor) use ($request) {
+                    $this->access->assertReadable($actor, $client);
+                    $this->orders->assertControlled($actor, $order);
+                    $reason = $this->orders->reason((string) $request->input('reason', ''));
+                    if ($record->status !== 'active') {
+                        return null;
+                    }
+                    $record->forceFill(['status' => 'revoked', 'revoked_at' => now(), 'revoked_by' => $actor->id, 'revoke_reason' => $reason])->save();
+                    $this->orders->action($actor, $order, 'covert_revoked', ['authorisation_id' => $record->id, 'reason' => $reason]);
 
-        return back()->with('success', 'Covert giving stopped. The prescription carries on openly.');
+                    return MedicationOrderAction::query()->where('client_medication_id', $order->id)->where('action', 'covert_revoked')->latest('id')->firstOrFail();
+                });
+            // The existing authorisation scope supports ending obsolete evidence;
+            // no order is reopened and no administration authority is granted.
+            if ($action !== null) {
+                $this->orders->finishActions(collect([$action]));
+            }
+        }, 5);
+
+        return back()->with('success', 'Covert authorisation revoked. The prescription record is unchanged.');
     }
 
     private function readableOrder(User $actor, int $id): ClientMedication

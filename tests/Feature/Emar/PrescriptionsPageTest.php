@@ -2176,23 +2176,25 @@ class PrescriptionsPageTest extends TestCase
                         && $byId->get($deletedAuthorisation->id)['can_revoke'] === true;
                 }));
 
+        $retainedOrders = [$superseded->fresh()->getRawOriginal(), $deleted->fresh()->getRawOriginal()];
         foreach ([
             $supersededAuthorisation->id => 'Superseded historical authorisation closed.',
             $deletedAuthorisation->id => 'Soft-deleted historical authorisation closed.',
         ] as $authorisationId => $reason) {
             $this->actingAs($actor)
                 ->post(route('emar.covert.revoke', $authorisationId), ['reason' => $reason])
-                ->assertSessionHasNoErrors();
+                ->assertRedirect()->assertSessionHasNoErrors();
             $this->assertDatabaseHas('medication_covert_authorisations', [
                 'id' => $authorisationId,
                 'status' => 'revoked',
             ]);
             $audit = AuditLog::query()
-                ->where('action', 'medications.covert_authorisation.revoked')
-                ->where('auditable_id', $authorisationId)
+                ->where('action', 'medication_order.covert_revoked')
+                ->where('meta->authorisation_id', $authorisationId)
                 ->sole();
             $this->assertSame($reason, $audit->meta['reason']);
         }
+        $this->assertSame($retainedOrders, [$superseded->fresh()->getRawOriginal(), $deleted->fresh()->getRawOriginal()]);
     }
 
     public function test_controlled_and_unknown_orders_are_concealed_and_classification_is_server_bound(): void
@@ -2423,8 +2425,10 @@ class PrescriptionsPageTest extends TestCase
         ];
         $this->actingAs($user)
             ->post(route('emar.covert.store'), $covertPayload)
-            ->assertRedirect()
-            ->assertSessionHasErrors('clinical_justification');
+            ->assertStatus(303)
+            ->assertRedirect('/emar/prescriptions?'.http_build_query(['client_id' => $client->id, 'order_id' => $ordinaryMedication->id, 'action' => 'covert']))
+            ->assertSessionHas('info');
+        $this->assertDatabaseMissing('medication_covert_authorisations', ['clinical_justification' => 'Canonical covert authorisation']);
         $this->actingAs($user)
             ->post(route('emar.covert.store'), [
                 ...$covertPayload,

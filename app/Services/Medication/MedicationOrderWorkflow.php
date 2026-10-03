@@ -419,7 +419,7 @@ final class MedicationOrderWorkflow
         $events = [];
         $completions = [];
         foreach ($actions as $action) {
-            $medication = ClientMedication::query()->with('client')->findOrFail($action->client_medication_id);
+            $medication = ClientMedication::withTrashed()->with('client')->findOrFail($action->client_medication_id);
             $events[] = new MedicationEventData(siteId: (int) $medication->client->site_id, kind: 'order.'.$action->action,
                 subjectType: 'medication_order_action', subjectId: (string) $action->id, actorId: (int) $action->actor_id,
                 occurredAt: CarbonImmutable::instance($action->occurred_at), summary: 'Medication order '.$action->action.'.',
