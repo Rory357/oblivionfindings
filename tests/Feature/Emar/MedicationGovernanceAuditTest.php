@@ -73,11 +73,12 @@ class MedicationGovernanceAuditTest extends TestCase
             'administered_at' => now(),
         ]);
 
-        // The person who raised the correction is blocked from approving it.
+        // The person who raised the correction is blocked from approving it
+        // (a validation error since P02-1).
         $this->actingAs($user)
             ->from('/emar/mar')
             ->post("/emar/corrections/{$correction->id}/approve")
-            ->assertSessionHas('error');
+            ->assertSessionHasErrors('correction');
 
         $this->assertSame('pending', $correction->fresh()->correction_status);
 

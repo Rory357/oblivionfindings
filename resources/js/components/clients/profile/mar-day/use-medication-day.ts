@@ -1,0 +1,71 @@
+import axios from 'axios';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import type { MedicationDay } from './types';
+
+export type DayLoad =
+    | { status: 'loading'; data: MedicationDay | null }
+    | { status: 'ready'; data: MedicationDay }
+    | { status: 'error'; data: MedicationDay | null };
+
+/**
+ * One person's medication day from the server (the Fleet profile pattern:
+ * the tab loads its own records). Null date = today. A newer request wins;
+ * a failed one keeps the last good day on screen behind the error.
+ */
+export function useMedicationDay(clientId: number, date: string | null) {
+    const [load, setLoad] = useState<DayLoad>({
+        status: 'loading',
+        data: null,
+    });
+    const latest = useRef(0);
+
+    const fetchDay = useCallback(async () => {
+        const request = ++latest.current;
+        setLoad((prev) => ({ status: 'loading', data: prev.data }));
+        try {
+            const response = await axios.get<MedicationDay>(
+                `/emar/clients/${clientId}/day`,
+                { params: date ? { date } : {} },
+            );
+            if (request === latest.current) {
+                setLoad({ status: 'ready', data: response.data });
+            }
+        } catch {
+            if (request === latest.current) {
+                setLoad((prev) => ({ status: 'error', data: prev.data }));
+            }
+        }
+    }, [clientId, date]);
+
+    useEffect(() => {
+        void fetchDay();
+    }, [fetchDay]);
+
+    return { load, reload: fetchDay };
+}
+
+/** The NZ day before / after a Y-m-d, as Y-m-d (calendar arithmetic, no time zone). */
+export function shiftDay(date: string, days: number): string {
+    const [y, m, d] = date.split('-').map(Number);
+    const next = new Date(Date.UTC(y, m - 1, d + days));
+    return next.toISOString().slice(0, 10);
+}
+
+/** "Today, Sat 3 Oct" / "Fri 2 Oct" / "Tomorrow, Sun 4 Oct". */
+export function dayLabel(
+    date: string,
+    today: string,
+    tomorrow: string,
+): string {
+    const [y, m, d] = date.split('-').map(Number);
+    const words = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-NZ', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        timeZone: 'UTC',
+    });
+    if (date === today) return `Today, ${words}`;
+    if (date === tomorrow) return `Tomorrow, ${words}`;
+    return words;
+}

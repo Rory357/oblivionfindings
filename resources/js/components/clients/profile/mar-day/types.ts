@@ -1,0 +1,82 @@
+import type {
+    ClientInfo,
+    CompetencyNotice,
+    NotGivenReasonOption,
+    PrnMedication,
+    ScheduleRow,
+    WitnessOption,
+} from '@/pages/meds/today/types';
+
+/**
+ * A dose on the day view: Meds today's schedule row, plus the projection's
+ * raw state and window so the grid can say "Due now" (inside the window)
+ * from "Due" (shows as due soon) and "Not recorded" (an earlier day) from
+ * "Overdue" (today).
+ */
+export type DayDose = ScheduleRow & {
+    state?: string | null;
+    window_opens_at?: string | null;
+    window_ends_at?: string | null;
+};
+
+export interface DayMedicine {
+    id: number;
+    name: string;
+    dose: string | null;
+    route: string | null;
+    is_controlled: boolean;
+    requires_witness: boolean;
+    /** Doses keyed by dose time (HH:mm), usually one each. */
+    cells: Record<string, DayDose[]>;
+}
+
+export type DayPrnMedication = PrnMedication & {
+    given_on_day: number;
+    last_given_on_day: string | null;
+    is_today: boolean;
+};
+
+export interface DayAllergyEntry {
+    allergen: string;
+    severity: string | null;
+    reaction: string | null;
+    source: string;
+}
+
+export interface MedicationDay {
+    date: string;
+    today: string;
+    tomorrow: string;
+    now: string;
+    timezone: string;
+    coverage: {
+        available_from: string;
+        complete: boolean;
+        notice: string | null;
+    };
+    times: string[];
+    medicines: DayMedicine[];
+    hidden_controlled: { total: number; overdue: number };
+    prn: { rows: DayPrnMedication[]; hidden: number };
+    allergies: {
+        status: 'recorded' | 'none' | 'unavailable';
+        entries: DayAllergyEntry[];
+    };
+    chart_alerts: { id: number; type: string | null; title: string }[];
+    can: {
+        record: boolean;
+        record_reason: 'no_permission' | 'no_shift' | null;
+        record_controlled: boolean;
+        report: boolean;
+    };
+    recorder: {
+        client: ClientInfo | null;
+        witnesses: WitnessOption[];
+        not_given_reasons: NotGivenReasonOption[];
+        signed_as: {
+            name: string;
+            role_label: string | null;
+            competency_notice?: CompetencyNotice | null;
+        };
+    } | null;
+}

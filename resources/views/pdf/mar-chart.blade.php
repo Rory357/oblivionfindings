@@ -75,7 +75,7 @@
                 <td style="text-align: center;">
                     @php
                         $admins = $med->administrations->filter(function ($a) use ($date) {
-                            return $a->scheduled_for && $a->scheduled_for->toDateString() === $date;
+                            return $a->scheduled_for && $a->scheduled_for->copy()->timezone(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString() === $date;
                         });
                     @endphp
                     @foreach($admins as $admin)
@@ -120,7 +120,7 @@
                 <td style="text-align: center;">
                     @php
                         $admins = $med->administrations->filter(function ($a) use ($date) {
-                            return $a->administered_at && $a->administered_at->toDateString() === $date;
+                            return $a->administered_at && $a->administered_at->copy()->timezone(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString() === $date;
                         });
                     @endphp
                     @if($admins->count() > 0)

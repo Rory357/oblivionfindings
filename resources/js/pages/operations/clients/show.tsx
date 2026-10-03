@@ -4035,35 +4035,10 @@ export default function ClientShow({
                         {tab === 'mar' && (
                             <MarTab
                                 clientId={client.id}
-                                clientFirstName={client.first_name}
-                                siteName={client.site?.name ?? null}
-                                medications={
-                                    (medical?.medications ?? []) as any[]
-                                }
-                                allergies={
-                                    Array.isArray(medical?.profile?.allergies)
-                                        ? (medical.profile
-                                              .allergies as string[])
-                                        : []
-                                }
-                                emarSummary={emarSummary}
-                                canRecord={Boolean(
-                                    can.record_medication_administration,
-                                )}
-                                canRecordControlled={Boolean(
-                                    can.record_controlled_medication,
-                                )}
+                                personName={preferredName}
                                 canViewControlled={Boolean(
                                     auth?.can?.medications?.controlledView,
                                 )}
-                                onRecordDose={(medicationId) =>
-                                    openProfileDialog(
-                                        'emar',
-                                        medicationId
-                                            ? { medicationId }
-                                            : undefined,
-                                    )
-                                }
                             />
                         )}
 

@@ -31,10 +31,16 @@ class EmarPdfController extends Controller
             'client_id' => 'required|integer|min:1',
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date|after_or_equal:date_from',
+            'include_prn' => 'nullable|boolean',
         ]);
 
         $dateFrom = $request->input('date_from', Carbon::now()->startOfMonth()->toDateString());
         $dateTo = $request->input('date_to', Carbon::now()->endOfMonth()->toDateString());
+        // NZ days, both ends included (P02-1b): a date is the organisation's day.
+        $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        $fromUtc = Carbon::parse($dateFrom, $timezone)->startOfDay()->utc();
+        $toUtc = Carbon::parse($dateTo, $timezone)->endOfDay()->utc();
+        $includePrn = ! $request->has('include_prn') || $request->boolean('include_prn');
 
         $actor = $request->user();
         abort_unless($actor, 403);
@@ -52,13 +58,10 @@ class EmarPdfController extends Controller
             ->where('active', true)
             ->where('is_prn', false)
             ->when(! $includeControlled, fn ($query) => $query->where('controlled_drug', false))
-            ->with(['administrations' => function ($query) use ($client, $dateFrom, $dateTo) {
+            ->with(['administrations' => function ($query) use ($client, $fromUtc, $toUtc) {
                 $query->effectiveClinicalEvidence()
                     ->where('client_id', $client->id)
-                    ->whereBetween('scheduled_for', [
-                        Carbon::parse($dateFrom)->startOfDay(),
-                        Carbon::parse($dateTo)->endOfDay(),
-                    ]);
+                    ->whereBetween('scheduled_for', [$fromUtc, $toUtc]);
             }])
             ->orderBy('name')
             ->get();
@@ -67,13 +70,12 @@ class EmarPdfController extends Controller
             ->where('active', true)
             ->where('is_prn', true)
             ->when(! $includeControlled, fn ($query) => $query->where('controlled_drug', false))
-            ->with(['administrations' => function ($query) use ($client, $dateFrom, $dateTo) {
+            // Leaving out as-needed medicines is the report's choice (P02-1b).
+            ->when(! $includePrn, fn ($query) => $query->whereRaw('1 = 0'))
+            ->with(['administrations' => function ($query) use ($client, $fromUtc, $toUtc) {
                 $query->effectiveClinicalEvidence()
                     ->where('client_id', $client->id)
-                    ->whereBetween('administered_at', [
-                        Carbon::parse($dateFrom)->startOfDay(),
-                        Carbon::parse($dateTo)->endOfDay(),
-                    ]);
+                    ->whereBetween('administered_at', [$fromUtc, $toUtc]);
             }])
             ->orderBy('name')
             ->get();

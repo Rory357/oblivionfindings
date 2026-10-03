@@ -8,6 +8,7 @@ use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ServiceContext;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\MedicationRecordAccess;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -211,15 +212,26 @@ class MedicationsReportController extends Controller
             'site_id' => ['nullable', 'integer'],
             'service_context_id' => ['nullable', 'integer'],
             'status' => ['nullable', 'in:given,refused,missed,withheld'],
+            'include_prn' => ['nullable', 'boolean'],
         ]);
 
+        // NZ days, both ends included (a date is the organisation's day,
+        // never a UTC midnight that drops the morning).
+        $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
         $dateFrom = isset($filters['date_from']) && $filters['date_from']
-            ? Carbon::parse($filters['date_from'])->startOfDay()
-            : now()->subDays(14)->startOfDay();
+            ? Carbon::parse($filters['date_from'], $timezone)->startOfDay()->utc()
+            : Carbon::now($timezone)->subDays(14)->startOfDay()->utc();
         $dateTo = isset($filters['date_to']) && $filters['date_to']
-            ? Carbon::parse($filters['date_to'])->endOfDay()
-            : now()->endOfDay();
+            ? Carbon::parse($filters['date_to'], $timezone)->endOfDay()->utc()
+            : Carbon::now($timezone)->endOfDay()->utc();
         [, $readerSiteIds] = $this->readerSiteIds($request, $filters);
+        if (! empty($filters['client_id'])) {
+            // The report scope limits the house; the person rule follows (P02).
+            app(MedicationRecordAccess::class)->assertReportable(
+                $request->user(),
+                Client::query()->find((int) $filters['client_id']),
+            );
+        }
 
         $q = $this->governanceScope->scopeCanonicalClientMedicationRows(
             ClientMedicationAdministration::query()->effectiveClinicalEvidence(),
@@ -245,6 +257,9 @@ class MedicationsReportController extends Controller
         }
         if (! empty($filters['status'])) {
             $q->where('status', $filters['status']);
+        }
+        if (array_key_exists('include_prn', $filters) && ! $request->boolean('include_prn')) {
+            $q->whereHas('medication', fn ($medication) => $medication->where('is_prn', false));
         }
 
         $filename = 'mar_export_'.now()->format('Ymd_His').'.csv';

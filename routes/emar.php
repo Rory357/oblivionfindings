@@ -3,6 +3,7 @@
 use App\Http\Controllers\BreakGlassController;
 use App\Http\Controllers\Emar\AuditLogController;
 use App\Http\Controllers\Emar\CDLossReportController;
+use App\Http\Controllers\Emar\ClientMedicationDayController;
 use App\Http\Controllers\Emar\CompetencyExemptionController;
 use App\Http\Controllers\Emar\DoseRequirementsController;
 use App\Http\Controllers\Emar\EmarController;
@@ -164,6 +165,13 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         Route::post('/rounds/{round}/guided/complete', [GuidedRoundController::class, 'complete'])
             ->name('meds.round.complete');
     });
+
+    // One person's medication day for the client profile's MAR tab (P02-1b);
+    // the per-person gate runs in the controller (MedicationRecordAccess).
+    Route::get('/clients/{client}/day', [ClientMedicationDayController::class, 'show'])
+        ->whereNumber('client')
+        ->middleware('permission:medications.view')
+        ->name('emar.clients.day');
 
     // Self-Administration Assessments
     Route::get('/self-admin', [EmarController::class, 'selfAdmin'])

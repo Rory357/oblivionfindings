@@ -180,6 +180,12 @@ class MedsBoardPayloadService
                         'time' => $scheduled->copy()->timezone($timezone)->format('H:i'),
                         'round_label' => $this->roundLabelFor($scheduled->copy()->timezone($timezone)),
                         'status' => $status,
+                        // The projection's own state and window, so a day
+                        // view can say "Due now" from "Due" and "Not
+                        // recorded" (an earlier day) from "Overdue" (P02-1b).
+                        'state' => $dose['state'],
+                        'window_opens_at' => $dose['window_opens_at']->copy()->timezone($timezone)->toIso8601String(),
+                        'window_ends_at' => $dose['window_ends_at']->copy()->timezone($timezone)->toIso8601String(),
                         // Away (C7): why, shown as "Away · reason".
                         'away_reason' => $status === 'away' ? $dose['away_reason'] : null,
                         'recorded' => $administration ? $this->recordedPayload($administration, $timezone) : null,
