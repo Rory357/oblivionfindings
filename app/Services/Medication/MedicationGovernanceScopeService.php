@@ -65,6 +65,7 @@ final class MedicationGovernanceScopeService
         'medications.stock.update',
         'medications.orders.manage',
         'medications.breakglass',
+        'medications.breakglass.end',
         'medications.audit.view',
         'fleet.manage',
         'fleet.medication.manage',

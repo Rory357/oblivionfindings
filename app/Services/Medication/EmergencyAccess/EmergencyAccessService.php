@@ -2,6 +2,7 @@
 
 namespace App\Services\Medication\EmergencyAccess;
 
+use App\Models\BreakGlassFlagDismissal;
 use App\Models\BreakGlassPolicy;
 use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
@@ -157,6 +158,7 @@ class EmergencyAccessService
             $grant = $this->lockGrant($grant);
             if ($actor) {
                 $actor = $this->governance->lockControlledWitnessUsers([$actor->id])->get($actor->id);
+                abort_unless($actor->approved_at !== null, 403);
             }
             if ($grant->ended_at !== null) {
                 return;
@@ -164,6 +166,7 @@ class EmergencyAccessService
             $expired = $grant->expires_at !== null && $grant->expires_at->lte(now());
             $owner = $actor !== null && (int) $actor->id === (int) $grant->user_id;
             if (! $expired) {
+                $this->governance->lockCurrentMedicationSite((int) $grant->client->site_id);
                 abort_unless($actor && in_array((int) $grant->client->site_id,
                     $this->sites->accessibleSiteIds($actor, $owner ? [] : ['medications.breakglass.end']), true), 404);
                 if (! $owner && mb_strlen(trim((string) $reason)) < 10) {
@@ -194,7 +197,8 @@ class EmergencyAccessService
         DB::transaction(function () use ($actor, $grant, $data): void {
             $grant = $this->lockGrant($grant);
             $actor = $this->governance->lockControlledWitnessUsers([$actor->id])->get($actor->id);
-            abort_unless($actor->canDo('medications.audit.view')
+            $this->governance->lockCurrentMedicationSite((int) $grant->client->site_id);
+            abort_unless($actor->approved_at !== null && $actor->canDo('medications.audit.view')
                 && ! in_array((int) $actor->id, [(int) $grant->user_id, (int) $grant->co_signed_by], true), 403);
             abort_unless(in_array((int) $grant->client->site_id, $this->sites->accessibleSiteIds($actor, ['medications.audit.view']), true), 404);
             $data = Validator::make($data, [
@@ -236,6 +240,42 @@ class EmergencyAccessService
             $this->events->record($grant, $previous ? 'review_corrected' : 'reviewed', $actor, [
                 'outcome' => $data['review_outcome'], 'corrects_review_id' => $previous?->id,
             ]);
+        }, 5);
+    }
+
+    public function acknowledgeRepeat(User $actor, int $houseId, int $staffId, string $reason): void
+    {
+        abort_unless($actor->approved_at !== null && $actor->canDo('medications.audit.view'), 403);
+        abort_if($staffId === (int) $actor->id, 403);
+        abort_unless(in_array($houseId, $this->sites->accessibleSiteIds($actor, ['medications.audit.view']), true), 404);
+        Validator::make(['reason' => $reason], ['reason' => ['required', 'string', 'min:10', 'max:1000']])->validate();
+        DB::transaction(function () use ($actor, $houseId, $staffId, $reason): void {
+            $policy = BreakGlassPolicy::current();
+            $candidates = ClientBreakGlassAccess::withTrashed()
+                ->whereHas('client', fn ($q) => $q->where('site_id', $houseId))
+                ->where('user_id', $staffId)
+                ->where('created_at', '>=', now()->subDays($policy->repeat_window_days))
+                ->get(['id', 'client_id']);
+            // Preserve the shared Client -> grant -> authorization -> Site order.
+            $clients = Client::query()->whereIn('id', $candidates->pluck('client_id'))
+                ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            $grants = ClientBreakGlassAccess::withTrashed()->whereIn('id', $candidates->pluck('id'))
+                ->where('user_id', $staffId)->orderBy('id')->lockForUpdate()->get()
+                ->filter(fn ($grant) => (int) $clients->get($grant->client_id)?->site_id === $houseId);
+            $actor = $this->governance->lockControlledWitnessUsers([$actor->id])->get($actor->id);
+            $this->governance->lockCurrentMedicationSite($houseId);
+            abort_unless($actor->approved_at !== null && $actor->canDo('medications.audit.view'), 403);
+            abort_if($staffId === (int) $actor->id, 403);
+            abort_unless(in_array($houseId, $this->sites->accessibleSiteIds($actor, ['medications.audit.view']), true), 404);
+            abort_unless($grants->count() >= $policy->repeat_threshold_count, 404);
+            BreakGlassFlagDismissal::updateOrCreate(
+                ['signal_type' => 'repeat', 'signal_key' => $houseId.':'.$staffId],
+                ['dismissed_by' => $actor->id, 'reason' => $reason,
+                    'dismissed_through' => $grants->max('created_at'), 'dismissed_through_access_id' => $grants->max('id')],
+            );
+            $grant = $grants->last();
+            $grant->setRelation('client', $clients->get($grant->client_id));
+            $this->events->record($grant, 'repeat_acknowledged', $actor);
         }, 5);
     }
 

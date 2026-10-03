@@ -2,16 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\BreakGlassFlagDismissal;
 use App\Models\BreakGlassPolicy;
 use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
 use App\Models\User;
-use App\Services\Medication\EmergencyAccess\EmergencyAccessEvents;
 use App\Services\Medication\EmergencyAccess\EmergencyAccessService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class BreakGlassController extends Controller
@@ -19,7 +16,6 @@ class BreakGlassController extends Controller
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
         private readonly EmergencyAccessService $grants,
-        private readonly EmergencyAccessEvents $events,
     ) {}
 
     public function store(Request $request, Client $client)
@@ -107,22 +103,7 @@ class BreakGlassController extends Controller
         ]);
         [$houseId, $staffId] = array_map('intval', explode(':', $data['key']));
         abort_if($staffId === (int) $user->id, 403);
-        $siteIds = $this->siteAccess->accessibleSiteIds($user, ['medications.audit.view']);
-        abort_unless(in_array($houseId, $siteIds, true), 404);
-        $policy = BreakGlassPolicy::current();
-        DB::transaction(function () use ($data, $user, $houseId, $staffId, $policy): void {
-            $grants = ClientBreakGlassAccess::withTrashed()
-                ->whereHas('client', fn ($q) => $q->where('site_id', $houseId))
-                ->where('user_id', $staffId)
-                ->where('created_at', '>=', now()->subDays($policy->repeat_window_days))
-                ->lockForUpdate()->get();
-            abort_unless($grants->count() >= $policy->repeat_threshold_count, 404);
-            BreakGlassFlagDismissal::updateOrCreate(
-                ['signal_type' => 'repeat', 'signal_key' => $data['key']],
-                ['dismissed_by' => $user->id, 'reason' => $data['reason'], 'dismissed_through' => $grants->max('created_at'), 'dismissed_through_access_id' => $grants->max('id')],
-            );
-            $this->events->record($grants->sortByDesc('id')->first(), 'repeat_acknowledged', $user, ['reason' => $data['reason']]);
-        }, 3);
+        $this->grants->acknowledgeRepeat($user, $houseId, $staffId, $data['reason']);
 
         return back()->with('success', 'Repeat use acknowledged. New use brings it back.');
     }

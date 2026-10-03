@@ -47,3 +47,7 @@ Downtime checks passed: 23 PHP syntax checks, four TypeScript syntax checks, foc
 Main owns combined frontend type/build and browser acceptance at 1440, 1280 and 200%, plus mobile behavior and PDF visual verification.
 
 Remaining shared work: P01/P02 recording strip, typed expiry and offline envelope; historical P01/P07 paper adapters; P09 history export/Print & exports placement. P09's recorder currently excludes soft-deleted Client/Site rows, so historical close evidence for removed records needs a shared P09 decision. The expiry job isolates failed grants, continues valid ones and reports the gap without inventing an event.
+
+## Candidate follow-up review
+
+The source review after e5cad7de0 found four defects now repaired: locked authorization evidence includes breakglass.end; overdue Tasks use the grant's frozen review_days before an expiry sweep; repeat acknowledgements recheck current authorization and canonical Client/Site ownership under Client -> grant -> user -> Site locks; manual end/review reject withdrawn account approval. Focused regressions cover those boundaries. Offline capture parsing also rejects normalized invalid calendar dates and accepts explicit millisecond timestamps; unit fixtures use a deterministic clock and date format. These follow-up cases remain unrun while Main repairs the shared heavy-command guard.

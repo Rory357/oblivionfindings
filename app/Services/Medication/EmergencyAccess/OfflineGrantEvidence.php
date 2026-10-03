@@ -13,12 +13,15 @@ final class OfflineGrantEvidence
     {
         if ($requiresSecondPerson || ($envelope['queued_offline'] ?? null) !== true
             || ! is_string($envelope['captured_offline_at'] ?? null)
-            || ! preg_match('/T.*(?:Z|[+-]\d{2}:\d{2})$/', $envelope['captured_offline_at'])
+            || ! preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/', $envelope['captured_offline_at'])
             || $grant->created_at === null || $grant->expires_at === null) {
             return false;
         }
         try {
             $captured = CarbonImmutable::parse($envelope['captured_offline_at']);
+            if ($captured->format('Y-m-d\TH:i:s') !== substr($envelope['captured_offline_at'], 0, 19)) {
+                return false;
+            }
         } catch (\Throwable) {
             return false;
         }

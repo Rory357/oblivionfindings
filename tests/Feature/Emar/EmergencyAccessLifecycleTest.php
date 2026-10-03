@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Tests\TestCase;
 
 class EmergencyAccessLifecycleTest extends TestCase
@@ -140,6 +141,22 @@ class EmergencyAccessLifecycleTest extends TestCase
         $this->assertTrue($grant->fresh()->isRunning());
     }
 
+    public function test_authorized_colleague_can_end_another_grant_with_current_permission_evidence(): void
+    {
+        $grant = $this->start();
+        $colleague = $this->staff('clinical_lead', ['medications.breakglass.end']);
+        $reason = 'The assigned nurse has arrived and can continue care';
+        $this->actingAs($colleague)->deleteJson('/emar/clients/'.$this->client->id.'/break-glass/'.$grant->id, ['reason' => $reason])
+            ->assertRedirect();
+
+        $ended = ClientBreakGlassAccess::withTrashed()->findOrFail($grant->id);
+        $this->assertSame('ended_by', $ended->ended_how);
+        $this->assertSame($colleague->id, $ended->ended_by);
+        $this->assertSame($reason, $ended->end_reason);
+        $this->assertFalse($ended->isRunning());
+        $this->assertSame($colleague->id, MedicationEvent::where('facts->action', 'closed')->sole()->actor_id);
+    }
+
     public function test_revoked_grant_is_waiting_for_review_and_self_review_is_denied(): void
     {
         $grant = $this->start();
@@ -250,6 +267,71 @@ class EmergencyAccessLifecycleTest extends TestCase
         $this->artisan('emar:expire-emergency-access')->assertFailed();
         $this->assertNull($removed->fresh()->ended_at);
         $this->assertNotNull($valid->fresh()->ended_at);
+    }
+
+    public function test_repeat_acknowledgement_rechecks_current_permission_after_stale_actor_read(): void
+    {
+        BreakGlassPolicy::updateApplicationPolicy(['repeat_threshold_count' => 2]);
+        $this->start();
+        ClientBreakGlassAccess::create([
+            'client_id' => $this->client->id, 'user_id' => $this->owner->id,
+            'reason' => 'Earlier synthetic use', 'expires_at' => now()->subMinute(),
+        ]);
+        $this->reviewer->load(['roles.permissions', 'permissionOverrides', 'hrEmployeeProfile']);
+        $permission = Permission::where('key', 'medications.audit.view')->sole();
+        $this->reviewer->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => false]]);
+        try {
+            app(EmergencyAccessService::class)->acknowledgeRepeat($this->reviewer, $this->site->id, $this->owner->id, 'Reviewed the repeated cover arrangements');
+            $this->fail('Revoked review authority must refuse acknowledgement.');
+        } catch (HttpExceptionInterface $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+        }
+        $this->assertDatabaseCount('break_glass_flag_dismissals', 0);
+        $this->assertSame(0, MedicationEvent::where('facts->action', 'repeat_acknowledged')->count());
+    }
+
+    public function test_review_rechecks_approval_after_stale_actor_read(): void
+    {
+        $grant = $this->start();
+        app(EmergencyAccessService::class)->end($this->owner, $grant);
+        $this->reviewer->newQuery()->whereKey($this->reviewer->id)->update(['approved_at' => null]);
+        try {
+            app(EmergencyAccessService::class)->review($this->reviewer, $grant, ['review_outcome' => 'justified']);
+            $this->fail('Approval withdrawn before the authorization lock must refuse review.');
+        } catch (HttpExceptionInterface $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+        }
+        $this->assertDatabaseCount('medication_emergency_access_reviews', 0);
+    }
+
+    public function test_manual_end_rechecks_approval_after_stale_actor_read(): void
+    {
+        $grant = $this->start();
+        $this->reviewer->newQuery()->whereKey($this->reviewer->id)->update(['approved_at' => null]);
+        try {
+            app(EmergencyAccessService::class)->end($this->reviewer, $grant, 'Assigned staff can continue medication care');
+            $this->fail('Approval withdrawn before the authorization lock must refuse a manual end.');
+        } catch (HttpExceptionInterface $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+        }
+        $this->assertTrue($grant->fresh()->isRunning());
+        $this->assertSame(0, MedicationEvent::where('facts->action', 'closed')->count());
+    }
+
+    public function test_unswept_expired_review_tasks_use_each_grants_frozen_deadline(): void
+    {
+        $expiry = now()->subDays(2)->subMinute();
+        $grants = collect([1, 3, null])->map(fn ($days) => ClientBreakGlassAccess::forceCreate([
+            'client_id' => $this->client->id, 'user_id' => $this->owner->id,
+            'created_at' => $expiry->copy()->subHour(), 'expires_at' => $expiry,
+            'policy_snapshot' => $days === null ? null : array_replace(BreakGlassPolicy::defaults(), ['review_days' => $days]),
+        ]));
+        $tasks = collect((new MedicationEmergencyAccessReviewProvider)->authorizedTasks($this->reviewer))->keyBy('id');
+        $this->assertCount(2, $tasks);
+        $this->assertTrue($tasks->has('med_emergency_review-'.$grants[0]->id));
+        $this->assertFalse($tasks->has('med_emergency_review-'.$grants[1]->id));
+        $this->assertTrue($tasks->has('med_emergency_review-'.$grants[2]->id));
+        $this->assertSame($grants[0]->reviewDueTime()->toIso8601String(), $tasks->get('med_emergency_review-'.$grants[0]->id)->dueAt);
     }
 
     public function test_overdue_review_projection_uses_independent_reviewer_authority(): void

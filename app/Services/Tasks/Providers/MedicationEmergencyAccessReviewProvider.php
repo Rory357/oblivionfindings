@@ -40,7 +40,7 @@ class MedicationEmergencyAccessReviewProvider implements HasModelClass, SiteScop
             ->whereNull('review_outcome')->where('user_id', '!=', $user->id)
             ->where(fn ($q) => $q->whereNull('co_signed_by')->orWhere('co_signed_by', '!=', $user->id))
             ->where(fn ($q) => $q->whereNotNull('ended_at')->orWhereNotNull('deleted_at')->orWhere('expires_at', '<=', now()))
-            ->whereRaw('COALESCE(review_due_at, DATE_ADD(COALESCE(ended_at, deleted_at, expires_at), INTERVAL 2 DAY)) < ?', [now()])
+            ->whereRaw("COALESCE(review_due_at, DATE_ADD(COALESCE(ended_at, deleted_at, expires_at), INTERVAL COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(policy_snapshot, '$.review_days')) AS UNSIGNED), 2) DAY)) < ?", [now()])
             ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']));
 
         return app(TaskProviderAuthorization::class)->siteScoped($user, $this->canView($user), $query,
