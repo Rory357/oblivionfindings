@@ -40,3 +40,22 @@ Required integrated browser checks: record/hub at 1440 and 1280, 200% zoom, pers
 Outstanding release checks for Main: validate stopped/superseded historical PDF contents and controlled classification retained in order versions/held slots; confirm every legacy allergy writer is retired or delegated after canonical adoption (MedicationsApiController::createAllergy still owns a register writer in the prerequisite source); confirm the one shared recorder works with Main's P01 adapter. The dry-run command is a tool for explicit evidence copying, not an executed operational migration. No clinical timing, thresholds, dose calculation or stock correction policy has been invented.
 
 Post-freeze scoped verification: the repaired shared queue serialized the targeted Pint run and its syntax continuation. Pint formatted 14 candidate PHP files. All 15 candidate PHP files pass `php -l`, and `git diff --check` passes. Frontend formatting/lint stopped before execution because the primary node_modules junction target disappeared; this worker did not repair or install shared dependencies. Main now has private frontend dependencies for its combined checks. No new backend suite, full type check, build or browser server was launched here. The formatting follow-on commit has no domain behaviour changes.
+
+## Bounded independent-review follow-on
+
+The legacy ClientMedicalController profile writer now takes the canonical Client lock followed by the health-profile lock, reauthorizes against the locked current Client, checks the locked profile for canonical adoption, and saves within the same transaction. If the legacy save wins first, the copy reads its latest allergy labels. If the copy wins first, incompatible legacy labels are rejected. Omitted allergy input no longer clears a canonical projection; a matching legacy projection is retained rather than rewritten. Notifications use the locked Client snapshot.
+
+Legacy INR create/disable routes now delegate to PersonMedicationClinicalController. They require the same request UUID, recorded instruction/source, explicit unlinked reason, NZ date checks, same-person/controlled privacy and error reason. The route-bound INR ID overrides body IDs. The existing alert refresh executes in the canonical transaction before the receipt and final event, so event failure rolls back the record, receipt and derived writes. The existing legacy INR dialog now supplies the new required evidence fields and a stable UUID; no dose is calculated. Existing OneChart governance fixtures supply recorded instructions and reasons.
+
+Main's four reported UI errors are also fixed: correction approval uses a disabled-reason string, ordinary meter tone uses the supported brand/default style, and the hub date field supplies id/label with a void-returning callback. Main's date component may be named NzDateField rather than this source branch's DatePicker: keep Main's component name when resolving that small date-field hunk.
+
+Verification for this follow-on: all six changed PHP files pass syntax checks, and diff whitespace checks pass. No backend suite, frontend dependency work, full type check, build or browser run was launched. Main owns functional acceptance on the combined snapshot.
+
+Exact affected backend regression paths:
+
+- `tests/Feature/Emar/PersonMedicationCommandsTest.php`: both serial allergy-save/copy outcomes, preserved projection on general-note save, legacy INR evidence/date validation, retry/event uniqueness, foreign/controlled denial, route-bound disable target, and final-event rollback for INR create/disable.
+- `tests/Feature/Emar/OneChartGovernanceWorkflowTest.php`: retained INR result and reasoned disable through the legacy adapters.
+- `tests/Feature/ClientMedicalControllerTest.php`: existing health-profile/medical route regression.
+- `tests/Feature/Emar/ProfileAllergySafetyTest.php`: allergy evidence reaches dose-time safety.
+
+The new source commit follows `8fadce3d8`; no prerequisite cherry-picks are included in it. The serial allergy cases do not claim an executed concurrent-database stress test; the shared lock order supplies the serialization guarantee, pending Main's independent review and combined tests.

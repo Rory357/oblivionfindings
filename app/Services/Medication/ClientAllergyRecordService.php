@@ -228,9 +228,9 @@ class ClientAllergyRecordService
     }
 
     /** Old profile editors cannot overwrite the richer canonical list. */
-    public function guardLegacyEdit(Client $client, mixed $labels): void
+    public function guardLegacyEdit(Client $client, mixed $labels, ?ClientMedicalProfile $lockedProfile = null): void
     {
-        $profile = ClientMedicalProfile::query()->where('client_id', $client->id)->first();
+        $profile = $lockedProfile ?? ClientMedicalProfile::query()->where('client_id', $client->id)->first();
         if (! $profile?->allergies_canonical_at) {
             return;
         }

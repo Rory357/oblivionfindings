@@ -162,7 +162,7 @@ export default function MedicationRecordHub(props: Props) {
                                 tone={
                                     props.meters.overdue
                                         ? 'critical'
-                                        : 'neutral'
+                                        : 'brand'
                                 }
                                 onClick={() =>
                                     visit({ date: props.today }, 'charts')
@@ -200,8 +200,12 @@ export default function MedicationRecordHub(props: Props) {
                                 ]}
                             />
                             <DatePicker
+                                id="medication-hub-day"
+                                label="NZ calendar day"
                                 value={props.filters.date}
-                                onChange={(date) => date && visit({ date })}
+                                onChange={(date) => {
+                                    if (date) visit({ date });
+                                }}
                             />
                             {props.view === 'medicines' && (
                                 <PageHeaderFilterSelect

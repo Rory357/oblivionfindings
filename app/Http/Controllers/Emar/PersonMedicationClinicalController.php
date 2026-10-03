@@ -13,6 +13,7 @@ use App\Services\Medication\Audit\MedicationEventData;
 use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
+use App\Services\MedicationAlertService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -71,6 +72,9 @@ final class PersonMedicationClinicalController extends Controller
                     $controlled = (bool) $med?->controlled_drug;
                 }
                 $record->saveOrFail();
+                // Preserve the legacy routes' immediate alert refresh inside
+                // the same transaction, before the receipt and final event.
+                app(MedicationAlertService::class)->generateClientAlerts($person->fresh());
                 $id = (string) $record->id; $type = 'inr_record';
             } else {
                 $legacy = app(EmarController::class);

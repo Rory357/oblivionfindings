@@ -2,6 +2,7 @@ import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { MedsWizardDialog } from '@/components/meds/wizard-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
     Field,
     InfoCard,
@@ -175,7 +176,9 @@ function RecordInrDialog({
     clientId: number;
     onClose: () => void;
 }) {
+    const [requestUuid] = useState(() => crypto.randomUUID());
     const form = useForm({
+        request_uuid: requestUuid,
         inr_value: '',
         tested_on: '',
         target_range_low: '',
@@ -183,6 +186,9 @@ function RecordInrDialog({
         dose_mg: '',
         next_test_date: '',
         notes: '',
+        instruction: '',
+        instruction_source: '',
+        unlinked_reason: '',
     });
 
     const submit = (e: React.FormEvent) => {
@@ -198,7 +204,7 @@ function RecordInrDialog({
             open
             onClose={onClose}
             title="Record INR"
-            description="Record a warfarin INR result"
+            description="Record the test result and the instruction supplied with it."
             railIcon={HeartPulse}
             railTitle="Record INR"
             railSubtitle="Warfarin monitoring"
@@ -226,8 +232,13 @@ function RecordInrDialog({
                 <StepHead
                     icon={HeartPulse}
                     title="INR result"
-                    blurb="Results are retained — disable, never delete."
+                    blurb="Results are retained. No dose is calculated from this value. Link an unlinked result to its medicine in the person’s record."
                 />
+                {form.errors.request_uuid && (
+                    <p className="text-subtle text-status-critical" role="alert">
+                        {form.errors.request_uuid}
+                    </p>
+                )}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <Field
                         label="INR value"
@@ -285,7 +296,7 @@ function RecordInrDialog({
                             placeholder="3.0"
                         />
                     </Field>
-                    <Field label="Dose (mg)">
+                    <Field label="Recorded dose (mg), if supplied">
                         <Input
                             type="number"
                             step="0.01"
@@ -315,6 +326,43 @@ function RecordInrDialog({
                                 form.setData('notes', e.target.value)
                             }
                             placeholder="Optional"
+                        />
+                    </Field>
+                    <Field
+                        label="Recorded instruction"
+                        required
+                        span
+                        error={form.errors.instruction}
+                    >
+                        <Textarea
+                            value={form.data.instruction}
+                            onChange={(e) => form.setData('instruction', e.target.value)}
+                            maxLength={2000}
+                        />
+                    </Field>
+                    <Field
+                        label="Instruction source"
+                        required
+                        span
+                        error={form.errors.instruction_source}
+                    >
+                        <Input
+                            value={form.data.instruction_source}
+                            onChange={(e) => form.setData('instruction_source', e.target.value)}
+                            maxLength={255}
+                            placeholder="Who supplied the instruction and when"
+                        />
+                    </Field>
+                    <Field
+                        label="Why this result is not linked to a medicine"
+                        required
+                        span
+                        error={form.errors.unlinked_reason}
+                    >
+                        <Textarea
+                            value={form.data.unlinked_reason}
+                            onChange={(e) => form.setData('unlinked_reason', e.target.value)}
+                            maxLength={2000}
                         />
                     </Field>
                 </div>

@@ -20,6 +20,7 @@ use App\Services\MedicationReportingService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 use Database\Factories\UserFactory;
 
@@ -114,6 +115,7 @@ class OneChartGovernanceWorkflowTest extends TestCase
 
         $this->actingAs($this->admin)
             ->post("/emar/clients/{$this->client->id}/inr", [
+                'request_uuid' => (string) Str::uuid(),
                 'client_medication_id' => $warfarin->id,
                 'inr_value' => 2.5,
                 'target_range_low' => 2.0,
@@ -122,6 +124,8 @@ class OneChartGovernanceWorkflowTest extends TestCase
                 'tested_on' => today()->toDateString(),
                 'next_test_date' => today()->addWeek()->toDateString(),
                 'notes' => 'Within target range.',
+                'instruction' => 'Continue the recorded prescriber instruction.',
+                'instruction_source' => 'Recorded GP instruction for this test.',
             ])
             ->assertRedirect();
 
@@ -135,7 +139,7 @@ class OneChartGovernanceWorkflowTest extends TestCase
         $recordId = $this->client->inrRecords()->firstOrFail()->id;
 
         $this->actingAs($this->admin)
-            ->post("/emar/inr/{$recordId}/disable")
+            ->post("/emar/inr/{$recordId}/disable", ['request_uuid' => (string) Str::uuid(), 'reason' => 'Entered against the wrong test date.'])
             ->assertRedirect();
 
         $this->assertSame(1, $this->client->inrRecords()->count());

@@ -221,7 +221,9 @@ export function HistorySection({
                                               icon: ClipboardCheck,
                                               disabled:
                                                   row.requested_by ===
-                                                  data.actor_id,
+                                                  data.actor_id
+                                                      ? 'A different person must approve this correction.'
+                                                      : undefined,
                                               onClick: () =>
                                                   setCommand({
                                                       row,

@@ -19,6 +19,7 @@ use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -145,6 +146,109 @@ class PersonMedicationCommandsTest extends TestCase
     private function url(string $suffix): string
     {
         return '/emar/clients/'.$this->person->id.'/record'.$suffix;
+    }
+
+    public function test_a_legacy_allergy_save_before_copy_is_included_in_canonical_safety_reading(): void
+    {
+        Notification::fake();
+        $this->putJson('/clients/'.$this->person->id.'/medical/profile', ['allergies' => ['New recorded allergy'], 'notes' => 'Legacy profile note'])->assertRedirect();
+        $service = app(ClientAllergyRecordService::class);
+        DB::transaction(fn () => $service->copyLegacy(Client::whereKey($this->person->id)->lockForUpdate()->firstOrFail()));
+        $this->assertSame(['New recorded allergy'], array_column($service->forClient($this->person), 'allergen'));
+    }
+
+    public function test_a_legacy_allergy_save_after_copy_cannot_replace_the_canonical_projection(): void
+    {
+        Notification::fake();
+        ClientMedicalProfile::create(['client_id' => $this->person->id, 'allergies' => ['Existing allergy'], 'notes' => 'Original note']);
+        $service = app(ClientAllergyRecordService::class);
+        DB::transaction(fn () => $service->copyLegacy(Client::whereKey($this->person->id)->lockForUpdate()->firstOrFail()));
+        $this->putJson('/clients/'.$this->person->id.'/medical/profile', ['allergies' => ['New allergy'], 'notes' => 'Rejected note'])->assertUnprocessable()->assertJsonValidationErrors('allergies');
+        $profile = ClientMedicalProfile::where('client_id', $this->person->id)->firstOrFail();
+        $this->assertSame(['Existing allergy'], $profile->allergies);
+        $this->assertSame('Original note', $profile->notes);
+        $this->assertSame(['Existing allergy'], array_column($service->forClient($this->person), 'allergen'));
+        $this->putJson('/clients/'.$this->person->id.'/medical/profile', ['notes' => 'Updated general note'])->assertRedirect();
+        $this->assertSame(['Existing allergy'], $profile->fresh()->allergies);
+        $this->assertNotNull($profile->fresh()->allergies_canonical_at);
+        $this->assertSame('Updated general note', $profile->fresh()->notes);
+    }
+
+    public function test_legacy_inr_routes_require_the_canonical_evidence_and_nz_date_fields(): void
+    {
+        $url = '/emar/clients/'.$this->person->id.'/inr';
+        $this->postJson($url, ['inr_value' => 2.4, 'tested_on' => '2026-10-03'])->assertUnprocessable()->assertJsonValidationErrors('request_uuid');
+        $payload = ['request_uuid' => (string) Str::uuid(), 'inr_value' => 2.4, 'tested_on' => '2026-10-04'];
+        $this->postJson($url, $payload)->assertUnprocessable()->assertJsonValidationErrors('unlinked_reason');
+        $this->postJson($url, [...$payload, 'unlinked_reason' => 'Order awaiting entry'])->assertUnprocessable()->assertJsonValidationErrors(['instruction', 'instruction_source', 'tested_on']);
+        $this->assertDatabaseCount('client_inr_records', 0);
+        $this->assertDatabaseCount('medication_idempotency_results', 0);
+        $this->assertDatabaseCount('medication_events', 0);
+    }
+
+    public function test_legacy_inr_retry_preserves_instruction_and_writes_one_canonical_event(): void
+    {
+        $payload = $this->legacyInrPayload();
+        $url = '/emar/clients/'.$this->person->id.'/inr';
+        $this->postJson($url, $payload)->assertOk();
+        $this->postJson($url, $payload)->assertOk();
+        $this->assertDatabaseCount('client_inr_records', 1);
+        $this->assertDatabaseCount('medication_idempotency_results', 1);
+        $this->assertSame(1, MedicationEvent::where('kind', 'clinical.inr')->count());
+        $this->assertDatabaseHas('client_inr_records', ['client_id' => $this->person->id, 'instruction' => $payload['instruction'], 'instruction_source' => $payload['instruction_source'], 'unlinked_reason' => $payload['unlinked_reason'], 'dose_mg' => null]);
+    }
+
+    public function test_legacy_inr_preserves_same_person_and_controlled_privacy(): void
+    {
+        $other = Client::factory()->create(['site_id' => $this->person->site_id]);
+        $foreign = ClientMedication::create(['client_id' => $other->id, 'name' => 'Warfarin', 'state' => 'active', 'active' => true]);
+        $hidden = ClientMedication::create(['client_id' => $this->person->id, 'name' => 'Hidden anticoagulant', 'controlled_drug' => true, 'state' => 'active', 'active' => true]);
+        $url = '/emar/clients/'.$this->person->id.'/inr';
+        foreach ([$foreign, $hidden] as $medicine) {
+            $this->postJson($url, $this->legacyInrPayload(['client_medication_id' => $medicine->id]))->assertNotFound();
+        }
+        $this->assertDatabaseCount('client_inr_records', 0);
+        $this->assertDatabaseCount('medication_events', 0);
+    }
+
+    public function test_legacy_inr_disabling_requires_reason_and_retry_retains_one_event(): void
+    {
+        $record = ClientInrRecord::create(['client_id' => $this->person->id, 'inr_value' => 2.4, 'tested_on' => '2026-10-03', 'recorded_by' => $this->lead->id]);
+        $other = ClientInrRecord::create(['client_id' => $this->person->id, 'inr_value' => 3.4, 'tested_on' => '2026-10-03', 'recorded_by' => $this->lead->id]);
+        $url = '/emar/inr/'.$record->id.'/disable';
+        $uuid = (string) Str::uuid();
+        $this->postJson($url, ['request_uuid' => $uuid])->assertUnprocessable()->assertJsonValidationErrors('reason');
+        $payload = ['request_uuid' => $uuid, 'record_id' => $other->id, 'reason' => 'Entered against the wrong test date'];
+        $this->postJson($url, $payload)->assertOk();
+        $this->postJson($url, $payload)->assertOk();
+        $this->assertSame('2.4', $record->fresh()->inr_value);
+        $this->assertSame($payload['reason'], $record->fresh()->disabled_reason);
+        $this->assertNull($other->fresh()->disabled_at);
+        $this->assertSame(1, MedicationEvent::where('kind', 'clinical.disable-inr')->count());
+        $this->assertDatabaseCount('medication_idempotency_results', 1);
+    }
+
+    public function test_legacy_inr_create_rolls_back_when_the_final_event_fails(): void
+    {
+        $this->expectCorrectionEventFailure(fn () => $this->postJson('/emar/clients/'.$this->person->id.'/inr', $this->legacyInrPayload()));
+        $this->assertDatabaseCount('client_inr_records', 0);
+        $this->assertDatabaseCount('medication_idempotency_results', 0);
+        $this->assertDatabaseCount('medication_events', 0);
+    }
+
+    public function test_legacy_inr_disable_rolls_back_when_the_final_event_fails(): void
+    {
+        $record = ClientInrRecord::create(['client_id' => $this->person->id, 'inr_value' => 2.4, 'tested_on' => '2026-10-03', 'recorded_by' => $this->lead->id]);
+        $this->expectCorrectionEventFailure(fn () => $this->postJson('/emar/inr/'.$record->id.'/disable', ['request_uuid' => (string) Str::uuid(), 'reason' => 'Entered against the wrong date']));
+        $this->assertNull($record->fresh()->disabled_at);
+        $this->assertNull($record->fresh()->disabled_reason);
+        $this->assertSame('2.4', $record->fresh()->inr_value);
+        $this->assertDatabaseCount('medication_idempotency_results', 0);
+    }
+
+    private function legacyInrPayload(array $overrides = []): array
+    {
+        return array_replace(['request_uuid' => (string) Str::uuid(), 'inr_value' => 2.4, 'tested_on' => '2026-10-03', 'instruction' => 'Follow the recorded prescriber instruction', 'instruction_source' => 'GP instruction dated 3 October', 'unlinked_reason' => 'Medicine order awaiting entry'], $overrides);
     }
 
     public function test_allergy_copy_command_defaults_to_no_writes_and_repeats_without_duplicate_events(): void

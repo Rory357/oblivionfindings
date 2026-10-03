@@ -5034,85 +5034,21 @@ class EmarController extends Controller
 
     public function storeInr(Request $request, Client $client)
     {
-        $actor = $request->user();
-        abort_unless($actor, 403);
+        $response = app(PersonMedicationClinicalController::class)->store($request, (int) $client->id, 'inr');
 
-        return $this->governanceScope->forClient($actor, (int) $client->id, 'medications.orders.manage', function (Client $lockedClient) use ($request, $actor) {
-            $record = function (?ClientMedication $medication = null) use ($request, $actor, $lockedClient) {
-                $validated = $request->validate([
-                    'client_medication_id' => ['nullable', 'integer'],
-                    'inr_value' => ['required', 'numeric', 'min:0.5', 'max:20'],
-                    'target_range_low' => ['nullable', 'numeric', 'min:0.5', 'max:20'],
-                    'target_range_high' => ['nullable', 'numeric', 'min:0.5', 'max:20', 'gte:target_range_low'],
-                    'dose_mg' => ['nullable', 'numeric', 'min:0', 'max:999.99'],
-                    'tested_on' => ['required', 'date'],
-                    'next_test_date' => ['nullable', 'date', 'after_or_equal:tested_on'],
-                    'notes' => ['nullable', 'string', 'max:2000'],
-                ]);
-                if ($medication !== null) {
-                    abort_unless((int) $validated['client_medication_id'] === (int) $medication->id, 404);
-                    $validated['client_medication_id'] = $medication->id;
-                }
-
-                $lockedClient->inrRecords()->create([
-                    ...$validated,
-                    'recorded_by' => $actor->id,
-                ]);
-                app(MedicationAlertService::class)->generateClientAlerts($lockedClient->fresh());
-
-                return redirect()->back()->with('success', 'INR result recorded.');
-            };
-
-            $medicationId = (int) $request->input('client_medication_id');
-            if ($medicationId <= 0) {
-                return $record();
-            }
-
-            return $this->governanceScope->forMedication(
-                $actor,
-                $medicationId,
-                'medications.orders.manage',
-                function (Client $canonicalClient, ClientMedication $medication) use ($actor, $lockedClient, $record) {
-                    abort_unless((int) $canonicalClient->id === (int) $lockedClient->id, 404);
-                    abort_if(
-                        $medication->controlled_drug
-                            && ! $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
-                        404,
-                    );
-
-                    return $record($medication);
-                },
-                $lockedClient->id,
-            );
-        });
+        return $request->expectsJson() || $request->header('X-Inertia')
+            ? $response
+            : redirect()->back()->with('success', 'INR result recorded.');
     }
 
     public function disableInr(Request $request, ClientInrRecord $inr)
     {
-        $actor = $request->user();
-        abort_unless($actor, 403);
+        $request->merge(['record_id' => (int) $inr->id]);
+        $response = app(PersonMedicationClinicalController::class)->store($request, (int) $inr->client_id, 'disable-inr');
 
-        return $this->governanceScope->forClientRecord($actor, $inr, 'medications.orders.manage', function (Client $client, ClientInrRecord $lockedInr) use ($actor) {
-            if ($lockedInr->client_medication_id !== null) {
-                $medication = ClientMedication::withTrashed()
-                    ->whereKey($lockedInr->client_medication_id)
-                    ->where('client_id', $client->id)
-                    ->lockForUpdate()
-                    ->first();
-                abort_unless($medication !== null, 404);
-                abort_if(
-                    $medication->controlled_drug
-                        && ! $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
-                    404,
-                );
-            }
-            if (! $lockedInr->disabled_at) {
-                $lockedInr->disable($actor->id);
-            }
-            app(MedicationAlertService::class)->generateClientAlerts($client->fresh());
-
-            return redirect()->back()->with('success', 'INR result disabled.');
-        });
+        return $request->expectsJson() || $request->header('X-Inertia')
+            ? $response
+            : redirect()->back()->with('success', 'INR result marked as entered in error.');
     }
 
     public function storeSyringeDriver(Request $request, Client $client)

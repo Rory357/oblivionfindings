@@ -218,7 +218,7 @@ function AvailableRecord({
                                     meters.allergies.status === 'recorded'
                                         ? 'critical'
                                         : meters.allergies.status === 'no_known'
-                                          ? 'neutral'
+                                          ? 'brand'
                                           : 'warning'
                                 }
                             >
