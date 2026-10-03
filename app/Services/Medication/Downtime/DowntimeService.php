@@ -44,7 +44,9 @@ final class DowntimeService
 
         return DB::transaction(function () use ($actor, $data, $sheets, $start, $end, $siteId, $clientIds, $fingerprint): MedicationDowntime {
             Site::query()->whereKey($siteId)->lockForUpdate()->firstOrFail();
-            abort_unless(in_array($siteId, $this->access->siteIds($actor), true), 404);
+            $actor = $this->access->lockActor($actor, $siteId);
+            abort_unless($this->access->manages($actor), 403);
+            $clientIds = $this->access->clients($actor, $siteId);
             if ($replay = MedicationDowntime::query()->where('request_uuid', $data['request_uuid'])->first()) {
                 abort_unless((int) $replay->created_by === (int) $actor->id, 404);
                 if (! hash_equals($replay->request_fingerprint, $fingerprint)) {
@@ -107,6 +109,8 @@ final class DowntimeService
         abort_unless($this->access->manages($actor), 403);
         DB::transaction(function () use ($actor, $downtime): void {
             $downtime = MedicationDowntime::query()->whereKey($downtime->id)->lockForUpdate()->firstOrFail();
+            $actor = $this->access->lockActor($actor, (int) $downtime->site_id);
+            abort_unless($this->access->manages($actor), 403);
             $this->access->downtime($actor, (int) $downtime->id);
             if ($downtime->finished_at) {
                 return;

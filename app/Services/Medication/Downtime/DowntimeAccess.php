@@ -7,6 +7,8 @@ use App\Models\ClientMedication;
 use App\Models\MedicationDowntime;
 use App\Models\MedicationPaperEntry;
 use App\Models\User;
+use App\Services\AuthorizationEvidenceLockService;
+use App\Services\CurrentAuthorizationReads;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
 use App\Services\UserSiteAccessService;
@@ -22,11 +24,23 @@ final class DowntimeAccess
             && $actor->hasRole('admin', 'provider_manager', 'coordinator', 'clinical_lead', 'team_lead');
     }
 
-    public function siteIds(User $actor, bool $pack = false): array
+    public function siteIds(User $actor, bool $pack = false, ?CurrentAuthorizationReads $reads = null): array
     {
         abort_unless($pack ? $actor->canDo('medications.reports.export') : ($this->manages($actor) || $actor->canDo('medications.administer.record')), 403);
 
-        return $this->sites->accessibleSiteIds($actor, MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS);
+        return $this->sites->accessibleSiteIds($actor, MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS, $reads);
+    }
+
+    /** Refresh authority after domain locks; NOWAIT avoids an inverse RBAC lock chain. */
+    public function lockActor(User $actor, int $siteId): User
+    {
+        $current = app(AuthorizationEvidenceLockService::class)->lockForUserWithoutWaiting($actor, ['*']);
+        abort_unless($current->isApproved(), 403);
+        CurrentAuthorizationReads::within(function (CurrentAuthorizationReads $reads) use ($current, $siteId): void {
+            abort_unless(in_array($siteId, $this->siteIds($current, reads: $reads), true), 404);
+        });
+
+        return $current;
     }
 
     public function downtime(User $actor, int $id): MedicationDowntime
@@ -41,10 +55,15 @@ final class DowntimeAccess
     public function order(User $actor, MedicationDowntime $downtime, int $id): ClientMedication
     {
         $order = ClientMedication::query()->whereHas('client', fn ($q) => $q->where('site_id', $downtime->site_id))->findOrFail($id);
-        $this->records->assertReadable($actor, $order->client);
-        abort_if($order->controlled_drug && ! $actor->canDo('medications.controlled.view'), 404);
+        $this->assertOrderReadable($actor, $order);
 
         return $order;
+    }
+
+    public function assertOrderReadable(User $actor, ClientMedication $order): void
+    {
+        $this->records->assertReadable($actor, $order->client);
+        abort_if($order->controlled_drug && ! $actor->canDo('medications.controlled.view'), 404);
     }
 
     public function entry(User $actor, MedicationDowntime $downtime, int $id): MedicationPaperEntry

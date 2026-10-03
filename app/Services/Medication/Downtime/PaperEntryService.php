@@ -156,7 +156,7 @@ final class PaperEntryService
 
         // All mutations follow client -> order -> downtime -> paper. Global order lock serialises overlapping windows.
         return DB::transaction(function () use ($actor, $downtime, $data): MedicationPaperEntry {
-            $order = $this->lockOrder($actor, $downtime, (int) $data['client_medication_id']);
+            [$order, $actor] = $this->lockOrder($actor, $downtime, (int) $data['client_medication_id']);
             $downtime = MedicationDowntime::query()->whereKey($downtime->id)->lockForUpdate()->firstOrFail();
             $fingerprint = PaperReconciliationRules::fingerprint(array_diff_key($data, array_flip(['preview_token', 'accountable_confirmation'])));
             $replay = MedicationPaperEntry::query()->where('request_uuid', $data['request_uuid'])->first();
@@ -200,7 +200,7 @@ final class PaperEntryService
     public function confirm(User $actor, MedicationDowntime $downtime, MedicationPaperEntry $entry, string $kind, ?string $pin): void
     {
         DB::transaction(function () use ($actor, $downtime, $entry, $kind, $pin): void {
-            $order = $this->lockOrder($actor, $downtime, (int) $entry->client_medication_id);
+            [$order, $actor] = $this->lockOrder($actor, $downtime, (int) $entry->client_medication_id);
             $entry = MedicationPaperEntry::query()->whereKey($entry->id)->lockForUpdate()->firstOrFail();
             $this->access->entry($actor, $downtime, (int) $entry->id);
             abort_unless((int) $actor->id === (int) ($kind === 'giver' ? $entry->given_by : $entry->witness_id), 404);
@@ -228,7 +228,7 @@ final class PaperEntryService
     public function reconcile(User $actor, MedicationDowntime $downtime, MedicationPaperEntry $entry, string $previewToken): array
     {
         return DB::transaction(function () use ($actor, $downtime, $entry, $previewToken): array {
-            $order = $this->lockOrder($actor, $downtime, (int) $entry->client_medication_id);
+            [$order, $actor] = $this->lockOrder($actor, $downtime, (int) $entry->client_medication_id);
             $entry = MedicationPaperEntry::query()->whereKey($entry->id)->firstOrFail();
             $this->access->entry($actor, $downtime, (int) $entry->id);
             if ($posted = $entry->posting()->first()) {
@@ -311,7 +311,8 @@ final class PaperEntryService
             throw ValidationException::withMessages(['reason' => 'Say how the signed paper was checked against this existing evidence.']);
         }
         DB::transaction(function () use ($actor, $downtime, $dose, $kind, $recordId, $reason): void {
-            $order = $this->lockOrder($actor, $downtime, (int) $dose->client_medication_id);
+            [$order, $actor] = $this->lockOrder($actor, $downtime, (int) $dose->client_medication_id);
+            abort_unless($this->access->manages($actor), 403);
             $downtime = MedicationDowntime::query()->whereKey($downtime->id)->lockForUpdate()->firstOrFail();
             $dose = $downtime->doses()->whereKey($dose->id)->lockForUpdate()->firstOrFail();
             $choices = $this->resolutionChoices($actor, $downtime, $dose);
@@ -349,13 +350,17 @@ final class PaperEntryService
         return $conflicts;
     }
 
-    private function lockOrder(User $actor, MedicationDowntime $downtime, int $id): ClientMedication
+    private function lockOrder(User $actor, MedicationDowntime $downtime, int $id): array
     {
         $visible = $this->access->order($actor, $downtime, $id);
         $client = Client::query()->whereKey($visible->client_id)->lockForUpdate()->firstOrFail();
         abort_unless((int) $client->site_id === (int) $downtime->site_id, 404);
 
-        return ClientMedication::query()->whereKey($id)->lockForUpdate()->firstOrFail()->setRelation('client', $client);
+        $order = ClientMedication::query()->whereKey($id)->where('client_id', $client->id)->lockForUpdate()->firstOrFail()->setRelation('client', $client);
+        $current = $this->access->lockActor($actor, (int) $downtime->site_id);
+        $this->access->assertOrderReadable($current, $order);
+
+        return [$order, $current];
     }
 
     private function instant(string $value): CarbonImmutable

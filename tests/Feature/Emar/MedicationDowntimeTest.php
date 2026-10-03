@@ -17,6 +17,7 @@ use App\Models\Role;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\Downtime\DowntimeAccess;
 use App\Services\Medication\Downtime\DowntimeEvents;
 use App\Services\Medication\Downtime\DowntimePackPdf;
 use App\Services\Medication\Downtime\DowntimePackService;
@@ -33,6 +34,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use LogicException;
 use Mockery;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Tests\TestCase;
 
 class MedicationDowntimeTest extends TestCase
@@ -588,6 +590,84 @@ class MedicationDowntimeTest extends TestCase
         $this->assertSame(['Synthetic allergen'], $profile->fresh()->allergies);
         $this->assertStringNotContainsString('%PDF-sensitive', $response->getContent());
         $this->assertSame(0, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
+    }
+
+    public function test_giver_confirmation_rechecks_cached_account_approval_before_writing(): void
+    {
+        $this->assertGiverConfirmationDeniedAfterRevocation(
+            fn (User $giver) => DB::table('users')->where('id', $giver->id)->update(['approved_at' => null]), 403,
+        );
+    }
+
+    public function test_giver_confirmation_rechecks_cached_record_permission_before_writing(): void
+    {
+        $this->assertGiverConfirmationDeniedAfterRevocation(function (User $giver): void {
+            $id = Permission::query()->where('key', 'medications.administer.record')->firstOrFail()->id;
+            $giver->permissionOverrides()->syncWithoutDetaching([$id => ['allowed' => false]]);
+        }, 403);
+    }
+
+    public function test_giver_confirmation_rechecks_cached_approved_site_before_writing(): void
+    {
+        $this->assertGiverConfirmationDeniedAfterRevocation(
+            fn (User $giver) => DB::table('hr_employee_profiles')->where('user_id', $giver->id)->update(['primary_site_id' => null, 'secondary_site_ids' => '[]']), 404,
+        );
+    }
+
+    public function test_declaration_rechecks_cached_site_authority_before_writing(): void
+    {
+        app(DowntimeAccess::class)->clients($this->lead, $this->site->id);
+        DB::table('hr_employee_profiles')->where('user_id', $this->lead->id)->update(['primary_site_id' => null, 'secondary_site_ids' => '[]']);
+        $before = MedicationEvent::query()->count();
+        try {
+            app(DowntimeService::class)->declare($this->lead, $this->declaration());
+            $this->fail('Revoked Site authority must not declare a downtime.');
+        } catch (HttpExceptionInterface $error) {
+            $this->assertSame(404, $error->getStatusCode());
+        }
+        $this->assertDatabaseCount('medication_downtimes', 0);
+        $this->assertSame($before, MedicationEvent::query()->count());
+    }
+
+    public function test_finishing_collection_rechecks_cached_site_authority_before_writing(): void
+    {
+        $downtime = $this->declare();
+        $this->capture($downtime);
+        app(DowntimeAccess::class)->downtime($this->lead, $downtime->id);
+        DB::table('hr_employee_profiles')->where('user_id', $this->lead->id)->update(['primary_site_id' => null, 'secondary_site_ids' => '[]']);
+        $before = MedicationEvent::query()->count();
+        try {
+            app(DowntimeService::class)->finish($this->lead, $downtime);
+            $this->fail('Revoked Site authority must not finish paper collection.');
+        } catch (HttpExceptionInterface $error) {
+            $this->assertSame(404, $error->getStatusCode());
+        }
+        $this->assertNull($downtime->fresh()->finished_at);
+        $this->assertSame($before, MedicationEvent::query()->count());
+    }
+
+    private function assertGiverConfirmationDeniedAfterRevocation(callable $revoke, int $status): void
+    {
+        $downtime = $this->declare();
+        $giver = $this->staff($this->site, 'support_worker', ['medications.view', 'medications.administer.record', 'clients.viewAny']);
+        $entry = $this->capture($downtime, ['given_by' => $giver->id]);
+        // Same request actor: preflight has already cached its grants and Site.
+        $giver->load(['permissionOverrides', 'roles.permissions']);
+        $access = app(DowntimeAccess::class);
+        $access->downtime($giver, $downtime->id);
+        $access->entry($giver, $downtime, $entry->id);
+        $this->assertTrue($giver->canDo('medications.administer.record'));
+        $revoke($giver);
+        $before = MedicationEvent::query()->count();
+        try {
+            app(PaperEntryService::class)->confirm($giver, $downtime, $entry, 'giver', null);
+            $this->fail('Revoked authority must not confirm paper evidence.');
+        } catch (HttpExceptionInterface $error) {
+            $this->assertSame($status, $error->getStatusCode());
+        }
+        $this->assertDatabaseMissing('medication_paper_confirmations', ['paper_entry_id' => $entry->id, 'kind' => 'giver']);
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertSame($before, MedicationEvent::query()->count());
     }
 
     private function fakePackRender(callable $duringRender): void
