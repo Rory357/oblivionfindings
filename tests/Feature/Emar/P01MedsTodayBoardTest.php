@@ -247,7 +247,7 @@ class P01MedsTodayBoardTest extends TestCase
                 ->assertInertia(fn (Assert $page) => $page
                     ->where('schedule.0.state', $state)
                     ->where('schedule.0.status', $status)
-                    ->where('schedule.0.requirements.window', $window)
+                    ->where('schedule.0.req.window', $window)
                 );
         }
     }
