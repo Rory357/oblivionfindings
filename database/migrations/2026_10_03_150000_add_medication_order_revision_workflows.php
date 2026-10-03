@@ -60,9 +60,9 @@ return new class extends Migration
         });
         Schema::create('medication_reconciliation_items', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('medication_reconciliation_id')->constrained('medication_reconciliations');
+            $table->foreignId('medication_reconciliation_id')->constrained('medication_reconciliations', indexName: 'mri_reconciliation_fk');
             $table->foreignId('client_medication_id')->nullable()->constrained('client_medications');
-            $table->foreignId('medication_order_revision_id')->nullable()->constrained('medication_order_revisions');
+            $table->foreignId('medication_order_revision_id')->nullable()->constrained('medication_order_revisions', indexName: 'mri_order_revision_fk');
             $table->string('medicine_name');
             $table->boolean('controlled')->default(false);
             $table->string('decision', 30)->nullable();
@@ -78,7 +78,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('medication_order_revision_id')->nullable()->constrained('medication_order_revisions');
             $table->foreignId('medication_reconciliation_id')->nullable()->constrained('medication_reconciliations');
-            $table->foreignId('medication_covert_authorisation_id')->nullable()->constrained('medication_covert_authorisations');
+            $table->foreignId('medication_covert_authorisation_id')->nullable()->constrained('medication_covert_authorisations', indexName: 'mof_covert_authorisation_fk');
             $table->string('purpose', 30);
             $table->string('file_name');
             $table->string('file_path');

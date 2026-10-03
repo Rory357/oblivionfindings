@@ -9,16 +9,17 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('medication_review_items', function (Blueprint $table) {
-            $table->foreignId('linked_stopped_order_version_id')->nullable()->constrained('medication_order_versions');
-            $table->foreignId('linked_replacement_order_version_id')->nullable()->constrained('medication_order_versions');
+            $table->foreignId('linked_stopped_order_version_id')->nullable()->constrained('medication_order_versions', indexName: 'mri_stopped_version_fk');
+            $table->foreignId('linked_replacement_order_version_id')->nullable()->constrained('medication_order_versions', indexName: 'mri_replacement_version_fk');
         });
     }
 
     public function down(): void
     {
         Schema::table('medication_review_items', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('linked_replacement_order_version_id');
-            $table->dropConstrainedForeignId('linked_stopped_order_version_id');
+            $table->dropForeign('mri_replacement_version_fk');
+            $table->dropForeign('mri_stopped_version_fk');
+            $table->dropColumn(['linked_replacement_order_version_id', 'linked_stopped_order_version_id']);
         });
     }
 };
