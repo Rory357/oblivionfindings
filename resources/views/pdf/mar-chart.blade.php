@@ -46,7 +46,9 @@
     <div class="allergy-banner">
         <strong>ALLERGIES:</strong>
         @foreach($allergies as $allergy)
-            {{ $allergy->allergen }}@if($allergy->severity) ({{ $allergy->severity }})@endif@if($allergy->reaction) — {{ $allergy->reaction }}@endif@if(!$loop->last), @endif
+            {{ $allergy->allergen }}@if($allergy->severity) ({{ $allergy->severity }})@endif
+            @if($allergy->reaction) — {{ $allergy->reaction }}@endif
+            @if(!$loop->last), @endif
         @endforeach
     </div>
     @endif

@@ -192,7 +192,7 @@ final class MedicationStockController extends Controller
             'receive' => [
                 'unit' => 'nullable|string|max:50',
                 'packs' => 'required_without:quantity|array|min:1|max:25',
-                'quantity' => [...array_diff($positive, ['required']), 'required_without:packs', 'prohibited_with:packs'],
+                'quantity' => [...array_diff($positive, ['required']), 'required_without:packs', 'prohibits:packs'],
                 'batch_number' => 'nullable|string|max:100', 'batch_not_printed' => 'required_without:packs|boolean',
                 'expiry_month' => 'nullable|string|max:7', 'expiry_not_printed' => 'required_without:packs|boolean',
                 'packs.*' => 'required|array:quantity,batch_number,batch_not_printed,expiry_month,expiry_not_printed,short_expiry_reason',
