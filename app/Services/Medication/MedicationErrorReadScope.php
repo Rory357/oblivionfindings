@@ -9,11 +9,11 @@ use Illuminate\Database\Eloquent\Builder;
 /** One scope before register/Tasks counts, filtering, search, detail and export. */
 final class MedicationErrorReadScope
 {
-    public function __construct(private readonly MedicationGovernanceScopeService $governance, private readonly MarLinkService $links) {}
+    public function __construct(private readonly MedicationGovernanceScopeService $governance, private readonly MedicationRecordAccess $records) {}
 
     public function apply(Builder $query, User $actor, array $siteIds): Builder
     {
-        $clientIds = $this->links->openableClientIds($actor, Client::query()->whereIn('site_id', $siteIds)->pluck('id'));
+        $clientIds = $this->records->readableClientIds($actor, Client::query()->whereIn('site_id', $siteIds)->pluck('id'));
         $this->governance->scopeCanonicalClientMedicationRows($query, $siteIds)->whereIn('client_id', $clientIds);
         if (! $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
             $this->governance->scopeWithoutControlledMedicationRows($query);
