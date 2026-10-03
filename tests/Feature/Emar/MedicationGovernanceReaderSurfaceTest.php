@@ -141,7 +141,7 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
         $this->assertSame([$context['local_client']->full_name], $rows->pluck(0)->unique()->all());
         $this->assertContains('Local ordinary medicine', $rows->pluck(2)->all());
         $this->assertNotContains('Foreign ordinary medicine', $rows->pluck(2)->all());
-        $this->assertSame('not_recorded', $rows->first(fn ($row) => $row[2] === 'Local ordinary medicine')[4]);
+        $this->assertSame('late', $rows->first(fn ($row) => $row[2] === 'Local ordinary medicine')[4]);
 
         $emptyAudit = $this->retainedAuditFeed($noSiteReader)->assertOk();
         $this->assertSame([], collect($emptyAudit->inertiaProps('events'))->all());
@@ -432,7 +432,7 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
                 $this->assertSame([$context[$scope.'_client']->full_name], $rows->pluck(0)->unique()->all());
                 // The forged cross-person dose cannot turn either ordinary
                 // medicine's scheduled slot into a given dose.
-                $this->assertSame('not_recorded', $rows->first(fn ($row) => $row[2] === ucfirst($scope).' ordinary medicine')[4]);
+                $this->assertSame('late', $rows->first(fn ($row) => $row[2] === ucfirst($scope).' ordinary medicine')[4]);
             }
             $this->actingAs($global)
                 ->get(route('emar.pdf.mar', ['client_id' => $context['foreign_client']->id, 'purpose' => 'care']))

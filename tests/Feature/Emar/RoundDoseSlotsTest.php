@@ -183,7 +183,7 @@ class RoundDoseSlotsTest extends TestCase
         $rows = collect($report->inertiaProps('page.data'))->keyBy('reference');
         $this->assertSame('on_time', $rows['round:'.$morning->id]['status']);
         $this->assertSame('late', $rows['round:'.$midday->id]['status']);
-        $this->assertSame('2026-06-15T01:00:00+00:00', $rows['round:'.$midday->id]['window_ends_at']);
+        $this->assertSame('2026-06-15T01:00:00+00:00', Carbon::parse($rows['round:'.$midday->id]['window_ends_at'])->utc()->toIso8601String());
     }
 
     public function test_my_calendar_shows_a_round_at_its_nz_time(): void

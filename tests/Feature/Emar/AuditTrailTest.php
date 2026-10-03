@@ -306,12 +306,11 @@ class AuditTrailTest extends TestCase
         );
         $this->assertSame($correctionRequester->name, $rejectedEvent['details']['submitted_by']);
 
-        $todayApprovedCorrections = collect($this->actingAs($user)
-            ->get(route('emar.audit', [
-                'date_from' => today()->toDateString(),
-                'date_to' => today()->toDateString(),
-                'event_types' => 'correction_approved',
-            ]))
+        $todayApprovedCorrections = collect($this->retainedAuditFeed($user, [
+            'date_from' => today()->toDateString(),
+            'date_to' => today()->toDateString(),
+            'event_types' => 'correction_approved',
+        ])
             ->assertOk()
             ->inertiaProps('events'));
         $this->assertSame(

@@ -137,7 +137,7 @@ class AuditOmissionsTest extends TestCase
             ->assertInertia(fn ($page) => $page->has('page.data', 1)
                 ->where('page.data.0.medicine', 'Checked medicine')->where('page.data.0.dose', '1 tablet')
                 ->where('page.data.0.version_reference', 'order-version:'.$checked->id)
-                ->where('page.data.0.status', 'not_recorded'));
+                ->where('page.data.0.status', 'late')->where('page.data.0.recorded_at', null));
     }
 
     public function test_a_period_before_the_dose_record_says_so(): void
@@ -175,7 +175,9 @@ class AuditOmissionsTest extends TestCase
             ->inertiaProps('page.data');
 
         return collect($events)
-            ->where('status', 'not_recorded')
+            // Today's ended, unrecorded window is Late; an earlier day's
+            // unrecorded window is Not recorded. Both are omission evidence.
+            ->whereIn('status', ['late', 'not_recorded'])
             ->map(fn (array $event): string => $event['medicine'].' '
                 .Carbon::parse($event['due_at'])->timezone('Pacific/Auckland')->format('Y-m-d H:i'))
             ->sort()
