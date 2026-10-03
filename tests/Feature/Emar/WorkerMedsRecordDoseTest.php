@@ -169,6 +169,54 @@ class WorkerMedsRecordDoseTest extends TestCase
             );
     }
 
+    public function test_shared_shift_recording_rechecks_pack_code_and_submitted_shift(): void
+    {
+        $medication = $this->scheduledMedication(['09:30']);
+        $payload = [
+            'client_medication_id' => $medication->id,
+            'scheduled_for' => Carbon::parse('2026-04-30 09:30', config('app.worker_timezone'))->toIso8601String(),
+            'status' => 'given',
+            'scan_verified' => true,
+            'scan_code' => 'WRONG-PACK-CODE',
+        ];
+        $this->actingAs($this->worker)->postJson('/meds/today/record', $payload)
+            ->assertUnprocessable()->assertJsonValidationErrors('scan_code');
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+
+        $payload['scan_code'] = app(\App\Services\MedicationScanVerificationService::class)->internalCode($this->client, $medication);
+        $payload['shift_id'] = 999999999;
+        $this->actingAs($this->worker)->postJson('/meds/today/record', $payload)->assertNotFound();
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $payload['shift_id'] = Shift::query()->where('user_id', $this->worker->id)->sole()->id;
+        $payload['client_request_uuid'] = '09e7da73-b562-49f0-895b-b51991584892';
+        $this->actingAs($this->worker)->postJson('/meds/today/record', $payload)->assertOk();
+        $this->actingAs($this->worker)->postJson('/meds/today/record', $payload)->assertOk()->assertJsonPath('replayed', true);
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+        $this->assertDatabaseCount('medication_events', 1);
+        $this->assertSame((int) $payload['shift_id'], (int) ClientMedicationAdministration::sole()->shift_id);
+    }
+
+    public function test_audit_append_failure_rolls_back_the_dose_and_its_follow_up(): void
+    {
+        $medication = $this->scheduledMedication(['09:30']);
+        $this->mock(\App\Services\Medication\Audit\MedicationEventRecorder::class)
+            ->shouldReceive('append')->once()->andThrow(new RuntimeException('Audit recorder unavailable'));
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($this->worker)->postJson('/meds/today/record', [
+                'client_medication_id' => $medication->id,
+                'scheduled_for' => Carbon::parse('2026-04-30 09:30', config('app.worker_timezone'))->toIso8601String(),
+                'status' => 'refused', 'reason_code' => 'refused',
+            ]);
+            $this->fail('A failed audit append must reject the source transaction.');
+        } catch (RuntimeException $error) {
+            $this->assertSame('Audit recorder unavailable', $error->getMessage());
+        }
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertDatabaseCount('medication_followups', 0);
+        $this->assertDatabaseCount('medication_events', 0);
+    }
+
     public function test_late_recording_outside_the_window_requires_a_reason(): void
     {
         $medication = $this->scheduledMedication(['08:00']);
@@ -1306,6 +1354,53 @@ class WorkerMedsRecordDoseTest extends TestCase
             ->get('/meds/today')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->count('prn_follow_ups', 0));
+    }
+
+    public function test_unresolved_prn_checks_survive_midnight_and_use_the_stored_time_without_a_default(): void
+    {
+        $prn = ClientMedication::query()->create([
+            'client_id' => $this->client->id,
+            'name' => 'Synthetic as-needed medicine',
+            'is_prn' => true,
+            'active' => true,
+            'state' => 'active',
+        ]);
+        $dueAt = Carbon::parse('2026-04-30 07:17:00', config('app.worker_timezone'))->utc();
+        $previousDay = ClientMedicationAdministration::create([
+            'client_id' => $this->client->id,
+            'client_medication_id' => $prn->id,
+            'administered_by' => $this->worker->id,
+            'administered_at' => now()->subDay(),
+            'effect_check_due_at' => $dueAt,
+            'status' => 'given',
+        ]);
+        $noTime = ClientMedicationAdministration::create([
+            'client_id' => $this->client->id,
+            'client_medication_id' => $prn->id,
+            'administered_by' => $this->worker->id,
+            'administered_at' => now()->subMinutes(10),
+            'status' => 'given',
+        ]);
+
+        $this->actingAs($this->worker)->get('/meds/today')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->count('prn_follow_ups', 2)
+                ->where('prn_follow_ups', function ($rows) use ($previousDay, $noTime, $dueAt) {
+                    $rows = collect($rows)->keyBy('administration_id');
+
+                    return Carbon::parse($rows[$previousDay->id]['effect_check_due_at'])->equalTo($dueAt)
+                        && $rows[$previousDay->id]['overdue'] === true
+                        && $rows[$noTime->id]['effect_check_due_at'] === null
+                        && $rows[$noTime->id]['check_at'] === null;
+                }));
+
+        $this->actingAs($this->worker)->post('/meds/today/prn/effect', [
+            'client_medication_administration_id' => $previousDay->id,
+            'effectiveness' => 'effective',
+        ])->assertSessionHas('success');
+        $this->get('/meds/today')->assertInertia(fn (Assert $page) => $page
+            ->count('prn_follow_ups', 1)
+            ->where('prn_follow_ups.0.administration_id', $noTime->id));
     }
 
     public function test_controlled_prn_effect_requires_the_exact_controlled_record_capability(): void

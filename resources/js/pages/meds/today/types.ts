@@ -66,7 +66,14 @@ export interface RecordedInfo {
 export interface BoardRequirements {
     block_all: string | null;
     block_given: string | null;
-    competency: 'current' | 'expired' | 'not_current' | 'restricted' | 'cosigner' | 'area' | null;
+    competency:
+        | 'current'
+        | 'expired'
+        | 'not_current'
+        | 'restricted'
+        | 'cosigner'
+        | 'area'
+        | null;
     second_person: 'witness' | 'rule' | 'cosigner' | null;
     witness_available: boolean;
     allergy_match: boolean;
@@ -85,6 +92,9 @@ export interface ScheduleRow {
     is_controlled: boolean;
     requires_witness: boolean;
     scheduled_for: string;
+    /** Canonical projection state; list status also includes the due-soon horizon. */
+    state?: string;
+    due_soon?: boolean;
     time: string;
     round_label: string;
     status: DoseStatus;
@@ -260,6 +270,11 @@ export interface PrnFollowUp {
     check_due_at?: string | null;
     check_at: string | null;
     by?: string | null;
+    given_label?: string | null;
+    effect_check_due_at?: string | null;
+    overdue?: boolean;
+    owner_id?: number | null;
+    owner_name?: string | null;
 }
 
 export interface StockAlert {
@@ -294,6 +309,7 @@ export interface NotGivenReasonOption {
 }
 
 export interface MedsTodayProps {
+    guidedRound?: import('@/components/emar/rounds/types').GuidedRound | null;
     /** P11: the worker's own medication eligibility (the "My eligibility" meter). */
     my_eligibility?: MyEligibilityData | null;
     today: string;
@@ -334,6 +350,7 @@ export interface MedsTodayProps {
         witness_pin?: WitnessPinStatus;
     };
     board_can: {
+        export_round?: boolean;
         view_emar: boolean;
         view_audit: boolean;
         record_administration: boolean;
@@ -348,6 +365,15 @@ export interface MedsTodayProps {
     hidden_controlled_doses?: number;
     /** …and how many of those are overdue (counted by the badge). */
     hidden_controlled_overdue?: number;
+    concealed_schedule?: {
+        total: number;
+        overdue: number;
+        due_now?: number;
+        open?: number;
+        waiting?: number;
+        due_so_far?: number;
+        recorded_so_far?: number;
+    };
     /** P01 C3 (approved Meds today). */
     clocked_in?: boolean;
     house_label?: string | null;

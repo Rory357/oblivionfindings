@@ -45,13 +45,12 @@ class GuidedRoundController extends Controller
         abort_unless($this->canWork($user), 403);
 
         return $this->medicationScope->forRound($user, $round, now(), function (MedicationScopeDecision $scope) {
-            // The guided walk-through is now a modal on /emar/rounds (and surfaced
-            // on /meds/today). Redirect deep links there with the round pre-opened.
+            // Keep the selected day when opening the shared board walk-through.
             $dateStr = $scope->round->round_date instanceof \DateTimeInterface
                 ? $scope->round->round_date->format('Y-m-d')
                 : (string) $scope->round->round_date;
 
-            return redirect()->route('emar.rounds', ['date' => $dateStr, 'guided' => $scope->round->id]);
+            return redirect()->route('meds.today', ['view' => 'rounds', 'round' => $scope->round->id, 'date' => $dateStr]);
         });
     }
 
@@ -71,7 +70,7 @@ class GuidedRoundController extends Controller
             $user,
             $round,
             now(),
-            function (MedicationScopeDecision $scope) {
+            function (MedicationScopeDecision $scope) use ($request) {
                 if ($scope->round->status === 'pending') {
                     $scope->round->forceFill([
                         'status' => 'in_progress',
@@ -85,6 +84,10 @@ class GuidedRoundController extends Controller
                 $dateStr = $scope->round->round_date instanceof \DateTimeInterface
                     ? $scope->round->round_date->format('Y-m-d')
                     : (string) $scope->round->round_date;
+
+                if ($request->input('return_to') === 'meds-today') {
+                    return redirect()->route('meds.today', ['view' => 'rounds', 'round' => $scope->round->id, 'date' => $dateStr]);
+                }
 
                 return redirect()->route('emar.rounds', [
                     'date' => $dateStr,

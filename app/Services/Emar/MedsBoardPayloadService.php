@@ -143,7 +143,7 @@ class MedsBoardPayloadService
             $doses = $states->dosesOn($medications->concat($controlled), $date, $now);
             // Counted only for a caller that asks (passes $hidden).
             if (func_num_args() >= 6) {
-                $hidden = $this->hiddenControlledDoses($controlled, $doses, $clientIds, $date);
+                $hidden = $this->hiddenControlledDoses($controlled, $doses, $clientIds, $date, $now);
             }
             // The words for an Away dose, as this reader may read them (C7).
             $doses = $states->withAwayReasons($doses, auth()->user());
@@ -178,6 +178,8 @@ class MedsBoardPayloadService
                         'is_controlled' => (bool) ($med->controlled_drug ?? false),
                         'requires_witness' => (bool) ($med->witness_required ?? false) || (bool) ($med->controlled_drug ?? false),
                         'scheduled_for' => $scheduled->toIso8601String(),
+                        'state' => $dose['state'],
+                        'due_soon' => (bool) $dose['due_soon'],
                         // P01 C3: the dose's own window, for the state line
                         // ("Due now · window until 10:00 am").
                         'window_opens_at' => $dose['window_opens_at']->toIso8601String(),
@@ -234,9 +236,9 @@ class MedsBoardPayloadService
      * @param  array<int, int>  $clientIds
      * @return array{total: int, overdue: int}
      */
-    private function hiddenControlledDoses(Collection $controlled, array $doses, array $clientIds, Carbon $date): array
+    private function hiddenControlledDoses(Collection $controlled, array $doses, array $clientIds, Carbon $date, Carbon $now): array
     {
-        $hidden = ['total' => 0, 'overdue' => 0];
+        $hidden = ['total' => 0, 'overdue' => 0, 'due_now' => 0, 'open' => 0, 'waiting' => 0, 'due_so_far' => 0, 'recorded_so_far' => 0];
         if ($controlled->isEmpty()) {
             return $hidden;
         }
@@ -248,6 +250,21 @@ class MedsBoardPayloadService
             foreach ($doses[(int) $order->id] ?? [] as $dose) {
                 $record = $records->get($this->scheduleService->slotKey((int) $order->client_id, (int) $order->id, $dose['due_at']));
                 $hidden['total']++;
+                $recorded = $record !== null && in_array($record->status, ScheduledDoseStates::RECORDED_STATUSES, true);
+                $staffDose = ! in_array($dose['state'], ['away', 'self_managed', 'pending_check'], true);
+                if ($dose['state'] === 'pending_check' && ! $recorded) {
+                    $hidden['waiting']++;
+                }
+                if ($staffDose && ! $recorded) {
+                    $hidden['open']++;
+                    if ($dose['state'] === 'due') {
+                        $hidden['due_now']++;
+                    }
+                }
+                if ($staffDose && $dose['due_at']->lte($now)) {
+                    $hidden['due_so_far']++;
+                    $hidden['recorded_so_far'] += $recorded ? 1 : 0;
+                }
                 if (ScheduledDoseStates::statusFor($dose, $record?->status) === 'overdue') {
                     $hidden['overdue']++;
                 }

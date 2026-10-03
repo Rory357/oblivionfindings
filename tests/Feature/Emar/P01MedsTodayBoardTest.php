@@ -196,6 +196,78 @@ class P01MedsTodayBoardTest extends TestCase
             );
     }
 
+    public function test_follow_up_readers_do_not_disclose_mismatched_person_or_medicine_links(): void
+    {
+        $this->shift(clockedIn: true);
+        $other = $this->person('Restricted', 'Person');
+        $foreignOrder = $this->order($other, 'Private medicine', ['08:00']);
+        $foreignFollowUp = $this->refusal($foreignOrder, '08:00', '10:00');
+        // Neither attaching somebody else's administration to a visible person,
+        // nor forging the administration's medicine link grants read authority.
+        $foreignFollowUp->forceFill(['client_id' => $this->client->id])->save();
+        $visibleOrder = $this->order($this->client, 'Visible medicine', ['08:00']);
+        $forgedFollowUp = $this->refusal($visibleOrder, '08:00', '10:00');
+        $forgedFollowUp->administration->forceFill(['client_medication_id' => $foreignOrder->id])->save();
+        $validFollowUp = $this->refusal($visibleOrder, '08:00', '11:00');
+        $foreignPrn = $this->order($other, 'Private as-needed medicine', [], ['is_prn' => true]);
+        ClientMedicationAdministration::query()->create([
+            'client_id' => $this->client->id,
+            'client_medication_id' => $foreignPrn->id,
+            'administered_by' => $this->worker->id,
+            'administered_at' => now()->subMinutes(10),
+            'status' => 'given',
+        ]);
+
+        $response = $this->actingAs($this->worker)->get('/meds/today')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('refusal_follow_ups', 1)
+                ->where('refusal_follow_ups.0.id', $validFollowUp->id)
+                ->where('refusal_follow_ups.0.medication_name', 'Visible medicine')
+                ->where('prn_follow_ups', [])
+            );
+        $response->assertDontSee('Private medicine')->assertDontSee('Private as-needed medicine');
+    }
+
+    public function test_due_soon_retains_the_canonical_window_at_both_edges(): void
+    {
+        config(['medications.mar.window_before_minutes' => 15, 'medications.mar.window_after_minutes' => 15, 'medications.mar.due_soon_minutes' => 60]);
+        $this->shift(clockedIn: true);
+        $this->order($this->client, '10 am medicine', ['10:00']);
+        foreach ([
+            ['09:15', 'not_due', 'due'],
+            ['09:45', 'due', 'due'],
+            ['10:15', 'due', 'due'],
+            ['10:16', 'late', 'overdue'],
+        ] as [$at, $state, $status]) {
+            Carbon::setTestNow(Carbon::parse('2026-04-30 '.$at, self::TZ)->utc());
+            $this->actingAs($this->worker)->get('/meds/today')->assertOk()
+                ->assertInertia(fn (Assert $page) => $page
+                    ->where('schedule.0.state', $state)
+                    ->where('schedule.0.status', $status)
+                    ->where('schedule.0.requirements.due.state', $state)
+                );
+        }
+    }
+
+    public function test_concealed_controlled_obligations_are_counted_without_named_rows(): void
+    {
+        $this->setPermissions(['medications.controlled.view' => false, 'medications.controlled.record' => false]);
+        $this->shift(clockedIn: true);
+        $this->order($this->client, 'PRIVATE CONTROLLED ORDER', ['08:00'], ['controlled_drug' => true]);
+
+        $response = $this->actingAs($this->worker)->get('/meds/today')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('schedule', [])
+                ->where('hidden_controlled_overdue', 1)
+                ->where('concealed_schedule.total', 1)
+                ->where('concealed_schedule.overdue', 1)
+                ->where('concealed_schedule.open', 1)
+                ->where('concealed_schedule.due_so_far', 1)
+                ->where('concealed_schedule.recorded_so_far', 0)
+            );
+        $response->assertDontSee('PRIVATE CONTROLLED ORDER');
+    }
+
     public function test_activity_loads_with_its_tab_ten_a_page_with_outcome_filter(): void
     {
         $this->shift(clockedIn: true);

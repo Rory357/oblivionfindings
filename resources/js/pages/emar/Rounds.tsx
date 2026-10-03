@@ -657,6 +657,8 @@ export default function Rounds(props: Props) {
                     witnesses={witnesses}
                     notGivenReasons={notGivenReasons}
                     signer={{
+                        name: signer.name,
+                        role_label: signer.role_label,
                         med_competent: signer.med_competent,
                         controlled_record: signer.controlled_record,
                         cd_witness: signer.cd_witness,

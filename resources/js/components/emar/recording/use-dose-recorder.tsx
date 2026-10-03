@@ -1,7 +1,8 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 
-import { PrnWizard } from '@/pages/meds/today/components/prn-wizard';
-import { RecordDoseWizard } from '@/pages/meds/today/components/record-dose-wizard';
+import { AsNeededPicker } from '@/components/emar/record-dose/dialogs';
+import { RecordDoseDialog } from '@/components/emar/record-dose/record-dose-dialog';
+import type { EntryPoint } from '@/components/emar/record-dose/types';
 import type {
     ClientInfo,
     CompetencyNotice,
@@ -10,16 +11,14 @@ import type {
     ScheduleRow,
     WitnessOption,
 } from '@/pages/meds/today/types';
+import { router } from '@inertiajs/react';
 
 /**
  * P02's ONE way into recording a dose. Every P02 surface — the profile's MAR
  * day view, the record's chart and header, the hub — records through this
  * hook and nothing else.
  *
- * Today it opens the recorders that work now: Meds today's RecordDoseWizard
- * for an exact scheduled dose (with its scheduled time) and PrnWizard for an
- * as-needed dose. When P01's Record-a-dose dialog lands, Lane C's C5 replaces
- * only this file's body (same API), and every caller follows.
+ * Requirements and saving both use P01's live, server-checked shared dialog.
  */
 export interface DoseRecorderContext {
     client: ClientInfo;
@@ -33,6 +32,7 @@ export interface DoseRecorderContext {
         competency_notice?: CompetencyNotice | null;
     };
     prnMedications: PrnMedication[];
+    entry?: EntryPoint;
 }
 
 type Outcome = 'given' | 'refused' | 'withheld';
@@ -71,7 +71,7 @@ export function useDoseRecorder(
         const back = opener.current;
         opener.current = null;
         // After the dialog has unmounted and released focus.
-        window.setTimeout(() => back?.focus(), 0);
+        window.setTimeout(() => back?.isConnected && back.focus(), 0);
     }, [onClosed]);
 
     const recordScheduled = useCallback(
@@ -90,24 +90,56 @@ export function useDoseRecorder(
     if (target && context) {
         element =
             target.kind === 'scheduled' ? (
-                <RecordDoseWizard
-                    row={target.row}
-                    client={context.client}
-                    date={context.date}
-                    witnesses={context.witnesses}
-                    notGivenReasons={context.notGivenReasons}
+                <RecordDoseDialog
+                    key={`${target.row.medication_id}:${target.row.scheduled_for}:${target.outcome}`}
+                    target={{
+                        kind: 'scheduled',
+                        orderId: target.row.medication_id,
+                        scheduledFor: target.row.scheduled_for,
+                        label: {
+                            person: context.client.name,
+                            medicine: target.row.medication_name,
+                        },
+                    }}
+                    entry={context.entry ?? 'mar'}
+                    mode={target.outcome === 'given' ? 'record' : 'notgiven'}
                     signedAs={context.signedAs}
-                    initialOutcome={target.outcome}
+                    returnFocus={() => opener.current}
+                    onRecorded={(result) => {
+                        if (result.status !== 'queued')
+                            router.reload({ preserveScroll: true });
+                    }}
                     onClose={close}
                 />
+            ) : target.medicationId === null ? (
+                <AsNeededPicker
+                    choices={context.prnMedications}
+                    onClose={close}
+                    onPick={(medicationId) =>
+                        setTarget({ kind: 'as_needed', medicationId })
+                    }
+                />
             ) : (
-                <PrnWizard
-                    medications={context.prnMedications}
-                    clients={new Map([[context.client.id, context.client]])}
-                    date={context.date}
-                    witnesses={context.witnesses}
+                <RecordDoseDialog
+                    key={`prn:${target.medicationId}`}
+                    target={{
+                        kind: 'prn',
+                        orderId: target.medicationId,
+                        label: {
+                            person: context.client.name,
+                            medicine:
+                                context.prnMedications.find(
+                                    (med) => med.id === target.medicationId,
+                                )?.name ?? 'As-needed medicine',
+                        },
+                    }}
+                    entry={context.entry ?? 'mar'}
                     signedAs={context.signedAs}
-                    initialMedId={target.medicationId}
+                    returnFocus={() => opener.current}
+                    onRecorded={(result) => {
+                        if (result.status !== 'queued')
+                            router.reload({ preserveScroll: true });
+                    }}
                     onClose={close}
                 />
             );

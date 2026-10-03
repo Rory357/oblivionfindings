@@ -1,40 +1,12 @@
-import { WitnessPinInput } from '@/components/medications/witness-pin-input';
+import { RecordDoseDialog } from '@/components/emar/record-dose/record-dose-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { doseTiming, type DoseWindow } from '@/lib/emar-dose-window';
-import {
-    emarMutationWasAccepted,
-    submitEmarMutation,
-} from '@/lib/emar-offline';
-import { createOfflineRequestUuid } from '@/lib/offline-queue';
-import {
-    witnessIsSelectable,
-    witnessOptionLabel,
-    type WitnessPickerOption,
-} from '@/lib/witness-pin';
-import { Link, router, useForm } from '@inertiajs/react';
-import axios from 'axios';
-import { AlertTriangle, QrCode, ShieldCheck } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
+import type { DoseWindow } from '@/lib/emar-dose-window';
+import type { WitnessPickerOption } from '@/lib/witness-pin';
+import type { SharedData } from '@/types';
+import { Link, router, usePage } from '@inertiajs/react';
+import { useMemo, useState } from 'react';
 
 type MedicationRow = {
     client_medication_id: number;
@@ -109,21 +81,6 @@ type Props = {
     witnesses: WitnessPickerOption[];
 };
 
-function toLocalDateTimeInput(iso?: string | null) {
-    if (!iso) return '';
-    const d = new Date(iso);
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function fromLocalDateTimeInput(value: string) {
-    return value ? new Date(value).toISOString() : null;
-}
-
-function minutesLabel(minutes: number) {
-    return `${minutes} minute${minutes === 1 ? '' : 's'}`;
-}
-
 function sentenceCase(value: string) {
     return value
         .split('_')
@@ -138,38 +95,18 @@ export default function ShiftMedicationCard({
     canRecord,
     canRecordControlled,
     summary,
-    witnesses,
 }: Props) {
-    const [open, setOpen] = useState(false);
+    const { auth } = usePage<SharedData>().props;
     const [activeRow, setActiveRow] = useState<MedicationRow | null>(null);
-    const [submitting, setSubmitting] = useState(false);
-    const [scanCode, setScanCode] = useState('');
-    const [scanStatus, setScanStatus] = useState<
-        'idle' | 'verified' | 'mismatch'
-    >('idle');
-    const [scanMessage, setScanMessage] = useState('');
-    const [scanMatchSource, setScanMatchSource] = useState<string | null>(null);
-    const [verifyingScan, setVerifyingScan] = useState(false);
-    const administrationReplay = useRef({
-        uuid: createOfflineRequestUuid(),
-        fingerprint: null as string | null,
-    });
-    const canRecordOnShift = canRecord && shiftStatus !== 'completed';
+    const canRecordOnShift =
+        canRecord && !['completed', 'cancelled'].includes(shiftStatus);
     const canRecordRow = (row: MedicationRow) =>
         canRecordOnShift &&
         (!row.medication.controlled_drug || canRecordControlled);
-
-    const adminForm = useForm({
-        status: 'given',
-        reason: '',
-        dose_given: '',
-        notes: '',
-        scheduled_for: '' as string | null,
-        administered_at: '',
-        shift_id: shiftId as number | string,
-        witnessed_by: '__none__',
-        witness_credential: '',
-    });
+    const openAdministrationDialog = (row: MedicationRow) => {
+        if (canRecordRow(row) && (row.medication.is_prn || row.scheduled_for))
+            setActiveRow(row);
+    };
 
     const outstandingCount = useMemo(
         () =>
@@ -178,237 +115,6 @@ export default function ShiftMedicationCard({
             Number(summary?.stats?.scheduled?.missed ?? 0),
         [summary],
     );
-
-    const doseWindow = summary?.dose_window ?? null;
-
-    const timing = useMemo(() => {
-        if (!activeRow || activeRow.medication.is_prn) return null;
-
-        return doseTiming(
-            adminForm.data.scheduled_for,
-            fromLocalDateTimeInput(adminForm.data.administered_at) ||
-                new Date().toISOString(),
-            doseWindow,
-        );
-    }, [
-        activeRow,
-        adminForm.data.administered_at,
-        adminForm.data.scheduled_for,
-        doseWindow,
-    ]);
-
-    const needsReason = useMemo(() => {
-        if (!activeRow) return false;
-        if (adminForm.data.status !== 'given') return true;
-        if (activeRow.medication.is_prn) return true;
-
-        return timing === 'early' || timing === 'late';
-    }, [activeRow, adminForm.data.status, timing]);
-
-    const outsideWindowHint =
-        adminForm.data.status !== 'given' || !doseWindow
-            ? null
-            : timing === 'early'
-              ? `This is more than ${minutesLabel(doseWindow.early_minutes)} before the scheduled time. Add a reason.`
-              : timing === 'late'
-                ? `This is more than ${minutesLabel(doseWindow.late_minutes)} after the scheduled time. Add a reason.`
-                : null;
-
-    const needsWitness = useMemo(
-        () =>
-            !!activeRow &&
-            (activeRow.requires_witness ||
-                activeRow.medication.controlled_drug) &&
-            adminForm.data.status === 'given',
-        [activeRow, adminForm.data.status],
-    );
-
-    const needsScanVerification = useMemo(
-        () =>
-            !!activeRow &&
-            adminForm.data.status === 'given' &&
-            !!activeRow.medication.scan_verification,
-        [activeRow, adminForm.data.status],
-    );
-
-    const canSubmit = useMemo(
-        () =>
-            !!activeRow &&
-            (!needsReason || !!adminForm.data.reason.trim()) &&
-            (!needsWitness || adminForm.data.witnessed_by !== '__none__') &&
-            (!needsWitness || !!adminForm.data.witness_credential.trim()) &&
-            (!needsScanVerification || scanStatus === 'verified'),
-        [
-            activeRow,
-            adminForm.data.reason,
-            adminForm.data.witnessed_by,
-            adminForm.data.witness_credential,
-            needsReason,
-            needsScanVerification,
-            needsWitness,
-            scanStatus,
-        ],
-    );
-
-    const openAdministrationDialog = (row: MedicationRow) => {
-        if (!canRecordRow(row)) return;
-        administrationReplay.current = {
-            uuid: createOfflineRequestUuid(),
-            fingerprint: null,
-        };
-        setActiveRow(row);
-        adminForm.reset();
-        adminForm.setData('status', 'given');
-        adminForm.setData('reason', '');
-        adminForm.setData('dose_given', '');
-        adminForm.setData('notes', '');
-        adminForm.setData('scheduled_for', row.scheduled_for ?? '');
-        adminForm.setData(
-            'administered_at',
-            toLocalDateTimeInput(new Date().toISOString()),
-        );
-        adminForm.setData('shift_id', shiftId);
-        adminForm.setData('witnessed_by', '__none__');
-        adminForm.setData('witness_credential', '');
-        setScanCode('');
-        setScanStatus('idle');
-        setScanMessage('');
-        setScanMatchSource(null);
-        setOpen(true);
-    };
-
-    const verifyScan = async () => {
-        if (!activeRow || !scanCode.trim()) {
-            return;
-        }
-
-        setVerifyingScan(true);
-
-        try {
-            const response = await axios.post(
-                `/api/medications/clients/${clientId}/medications/${activeRow.medication.id}/scan-verify`,
-                {
-                    code: scanCode.trim(),
-                    source: 'manual',
-                },
-            );
-
-            setScanStatus('verified');
-            setScanMessage(
-                response.data.message ?? 'Medication code verified.',
-            );
-            setScanMatchSource(response.data.match_source ?? null);
-        } catch (error: unknown) {
-            const message = axios.isAxiosError(error)
-                ? error.response?.data?.message ||
-                  error.response?.data?.error ||
-                  'This code does not match the selected medication.'
-                : 'This code does not match the selected medication.';
-
-            setScanStatus('mismatch');
-            setScanMessage(message);
-            setScanMatchSource(null);
-        } finally {
-            setVerifyingScan(false);
-        }
-    };
-
-    const submitAdministration = async () => {
-        if (!activeRow) return;
-        if (
-            needsWitness &&
-            typeof navigator !== 'undefined' &&
-            !navigator.onLine
-        ) {
-            toast.error(
-                'Reconnect to record this witnessed medication action. Witness credentials are never saved on this device.',
-            );
-            return;
-        }
-
-        setSubmitting(true);
-
-        try {
-            const { witness_credential: witnessCredential, ...materialForm } =
-                adminForm.data;
-            const materialPayload = {
-                ...materialForm,
-                administered_at: fromLocalDateTimeInput(
-                    adminForm.data.administered_at,
-                ),
-                scheduled_for: adminForm.data.scheduled_for || null,
-                witnessed_by:
-                    adminForm.data.witnessed_by === '__none__'
-                        ? null
-                        : Number(adminForm.data.witnessed_by),
-                scan_code:
-                    needsScanVerification && scanStatus === 'verified'
-                        ? scanCode.trim()
-                        : null,
-                scan_source:
-                    needsScanVerification && scanStatus === 'verified'
-                        ? 'manual'
-                        : null,
-                scan_verified:
-                    needsScanVerification && scanStatus === 'verified',
-                scan_match_source:
-                    needsScanVerification && scanStatus === 'verified'
-                        ? scanMatchSource
-                        : null,
-            };
-            const materialFingerprint = JSON.stringify(materialPayload);
-            if (
-                administrationReplay.current.fingerprint !== null &&
-                administrationReplay.current.fingerprint !== materialFingerprint
-            ) {
-                administrationReplay.current.uuid = createOfflineRequestUuid();
-            }
-            administrationReplay.current.fingerprint = materialFingerprint;
-
-            const result = await submitEmarMutation(
-                `/api/medications/clients/${clientId}/medications/${activeRow.medication.id}/administrations`,
-                {
-                    ...materialPayload,
-                    ...(needsWitness
-                        ? { witness_credential: witnessCredential }
-                        : {}),
-                    client_request_uuid: administrationReplay.current.uuid,
-                },
-                {
-                    allowQueueWhenOffline: !needsWitness,
-                    successMessage: 'Medication administration recorded.',
-                    queuedMessage:
-                        'Medication administration saved offline and queued to sync automatically.',
-                },
-            );
-
-            if (!emarMutationWasAccepted(result.status)) {
-                return;
-            }
-
-            setOpen(false);
-            setActiveRow(null);
-
-            if (result.status !== 'queued') {
-                router.reload();
-            }
-        } catch (error: unknown) {
-            if (needsWitness && axios.isAxiosError(error) && !error.response) {
-                toast.error(
-                    'Reconnect to record this witnessed medication action. Check the chart before trying again. Trying again won’t create a duplicate.',
-                );
-                return;
-            }
-
-            toast.error(
-                error instanceof Error
-                    ? error.message
-                    : 'Failed to record medication administration.',
-            );
-        } finally {
-            setSubmitting(false);
-        }
-    };
 
     return (
         <>
@@ -696,335 +402,41 @@ export default function ShiftMedicationCard({
                 </CardContent>
             </Card>
 
-            <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>
-                            Record medication administration
-                        </DialogTitle>
-                    </DialogHeader>
-
-                    {activeRow ? (
-                        <div className="space-y-3">
-                            <div className="rounded-md border p-3">
-                                <div className="text-sm font-medium">
-                                    {activeRow.medication.name}
-                                </div>
-                                <div className="mt-1 text-xs text-muted-foreground">
-                                    {activeRow.medication.dosage ||
-                                        'Dose not specified'}
-                                    {activeRow.scheduled_time
-                                        ? ` | Scheduled ${activeRow.scheduled_time}`
-                                        : ' | PRN'}
-                                </div>
-                            </div>
-
-                            {activeRow.medication.scan_verification &&
-                            adminForm.data.status === 'given' ? (
-                                <div className="space-y-3 rounded-md border p-4">
-                                    <div className="flex items-center gap-2">
-                                        <QrCode className="h-4 w-4" />
-                                        <div className="text-sm font-medium">
-                                            Medication scan verification
-                                        </div>
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">
-                                        {activeRow.medication.scan_verification
-                                            .requires_internal_code
-                                            ? 'No supplier barcode is on file for this medication. Use the internal eMAR QR/code below.'
-                                            : 'Verify the pack barcode or one of the registered medication codes before recording a given dose.'}
-                                    </div>
-                                    <div className="grid gap-4 md:grid-cols-[1fr_120px]">
-                                        <div className="space-y-3">
-                                            <div className="space-y-1">
-                                                <Label>
-                                                    Scanned or entered code
-                                                </Label>
-                                                <div className="flex gap-2">
-                                                    <Input
-                                                        value={scanCode}
-                                                        onChange={(event) => {
-                                                            setScanCode(
-                                                                event.target
-                                                                    .value,
-                                                            );
-                                                            setScanStatus(
-                                                                'idle',
-                                                            );
-                                                            setScanMessage('');
-                                                            setScanMatchSource(
-                                                                null,
-                                                            );
-                                                        }}
-                                                        placeholder={`Enter ${activeRow.medication.scan_verification.primary_label.toLowerCase()}...`}
-                                                    />
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        onClick={verifyScan}
-                                                        disabled={
-                                                            !scanCode.trim() ||
-                                                            verifyingScan
-                                                        }
-                                                    >
-                                                        {verifyingScan
-                                                            ? 'Checking...'
-                                                            : 'Verify'}
-                                                    </Button>
-                                                </div>
-                                            </div>
-
-                                            {scanMessage ? (
-                                                <div
-                                                    className={`flex items-center gap-2 text-xs ${
-                                                        scanStatus ===
-                                                        'verified'
-                                                            ? 'text-status-success'
-                                                            : 'text-status-critical'
-                                                    }`}
-                                                >
-                                                    {scanStatus ===
-                                                    'verified' ? (
-                                                        <ShieldCheck className="h-3.5 w-3.5" />
-                                                    ) : (
-                                                        <AlertTriangle className="h-3.5 w-3.5" />
-                                                    )}
-                                                    {scanMessage}
-                                                </div>
-                                            ) : (
-                                                <div className="text-xs text-muted-foreground">
-                                                    Verification is required
-                                                    before recording a given
-                                                    dose.
-                                                </div>
-                                            )}
-
-                                            <div className="space-y-1">
-                                                <Label>Codes on file</Label>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {activeRow.medication.scan_verification.code_options.map(
-                                                        (option) => (
-                                                            <Button
-                                                                key={`${option.source}-${option.value}`}
-                                                                type="button"
-                                                                variant="secondary"
-                                                                size="sm"
-                                                                className="h-auto justify-start px-2 py-1 font-mono text-xs"
-                                                                onClick={() => {
-                                                                    setScanCode(
-                                                                        option.value,
-                                                                    );
-                                                                    setScanStatus(
-                                                                        'idle',
-                                                                    );
-                                                                    setScanMessage(
-                                                                        '',
-                                                                    );
-                                                                    setScanMatchSource(
-                                                                        null,
-                                                                    );
-                                                                }}
-                                                            >
-                                                                {option.label}:{' '}
-                                                                {option.value}
-                                                            </Button>
-                                                        ),
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            {/* eslint-disable-next-line no-restricted-syntax -- QR code needs a tight white scan surface inside the medication row. */}
-                                            <div className="rounded-md border bg-white p-2">
-                                                <img
-                                                    src={
-                                                        activeRow.medication
-                                                            .scan_verification
-                                                            .svg_url
-                                                    }
-                                                    alt="Medication QR code"
-                                                    className="h-24 w-24"
-                                                />
-                                            </div>
-                                            <div className="text-center text-[11px] text-muted-foreground">
-                                                Internal eMAR QR
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : null}
-
-                            <div className="space-y-1">
-                                <Label>Status</Label>
-                                <Select
-                                    value={adminForm.data.status}
-                                    onValueChange={(value) =>
-                                        adminForm.setData('status', value)
-                                    }
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select status" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="given">
-                                            Given
-                                        </SelectItem>
-                                        <SelectItem value="refused">
-                                            Refused
-                                        </SelectItem>
-                                        <SelectItem value="withheld">
-                                            Withheld
-                                        </SelectItem>
-                                        <SelectItem value="missed">
-                                            Missed
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div className="space-y-1">
-                                <Label>Administered at</Label>
-                                <Input
-                                    type="datetime-local"
-                                    value={adminForm.data.administered_at}
-                                    onChange={(event) =>
-                                        adminForm.setData(
-                                            'administered_at',
-                                            event.target.value,
-                                        )
-                                    }
-                                />
-                            </div>
-
-                            {needsWitness ? (
-                                <div className="space-y-3 rounded-md border p-3">
-                                    <div className="space-y-1">
-                                        <Label>Witness</Label>
-                                        <Select
-                                            value={adminForm.data.witnessed_by}
-                                            onValueChange={(value) =>
-                                                adminForm.setData(
-                                                    'witnessed_by',
-                                                    value,
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select witness" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="__none__">
-                                                    Select witness
-                                                </SelectItem>
-                                                {witnesses.map((witness) => (
-                                                    <SelectItem
-                                                        key={witness.id}
-                                                        value={String(
-                                                            witness.id,
-                                                        )}
-                                                        disabled={
-                                                            !witnessIsSelectable(
-                                                                witness,
-                                                            )
-                                                        }
-                                                    >
-                                                        {witnessOptionLabel(
-                                                            witness,
-                                                        )}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <WitnessPinInput
-                                        label="Their witness PIN"
-                                        required={false}
-                                        value={
-                                            adminForm.data.witness_credential
-                                        }
-                                        onChange={(v) =>
-                                            adminForm.setData(
-                                                'witness_credential',
-                                                v,
-                                            )
-                                        }
-                                        className="space-y-1"
-                                    />
-                                </div>
-                            ) : null}
-
-                            <div className="space-y-1">
-                                <Label>Reason</Label>
-                                <Input
-                                    value={adminForm.data.reason}
-                                    onChange={(event) =>
-                                        adminForm.setData(
-                                            'reason',
-                                            event.target.value,
-                                        )
-                                    }
-                                    placeholder={
-                                        needsReason
-                                            ? 'Required for this administration'
-                                            : 'Optional'
-                                    }
-                                />
-                                {needsReason ? (
-                                    <div className="text-xs text-muted-foreground">
-                                        {outsideWindowHint ??
-                                            'A reason is needed for PRN doses, doses not given, and doses given outside the allowed time.'}
-                                    </div>
-                                ) : null}
-                            </div>
-
-                            <div className="space-y-1">
-                                <Label>Dose given</Label>
-                                <Input
-                                    value={adminForm.data.dose_given}
-                                    onChange={(event) =>
-                                        adminForm.setData(
-                                            'dose_given',
-                                            event.target.value,
-                                        )
-                                    }
-                                />
-                            </div>
-
-                            <div className="space-y-1">
-                                <Label>Notes</Label>
-                                <Textarea
-                                    value={adminForm.data.notes}
-                                    onChange={(event) =>
-                                        adminForm.setData(
-                                            'notes',
-                                            event.target.value,
-                                        )
-                                    }
-                                />
-                            </div>
-                        </div>
-                    ) : null}
-
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setOpen(false)}
-                            disabled={submitting}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="button"
-                            disabled={submitting || !canSubmit}
-                            onClick={submitAdministration}
-                        >
-                            {submitting ? 'Saving...' : 'Save administration'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            {activeRow && (
+                <RecordDoseDialog
+                    key={`${activeRow.medication.id}:${activeRow.scheduled_for ?? 'prn'}`}
+                    target={
+                        activeRow.medication.is_prn
+                            ? {
+                                  kind: 'prn',
+                                  orderId: activeRow.medication.id,
+                                  label: {
+                                      medicine: activeRow.medication.name,
+                                  },
+                              }
+                            : {
+                                  kind: 'scheduled',
+                                  orderId: activeRow.medication.id,
+                                  scheduledFor: activeRow.scheduled_for!,
+                                  label: {
+                                      medicine: activeRow.medication.name,
+                                  },
+                              }
+                    }
+                    entry="shift"
+                    signedAs={{ name: auth.user.name, role_label: null }}
+                    shiftContext={{
+                        shiftId,
+                        scanVerification:
+                            activeRow.medication.scan_verification,
+                    }}
+                    onClose={() => setActiveRow(null)}
+                    onRecorded={(result) => {
+                        if (result.status !== 'queued')
+                            router.reload({ preserveScroll: true });
+                    }}
+                />
+            )}
         </>
     );
 }
