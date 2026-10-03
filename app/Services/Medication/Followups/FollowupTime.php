@@ -17,6 +17,9 @@ final class FollowupTime
             $instant = CarbonImmutable::parse($value);
             $local = $instant->setTimezone('Pacific/Auckland');
             $providedWall = substr($value, 0, 16);
+            if (str_ends_with($value, 'Z') && $instant->format('Y-m-d\TH:i') !== $providedWall) {
+                throw new \InvalidArgumentException('Invalid UTC calendar time.');
+            }
             if (! str_ends_with($value, 'Z') && $local->format('Y-m-d\TH:i') !== $providedWall) {
                 throw new \InvalidArgumentException('Invalid NZ wall time/offset.');
             }

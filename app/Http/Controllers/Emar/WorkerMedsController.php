@@ -28,6 +28,7 @@ use App\Services\Medication\Followups\MedicationFollowupService;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\Recording\DoseRecordingRequirements;
 use App\Services\Medication\StaffEligibilityRegister;
+use App\Services\Medication\Followups\LegacyEffectFollowupAdapter;
 use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
@@ -1000,105 +1001,7 @@ class WorkerMedsController extends Controller
      */
     public function recordPrnEffect(Request $request): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user, 403);
-
-        abort_unless(
-            $user->canDo('medications.administer.record'),
-            403,
-            'You do not have permission to record medication administrations.'
-        );
-
-        // The medication_prn_effectiveness schema only supports the fields above.
-        // Richer review data the eMAR design asked for needs migrations and is
-        // deferred (see docs/PRN_GAP_ANALYSIS.md "effectiveness extra fields"):
-        //   TODO(G1): structured side-effects (chip-multi) — folded into observations for now
-        //   TODO(G2): symptom/pain score before→after (0–10)
-        //   TODO(G3): vitals after dose (pulse/BP/resp)
-        //   TODO(G4): "further dose likely?" flag
-        //   TODO(G5): structured "who was notified" (GP/family/senior)
-        //   TODO(G6): follow-up due time
-        //   TODO(G7): link to care/behaviour plan
-        $administrationId = filter_var(
-            $request->input('client_medication_administration_id'),
-            FILTER_VALIDATE_INT,
-            ['options' => ['min_range' => 1]],
-        );
-        abort_unless($administrationId !== false, 404);
-        $administration = new ClientMedicationAdministration;
-        $administration->setAttribute($administration->getKeyName(), (int) $administrationId);
-
-        return $this->medicationScope->forPrnEffectiveness(
-            $user,
-            $administration,
-            now(),
-            function (MedicationScopeDecision $scope) use ($request) {
-                $data = $request->validate([
-                    'client_medication_administration_id' => ['required', 'integer'],
-                    'effectiveness' => ['required', 'in:effective,partially_effective,not_effective'],
-                    // Explicit "reviewed X minutes after the dose" chip from the eMAR
-                    // effectiveness wizard; when omitted we derive it from the elapsed
-                    // time (the worker board's quick follow-up never sends it).
-                    'review_minutes_after' => ['nullable', 'integer', 'min:0', 'max:1440'],
-                    'observations' => ['nullable', 'string', 'max:2000'],
-                    'escalation_needed' => ['nullable', 'boolean'],
-                    'escalation_action' => ['nullable', 'string', 'max:500'],
-                ]);
-                abort_unless(
-                    (int) $data['client_medication_administration_id'] === (int) $scope->administration->id,
-                    404,
-                );
-                $administration = $scope->administration;
-                $administration->loadMissing('prnEffectiveness');
-                $reviewMinutes = $data['review_minutes_after']
-                    ?? ($administration->administered_at
-                        ? max(0, (int) round($this->boardPayload->rawUtcInstant($administration, 'administered_at')->diffInMinutes(now('UTC'))))
-                        : null);
-
-                // updateOrCreate (keyed on the hasOne administration) so the eMAR
-                // "Re-record effectiveness" action revises the single register entry.
-                $existed = (bool) $administration->prnEffectiveness;
-                MedicationPrnEffectiveness::updateOrCreate(
-                    ['client_medication_administration_id' => $administration->id],
-                    [
-                        'client_id' => $scope->client->id,
-                        'client_medication_id' => $scope->medication->id,
-                        'effectiveness' => $data['effectiveness'],
-                        'review_minutes_after' => $reviewMinutes,
-                        'observations' => $data['observations'] ?? null,
-                        'escalation_needed' => (bool) ($data['escalation_needed'] ?? false),
-                        'escalation_action' => $data['escalation_action'] ?? null,
-                        'reviewed_by' => $scope->performer->id,
-                        'reviewed_at' => now(),
-                    ],
-                );
-                $this->medicationScope->recordBreakGlassUse(
-                    $scope,
-                    'recorded_prn_effectiveness',
-                    'Administration '.$administration->id,
-                );
-                app(MedicationFollowupService::class)->syncAdministration($administration);
-                app(MedicationEventRecorder::class)->append(new MedicationEventData(
-                    siteId: (int) $scope->client->site_id,
-                    kind: $existed ? 'prn.effect_amended' : 'prn.effect_recorded',
-                    subjectType: 'medication_administration',
-                    subjectId: (string) $administration->id,
-                    actorId: (int) $scope->performer->id,
-                    occurredAt: CarbonImmutable::now('UTC'),
-                    summary: $existed ? 'As-needed effect review amended.' : 'As-needed effect review recorded.',
-                    facts: ['effectiveness' => $data['effectiveness']],
-                    clientId: (int) $scope->client->id,
-                    controlled: (bool) $scope->medication->controlled_drug,
-                ));
-
-                return back()->with(
-                    'success',
-                    $existed
-                        ? 'Effectiveness review updated on the PRN register.'
-                        : 'Follow-up recorded — effect noted on the PRN register.',
-                );
-            },
-        );
+        return app(LegacyEffectFollowupAdapter::class)->save($request, $this->medicationScope);
     }
 
     /**

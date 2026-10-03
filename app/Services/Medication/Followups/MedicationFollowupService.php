@@ -153,8 +153,12 @@ final class MedicationFollowupService
                 ], $this->instant($effect, 'reviewed_at'));
             }
         }
+        $refusalSources = [$administration->id];
+        if ($administration->is_correction && in_array($administration->status, ['refused', 'withheld'], true)) {
+            $refusalSources[] = $administration->corrected_of_id;
+        }
         foreach (MedicationRefusalFollowup::query()
-            ->where('client_medication_administration_id', $administration->id)
+            ->whereIn('client_medication_administration_id', $refusalSources)
             ->where('client_id', $client->id)->orderBy('id')->get() as $refusal) {
             $row = $this->ensure('refusal:'.$administration->id, 'reoffer', $client, $medication, $administration,
                 $refusal->owner_id ? (int) $refusal->owner_id : ((int) $refusal->created_by ?: null),
@@ -179,8 +183,36 @@ final class MedicationFollowupService
                 ->where('client_id', $client->id)->where('client_medication_id', $medication->id)->first();
             if ($root) {
                 $this->syncAdministration($root);
+                ClientMedicationAdministration::query()->effectiveClinicalEvidence()
+                    ->where('corrected_of_id', $root->id)->where('client_id', $client->id)
+                    ->where('client_medication_id', $medication->id)->orderBy('id')->get()
+                    ->each(fn ($accepted) => $this->syncAdministration($accepted));
             }
         }
+    }
+
+    /** Prepare an existing source's canonical work, without recording an outcome. */
+    public function prepareAdministration(User $actor, int $administrationId, string $type = 'effect'): MedicationFollowup
+    {
+        abort_unless(in_array($type, ['effect', 'reoffer'], true) && $actor->canDo('medications.administer.record') && $this->staff->isCurrent($actor), 403);
+        $snapshot = ClientMedicationAdministration::query()->effectiveClinicalEvidence()->findOrFail($administrationId);
+        $this->records->client($actor, (int) $snapshot->client_id);
+
+        return DB::transaction(function () use ($actor, $snapshot, $type) {
+            $client = Client::query()->whereKey($snapshot->client_id)->lockForUpdate()->firstOrFail();
+            $medication = ClientMedication::withTrashed()->whereKey($snapshot->client_medication_id)
+                ->where('client_id', $client->id)->lockForUpdate()->firstOrFail();
+            $administration = ClientMedicationAdministration::query()->effectiveClinicalEvidence()->whereKey($snapshot->id)
+                ->where('client_id', $client->id)->where('client_medication_id', $medication->id)->lockForUpdate()->firstOrFail();
+            $this->records->assertReadable($actor, $client);
+            abort_if($medication->controlled_drug && (! $actor->canDo('medications.controlled.view') || ! $actor->canDo('medications.controlled.record')), 404);
+            abort_unless($type === 'effect' ? $medication->is_prn && $administration->status === 'given'
+                : in_array($administration->status, ['refused', 'withheld'], true), 404);
+            $administration->setRelation('client', $client)->setRelation('medication', $medication);
+            $this->syncAdministration($administration);
+
+            return MedicationFollowup::query()->where('source_key', ($type === 'effect' ? 'effect:' : 'refusal:').$administration->id)->firstOrFail();
+        }, 5);
     }
 
     /** Apply current person ownership before loading details, counts or tasks. */
@@ -238,7 +270,17 @@ final class MedicationFollowupService
             || ! ClientMedicationAdministration::query()->effectiveClinicalEvidence()->whereKey($row->administration_id)->where('status', 'given')->exists())) {
             $canComplete = false;
         }
-        $state = $row->completed_at ? 'done' : ($row->due_at?->isPast() ? 'overdue' : $row->state);
+        $state = $row->completed_at ? ($row->state === 'retired' ? 'retired' : 'done') : ($row->due_at?->isPast() ? 'overdue' : $row->state);
+        $reofferTarget = null;
+        if ($row->type === 'reoffer' && ! $row->completed_at) {
+            $row->loadMissing('administration');
+            $scheduled = $row->administration ? $this->instant($row->administration, 'scheduled_for') : null;
+            if ($scheduled && $row->administration->status === 'refused') {
+                $reofferTarget = ['kind' => 'scheduled', 'orderId' => $row->client_medication_id,
+                    'scheduledFor' => $scheduled->toIso8601String(),
+                    'label' => ['person' => $row->client->full_name, 'medicine' => $row->medication->name]];
+            }
+        }
 
         return [
             'id' => $row->id, 'type' => $row->type, 'label' => self::TYPES[$row->type],
@@ -246,6 +288,7 @@ final class MedicationFollowupService
             'site' => ['id' => $row->client->site_id, 'name' => $row->client->site?->name],
             'medication' => $row->medication ? ['id' => $row->medication->id, 'name' => $row->medication->name] : null,
             'administration_id' => $row->administration_id, 'owner' => $row->owner ? ['id' => $row->owner->id, 'name' => $row->owner->name] : null,
+            'reoffer_target' => $reofferTarget,
             'original_owner' => $row->originalOwner ? ['id' => $row->originalOwner->id, 'name' => $row->originalOwner->name] : null,
             'due_at' => $row->due_at?->toIso8601String(), 'completed_at' => $row->completed_at?->toIso8601String(),
             'state' => $state, 'revision' => $row->revision, 'context' => $row->context,
@@ -344,7 +387,9 @@ final class MedicationFollowupService
                     throw ValidationException::withMessages(['request_uuid' => 'This request was already used for different follow-up details.']);
                 }
 
-                return $this->present($row, $lockedActor) + ['duplicate' => true];
+                return $this->present($row, $lockedActor) + ['duplicate' => true]
+                    + ($action === 'refusal' && ($data['outcome'] ?? null) === 'taken'
+                        ? ['next_action' => 'record_reoffer', 'reoffer_of_id' => $row->administration_id] : []);
             }
             abort_if((int) $data['revision'] !== $row->revision, 409, 'This follow-up changed. Refresh it and review your entries.');
             abort_if($row->completed_at && $action !== 'amend_effect', 409, 'This follow-up is already complete.');
@@ -417,7 +462,7 @@ final class MedicationFollowupService
                 ['client_medication_administration_id' => $administration->id],
                 ['client_id' => $row->client_id, 'client_medication_id' => $row->client_medication_id,
                     'effectiveness' => $data['outcome'], 'observations' => $data['observations'] ?? null,
-                    'review_minutes_after' => max(0, (int) $this->instant($administration, 'administered_at')?->diffInMinutes(now('UTC'))),
+                    'review_minutes_after' => $data['review_minutes_after'] ?? max(0, (int) $this->instant($administration, 'administered_at')?->diffInMinutes(now('UTC'))),
                     'escalation_needed' => $data['outcome'] === 'not_effective' || ($data['escalation_needed'] ?? false),
                     'escalation_action' => $data['escalation_action'] ?? null, 'reviewed_by' => $actor->id, 'reviewed_at' => now('UTC')]);
             if (! $row->completed_at) {
@@ -443,7 +488,7 @@ final class MedicationFollowupService
                 $this->validateRefusalAssessment($data);
             }
             $refusal = MedicationRefusalFollowup::query()->whereKey($row->context['refusal_id'] ?? 0)
-                ->where('client_id', $row->client_id)->where('client_medication_administration_id', $row->administration_id)
+                ->where('client_id', $row->client_id)->whereIn('client_medication_administration_id', array_filter([$row->administration_id, $administration?->corrected_of_id]))
                 ->lockForUpdate()->firstOrFail();
             if ($full) {
                 $refusal->fill([
@@ -674,8 +719,9 @@ final class MedicationFollowupService
     private function syncRefusalOwnership(MedicationFollowup $row): void
     {
         if ($row->type === 'reoffer') {
+            $row->loadMissing('administration');
             MedicationRefusalFollowup::query()->whereKey($row->context['refusal_id'] ?? 0)
-                ->where('client_id', $row->client_id)->where('client_medication_administration_id', $row->administration_id)
+                ->where('client_id', $row->client_id)->whereIn('client_medication_administration_id', array_filter([$row->administration_id, $row->administration?->corrected_of_id]))
                 ->update(['owner_id' => $row->owner_id, 'follow_up_due_at' => $row->due_at]);
         }
     }
@@ -684,6 +730,7 @@ final class MedicationFollowupService
     public function acknowledged(ShiftHandover $handover, Shift $incoming, User $actor): void
     {
         if (DB::transactionLevel() < 1 || (int) $incoming->user_id !== (int) $actor->id
+            || (int) $handover->incoming_shift_id !== (int) $incoming->id || (int) $incoming->client_id !== (int) $handover->client_id
             || $handover->status !== 'acknowledged' || (int) $handover->acknowledged_by !== (int) $actor->id) {
             throw new \LogicException('Carry-over requires the canonical acknowledged incoming shift.');
         }
@@ -695,6 +742,9 @@ final class MedicationFollowupService
             ->where('created_at', '<=', $this->instant($incoming, 'starts_at'))
             ->orderBy('id')->lockForUpdate()->get();
         foreach ($rows as $row) {
+            if ($row->medication?->controlled_drug && ! $actor->canDo('medications.controlled.record')) {
+                continue;
+            }
             if ((int) $row->owner_id === (int) $actor->id) {
                 continue;
             }
@@ -722,6 +772,7 @@ final class MedicationFollowupService
             $incoming = Shift::query()->whereKey($snapshot->incoming_shift_id)->lockForUpdate()->first();
             $handover = ShiftHandover::query()->whereKey($snapshot->id)->where('client_id', $client->id)->lockForUpdate()->first();
             if (! $incoming || ! $handover || $handover->status !== 'submitted'
+                || (int) $handover->incoming_shift_id !== (int) $incoming->id || (int) $incoming->client_id !== (int) $client->id
                 || $handover->acknowledged_at || $incoming->status === 'cancelled'
                 || (int) ($incoming->site_id ?? $client->site_id) !== (int) $client->site_id) {
                 return;
@@ -738,7 +789,7 @@ final class MedicationFollowupService
     private function close(MedicationFollowup $row, int $by, string $action, array $data, ?CarbonImmutable $at = null, ?string $fingerprint = null): void
     {
         $row->update(['completed_at' => $at ?? now('UTC'), 'completed_by' => $by > 0 ? $by : null,
-            'state' => 'done', 'revision' => $row->revision + 1]);
+            'state' => $action === 'source_retired' ? 'retired' : 'done', 'revision' => $row->revision + 1]);
         $this->event($row, $by > 0 ? $by : null, $action, $data, fingerprint: $fingerprint);
     }
 

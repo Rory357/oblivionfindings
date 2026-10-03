@@ -54,9 +54,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        // Preserve permission grants: rollback cannot determine whether a
-        // later administrator deliberately changed this permission.
-        Schema::dropIfExists('medication_followup_events');
-        Schema::dropIfExists('medication_followups');
+        throw new LogicException('Medication follow-up evidence cannot be rolled back destructively. Deploy an evidence-preserving forward migration.');
     }
 };

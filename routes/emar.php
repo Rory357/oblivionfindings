@@ -43,6 +43,8 @@ use Illuminate\Support\Facades\Route;
 // administer/update permissions so support workers can load it, with manager
 // permissions also allowed for oversight roles that want the operational view.
 Route::middleware(['auth'])->group(function () {
+    Route::post('/medication-followups/administrations/{administration}/prepare', [MedicationFollowupController::class, 'prepare'])
+        ->whereNumber('administration')->middleware('permission:medications.administer.record')->name('medication_followups.prepare');
     Route::get('/medication-followups', [MedicationFollowupController::class, 'index'])
         ->middleware('permission:medications.view')->name('medication_followups.index');
     Route::get('/medication-followups/{followup}', [MedicationFollowupController::class, 'show'])
@@ -556,10 +558,10 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->middleware('permission:medications.administer.record')
         ->name('emar.refusal_followups.store');
     Route::post('/refusal-followups/{followup}/complete', [RefusalFollowUpController::class, 'complete'])
-        ->middleware('permission:medications.administer.correct')
+        ->middleware('permission:medications.administer.record')
         ->name('emar.refusal_followups.complete');
     Route::post('/refusal-followups/{followup}/notify-gp', [RefusalFollowUpController::class, 'notifyGp'])
-        ->middleware('permission:medications.administer.correct')
+        ->middleware('permission:medications.followups.manage')
         ->name('emar.refusal_followups.notify_gp');
 
     // ─── Controlled Drug Loss Reports ─────────────────────

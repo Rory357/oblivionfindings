@@ -18,7 +18,7 @@ final class MedicationFollowupController extends Controller
         $data = $request->validate([
             'client_id' => ['nullable', 'integer', 'min:1'], 'site_id' => ['nullable', 'integer', 'min:1'],
             'type' => ['nullable', 'in:'.implode(',', array_keys(MedicationFollowupService::TYPES))],
-            'state' => ['nullable', 'in:open,overdue,done'], 'q' => ['nullable', 'string', 'max:100'],
+            'state' => ['nullable', 'in:open,overdue,lead,unscheduled,done'], 'q' => ['nullable', 'string', 'max:100'],
         ]);
         $actor = $request->user();
         if (! empty($data['client_id'])) {
@@ -47,10 +47,23 @@ final class MedicationFollowupController extends Controller
         if ($state === 'overdue') {
             $query->where('due_at', '<', now('UTC'));
         }
+        if ($state === 'lead') {
+            $query->whereIn('type', MedicationFollowupService::LEAD_TYPES);
+        }
+        if ($state === 'unscheduled') {
+            $query->whereNull('due_at');
+        }
         $rows = $query->with(['client.site', 'medication', 'owner', 'originalOwner'])
             ->orderByRaw('due_at IS NULL')->orderBy('due_at')->orderBy('id')
             ->paginate(25)->withQueryString()->through(fn (MedicationFollowup $row) => $this->work->present($row, $actor));
-        $payload = ['followups' => $rows, 'meters' => $meters, 'filters' => $data,
+        // A neutral caption only: searching a concealed medicine must not expose
+        // whether its name matched. Person access precedes even this count.
+        $hiddenControlled = $actor->canDo('medications.controlled.view') ? 0
+            : $this->work->visibleQuery($actor, includeControlled: true)
+                ->when($data['client_id'] ?? null, fn ($q, $id) => $q->where('client_id', $id))
+                ->when($data['site_id'] ?? null, fn ($q, $id) => $q->whereHas('client', fn ($c) => $c->where('site_id', $id)))
+                ->whereNull('completed_at')->whereHas('medication', fn ($m) => $m->where('controlled_drug', true))->count();
+        $payload = ['followups' => $rows, 'meters' => $meters, 'filters' => $data, 'hidden_controlled' => $hiddenControlled,
             'can_manage' => $actor->canDo(MedicationFollowupService::MANAGE), 'types' => MedicationFollowupService::TYPES];
         if ($request->expectsJson()) {
             return response()->json($payload)->header('Cache-Control', 'private, no-store');
@@ -64,6 +77,14 @@ final class MedicationFollowupController extends Controller
         return response()->json($this->work->details($request->user(), $followup))->header('Cache-Control', 'private, no-store');
     }
 
+    public function prepare(Request $request, int $administration)
+    {
+        $data = $request->validate(['type' => ['nullable', 'in:effect,reoffer']]);
+        $row = $this->work->prepareAdministration($request->user(), $administration, $data['type'] ?? 'effect');
+
+        return response()->json($this->work->details($request->user(), $row->id))->header('Cache-Control', 'private, no-store');
+    }
+
     public function transition(Request $request, int $followup)
     {
         $data = $request->validate([
@@ -72,6 +93,7 @@ final class MedicationFollowupController extends Controller
             'outcome' => ['nullable', 'string', 'max:2000'], 'reason' => ['nullable', 'string', 'max:2000'],
             'again_at' => ['nullable', 'string', 'max:40'], 'owner_id' => ['nullable', 'integer', 'min:1'],
             'observations' => ['nullable', 'string', 'max:2000'], 'escalation_needed' => ['nullable', 'boolean'],
+            'review_minutes_after' => ['nullable', 'integer', 'min:0', 'max:1440'],
             'told' => ['nullable', 'string', 'max:255'], 'escalation_action' => ['nullable', 'string', 'max:2000'],
             'reason_category' => ['nullable', 'string', 'max:50'], 'capacity' => ['nullable', 'string', 'max:50'],
             'offered_alternative' => ['nullable', 'boolean'], 'alternative_details' => ['nullable', 'string', 'max:2000'],

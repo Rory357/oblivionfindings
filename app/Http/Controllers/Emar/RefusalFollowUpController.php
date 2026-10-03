@@ -8,6 +8,7 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationRefusalFollowup;
 use App\Models\User;
+use App\Services\Medication\Followups\MedicationFollowupService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
@@ -121,8 +122,10 @@ class RefusalFollowUpController extends Controller
                     'client_id' => $scope->client->id,
                     'client_medication_administration_id' => $rootAdministration->id,
                 ], $attributes);
-                if (! $followup->wasRecentlyCreated) { $followup->fill($attributes)->save(); }
-                app(\App\Services\Medication\Followups\MedicationFollowupService::class)->syncAdministration($rootAdministration);
+                if (! $followup->wasRecentlyCreated) {
+                    $followup->fill($attributes)->save();
+                }
+                app(MedicationFollowupService::class)->syncAdministration($rootAdministration);
 
                 if (! empty($attributes['escalated_to_manager'])) {
                     app(MedicationIncidentIntegrationService::class)
@@ -139,35 +142,19 @@ class RefusalFollowUpController extends Controller
      */
     public function complete(Request $request, MedicationRefusalFollowup $followup)
     {
-        $user = $this->correctionActor($request);
+        $user = $request->user();
+        abort_unless($user?->canDo('medications.administer.record'), 403);
+        $source = $followup->administration()->where('client_id', $followup->client_id)->firstOrFail();
+        $rootId = $source->is_correction ? $source->corrected_of_id : $source->id;
+        $effective = ClientMedicationAdministration::query()->effectiveClinicalEvidence()
+            ->where('client_id', $source->client_id)->where('client_medication_id', $source->client_medication_id)
+            ->where(fn ($q) => $q->whereKey($rootId)->orWhere('corrected_of_id', $rootId))->firstOrFail();
+        $row = app(MedicationFollowupService::class)->prepareAdministration($user, $effective->id, 'reoffer');
+        abort_unless((int) ($row->context['refusal_id'] ?? 0) === (int) $followup->id, 404);
+        $request->merge(['action' => 'refusal']);
+        $response = app(MedicationFollowupController::class)->transition($request, $row->id);
 
-        return $this->withCanonicalFollowup($user, $followup, function (MedicationRefusalFollowup $lockedFollowup) use ($request, $user) {
-            if ($lockedFollowup->follow_up_completed_at !== null) {
-                return redirect()->back()->with('success', 'Follow-up was already completed.');
-            }
-
-            // Completion must record what was actually done/decided — a bare
-            // timestamp left auditors unable to verify the resolution action.
-            $validated = $request->validate([
-                'outcome' => ['required', 'string', 'max:2000'],
-            ]);
-
-            $lockedFollowup->update([
-                'follow_up_completed_at' => now(),
-                'follow_up_completed_by' => $user->id,
-                'follow_up_outcome' => $validated['outcome'],
-            ]);
-
-            app(\App\Services\Medication\Followups\MedicationFollowupService::class)->syncAdministration($lockedFollowup->administration);
-
-            app(MedicationIncidentIntegrationService::class)->resolveRefusalEscalation(
-                $lockedFollowup,
-                'Medication refusal follow-up completed.',
-                $user->id
-            );
-
-            return redirect()->back()->with('success', 'Follow-up marked as completed.');
-        });
+        return $request->expectsJson() ? $response : back()->with('success', 'Medication refusal follow-up saved.');
     }
 
     /**
@@ -199,7 +186,7 @@ class RefusalFollowUpController extends Controller
     private function correctionActor(Request $request): User
     {
         $user = $request->user();
-        abort_unless($user?->canDo('medications.administer.correct'), 403);
+        abort_unless($user?->canDo('medications.followups.manage'), 403);
 
         return $user;
     }
@@ -215,7 +202,7 @@ class RefusalFollowUpController extends Controller
         return $this->governanceScope->forClient(
             $user,
             $clientId,
-            'medications.administer.correct',
+            'medications.followups.manage',
             function (Client $client) use ($submittedFollowup, $callback, $user) {
                 $administrationSnapshot = ClientMedicationAdministration::query()
                     ->whereKey($submittedFollowup->client_medication_administration_id)

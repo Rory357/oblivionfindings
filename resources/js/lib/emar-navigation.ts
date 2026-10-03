@@ -278,8 +278,7 @@ export const EMAR_HUBS: EmarHub[] = [
         key: 'safety',
         label: 'Safety & oversight',
         icon: ShieldCheck,
-        // A break-glass holder sees the hub for Emergency access alone.
-        visible: any(hasLeadCapability, auditView, breakGlass),
+        visible: any(view, hasLeadCapability, auditView, breakGlass),
         views: [
             {
                 key: 'overview',
@@ -288,6 +287,13 @@ export const EMAR_HUBS: EmarHub[] = [
                 icon: LayoutGrid,
                 visible: lead,
                 aliases: ['/emar/daily'],
+            },
+            {
+                key: 'followups',
+                label: 'Follow-ups',
+                href: '/medication-followups',
+                icon: ClipboardList,
+                visible: view,
             },
             {
                 key: 'errors',

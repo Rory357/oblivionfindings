@@ -27,7 +27,6 @@ use App\Models\MedicationDestruction;
 use App\Models\MedicationInteraction;
 use App\Models\MedicationPharmacyOrder;
 use App\Models\MedicationPrescriberOrder;
-use App\Models\MedicationPrnEffectiveness;
 use App\Models\MedicationReview;
 use App\Models\MedicationRound;
 use App\Models\MedicationRoundTemplate;
@@ -47,6 +46,7 @@ use App\Services\MarScheduleService;
 use App\Services\Medication\Alerts\MedicationAlertSources;
 use App\Services\Medication\CompetencyPolicySettings;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
+use App\Services\Medication\Followups\LegacyEffectFollowupAdapter;
 use App\Services\Medication\Followups\MedicationFollowupService;
 use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationGovernanceScopeService;
@@ -7840,53 +7840,8 @@ class EmarController extends Controller
 
     public function storePrnEffectiveness(Request $request)
     {
-        $this->assertMedicationCapability($request, 'medications.administer.record');
-
-        $user = $request->user();
-        abort_unless($user, 403);
-        $administration = ClientMedicationAdministration::query()
-            ->whereKey($request->integer('client_medication_administration_id'))
-            ->firstOrFail();
-
-        return $this->medicationScope->forPrnEffectiveness(
-            $user,
-            $administration,
-            now(),
-            function (MedicationScopeDecision $scope) use ($request) {
-                abort_if(
-                    $scope->medication->controlled_drug
-                        && ! $scope->performer->canDo('medications.controlled.record'),
-                    404,
-                );
-                $validated = $request->validate([
-                    'client_medication_administration_id' => 'required|integer',
-                    'effectiveness' => 'required|in:effective,partially_effective,not_effective',
-                    'review_minutes_after' => 'nullable|integer|min:0',
-                    'observations' => 'nullable|string',
-                    'escalation_needed' => 'nullable|boolean',
-                    'escalation_action' => 'nullable|string',
-                ]);
-                MedicationPrnEffectiveness::updateOrCreate(
-                    ['client_medication_administration_id' => $scope->administration->id],
-                    [
-                        ...$validated,
-                        'client_id' => $scope->client->id,
-                        'client_medication_id' => $scope->medication->id,
-                        'reviewed_by' => $scope->performer->id,
-                        'reviewed_at' => now(),
-                    ],
-                );
-                $this->medicationScope->recordBreakGlassUse(
-                    $scope,
-                    'recorded_prn_effectiveness',
-                    'Administration '.$scope->administration->id,
-                );
-
-                return redirect()->back();
-            },
-        );
+        return app(LegacyEffectFollowupAdapter::class)->save($request, $this->medicationScope);
     }
-
     // ─── Medications CRUD ─────────────────────────────────
 
     public function storeMedication(Request $request)

@@ -120,12 +120,12 @@ class MedicationFollowupWorkflowTest extends TestCase
         $this->assertSame(2, $old->events()->count());
         $new = MedicationFollowup::query()->where('source_key', 'effect:'.$replacement->id)->sole();
         $this->actingAs($this->worker)->getJson('/medication-followups/'.$old->id)->assertOk()->assertJsonPath('can_complete', false);
-        $this->post($old->fresh(), ['action' => 'couldnt_check', 'reason' => 'Away', 'again_at' => '2026-10-03T10:00:00+13:00'])->assertNotFound();
-        $this->post($old->fresh(), ['action' => 'amend_effect', 'outcome' => 'effective'])->assertNotFound();
+        $this->postFollowup($old->fresh(), ['action' => 'couldnt_check', 'reason' => 'Away', 'again_at' => '2026-10-03T10:00:00+13:00'])->assertNotFound();
+        $this->postFollowup($old->fresh(), ['action' => 'amend_effect', 'outcome' => 'effective'])->assertNotFound();
         $tasks = (new MedicationFollowupProvider)->authorizedTasks($this->worker);
         $this->assertCount(1, $tasks);
         $this->assertSame('medication-followup-'.$new->id, $tasks[0]->id);
-        $this->post($new, ['action' => 'effect', 'outcome' => 'effective'])->assertOk();
+        $this->postFollowup($new, ['action' => 'effect', 'outcome' => 'effective'])->assertOk();
         $this->assertSame($replacement->id, MedicationPrnEffectiveness::query()->sole()->client_medication_administration_id);
     }
 
@@ -143,6 +143,25 @@ class MedicationFollowupWorkflowTest extends TestCase
         });
         $this->assertDatabaseCount('medication_followups', 1);
         $this->assertNotNull($old->fresh()->completed_at);
+        $this->assertCount(0, (new MedicationFollowupProvider)->authorizedTasks($this->worker));
+        $this->assertDatabaseCount('client_medication_administrations', 2);
+    }
+
+    public function test_approval_endpoint_synchronizes_retirement_inside_the_correction_aggregate(): void
+    {
+        [$original, $old] = $this->effect();
+        $correction = ClientMedicationAdministration::query()->create([
+            'client_id' => $this->client->id, 'client_medication_id' => $original->client_medication_id,
+            'status' => 'withheld', 'is_correction' => true, 'corrected_of_id' => $original->id,
+            'correction_status' => 'pending', 'correction_requested_by' => $this->worker->id,
+            'administered_by' => $this->worker->id, 'administered_at' => now(),
+        ]);
+        $lead = $this->staff('team_lead');
+        $this->grant($lead, ['medications.administer.correct', 'clients.viewAny']);
+        $this->actingAs($lead)->post('/emar/corrections/'.$correction->id.'/approve')->assertRedirect();
+        $this->assertSame('approved', $correction->fresh()->correction_status);
+        $this->assertSame('retired', $old->fresh()->state);
+        $this->assertSame(1, $old->events()->where('action', 'source_retired')->count());
         $this->assertCount(0, (new MedicationFollowupProvider)->authorizedTasks($this->worker));
         $this->assertDatabaseCount('client_medication_administrations', 2);
     }
@@ -179,11 +198,90 @@ class MedicationFollowupWorkflowTest extends TestCase
         $this->assertSame(0, MedicationEvent::query()->where('kind', 'followup.source_completed')->count());
     }
 
+    public function test_batch_completion_finishes_all_domain_work_before_one_audit_append_and_rolls_back_together(): void
+    {
+        $rows = DB::transaction(fn () => [
+            $this->work()->ensureForSource('order-check', 'batch-a', $this->client, null, null, null, null),
+            $this->work()->ensureForSource('second-check', 'batch-b', $this->client, null, null, null, null),
+        ]);
+        $commands = array_map(fn ($row) => ['source_key' => $row->source_key, 'actor' => $this->worker, 'outcome' => 'checked', 'facts' => ['check_id' => 91]], $rows);
+        $mock = \Mockery::mock();
+        $mock->shouldReceive('appendMany')->once()->withArgs(function (array $events) use ($rows) {
+            $this->assertCount(2, $events);
+            foreach ($rows as $row) {
+                $this->assertNotNull($row->fresh()->completed_at);
+            }
+
+            return true;
+        })->andThrow(new \RuntimeException('Synthetic batch audit failure'));
+        $this->app->instance(MedicationEventRecorder::class, $mock);
+        try {
+            DB::transaction(fn () => $this->work()->completeSources($commands));
+            $this->fail('The final audit failure must propagate.');
+        } catch (\RuntimeException $error) {
+            $this->assertSame('Synthetic batch audit failure', $error->getMessage());
+        }
+        foreach ($rows as $row) {
+            $this->assertNull($row->fresh()->completed_at);
+            $this->assertSame(1, $row->fresh()->revision);
+            $this->assertSame(1, $row->events()->count());
+        }
+        $this->app->forgetInstance(MedicationEventRecorder::class);
+        DB::transaction(fn () => $this->work()->completeSources($commands));
+        DB::transaction(fn () => $this->work()->completeSources($commands));
+        $this->assertSame(2, MedicationEvent::query()->where('kind', 'followup.source_completed')->count());
+    }
+
+    public function test_lost_reoffer_response_replay_still_opens_the_exact_recorder_and_does_not_close_work(): void
+    {
+        [$dose, $row] = $this->refusal();
+        $data = ['action' => 'refusal', 'outcome' => 'taken', 'revision' => 1, 'request_uuid' => (string) Str::uuid()];
+        $this->postFollowup($row, $data)->assertOk()->assertJsonPath('next_action', 'record_reoffer');
+        $this->postFollowup($row, $data)->assertOk()->assertJsonPath('duplicate', true)->assertJsonPath('next_action', 'record_reoffer')->assertJsonPath('reoffer_of_id', $dose->id);
+        $this->assertNull($row->fresh()->completed_at);
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+    }
+
+    public function test_legacy_refusal_completion_cannot_bypass_the_full_assessment(): void
+    {
+        [, $row] = $this->refusal();
+        $refusal = MedicationRefusalFollowup::query()->sole();
+        $this->actingAs($this->worker)->postJson('/emar/refusal-followups/'.$refusal->id.'/complete', [
+            'request_uuid' => (string) Str::uuid(), 'revision' => 1,
+            'outcome' => 'refused_again', 'reason' => 'They chose not to take it.',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['reason_category', 'capacity', 'next_action']);
+        $this->assertNull($row->fresh()->completed_at);
+        $this->assertNull($refusal->fresh()->follow_up_completed_at);
+    }
+
+    public function test_legacy_effect_route_uses_canonical_receipt_and_requires_who_and_what(): void
+    {
+        [$dose, $row] = $this->effect();
+        $this->actingAs($this->worker)->postJson('/meds/today/prn/effect', [
+            'client_medication_administration_id' => $dose->id,
+            'request_uuid' => (string) Str::uuid(), 'revision' => 1, 'effectiveness' => 'not_effective',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['told', 'escalation_action']);
+        $this->assertNull($row->fresh()->completed_at);
+        $this->assertDatabaseCount('medication_prn_effectiveness', 0);
+    }
+
+    public function test_legacy_effect_retry_uses_the_original_receipt_action_after_completion(): void
+    {
+        [$dose] = $this->effect();
+        $data = ['client_medication_administration_id' => $dose->id, 'effectiveness' => 'effective',
+            'request_uuid' => (string) Str::uuid(), 'revision' => 1];
+        $this->actingAs($this->worker)->post('/meds/today/prn/effect', $data)->assertRedirect();
+        $this->actingAs($this->worker)->post('/meds/today/prn/effect', $data)->assertRedirect();
+        $this->assertDatabaseCount('medication_prn_effectiveness', 1);
+        $this->assertSame(1, MedicationEvent::query()->where('kind', 'followup.effect')->count());
+        $this->assertSame(0, MedicationEvent::query()->where('kind', 'followup.amend_effect')->count());
+    }
+
     public function test_couldnt_check_requires_a_reason_and_never_closes(): void
     {
         [, $row] = $this->effect();
-        $this->post($row, ['action' => 'couldnt_check', 'again_at' => '2026-10-03T10:15:00+13:00'])->assertUnprocessable()->assertJsonValidationErrors('reason');
-        $this->post($row, ['action' => 'couldnt_check', 'reason' => 'Asleep', 'again_at' => '2026-10-03T10:15:00+13:00'])->assertOk()->assertJsonPath('state', 'couldnt_check');
+        $this->postFollowup($row, ['action' => 'couldnt_check', 'again_at' => '2026-10-03T10:15:00+13:00'])->assertUnprocessable()->assertJsonValidationErrors('reason');
+        $this->postFollowup($row, ['action' => 'couldnt_check', 'reason' => 'Asleep', 'again_at' => '2026-10-03T10:15:00+13:00'])->assertOk()->assertJsonPath('state', 'couldnt_check');
         $this->assertNull($row->fresh()->completed_at);
         $this->assertSame('2026-10-02 21:15:00', $row->fresh()->due_at->format('Y-m-d H:i:s'));
         $this->assertDatabaseCount('medication_prn_effectiveness', 0);
@@ -192,7 +290,7 @@ class MedicationFollowupWorkflowTest extends TestCase
     public function test_reschedule_rejects_a_time_after_the_shift_end(): void
     {
         [, $row] = $this->effect();
-        $this->post($row, ['action' => 'couldnt_check', 'reason' => 'Away', 'again_at' => '2026-10-03T15:01:00+13:00'])
+        $this->postFollowup($row, ['action' => 'couldnt_check', 'reason' => 'Away', 'again_at' => '2026-10-03T15:01:00+13:00'])
             ->assertUnprocessable()->assertJsonValidationErrors('again_at');
         $this->assertSame(1, $row->fresh()->revision);
     }
@@ -200,7 +298,7 @@ class MedicationFollowupWorkflowTest extends TestCase
     public function test_reschedule_accepts_the_exact_end_of_shift(): void
     {
         [, $row] = $this->effect();
-        $this->post($row, ['action' => 'couldnt_check', 'reason' => 'Away', 'again_at' => '2026-10-03T15:00:00+13:00'])->assertOk();
+        $this->postFollowup($row, ['action' => 'couldnt_check', 'reason' => 'Away', 'again_at' => '2026-10-03T15:00:00+13:00'])->assertOk();
         $this->assertNull($row->fresh()->completed_at);
     }
 
@@ -208,8 +306,8 @@ class MedicationFollowupWorkflowTest extends TestCase
     {
         [, $row] = $this->effect();
         $data = ['action' => 'effect', 'outcome' => 'effective', 'request_uuid' => (string) Str::uuid(), 'revision' => 1];
-        $this->post($row, $data)->assertOk()->assertJsonPath('sync.status', 'processed');
-        $this->post($row, $data)->assertOk()->assertJsonPath('duplicate', true);
+        $this->postFollowup($row, $data)->assertOk()->assertJsonPath('sync.status', 'processed');
+        $this->postFollowup($row, $data)->assertOk()->assertJsonPath('duplicate', true);
         $this->assertDatabaseCount('medication_prn_effectiveness', 1);
         $this->assertSame(2, $row->fresh()->revision);
         $this->assertSame(1, MedicationEvent::query()->where('kind', 'followup.effect')->count());
@@ -219,24 +317,24 @@ class MedicationFollowupWorkflowTest extends TestCase
     {
         [, $row] = $this->effect();
         $data = ['action' => 'effect', 'outcome' => 'effective', 'request_uuid' => (string) Str::uuid(), 'revision' => 1];
-        $this->post($row, $data)->assertOk();
-        $this->post($row, [...$data, 'outcome' => 'partially_effective'])->assertUnprocessable()->assertJsonValidationErrors('request_uuid');
+        $this->postFollowup($row, $data)->assertOk();
+        $this->postFollowup($row, [...$data, 'outcome' => 'partially_effective'])->assertUnprocessable()->assertJsonValidationErrors('request_uuid');
         $this->assertSame('effective', MedicationPrnEffectiveness::query()->sole()->effectiveness);
     }
 
     public function test_stale_revision_preserves_entries_and_changes_no_evidence(): void
     {
         [, $row] = $this->effect();
-        $this->post($row, ['action' => 'couldnt_check', 'reason' => 'Away', 'again_at' => '2026-10-03T10:00:00+13:00'])->assertOk();
-        $this->post($row, ['action' => 'effect', 'outcome' => 'effective', 'revision' => 1])->assertConflict();
+        $this->postFollowup($row, ['action' => 'couldnt_check', 'reason' => 'Away', 'again_at' => '2026-10-03T10:00:00+13:00'])->assertOk();
+        $this->postFollowup($row, ['action' => 'effect', 'outcome' => 'effective', 'revision' => 1])->assertConflict();
         $this->assertNull($row->fresh()->completed_at);
     }
 
     public function test_didnt_help_requires_who_was_told_and_what_was_done(): void
     {
         [, $row] = $this->effect();
-        $this->post($row, ['action' => 'effect', 'outcome' => 'not_effective'])->assertUnprocessable()->assertJsonValidationErrors(['told', 'escalation_action']);
-        $this->post($row, ['action' => 'effect', 'outcome' => 'not_effective', 'told' => 'House lead', 'escalation_action' => 'Rang the lead; they will assess.'])->assertOk();
+        $this->postFollowup($row, ['action' => 'effect', 'outcome' => 'not_effective'])->assertUnprocessable()->assertJsonValidationErrors(['told', 'escalation_action']);
+        $this->postFollowup($row, ['action' => 'effect', 'outcome' => 'not_effective', 'told' => 'House lead', 'escalation_action' => 'Rang the lead; they will assess.'])->assertOk();
         $this->assertTrue(MedicationPrnEffectiveness::query()->sole()->escalation_needed);
     }
 
@@ -244,7 +342,7 @@ class MedicationFollowupWorkflowTest extends TestCase
     {
         [$dose] = $this->effect();
         $row = DB::transaction(fn () => $this->work()->ensure('synthetic-unconfirmed:'.$dose->id, 'unconfirmed', $this->client, $dose->medication, $dose, null, now()->addHour()));
-        $this->post($row, ['action' => 'signoff', 'outcome' => 'Reviewed'])->assertForbidden();
+        $this->postFollowup($row, ['action' => 'signoff', 'outcome' => 'Reviewed'])->assertForbidden();
         $lead = $this->staff('team_lead');
         $this->grant($lead, ['medications.followups.manage', 'clients.viewAny']);
         $this->actingAs($lead)->postJson('/medication-followups/'.$row->id.'/transition', ['action' => 'signoff', 'outcome' => 'Reviewed with recorder', 'revision' => 1, 'request_uuid' => (string) Str::uuid()])->assertOk();
@@ -255,10 +353,10 @@ class MedicationFollowupWorkflowTest extends TestCase
     {
         [, $row] = $this->effect();
         $other = $this->staff();
-        $this->post($row, ['action' => 'reassign', 'owner_id' => $other->id, 'reason' => 'Handing over'])->assertUnprocessable();
+        $this->postFollowup($row, ['action' => 'reassign', 'owner_id' => $other->id, 'reason' => 'Handing over'])->assertUnprocessable();
         $this->onShift($other);
         $this->client->supportWorkers()->syncWithoutDetaching([$other->id]);
-        $this->post($row, ['action' => 'reassign', 'owner_id' => $other->id, 'reason' => 'Handing over'])->assertOk();
+        $this->postFollowup($row, ['action' => 'reassign', 'owner_id' => $other->id, 'reason' => 'Handing over'])->assertOk();
         $this->assertSame($other->id, $row->fresh()->owner_id);
         $this->assertSame($this->worker->id, $row->fresh()->original_owner_id);
     }
@@ -278,7 +376,7 @@ class MedicationFollowupWorkflowTest extends TestCase
         $other = Site::factory()->create(['is_active' => true]);
         $this->client->update(['site_id' => $other->id]);
         $this->actingAs($this->worker)->getJson('/medication-followups/'.$row->id)->assertNotFound();
-        $this->post($row, ['action' => 'effect', 'outcome' => 'effective'])->assertNotFound();
+        $this->postFollowup($row, ['action' => 'effect', 'outcome' => 'effective'])->assertNotFound();
         $this->assertCount(0, (new MedicationFollowupProvider)->authorizedTasks($this->worker));
     }
 
@@ -288,7 +386,7 @@ class MedicationFollowupWorkflowTest extends TestCase
         $this->deny($this->worker, ['medications.controlled.view', 'medications.controlled.record']);
         $this->actingAs($this->worker)->getJson('/medication-followups')->assertOk()->assertJsonCount(0, 'followups.data');
         $this->actingAs($this->worker)->getJson('/medication-followups/'.$row->id)->assertNotFound();
-        $this->post($row, ['action' => 'effect', 'outcome' => 'effective'])->assertNotFound();
+        $this->postFollowup($row, ['action' => 'effect', 'outcome' => 'effective'])->assertNotFound();
         $this->assertCount(0, (new MedicationFollowupProvider)->authorizedTasks($this->worker));
     }
 
@@ -296,7 +394,7 @@ class MedicationFollowupWorkflowTest extends TestCase
     {
         [, $row] = $this->effect();
         $this->worker->hrEmployeeProfile->update(['is_active' => false]);
-        $this->post($row, ['action' => 'effect', 'outcome' => 'effective'])->assertNotFound();
+        $this->postFollowup($row, ['action' => 'effect', 'outcome' => 'effective'])->assertNotFound();
         $this->assertNull($row->fresh()->completed_at);
     }
 
@@ -323,7 +421,7 @@ class MedicationFollowupWorkflowTest extends TestCase
     {
         [$dose] = $this->effect();
         $row = DB::transaction(fn () => $this->work()->ensureForSource('confirm', 44, $this->client, $dose->medication, $dose, $this->worker->id, now()->addMinutes(30)));
-        $this->post($row, ['action' => 'confirmation', 'outcome' => 'yes'])->assertUnprocessable();
+        $this->postFollowup($row, ['action' => 'confirmation', 'outcome' => 'yes'])->assertUnprocessable();
         DB::transaction(fn () => $this->work()->completeFromSource($row->source_key, $this->worker, 'no', ['nomination_id' => 44]));
         DB::transaction(fn () => $this->work()->completeFromSource($row->source_key, $this->worker, 'no', ['nomination_id' => 44]));
         $this->assertSame(1, MedicationFollowup::query()->where('type', 'disputed')->count());
@@ -333,7 +431,7 @@ class MedicationFollowupWorkflowTest extends TestCase
     public function test_short_refusal_not_needed_does_not_create_a_second_refusal(): void
     {
         [$dose, $row] = $this->refusal();
-        $this->post($row, ['action' => 'refusal', 'outcome' => 'not_needed', 'reason' => 'Prescriber advised the next scheduled dose.'])->assertOk();
+        $this->postFollowup($row, ['action' => 'refusal', 'outcome' => 'not_needed', 'reason' => 'Prescriber advised the next scheduled dose.'])->assertOk();
         $this->assertDatabaseCount('client_medication_administrations', 1);
         $this->assertSame('refused', $dose->fresh()->status);
         $this->assertNotNull($row->fresh()->completed_at);
@@ -342,7 +440,7 @@ class MedicationFollowupWorkflowTest extends TestCase
     public function test_second_refusal_requires_the_full_assessment(): void
     {
         [, $row] = $this->refusal();
-        $this->post($row, ['action' => 'refusal', 'outcome' => 'refused_again', 'reason' => 'They chose not to take it.'])->assertUnprocessable()
+        $this->postFollowup($row, ['action' => 'refusal', 'outcome' => 'refused_again', 'reason' => 'They chose not to take it.'])->assertUnprocessable()
             ->assertJsonValidationErrors(['reason_category', 'capacity', 'next_action']);
         $this->assertNull($row->fresh()->completed_at);
     }
@@ -350,7 +448,7 @@ class MedicationFollowupWorkflowTest extends TestCase
     public function test_reoffer_recording_cancellation_leaves_followup_open(): void
     {
         [$dose, $row] = $this->refusal();
-        $this->post($row, ['action' => 'refusal', 'outcome' => 'taken'])->assertOk()->assertJsonPath('next_action', 'record_reoffer')->assertJsonPath('reoffer_of_id', $dose->id);
+        $this->postFollowup($row, ['action' => 'refusal', 'outcome' => 'taken'])->assertOk()->assertJsonPath('next_action', 'record_reoffer')->assertJsonPath('reoffer_of_id', $dose->id);
         $this->assertNull($row->fresh()->completed_at);
         $this->assertNull(MedicationRefusalFollowup::query()->sole()->follow_up_completed_at);
     }
@@ -484,7 +582,7 @@ class MedicationFollowupWorkflowTest extends TestCase
         $user->unsetRelation('roles')->unsetRelation('permissionOverrides');
     }
 
-    private function post(MedicationFollowup $row, array $data)
+    private function postFollowup(MedicationFollowup $row, array $data)
     {
         return $this->actingAs($this->worker)->postJson('/medication-followups/'.$row->id.'/transition', ['revision' => $row->revision, 'request_uuid' => (string) Str::uuid(), ...$data]);
     }
