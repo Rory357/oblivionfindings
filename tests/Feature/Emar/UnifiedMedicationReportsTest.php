@@ -50,7 +50,43 @@ it('uses the new medication report grant rather than generic reporting access', 
     $ids = Permission::whereIn('key', ['reports.viewAny', 'medications.view'])->pluck('id');
     $user->permissionOverrides()->sync($ids->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])->all());
     $this->actingAs($user->fresh())->get('/emar/reports')->assertForbidden();
+    $this->get('/reports/modules/medication_administrations')->assertForbidden();
+    $this->get('/reports/modules/medication_administrations/export')->assertForbidden();
+    $combined = $this->get('/reports/combined/care-quality')->assertOk();
+    expect(collect($combined->inertiaProps('metrics'))->pluck('label'))->not->toContain('Medication exceptions (7d)');
+    expect(collect($combined->inertiaProps('sections'))->pluck('title'))->not->toContain('Recent Medication Exceptions');
+    $csv = $this->get('/reports/combined/care-quality/export')->assertOk()->streamedContent();
+    expect($csv)->not->toContain('Medication exceptions', 'Recent Medication Exceptions', 'Open controlled discrepancies');
+    $this->get('/reports/combined/workforce-operations/export')->assertOk()->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
     $this->actingAs(p09Reader('auditor', $this->site))->get('/emar/reports')->assertOk()->assertInertia(fn ($page) => $page->component('emar/reports/hub')->where('filters.report', 'doses')->where('data.totals.given_rate', null));
+});
+
+it('routes generic clinical medication downloads to the guarded purpose flow without releasing CSV', function () {
+    $actor = p09Reader('admin', $this->site);
+    $this->actingAs($actor)->get('/reports/modules/medication_administrations')->assertOk()->assertInertia(fn ($page) => $page->where('module.export_route', '/emar/reports?view=exports')->where('module.export_label', 'Print & exports'));
+    $this->get('/reports/modules/medication_administrations/export')->assertRedirect('/emar/reports?view=exports');
+    $this->get('/reports/modules/controlled_drug_discrepancies/export')->assertRedirect('/emar/reports?view=exports');
+    $this->get('/reports/combined/care-quality')->assertOk()->assertInertia(fn ($page) => $page->where('report.export_route', '/emar/reports?view=exports'));
+    $this->get('/reports/combined/care-quality/export')->assertRedirect('/emar/reports?view=exports');
+    $csv = $this->get('/reports/combined/compliance-risk/export')->assertOk()->streamedContent();
+    expect($csv)->not->toContain('Break-glass accesses');
+    expect(MedicationEvent::count())->toBe(0);
+});
+
+it('keeps finance out of generic clinical rows even with generic reporting authority', function () {
+    $actor = p09Reader('finance', $this->site);
+    $id = Permission::where('key', 'reports.viewAny')->value('id');
+    $actor->permissionOverrides()->syncWithoutDetaching([$id => ['allowed' => true]]);
+    $this->actingAs($actor->fresh())->get('/reports/modules/medication_administrations')->assertForbidden();
+    $this->get('/reports/modules/medication_administrations/export')->assertForbidden();
+    $this->get('/reports/modules/controlled_drug_discrepancies')->assertForbidden();
+    $combined = $this->get('/reports/combined/care-quality')->assertOk();
+    expect(collect($combined->inertiaProps('report.modules')))->not->toContain('medication_administrations', 'controlled_drug_discrepancies');
+    expect(collect($combined->inertiaProps('metrics'))->pluck('label'))->not->toContain('Medication exceptions (7d)');
+    expect(collect($combined->inertiaProps('sections'))->pluck('title'))->not->toContain('Recent Medication Exceptions');
+    $csv = $this->get('/reports/combined/care-quality/export')->assertOk()->streamedContent();
+    expect($csv)->not->toContain('Medication exceptions', 'Recent Medication Exceptions', 'Open controlled discrepancies');
+    expect(MedicationEvent::count())->toBe(0);
 });
 
 it('keeps finance stock aggregated and denies person and clinical reports', function () {
