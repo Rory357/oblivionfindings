@@ -10,7 +10,6 @@ use App\Models\MedicationError;
 use App\Models\MedicationErrorEntry;
 use App\Models\MedicationMarAttachment;
 use App\Models\User;
-use App\Services\AuditLogger;
 use App\Services\Medication\Audit\MedicationEventData;
 use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\MarLinkService;
@@ -22,6 +21,8 @@ use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\Medication\Reporting\MedicationExportAudit;
+use App\Services\Medication\Reporting\MedicationReportAccess;
 use App\Services\Medication\Reporting\RecordsReportingSettings;
 use Carbon\CarbonImmutable;
 use Closure;
@@ -229,7 +230,8 @@ class MedicationErrorController extends Controller
             'clients' => $this->governanceScope->clientPicker($readerSites)->whereIn('id', $clients)->values(), 'staff' => $this->governanceScope->staffPicker($readerSites)->filter(fn ($staff) => User::query()->find($staff['id'])?->canDo('medications.errors.manage'))->values(),
             'sites' => $this->governanceScope->sitePicker($sites)->map(fn ($s) => $s->only(['id', 'name']))->values(),
             'triage_rule' => app(MedicationErrorWorkflow::class)->triageRule(),
-            'can' => ['record' => $actor->canDo('medications.administer.record'), 'manage' => $actor->canDo('medications.errors.manage'), 'all' => $all, 'controlled' => $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)],
+            'export_period' => ['date_from' => $now->copy()->subDays(89)->toDateString(), 'date_to' => $now->toDateString()],
+            'can' => ['record' => $actor->canDo('medications.administer.record'), 'manage' => $actor->canDo('medications.errors.manage'), 'all' => $all, 'export' => $all && app(MedicationReportAccess::class)->canExport($actor, 'errors'), 'controlled' => $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)],
         ]);
     }
 
@@ -237,26 +239,22 @@ class MedicationErrorController extends Controller
     {
         $actor = $request->user();
         abort_unless($actor?->canDo('medications.view') && ($actor->canDo('medications.errors.manage') || $actor->canDo('medications.audit.view')), 403);
-        $data = $request->validate(['purpose' => 'required|string|min:3|max:500']);
-        $site = $request->integer('site_id') ?: null;
-        $sites = $this->governanceScope->readerSiteIds($actor, 'medications.view', requestedSiteId: $site);
-        $query = app(MedicationErrorReadScope::class)->apply(MedicationError::query(), $actor, $site ? [$site] : $sites);
-        AuditLogger::logOrFail('medications.errors.export', null, ['actor_id' => (int) $actor->id, 'purpose' => $data['purpose'], 'site_ids' => $sites, 'format' => 'neutral_csv']);
+        abort_unless(app(MedicationReportAccess::class)->canExport($actor, 'errors'), 403);
+        // Retained links used a free-text purpose. Preserve that explanation
+        // through the common, validated "Something else" purpose contract.
+        $purpose = $request->input('purpose');
+        if (is_string($purpose) && trim($purpose) !== '' && ! array_key_exists($purpose, MedicationExportAudit::PURPOSES)) {
+            $request->merge(['purpose' => 'other', 'purpose_detail' => $purpose]);
+        }
+        if (! $request->filled('period') && ! $request->filled('date_from') && ! $request->filled('date_to')) {
+            $now = now('Pacific/Auckland');
+            $request->merge(['period' => 'custom', 'date_from' => $now->copy()->subDays(89)->toDateString(), 'date_to' => $now->toDateString()]);
+        }
+        $request->merge(['type' => 'errors']);
 
-        return response()->streamDownload(function () use ($query) {
-            $stream = fopen('php://output', 'w');
-            fputcsv($stream, ['Error', 'Person', 'House', 'Occurred (NZ)', 'Reach', 'Harm', 'Stage', 'Owner', 'Summary'], ',', '"', '');
-            $query->with(['client.site', 'owner'])->orderBy('id')->chunkById(200, function ($errors) use ($stream) {
-                foreach ($errors as $error) {
-                    $row = [$error->reference_number, trim($error->client->first_name.' '.$error->client->last_name), $error->client->site?->name,
-                        ($error->occurred_at ?? $error->reported_at)?->tz('Pacific/Auckland')->format('Y-m-d H:i'),
-                        $error->reached_client, $error->harm_level, $error->stage(), $error->owner?->name, MedicationErrorSummary::for($error)];
-                    $row = array_map(fn ($value) => preg_match('/^[\x00-\x20]*[=+@-]/u', (string) $value) ? "'".$value : $value, $row);
-                    fputcsv($stream, $row, ',', '"', '');
-                }
-            });
-            fclose($stream);
-        }, 'medication-errors-neutral.csv', ['Content-Type' => 'text/csv; charset=UTF-8', 'Cache-Control' => 'private, no-store']);
+        // One renderer, CSV guard, canonical person/CD scope, current-evidence
+        // release check and final chained export event for both entry points.
+        return app(MedicationReportsController::class)->export($request);
     }
 
     public function medicines(Request $request, Client $client)

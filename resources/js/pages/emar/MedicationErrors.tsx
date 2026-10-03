@@ -1,13 +1,4 @@
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogDescription,
-    DialogFooter,
-} from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { MedicationExportButton } from '@/components/emar/medication-export-button';
 import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import {
     EntityContextMenu,
@@ -21,7 +12,6 @@ import {
     PageHeader,
     PageHeaderFilterButton,
     PageHeaderFilterSelect,
-    PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
@@ -85,10 +75,12 @@ type Props = {
     clients: { id: number; first_name: string; last_name: string }[];
     staff: Person[];
     sites: Person[];
+    export_period: { date_from: string; date_to: string };
     can: {
         record: boolean;
         manage: boolean;
         all: boolean;
+        export: boolean;
         controlled: boolean;
     };
 };
@@ -119,10 +111,9 @@ export default function MedicationErrors({
     staff,
     sites,
     can,
+    export_period,
 }: Props) {
     const [report, setReport] = useState(false);
-    const [exportOpen, setExportOpen] = useState(false);
-    const [purpose, setPurpose] = useState('');
     const [query, setQuery] = useState(filters.q);
     const ctx = useEntityContextMenu<ErrorRecord>();
     const crumbs = useEmarBreadcrumbs();
@@ -214,12 +205,15 @@ export default function MedicationErrors({
                                 }}
                                 placeholder="Search person or error reference"
                             />
-                            {can.all && (
-                                <PageHeaderGlassButton
-                                    onClick={() => setExportOpen(true)}
+                            {can.export && (
+                                <MedicationExportButton
+                                    type="errors"
+                                    siteId={filters.site_id ?? undefined}
+                                    dateFrom={export_period.date_from}
+                                    dateTo={export_period.date_to}
                                 >
                                     Export neutral CSV
-                                </PageHeaderGlassButton>
+                                </MedicationExportButton>
                             )}
                             {can.record && (
                                 <PageHeaderPrimaryButton
@@ -599,49 +593,6 @@ export default function MedicationErrors({
                     onClose={ctx.close}
                 />
             )}
-            <Dialog open={exportOpen} onOpenChange={setExportOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Export medication errors</DialogTitle>
-                        <DialogDescription>
-                            Exports every error in your permitted house and
-                            person scope. The CSV contains neutral summaries;
-                            investigation text stays in the error records.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <Label htmlFor="error-export-purpose">
-                        Purpose of this export
-                    </Label>
-                    <Textarea
-                        id="error-export-purpose"
-                        value={purpose}
-                        onChange={(e) => setPurpose(e.target.value)}
-                        maxLength={500}
-                    />
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setExportOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button disabled={purpose.trim().length < 3} asChild>
-                            <a
-                                href={`/emar/errors/export?${new URLSearchParams({ ...(filters.site_id ? { site_id: String(filters.site_id) } : {}), purpose })}`}
-                                onClick={(event) => {
-                                    if (purpose.trim().length < 3) {
-                                        event.preventDefault();
-                                        return;
-                                    }
-                                    setExportOpen(false);
-                                }}
-                            >
-                                Download neutral CSV
-                            </a>
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
             <ReportErrorModal
                 open={report}
                 onClose={() => setReport(false)}

@@ -16,6 +16,7 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\Audit\MedicationEventRecorder;
+use App\Services\Medication\Reporting\MedicationExportAudit;
 use App\Services\Medication\Reporting\RecordsReportingSettings;
 use App\Services\Tasks\Providers\MedicationErrorProvider;
 use Database\Seeders\RbacSeeder;
@@ -225,11 +226,48 @@ class MedicationErrorWorkflowTest extends TestCase
 
     public function test_neutral_export_requires_purpose_and_omits_private_narrative(): void
     {
-        $this->report(['description' => 'PRIVATE account for export regression']);
+        $error = $this->report(['description' => 'PRIVATE account for export regression']);
+        $this->grantPermissions($this->manager, ['medications.reports.view', 'medications.reports.export']);
         $this->actingAs($this->manager)->get('/emar/errors/export')->assertSessionHasErrors('purpose');
         $response = $this->actingAs($this->manager)->get('/emar/errors/export?purpose=Synthetic+safety+review')->assertOk();
-        $this->assertStringNotContainsString('PRIVATE', $response->streamedContent());
-        $this->assertStringContainsString('Details are held', $response->streamedContent());
+        $this->assertStringNotContainsString('PRIVATE', $response->getContent());
+        $this->assertStringContainsString($error->reference_number, $response->getContent());
+        $this->assertTrue($response->headers->hasCacheControlDirective('no-store'));
+        $this->assertDatabaseHas('medication_events', ['kind' => 'export.created', 'actor_id' => $this->manager->id, 'subject_id' => 'errors']);
+    }
+
+    public function test_audit_reader_cannot_use_legacy_error_export_without_report_export_permission(): void
+    {
+        $reader = $this->staff('auditor');
+        $this->grantPermissions($reader, ['medications.view', 'medications.audit.view', 'medications.audit.export', 'medications.reports.view']);
+        $reader->permissionOverrides()->syncWithoutDetaching([
+            Permission::query()->where('key', 'medications.reports.export')->sole()->id => ['allowed' => false],
+        ]);
+        $reader->unsetRelation('permissionOverrides')->unsetRelation('roles');
+        $this->actingAs($reader)->get('/emar/errors')->assertInertia(fn (Assert $page) => $page->where('can.export', false));
+        $this->actingAs($reader)->get('/emar/errors/export?type=audit&purpose=audit')->assertForbidden();
+        $this->assertDatabaseCount('medication_events', 0);
+    }
+
+    public function test_legacy_error_export_rechecks_permission_after_preparing_the_file(): void
+    {
+        $this->report(['description' => 'PRIVATE export revocation account']);
+        $this->grantPermissions($this->manager, ['medications.reports.view', 'medications.reports.export']);
+        $audit = app(MedicationExportAudit::class);
+        // Proxy the existing final service only at its after-render seam, then
+        // execute its real current-evidence release check with a revoked grant.
+        $proxy = \Mockery::mock($audit);
+        $proxy->shouldReceive('record')->once()->andReturnUsing(function (...$arguments) use ($audit): void {
+            $this->manager->permissionOverrides()->syncWithoutDetaching([
+                Permission::query()->where('key', 'medications.reports.export')->sole()->id => ['allowed' => false],
+            ]);
+            $audit->record(...$arguments);
+        });
+        $this->app->instance(MedicationExportAudit::class, $proxy);
+        $response = $this->actingAs($this->manager)->get('/emar/errors/export?purpose=review');
+        $response->assertForbidden();
+        $this->assertStringNotContainsString('PRIVATE', $response->getContent());
+        $this->assertDatabaseCount('medication_events', 1);
     }
 
     public function test_manual_operational_alert_uses_neutral_summary_and_canonical_read_scope(): void
