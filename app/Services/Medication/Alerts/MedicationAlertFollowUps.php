@@ -109,7 +109,7 @@ class MedicationAlertFollowUps
                 && $now->gte($raised->copy()->addMinutes($followUp['realert_every'] * ((int) $alert->realert_count + 1)));
 
             $step = (int) $alert->recipients()->max('step') + 1;
-            $subject = $this->subjectOf($alert);
+            $subject = MedicationAlertSubject::of($alert);
             // Everyone told so far, with why they were first told.
             $toldSoFar = $alert->recipients()
                 ->whereNotNull('told_at')
@@ -147,22 +147,5 @@ class MedicationAlertFollowUps
 
             return $escalate || $realert;
         });
-    }
-
-    private function subjectOf(MedicationAlert $alert): MedicationAlertSubject
-    {
-        return new MedicationAlertSubject(
-            key: '',
-            siteId: $alert->site_id !== null ? (int) $alert->site_id : null,
-            title: (string) $alert->title,
-            message: (string) $alert->message,
-            shortMessage: (string) $alert->short_message,
-            actionUrl: $alert->action_url,
-            severity: (string) $alert->severity,
-            clientId: $alert->client_id !== null ? (int) $alert->client_id : null,
-            controlled: (bool) $alert->controlled,
-            staffUserId: $alert->staff_user_id !== null ? (int) $alert->staff_user_id : null,
-            context: $alert->subject ?? [],
-        );
     }
 }

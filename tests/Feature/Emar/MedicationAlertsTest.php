@@ -1025,3 +1025,198 @@ it('tells the on-call person when an alert includes them, and escalates to them'
         ->and($error->recipients()->where('user_id', $backup->id)->count())->toBe(1)
         ->and($error->recipients()->where('user_id', $backup->id)->value('reason'))->toBe('onCall');
 });
+
+/*
+ * B2 chunk 5: quiet hours — New Zealand wall-clock times across midnight.
+ * Email and push for alerts without Follow up wait until the house's quiet
+ * hours end; the bell is never held, and Follow up alerts never wait.
+ */
+
+function b2Quiet(string $from, string $until): void
+{
+    b2FollowUp(['quiet_from' => $from, 'quiet_until' => $until]);
+}
+
+/** @param array<string, string> $value */
+function b2QuietHouse(Site $site, array $value): void
+{
+    MedicationSiteSetting::query()->updateOrCreate(
+        ['site_id' => $site->id, 'key' => 'medications.alert_quiet_hours'],
+        ['value' => json_encode($value)],
+    );
+}
+
+function b2Via(User $user, string $type): array
+{
+    return b2Sent($user, $type)->flatMap(fn (MedicationAlertNotification $n) => $n->via($user))->values()->all();
+}
+
+function b2Nz(string $local): Carbon
+{
+    return Carbon::parse($local, 'Pacific/Auckland')->utc();
+}
+
+it('holds email and push overnight but never the bell, and sends them once when quiet hours end', function () {
+    Carbon::setTestNow(b2Nz('2026-10-02 23:10'));
+    $site = Site::factory()->create();
+    $lead = b2Staff($site, 'team_lead');
+    b2WorkEmail($lead, 'lead@work.example.test');
+    b2Push($lead);
+    b2Setting('stock', ['inapp' => true, 'email' => true, 'push' => true, 'follow_up' => false, 'groups' => ['houseLead'], 'people' => []]);
+    b2Quiet('21:00', '07:00');
+
+    $alert = app(MedicationAlerts::class)->raise('stock', b2Subject($site, 'stock:1'));
+
+    // The bell straight away; email and push wait until 7:00 am NZ.
+    expect(b2Via($lead, 'stock'))->toBe(['database']);
+    $row = $alert->recipients()->where('user_id', $lead->id)->first();
+    expect($row->channels)->toBe(['inapp', 'email', 'push'])
+        ->and($row->told_at)->not->toBeNull()
+        ->and($row->held_until->equalTo(b2Nz('2026-10-03 07:00')))->toBeTrue()
+        ->and($alert->after_hours)->toBeTrue()
+        ->and($alert->after_hours_source)->toBe('organisation');
+    expect($alert->events()->where('event', MedicationAlertEvent::HELD)->value('detail'))->toMatchArray([
+        'user_ids' => [$lead->id],
+        'source' => 'organisation',
+    ]);
+
+    // Not before 7:00 am.
+    Carbon::setTestNow(b2Nz('2026-10-03 06:45'));
+    $this->artisan('emar:alert-follow-ups')->expectsOutputToContain('Held for quiet hours: 0 sent')->assertSuccessful();
+    expect(b2Via($lead, 'stock'))->toBe(['database']);
+
+    // The 7:00 am tick sends them, once.
+    Carbon::setTestNow(b2Nz('2026-10-03 07:00'));
+    $this->artisan('emar:alert-follow-ups')->expectsOutputToContain('Held for quiet hours: 1 sent')->assertSuccessful();
+    expect(b2Via($lead, 'stock'))->toBe(['database', 'mail', PushChannel::class])
+        ->and(b2Kinds($lead, 'stock'))->toBe(['first', 'first'])
+        ->and($row->fresh()->held_until)->toBeNull()
+        ->and($alert->events()->where('event', MedicationAlertEvent::RELEASED)->value('detail')['told'][0])->toMatchArray([
+            'user_id' => $lead->id,
+            'channels' => ['email', 'push'],
+        ]);
+    Carbon::setTestNow(b2Nz('2026-10-03 07:15'));
+    expect(app(MedicationAlerts::class)->releaseHeld(now()))->toBe(0)
+        ->and(b2Sent($lead, 'stock'))->toHaveCount(2);
+});
+
+it('tells someone reached only by a held email when quiet hours end, and never counts them as reaching nobody', function () {
+    Carbon::setTestNow(b2Nz('2026-10-02 23:10'));
+    $site = Site::factory()->create();
+    $lead = b2Staff($site, 'team_lead');
+    b2WorkEmail($lead, 'lead@work.example.test');
+    b2Setting('stock', ['inapp' => false, 'email' => true, 'push' => false, 'follow_up' => false, 'groups' => ['houseLead'], 'people' => []]);
+    b2Quiet('21:00', '07:00');
+
+    $alert = app(MedicationAlerts::class)->raise('stock', b2Subject($site, 'stock:1'));
+    expect(b2Sent($lead, 'stock'))->toHaveCount(0)
+        ->and($alert->reached_nobody)->toBeFalse()
+        ->and($alert->recipients()->value('told_at'))->toBeNull();
+
+    $morning = b2Nz('2026-10-03 07:00');
+    expect(app(MedicationAlerts::class)->releaseHeld($morning))->toBe(1)
+        ->and(b2Via($lead, 'stock'))->toBe(['mail'])
+        ->and($alert->recipients()->first()->told_at->equalTo($morning))->toBeTrue();
+});
+
+it('never holds a Follow up alert, and each house follows the organisation, sets its own hours or has none', function () {
+    Carbon::setTestNow(b2Nz('2026-10-02 23:10'));
+    $follows = Site::factory()->create();
+    $none = Site::factory()->create();
+    $own = Site::factory()->create();
+    $leads = [];
+    foreach ([$follows, $none, $own] as $site) {
+        $leads[$site->id] = b2Staff($site, 'team_lead');
+        b2WorkEmail($leads[$site->id], 'lead'.$site->id.'@work.example.test');
+    }
+    b2QuietHouse($none, ['mode' => 'off']);
+    b2QuietHouse($own, ['mode' => 'own', 'from' => '23:00', 'until' => '05:30']);
+    b2Quiet('21:00', '07:00');
+    b2Setting('stock', ['inapp' => true, 'email' => true, 'push' => false, 'follow_up' => false, 'groups' => ['houseLead'], 'people' => []]);
+    b2Setting('errors', ['inapp' => true, 'email' => true, 'push' => false, 'follow_up' => true, 'groups' => ['houseLead'], 'people' => []]);
+    $raise = fn (string $type, Site $site) => app(MedicationAlerts::class)->raise($type, b2Subject($site, $type.':'.$site->id));
+    $held = fn (MedicationAlert $alert) => $alert->recipients()->value('held_until');
+
+    // Follow up alerts are never held: email goes now, at every house.
+    $raise('errors', $follows);
+    expect(b2Via($leads[$follows->id], 'errors'))->toBe(['database', 'mail']);
+
+    $atFollows = $raise('stock', $follows);
+    expect($held($atFollows)->equalTo(b2Nz('2026-10-03 07:00')))->toBeTrue();
+
+    // None: sent straight away — but still after hours by the organisation's hours.
+    $atNone = $raise('stock', $none);
+    expect($held($atNone))->toBeNull()
+        ->and(b2Via($leads[$none->id], 'stock'))->toBe(['database', 'mail'])
+        ->and($atNone->after_hours)->toBeTrue()
+        ->and($atNone->after_hours_source)->toBe('organisation');
+
+    // Its own hours: held until 5:30 am, and after hours by them.
+    $atOwn = $raise('stock', $own);
+    expect($held($atOwn)->equalTo(b2Nz('2026-10-03 05:30')))->toBeTrue()
+        ->and($atOwn->after_hours_source)->toBe('house')
+        ->and($atOwn->events()->where('event', MedicationAlertEvent::HELD)->value('detail')['source'])->toBe('house');
+
+    // In the day nothing waits and nothing is after hours.
+    Carbon::setTestNow(b2Nz('2026-10-03 12:00'));
+    $day = app(MedicationAlerts::class)->raise('stock', b2Subject($follows, 'stock:day'));
+    expect($held($day))->toBeNull()
+        ->and($day->after_hours)->toBeFalse()
+        ->and($day->after_hours_source)->toBeNull();
+
+    // An organisation with no quiet hours holds nothing; a house's own still do.
+    b2Quiet('off', 'off');
+    Carbon::setTestNow(b2Nz('2026-10-03 23:30'));
+    expect($held(app(MedicationAlerts::class)->raise('stock', b2Subject($follows, 'stock:late'))))->toBeNull()
+        ->and($held(app(MedicationAlerts::class)->raise('stock', b2Subject($own, 'stock:late-own'))))->not->toBeNull();
+});
+
+it('sends nothing held for an alert dealt with overnight, and only to people still allowed to get it', function () {
+    Carbon::setTestNow(b2Nz('2026-10-02 23:10'));
+    $site = Site::factory()->create();
+    $stays = b2Staff($site, 'team_lead');
+    $leaves = b2Staff($site, 'team_lead');
+    b2WorkEmail($stays, 'stays@work.example.test');
+    b2WorkEmail($leaves, 'leaves@work.example.test');
+    b2Setting('stock', ['inapp' => true, 'email' => true, 'push' => false, 'follow_up' => false, 'groups' => ['houseLead'], 'people' => []]);
+    b2Quiet('21:00', '07:00');
+    $alerts = app(MedicationAlerts::class);
+
+    $dealt = $alerts->raise('stock', b2Subject($site, 'stock:1'));
+    $open = $alerts->raise('stock', b2Subject($site, 'stock:2'));
+    $alerts->resolve('stock', 'stock:1', 'Restocked');
+    // Overnight, one of them loses medication access.
+    $leaves->permissionOverrides()->syncWithoutDetaching([Permission::query()->where('key', 'medications.view')->value('id') => ['allowed' => false]]);
+
+    // A fresh tick, as the scheduler runs it.
+    expect(app(MedicationAlerts::class)->releaseHeld(b2Nz('2026-10-03 07:00')))->toBe(1)
+        ->and(b2Via($stays, 'stock'))->toBe(['database', 'database', 'mail'])
+        ->and(b2Via($leaves, 'stock'))->toBe(['database', 'database'])
+        ->and($dealt->events()->where('event', MedicationAlertEvent::HELD_NOT_SENT)->exists())->toBeTrue()
+        ->and($open->events()->where('event', MedicationAlertEvent::RELEASED)->value('detail')['not_sent'])->toBe([$leaves->id])
+        ->and($dealt->recipients()->whereNotNull('held_until')->count())->toBe(0);
+});
+
+it('holds until 7:00 am on the clock across both daylight-saving changes', function () {
+    $site = Site::factory()->create();
+    $lead = b2Staff($site, 'team_lead');
+    b2WorkEmail($lead, 'lead@work.example.test');
+    b2Setting('stock', ['inapp' => true, 'email' => true, 'push' => false, 'follow_up' => false, 'groups' => ['houseLead'], 'people' => []]);
+    b2Quiet('21:00', '07:00');
+    $alerts = app(MedicationAlerts::class);
+
+    // Last Sunday in September: 2:00 am NZST becomes 3:00 am NZDT.
+    Carbon::setTestNow(b2Nz('2026-09-26 22:00'));
+    $spring = $alerts->raise('stock', b2Subject($site, 'stock:spring'));
+    expect($spring->recipients()->value('held_until')->utc()->format('Y-m-d H:i'))->toBe('2026-09-26 18:00');
+    expect($alerts->releaseHeld(b2Nz('2026-09-27 06:59')))->toBe(0)
+        ->and($alerts->releaseHeld(b2Nz('2026-09-27 07:00')))->toBe(1);
+
+    // First Sunday in April: 3:00 am NZDT becomes 2:00 am NZST.
+    Carbon::setTestNow(b2Nz('2026-04-04 22:00'));
+    $autumn = $alerts->raise('stock', b2Subject($site, 'stock:autumn'));
+    expect($autumn->recipients()->value('held_until')->utc()->format('Y-m-d H:i'))->toBe('2026-04-04 19:00');
+    expect($alerts->releaseHeld(b2Nz('2026-04-05 06:59')))->toBe(0)
+        ->and($alerts->releaseHeld(b2Nz('2026-04-05 07:00')))->toBe(1)
+        ->and(b2Via($lead, 'stock'))->toBe(['database', 'mail', 'database', 'mail']);
+});

@@ -6,10 +6,11 @@
  * is reviewed and saved.
  *
  * Built so far: the Alerts tab (in-app, email, push, Follow up, who gets
- * it), Delivery (follow-up, email, push, in-app and the privacy switch), the
- * message preview and their Overview cards. Quiet hours, On-call contacts
- * and the Alert log arrive with their chunks (P11 B2 C4–C6) — until then
- * they aren't shown (hide-unbuilt). */
+ * it), Delivery (follow-up, email, push, quiet hours, in-app, after hours
+ * and the privacy switch, then Who can't be reached), the message preview
+ * and their Overview cards; On-call contacts is in _oncall. The Alert log
+ * arrives with its chunk (P11 B2 C6) — until then it isn't shown
+ * (hide-unbuilt). */
 import { DiscardDraftDialog } from '@/components/governance/DiscardDraftDialog';
 import { EntityChip } from '@/components/lists/entity-cells';
 import {
@@ -57,6 +58,7 @@ import {
     Timer,
     User,
     Users,
+    UserX,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useSettings, type Dialog } from './_context';
@@ -70,12 +72,14 @@ import {
     encodePeople,
     fallbackHouses,
     fallbackWarnings,
+    fmtT,
     inAppLocked,
     isDirty,
     isSiteDirty,
     parseAlert,
     parseGroups,
     parsePeople,
+    quietAt,
     siteDraftValue,
     siteSlot,
     withDraft,
@@ -84,6 +88,13 @@ import {
     type SettingsPayload,
 } from './_model';
 import type { OnCallData } from './_oncall';
+import { QuietHoursGroup } from './_quiet';
+import {
+    reachMatters,
+    reachRows,
+    WhoCantBeReached,
+    type ReachGap,
+} from './_reach';
 import { NoMatches, useRow } from './_sections';
 import {
     Changed,
@@ -148,6 +159,10 @@ export type AlertData = {
     delivery: { push_ready: number; people: number };
     /** On-call contacts (B2 C4), one per house this person sees. */
     onCall: OnCallData;
+    /** Houses this person sees, for their quiet hours (B2 C5). */
+    houses: { id: number; name: string }[];
+    /** People with a contact gap: Who can't be reached (B2 C5). */
+    reachGaps: ReachGap[];
 };
 
 const G = 'alerts';
@@ -211,7 +226,9 @@ function goesTo(
 }
 
 export function AlertsOverview({ q, data }: { q: string; data: AlertData }) {
-    const { s, go } = useSettings();
+    const { s, draft, go } = useSettings();
+    const reach = reachRows(s, draft, data.reachGaps);
+    const reachNow = reach.filter(reachMatters).length;
     const keys = alertKeys(s);
     const on = (c: Channel) =>
         keys.filter((k) => parseAlert(draftValue(s, {}, G, k))?.[c]).length;
@@ -316,6 +333,23 @@ export function AlertsOverview({ q, data }: { q: string; data: AlertData }) {
                         ),
                     cta: 'Review on-call contacts',
                     onClick: () => go('alerts', 'oncall'),
+                },
+                {
+                    icon: UserX,
+                    title: 'Who can’t be reached',
+                    lines: [
+                        reach.length
+                            ? `${reach.length} people have a contact gap · ${reachNow} matter now.`
+                            : 'Everyone can be reached.',
+                        'From staff records, push set-up and approved leave.',
+                    ],
+                    badge: reachNow ? (
+                        <StatusBadge variant="warning" size="sm">
+                            {reachNow} can’t be reached
+                        </StatusBadge>
+                    ) : undefined,
+                    cta: 'Review who can’t be reached',
+                    onClick: () => go('alerts', 'delivery'),
                 },
             ]}
         />
@@ -631,9 +665,10 @@ export function AlertsTable({
 const PRIVATE_HINT =
     'Emails and push notifications, including on lock screens, say what happened and link to the app. The details stay in the app.';
 
-/* ── Alerts & access › Delivery (v5 "Delivery & follow-up"; B2 C2: email,
- * push, in-app and the privacy switch — follow-up, quiet hours and after
- * hours arrive with C3–C5). ── */
+/* ── Alerts & access › Delivery (v5 "Delivery & follow-up"): follow-up
+ * (B2 C3), email, push and the privacy switch (C2), quiet hours (C5),
+ * in-app, after hours (C4), what happens if nobody attends, then Who can't
+ * be reached (C5). ── */
 export function AlertsDelivery({
     q,
     show,
@@ -722,395 +757,420 @@ export function AlertsDelivery({
     const attLabel =
         def('attended')?.label ?? 'An alert counts as attended when';
     return (
-        <Section
-            id="sc-delivery"
-            title="Delivery & follow-up"
-            caption="How alerts reach people, and what happens if nobody attends"
-            right={<EntityChip icon={Building2}>Every house</EntityChip>}
-        >
-            {fu.length && !reOn && !escOn ? (
-                <InfoCard icon={AlertTriangle}>
-                    <b>
-                        Follow up is on for {fu.length} alert{' '}
-                        {fu.length === 1 ? 'type' : 'types'}, but re-alerting
-                        and escalation are both off.
-                    </b>{' '}
-                    Each alert is still sent once, as today.
-                </InfoCard>
-            ) : null}
-            <GroupGrid empty={<NoMatches q={q} clear={clear} />}>
-                {def('realert_every') && def('realert_max') ? (
-                    <SettingGroup
-                        id="realert"
-                        icon={BellRing}
-                        title="Re-alert until attended"
-                        caption={`For the ${fu.length} alert ${fu.length === 1 ? 'type' : 'types'} with Follow up on`}
-                    >
-                        <GroupRow
-                            id="dl-reon"
-                            label={reLabel}
-                            hint={
-                                reOn
-                                    ? `Sent again to everyone told so far every ${value('realert_every') || '…'} minutes, up to ${value('realert_max') === off ? '…' : value('realert_max') || '…'} times, until someone attends.`
-                                    : 'Off — each alert is sent once (today).'
-                            }
-                            state={pairState}
-                            error={err('realert_every') || err('realert_max')}
-                            errorId="dl-realert-error"
-                            hidden={
-                                !shown(
-                                    show,
-                                    q,
-                                    'realert_every',
-                                    reLabel,
-                                    're-alert repeat',
-                                )
-                            }
-                            control={
-                                <OnOff
-                                    id="dl-reon"
-                                    checked={reOn}
-                                    disabled={disabled}
-                                    label={reLabel}
-                                    onChange={(v) => {
-                                        switchOn('realert_every', v);
-                                        switchOn('realert_max', v);
-                                    }}
-                                />
-                            }
+        <>
+            <Section
+                id="sc-delivery"
+                title="Delivery & follow-up"
+                caption="How alerts reach people, and what happens if nobody attends"
+                right={<EntityChip icon={Building2}>Every house</EntityChip>}
+            >
+                {fu.length && !reOn && !escOn ? (
+                    <InfoCard icon={AlertTriangle}>
+                        <b>
+                            Follow up is on for {fu.length} alert{' '}
+                            {fu.length === 1 ? 'type' : 'types'}, but
+                            re-alerting and escalation are both off.
+                        </b>{' '}
+                        Each alert is still sent once, as today.
+                    </InfoCard>
+                ) : null}
+                <GroupGrid empty={<NoMatches q={q} clear={clear} />}>
+                    {def('realert_every') && def('realert_max') ? (
+                        <SettingGroup
+                            id="realert"
+                            icon={BellRing}
+                            title="Re-alert until attended"
+                            caption={`For the ${fu.length} alert ${fu.length === 1 ? 'type' : 'types'} with Follow up on`}
                         >
-                            {reOn ? (
-                                <span className="inline-flex flex-wrap items-center gap-2">
-                                    <span className="text-subtle">Every</span>
-                                    {num(
-                                        'realert_every',
-                                        'Minutes between re-alerts',
-                                        'minutes, up to',
-                                        'dl-realert-error',
-                                    )}
-                                    {num(
-                                        'realert_max',
-                                        'Most re-alerts',
-                                        'times',
-                                        'dl-realert-error',
-                                    )}
-                                </span>
-                            ) : null}
-                        </GroupRow>
-                        {def('attended') ? (
                             <GroupRow
-                                id="dl-attended"
-                                label={attLabel}
-                                hint="Stops re-alerts and escalation. Recorded with the person’s name and the time."
-                                state={state('attended')}
+                                id="dl-reon"
+                                label={reLabel}
+                                hint={
+                                    reOn
+                                        ? `Sent again to everyone told so far every ${value('realert_every') || '…'} minutes, up to ${value('realert_max') === off ? '…' : value('realert_max') || '…'} times, until someone attends.`
+                                        : 'Off — each alert is sent once (today).'
+                                }
+                                state={pairState}
+                                error={
+                                    err('realert_every') || err('realert_max')
+                                }
+                                errorId="dl-realert-error"
                                 hidden={
                                     !shown(
                                         show,
                                         q,
-                                        'attended',
-                                        attLabel,
-                                        'acknowledge opens dealt',
+                                        'realert_every',
+                                        reLabel,
+                                        're-alert repeat',
                                     )
                                 }
-                            >
-                                <Choice
-                                    value={value('attended')}
-                                    disabled={disabled}
-                                    onChange={(v) => edit('attended', v)}
-                                    options={(
-                                        def('attended')?.options ?? []
-                                    ).map(
-                                        (o) =>
-                                            [o.value, o.label] as [
-                                                string,
-                                                string,
-                                            ],
-                                    )}
-                                />
-                            </GroupRow>
-                        ) : null}
-                        <GroupRow
-                            id="dl-fu"
-                            label="Alerts followed up"
-                            hint={
-                                fuLabels.length
-                                    ? fuLabels.join(', ')
-                                    : 'None — turn on Follow up in the Alerts table.'
-                            }
-                            hidden={!link('Alerts followed up', 'follow up')}
-                            control={toAlerts}
-                        />
-                    </SettingGroup>
-                ) : null}
-                {def('escalate_after') && def('escalate_to') ? (
-                    <SettingGroup
-                        id="escalate"
-                        icon={Siren}
-                        title="Escalate if still not attended"
-                        caption="Tells more people, as well as the first ones"
-                    >
-                        <GroupRow
-                            id="dl-escon"
-                            label={escLabel}
-                            hint={
-                                escOn
-                                    ? `After ${value('escalate_after') || '…'} minutes with nobody attending.`
-                                    : 'Off — nobody else is told (today).'
-                            }
-                            state={state('escalate_after')}
-                            error={err('escalate_after')}
-                            errorId="dl-escalate_after-error"
-                            hidden={
-                                !shown(
-                                    show,
-                                    q,
-                                    'escalate_after',
-                                    escLabel,
-                                    'escalate',
-                                )
-                            }
-                            control={
-                                <OnOff
-                                    id="dl-escon"
-                                    checked={escOn}
-                                    disabled={disabled}
-                                    label={escLabel}
-                                    onChange={(v) => {
-                                        switchOn('escalate_after', v);
-                                        if (!v)
-                                            edit(
-                                                'escalate_to',
-                                                s.values[D]?.escalate_to ??
-                                                    def('escalate_to')
-                                                        ?.default ??
-                                                    '[]',
-                                            );
-                                        clearError(`${D}.escalate_to`);
-                                    }}
-                                />
-                            }
-                        >
-                            {escOn
-                                ? num(
-                                      'escalate_after',
-                                      'Minutes before escalating',
-                                      'minutes',
-                                  )
-                                : null}
-                        </GroupRow>
-                        {escOn ? (
-                            <GroupRow
-                                id="dl-escalate_to"
-                                label={
-                                    def('escalate_to')?.label ?? 'Escalate to'
+                                control={
+                                    <OnOff
+                                        id="dl-reon"
+                                        checked={reOn}
+                                        disabled={disabled}
+                                        label={reLabel}
+                                        onChange={(v) => {
+                                            switchOn('realert_every', v);
+                                            switchOn('realert_max', v);
+                                        }}
+                                    />
                                 }
-                                hint="The on-call person arrives with on-call contacts."
-                                state={state('escalate_to')}
-                                error={err('escalate_to')}
-                                errorId="dl-escalate_to-error"
+                            >
+                                {reOn ? (
+                                    <span className="inline-flex flex-wrap items-center gap-2">
+                                        <span className="text-subtle">
+                                            Every
+                                        </span>
+                                        {num(
+                                            'realert_every',
+                                            'Minutes between re-alerts',
+                                            'minutes, up to',
+                                            'dl-realert-error',
+                                        )}
+                                        {num(
+                                            'realert_max',
+                                            'Most re-alerts',
+                                            'times',
+                                            'dl-realert-error',
+                                        )}
+                                    </span>
+                                ) : null}
+                            </GroupRow>
+                            {def('attended') ? (
+                                <GroupRow
+                                    id="dl-attended"
+                                    label={attLabel}
+                                    hint="Stops re-alerts and escalation. Recorded with the person’s name and the time."
+                                    state={state('attended')}
+                                    hidden={
+                                        !shown(
+                                            show,
+                                            q,
+                                            'attended',
+                                            attLabel,
+                                            'acknowledge opens dealt',
+                                        )
+                                    }
+                                >
+                                    <Choice
+                                        value={value('attended')}
+                                        disabled={disabled}
+                                        onChange={(v) => edit('attended', v)}
+                                        options={(
+                                            def('attended')?.options ?? []
+                                        ).map(
+                                            (o) =>
+                                                [o.value, o.label] as [
+                                                    string,
+                                                    string,
+                                                ],
+                                        )}
+                                    />
+                                </GroupRow>
+                            ) : null}
+                            <GroupRow
+                                id="dl-fu"
+                                label="Alerts followed up"
+                                hint={
+                                    fuLabels.length
+                                        ? fuLabels.join(', ')
+                                        : 'None — turn on Follow up in the Alerts table.'
+                                }
+                                hidden={
+                                    !link('Alerts followed up', 'follow up')
+                                }
+                                control={toAlerts}
+                            />
+                        </SettingGroup>
+                    ) : null}
+                    {def('escalate_after') && def('escalate_to') ? (
+                        <SettingGroup
+                            id="escalate"
+                            icon={Siren}
+                            title="Escalate if still not attended"
+                            caption="Tells more people, as well as the first ones"
+                        >
+                            <GroupRow
+                                id="dl-escon"
+                                label={escLabel}
+                                hint={
+                                    escOn
+                                        ? `After ${value('escalate_after') || '…'} minutes with nobody attending.`
+                                        : 'Off — nobody else is told (today).'
+                                }
+                                state={state('escalate_after')}
+                                error={err('escalate_after')}
+                                errorId="dl-escalate_after-error"
                                 hidden={
                                     !shown(
                                         show,
                                         q,
-                                        'escalate_to',
-                                        'Escalate to',
+                                        'escalate_after',
+                                        escLabel,
                                         'escalate',
                                     )
                                 }
+                                control={
+                                    <OnOff
+                                        id="dl-escon"
+                                        checked={escOn}
+                                        disabled={disabled}
+                                        label={escLabel}
+                                        onChange={(v) => {
+                                            switchOn('escalate_after', v);
+                                            if (!v)
+                                                edit(
+                                                    'escalate_to',
+                                                    s.values[D]?.escalate_to ??
+                                                        def('escalate_to')
+                                                            ?.default ??
+                                                        '[]',
+                                                );
+                                            clearError(`${D}.escalate_to`);
+                                        }}
+                                    />
+                                }
                             >
-                                {disabled ? (
-                                    <p className="text-[13px]">
-                                        {escalateTo
-                                            .map(
+                                {escOn
+                                    ? num(
+                                          'escalate_after',
+                                          'Minutes before escalating',
+                                          'minutes',
+                                      )
+                                    : null}
+                            </GroupRow>
+                            {escOn ? (
+                                <GroupRow
+                                    id="dl-escalate_to"
+                                    label={
+                                        def('escalate_to')?.label ??
+                                        'Escalate to'
+                                    }
+                                    hint="After hours, the on-call person is whoever the roster says."
+                                    state={state('escalate_to')}
+                                    error={err('escalate_to')}
+                                    errorId="dl-escalate_to-error"
+                                    hidden={
+                                        !shown(
+                                            show,
+                                            q,
+                                            'escalate_to',
+                                            'Escalate to',
+                                            'escalate',
+                                        )
+                                    }
+                                >
+                                    {disabled ? (
+                                        <p className="text-[13px]">
+                                            {escalateTo
+                                                .map(
+                                                    (g) =>
+                                                        groups.find(
+                                                            (o) =>
+                                                                o.value === g,
+                                                        )?.label ?? g,
+                                                )
+                                                .join(', ') || 'Nobody chosen'}
+                                        </p>
+                                    ) : (
+                                        <ChipMulti
+                                            values={escalateTo.map(
                                                 (g) =>
                                                     groups.find(
                                                         (o) => o.value === g,
                                                     )?.label ?? g,
-                                            )
-                                            .join(', ') || 'Nobody chosen'}
-                                    </p>
-                                ) : (
-                                    <ChipMulti
-                                        values={escalateTo.map(
-                                            (g) =>
-                                                groups.find(
-                                                    (o) => o.value === g,
-                                                )?.label ?? g,
-                                        )}
-                                        options={groups.map((o) => o.label)}
-                                        onChange={(labels) => {
-                                            edit(
-                                                'escalate_to',
-                                                encodeGroups(
-                                                    def('escalate_to')!,
-                                                    groups
-                                                        .filter((o) =>
-                                                            labels.includes(
-                                                                o.label,
+                                            )}
+                                            options={groups.map((o) => o.label)}
+                                            onChange={(labels) => {
+                                                edit(
+                                                    'escalate_to',
+                                                    encodeGroups(
+                                                        def('escalate_to')!,
+                                                        groups
+                                                            .filter((o) =>
+                                                                labels.includes(
+                                                                    o.label,
+                                                                ),
+                                                            )
+                                                            .map(
+                                                                (o) => o.value,
                                                             ),
-                                                        )
-                                                        .map((o) => o.value),
-                                                ),
-                                            );
-                                            clearError(`${D}.escalate_to`);
-                                        }}
-                                    />
-                                )}
-                            </GroupRow>
-                        ) : null}
+                                                    ),
+                                                );
+                                                clearError(`${D}.escalate_to`);
+                                            }}
+                                        />
+                                    )}
+                                </GroupRow>
+                            ) : null}
+                        </SettingGroup>
+                    ) : null}
+                    <SettingGroup
+                        id="email"
+                        icon={Mail}
+                        title="Email"
+                        caption="Sent to each person’s work email"
+                    >
+                        <GroupRow
+                            id="dl-emailn"
+                            label="Alert types sent by email"
+                            hint="Turn email on per alert in the Alerts table. People without a work email aren’t emailed."
+                            hidden={!link('Alert types sent by email', 'email')}
+                            control={counted('email')}
+                        />
+                        <GroupRow
+                            id="dl-preview"
+                            label="See what a message looks like"
+                            hint="In the bell, by email and on a lock screen — with this switch applied."
+                            hidden={
+                                !link(
+                                    'See what a message looks like',
+                                    'preview',
+                                    'message',
+                                )
+                            }
+                            control={
+                                <Button
+                                    variant="link"
+                                    onClick={() =>
+                                        open({
+                                            kind: 'msgpreview',
+                                            key: 'overdue',
+                                        })
+                                    }
+                                >
+                                    Preview
+                                    <ArrowUpRight className="size-4" />
+                                </Button>
+                            }
+                        />
+                        <GroupRow
+                            id="dl-private"
+                            label={privLabel}
+                            hint={PRIVATE_HINT}
+                            state={state('private')}
+                            hidden={
+                                !shown(
+                                    show,
+                                    q,
+                                    'private',
+                                    privLabel,
+                                    PRIVATE_HINT,
+                                    'privacy email push',
+                                )
+                            }
+                            control={
+                                <OnOff
+                                    id="dl-private"
+                                    checked={value('private') === 'yes'}
+                                    disabled={disabled}
+                                    label={privLabel}
+                                    onChange={(v) =>
+                                        edit('private', v ? 'yes' : 'no')
+                                    }
+                                />
+                            }
+                        />
                     </SettingGroup>
-                ) : null}
-                <SettingGroup
-                    id="email"
-                    icon={Mail}
-                    title="Email"
-                    caption="Sent to each person’s work email"
-                >
-                    <GroupRow
-                        id="dl-emailn"
-                        label="Alert types sent by email"
-                        hint="Turn email on per alert in the Alerts table. People without a work email aren’t emailed."
-                        hidden={!link('Alert types sent by email', 'email')}
-                        control={counted('email')}
+                    <SettingGroup
+                        id="push"
+                        icon={Smartphone}
+                        title="Push"
+                        caption="To the phone app and browsers people have allowed"
+                    >
+                        <GroupRow
+                            id="dl-pushn"
+                            label="Alert types sent by push"
+                            hint="Turn push on per alert in the Alerts table."
+                            hidden={!link('Alert types sent by push', 'push')}
+                            control={counted('push')}
+                        />
+                        <GroupRow
+                            id="dl-pushready"
+                            label="Staff with push set up"
+                            hint="People turn push on for their own phone or browser, in their account › Notifications. Gaps are listed under Who can’t be reached."
+                            hidden={!link('Staff with push set up', 'push')}
+                            control={
+                                <span className="text-subtle">
+                                    {data.delivery.push_ready} of{' '}
+                                    {data.delivery.people}
+                                </span>
+                            }
+                        />
+                    </SettingGroup>
+                    <QuietHoursGroup
+                        q={q}
+                        show={show}
+                        houses={data.houses}
+                        houseIds={data.access.house_ids}
+                        readOnlyAudit={data.readOnlyAudit}
                     />
-                    <GroupRow
-                        id="dl-preview"
-                        label="See what a message looks like"
-                        hint="In the bell, by email and on a lock screen — with this switch applied."
-                        hidden={
-                            !link(
-                                'See what a message looks like',
-                                'preview',
-                                'message',
-                            )
-                        }
-                        control={
-                            <Button
-                                variant="link"
-                                onClick={() =>
-                                    open({ kind: 'msgpreview', key: 'overdue' })
-                                }
-                            >
-                                Preview
-                                <ArrowUpRight className="size-4" />
-                            </Button>
-                        }
-                    />
-                    <GroupRow
-                        id="dl-private"
-                        label={privLabel}
-                        hint={PRIVATE_HINT}
-                        state={state('private')}
-                        hidden={
-                            !shown(
-                                show,
-                                q,
-                                'private',
-                                privLabel,
-                                PRIVATE_HINT,
-                                'privacy email push',
-                            )
-                        }
-                        control={
-                            <OnOff
-                                id="dl-private"
-                                checked={value('private') === 'yes'}
-                                disabled={disabled}
-                                label={privLabel}
-                                onChange={(v) =>
-                                    edit('private', v ? 'yes' : 'no')
-                                }
-                            />
-                        }
-                    />
-                </SettingGroup>
-                <SettingGroup
-                    id="push"
-                    icon={Smartphone}
-                    title="Push"
-                    caption="To the phone app and browsers people have allowed"
-                >
-                    <GroupRow
-                        id="dl-pushn"
-                        label="Alert types sent by push"
-                        hint="Turn push on per alert in the Alerts table."
-                        hidden={!link('Alert types sent by push', 'push')}
-                        control={counted('push')}
-                    />
-                    <GroupRow
-                        id="dl-pushready"
-                        label="Staff with push set up"
-                        hint="People turn push on for their own phone or browser, in their account › Notifications."
-                        hidden={!link('Staff with push set up', 'push')}
-                        control={
-                            <span className="text-subtle">
-                                {data.delivery.push_ready} of{' '}
-                                {data.delivery.people}
-                            </span>
-                        }
-                    />
-                </SettingGroup>
-                <SettingGroup
-                    id="inapp"
-                    icon={Bell}
-                    title="In-app"
-                    caption="The bell (notifications)"
-                >
-                    <GroupRow
-                        id="dl-inappn"
-                        label="Alert types sent in-app"
-                        hint="Decided alerts are always in-app; any other alert stays in-app unless email or push is on."
-                        hidden={!link('Alert types sent in-app', 'in-app')}
-                        control={counted('inapp')}
-                    />
-                </SettingGroup>
-                <SettingGroup
-                    id="afterhours"
-                    icon={Phone}
-                    title="After hours"
-                    caption="Nobody is phoned automatically"
-                >
-                    <GroupRow
-                        id="dl-oncall"
-                        label="On-call contacts"
-                        hint="Follows the roster: on-call shift, then the team lead on shift, then a backup person."
-                        hidden={!link('On-call contacts', 'after hours')}
-                        control={
-                            <Button
-                                variant="link"
-                                onClick={() => go('alerts', 'oncall')}
-                            >
-                                {
-                                    data.onCall.houses.filter((h) => h.rule)
-                                        .length
-                                }{' '}
-                                of {data.onCall.houses.length} houses
-                                <ArrowUpRight className="size-4" />
-                            </Button>
-                        }
-                    />
-                    <GroupRow
-                        id="dl-oncallgets"
-                        label="Alerts that go to the on-call person"
-                        hint={
-                            toOnCall.length
-                                ? toOnCall.join(', ')
-                                : escOn && escalateTo.includes('onCall')
-                                  ? 'Only through escalation.'
-                                  : 'None yet — add them in an alert’s groups, or escalate to them.'
-                        }
-                        hidden={
-                            !link(
-                                'Alerts that go to the on-call person',
-                                'on-call',
-                            )
-                        }
-                        control={toAlerts}
-                    />
-                </SettingGroup>
-                {show === 'all' ? <FollowUpPreview /> : null}
-            </GroupGrid>
-        </Section>
+                    <SettingGroup
+                        id="inapp"
+                        icon={Bell}
+                        title="In-app"
+                        caption="The bell (notifications)"
+                    >
+                        <GroupRow
+                            id="dl-inappn"
+                            label="Alert types sent in-app"
+                            hint="Decided alerts are always in-app; any other alert stays in-app unless email or push is on."
+                            hidden={!link('Alert types sent in-app', 'in-app')}
+                            control={counted('inapp')}
+                        />
+                    </SettingGroup>
+                    <SettingGroup
+                        id="afterhours"
+                        icon={Phone}
+                        title="After hours"
+                        caption="Nobody is phoned automatically"
+                    >
+                        <GroupRow
+                            id="dl-oncall"
+                            label="On-call contacts"
+                            hint="Follows the roster: on-call shift, then the team lead on shift, then a backup person."
+                            hidden={!link('On-call contacts', 'after hours')}
+                            control={
+                                <Button
+                                    variant="link"
+                                    onClick={() => go('alerts', 'oncall')}
+                                >
+                                    {
+                                        data.onCall.houses.filter((h) => h.rule)
+                                            .length
+                                    }{' '}
+                                    of {data.onCall.houses.length} houses
+                                    <ArrowUpRight className="size-4" />
+                                </Button>
+                            }
+                        />
+                        <GroupRow
+                            id="dl-oncallgets"
+                            label="Alerts that go to the on-call person"
+                            hint={
+                                toOnCall.length
+                                    ? toOnCall.join(', ')
+                                    : escOn && escalateTo.includes('onCall')
+                                      ? 'Only through escalation.'
+                                      : 'None yet — add them in an alert’s groups, or escalate to them.'
+                            }
+                            hidden={
+                                !link(
+                                    'Alerts that go to the on-call person',
+                                    'on-call',
+                                )
+                            }
+                            control={toAlerts}
+                        />
+                    </SettingGroup>
+                    {show === 'all' ? (
+                        <FollowUpPreview houses={data.houses} />
+                    ) : null}
+                </GroupGrid>
+            </Section>
+            <WhoCantBeReached gaps={data.reachGaps} />
+        </>
     );
 }
 
@@ -1123,7 +1183,11 @@ const fmtMin = (m: number) =>
 /* ── What happens if nobody attends (v5): worked out from the draft for one
  * alert; a re-alert and an escalation at the same moment are one step, and
  * after an escalation re-alerts go to everyone told so far. Nothing is sent. ── */
-function FollowUpPreview() {
+function FollowUpPreview({
+    houses,
+}: {
+    houses: { id: number; name: string }[];
+}) {
     const { s, draft } = useSettings();
     const keys = alertKeys(s);
     const [k, setK] = useState(keys.includes('overdue') ? 'overdue' : keys[0]);
@@ -1184,6 +1248,10 @@ function FollowUpPreview() {
         ];
     });
     const shownEv = ev.slice(0, 5);
+    // Quiet hours (B2 C5): email and push wait; never for Follow up alerts.
+    const quiet = houses
+        .map((h) => [h, quietAt(s, draft, h.id)] as const)
+        .filter(([, w]) => w);
     const stop = (
         s.definitions[D]?.attended?.options.find(
             (o) => o.value === v('attended'),
@@ -1237,6 +1305,24 @@ function FollowUpPreview() {
                 <ReviewRow
                     label="Then"
                     value={`${ev.length - shownEv.length} more re-alerts, up to ${max} in all`}
+                />
+            ) : null}
+            {quiet.length && !x.follow_up && (x.email || x.push) ? (
+                <ReviewRow
+                    label="Overnight"
+                    value={
+                        <span className="text-right">
+                            Email and push wait; the bell shows it straight away
+                            <span className="text-caption block">
+                                {quiet
+                                    .map(
+                                        ([h, w]) =>
+                                            `${h.name}: ${fmtT(w!.from)} to ${fmtT(w!.until)}${w!.source === 'house' ? ' (own hours)' : ''}`,
+                                    )
+                                    .join(' · ')}
+                            </span>
+                        </span>
+                    }
                 />
             ) : null}
             <ReviewRow

@@ -35,6 +35,17 @@ class MedicationAlertEvent extends Model
 
     public const ESCALATED = 'escalated';
 
+    /**
+     * Quiet hours (B2 chunk 5): email and push held until the house's quiet
+     * hours end (the bell went straight away); then sent, or not sent because
+     * the alert was dealt with first.
+     */
+    public const HELD = 'held';
+
+    public const RELEASED = 'released';
+
+    public const HELD_NOT_SENT = 'held_not_sent';
+
     /** Written at deploy for a subject people were told about before B2; nothing was sent. */
     public const CARRIED_OVER = 'carried_over_at_deploy';
 

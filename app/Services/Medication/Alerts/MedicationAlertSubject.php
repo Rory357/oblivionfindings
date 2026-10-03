@@ -2,6 +2,8 @@
 
 namespace App\Services\Medication\Alerts;
 
+use App\Models\MedicationAlert;
+
 /**
  * What one medication alert is about (eMAR P11 B2), as its source raises it.
  *
@@ -27,4 +29,22 @@ final class MedicationAlertSubject
         public readonly ?int $staffUserId = null,
         public readonly array $context = [],
     ) {}
+
+    /** The subject of an alert already raised, for a later step (follow-up, release after quiet hours). */
+    public static function of(MedicationAlert $alert): self
+    {
+        return new self(
+            key: '',
+            siteId: $alert->site_id !== null ? (int) $alert->site_id : null,
+            title: (string) $alert->title,
+            message: (string) $alert->message,
+            shortMessage: (string) $alert->short_message,
+            actionUrl: $alert->action_url,
+            severity: (string) $alert->severity,
+            clientId: $alert->client_id !== null ? (int) $alert->client_id : null,
+            controlled: (bool) $alert->controlled,
+            staffUserId: $alert->staff_user_id !== null ? (int) $alert->staff_user_id : null,
+            context: $alert->subject ?? [],
+        );
+    }
 }

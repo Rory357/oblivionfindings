@@ -10,6 +10,7 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\Alerts\MedicationAlertSettings;
+use App\Services\Medication\Alerts\MedicationQuietHours;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\DB;
 
@@ -469,4 +470,117 @@ it('counts a Site as a house by its type, a facility that holds people, or any S
     expect($names)->toContain('A house', 'B residential', 'E facility with people', 'F head office with orders')
         ->not->toContain('C head office')
         ->not->toContain('D empty facility');
+});
+
+/*
+ * B2 chunk 5: quiet hours (the organisation's, then each house's) and Who
+ * can't be reached.
+ */
+it('saves the organisation’s quiet hours as one pair, never as a loosening, and refuses half a pair or the same time twice', function () {
+    $manager = b2SettingsActor('provider_manager', Site::factory()->create());
+    $change = fn (string $key, string $value, string $from = 'off') => ['group' => 'delivery', 'key' => $key, 'site_id' => null, 'value' => $value, 'from' => $from];
+    $save = fn (array $changes) => $this->actingAs($manager)
+        ->from(route('emar.settings'))
+        ->put(route('emar.settings.changes.save'), ['view' => 'alerts', 'changes' => $changes]);
+
+    $save([$change('quiet_from', '21:00')])->assertSessionHasErrors(['changes.0.value' => 'Choose when quiet hours start and end.']);
+    $save([$change('quiet_from', '21:00'), $change('quiet_until', '21:00')])->assertSessionHasErrors(['changes.0.value' => 'Quiet hours can’t start and end at the same time.']);
+    $save([$change('quiet_from', '25:00'), $change('quiet_until', '07:00')])->assertSessionHasErrors('changes.0.value');
+    expect(MedicationSettingChange::query()->where('setting_group', 'delivery')->count())->toBe(0);
+
+    $save([$change('quiet_from', '21:00'), $change('quiet_until', '07:00')])->assertSessionHasNoErrors();
+    expect(MedicationSettingChange::query()->where('setting_group', 'delivery')->orderBy('setting_key')->get(['setting_key', 'before_text', 'after_text', 'loosens', 'audit_event'])->toArray())->toBe([
+        ['setting_key' => 'quiet_from', 'before_text' => 'Off — sent straight away', 'after_text' => 'From 9:00 pm', 'loosens' => false, 'audit_event' => 'medications.alert_delivery.updated'],
+        ['setting_key' => 'quiet_until', 'before_text' => 'Off', 'after_text' => 'Until 7:00 am', 'loosens' => false, 'audit_event' => 'medications.alert_delivery.updated'],
+    ]);
+    expect(app(MedicationQuietHours::class)->window(null))->toBe(['from' => '21:00', 'until' => '07:00', 'source' => 'organisation']);
+
+    // Switching them off again is never a loosening: no confirm asked.
+    $save([$change('quiet_from', 'off', '21:00'), $change('quiet_until', 'off', '07:00')])->assertSessionHasNoErrors();
+    expect(app(MedicationQuietHours::class)->window(null))->toBeNull();
+});
+
+it('lets a house lead set only their own house’s quiet hours, with both times when it has its own', function () {
+    $home = Site::factory()->create(['is_active' => true, 'type' => 'house', 'name' => 'Kōwhai House']);
+    $other = Site::factory()->create(['is_active' => true, 'type' => 'house', 'name' => 'Rimu House']);
+    $lead = b2SettingsActor('team_lead', $home);
+    $hours = fn (Site $site, array $value) => ['group' => 'quietHouse', 'key' => 'hours', 'site_id' => $site->id, 'value' => json_encode($value), 'from' => '{"mode":"org"}'];
+
+    b2Save($this, $lead, $hours($home, ['mode' => 'own', 'from' => '22:00', 'until' => '']))
+        ->assertSessionHasErrors(['changes.0.value' => 'Kōwhai House: choose when its quiet hours start and end.']);
+    b2Save($this, $lead, $hours($home, ['mode' => 'own', 'from' => '22:00', 'until' => '22:00']))
+        ->assertSessionHasErrors(['changes.0.value' => 'Kōwhai House: quiet hours can’t start and end at the same time.']);
+    b2Save($this, $lead, $hours($other, ['mode' => 'off']))->assertForbidden();
+
+    b2Save($this, $lead, $hours($home, ['mode' => 'own', 'from' => '22:00', 'until' => '06:00']))->assertSessionHasNoErrors();
+    $row = MedicationSettingChange::query()->where('setting_group', 'quietHouse')->sole();
+    expect($row->only(['site_id', 'label', 'before_text', 'after_text', 'loosens', 'audit_event', 'actor_id']))->toBe([
+        'site_id' => $home->id,
+        'label' => 'Quiet hours',
+        'before_text' => 'Follows the organisation',
+        'after_text' => 'Own hours: 10:00 pm to 6:00 am',
+        'loosens' => false,
+        'audit_event' => 'medications.alert_quiet_hours.updated',
+        'actor_id' => $lead->id,
+    ]);
+    expect(app(MedicationQuietHours::class)->window($home->id))->toBe(['from' => '22:00', 'until' => '06:00', 'source' => 'house'])
+        ->and(app(MedicationQuietHours::class)->window($other->id))->toBeNull();
+
+    $response = $this->actingAs($lead)->get(route('emar.settings'))->assertOk();
+    expect($response->inertiaProps('alertHouses'))->toBe([['id' => $home->id, 'name' => 'Kōwhai House']])
+        ->and($response->inertiaProps("settings.site_values.{$home->id}.quietHouse.hours"))->toBe('{"mode":"own","from":"22:00","until":"06:00"}')
+        ->and($response->inertiaProps('settings.definitions.delivery.quiet_from'))->toMatchArray(['kind' => 'time', 'paired_with' => 'quiet_until', 'time_prefix' => 'From'])
+        ->and($response->inertiaProps('settings.definitions.quietHouse.hours'))->toMatchArray(['kind' => 'quiet', 'scope' => 'site', 'house_managed' => true]);
+});
+
+it('lists who can’t be reached — work email, push, work phone, and an on-call backup on leave, never the type of leave', function () {
+    Illuminate\Support\Carbon::setTestNow(Illuminate\Support\Carbon::parse('2026-10-01 12:00', 'Pacific/Auckland')->utc());
+    $site = Site::factory()->create(['is_active' => true, 'type' => 'house', 'name' => 'Kōwhai House']);
+    $manager = b2SettingsActor('provider_manager', $site);
+    $everything = b2OnCallStaff($site, '021 555 0101');
+    $noEmail = b2OnCallStaff($site, '021 555 0102');
+    HrEmployeeProfile::query()->where('user_id', $noEmail->id)->update(['work_email' => null]);
+    $backup = b2OnCallStaff($site, null, 'clinical_lead');
+    $awayNotOnCall = b2OnCallStaff($site, '021 555 0104');
+    // Medication access but no house: nothing at a house can reach them, so they aren't listed.
+    $noHouse = User::factory()->create(['approved_at' => now()]);
+    foreach ([$manager, $everything, $noEmail, $backup, $awayNotOnCall, $noHouse] as $person) {
+        $person->permissionOverrides()->syncWithoutDetaching([Permission::query()->where('key', 'medications.view')->value('id') => ['allowed' => true]]);
+    }
+    foreach ([$manager, $everything, $noEmail, $awayNotOnCall] as $person) {
+        App\Models\UserPushSubscription::query()->create(['user_id' => $person->id, 'provider' => 'webpush', 'token' => 'https://push.example.test/'.$person->id, 'keys' => ['p256dh' => 'k', 'auth' => 'a'], 'enabled' => true]);
+    }
+    HrEmployeeProfile::query()->where('user_id', $manager->id)->update(['work_phone' => '021 555 0100']);
+    MedicationOnCallRule::query()->create(['site_id' => $site->id, 'mode' => 'roster', 'team_lead' => true, 'backup_user_id' => $backup->id]);
+    foreach ([$backup, $awayNotOnCall] as $person) {
+        App\Domain\Hr\Models\HrLeaveRequest::query()->create([
+            'tenant_id' => 1,
+            'user_id' => $person->id,
+            'leave_type' => 'sick',
+            'starts_at' => Illuminate\Support\Carbon::parse('2026-10-01 00:00', 'Pacific/Auckland')->utc(),
+            'ends_at' => Illuminate\Support\Carbon::parse('2026-10-05 23:59', 'Pacific/Auckland')->utc(),
+            'hours_requested' => 40,
+            'status' => 'approved',
+        ]);
+    }
+
+    $response = $this->actingAs($manager)->get(route('emar.settings'))->assertOk();
+    $rows = collect($response->inertiaProps('alertReachGaps'))->keyBy('id');
+
+    expect($rows->keys()->sort()->values()->all())->toBe(collect([$noEmail->id, $backup->id])->sort()->values()->all());
+    expect($rows[$noEmail->id])->toMatchArray(['work_email' => false, 'push' => true, 'phone' => true, 'leave' => null, 'on_call' => false, 'houses' => 'Kōwhai House'])
+        ->and($rows[$noEmail->id]['groups'])->toContain('staffMember');
+    expect($rows[$backup->id])->toMatchArray([
+        'work_email' => true,
+        'push' => false,
+        'phone' => false,
+        'leave' => 'On leave Thu 1 – Mon 5 Oct (Leave hub)',
+        'backup_for' => ['Kōwhai House'],
+        'on_call' => true,
+    ])->and($rows[$backup->id]['groups'])->toContain('clinicalLead', 'onCall');
+    // Leave says "On leave" only — never its type — and only for someone needed on call.
+    expect(json_encode($response->inertiaProps('alertReachGaps')))->not->toContain('sick')->not->toContain('Sick');
+    expect($rows->has($awayNotOnCall->id))->toBeFalse()
+        ->and($rows->has($noHouse->id))->toBeFalse();
+    Illuminate\Support\Carbon::setTestNow();
 });

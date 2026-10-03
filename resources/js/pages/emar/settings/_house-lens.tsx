@@ -24,6 +24,7 @@ import {
     Clock,
     Home,
     KeyRound,
+    Moon,
     Phone,
     Pill,
     Repeat,
@@ -32,8 +33,12 @@ import {
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import {
+    fmtT,
     format,
+    parseQuiet,
+    quietAt,
     savedValue,
+    siteSavedValue,
     type SettingsPayload,
     type ViewKey,
 } from './_model';
@@ -141,6 +146,8 @@ export function HouseLens({
           ]
         : STEPS;
     const oc = oncall?.houses.find((h) => h.site_id === houseId);
+    // Saved settings only (B2 C5): the quiet hours that hold email and push here.
+    const quiet = quietAt(s, {}, houseId);
     const tonight =
         oc?.rule && oc.roster[0]
             ? resolveNight(
@@ -473,6 +480,32 @@ export function HouseLens({
                                 }
                             />
                         </ReviewCard>
+                        {s.definitions.quietHouse?.hours ? (
+                            <ReviewCard icon={Moon} title="Quiet hours">
+                                <ReviewRow
+                                    label="Non-urgent email and push"
+                                    value={
+                                        <V
+                                            v={
+                                                quiet
+                                                    ? `Held ${fmtT(quiet.from)} to ${fmtT(quiet.until)}`
+                                                    : 'Sent straight away'
+                                            }
+                                            house={
+                                                (parseQuiet(
+                                                    siteSavedValue(
+                                                        s,
+                                                        'quietHouse',
+                                                        'hours',
+                                                        houseId,
+                                                    ),
+                                                )?.mode ?? 'org') !== 'org'
+                                            }
+                                        />
+                                    }
+                                />
+                            </ReviewCard>
+                        ) : null}
                         <ReviewCard icon={Phone} title="On-call contact">
                             <ReviewRow
                                 label="How it’s decided"

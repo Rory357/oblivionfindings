@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Notifications\MedicationAlertNotification;
 use Carbon\CarbonInterface;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -27,12 +28,17 @@ use Throwable;
  * An alert stays open until it is dealt with: resolve() for one subject when
  * its source is put right, reconcile() for a scheduled check that lists every
  * subject still true. Then the same subject can alert again.
+ *
+ * Quiet hours (B2 chunk 5): during the house's window, email and push for an
+ * alert without Follow up wait (held_until) and releaseHeld() sends them
+ * when it ends. The bell is never held.
  */
 class MedicationAlerts
 {
     public function __construct(
         private readonly MedicationAlertRecipients $recipients,
         private readonly MedicationAlertSettings $settings,
+        private readonly MedicationQuietHours $quietHours,
     ) {}
 
     /**
@@ -67,6 +73,10 @@ class MedicationAlerts
     private function record(string $type, MedicationAlertSubject $subject, string $key, ?array $setting, array $channels): MedicationAlert
     {
         $now = now();
+        // After hours on the alert log (Main's answer): the house's own quiet
+        // hours, else the organisation default — and which one applied.
+        $afterHours = $this->quietHours->afterHoursWindow($subject->siteId);
+        $isAfterHours = $afterHours !== null && MedicationQuietHours::within($afterHours, $now);
         $alert = MedicationAlert::query()->create([
             'type' => $type,
             'dedupe_key' => $key,
@@ -83,6 +93,8 @@ class MedicationAlerts
             'subject' => $subject->context,
             'follow_up' => (bool) ($setting['follow_up'] ?? false),
             'reached_nobody' => false,
+            'after_hours' => $isAfterHours,
+            'after_hours_source' => $isAfterHours ? $afterHours['source'] : null,
             'status' => MedicationAlert::STATUS_OPEN,
             'raised_at' => $now,
         ]);
@@ -104,7 +116,7 @@ class MedicationAlerts
         // No channel switched on means nobody is told, whoever the groups are
         // (B2 C1 review): no recipient is recorded as told.
         $followUp = $this->settings->followUp();
-        ['told' => $told, 'unreachable' => $unreachable] = $this->deliver(
+        ['told' => $told, 'unreachable' => $unreachable, 'held' => $held] = $this->deliver(
             $alert,
             $resolved['told'],
             $channels,
@@ -119,6 +131,14 @@ class MedicationAlerts
         }
 
         $this->event($alert, MedicationAlertEvent::SENT, ['told' => $told, 'channels' => $channels]);
+        if ($held !== null) {
+            $this->event($alert, MedicationAlertEvent::HELD, [
+                'user_ids' => $held['user_ids'],
+                'until' => $held['until']->toIso8601String(),
+                'source' => $held['source'],
+                'note' => 'Email and push wait until quiet hours end. The bell showed it straight away.',
+            ]);
+        }
         if ($unreachable !== []) {
             $this->event($alert, MedicationAlertEvent::NOT_REACHABLE, [
                 'user_ids' => $unreachable,
@@ -168,10 +188,16 @@ class MedicationAlerts
      * can't hold the record or undo it. A Follow up alert waiting for an
      * acknowledgement asks for one in the bell (B2 chunk 3).
      *
+     * Quiet hours (B2 chunk 5): when an alert without Follow up is raised
+     * inside the house's window, email and push wait until it ends — the
+     * bell doesn't. Re-alerts and escalations are only for Follow up alerts,
+     * so they're never held. Someone reached only by a held channel is told
+     * when it's released.
+     *
      * @param  iterable<array{user: User, reason: string}>  $people
      * @param  list<string>  $channels
      * @param  array{realert_every: int|null, realert_max: int|null, attended: string, escalate_after: int|null, escalate_to: list<string>}  $followUp
-     * @return array{told: list<array{user_id: int, reason: string, channels: list<string>}>, unreachable: list<int>}
+     * @return array{told: list<array{user_id: int, reason: string, channels: list<string>}>, unreachable: list<int>, held: array{user_ids: list<int>, until: Carbon, source: string}|null}
      */
     public function deliver(MedicationAlert $alert, iterable $people, array $channels, int $step, string $kind, CarbonInterface $now, array $followUp): array
     {
@@ -180,9 +206,14 @@ class MedicationAlerts
         $told = [];
         $unreachable = [];
         $afterCommit = [];
+        $heldIds = [];
         if ($channels === []) {
-            return ['told' => [], 'unreachable' => []];
+            return ['told' => [], 'unreachable' => [], 'held' => null];
         }
+        $window = $kind === MedicationAlertNotification::FIRST && ! $alert->follow_up
+            ? $this->quietHours->window($alert->site_id !== null ? (int) $alert->site_id : null)
+            : null;
+        $holdUntil = $window !== null ? MedicationQuietHours::endsAt($window, $now) : null;
         foreach ($people as ['user' => $user, 'reason' => $reason]) {
             $reach = $this->reachable($user, $channels);
             if ($reach === []) {
@@ -198,7 +229,10 @@ class MedicationAlerts
                 $notificationId = $notification->id;
             }
             $outside = array_values(array_diff($reach, ['inapp']));
-            if ($outside !== []) {
+            $held = $holdUntil !== null && $outside !== [];
+            if ($held) {
+                $heldIds[] = (int) $user->id;
+            } elseif ($outside !== []) {
                 $afterCommit[] = [$user, $outside];
             }
             MedicationAlertRecipient::query()->create([
@@ -207,8 +241,11 @@ class MedicationAlerts
                 'reason' => $reason,
                 'step' => $step,
                 'channels' => $reach,
-                'told_at' => $now,
+                // Told when something reached them: the bell now, or a held
+                // email or push when quiet hours end.
+                'told_at' => $notificationId !== null || ! $held ? $now : null,
                 'notification_id' => $notificationId,
+                'held_until' => $held ? $holdUntil : null,
             ]);
             $told[] = ['user_id' => (int) $user->id, 'reason' => $reason, 'channels' => $reach];
         }
@@ -216,7 +253,93 @@ class MedicationAlerts
             DB::afterCommit(fn () => $this->sendOutside($alert, $afterCommit, $private, $kind));
         }
 
-        return ['told' => $told, 'unreachable' => $unreachable];
+        return [
+            'told' => $told,
+            'unreachable' => $unreachable,
+            'held' => $heldIds === [] ? null : ['user_ids' => $heldIds, 'until' => $holdUntil, 'source' => $window['source']],
+        ];
+    }
+
+    /**
+     * Quiet hours have ended (B2 chunk 5): send the email and push held for
+     * them, from the 15-minute tick. Each alert is claimed under its row
+     * lock, so two runs never send twice. Only people still allowed to get
+     * it, on channels they can still be reached on; nothing is sent for an
+     * alert dealt with meanwhile. Returns how many people were sent to.
+     */
+    public function releaseHeld(CarbonInterface $now): int
+    {
+        $due = MedicationAlertRecipient::query()
+            ->whereNotNull('held_until')
+            ->where('held_until', '<=', $now)
+            ->distinct()
+            ->pluck('medication_alert_id');
+        $sent = 0;
+        foreach ($due as $alertId) {
+            try {
+                $sent += $this->release((int) $alertId, $now);
+            } catch (Throwable $exception) {
+                Log::error('Held medication alert could not be released', ['medication_alert_id' => $alertId, 'exception' => $exception->getMessage()]);
+                report($exception);
+            }
+        }
+
+        return $sent;
+    }
+
+    private function release(int $alertId, CarbonInterface $now): int
+    {
+        return DB::transaction(function () use ($alertId, $now): int {
+            $alert = MedicationAlert::query()->whereKey($alertId)->lockForUpdate()->first();
+            if (! $alert instanceof MedicationAlert) {
+                return 0;
+            }
+            $rows = $alert->recipients()
+                ->whereNotNull('held_until')
+                ->where('held_until', '<=', $now)
+                ->get();
+            if ($rows->isEmpty()) {
+                return 0;
+            }
+            MedicationAlertRecipient::query()->whereIn('id', $rows->pluck('id'))->update(['held_until' => null]);
+            $userIds = $rows->pluck('user_id')->map(fn (mixed $id): int => (int) $id)->unique()->values()->all();
+            if ($alert->open_key === null) {
+                $this->event($alert, MedicationAlertEvent::HELD_NOT_SENT, [
+                    'user_ids' => $userIds,
+                    'reason' => 'It was dealt with before quiet hours ended, so the email and push weren’t sent.',
+                ]);
+
+                return 0;
+            }
+            $allowed = $this->recipients->stillAllowed(
+                $rows->mapWithKeys(fn (MedicationAlertRecipient $row): array => [(int) $row->user_id => (string) $row->reason])->all(),
+                MedicationAlertSubject::of($alert),
+            );
+            $send = [];
+            $told = [];
+            foreach ($allowed as ['user' => $user, 'reason' => $reason]) {
+                $row = $rows->firstWhere('user_id', $user->id);
+                $channels = $this->reachable($user, array_values(array_diff($row->channels ?? [], ['inapp'])));
+                if ($channels === []) {
+                    continue;
+                }
+                $send[] = [$user, $channels];
+                $told[] = ['user_id' => (int) $user->id, 'reason' => $reason, 'channels' => $channels];
+                if ($row->told_at === null) {
+                    $row->forceFill(['told_at' => $now])->save();
+                }
+            }
+            $this->event($alert, MedicationAlertEvent::RELEASED, [
+                'told' => $told,
+                'not_sent' => array_values(array_diff($userIds, array_column($told, 'user_id'))),
+            ]);
+            if ($send !== []) {
+                $private = $this->settings->privateDelivery();
+                DB::afterCommit(fn () => $this->sendOutside($alert, $send, $private, MedicationAlertNotification::FIRST));
+            }
+
+            return count($send);
+        });
     }
 
     /**

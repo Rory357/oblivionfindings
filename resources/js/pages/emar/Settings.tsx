@@ -89,6 +89,7 @@ import {
     OnCallDialogHost,
     type OnCallData,
 } from './settings/_oncall';
+import { ReachDialogHost, type ReachGap } from './settings/_reach';
 import {
     MedicineRules,
     RuleDialogHost,
@@ -153,6 +154,10 @@ type Props = {
     alertDelivery: { push_ready: number; people: number };
     /** On-call contacts (B2 C4), one per house this person sees. */
     onCall: OnCallData;
+    /** Houses this person sees, for their quiet hours (B2 C5). */
+    alertHouses: { id: number; name: string }[];
+    /** People with a contact gap: Who can't be reached (B2 C5). */
+    alertReachGaps: ReachGap[];
 };
 
 const VIEW_ICON: Record<ViewKey, LucideIcon> = {
@@ -428,8 +433,9 @@ export default function EmarSettings(props: Props) {
             setDialog({ kind: 'review', view });
             return;
         }
-        const [group, key] = first.split('.');
-        const section = s.definitions[group]?.[key]?.section;
+        const [group, slot] = first.split('.');
+        // A house setting's error names its house: "hours@12".
+        const section = s.definitions[group]?.[slot.split('@')[0]]?.section;
         if (section && section !== sec) go(view, section);
     };
 
@@ -456,12 +462,14 @@ export default function EmarSettings(props: Props) {
         previews: props.alertPreviews ?? {},
         delivery: props.alertDelivery ?? { push_ready: 0, people: 0 },
         onCall: onCallData,
+        houses: props.alertHouses ?? [],
+        reachGaps: props.alertReachGaps ?? [],
     };
-    // House extras: their own houses' managers (B2 Q3); everything else
-    // needs all-sites authority.
+    // House extras and quiet hours: their own houses' managers (B2 Q3,
+    // Q12); everything else needs all-sites authority.
     const canEdit = (group: string) =>
         !!s.groups[group] &&
-        (group === 'alertExtra'
+        (group === 'alertExtra' || group === 'quietHouse'
             ? !readOnlyAudit && alertAccess.house_ids.length > 0
             : s.can_manage_organisation);
     const ctx: SettingsContext = {
@@ -516,6 +524,8 @@ export default function EmarSettings(props: Props) {
                 'alertNobodyOpen',
                 'alertDelivery',
                 'onCall',
+                'alertHouses',
+                'alertReachGaps',
             ],
             onSuccess: () => setLoadedAt(new Date()),
         });
@@ -959,6 +969,7 @@ export default function EmarSettings(props: Props) {
                 <RuleDialogHost dialog={dialog} data={ruleData} />
                 <AlertDialogHost dialog={dialog} data={alertData} />
                 <OnCallDialogHost dialog={dialog} data={onCallData} />
+                <ReachDialogHost dialog={dialog} gaps={alertData.reachGaps} />
                 <TemplateDialogHost dialog={dialog} data={templateData} />
             </SettingsCtx.Provider>
         </AppLayout>

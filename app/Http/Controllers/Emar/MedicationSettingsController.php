@@ -18,6 +18,7 @@ use App\Models\WitnessPinReminder;
 use App\Notifications\WitnessPinReminderNotification;
 use App\Services\AuditLogger;
 use App\Services\Medication\Alerts\MedicationAlertPreviews;
+use App\Services\Medication\Alerts\MedicationAlertReachGaps;
 use App\Services\Medication\Alerts\MedicationAlertRecipients;
 use App\Services\Medication\Alerts\OnCallResolver;
 use App\Services\Medication\MedicationGovernanceScopeService;
@@ -27,6 +28,8 @@ use App\Services\Medication\Settings\MedicationSettingsRegistry;
 use App\Services\Medication\Settings\MedicationSettingsStore;
 use App\Services\Medication\Settings\MedicineRuleScope;
 use App\Services\Medication\Settings\MedicineRuleWording;
+use App\Services\Medication\Settings\QuietHoursCodec;
+use App\Services\Medication\Settings\TimeCodec;
 use App\Services\Medication\WitnessPinResetAuthority;
 use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationRuleService;
@@ -120,6 +123,7 @@ class MedicationSettingsController extends Controller
             // (another house's extras: 403, never a validation message).
             $this->assertAlertPeople($changes);
             $this->assertFollowUpConsistent($changes);
+            $this->assertQuietHoursConsistent($changes);
 
             return $this->settingsStore->apply($lockedActor, $changes, (bool) ($validated['confirm_loosening'] ?? false));
         }, 3);
@@ -381,6 +385,63 @@ class MedicationSettingsController extends Controller
             throw ValidationException::withMessages([
                 $field('escalate_to', 'escalate_after') => 'Choose who it escalates to.',
             ]);
+        }
+    }
+
+    /**
+     * Quiet hours need both times, and different ones (P11 v5, B2 chunk 5):
+     * the organisation's pair — whatever this save changes and what's saved —
+     * and each house with its own hours.
+     *
+     * @param  list<array{definition: MedicationSettingDefinition, site_id: int|null, value: string, from: string}>  $changes
+     */
+    private function assertQuietHoursConsistent(array $changes): void
+    {
+        $org = [];
+        foreach ($changes as $index => $change) {
+            $definition = $change['definition'];
+            if ($definition->group === 'delivery' && in_array($definition->key, ['quiet_from', 'quiet_until'], true)) {
+                $org[$definition->key] = [$change['value'], $index];
+            }
+            if ($definition->group === 'quietHouse' && $change['site_id'] !== null) {
+                $q = (new QuietHoursCodec)->decode($change['value']);
+                if ($q === null || $q['mode'] !== QuietHoursCodec::OWN) {
+                    continue;
+                }
+                $house = (string) (Site::query()->whereKey($change['site_id'])->value('name') ?? 'This house');
+                if ($q['from'] === '' || $q['until'] === '') {
+                    throw ValidationException::withMessages([
+                        "changes.{$index}.value" => $house.': choose when its quiet hours start and end.',
+                    ]);
+                }
+                if ($q['from'] === $q['until']) {
+                    throw ValidationException::withMessages([
+                        "changes.{$index}.value" => $house.': quiet hours can’t start and end at the same time.',
+                    ]);
+                }
+            }
+        }
+        if ($org === []) {
+            return;
+        }
+        $value = function (string $key) use ($org): string {
+            if (isset($org[$key])) {
+                return $org[$key][0];
+            }
+            $definition = $this->settingsRegistry->definition('delivery', $key);
+
+            return $definition === null
+                ? TimeCodec::OFF
+                : $definition->normalise(AppSetting::query()->where('key', $definition->storageKey)->value('value'));
+        };
+        $field = 'changes.'.($org['quiet_from'][1] ?? $org['quiet_until'][1]).'.value';
+        $from = $value('quiet_from');
+        $until = $value('quiet_until');
+        if (($from === TimeCodec::OFF) !== ($until === TimeCodec::OFF)) {
+            throw ValidationException::withMessages([$field => 'Choose when quiet hours start and end.']);
+        }
+        if ($from !== TimeCodec::OFF && $from === $until) {
+            throw ValidationException::withMessages([$field => 'Quiet hours can’t start and end at the same time.']);
         }
     }
 
@@ -1069,7 +1130,7 @@ class MedicationSettingsController extends Controller
      *
      * @param  list<int>  $siteIds  Houses whose settings this person reads.
      * @param  list<int>  $houseSiteIds  Their own houses (HR profile).
-     * @return array{alertAccess: array<string, mixed>, alertPeople: list<array<string, mixed>>, alertNames: array<int, string>, alertReach: array<string, mixed>, alertNobodyOpen: int, alertPreviews: array<string, mixed>, alertDelivery: array{push_ready: int, people: int}, onCall: array<string, mixed>}
+     * @return array{alertAccess: array<string, mixed>, alertPeople: list<array<string, mixed>>, alertNames: array<int, string>, alertReach: array<string, mixed>, alertNobodyOpen: int, alertPreviews: array<string, mixed>, alertDelivery: array{push_ready: int, people: int}, onCall: array<string, mixed>, alertHouses: list<array{id: int, name: string}>, alertReachGaps: list<array<string, mixed>>}
      */
     private function alertPayload(User $actor, bool $canView, bool $canManage, bool $canManageGlobal, bool $canHouseAlerts, array $siteIds, array $houseSiteIds): array
     {
@@ -1088,6 +1149,8 @@ class MedicationSettingsController extends Controller
                 'alertPreviews' => [],
                 'alertDelivery' => ['push_ready' => 0, 'people' => 0],
                 'onCall' => ['houses' => [], 'staff' => []],
+                'alertHouses' => [],
+                'alertReachGaps' => [],
             ];
         }
 
@@ -1106,7 +1169,17 @@ class MedicationSettingsController extends Controller
         $housePeople = $manageOrg ? [] : ($houseIds !== [] ? $this->alertPeople($houseIds) : []);
         $readable = array_values(array_unique([...$named, ...array_column($housePeople, 'id')]));
         $people = $manageOrg ? $this->alertPeople(null) : $housePeople;
-        $peopleIds = array_column($people, 'id');
+        // Everyone who can get alerts at the houses this person sees (B2
+        // chunk 5): "Staff with push set up" and "Who can't be reached".
+        $visiblePeople = match (true) {
+            $manageOrg => $people,
+            $canManageGlobal => $this->alertPeople(null),
+            $siteIds === $houseIds => $housePeople,
+            default => $siteIds === [] ? [] : $this->alertPeople($siteIds),
+        };
+        $peopleIds = array_column($visiblePeople, 'id');
+        $alertHouseIds = $this->alertHouseIds($siteIds);
+        $onCall = $this->onCallPayload($actor, $alertHouseIds);
 
         return [
             'alertAccess' => [
@@ -1117,7 +1190,7 @@ class MedicationSettingsController extends Controller
             // The safety net's warning (P11 B2): who each group would tell at
             // each house, from the same resolution an alert uses.
             'alertReach' => [
-                'houses' => $recipients->reach($this->alertHouseIds($siteIds), now()),
+                'houses' => $recipients->reach($alertHouseIds, now()),
                 'people' => $recipients->peopleReach($readable),
             ],
             // Open alerts nobody could be told about — never only a log row.
@@ -1129,12 +1202,17 @@ class MedicationSettingsController extends Controller
             // Organisation editors name anyone; house managers people at their houses.
             'alertPeople' => $people,
             // On-call contacts (B2 chunk 4): one per house this person sees.
-            'onCall' => $this->onCallPayload($actor, $this->alertHouseIds($siteIds)),
+            'onCall' => $onCall,
+            // Quiet hours (B2 chunk 5): one row per house this person sees.
+            'alertHouses' => $this->siteChoices($alertHouseIds),
+            // Who can't be reached (B2 chunk 5): people with a contact gap;
+            // the page works out from its draft which gaps matter.
+            'alertReachGaps' => app(MedicationAlertReachGaps::class)->rows($visiblePeople, $onCall['houses'], now()),
             // Message preview (B2 chunk 2): synthetic samples through the real
             // notification, with the privacy switch on and off.
             'alertPreviews' => app(MedicationAlertPreviews::class)->all(),
-            // Delivery › Push: of the people who can get alerts, how many have
-            // a phone or browser allowed.
+            // Delivery › Push: of the people who can get alerts at the houses
+            // this person sees, how many have a phone or browser allowed.
             'alertDelivery' => [
                 'push_ready' => $peopleIds === [] ? 0 : UserPushSubscription::query()
                     ->whereIn('user_id', $peopleIds)

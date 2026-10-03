@@ -27,7 +27,8 @@ export type Dialog =
     | { kind: 'msgpreview'; key: string }
     | { kind: 'oncall'; siteId: number }
     | { kind: 'oncallview'; siteId: number }
-    | { kind: 'oncallremove'; siteId: number };
+    | { kind: 'oncallremove'; siteId: number }
+    | { kind: 'reach'; id: number };
 
 export type SettingsContext = {
     s: SettingsPayload;

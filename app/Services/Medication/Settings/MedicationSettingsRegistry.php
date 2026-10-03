@@ -47,6 +47,18 @@ class MedicationSettingsRegistry
 
     public const DELIVERY_ESCALATE_TO = 'medications.alert_delivery.escalate_to';
 
+    /**
+     * Quiet hours (P11 v5 Delivery › Quiet hours, B2 chunk 5): the
+     * organisation default, then each house follows it, sets its own or has
+     * none (Q12). NZ wall-clock times; "off" when not set.
+     */
+    public const DELIVERY_QUIET_FROM = 'medications.alert_delivery.quiet_from';
+
+    public const DELIVERY_QUIET_UNTIL = 'medications.alert_delivery.quiet_until';
+
+    /** A house's quiet hours: `medications.alert_quiet_hours` per Site. */
+    public const QUIET_HOUSE_STORAGE = 'medications.alert_quiet_hours';
+
     /** "Off" for the follow-up numbers: each alert is sent once, nobody else is told. */
     public const FOLLOW_UP_OFF = 'off';
 
@@ -122,6 +134,7 @@ class MedicationSettingsRegistry
             $this->alertRecipients(),
             $this->alertExtras(),
             $this->alertDelivery(),
+            $this->quietHouses(),
         ];
     }
 
@@ -196,6 +209,9 @@ class MedicationSettingsRegistry
      * after N minutes, until someone attends. Both start off (today: each
      * alert is sent once). What counts as attended runs dealt with >
      * acknowledged > opened; moving towards "opened" is a loosening.
+     *
+     * B2 chunk 5, the organisation's quiet hours: email and push for alerts
+     * without Follow up wait until they end; the bell never waits.
      */
     private function alertDelivery(): MedicationSettingGroup
     {
@@ -258,6 +274,62 @@ class MedicationSettingsRegistry
                     options: [],
                     default: '[]',
                     codec: new GroupListCodec(self::ESCALATE_TO_GROUPS),
+                ),
+                // B2 chunk 5: both off (today: every alert is sent straight
+                // away) until someone chooses the times — no default times.
+                new MedicationSettingDefinition(
+                    group: 'delivery',
+                    key: 'quiet_from',
+                    storageKey: self::DELIVERY_QUIET_FROM,
+                    scope: MedicationSettingDefinition::SCOPE_ORGANISATION,
+                    section: 'delivery',
+                    label: 'Hold non-urgent alerts overnight',
+                    options: [],
+                    default: TimeCodec::OFF,
+                    pairedWith: 'quiet_until',
+                    codec: new TimeCodec('Off — sent straight away', 'From'),
+                ),
+                new MedicationSettingDefinition(
+                    group: 'delivery',
+                    key: 'quiet_until',
+                    storageKey: self::DELIVERY_QUIET_UNTIL,
+                    scope: MedicationSettingDefinition::SCOPE_ORGANISATION,
+                    section: 'delivery',
+                    label: 'Quiet hours end',
+                    options: [],
+                    default: TimeCodec::OFF,
+                    pairedWith: 'quiet_from',
+                    codec: new TimeCodec('Off', 'Until'),
+                ),
+            ],
+        );
+    }
+
+    /**
+     * Each house's quiet hours (P11 v5 Q12): follow the organisation, its own
+     * hours, or none. House managers change their own houses
+     * (`medications.alerts.manage_house`); the organisation default needs
+     * all-sites authority.
+     */
+    private function quietHouses(): MedicationSettingGroup
+    {
+        return new MedicationSettingGroup(
+            key: 'quietHouse',
+            view: self::VIEW_ALERTS,
+            effect: 'From tonight, at that house',
+            auditEvent: 'medications.alert_quiet_hours.updated',
+            definitions: [
+                new MedicationSettingDefinition(
+                    group: 'quietHouse',
+                    key: 'hours',
+                    storageKey: self::QUIET_HOUSE_STORAGE,
+                    scope: MedicationSettingDefinition::SCOPE_SITE,
+                    section: 'delivery',
+                    label: 'Quiet hours',
+                    options: [],
+                    default: QuietHoursCodec::DEFAULT,
+                    codec: new QuietHoursCodec,
+                    houseManaged: true,
                 ),
             ],
         );

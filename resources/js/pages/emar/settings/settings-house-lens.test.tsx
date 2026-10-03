@@ -310,4 +310,51 @@ describe('What applies at a house', () => {
         ).toBeInTheDocument();
         expect(screen.getByText('On-call contact')).toBeInTheDocument();
     });
+
+    it('shows the quiet hours that hold email and push at the house (B2 C5)', () => {
+        const withQuiet: SettingsPayload = {
+            ...s,
+            definitions: {
+                ...s.definitions,
+                quietHouse: {
+                    hours: {
+                        ...def('quietHouse', 'hours', [], '{"mode":"org"}'),
+                        scope: 'site',
+                        kind: 'quiet',
+                    },
+                },
+            },
+            values: {
+                ...s.values,
+                delivery: { quiet_from: '21:00', quiet_until: '07:00' },
+            },
+            site_values: { '4': { quietHouse: { hours: '{"mode":"off"}' } } },
+        };
+        const view = (houseIndex: number) =>
+            render(
+                <HouseLens
+                    s={withQuiet}
+                    houses={houseIndex ? [houses[1], houses[0]] : houses}
+                    rules={[]}
+                    templates={[]}
+                    pins={[]}
+                    oncall={{ houses: [], staff: {} }}
+                    onOpen={vi.fn()}
+                    onClose={vi.fn()}
+                />,
+            );
+        view(0);
+        fireEvent.click(
+            screen.getByRole('button', { name: /Alerts & on-call/ }),
+        );
+        // Quiet hours (B2 C5): Kōwhai follows the organisation.
+        expect(screen.getByText('Quiet hours')).toBeInTheDocument();
+        expect(screen.getByText('Held 9:00 pm to 7:00 am')).toBeInTheDocument();
+        cleanup();
+        view(1);
+        fireEvent.click(
+            screen.getByRole('button', { name: /Alerts & on-call/ }),
+        );
+        expect(screen.getByText('Sent straight away')).toBeInTheDocument();
+    });
 });

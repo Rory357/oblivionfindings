@@ -35,8 +35,11 @@ export type SettingDefinition = {
         off: string | null;
         off_is_loosest: boolean;
     } | null;
-    /** A value that isn't one option or number (P11 B2): who gets an alert, a list of people, a list of groups. */
-    kind?: 'alert' | 'people' | 'groups' | null;
+    /** A value that isn't one option or number (P11 B2): who gets an alert, a list of people, a list of groups,
+     * a time ("21:00" or "off", B2 C5) or a house's quiet hours. */
+    kind?: 'alert' | 'people' | 'groups' | 'time' | 'quiet' | null;
+    /** The words before a time ("From 9:00 pm"). */
+    time_prefix?: string;
     /** The name "Still to decide" uses ("Alert: Overdue doses"). */
     decide_label?: string | null;
     /** A house setting house managers change for their own houses (B2 Q3). */
@@ -67,6 +70,86 @@ export const encodeGroups = (def: SettingDefinition, groups: string[]) =>
             .map((o) => o.value)
             .filter((g) => groups.includes(g)),
     );
+
+/** "21:00" → "9:00 pm" (v5 `fmtT`). */
+export const fmtT = (t: string) => {
+    const [h, m] = t.split(':').map(Number);
+    return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`;
+};
+
+const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+export const TIME_OFF = 'off';
+
+/** A house's quiet hours (B2 C5, v5 Q12): follow the organisation, its own hours, or none. */
+export type QuietHouse = {
+    mode: 'org' | 'own' | 'off';
+    from: string;
+    until: string;
+};
+
+export function parseQuiet(value: string): QuietHouse | null {
+    try {
+        const v = JSON.parse(value);
+        if (
+            !v ||
+            typeof v !== 'object' ||
+            !['org', 'own', 'off'].includes(v.mode)
+        )
+            return null;
+        if (v.mode !== 'own') return { mode: v.mode, from: '', until: '' };
+        const t = (x: unknown) =>
+            x === undefined || x === null || x === ''
+                ? ''
+                : typeof x === 'string' && TIME.test(x)
+                  ? x
+                  : null;
+        const from = t(v.from);
+        const until = t(v.until);
+        return from === null || until === null
+            ? null
+            : { mode: 'own', from, until };
+    } catch {
+        return null;
+    }
+}
+
+/** The server's canonical form. */
+export const encodeQuiet = (q: QuietHouse) =>
+    JSON.stringify(
+        q.mode === 'own'
+            ? { mode: 'own', from: q.from, until: q.until }
+            : { mode: q.mode },
+    );
+
+export const QUIET_HOUSE_DEFAULT = '{"mode":"org"}';
+
+/**
+ * The quiet hours that hold email and push at a house, from the draft (v5
+ * `quietAt`): its own hours, the organisation's, or none.
+ */
+export function quietAt(
+    s: SettingsPayload,
+    draft: Draft,
+    siteId: number,
+): { from: string; until: string; source: 'org' | 'house' } | null {
+    const q = parseQuiet(
+        siteDraftValue(s, draft, 'quietHouse', 'hours', siteId),
+    ) ?? {
+        mode: 'org',
+        from: '',
+        until: '',
+    };
+    const usable = (from: string, until: string) =>
+        TIME.test(from) && TIME.test(until) && from !== until;
+    if (q.mode === 'off') return null;
+    if (q.mode === 'own')
+        return usable(q.from, q.until)
+            ? { from: q.from, until: q.until, source: 'house' }
+            : null;
+    const from = draftValue(s, draft, 'delivery', 'quiet_from');
+    const until = draftValue(s, draft, 'delivery', 'quiet_until');
+    return usable(from, until) ? { from, until, source: 'org' } : null;
+}
 
 /** One medication alert in the catalogue (P11 v5 `ALERTS`). */
 export type AlertMeta = {
@@ -363,6 +446,8 @@ export function accepts(def: SettingDefinition, value: string): boolean {
         return !!a && a.groups.every((g) => def.alert!.groups.includes(g));
     }
     if (def.kind === 'people') return parsePeople(value) !== null;
+    if (def.kind === 'time') return value === TIME_OFF || TIME.test(value);
+    if (def.kind === 'quiet') return parseQuiet(value) !== null;
     if (def.kind === 'groups') {
         const g = parseGroups(value);
         return (
@@ -406,6 +491,18 @@ export function format(
             who.length ? who.join(', ') : 'nobody',
         ].join(' · ');
     }
+    if (def.kind === 'time')
+        return value === TIME_OFF || !TIME.test(value)
+            ? (def.off_label ?? 'Off')
+            : [def.time_prefix, fmtT(value)].filter(Boolean).join(' ');
+    if (def.kind === 'quiet') {
+        const q = parseQuiet(value);
+        if (!q || q.mode === 'org') return 'Follows the organisation';
+        if (q.mode === 'off') return 'No quiet hours at this house';
+        return q.from && q.until
+            ? `Own hours: ${fmtT(q.from)} to ${fmtT(q.until)}`
+            : 'Own hours — times not chosen';
+    }
     if (def.kind === 'groups') {
         const g = parseGroups(value) ?? [];
         return g.length
@@ -445,6 +542,8 @@ export function loosens(
     to: string,
 ): boolean {
     if (from === to) return false;
+    // Quiet hours only hold email and push, never the bell (v5: never a loosening).
+    if (def.kind === 'time' || def.kind === 'quiet') return false;
     if (def.kind === 'alert') {
         const a = parseAlert(from);
         const b = parseAlert(to);
@@ -685,6 +784,13 @@ export function stillToDecide(s: SettingsPayload): Pending[] {
                 : undefined;
             const saved = savedValue(s, g.key, key);
             const value = format(def, saved, s.people_names);
+            // v5: follow-up and quiet hours that are off say what happens today.
+            const today =
+                g.key === 'delivery' &&
+                ['realert_every', 'escalate_after', 'quiet_from'].includes(
+                    key,
+                ) &&
+                (saved === TIME_OFF || saved === offValue(def));
             out.push({
                 group: g.key,
                 key,
@@ -692,10 +798,11 @@ export function stillToDecide(s: SettingsPayload): Pending[] {
                 section: def.section,
                 label: def.decide_label ?? def.label,
                 state: 'default',
-                until:
-                    isNumber(def) && saved !== offValue(def)
-                        ? `Today’s rule: ${pair ? `${value} within ${format(pair, savedValue(s, g.key, pair.key))}` : value}`
-                        : `Behaves as: ${value}`,
+                until: today
+                    ? `Today: ${value}`
+                    : isNumber(def) && saved !== offValue(def)
+                      ? `Today’s rule: ${pair ? `${value} within ${format(pair, savedValue(s, g.key, pair.key))}` : value}`
+                      : `Behaves as: ${value}`,
             });
         });
     });
@@ -757,6 +864,34 @@ export function validateView(
             !(parseGroups(v('escalate_to')) ?? []).length
         )
             errors['delivery.escalate_to'] = 'Choose who it escalates to.';
+        // Quiet hours (B2 C5): both times, and different ones.
+        if (definitionOf(s, 'delivery', 'quiet_from')) {
+            const from = v('quiet_from');
+            const until = v('quiet_until');
+            if (from !== TIME_OFF || until !== TIME_OFF) {
+                if (!TIME.test(from) || !TIME.test(until))
+                    errors['delivery.quiet_from'] =
+                        'Choose when quiet hours start and end.';
+                else if (from === until)
+                    errors['delivery.quiet_from'] =
+                        'Quiet hours can’t start and end at the same time.';
+            }
+        }
+    }
+    // Each house with its own quiet hours: both times, and different ones.
+    if (s.groups.quietHouse?.view === view) {
+        Object.entries(draft.quietHouse ?? {}).forEach(([slot, value]) => {
+            const [key, site] = slot.split('@');
+            const q = parseQuiet(value);
+            if (key !== 'hours' || !site || q?.mode !== 'own') return;
+            const name = s.site_names?.[Number(site)] ?? 'This house';
+            if (!q.from || !q.until)
+                errors[`quietHouse.${slot}`] =
+                    `${name}: choose when its quiet hours start and end.`;
+            else if (q.from === q.until)
+                errors[`quietHouse.${slot}`] =
+                    `${name}: quiet hours can’t start and end at the same time.`;
+        });
     }
     return errors;
 }
