@@ -17,7 +17,7 @@ import { useDoseRecorder } from '@/components/emar/recording/use-dose-recorder';
 import { EntityTable } from '@/components/lists/entity-table';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { toDateInput } from '@/lib/datetime';
+import { formatDateOnly } from '@/lib/datetime';
 import { MarTab } from '@/pages/operations/clients/tabs/mar';
 import {
     CalendarDays,
@@ -187,7 +187,7 @@ function WeekChart({
             }
         >
             <p className="text-caption text-muted-foreground">
-                {toDateInput(data.days[0].date)} – {toDateInput(last.date)} ·
+                {formatDateOnly(data.days[0].date)} – {formatDateOnly(last.date)} ·
                 Pacific/Auckland
                 {hidden
                     ? ` · ${hidden} controlled doses — details need controlled-medicine access`
