@@ -20,6 +20,7 @@ use App\Services\MedicationReportingService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\Support\ReadsRetainedMedicationAuditEvidence;
 use Tests\TestCase;
 
@@ -93,11 +94,25 @@ class MedicationReportCanonicalScopeTest extends TestCase
             'FORGED CROSS-CLIENT ADMINISTRATION LEAK',
         );
         $this->administration(
+            $localClient,
+            $foreignMedication,
+            $recorder,
+            'given',
+            'FORGED CROSS-CLIENT GIVEN ADMINISTRATION LEAK',
+        );
+        $this->administration(
             $foreignClient,
             $foreignMedication,
             $recorder,
             'refused',
             'FOREIGN OUT-OF-SCOPE ADMINISTRATION',
+        );
+        $this->administration(
+            $foreignClient,
+            $foreignMedication,
+            $recorder,
+            'given',
+            'FOREIGN OUT-OF-SCOPE GIVEN ADMINISTRATION',
         );
         $localError = MedicationError::query()->create([
             'client_id' => $localClient->id,
@@ -293,8 +308,15 @@ class MedicationReportCanonicalScopeTest extends TestCase
         $this->assertSame(0, (int) $emarPage->inertiaProps('data.totals.due'));
         $this->assertSame(0, (int) $emarPage->inertiaProps('data.totals.given'));
         $this->assertSame(0, (int) $emarPage->inertiaProps('data.totals.missed'));
-        $this->actingAs($reader)->get(route('emar.reports', ['report' => 'prn']))->assertOk()
-            ->assertInertia(fn ($page) => $page->where('data.totals.given', 1)->has('page.data', 1)->where('page.data.0.client_id', $localClient->id));
+        // Approved P09 Q6 gives every reader the same generic dose numbers:
+        // ordinary and controlled PRN doses count, but neither forged ownership
+        // nor a foreign person's genuine given dose can enter those numbers.
+        $prnPage = $this->actingAs($reader)->get(route('emar.reports', ['report' => 'prn']))->assertOk()
+            ->assertInertia(fn ($page) => $page->where('data.totals.given', 2)->has('page.data', 1)
+                ->where('page.data.0.client_id', $localClient->id)->where('page.data.0.given', 2));
+        $this->assertNoForgedMedicationMarkers($prnPage->getContent());
+        $this->assertStringNotContainsString($localControlledMedication->name, $prnPage->getContent());
+        $this->assertStringNotContainsString('RESTRICTED CONTROLLED ADMINISTRATION', $prnPage->getContent());
         $this->actingAs($reader)->get(route('emar.reports', ['report' => 'errors']))->assertOk()
             ->assertInertia(fn ($page) => $page->where('data.totals.open', 1)->has('page.data', 1)
                 ->where('page.data.0.reference', $localError->fresh()->reference_number));
@@ -509,21 +531,28 @@ class MedicationReportCanonicalScopeTest extends TestCase
             'status' => 'in_progress',
         ]);
 
+        $occurredAt = now('Pacific/Auckland')->startOfMinute();
         $this->actingAs($recorder)
             ->post(route('emar.errors.store'), [
                 'client_id' => $client->id,
                 'client_medication_id' => $ordinaryMedication->id,
                 'error_type' => 'documentation',
-                'severity' => 'minor',
+                'report_token' => (string) Str::uuid(),
+                'occurred_at' => $occurredAt->format('Y-m-d\TH:i'),
+                'reached_client' => 'yes',
+                'harm_level' => 'minor',
                 'description' => 'Real linked medication error journey.',
                 'create_incident' => true,
             ])
-            ->assertRedirect();
+            ->assertRedirect()->assertSessionHasNoErrors()->assertSessionHas('success');
 
         $ordinaryError = MedicationError::query()
             ->where('client_medication_id', $ordinaryMedication->id)
             ->sole();
         $ordinaryIncident = ClientIncident::query()->findOrFail($ordinaryError->client_incident_id);
+        $this->assertSame($occurredAt->copy()->utc()->toIso8601String(), $ordinaryError->occurred_at->utc()->toIso8601String());
+        $this->assertSame($client->id, $ordinaryIncident->client_id);
+        $this->assertSame($site->id, $ordinaryIncident->site_id);
         $this->assertNull(data_get($ordinaryIncident->metadata, 'medication_id'));
 
         $controlledIncident = ClientIncident::factory()->create([
@@ -869,7 +898,9 @@ class MedicationReportCanonicalScopeTest extends TestCase
     {
         $this->assertStringNotContainsString('FOREIGN FORGED MEDICATION LEAK', $payload);
         $this->assertStringNotContainsString('FORGED CROSS-CLIENT ADMINISTRATION LEAK', $payload);
+        $this->assertStringNotContainsString('FORGED CROSS-CLIENT GIVEN ADMINISTRATION LEAK', $payload);
         $this->assertStringNotContainsString('FOREIGN OUT-OF-SCOPE ADMINISTRATION', $payload);
+        $this->assertStringNotContainsString('FOREIGN OUT-OF-SCOPE GIVEN ADMINISTRATION', $payload);
         $this->assertStringNotContainsString('FORGED CROSS-CLIENT MEDICATION ERROR LEAK', $payload);
         $this->assertStringNotContainsString('FORGED CROSS-CLIENT MEDICATION INCIDENT LEAK', $payload);
         $this->assertStringNotContainsString('MISSING HISTORICAL MEDICATION INCIDENT LEAK', $payload);
