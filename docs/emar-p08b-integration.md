@@ -45,6 +45,8 @@ Six failures came from missing per-person permission evidence in the locked comm
 
 The 41 warnings came from the absent `.env`. A minimal ignored, synthetic testing file now supplies only `APP_ENV=testing` and `APP_DEBUG=true`; primary or production configuration was not copied. The corrected snapshot has not had another backend run: Main explicitly holds worker database tests and owns the consolidated run after integration.
 
+Failure corrections are owned commit `2f66414ccb46737ff43de438963f34ebad84d227`. PHP syntax passed for all seven changed PHP files and the commit passed whitespace checks. The one authorized scoped frontend formatting/syntax attempt entered the repaired queue and exited before inspecting the source because the primary checkout's Prettier module was unavailable. It is not a frontend pass. The final formatting/handoff commit makes only TypeScript whitespace and documentation changes; Main retains the full frontend gate.
+
 Main's consolidated run must include:
 
 - `tests/Feature/Emar/MedicationErrorWorkflowTest.php`

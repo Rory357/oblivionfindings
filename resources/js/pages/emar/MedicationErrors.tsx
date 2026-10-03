@@ -92,7 +92,14 @@ type Props = {
         controlled: boolean;
     };
 };
-type ErrorView = 'triage' | 'investigating' | 'actions' | 'closed' | 'incidents' | 'trends' | 'mine';
+type ErrorView =
+    | 'triage'
+    | 'investigating'
+    | 'actions'
+    | 'closed'
+    | 'incidents'
+    | 'trends'
+    | 'mine';
 const views: ReadonlyArray<readonly [ErrorView, string]> = [
     ['triage', 'To triage'],
     ['investigating', 'Investigating'],
@@ -397,7 +404,13 @@ export default function MedicationErrors({
                                                                                 '',
                                                                         )
                                                                       ? 'critical'
-                                                                      : ['minor', 'moderate'].includes(e.harm_level ?? '')
+                                                                      : [
+                                                                              'minor',
+                                                                              'moderate',
+                                                                          ].includes(
+                                                                              e.harm_level ??
+                                                                                  '',
+                                                                          )
                                                                         ? 'warning'
                                                                         : 'neutral'
                                                             }
