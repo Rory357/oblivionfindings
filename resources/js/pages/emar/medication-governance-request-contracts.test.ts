@@ -335,7 +335,7 @@ describe('controlled medication request contracts', () => {
         ).toBe(19);
     });
 
-    it('asks for a syringe driver witness for any controlled medicine, as the server does', () => {
+    it('uses the server-resolved syringe driver witness policy and falls back to the explicit order requirement', () => {
         const medicine = {
             id: 41,
             name: 'Midazolam',
@@ -351,6 +351,19 @@ describe('controlled medication request contracts', () => {
                 ...medicine,
                 controlled_drug: true,
             }),
+        ).toBe(false);
+        expect(
+            syringeDriverRequiresWitness({
+                ...medicine,
+                controlled_drug: true,
+                requires_witness: true,
+            }),
+        ).toBe(true);
+        expect(
+            syringeDriverRequiresWitness({
+                ...medicine,
+                requires_witness: true,
+            }),
         ).toBe(true);
         expect(
             syringeDriverRequiresWitness({
@@ -358,5 +371,13 @@ describe('controlled medication request contracts', () => {
                 witness_required: true,
             }),
         ).toBe(true);
+        expect(
+            syringeDriverRequiresWitness({
+                ...medicine,
+                controlled_drug: true,
+                witness_required: true,
+                requires_witness: false,
+            }),
+        ).toBe(false);
     });
 });
