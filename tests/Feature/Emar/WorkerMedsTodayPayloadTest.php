@@ -3,6 +3,7 @@
 namespace Tests\Feature\Emar;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
@@ -17,8 +18,10 @@ use App\Models\User;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\MedicationReadQueryInventory;
 use Tests\TestCase;
 
 class WorkerMedsTodayPayloadTest extends TestCase
@@ -284,38 +287,85 @@ class WorkerMedsTodayPayloadTest extends TestCase
         // The badge counts the people the worker supports or may open (C6d).
         $client->supportWorkers()->attach($worker->id);
 
-        // 3 scheduled meds × 3 in-window dose times = 9 slots, no PRN meds (PRN
-        // 24h counts hit the administrations table through a separate accessor).
-        // Before F1 the list issued one administration query per slot.
-        foreach (['Med A', 'Med B', 'Med C'] as $name) {
-            ClientMedication::query()->create([
-                'client_id' => $client->id,
-                'name' => $name,
-                'dosage' => '1 tablet',
-                'frequency' => 'Three times daily',
-                'dose_times' => ['08:00', '10:00', '12:00'],
-                'is_prn' => false,
-                'active' => true,
-                'state' => 'active',
+        $this->denyPermissions($worker, ['medications.controlled.view', 'medications.controlled.record']);
+        $orders = [];
+        $createOrder = function (Client $person, array $times, bool $controlled = false) use (&$orders): ClientMedication {
+            $order = ClientMedication::query()->create([
+                'client_id' => $person->id, 'name' => 'Query fixture medicine '.(count($orders) + 1),
+                'dosage' => '1 tablet', 'frequency' => 'Scheduled', 'dose_times' => $times,
+                'is_prn' => false, 'controlled_drug' => $controlled, 'active' => true, 'state' => 'active',
+                'approval_status' => 'verified', 'start_date' => '2026-04-01', 'end_date' => null,
             ]);
+            if (! $controlled) {
+                $orders[] = $order;
+            }
+
+            return $order;
+        };
+        $createOrder($client, ['10:00']);
+        $unassigned = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        $foreign = Client::factory()->create([
+            'site_id' => Site::factory()->create(['is_active' => true])->id, 'status' => 'active',
+        ]);
+        $foreign->supportWorkers()->attach($worker->id);
+        $hidden = [
+            $createOrder($unassigned, ['10:00']), $createOrder($foreign, ['10:00']),
+            $createOrder($client, ['10:00'], controlled: true),
+        ];
+        $orders = [$orders[0]];
+
+        foreach ([1, 7, 25] as $slotCount) {
+            if ($slotCount === 7) {
+                $createOrder($client, ['10:00', '11:00', '12:00']);
+                $createOrder($client, ['10:00', '11:00', '12:00']);
+            } elseif ($slotCount === 25) {
+                for ($personIndex = 0; $personIndex < 2; $personIndex++) {
+                    $person = Client::factory()->create([
+                        'site_id' => $site->id, 'service_context_id' => $serviceContext->id, 'status' => 'active',
+                    ]);
+                    $person->supportWorkers()->attach($worker->id);
+                    Shift::factory()->create([
+                        'client_id' => $person->id, 'site_id' => $site->id, 'service_context_id' => $serviceContext->id,
+                        'user_id' => $worker->id, 'starts_at' => now()->subMinutes(30), 'ends_at' => now()->addHours(4),
+                        'status' => 'scheduled',
+                    ]);
+                    for ($orderIndex = 0; $orderIndex < 3; $orderIndex++) {
+                        $createOrder($person, ['10:00', '11:00', '12:00']);
+                    }
+                }
+            }
+            app()->forgetScopedInstances();
+            auth()->forgetUser();
+            Cache::forget("user:{$worker->id}:task-nav:v1");
+            Cache::forget(HandleInertiaRequests::medsOverdueBadgeCacheKey(
+                $worker->id, Carbon::now(config('app.worker_timezone'))->toDateString(),
+            ));
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            try {
+                $response = $this->actingAs($worker->fresh())->get('/meds/today')->assertOk();
+                $reads = MedicationReadQueryInventory::fromLog(DB::getQueryLog());
+            } finally {
+                DB::disableQueryLog();
+                DB::flushQueryLog();
+            }
+            $this->assertCount($slotCount, $response->inertiaProps('schedule'));
+            $this->assertSame(
+                collect($orders)->pluck('id')->sort()->values()->all(),
+                collect($response->inertiaProps('schedule'))->pluck('medication_id')->unique()->sort()->values()->all(),
+            );
+            // Keep the original two fixed board/badge reads, and account for
+            // independent canonical evidence by its actual top-level purpose.
+            $this->assertSame(2, count($reads['board_day']) + count($reads['scheduled_window']));
+            $this->assertSame([
+                'scheduled_window' => 1, 'board_day' => 1, 'prn_unresolved' => 1,
+                'administration_batch' => 0, 'followup_scope' => 1, 'refusal_scope' => 1, 'unexpected' => 0,
+            ], MedicationReadQueryInventory::counts($reads), MedicationReadQueryInventory::describe($reads));
+            $this->assertDatabaseCount('client_medication_administrations', 0);
         }
-
-        DB::enableQueryLog();
-
-        $this->actingAs($worker)->get('/meds/today')->assertOk();
-
-        $administrationReads = collect(DB::getQueryLog())
-            ->filter(fn (array $entry) => str_contains($entry['query'], 'client_medication_administrations'));
-        $adminQueries = $administrationReads->count();
-
-        DB::disableQueryLog();
-
-        // Exactly two fixed administration queries, regardless of how many
-        // dose slots exist: the board's day query (slot matching + PRN
-        // follow-ups) and the sidebar overdue-badge window query in
-        // HandleInertiaRequests (cached for 60s after this first load).
-        // Before F1 the list issued one administration query PER SLOT.
-        $this->assertSame(2, $adminQueries, $administrationReads->pluck('query')->implode(PHP_EOL));
+        foreach ($hidden as $order) {
+            $this->actingAs($worker->fresh())->getJson(route('emar.medications.detail', $order))->assertNotFound();
+        }
     }
 
     public function test_sidebar_badge_keeps_an_overnight_shift_after_midnight(): void
