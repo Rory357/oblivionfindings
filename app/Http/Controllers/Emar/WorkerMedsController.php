@@ -11,6 +11,7 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
 use App\Models\MedicationPrnEffectiveness;
+use App\Models\MedicationRefusalFollowup;
 use App\Models\MedicationRound;
 use App\Models\Shift;
 use App\Models\TimelineEvent;
@@ -19,7 +20,9 @@ use App\Services\Emar\MedsBoardPayloadService;
 use App\Services\EnhancedMarService;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\Alerts\OnCallResolver;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
+use App\Services\Medication\Recording\DoseRecordingRequirements;
 use App\Services\Medication\StaffEligibilityRegister;
 use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationScopeDecision;
@@ -29,6 +32,7 @@ use App\Services\Timeline\TimelineEmitter;
 use App\Services\UserSiteAccessService;
 use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -114,6 +118,11 @@ class WorkerMedsController extends Controller
             ...$row,
             'mar_url' => $marLinks->canOpen($user, (int) $row['client_id']) ? $row['mar_url'] : null,
         ], $schedule);
+        // P01 C3: what each open dose needs and allows for this worker, from
+        // the one requirements source the dialog reads (block, competency,
+        // second person, allergy match) — the rows' state lines and the
+        // "Needs help" meter say the same as the dialog.
+        $schedule = $this->withRequirements($user, $schedule);
 
         // Legacy due lists (kept for the established payload contract): the
         // operational "what needs me" window of -2h … +8h around now.
@@ -192,7 +201,292 @@ class WorkerMedsController extends Controller
             'people_after_clock_in' => $peopleAfterClockIn,
             'hidden_controlled_doses' => $hiddenControlled['total'],
             'hidden_controlled_overdue' => $hiddenControlled['overdue'],
+            // P01 C3 (approved Meds today): the header's state chip and
+            // subline, the not-clocked-in banner's on-call contact, the
+            // people you may open who aren't on your shift, your refusal
+            // follow-ups, and the paginated activity list.
+            'clocked_in' => $this->isClockedIn($user, $now),
+            'house_label' => $this->houseLabel($assignedClientIds),
+            'on_call' => $this->onCallFor($assignedClientIds, $now),
+            'off_shift' => $isToday
+                ? $this->offShiftRows($user, $assignedClientIds, $date, $now, $includeControlled)
+                : [],
+            'refusal_follow_ups' => $this->refusalFollowUps($assignedClientIds, $includeControlled, $now, $timezone),
+            'prn_recorded_today' => $this->prnRecordedToday($dayAdministrations, $timezone),
+            // Activity is loaded when its tab is open (or asked for by name on
+            // a partial reload), so the default board load stays one fixed
+            // administrations query.
+            'activity_page' => $request->query('view') === 'activity'
+                ? $this->activityPageFor($request, $assignedClientIds, $now, $includeControlled)
+                : Inertia::optional(fn () => $this->activityPageFor($request, $assignedClientIds, $now, $includeControlled)),
+            'board_extra_can' => [
+                'report_error' => $user->canDo('medications.administer.record'),
+                'view_handovers' => $user->canDo('medications.view'),
+            ],
+            // Whose medication record (MAR) the row menus may offer to open.
+            'mar_client_ids' => $user->canDo('medications.view')
+                ? $marLinks->openableClientIds($user, $assignedClientIds)
+                : [],
         ]);
+    }
+
+    /**
+     * Each open row's recording requirements for this worker (keys only:
+     * block_all / block_given, competency, second person, allergy match,
+     * window). Done or not-yet-due rows carry none.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array<string, mixed>>
+     */
+    private function withRequirements(User $user, array $rows): array
+    {
+        $open = array_values(array_filter(
+            $rows,
+            fn (array $row): bool => $row['recorded'] === null
+                && in_array($row['status'], ['due', 'overdue', 'pending_check'], true),
+        ));
+        $board = [];
+        if ($open !== []) {
+            try {
+                $orders = ClientMedication::query()
+                    ->with('client')
+                    ->whereIn('id', array_values(array_unique(array_map(fn (array $row): int => (int) $row['medication_id'], $open))))
+                    ->get()
+                    ->keyBy('id');
+                $doses = [];
+                foreach ($open as $row) {
+                    $order = $orders->get((int) $row['medication_id']);
+                    if ($order !== null) {
+                        $doses[] = ['order' => $order, 'due_at' => Carbon::parse($row['scheduled_for'])];
+                    }
+                }
+                $board = app(DoseRecordingRequirements::class)->forBoard($user, $doses);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
+        return array_map(fn (array $row): array => [
+            ...$row,
+            'req' => $board[DoseRecordingRequirements::boardKey((int) $row['medication_id'], Carbon::parse($row['scheduled_for']))] ?? null,
+        ], $rows);
+    }
+
+    /**
+     * Meds today › Activity: the board's recorded doses, 10 a page, with the
+     * range / outcome / search the tab's filters put in the query string.
+     *
+     * @param  array<int, int>  $clientIds
+     */
+    private function activityPageFor(Request $request, array $clientIds, Carbon $now, bool $includeControlled): LengthAwarePaginator
+    {
+        $search = $request->query('q');
+
+        return $this->boardPayload->activityPage(
+            $clientIds,
+            $now,
+            $includeControlled,
+            $request->query('range') === 'today' ? 'today' : '24h',
+            in_array($request->query('outcome'), ['given', 'notgiven'], true) ? (string) $request->query('outcome') : 'all',
+            is_string($search) && trim($search) !== '' ? mb_substr(trim($search), 0, 80) : null,
+        );
+    }
+
+    /** Clocked in now: a shift of theirs that has started and not ended. */
+    private function isClockedIn(User $user, Carbon $now): bool
+    {
+        return Shift::query()
+            ->where('user_id', $user->id)
+            ->whereNotNull('actual_starts_at')
+            ->where('actual_starts_at', '<=', $now->copy()->utc())
+            ->where(fn ($live) => $live->whereNull('actual_ends_at')->orWhere('actual_ends_at', '>=', $now->copy()->utc()))
+            ->exists();
+    }
+
+    /** "Kōwhai House", or "2 houses" — the header subline's place. */
+    private function houseLabel(array $clientIds): ?string
+    {
+        if ($clientIds === []) {
+            return null;
+        }
+        $names = Client::query()->whereIn('id', $clientIds)->with('site:id,name')->get(['id', 'site_id'])
+            ->map(fn (Client $client): ?string => $client->site?->name)
+            ->filter()
+            ->unique()
+            ->values();
+
+        return match ($names->count()) {
+            0 => null,
+            1 => $names->first(),
+            default => $names->count().' houses',
+        };
+    }
+
+    /**
+     * The on-call contact at the board's house now (Settings › On-call), for
+     * "Can't clock in? Contact the coordinator on call".
+     *
+     * @return array{configured: bool, name: ?string, phone: ?string, warning: ?string}|null
+     */
+    private function onCallFor(array $clientIds, Carbon $now): ?array
+    {
+        $siteId = $clientIds === [] ? null : Client::query()->whereIn('id', $clientIds)->value('site_id');
+        if (! $siteId) {
+            return null;
+        }
+        $resolver = app(OnCallResolver::class);
+        $resolved = $resolver->at((int) $siteId, $now);
+
+        return [
+            'configured' => $resolved['configured'],
+            'name' => $resolved['user']?->name,
+            'phone' => $resolver->phoneOf($resolved['user']),
+            'warning' => $resolved['warning'],
+        ];
+    }
+
+    /**
+     * People this worker may open (assigned to them, at a house in their
+     * access) who aren't on their shift today: their due or late doses are
+     * listed so nothing is missed, each saying why it can't be recorded
+     * (P01: "At Kōwhai House, not on your shift").
+     *
+     * @param  array<int, int>  $boardClientIds
+     * @return list<array<string, mixed>>
+     */
+    private function offShiftRows(User $user, array $boardClientIds, Carbon $date, Carbon $now, bool $includeControlled): array
+    {
+        try {
+            $siteIds = $this->siteAccess->accessibleSiteIds($user, ['clinical.accessAllSites', 'sites.viewAll']);
+            if ($siteIds === []) {
+                return [];
+            }
+            $candidates = Client::query()
+                ->whereIn('site_id', $siteIds)
+                ->whereNotIn('id', $boardClientIds === [] ? [0] : $boardClientIds)
+                ->whereHas('supportWorkers', fn ($workers) => $workers->whereKey($user->id))
+                ->pluck('id')
+                ->map(fn ($id): int => (int) $id)
+                ->all();
+            $people = $candidates === [] ? [] : app(MarLinkService::class)->openableClientIds($user, $candidates);
+            if ($people === []) {
+                return [];
+            }
+            $bySlot = $this->boardPayload->slotIndex($this->boardPayload->administrationsForDay($people, $date, $includeControlled));
+            $rows = array_values(array_filter(
+                $this->boardPayload->scheduleForDate($people, $date, $now, $bySlot, $includeControlled),
+                fn (array $row): bool => $row['recorded'] === null && in_array($row['status'], ['due', 'overdue'], true),
+            ));
+
+            return $this->withRequirements($user, $rows);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return [];
+        }
+    }
+
+    /**
+     * As-needed doses recorded this day for the board's people, newest first
+     * (Meds today › As-needed: "As-needed doses recorded today").
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function prnRecordedToday(Collection $dayAdministrations, string $timezone): array
+    {
+        return $dayAdministrations
+            ->filter(fn (ClientMedicationAdministration $a): bool => $a->getRawOriginal('scheduled_for') === null
+                && ($a->medication?->is_prn ?? false))
+            ->sortByDesc(fn (ClientMedicationAdministration $a): string => (string) $a->getRawOriginal('administered_at'))
+            ->map(function (ClientMedicationAdministration $a) use ($timezone): array {
+                $at = $a->getRawOriginal('administered_at')
+                    ? $this->boardPayload->rawUtcInstant($a, 'administered_at')->setTimezone($timezone)
+                    : null;
+                $check = $a->getRawOriginal('effect_check_due_at')
+                    ? $this->boardPayload->rawUtcInstant($a, 'effect_check_due_at')->setTimezone($timezone)
+                    : null;
+
+                return [
+                    'id' => $a->id,
+                    'client_id' => (int) $a->client_id,
+                    'medication_name' => $a->medication?->name,
+                    'status' => $a->status,
+                    'time' => $at?->format('g:i a'),
+                    'dose_given' => $a->dose_given,
+                    'reason' => $a->reason,
+                    'by' => $a->administeredBy?->name,
+                    'check_at' => $check?->format('g:i a'),
+                    'effect_recorded' => (bool) $a->prnEffectiveness,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Open refusal follow-ups for the board's people (P01: a refused dose
+     * opens one, owned by whoever recorded it; a re-offer closes it).
+     *
+     * @param  array<int, int>  $clientIds
+     * @return list<array<string, mixed>>
+     */
+    private function refusalFollowUps(array $clientIds, bool $includeControlled, Carbon $now, string $timezone): array
+    {
+        if ($clientIds === []) {
+            return [];
+        }
+        try {
+            // EM-12: a reader without controlled access never sees a
+            // controlled refusal (filtered after the eager load, so the board
+            // keeps its one fixed administrations query when none are open).
+            return MedicationRefusalFollowup::query()
+                ->whereIn('client_id', $clientIds)
+                ->whereNull('follow_up_completed_at')
+                ->with([
+                    'administration:id,client_medication_id,scheduled_for,administered_at,status',
+                    'administration.medication:id,name,controlled_drug',
+                    'client:id,first_name,last_name,preferred_name',
+                    'owner:id,name',
+                ])
+                ->orderBy('follow_up_due_at')
+                ->get()
+                ->filter(fn (MedicationRefusalFollowup $followUp): bool => $followUp->administration?->medication !== null
+                    && ($includeControlled || ! $followUp->administration->medication->controlled_drug))
+                ->map(function (MedicationRefusalFollowup $followUp) use ($now, $timezone): array {
+                    $due = $followUp->getRawOriginal('follow_up_due_at')
+                        ? Carbon::parse((string) $followUp->getRawOriginal('follow_up_due_at'), 'UTC')->setTimezone($timezone)
+                        : null;
+                    $refusedAt = $followUp->administration?->getRawOriginal('administered_at')
+                        ? Carbon::parse((string) $followUp->administration->getRawOriginal('administered_at'), 'UTC')->setTimezone($timezone)
+                        : null;
+                    $scheduled = $followUp->administration?->getRawOriginal('scheduled_for')
+                        ? Carbon::parse((string) $followUp->administration->getRawOriginal('scheduled_for'), 'UTC')
+                        : null;
+
+                    return [
+                        'id' => $followUp->id,
+                        'refusal_id' => (int) $followUp->client_medication_administration_id,
+                        'client_id' => (int) $followUp->client_id,
+                        'preferred' => $followUp->client ? ($followUp->client->preferred_name ?: $followUp->client->first_name) : 'Unknown',
+                        'medication_id' => (int) ($followUp->administration?->client_medication_id ?? 0),
+                        'medication_name' => $followUp->administration?->medication?->name,
+                        'is_controlled' => (bool) ($followUp->administration?->medication?->controlled_drug ?? false),
+                        'scheduled_for' => $scheduled?->toIso8601String(),
+                        'refused_time' => $refusedAt?->format('g:i a'),
+                        'due_at' => $due?->toIso8601String(),
+                        'due_time' => $due?->format('g:i a'),
+                        'overdue' => $due !== null && $due->lt($now),
+                        'owner' => $followUp->owner?->name,
+                        'escalated' => (bool) $followUp->escalated_to_manager,
+                    ];
+                })
+                ->values()
+                ->all();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return [];
+        }
     }
 
     /**
@@ -860,6 +1154,11 @@ class WorkerMedsController extends Controller
                     $givenAt = $a->getRawOriginal('administered_at')
                         ? $this->boardPayload->rawUtcInstant($a, 'administered_at')->setTimezone($timezone)
                         : null;
+                    // The check time the recorder chose (P01). Doses recorded
+                    // before P01 have none: they keep the old one-hour guide.
+                    $checkAt = $a->getRawOriginal('effect_check_due_at')
+                        ? $this->boardPayload->rawUtcInstant($a, 'effect_check_due_at')->setTimezone($timezone)
+                        : $givenAt?->copy()->addHour();
 
                     return [
                         'administration_id' => $a->id,
@@ -869,7 +1168,9 @@ class WorkerMedsController extends Controller
                         'dose_given' => $a->dose_given,
                         'given_at' => $givenAt?->toIso8601String(),
                         'given_time' => $givenAt?->format('g:i a'),
-                        'check_at' => $givenAt?->copy()->addHour()->format('g:i a'),
+                        'check_due_at' => $checkAt?->toIso8601String(),
+                        'check_at' => $checkAt?->format('g:i a'),
+                        'by' => $a->administeredBy?->name,
                     ];
                 })
                 ->sortBy('given_at')

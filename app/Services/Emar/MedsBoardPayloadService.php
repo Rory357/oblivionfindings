@@ -20,6 +20,7 @@ use App\Services\Medication\WitnessPinService;
 use App\Services\UserSiteAccessService;
 use App\Support\EmarUrl;
 use Carbon\Carbon;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -177,6 +178,10 @@ class MedsBoardPayloadService
                         'is_controlled' => (bool) ($med->controlled_drug ?? false),
                         'requires_witness' => (bool) ($med->witness_required ?? false) || (bool) ($med->controlled_drug ?? false),
                         'scheduled_for' => $scheduled->toIso8601String(),
+                        // P01 C3: the dose's own window, for the state line
+                        // ("Due now · window until 10:00 am").
+                        'window_opens_at' => $dose['window_opens_at']->toIso8601String(),
+                        'window_ends_at' => $dose['window_ends_at']->toIso8601String(),
                         'time' => $scheduled->copy()->timezone($timezone)->format('H:i'),
                         'round_label' => $this->roundLabelFor($scheduled->copy()->timezone($timezone)),
                         'status' => $status,
@@ -284,7 +289,111 @@ class MedsBoardPayloadService
                 ? NotGivenReason::tryFrom($administration->reason_code)?->label()
                 : null,
             'notes' => $administration->notes,
+            // P01 recording contract facts the row's state lines show.
+            'dose_given' => $administration->dose_given,
+            'amount_mode' => $administration->amount_mode,
+            'late_reason' => $administration->late_reason,
+            'second_person_kind' => $administration->second_person_kind,
+            'second_person_status' => $administration->second_person_status,
+            'reoffer_of_id' => $administration->reoffer_of_id !== null ? (int) $administration->reoffer_of_id : null,
+            'review_reason_key' => $administration->review_reason_key,
         ];
+    }
+
+    /**
+     * Meds today › Activity (P01 C3): what was recorded for these people, 10
+     * a page, newest first — the last 24 hours or today only, every outcome
+     * or given / not given, optionally searched by person or medicine. Only
+     * the people the board shows; controlled records only for a reader who
+     * may see them (EM-12).
+     *
+     * @param  array<int, int>  $clientIds
+     */
+    public function activityPage(
+        array $clientIds,
+        Carbon $now,
+        bool $includeControlled,
+        string $range = '24h',
+        string $outcome = 'all',
+        ?string $search = null,
+    ): LengthAwarePaginator {
+        $timezone = $this->scheduleService->workerTimezone();
+        $from = $range === 'today'
+            ? $now->copy()->timezone($timezone)->startOfDay()->utc()
+            : $now->copy()->utc()->subDay();
+
+        $query = $this->canonicalAdministrations($includeControlled)
+            ->whereIn('client_id', $clientIds === [] ? [0] : $clientIds)
+            ->whereNotNull('administered_at')
+            ->whereBetween('administered_at', [$from, $now->copy()->utc()])
+            ->when($outcome === 'given', fn (Builder $q) => $q->where('status', 'given'))
+            ->when($outcome === 'notgiven', fn (Builder $q) => $q->whereIn('status', ['refused', 'withheld', 'missed']))
+            ->when(filled($search), function (Builder $q) use ($search): void {
+                $term = '%'.str_replace(['%', '_'], ['\\%', '\\_'], trim((string) $search)).'%';
+                $q->where(function (Builder $match) use ($term): void {
+                    $match->whereHas('client', fn (Builder $c) => $c->where('first_name', 'like', $term)
+                        ->orWhere('last_name', 'like', $term)
+                        ->orWhere('preferred_name', 'like', $term))
+                        ->orWhereHas('medication', fn (Builder $m) => $m->where('name', 'like', $term));
+                });
+            })
+            ->with([
+                'client:id,first_name,last_name,preferred_name,profile_photo_path',
+                'medication:id,client_id,name,is_prn,controlled_drug',
+                'administeredBy:id,name',
+                'witnessedBy:id,name',
+            ])
+            ->orderByDesc('administered_at')
+            ->orderByDesc('id');
+
+        $today = $now->copy()->timezone($timezone)->toDateString();
+
+        return $query->paginate(10)->withQueryString()->through(function (ClientMedicationAdministration $a) use ($timezone, $today): array {
+            $at = $this->rawUtcInstant($a, 'administered_at')->setTimezone($timezone);
+            $isPrn = (bool) ($a->medication?->is_prn ?? false);
+            $outcome = match ($a->status) {
+                'given' => $a->reoffer_of_id !== null ? 'Given after re-offer' : ($isPrn ? 'Given (as needed)' : 'Given'),
+                'refused' => $a->reoffer_of_id !== null ? 'Refused again' : 'Refused',
+                'withheld' => NotGivenReason::tryFrom((string) $a->reason_code)?->label() ?? 'Withheld',
+                default => ucfirst((string) $a->status),
+            };
+            $detail = array_values(array_filter([
+                // "1 tablet as ordered" / "2 tablets" — the amount, unless a
+                // less/more line below says it.
+                $a->status === 'given' && filled($a->dose_given) && ! in_array($a->amount_mode, ['less', 'more'], true)
+                    ? $a->dose_given.($a->amount_mode === 'as_ordered' && ! $isPrn ? ' as ordered' : '')
+                    : null,
+                $a->witnessedBy?->name ?($a->second_person_kind === 'witness' || $a->medication?->controlled_drug ? 'Witnessed by ' : 'Confirmed by ').$a->witnessedBy->name : null,
+                $a->second_person_status === 'not_confirmed' ? 'Not confirmed by a second person' : null,
+                $a->amount_mode === 'less' ? 'Less than ordered: '.$a->dose_given : null,
+                $a->amount_mode === 'more' ? 'More than ordered: '.$a->dose_given : null,
+                $a->late_reason ? 'Outside the dose window' : null,
+                $isPrn && $a->reason ? 'for '.mb_strtolower((string) $a->reason) : null,
+                // Not given: what was said ("Grace said no").
+                ! $isPrn && in_array($a->status, ['refused', 'withheld'], true) && filled($a->reason) ? $a->reason : null,
+                ! $isPrn && in_array($a->status, ['refused', 'withheld'], true) && blank($a->reason) && filled($a->notes) ? $a->notes : null,
+            ]));
+            if ($detail !== []) {
+                $detail[0] = Str::ucfirst($detail[0]);
+            }
+
+            return [
+                'id' => $a->id,
+                'client_id' => (int) $a->client_id,
+                'preferred' => $a->client ? ($a->client->preferred_name ?: $a->client->first_name) : 'Unknown',
+                'surname' => $a->client?->last_name,
+                'photo_url' => $a->client?->profile_photo_path ? $a->client->profile_photo_url : null,
+                'at' => $at->toIso8601String(),
+                'time' => $at->format('g:i a'),
+                'day' => $at->toDateString() === $today ? null : $at->format('l'),
+                'medication_name' => $a->medication?->name,
+                'is_controlled' => (bool) ($a->medication?->controlled_drug ?? false),
+                'status' => $a->status,
+                'outcome' => $outcome,
+                'by' => $a->administeredBy?->name,
+                'detail' => $detail === [] ? null : implode(' · ', $detail),
+            ];
+        });
     }
 
     /** Friendly time-of-day bucket shown under the slot time. */

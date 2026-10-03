@@ -1,0 +1,302 @@
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type { MedsTodayProps, ScheduleRow } from './types';
+
+vi.mock('@/layouts/app-layout', () => ({
+    default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+vi.mock('@/hooks/use-emar-breadcrumbs', () => ({ useEmarBreadcrumbs: () => [] }));
+vi.mock('@inertiajs/react', () => ({
+    Head: () => null,
+    Link: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
+        <a href={href} {...rest}>
+            {children}
+        </a>
+    ),
+    router: { get: vi.fn(), reload: vi.fn(), visit: vi.fn(), on: vi.fn(() => () => undefined) },
+    usePage: () => ({ props: {}, url: '/meds/today' }),
+}));
+// The one recording dialog is tested on its own; here we check what the page opens.
+vi.mock('@/components/emar/record-dose/record-dose-dialog', () => ({
+    RecordDoseDialog: (p: { mode?: string; entry: string; target: { kind: string; orderId: number; scheduledFor?: string }; nextLabel?: string | null }) => (
+        <div role="dialog" aria-label="Record a dose">
+            {`${p.mode ?? 'record'}|${p.entry}|${p.target.kind}|${p.target.orderId}|${p.target.scheduledFor ?? ''}|${p.nextLabel ?? ''}`}
+        </div>
+    ),
+}));
+vi.mock('@/components/emar/record-dose/dialogs', () => ({
+    WhyDialog: (p: { target: { orderId: number } }) => (
+        <div role="dialog" aria-label="Why can’t I record this?">
+            {`why|${p.target.orderId}`}
+        </div>
+    ),
+    AsNeededPicker: () => <div role="dialog" aria-label="Record an as-needed dose" />,
+}));
+vi.mock('@/pages/emar/components/report-error-modal', () => ({
+    ReportErrorModal: (p: { initialClientId?: number | null }) => (
+        <div role="dialog" aria-label="Report a medication error">
+            {`error|${p.initialClientId ?? ''}`}
+        </div>
+    ),
+}));
+
+import MedsToday from './index';
+
+const NZ = (hhmm: string) => `2026-04-30T${hhmm}:00+12:00`;
+
+function row(over: Partial<ScheduleRow> & Pick<ScheduleRow, 'key' | 'client_id' | 'client_name' | 'medication_id' | 'medication_name' | 'scheduled_for' | 'status'>): ScheduleRow {
+    const at = new Date(over.scheduled_for).getTime();
+    return {
+        dose: '1 tablet',
+        route: 'oral',
+        is_controlled: false,
+        requires_witness: false,
+        time: '',
+        round_label: 'Morning',
+        recorded: null,
+        mar_url: `/emar/mar?client_id=${over.client_id}`,
+        window_opens_at: new Date(at - 3_600_000).toISOString(),
+        window_ends_at: new Date(at + 3_600_000).toISOString(),
+        req: null,
+        ...over,
+    };
+}
+
+const okReq = { block_all: null, block_given: null, competency: 'current' as const, second_person: null, witness_available: true, allergy_match: false, not_simple: [], window: 'due' as const };
+
+function props(over: Partial<MedsTodayProps> = {}): MedsTodayProps {
+    return {
+        today: 'Thursday, 30 April 2026',
+        date: '2026-04-30',
+        date_label: 'Thursday 30 April 2026',
+        is_today: true,
+        server_now: NZ('09:30'),
+        now_label: '9:30 am',
+        stats: { meds_due: 0, meds_overdue: 0, due_now: 0, due_later: 0, upcoming_rounds: 0 },
+        active_round: null,
+        upcoming_rounds: [],
+        rounds: [],
+        schedule: [
+            row({ key: 'a-para', client_id: 1, client_name: 'Aroha Ngata', medication_id: 11, medication_name: 'Paracetamol 500mg', scheduled_for: NZ('09:30'), status: 'due', req: okReq }),
+            row({
+                key: 'a-leve',
+                client_id: 1,
+                client_name: 'Aroha Ngata',
+                medication_id: 12,
+                medication_name: 'Amoxicillin 500mg',
+                scheduled_for: NZ('08:00'),
+                status: 'overdue',
+                req: { ...okReq, block_given: 'allergyBlocked', allergy_match: true, window: 'late' },
+            }),
+            row({
+                key: 'h-sert',
+                client_id: 2,
+                client_name: 'Hemi Walker',
+                medication_id: 13,
+                medication_name: 'Sertraline 50mg',
+                scheduled_for: NZ('08:00'),
+                status: 'refused',
+                recorded: { id: 90, status: 'refused', administered_at: NZ('08:05'), time: '08:05', by: 'Priya Shah', witness: null, reason: 'refused', reason_label: 'Refused', notes: 'Said she felt fine' },
+            }),
+        ],
+        clients: [
+            { id: 1, name: 'Aroha Ngata', preferred: 'Aroha', nhi: null, dob: null, age: null, site_id: 5, site_name: 'Kōwhai House', allergies: [] },
+            { id: 2, name: 'Hemi Walker', preferred: 'Hemi', nhi: null, dob: null, age: null, site_id: 5, site_name: 'Kōwhai House', allergies: [] },
+        ],
+        sites: [{ id: 5, name: 'Kōwhai House' }],
+        prn_medications: [
+            {
+                id: 21,
+                client_id: 1,
+                client_name: 'Aroha Ngata',
+                name: 'Ibuprofen 200mg',
+                dose: '200mg',
+                route: 'oral',
+                form: 'tablet',
+                instructions: null,
+                prn_reason: 'Pain',
+                max_per_day: 3,
+                given_last_24h: 1,
+                remaining_today: 2,
+                near_limit: false,
+                over_limit: false,
+                is_controlled: false,
+                requires_witness: false,
+                min_hours_between: 4,
+                last_given_at: NZ('08:20'),
+                last_given_label: '8:20 am',
+                next_allowed_at: NZ('12:20'),
+                next_allowed_label: '12:20 pm',
+                interval_blocked: true,
+            },
+        ],
+        prn_follow_ups: [
+            { administration_id: 70, client_id: 1, medication_name: 'Ibuprofen 200mg', dose_given: '200mg', given_at: NZ('08:20'), given_time: '8:20 am', check_due_at: NZ('09:20'), check_at: '9:20 am', by: 'Priya Shah' },
+        ],
+        stock_alerts: [],
+        activity: [],
+        witnesses: [],
+        not_given_reasons: [],
+        shift_label: '7:00 am – 3:00 pm',
+        board_user: { first_name: 'Priya', name: 'Priya Shah', role_label: 'Support worker', med_competent: true, controlled_record: false, cd_witness: false },
+        board_can: { view_emar: true, view_audit: false, record_administration: true, record_controlled: false, view_controlled: false, manage_stock: false },
+        has_shift_context: true,
+        clocked_in: true,
+        house_label: 'Kōwhai House',
+        on_call: { configured: true, name: 'Rangi Parata', phone: '021 555 0142', warning: null },
+        off_shift: [
+            row({ key: 'm-metf', client_id: 3, client_name: 'Mere Tane', medication_id: 14, medication_name: 'Metformin 500mg', scheduled_for: NZ('09:00'), status: 'due', req: { ...okReq, block_all: 'notOnShift', window: null } }),
+        ],
+        refusal_follow_ups: [
+            {
+                id: 40,
+                refusal_id: 90,
+                client_id: 2,
+                preferred: 'Hemi',
+                medication_id: 13,
+                medication_name: 'Sertraline 50mg',
+                is_controlled: false,
+                scheduled_for: NZ('08:00'),
+                refused_time: '8:05 am',
+                due_at: NZ('10:00'),
+                due_time: '10:00 am',
+                overdue: false,
+                owner: 'Priya Shah',
+                escalated: false,
+            },
+        ],
+        prn_recorded_today: [],
+        board_extra_can: { report_error: true, view_handovers: true },
+        mar_client_ids: [1, 2],
+        ...over,
+    };
+}
+
+describe('Meds today (P01 C3)', () => {
+    beforeEach(() => window.history.replaceState(null, '', '/meds/today'));
+
+    it('shows the header facts and meters that link to their views', () => {
+        render(<MedsToday {...props()} />);
+
+        expect(screen.getByRole('heading', { name: 'Meds today' })).toBeInTheDocument();
+        expect(screen.getByText('On shift')).toBeInTheDocument();
+        expect(screen.getByText('Thu 30 Apr 2026 · Kōwhai House · shift 7:00 am–3:00 pm')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Updated 9:30 am NZST/ })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'View 1 doses due now' })).toHaveTextContent('1 person · by 10:30 am');
+        expect(screen.getByRole('button', { name: 'View 1 late doses' })).toHaveTextContent('Oldest due 8:00 am');
+        expect(screen.getByRole('button', { name: 'View 1 doses you can’t record as given' })).toHaveTextContent('Allergy match');
+        expect(screen.getByRole('button', { name: /View activity, 1 of 3 recorded/ })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'View follow-ups, 1 overdue' })).toHaveTextContent('1 overdueOldest 9:20 am');
+        expect(screen.getByRole('link', { name: 'Shift handover — medication' })).toHaveAttribute('href', '/emar/handovers');
+        fireEvent.click(screen.getByRole('button', { name: 'Record as-needed dose' }));
+        expect(screen.getByRole('dialog', { name: 'Record an as-needed dose' })).toBeInTheDocument();
+    });
+
+    it('words each dose’s state and opens the one dialog from the row', () => {
+        render(<MedsToday {...props()} />);
+
+        expect(screen.getByText(/Due now · 9:30 am · window until 10:30 am/)).toBeInTheDocument();
+        expect(screen.getByText(/Due 8:00 am · outside today’s window \(7:00 am–9:00 am\)/)).toBeInTheDocument();
+        expect(screen.getByText(/Allergy match — can’t be recorded as given/)).toBeInTheDocument();
+        expect(screen.getByText('Refused 8:05 am · Priya Shah · Said she felt fine')).toBeInTheDocument();
+        expect(screen.getByText('Follow-up · Priya Shah · offer again by 10:00 am')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Record' }));
+        expect(screen.getByRole('dialog', { name: 'Record a dose' })).toHaveTextContent(`record|meds-today|scheduled|11|${NZ('09:30')}|`);
+    });
+
+    it('opens “Why can’t I record?” for a blocked dose', () => {
+        render(<MedsToday {...props()} />);
+
+        // The allergy-blocked row on the shift, and the off-shift row underneath.
+        const why = screen.getAllByRole('button', { name: /Why can’t I record\?/ });
+        expect(why).toHaveLength(2);
+        fireEvent.click(why[0]);
+        expect(screen.getByRole('dialog', { name: 'Why can’t I record this?' })).toHaveTextContent('why|12');
+    });
+
+    it('offers a re-offer on a refused dose', () => {
+        render(<MedsToday {...props()} />);
+
+        fireEvent.click(screen.getByRole('button', { name: /Record re-offer/ }));
+        expect(screen.getByRole('dialog', { name: 'Record a dose' })).toHaveTextContent(`reoffer|meds-today|scheduled|13|${NZ('08:00')}|`);
+    });
+
+    it('gives the row one menu on right-click', () => {
+        render(<MedsToday {...props()} />);
+
+        const cell = screen.getByText('Paracetamol 500mg');
+        fireEvent.contextMenu(cell, { clientX: 200, clientY: 200 });
+        const menu = screen.getByRole('menu');
+        // One entry for an open dose: the dialog's first step offers every outcome.
+        expect(within(menu).getByRole('menuitem', { name: /Record dose/ })).toBeInTheDocument();
+        expect(within(menu).queryByRole('menuitem', { name: /Record not given/ })).not.toBeInTheDocument();
+        expect(within(menu).getByRole('menuitem', { name: /Open Aroha’s medication record/ })).toBeInTheDocument();
+        fireEvent.click(within(menu).getByRole('menuitem', { name: /Report a medication error/ }));
+        expect(screen.getByRole('dialog', { name: 'Report a medication error' })).toHaveTextContent('error|1');
+    });
+
+    it('opens the dose details for a not-yet-due dose', () => {
+        const base = props();
+        render(
+            <MedsToday
+                {...props({
+                    schedule: [
+                        ...base.schedule,
+                        row({ key: 'a-met12', client_id: 1, client_name: 'Aroha Ngata', medication_id: 15, medication_name: 'Metformin 500mg', scheduled_for: NZ('12:00'), status: 'upcoming' }),
+                    ],
+                })}
+            />,
+        );
+
+        expect(screen.getByText(/Due 12:00 pm · window opens 11:00 am/)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'View' }));
+        const dialog = screen.getByRole('dialog', { name: 'Metformin 500mg · Aroha' });
+        expect(dialog).toHaveTextContent('Not yet due — window opens 11:00 am');
+        expect(within(dialog).getByRole('link', { name: /Open Aroha’s medication record/ })).toHaveAttribute('href', '/emar/mar?client_id=1');
+    });
+
+    it('lists people not on your shift underneath, each saying why', () => {
+        render(<MedsToday {...props()} />);
+
+        expect(screen.getByText('At Kōwhai House, not on your shift')).toBeInTheDocument();
+        expect(screen.getByText(/Mere isn’t on your shift/)).toBeInTheDocument();
+    });
+
+    it('tells a worker who isn’t clocked in what to do and who is on call', () => {
+        render(<MedsToday {...props({ clocked_in: false })} />);
+
+        expect(screen.getByText('Not clocked in')).toBeInTheDocument();
+        expect(screen.getByText('You’re not clocked in')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /Clock in/ })).toHaveAttribute('href', '/attendance');
+        expect(screen.getByText('Rangi Parata')).toBeInTheDocument();
+    });
+
+    it('says the board may be out of date when a refresh fails', async () => {
+        const { router } = await import('@inertiajs/react');
+        vi.mocked(router.reload).mockImplementationOnce((options) => {
+            act(() => options?.onFinish?.({} as never));
+        });
+        render(<MedsToday {...props()} />);
+
+        fireEvent.click(screen.getByRole('button', { name: /Updated 9:30 am/ }));
+        // The filter-row button and the banner both say so; the banner offers Refresh now.
+        expect(screen.getAllByText(/^Not updated since 9:30 am NZST/)).toHaveLength(2);
+        expect(screen.getByText(/^Not updated since 9:30 am NZST \(\d+ min ago\)$/)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Refresh now/ })).toBeInTheDocument();
+    });
+
+    it('lists refusal and as-needed follow-ups and records a re-offer from them', () => {
+        render(<MedsToday {...props()} />);
+
+        fireEvent.click(screen.getByRole('tab', { name: /Follow-ups/ }));
+        expect(screen.getByText('Refused: Sertraline 50mg')).toBeInTheDocument();
+        expect(screen.getByText('Did it help? Ibuprofen 200mg')).toBeInTheDocument();
+        expect(screen.getByText('9:20 am')).toBeInTheDocument();
+
+        const reoffer = screen.getAllByRole('button', { name: /Record re-offer/ });
+        fireEvent.click(reoffer[reoffer.length - 1]);
+        expect(screen.getByRole('dialog', { name: 'Record a dose' })).toHaveTextContent(`reoffer|follow-up|scheduled|13|${NZ('08:00')}|`);
+    });
+});

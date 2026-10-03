@@ -68,6 +68,12 @@ class MedicationRefusalFollowup extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    /** Who follows it up (P01: whoever recorded the refusal). */
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'owner_id');
+    }
+
     public function gpNotifiedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'gp_notified_by');
