@@ -28,6 +28,7 @@ use App\Services\Tasks\Providers\CdLossReportProvider;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -1057,100 +1058,75 @@ class MedicationRbacAuthorizationTest extends TestCase
         $site = Site::factory()->create(['is_active' => true]);
         $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
         $medication = ClientMedication::factory()->create([
-            'client_id' => $client->id,
-            'name' => 'Replay bound morphine',
-            'controlled_drug' => true,
-            'active' => true,
-            'state' => 'active',
-            'approval_status' => 'verified',
+            'client_id' => $client->id, 'name' => 'Synthetic replay-bound controlled medicine',
+            'controlled_drug' => true, 'active' => true, 'state' => 'active', 'approval_status' => 'verified',
         ]);
         $stock = ClientMedicationStock::query()->create([
-            'client_medication_id' => $medication->id,
-            'on_hand' => 10,
-            'reorder_level' => 5,
+            'client_medication_id' => $medication->id, 'on_hand' => 10, 'unit' => 'tablets', 'reorder_level' => 5,
         ]);
-        $actor = $this->userWithPermissions(['medications.controlled.record'], $site);
-        $unauthorisedWitness = $this->userWithPermissions([], $site);
-        $authorisedWitness = $this->userWithPermissions(['medications.controlled.witness'], $site);
-        $this->qualifyControlledWitness($authorisedWitness, $site, $client, $actor);
-        $entryUuid = '0d7527ad-b469-4480-858e-a49a966c9370';
-        $balanceUuid = 'd88c78e5-34cf-4f7f-b6a3-31d586d8447e';
+        $actor = $this->controlledRecorder($client);
+        $witness = $this->userWithPermissions(['medications.controlled.witness'], $site);
+        $this->qualifyControlledWitness($witness, $site, $client, $actor);
+        $entryPayload = [
+            'client_medication_id' => $medication->id, 'movement_type' => 'going_out', 'quantity' => 1,
+            'expected_entry_id' => null, 'expected_balance' => 10, 'actual_balance' => 9,
+            'witnessed_by' => $witness->id, 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
+            'client_request_uuid' => '0d7527ad-b469-4480-858e-a49a966c9370',
+        ];
 
-        $entryReplay = MedicationIdempotencyResult::query()->create([
-            'scope' => 'emar-controlled-entry',
-            'request_uuid' => $entryUuid,
-            'response_payload' => [
-                'success' => true,
-                '_request_fingerprint' => 'unauthorised-witness-binding',
-            ],
-            'expires_at' => now()->addDays(7),
+        // Obtain a real receipt from the approved current route and replay table.
+        $movement = $this->actingAs($actor)->postJson(route('emar.controlled.entries.store'), $entryPayload)->assertOk();
+        $entryId = $movement->json('entry_id');
+        $this->assertIsInt($entryId);
+        $receipt = DB::table('controlled_product_requests')->where('actor_id', $actor->id)
+            ->where('request_uuid', $entryPayload['client_request_uuid'])->first();
+        $this->assertNotNull($receipt);
+        $entriesBefore = DB::table('client_controlled_drug_entries')->orderBy('id')->get()->map(fn ($row) => (array) $row)->all();
+        $witnessPermission = Permission::query()->where('key', 'medications.controlled.witness')->firstOrFail();
+
+        // A matching cached success must still deny a witness whose exact current authority ended.
+        $witness->permissionOverrides()->syncWithoutDetaching([$witnessPermission->id => ['allowed' => false]]);
+        $witness->unsetRelation('permissionOverrides')->unsetRelation('roles');
+        $this->actingAs($actor)->postJson(route('emar.controlled.entries.store'), $entryPayload)->assertNotFound();
+        $this->assertSame($entriesBefore, DB::table('client_controlled_drug_entries')->orderBy('id')->get()->map(fn ($row) => (array) $row)->all());
+        $this->assertSame(9.0, (float) $stock->refresh()->on_hand);
+        $this->assertEquals($receipt, DB::table('controlled_product_requests')->where('id', $receipt->id)->first());
+
+        $witness->permissionOverrides()->syncWithoutDetaching([$witnessPermission->id => ['allowed' => true]]);
+        $witness->unsetRelation('permissionOverrides')->unsetRelation('roles');
+
+        // Both targets are readable at the approved site; the receipt still binds one canonical medicine/person.
+        $otherClient = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        $otherMedication = ClientMedication::factory()->create([
+            'client_id' => $otherClient->id, 'controlled_drug' => true,
+            'active' => true, 'state' => 'active', 'approval_status' => 'verified',
         ]);
-
-        $this->actingAs($actor)
-            ->postJson(route('emar.controlled.entries.store'), [
-                'client_medication_id' => $medication->id,
-                'client_id' => $client->id,
-                'medication_name' => $medication->name,
-                'entry_type' => 'administration',
-                'quantity' => 1,
-                'on_hand_before' => 10,
-                'on_hand_after' => 9,
-                'witnessed_by' => $unauthorisedWitness->id,
-                'client_request_uuid' => $entryUuid,
-            ])
-            ->assertNotFound();
-
-        $entryReplay->forceFill([
-            'response_payload' => [
-                'success' => true,
-                '_request_fingerprint' => 'different-client-binding',
-            ],
+        $otherStock = ClientMedicationStock::query()->create([
+            'client_medication_id' => $otherMedication->id, 'on_hand' => 10, 'unit' => 'tablets',
         ]);
-        $entryReplay->save();
+        $this->recordPresence($actor, $otherClient);
+        $this->actingAs($actor)->postJson(route('emar.controlled.entries.store'), [
+            ...$entryPayload, 'client_medication_id' => $otherMedication->id,
+        ])->assertConflict();
+        $this->assertSame($entriesBefore, DB::table('client_controlled_drug_entries')->orderBy('id')->get()->map(fn ($row) => (array) $row)->all());
+        $this->assertSame(10.0, (float) $otherStock->refresh()->on_hand);
 
-        $this->actingAs($actor)
-            ->postJson(route('emar.controlled.entries.store'), [
-                'client_medication_id' => $medication->id,
-                'client_id' => $client->id,
-                'medication_name' => $medication->name,
-                'entry_type' => 'administration',
-                'quantity' => 1,
-                'on_hand_before' => 10,
-                'on_hand_after' => 9,
-                'witnessed_by' => $authorisedWitness->id,
-                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
-                'client_request_uuid' => $entryUuid,
-            ])
-            ->assertConflict()
-            ->assertJsonPath('sync.status', 'conflict');
-
-        MedicationIdempotencyResult::query()->create([
-            'scope' => 'emar-controlled-balance-check',
-            'request_uuid' => $balanceUuid,
-            'response_payload' => [
-                'success' => true,
-                '_request_fingerprint' => 'different-balance-binding',
-            ],
-            'expires_at' => now()->addDays(7),
-        ]);
-
-        $this->actingAs($actor)
-            ->postJson(route('emar.controlled.balance_check.store'), [
-                'client_medication_id' => $medication->id,
-                'client_id' => $client->id,
-                'medication_name' => $medication->name,
-                'expected_balance' => 10,
-                'actual_balance' => 10,
-                'witnessed_by' => $authorisedWitness->id,
-                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
-                'client_request_uuid' => $balanceUuid,
-            ])
-            ->assertConflict()
-            ->assertJsonPath('sync.status', 'conflict');
-
-        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $balancePayload = [
+            'client_medication_id' => $medication->id, 'expected_entry_id' => $entryId,
+            'expected_balance' => 9, 'actual_balance' => 9,
+            'witnessed_by' => $witness->id, 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
+            'client_request_uuid' => 'd88c78e5-34cf-4f7f-b6a3-31d586d8447e',
+        ];
+        $this->actingAs($actor)->postJson(route('emar.controlled.balance_check.store'), $balancePayload)->assertOk();
+        $countsBefore = DB::table('client_controlled_drug_entries')->orderBy('id')->get()->map(fn ($row) => (array) $row)->all();
+        $this->actingAs($actor)->postJson(route('emar.controlled.balance_check.store'), [
+            ...$balancePayload, 'actual_balance' => 8,
+        ])->assertConflict();
+        $this->assertSame($countsBefore, DB::table('client_controlled_drug_entries')->orderBy('id')->get()->map(fn ($row) => (array) $row)->all());
+        $this->assertDatabaseCount('client_controlled_drug_entries', 2);
         $this->assertDatabaseCount('client_controlled_drug_discrepancies', 0);
-        $this->assertSame(10.0, (float) $stock->refresh()->on_hand);
+        $this->assertDatabaseCount('controlled_product_requests', 2);
+        $this->assertSame(9.0, (float) $stock->refresh()->on_hand);
     }
 
     public function test_controlled_stock_replay_rechecks_exact_authority_before_returning_cached_success(): void
