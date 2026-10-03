@@ -11,12 +11,16 @@ use App\Models\MedicationEmergencyAccessReview;
 use App\Models\MedicationEvent;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\RoleNotificationPreference;
 use App\Models\Site;
 use App\Models\User;
+use App\Models\UserNotificationPreference;
 use App\Models\UserWitnessPin;
+use App\Notifications\AppEventNotification;
 use App\Notifications\MedicationAlertNotification;
 use App\Services\Medication\EmergencyAccess\EmergencyAccessService;
 use App\Services\Tasks\Providers\MedicationEmergencyAccessReviewProvider;
+use App\Services\NotificationService;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -155,6 +159,37 @@ class EmergencyAccessLifecycleTest extends TestCase
         $this->assertSame($reason, $ended->end_reason);
         $this->assertFalse($ended->isRunning());
         $this->assertSame($colleague->id, MedicationEvent::where('facts->action', 'closed')->sole()->actor_id);
+        Notification::assertSentTo($this->owner, AppEventNotification::class, fn (AppEventNotification $notification): bool =>
+            $notification->payload['event_key'] === 'break_glass_access.ended'
+            && $notification->payload['access_id'] === $grant->id
+            && $notification->payload['body'] === $reason);
+        Notification::assertNotSentTo($colleague, AppEventNotification::class, fn (AppEventNotification $notification): bool =>
+            $notification->payload['event_key'] === 'break_glass_access.ended');
+    }
+
+    public function test_explicit_support_collection_preserves_recipients_and_user_over_role_preferences(): void
+    {
+        $enabledByUser = $this->staff('clinical_lead', []);
+        $disabledByUser = $this->staff('provider_manager', []);
+        $eventKey = 'break_glass_access.ended';
+        RoleNotificationPreference::create([
+            'role_id' => Role::where('name', 'clinical_lead')->sole()->id,
+            'key' => $eventKey, 'enabled' => false,
+        ]);
+        RoleNotificationPreference::create([
+            'role_id' => Role::where('name', 'provider_manager')->sole()->id,
+            'key' => $eventKey, 'enabled' => true,
+        ]);
+        UserNotificationPreference::create(['user_id' => $enabledByUser->id, 'key' => $eventKey, 'enabled' => true]);
+        UserNotificationPreference::create(['user_id' => $disabledByUser->id, 'key' => $eventKey, 'enabled' => false]);
+
+        $recipients = collect([$this->owner, $this->reviewer, $enabledByUser, $disabledByUser]);
+        $allowed = app(NotificationService::class)->applyPreferences($recipients, $eventKey);
+
+        $this->assertSame([$this->owner->id, $enabledByUser->id], $allowed->pluck('id')->all());
+        $this->assertSame($this->owner, $allowed[0]);
+        $this->assertSame($enabledByUser, $allowed[1]);
+        $this->assertCount(4, $recipients);
     }
 
     public function test_revoked_grant_is_waiting_for_review_and_self_review_is_denied(): void
@@ -323,6 +358,7 @@ class EmergencyAccessLifecycleTest extends TestCase
         $expiry = now()->subDays(2)->subMinute();
         $grants = collect([1, 3, null])->map(fn ($days) => ClientBreakGlassAccess::forceCreate([
             'client_id' => $this->client->id, 'user_id' => $this->owner->id,
+            'reason' => 'Historical emergency cover awaiting independent review',
             'created_at' => $expiry->copy()->subHour(), 'expires_at' => $expiry,
             'policy_snapshot' => $days === null ? null : array_replace(BreakGlassPolicy::defaults(), ['review_days' => $days]),
         ]));
