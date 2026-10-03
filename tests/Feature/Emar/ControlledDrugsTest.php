@@ -164,7 +164,7 @@ class ControlledDrugsTest extends TestCase
             ]);
 
         // Their login password is no longer accepted.
-        $entry('password', 10)->assertSessionHasErrors(['witness_credential' => WitnessPinService::INCORRECT]);
+        $entry('password', 10)->assertSessionHasErrors('witness_credential');
         $this->assertSame(1, (int) UserWitnessPin::query()->where('user_id', $witness->id)->value('failed_attempts'));
         $this->assertSame(1, AuditLog::query()->where('action', 'medications.witness_pin.failed')->count());
         $this->assertSame(0, ClientControlledDrugEntry::count());

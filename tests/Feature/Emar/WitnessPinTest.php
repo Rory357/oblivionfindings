@@ -130,7 +130,7 @@ class WitnessPinTest extends TestCase
         $this->actingAs($worker)
             ->from('/settings/witness-pin')
             ->put('/settings/witness-pin', ['current_pin' => '000001', 'pin' => '708142', 'pin_confirmation' => '708142'])
-            ->assertSessionHasErrors(['current_pin' => WitnessPinService::INCORRECT]);
+            ->assertSessionHasErrors('current_pin');
         // A wrong current PIN counts towards the lock like any other.
         $this->assertSame(1, (int) UserWitnessPin::query()->where('user_id', $worker->id)->value('failed_attempts'));
 
@@ -194,7 +194,7 @@ class WitnessPinTest extends TestCase
                 DB::transaction(fn () => $pins->verify($witness, '000001', 'witness_credential'));
                 $this->fail('A wrong PIN must be rejected.');
             } catch (ValidationException $rejected) {
-                $this->assertSame(WitnessPinService::INCORRECT, $rejected->errors()['witness_credential'][0]);
+                $this->assertStringStartsWith('Incorrect PIN.', $rejected->errors()['witness_credential'][0]);
             }
             $this->assertSame($attempt, (int) UserWitnessPin::query()->where('user_id', $witness->id)->value('failed_attempts'));
         }
@@ -285,7 +285,7 @@ class WitnessPinTest extends TestCase
         $recorder = $this->siteStaff('support_worker', ['medications.administer.record']);
         $context = ['actor_id' => (int) $recorder->id];
         $pins = app(WitnessPinService::class);
-        $key = 'medication-witness-pin:'.$recorder->id.':'.$witness->id;
+        $key = $pins->attemptBudgetKey((int) $recorder->id, UserWitnessPin::query()->where('user_id', $witness->id)->sole());
 
         foreach (range(1, 2) as $attempt) {
             try {
@@ -593,6 +593,75 @@ class WitnessPinTest extends TestCase
         (require base_path(self::MIGRATION))->up();
         $this->assertSame($grants, DB::table('role_permission')->count());
         $this->assertSame(1, Permission::query()->where('key', 'medications.witness_pin.reset')->count());
+    }
+
+    public function test_owner_reset_releases_the_old_recorder_attempt_budget(): void
+    {
+        $witness = $this->siteStaff('support_worker', ['medications.controlled.witness']);
+        $recorder = $this->siteStaff('support_worker', ['medications.administer.record']);
+        $pins = app(WitnessPinService::class);
+        foreach (range(1, 5) as $unused) {
+            try {
+                $pins->verify($witness, '000001', 'witness_credential', ['actor_id' => (int) $recorder->id]);
+            } catch (ValidationException) {
+            }
+        }
+        $this->assertSame(WitnessPinService::STATUS_LOCKED, $pins->status($witness->fresh()));
+        $pins->set($witness, '708142', WitnessPinService::CONFIRMED_WITH_LOGIN_PASSWORD);
+        $pins->verify($witness->fresh(), '708142', 'witness_credential', ['actor_id' => (int) $recorder->id]);
+        $this->assertSame(WitnessPinService::STATUS_SET, $pins->status($witness->fresh()));
+    }
+
+    public function test_a_deferred_failure_does_not_count_against_a_replaced_pin(): void
+    {
+        $witness = $this->siteStaff('support_worker', ['medications.controlled.witness']);
+        $pins = app(WitnessPinService::class);
+        DB::transaction(function () use ($witness, $pins): void {
+            try {
+                $pins->verify($witness, '000001', 'witness_credential');
+            } catch (ValidationException) {
+                $pins->set($witness, '708142', WitnessPinService::CONFIRMED_WITH_LOGIN_PASSWORD);
+            }
+        });
+        $this->assertSame(0, UserWitnessPin::query()->where('user_id', $witness->id)->value('failed_attempts'));
+        $this->assertSame(1, AuditLog::query()->where('action', 'medications.witness_pin.failed_superseded')->count());
+        $pins->verify($witness->fresh(), '708142', 'witness_credential');
+    }
+
+    public function test_peppered_pins_keep_legacy_pins_usable_and_fail_closed_without_the_key(): void
+    {
+        $witness = $this->siteStaff('support_worker', ['medications.controlled.witness']);
+        $pins = app(WitnessPinService::class);
+        config(['medications.witness_pin.pepper' => str_repeat('test-only-pepper-', 4)]);
+        $pins->verify($witness, UserFactory::TEST_WITNESS_PIN, 'witness_credential');
+        $pins->set($witness, '708142', WitnessPinService::CONFIRMED_WITH_LOGIN_PASSWORD);
+        $pin = UserWitnessPin::query()->where('user_id', $witness->id)->sole();
+        $this->assertSame(WitnessPinService::HASH_PEPPERED, $pin->hash_version);
+        $this->assertFalse(Hash::check('708142', $pin->pin_hash));
+        $pins->verify($witness->fresh(), '708142', 'witness_credential');
+        config(['medications.witness_pin.pepper' => null]);
+        try {
+            $pins->verify($witness->fresh(), '708142', 'cd_witness_credential');
+            $this->fail('A missing pepper must not silently treat a protected PIN as a raw PIN.');
+        } catch (ValidationException $error) {
+            $this->assertStringContainsString('not configured', $error->errors()['cd_witness_credential'][0]);
+        }
+        $this->assertSame(0, $pin->refresh()->failed_attempts);
+    }
+
+    public function test_wrong_pin_message_names_the_actual_remaining_attempts(): void
+    {
+        $witness = $this->siteStaff('support_worker', ['medications.controlled.witness']);
+        foreach (range(1, 4) as $attempt) {
+            try {
+                app(WitnessPinService::class)->verify($witness, '000001', 'witness_credential');
+                $this->fail('A wrong PIN must fail.');
+            } catch (ValidationException $error) {
+                $left = 5 - $attempt;
+                $this->assertSame('Incorrect PIN. '.$left.' '.($left === 1 ? 'try' : 'tries').' left before '
+                    .$witness->name.'’s PIN locks for 15 minutes.', $error->errors()['witness_credential'][0]);
+            }
+        }
     }
 
     /** @return list<string> */

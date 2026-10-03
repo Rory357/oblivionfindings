@@ -518,7 +518,7 @@ class WorkerMedsRecordDoseTest extends TestCase
         $failedAttempts = fn (): int => (int) UserWitnessPin::query()->where('user_id', $witness->id)->value('failed_attempts');
 
         foreach (range(1, 4) as $attempt) {
-            $record('000001')->assertSessionHasErrors(['witness_credential' => WitnessPinService::INCORRECT]);
+            $record('000001')->assertSessionHasErrors('witness_credential');
             $this->assertSame($attempt, $failedAttempts(), "Wrong PIN {$attempt} must be counted.");
         }
 

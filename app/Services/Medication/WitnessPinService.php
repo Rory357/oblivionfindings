@@ -43,6 +43,10 @@ final class WitnessPinService
 
     public const METHOD = 'witness_pin';
 
+    public const HASH_RAW = 'pin_v1';
+
+    public const HASH_PEPPERED = 'hmac_sha256_v1';
+
     public const INCORRECT = 'Incorrect PIN. Repeated wrong attempts lock the PIN.';
 
     public function __construct(private readonly WitnessPinSettings $settings) {}
@@ -169,14 +173,15 @@ final class WitnessPinService
 
         DB::transaction(function () use ($owner, $pin, $confirmedWith): void {
             $existing = UserWitnessPin::query()->where('user_id', $owner->id)->lockForUpdate()->first();
-            if ($existing !== null && ! $existing->must_change && Hash::check($pin, $existing->pin_hash)) {
+            if ($existing !== null && ! $existing->must_change && Hash::check($this->hashInput($pin, $existing->hash_version ?? self::HASH_RAW, 'pin'), $existing->pin_hash)) {
                 throw ValidationException::withMessages(['pin' => 'Choose a PIN you haven’t just been using.']);
             }
 
             UserWitnessPin::query()->updateOrCreate(
                 ['user_id' => $owner->id],
                 [
-                    'pin_hash' => Hash::make($pin),
+                    'pin_hash' => Hash::make($this->hashInput($pin, $this->newHashVersion(), 'pin')),
+                    'hash_version' => $this->newHashVersion(),
                     'set_at' => now(),
                     'failed_attempts' => 0,
                     'last_failed_at' => null,
@@ -273,7 +278,7 @@ final class WitnessPinService
         // connection would roll back with the caller, so there the attempt is
         // counted with the durable failure write instead.
         $limiterKey = isset($context['actor_id'])
-            ? 'medication-witness-pin:'.(int) $context['actor_id'].':'.(int) $witness->id
+            ? $this->attemptBudgetKey((int) $context['actor_id'], $record)
             : null;
         $reserved = false;
         if ($limiterKey !== null) {
@@ -290,7 +295,7 @@ final class WitnessPinService
             }
         }
 
-        if (preg_match('/^\d{'.self::LENGTH.'}$/', (string) $pin) === 1 && Hash::check((string) $pin, $record->pin_hash)) {
+        if (preg_match('/^\d{'.self::LENGTH.'}$/', (string) $pin) === 1 && Hash::check($this->hashInput((string) $pin, $record->hash_version ?? self::HASH_RAW, $errorKey), $record->pin_hash)) {
             if ($record->failed_attempts > 0) {
                 $record->forceFill(['failed_attempts' => 0, 'last_failed_at' => null])->save();
             }
@@ -309,7 +314,7 @@ final class WitnessPinService
         );
 
         throw ValidationException::withMessages([
-            $errorKey => $lockedUntil !== null ? $this->lockedMessage($who, $lockedUntil) : self::INCORRECT,
+            $errorKey => $lockedUntil !== null ? $this->lockedMessage($who, $lockedUntil) : $this->incorrectMessage($witness, $record),
         ]);
     }
 
@@ -334,12 +339,13 @@ final class WitnessPinService
         $lockedUntil = $attempts >= $max ? now()->addMinutes($this->settings->lockoutMinutes()) : null;
 
         $done = false;
-        $this->whenOutsideTransactions(function () use (&$done, $witnessId, $max, $context, $limiterKey): void {
+        $expectedHash = (string) $snapshot->pin_hash;
+        $this->whenOutsideTransactions(function () use (&$done, $witnessId, $max, $context, $limiterKey, $expectedHash): void {
             if ($done) {
                 return;
             }
             $done = true;
-            $this->writeFailure($witnessId, $max, $context);
+            $this->writeFailure($witnessId, $max, $context, $expectedHash);
             if ($limiterKey !== null) {
                 RateLimiter::hit($limiterKey, $this->limiterDecaySeconds());
             }
@@ -411,14 +417,24 @@ final class WitnessPinService
     }
 
     /** @param  array<string, mixed>  $context */
-    private function writeFailure(int $witnessId, int $max, array $context): void
+    private function writeFailure(int $witnessId, int $max, array $context, string $expectedHash): void
     {
-        DB::transaction(function () use ($witnessId, $max, $context): void {
+        DB::transaction(function () use ($witnessId, $max, $context, $expectedHash): void {
             $pin = UserWitnessPin::query()->where('user_id', $witnessId)->lockForUpdate()->first();
             if ($pin === null) {
                 return;
             }
 
+            // A reset/replacement may win the mutex between rollback and this
+            // durable callback. An old failure must never lock the new PIN.
+            if (! hash_equals($expectedHash, (string) $pin->pin_hash) || $pin->must_change) {
+                AuditLogger::log('medications.witness_pin.failed_superseded', $pin, [
+                    'witness_user_id' => $witnessId,
+                    'credential_replaced' => true,
+                ] + collect($context)->only(['site_id', 'surface', 'actor_id', 'purpose'])->all());
+
+                return;
+            }
             $attempts = $this->attemptsSoFar($pin) + 1;
             $locks = $attempts >= $max;
             $pin->forceFill([
@@ -448,6 +464,40 @@ final class WitnessPinService
         }
 
         return (int) $pin->failed_attempts;
+    }
+
+    /** Owner reset changes the credential generation and releases every old recorder budget. */
+    public function attemptBudgetKey(int $actorId, UserWitnessPin $pin): string
+    {
+        return 'medication-witness-pin:'.$actorId.':'.$pin->user_id.':'.hash('sha256', (string) $pin->pin_hash);
+    }
+
+    private function newHashVersion(): string
+    {
+        return filled(config('medications.witness_pin.pepper')) ? self::HASH_PEPPERED : self::HASH_RAW;
+    }
+
+    private function hashInput(string $pin, string $version, string $errorKey): string
+    {
+        if ($version === self::HASH_RAW) {
+            return $pin;
+        }
+        $pepper = config('medications.witness_pin.pepper');
+        if ($version !== self::HASH_PEPPERED || ! is_string($pepper) || strlen($pepper) < 32) {
+            throw ValidationException::withMessages([
+                $errorKey => 'Witness PIN security is not configured. Contact the administrator before using this PIN.',
+            ]);
+        }
+
+        return hash_hmac('sha256', $pin, $pepper);
+    }
+
+    private function incorrectMessage(User $witness, UserWitnessPin $snapshot): string
+    {
+        $left = max(0, $this->settings->maxAttempts() - $this->attemptsSoFar($snapshot) - 1);
+
+        return 'Incorrect PIN. '.$left.' '.($left === 1 ? 'try' : 'tries').' left before '
+            .$witness->name.'’s PIN locks for '.$this->settings->lockoutMinutes().' minutes.';
     }
 
     private function lockedMessage(string $who, CarbonInterface $until): string

@@ -1875,7 +1875,7 @@ class PrescriptionsPageTest extends TestCase
                 // fifth wrong PIN also locks the PIN (default limit 5).
                 $message = session('errors')->first('read_back_witness_credential');
                 $attempt < 5
-                    ? $this->assertSame(WitnessPinService::INCORRECT, $message)
+                    ? $this->assertStringStartsWith('Incorrect PIN.', $message)
                     : $this->assertStringContainsString('witness PIN is locked after too many wrong attempts', $message);
             }
             $this->actingAs($actor)

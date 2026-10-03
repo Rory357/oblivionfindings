@@ -10,6 +10,7 @@ use App\Services\Medication\WitnessPinService;
 use App\Services\Medication\WitnessPinSettings;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -56,34 +57,40 @@ class WitnessPinController extends Controller
     public function update(Request $request): RedirectResponse
     {
         $user = $this->staff($request);
-        $status = $this->pins->status($user);
-        $needsLogin = $status !== WitnessPinService::STATUS_SET && $this->loginCheckToSet();
-        $validated = $request->validate([
-            'current_pin' => ['nullable', 'string', 'max:12'],
-            'current_password' => $needsLogin ? ['required', 'string'] : ['nullable', 'string'],
-            'pin' => ['required', 'string', 'max:12', 'confirmed'],
-            'pin_confirmation' => ['required', 'string', 'max:12'],
-        ], [
-            'current_password.required' => 'Confirm your login password to set your witness PIN.',
-            'pin.confirmed' => 'The two PINs don’t match.',
-        ]);
-
-        if ($status === WitnessPinService::STATUS_LOCKED) {
-            throw ValidationException::withMessages([
-                'current_pin' => 'Your PIN is locked. Reset it by confirming your login password instead.',
+        DB::transaction(function () use ($request, $user): void {
+            // Keep identity proof and replacement under the same PIN mutex.
+            // An old PIN must not replace one reset during this request.
+            $pin = UserWitnessPin::query()->where('user_id', $user->id)->lockForUpdate()->first();
+            $user->setRelation('witnessPin', $pin);
+            $status = $this->pins->statusOf($pin);
+            $needsLogin = $status !== WitnessPinService::STATUS_SET && $this->loginCheckToSet();
+            $validated = $request->validate([
+                'current_pin' => ['nullable', 'string', 'max:12'],
+                'current_password' => $needsLogin ? ['required', 'string'] : ['nullable', 'string'],
+                'pin' => ['required', 'string', 'max:12', 'confirmed'],
+                'pin_confirmation' => ['required', 'string', 'max:12'],
+            ], [
+                'current_password.required' => 'Confirm your login password to set your witness PIN.',
+                'pin.confirmed' => 'The two PINs don’t match.',
             ]);
-        }
 
-        $confirmedWith = WitnessPinService::CONFIRMED_WITH_SESSION;
-        if ($status === WitnessPinService::STATUS_SET) {
-            $this->pins->assertOwnerKnowsPin($user, $validated['current_pin'] ?? null);
-            $confirmedWith = WitnessPinService::CONFIRMED_WITH_CURRENT_PIN;
-        } elseif ($needsLogin) {
-            $this->assertLoginPassword($user, (string) $validated['current_password'], 'set');
-            $confirmedWith = WitnessPinService::CONFIRMED_WITH_LOGIN_PASSWORD;
-        }
+            if ($status === WitnessPinService::STATUS_LOCKED) {
+                throw ValidationException::withMessages([
+                    'current_pin' => 'Your PIN is locked. Reset it by confirming your login password instead.',
+                ]);
+            }
 
-        $this->pins->set($user, $validated['pin'], $confirmedWith);
+            $confirmedWith = WitnessPinService::CONFIRMED_WITH_SESSION;
+            if ($status === WitnessPinService::STATUS_SET) {
+                $this->pins->assertOwnerKnowsPin($user, $validated['current_pin'] ?? null);
+                $confirmedWith = WitnessPinService::CONFIRMED_WITH_CURRENT_PIN;
+            } elseif ($needsLogin) {
+                $this->assertLoginPassword($user, (string) $validated['current_password'], 'set');
+                $confirmedWith = WitnessPinService::CONFIRMED_WITH_LOGIN_PASSWORD;
+            }
+
+            $this->pins->set($user, $validated['pin'], $confirmedWith);
+        });
 
         return back()->with('success', 'Your witness PIN is set. You can now co-sign and witness.');
     }
@@ -100,8 +107,11 @@ class WitnessPinController extends Controller
             'pin.confirmed' => 'The two PINs don’t match.',
         ]);
 
-        $this->assertLoginPassword($user, (string) $validated['current_password'], 'reset');
-        $this->pins->set($user, $validated['pin'], WitnessPinService::CONFIRMED_WITH_LOGIN_PASSWORD);
+        DB::transaction(function () use ($user, $validated): void {
+            UserWitnessPin::query()->where('user_id', $user->id)->lockForUpdate()->first();
+            $this->assertLoginPassword($user, (string) $validated['current_password'], 'reset');
+            $this->pins->set($user, $validated['pin'], WitnessPinService::CONFIRMED_WITH_LOGIN_PASSWORD);
+        });
 
         return back()->with('success', 'Your witness PIN was reset. You can now co-sign and witness.');
     }
