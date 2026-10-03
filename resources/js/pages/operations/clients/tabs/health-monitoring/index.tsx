@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge';
+import { DoseObservations } from '@/components/emar/record/clinical';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -103,6 +104,7 @@ type HealthMonitoringTabProps = {
     clientId: number;
     data: HealthMonitoringData;
     isLoading?: boolean;
+    canViewDoseReadings?: boolean;
 };
 
 type SectionKey =
@@ -148,6 +150,7 @@ export function HealthMonitoringTab({
     clientId,
     data,
     isLoading = false,
+    canViewDoseReadings = false,
 }: HealthMonitoringTabProps) {
     const [section, setSection] = useState<SectionKey>('fluid');
     const [bowel, setBowel] = useState({
@@ -366,6 +369,7 @@ export function HealthMonitoringTab({
 
     return (
         <div className="space-y-6">
+            {canViewDoseReadings && <DoseObservations key={clientId} clientId={clientId} />}
             <div className="grid gap-3 md:grid-cols-4">
                 <MetricCard
                     label="Fluid entries"

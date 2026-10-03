@@ -56,6 +56,7 @@ import {
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { SkeletonTable } from '@/components/ui/skeleton-table';
+import { formatDateTime } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 
 export type MarTabProps = {
@@ -64,6 +65,10 @@ export type MarTabProps = {
     personName: string;
     /** The reader sees controlled medicines; otherwise exports leave them out. */
     canViewControlled: boolean;
+    embedded?: boolean;
+    view?: 'scheduled' | 'asneeded';
+    initialDate?: string | null;
+    onDateChange?: (date: string | null) => void;
 };
 
 const SEVERITY_WORD: Record<string, string> = {
@@ -134,8 +139,16 @@ function AllergyLine({
 }) {
     // The review stamp arrives with P02-6 (leads confirm the list); until
     // then every list reads "Not reviewed", honestly.
-    const review =
-        'Not reviewed — a house lead or clinical lead confirms the list.';
+    const review = allergies.reviewed
+        ? `Reviewed by ${allergies.reviewed.by ?? 'recorded reviewer'} · ${formatDateTime(allergies.reviewed.at)} · checked with ${allergies.reviewed.how}`
+        : 'Not reviewed — a house lead or clinical lead confirms the list.';
+    if (allergies.status === 'no_known')
+        return (
+            <div className="rounded-lg border p-3 text-sm">
+                No known allergies — confirmed after review.
+                <p className="text-caption text-muted-foreground">{review}</p>
+            </div>
+        );
     if (allergies.status === 'unavailable') {
         return (
             <SafetyLine
@@ -187,8 +200,16 @@ export function MarTab({
     clientId,
     personName,
     canViewControlled,
+    embedded = false,
+    view,
+    initialDate = null,
+    onDateChange,
 }: MarTabProps) {
-    const [date, setDate] = useState<string | null>(null);
+    const [date, setDate] = useState<string | null>(initialDate);
+    const chooseDate = (next: string | null) => {
+        setDate(next);
+        onDateChange?.(next);
+    };
     const { load, reload } = useMedicationDay(clientId, date);
     const day = load.data;
     const [openDose, setOpenDose] = useState<{
@@ -288,11 +309,15 @@ export function MarTab({
                                     Report
                                 </Button>
                             ) : null}
-                            <Button variant="outline" asChild>
-                                <Link href={`/emar/mar?client_id=${clientId}`}>
-                                    Open medication record
-                                </Link>
-                            </Button>
+                            {!embedded && (
+                                <Button variant="outline" asChild>
+                                    <Link
+                                        href={`/emar/mar?client_id=${clientId}`}
+                                    >
+                                        Open medication record
+                                    </Link>
+                                </Button>
+                            )}
                             {day &&
                             day.can.record_reason !== 'no_permission' ? (
                                 <DropdownMenu>
@@ -393,7 +418,7 @@ export function MarTab({
                                 aria-label="Earlier day"
                                 disabled={!day || !canGoBack}
                                 onClick={() =>
-                                    day && setDate(shiftDay(day.date, -1))
+                                    day && chooseDate(shiftDay(day.date, -1))
                                 }
                             >
                                 <ChevronLeft className="size-4" />
@@ -410,7 +435,7 @@ export function MarTab({
                                 aria-label="Later day"
                                 disabled={!day || !canGoForward}
                                 onClick={() =>
-                                    day && setDate(shiftDay(day.date, 1))
+                                    day && chooseDate(shiftDay(day.date, 1))
                                 }
                             >
                                 <ChevronRight className="size-4" />
@@ -418,18 +443,21 @@ export function MarTab({
                             {day && !isToday ? (
                                 <Button
                                     variant="ghost"
-                                    onClick={() => setDate(null)}
+                                    onClick={() => chooseDate(null)}
                                 >
                                     Today
                                 </Button>
                             ) : null}
                         </div>
-                        {day && day.medicines.length > 0 ? (
+                        {view !== 'asneeded' &&
+                        day &&
+                        day.medicines.length > 0 ? (
                             <MarDayLegend kinds={legendKinds} />
                         ) : null}
                     </div>
 
-                    {load.status === 'error' && !day ? (
+                    {view === 'asneeded' && day ? null : load.status ===
+                          'error' && !day ? (
                         <ErrorState
                             title="We couldn’t load medication"
                             message="The rest of the profile is fine. Try again, or open the medication record."
@@ -447,8 +475,16 @@ export function MarTab({
                         />
                     ) : day.medicines.length === 0 ? (
                         <EmptyState
-                            title={`No scheduled medicines for ${personName} ${isToday ? 'today' : 'this day'}`}
-                            description="New orders are added and checked in Orders & reviews."
+                            title={
+                                day.hidden_controlled.total
+                                    ? 'Scheduled doses include controlled medicines'
+                                    : `No scheduled medicines for ${personName} ${isToday ? 'today' : 'this day'}`
+                            }
+                            description={
+                                day.hidden_controlled.total
+                                    ? 'Details need controlled-medicine access. The house lead can tell you more.'
+                                    : 'New orders are added and checked in Orders & reviews.'
+                            }
                         />
                     ) : (
                         <div
@@ -501,7 +537,7 @@ export function MarTab({
                 </CardContent>
             </Card>
 
-            {day && day.coverage.complete ? (
+            {view !== 'scheduled' && day && day.coverage.complete ? (
                 <Card>
                     <CardContent className="p-5">
                         <PrnStrip

@@ -218,7 +218,7 @@ class OneChartAdministrationSafetyTest extends TestCase
         $this->assertNotNull($admin->witnessed_at);
     }
 
-    public function test_facility_rule_requires_pulse_and_mirrors_vitals_observation(): void
+    public function test_facility_rule_requires_pulse_and_keeps_the_reading_on_the_dose_only(): void
     {
         $medication = $this->createMedication([
             'name' => 'Digoxin',
@@ -262,7 +262,7 @@ class OneChartAdministrationSafetyTest extends TestCase
             'pulse_bpm' => 72,
         ]);
 
-        $this->assertDatabaseHas('clinical_observations', [
+        $this->assertDatabaseMissing('clinical_observations', [
             'client_id' => $this->client->id,
             'observation_type' => 'vitals',
             'recorded_by' => $this->admin->id,

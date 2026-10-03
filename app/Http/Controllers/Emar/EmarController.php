@@ -5193,7 +5193,8 @@ class EmarController extends Controller
         $actor = $request->user();
         abort_unless($actor, 403);
 
-        return $this->governanceScope->forClientRecord($actor, $driver, 'medications.orders.manage', function (Client $client, MedicationSyringeDriver $lockedDriver) use ($request, $actor) {
+        return $this->governanceScope->forClientRecord($actor, $driver, 'medications.administer.record', function (Client $client, MedicationSyringeDriver $lockedDriver) use ($request, $actor) {
+            app(\App\Services\Medication\MedicationRecordAccess::class)->assertReadable($actor, $client);
             abort_if($lockedDriver->site_id !== null && (int) $lockedDriver->site_id !== (int) $client->site_id, 404);
             $this->assertRunningSyringeDriverMutationAuthority($client, $lockedDriver, $actor);
             $validated = $request->validate([

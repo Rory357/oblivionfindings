@@ -4,12 +4,14 @@ namespace Tests\Feature\Emar;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
+use App\Models\AuditLog;
 use App\Models\ClientInrRecord;
 use App\Models\ClientMedication;
 use App\Models\MedicationSyringeDriver;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\MedicationProfileAuditPrivacy;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -94,6 +96,39 @@ class PersonMedicationRecordTest extends TestCase
         $order = $this->medicine('Paracetamol');
         MedicationSyringeDriver::query()->create(['client_id' => $this->person->id, 'site_id' => Site::factory()->create()->id, 'status' => 'running', 'commenced_at' => now(), 'commenced_by' => $this->reader->id, 'contents' => [['client_medication_id' => $order->id, 'name' => $order->name]]]);
         $this->actingAs($this->reader)->get('/emar/mar?client_id='.$this->person->id)->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->component('emar/record/show')->where('meters.driver', null));
+    }
+
+    public function test_profile_audit_keeps_ordinary_medicine_events_and_conceals_controlled_events(): void
+    {
+        $ordinary = $this->medicine('Paracetamol');
+        $controlled = $this->medicine('Secret controlled medicine', ['controlled_drug' => true]);
+        $ordinaryLog = $this->audit($ordinary);
+        $controlledLog = $this->audit($controlled);
+        $ids = app(MedicationProfileAuditPrivacy::class)->apply(AuditLog::query()->where('client_id', $this->person->id), $this->reader, $this->person)->pluck('id')->all();
+        $this->assertContains($ordinaryLog->id, $ids);
+        $this->assertNotContains($controlledLog->id, $ids);
+    }
+
+    public function test_profile_audit_rejects_a_forged_medicine_owner(): void
+    {
+        $other = Client::factory()->create(['site_id' => $this->site->id]);
+        $foreign = $this->medicine('Other person medicine', ['client_id' => $other->id]);
+        $log = $this->audit($foreign);
+        $ids = app(MedicationProfileAuditPrivacy::class)->apply(AuditLog::query()->where('client_id', $this->person->id), $this->reader, $this->person)->pluck('id')->all();
+        $this->assertNotContains($log->id, $ids);
+    }
+
+    public function test_profile_audit_rechecks_medication_person_access(): void
+    {
+        $log = $this->audit($this->medicine('Paracetamol'));
+        $this->person->supportWorkers()->detach($this->reader->id);
+        $ids = app(MedicationProfileAuditPrivacy::class)->apply(AuditLog::query()->where('client_id', $this->person->id), $this->reader, $this->person)->pluck('id')->all();
+        $this->assertNotContains($log->id, $ids);
+    }
+
+    private function audit(ClientMedication $medicine): AuditLog
+    {
+        return AuditLog::query()->create(['user_id' => $this->reader->id, 'client_id' => $this->person->id, 'action' => 'medications.updated', 'auditable_type' => ClientMedication::class, 'auditable_id' => $medicine->id, 'meta' => ['name' => $medicine->name]]);
     }
 
     private function url(string $suffix): string

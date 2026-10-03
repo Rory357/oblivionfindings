@@ -14,34 +14,57 @@ export type DayLoad =
  * a failed one keeps the last good day on screen behind the error.
  */
 export function useMedicationDay(clientId: number, date: string | null) {
-    const [load, setLoad] = useState<DayLoad>({
-        status: 'loading',
-        data: null,
+    const [state, setState] = useState<{ clientId: number; load: DayLoad }>({
+        clientId,
+        load: { status: 'loading', data: null },
     });
     const latest = useRef(0);
 
     const fetchDay = useCallback(async () => {
         const request = ++latest.current;
-        setLoad((prev) => ({ status: 'loading', data: prev.data }));
+        setState((prev) => ({
+            clientId,
+            load: {
+                status: 'loading',
+                data: prev.clientId === clientId ? prev.load.data : null,
+            },
+        }));
         try {
             const response = await axios.get<MedicationDay>(
                 `/emar/clients/${clientId}/day`,
                 { params: date ? { date } : {} },
             );
             if (request === latest.current) {
-                setLoad({ status: 'ready', data: response.data });
+                setState({
+                    clientId,
+                    load: { status: 'ready', data: response.data },
+                });
             }
         } catch {
             if (request === latest.current) {
-                setLoad((prev) => ({ status: 'error', data: prev.data }));
+                setState((prev) => ({
+                    clientId,
+                    load: {
+                        status: 'error',
+                        data:
+                            prev.clientId === clientId ? prev.load.data : null,
+                    },
+                }));
             }
         }
     }, [clientId, date]);
 
     useEffect(() => {
         void fetchDay();
+        return () => {
+            latest.current++;
+        };
     }, [fetchDay]);
 
+    const load: DayLoad =
+        state.clientId === clientId
+            ? state.load
+            : { status: 'loading', data: null };
     return { load, reload: fetchDay };
 }
 

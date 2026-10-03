@@ -17,6 +17,7 @@ export type CellKind =
     | 'due'
     | 'pending_check'
     | 'away'
+    | 'self_managed'
     | 'upcoming';
 
 export const CELL_META: Record<
@@ -74,6 +75,11 @@ export const CELL_META: Record<
         tone: 'neutral',
         legend: 'Later in the day',
     },
+    self_managed: {
+        label: 'Self-managed',
+        tone: 'neutral',
+        legend: 'Listed for information · nothing for staff to record',
+    },
 };
 
 /** Legend order: what needs doing first, then outcomes, then the rest. */
@@ -89,9 +95,11 @@ export const LEGEND_ORDER: CellKind[] = [
     'not_recorded',
     'pending_check',
     'away',
+    'self_managed',
 ];
 
 export function cellKind(dose: DayDose, isToday: boolean): CellKind {
+    if (dose.state === 'self_managed') return 'self_managed';
     switch (dose.status) {
         case 'given':
         case 'refused':
@@ -122,7 +130,13 @@ export function clockLabel(hm: string | null | undefined): string {
 
 export function cellLabel(dose: DayDose, kind: CellKind): string {
     if (kind === 'given' && dose.recorded?.time) {
-        return `Given ✓ ${clockLabel(dose.recorded.time)}`;
+        const outcome =
+            dose.support_mode === 'prompted'
+                ? 'Taken with prompting'
+                : dose.support_mode === 'assisted'
+                  ? 'Taken with assistance'
+                  : 'Given';
+        return `${outcome} ✓ ${clockLabel(dose.recorded.time)}`;
     }
     if (kind === 'away' && dose.away_reason) {
         return `${CELL_META.away.label} · ${dose.away_reason}`;
@@ -178,6 +192,8 @@ export function idleHint(dose: DayDose, kind: CellKind): string | null {
             return 'Can be recorded once the order is checked.';
         case 'away':
             return 'Not due while the person is away.';
+        case 'self_managed':
+            return 'The person manages this medicine. Nothing for staff to record.';
         case 'not_recorded':
             return 'Nothing was recorded for this dose.';
         default:

@@ -9,6 +9,7 @@ use App\Http\Controllers\Emar\CompetencyExemptionController;
 use App\Http\Controllers\Emar\DoseRequirementsController;
 use App\Http\Controllers\Emar\EmarController;
 use App\Http\Controllers\Emar\PersonMedicationRecordController;
+use App\Http\Controllers\Emar\PersonMedicationClinicalController;
 use App\Http\Controllers\Emar\EmarPdfController;
 use App\Http\Controllers\Emar\EmarReportController;
 use App\Http\Controllers\Emar\GuidedRoundController;
@@ -263,9 +264,18 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->name('emar.clients.day');
 
     Route::prefix('/clients/{client}/record')->whereNumber('client')->middleware('permission:medications.view')->group(function () {
+        Route::get('/allergies', [\App\Http\Controllers\ClientAllergyRecordController::class, 'show'])->name('emar.record.allergies');
+        Route::post('/allergies', [\App\Http\Controllers\ClientAllergyRecordController::class, 'update'])->name('emar.record.allergies.update');
         Route::get('/medicines', [PersonMedicationRecordController::class, 'medicines'])->name('emar.record.medicines');
         Route::get('/medicines/{medication}', [PersonMedicationRecordController::class, 'medicine'])->whereNumber('medication')->name('emar.record.medicine');
         Route::get('/support', [PersonMedicationRecordController::class, 'support'])->name('emar.record.support');
+        Route::get('/safety', [PersonMedicationRecordController::class, 'safety'])->name('emar.record.safety');
+        Route::get('/clinical', [PersonMedicationRecordController::class, 'clinical'])->name('emar.record.clinical');
+        Route::get('/week', [PersonMedicationRecordController::class, 'week'])->name('emar.record.week');
+        Route::post('/clinical/{command}', [PersonMedicationClinicalController::class, 'store'])->name('emar.record.clinical.store');
+        Route::get('/history', [PersonMedicationRecordController::class, 'history'])->name('emar.record.history');
+        Route::get('/doses/{administration}', [PersonMedicationRecordController::class, 'dose'])->whereNumber('administration')->name('emar.record.dose');
+        Route::post('/doses/{administration}/corrections/{command}', [\App\Http\Controllers\Emar\PersonMedicationCorrectionController::class, 'store'])->whereNumber('administration')->name('emar.record.correction');
     });
 
     // Self-Administration Assessments
@@ -335,7 +345,6 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         Route::post('/clients/{client}/inr', [EmarController::class, 'storeInr'])->name('emar.clients.inr.store');
         Route::post('/inr/{inr}/disable', [EmarController::class, 'disableInr'])->name('emar.inr.disable');
         Route::post('/clients/{client}/syringe-drivers', [EmarController::class, 'storeSyringeDriver'])->name('emar.clients.syringe_drivers.store');
-        Route::post('/syringe-drivers/{driver}/checks', [EmarController::class, 'addSyringeDriverCheck'])->name('emar.syringe_drivers.checks.store');
         Route::post('/syringe-drivers/{driver}/complete', [EmarController::class, 'completeSyringeDriver'])->name('emar.syringe_drivers.complete');
 
         // Competency Assessments
@@ -365,6 +374,10 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         Route::post('/medications/{medication}/discontinue', [EmarController::class, 'discontinueMedication'])->name('emar.medications.discontinue');
 
     }); // end medications.orders.manage middleware group
+
+    Route::post('/syringe-drivers/{driver}/checks', [EmarController::class, 'addSyringeDriverCheck'])
+        ->middleware('permission:medications.administer.record')
+        ->name('emar.syringe_drivers.checks.store');
 
     Route::post('/prn/effectiveness', [EmarController::class, 'storePrnEffectiveness'])
         ->middleware('permission:medications.administer.record')

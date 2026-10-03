@@ -270,6 +270,11 @@ class ClientMedicationAdministration extends Model
         return $this->belongsTo(User::class, 'correction_requested_by');
     }
 
+    public function correctionApprovedBy()
+    {
+        return $this->belongsTo(User::class, 'correction_approved_by');
+    }
+
     public function reviewFlaggedBy()
     {
         return $this->belongsTo(User::class, 'review_flagged_by');

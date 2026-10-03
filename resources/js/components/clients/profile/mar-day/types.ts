@@ -15,8 +15,9 @@ import type {
  */
 export type DayDose = ScheduleRow & {
     state?: string | null;
-    window_opens_at?: string | null;
-    window_ends_at?: string | null;
+    window_opens_at?: string;
+    window_ends_at?: string;
+    support_mode?: 'self_managed' | 'prompted' | 'assisted' | 'staff_given';
 };
 
 export interface DayMedicine {
@@ -59,10 +60,11 @@ export interface MedicationDay {
     hidden_controlled: { total: number; overdue: number };
     prn: { rows: DayPrnMedication[]; hidden: number };
     allergies: {
-        status: 'recorded' | 'none' | 'unavailable';
+        status: 'recorded' | 'none' | 'no_known' | 'unavailable';
         entries: DayAllergyEntry[];
+        reviewed?: { at: string; by: string | null; how: string } | null;
     };
-    chart_alerts: { id: number; type: string | null; title: string }[];
+    chart_alerts: { id: number | null; type: string | null; title: string }[];
     can: {
         record: boolean;
         record_reason: 'no_permission' | 'no_shift' | null;

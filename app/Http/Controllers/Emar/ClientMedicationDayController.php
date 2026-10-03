@@ -13,6 +13,7 @@ use App\Services\Medication\DoseSlots\DoseSlotCoverage;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\Medication\MedicationRecordDayService;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -70,7 +71,9 @@ class ClientMedicationDayController extends Controller
         $hidden = ['total' => 0, 'overdue' => 0];
         if ($coverage['complete']) {
             $bySlot = $this->board->slotIndex($this->board->administrationsForDay($clientIds, $day, $includeControlled));
-            $rows = $this->board->scheduleForDate($clientIds, $day, $now, $bySlot, $includeControlled, $hidden);
+            $rows = $date < $today
+                ? app(MedicationRecordDayService::class)->scheduled($clientIds, $day, $now, $bySlot, $includeControlled, $hidden)
+                : $this->board->scheduleForDate($clientIds, $day, $now, $bySlot, $includeControlled, $hidden);
             foreach ($rows as $row) {
                 $id = (int) $row['medication_id'];
                 $medicines[$id] ??= [
@@ -107,7 +110,7 @@ class ClientMedicationDayController extends Controller
                 ->whereNull('resolved_at')
                 ->orderBy('created_at')
                 ->get(['id', 'type', 'title'])
-                ->map(fn (ClientMedicationAlert $alert) => [
+                ->map(fn (ClientMedicationAlert $alert) => app(\App\Services\Medication\MedicationRecordSafetyPrivacy::class)->hidesUnstructuredText($actor, $person) ? ['id' => null, 'type' => null, 'title' => 'Chart alert — details need controlled-medicine access'] : [
                     'id' => $alert->id,
                     'type' => $alert->type,
                     'title' => $alert->title,
@@ -132,7 +135,7 @@ class ClientMedicationDayController extends Controller
                 'not_given_reasons' => $this->board->notGivenReasons(),
                 'signed_as' => $this->board->boardUser($actor),
             ] : null,
-        ]);
+        ])->header('Cache-Control', 'private, no-store');
     }
 
     /**
@@ -144,14 +147,18 @@ class ClientMedicationDayController extends Controller
      */
     private function asNeeded(array $clientIds, Carbon $day, Carbon $now, bool $isToday, bool $includeControlled): array
     {
-        $all = collect($this->board->prnMedications($clientIds, $now, true));
+        $all = collect($isToday || $day->greaterThan($now)
+            ? $this->board->prnMedications($clientIds, $now, true)
+            : app(MedicationRecordDayService::class)->prn($clientIds, $day));
         $hidden = $includeControlled ? 0 : $all->where('is_controlled', true)->count();
         $rows = $includeControlled ? $all : $all->where('is_controlled', false);
 
         $from = $day->copy()->utc();
         $to = $day->copy()->endOfDay()->utc();
-        $given = ClientMedicationAdministration::query()
-            ->effectiveClinicalEvidence()
+        $given = app(MedicationGovernanceScopeService::class)->scopeCanonicalClientMedicationRows(
+            ClientMedicationAdministration::query()->effectiveClinicalEvidence()->whereIn('client_id', $clientIds),
+            null, false,
+        )
             ->whereIn('client_medication_id', $rows->pluck('id')->all())
             ->where('status', 'given')
             ->whereBetween('administered_at', [$from, $to])
@@ -184,21 +191,12 @@ class ClientMedicationDayController extends Controller
     private function allergies(Client $person): array
     {
         try {
-            $entries = collect(app(ClientAllergyRecordService::class)->forClient($person))
-                ->map(fn (array $entry) => [
-                    'allergen' => $entry['allergen'],
-                    'severity' => $entry['severity'],
-                    'reaction' => $entry['reaction'],
-                    'source' => $entry['source'],
-                ])
-                ->values()
-                ->all();
+            return app(ClientAllergyRecordService::class)->summary($person);
         } catch (\Throwable $e) {
             report($e);
 
             return ['status' => 'unavailable', 'entries' => []];
         }
 
-        return ['status' => $entries === [] ? 'none' : 'recorded', 'entries' => $entries];
     }
 }

@@ -77,6 +77,10 @@ class MedicationAllergy extends Model
         $allergen = strtolower($this->allergen);
         $medication = strtolower($medicationName);
 
+        // Retain incomplete historic entries for review, without treating an
+        // empty allergen as a match for every medicine.
+        if (trim($allergen) === '' || trim($medication) === '') return false;
+
         // Direct match
         if (str_contains($medication, $allergen) || str_contains($allergen, $medication)) {
             return true;

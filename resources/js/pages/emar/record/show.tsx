@@ -1,12 +1,17 @@
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { AlertTriangle, Clock, Home, Pill } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
+import { ChartSection } from '@/components/emar/record/chart';
+import { ClinicalSection } from '@/components/emar/record/clinical';
+import { HistorySection } from '@/components/emar/record/history';
 import {
     MedicinesSection,
     RecordMedicineDialog,
     SupportSection,
 } from '@/components/emar/record/reading';
+import { RecordDoseLaunch } from '@/components/emar/record/record-dose-launch';
+import { SafetySection } from '@/components/emar/record/safety';
 import {
     locationSearch,
     readLocation,
@@ -34,7 +39,7 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useEmarRecordBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
-import { formatTime } from '@/lib/datetime';
+import { formatDateOnly, formatDateTime, formatTime } from '@/lib/datetime';
 
 export default function PersonMedicationRecord(props: RecordPageProps) {
     if (props.unavailable)
@@ -70,15 +75,26 @@ export default function PersonMedicationRecord(props: RecordPageProps) {
                 </Card>
             </AppLayout>
         );
-    return <AvailableRecord {...props} />;
+    return <AvailableRecord key={props.person.id} {...props} />;
 }
 
 function AvailableRecord({
     person,
     meters,
     as_at,
+    can,
 }: Extract<RecordPageProps, { person: unknown }>) {
     const page = usePage();
+    const query = new URLSearchParams(page.url.split('?')[1]);
+    const date = query.get('date');
+    const week = query.get('mode') === 'week';
+    const historyPage = Math.max(1, Number(query.get('page')) || 1);
+    const sections = RECORD_SECTIONS.map((item) => ({
+        ...item,
+        views: item.views.filter(
+            (view) => view.key !== 'changes' || can.view_audit,
+        ),
+    }));
     const [location, setLocation] = useState(() =>
         readLocation(page.url.split('?')[1] ?? ''),
     );
@@ -100,20 +116,34 @@ function AvailableRecord({
         (next: RecordLocation) => {
             setLocation(next);
             setSearch('');
-            window.history.pushState(
-                null,
-                '',
-                `/emar/mar${locationSearch(person.id, next)}`,
-            );
+            router.push({
+                url: `/emar/mar${locationSearch(person.id, next)}`,
+                preserveState: true,
+                preserveScroll: true,
+            });
         },
         [person.id],
     );
     useEffect(() => {
-        const onBack = () => setLocation(readLocation(window.location.search));
-        window.addEventListener('popstate', onBack);
-        return () => window.removeEventListener('popstate', onBack);
-    }, []);
-    const section = RECORD_SECTIONS.find((item) => item.key === location.tab)!;
+        setLocation(readLocation(page.url.split('?')[1] ?? ''));
+        setMedicine(
+            Number(
+                new URLSearchParams(page.url.split('?')[1]).get(
+                    'medication_id',
+                ),
+            ) || null,
+        );
+    }, [page.url]);
+    const section = sections.find((item) => item.key === location.tab)!;
+    const activeView = section.views.some((view) => view.key === location.view)
+        ? location.view
+        : section.views[0].key;
+    const navigateQuery = (extra: Record<string, string | null>) =>
+        router.push({
+            url: `/emar/mar${locationSearch(person.id, location, extra)}`,
+            preserveState: true,
+            preserveScroll: true,
+        });
     const jump = (tab: RecordLocation['tab'], view?: string) => {
         const target = RECORD_SECTIONS.find((item) => item.key === tab);
         if (target) go({ tab, view: view ?? target.views[0].key });
@@ -151,10 +181,16 @@ function AvailableRecord({
                         </>
                     }
                     actions={
-                        <PageHeaderSearchTrigger
-                            placeholder="Find in this record…"
-                            onOpen={() => setFind(true)}
-                        />
+                        <>
+                            <PageHeaderSearchTrigger
+                                placeholder="Find in this record…"
+                                onOpen={() => setFind(true)}
+                            />
+                            <RecordDoseLaunch
+                                clientId={person.id}
+                                personName={person.preferred}
+                            />
+                        </>
                     }
                     meters={
                         <>
@@ -181,17 +217,61 @@ function AvailableRecord({
                                 tone={
                                     meters.allergies.status === 'recorded'
                                         ? 'critical'
-                                        : 'warning'
+                                        : meters.allergies.status === 'no_known'
+                                          ? 'neutral'
+                                          : 'warning'
                                 }
                             >
                                 <PageHeaderMeterBig>
                                     {meters.allergies.status === 'unavailable'
                                         ? 'Couldn’t load'
-                                        : meters.allergies.count ||
-                                          'None recorded'}
+                                        : meters.allergies.status === 'no_known'
+                                          ? 'No known allergies'
+                                          : meters.allergies.count ||
+                                            'None recorded'}
                                 </PageHeaderMeterBig>
                                 <PageHeaderMeterCaption>
-                                    Not reviewed · health profile
+                                    {meters.allergies.reviewed
+                                        ? `Reviewed by ${meters.allergies.reviewed.by ?? 'recorded reviewer'}`
+                                        : 'Not reviewed'}{' '}
+                                    · health profile
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="INR"
+                                onClick={() => jump('clinical', 'inr')}
+                                ariaLabel="View INR results"
+                            >
+                                <PageHeaderMeterBig>
+                                    {meters.inr?.value ?? 'None recorded'}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    {meters.inr
+                                        ? `${formatDateOnly(meters.inr.tested)} · ${meters.inr.target ? `target ${meters.inr.target.join('–')}` : 'target not recorded'}`
+                                        : 'Open clinical results'}
+                                    {meters.inr?.next
+                                        ? ` · next ${formatDateOnly(meters.inr.next)}`
+                                        : ''}
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Syringe driver"
+                                onClick={() => jump('clinical', 'driver')}
+                                ariaLabel="View syringe driver"
+                            >
+                                <PageHeaderMeterBig>
+                                    {meters.driver?.concealed
+                                        ? 'Controlled access needed'
+                                        : meters.driver
+                                          ? 'Running'
+                                          : 'None running'}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    {meters.driver && !meters.driver.concealed
+                                        ? meters.driver.last_check
+                                            ? `Last checked ${formatDateTime(meters.driver.last_check)}`
+                                            : 'No check recorded'
+                                        : 'Open clinical record'}
                                 </PageHeaderMeterCaption>
                             </PageHeaderMeterBlock>
                         </>
@@ -212,7 +292,7 @@ function AvailableRecord({
                     }
                     rail={
                         <PageHeaderRail
-                            items={RECORD_SECTIONS}
+                            items={sections}
                             value={location.tab}
                             onSelect={(tab) => jump(tab)}
                             onFind={() => setFind(true)}
@@ -222,7 +302,7 @@ function AvailableRecord({
                 />
                 <TierTwoTabs
                     tabs={section.views}
-                    activeTab={location.view}
+                    activeTab={activeView}
                     onTab={(view) => go({ tab: location.tab, view })}
                     testIdPrefix="medication-record"
                     panelId="medication-record-panel"
@@ -242,7 +322,7 @@ function AvailableRecord({
                 <div
                     id="medication-record-panel"
                     role="tabpanel"
-                    aria-labelledby={`medication-record-tab-${location.view}`}
+                    aria-labelledby={`medication-record-tab-${activeView}`}
                     className="min-w-0"
                 >
                     {location.tab === 'medicines' ? (
@@ -252,11 +332,44 @@ function AvailableRecord({
                             search={search}
                             onMedicine={setMedicine}
                         />
-                    ) : (
+                    ) : location.tab === 'support' ? (
                         <SupportSection
                             clientId={person.id}
                             assessment={location.view === 'assessment'}
                             onMedicine={setMedicine}
+                        />
+                    ) : location.tab === 'chart' ? (
+                        <ChartSection
+                            clientId={person.id}
+                            personName={person.preferred}
+                            canViewControlled={can.view_controlled}
+                            view={activeView}
+                            date={date}
+                            week={week}
+                            onChange={(nextDate, nextWeek) =>
+                                navigateQuery({
+                                    date: nextDate,
+                                    mode: nextWeek ? 'week' : null,
+                                })
+                            }
+                        />
+                    ) : location.tab === 'allergies' ? (
+                        <SafetySection clientId={person.id} view={activeView} />
+                    ) : location.tab === 'clinical' ? (
+                        <ClinicalSection
+                            clientId={person.id}
+                            view={activeView}
+                        />
+                    ) : (
+                        <HistorySection
+                            clientId={person.id}
+                            view={activeView}
+                            page={historyPage}
+                            onPage={(next) =>
+                                navigateQuery({
+                                    page: next > 1 ? String(next) : null,
+                                })
+                            }
                         />
                     )}
                 </div>
@@ -266,13 +379,23 @@ function AvailableRecord({
                     key={medicine}
                     clientId={person.id}
                     medicationId={medicine}
-                    onClose={() => setMedicine(null)}
+                    onClose={() => {
+                        setMedicine(null);
+                        if (query.has('medication_id')) {
+                            query.delete('medication_id');
+                            router.replace({
+                                url: `/emar/mar?${query}`,
+                                preserveState: true,
+                                preserveScroll: true,
+                            });
+                        }
+                    }}
                 />
             ) : null}
             <TabSearchPalette
                 open={find}
                 onClose={() => setFind(false)}
-                groups={RECORD_SECTIONS.map((item) => ({
+                groups={sections.map((item) => ({
                     ...item,
                     tabs: item.views.map((view) => ({
                         ...view,

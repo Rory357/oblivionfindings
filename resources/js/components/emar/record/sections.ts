@@ -1,7 +1,13 @@
 import {
+    Activity,
+    BellRing,
+    CalendarDays,
     ClipboardList,
     History,
     Pill,
+    ShieldAlert,
+    Stethoscope,
+    Syringe,
     Users,
     type LucideIcon,
 } from 'lucide-react';
@@ -29,6 +35,15 @@ export interface RecordSection {
 
 export const RECORD_SECTIONS: RecordSection[] = [
     {
+        key: 'chart',
+        label: 'Chart',
+        icon: ClipboardList,
+        views: [
+            { key: 'scheduled', label: 'Scheduled doses', icon: CalendarDays },
+            { key: 'asneeded', label: 'As needed', icon: Pill },
+        ],
+    },
+    {
         key: 'medicines',
         label: 'Medicines',
         icon: Pill,
@@ -44,6 +59,36 @@ export const RECORD_SECTIONS: RecordSection[] = [
         views: [
             { key: 'bymedicine', label: 'By medicine', icon: Users },
             { key: 'assessment', label: 'Assessment', icon: ClipboardList },
+        ],
+    },
+    {
+        key: 'allergies',
+        label: 'Allergies & alerts',
+        icon: ShieldAlert,
+        views: [
+            { key: 'allergies', label: 'Allergies', icon: ShieldAlert },
+            { key: 'alerts', label: 'Chart alerts', icon: BellRing },
+            { key: 'interactions', label: 'Interactions', icon: Pill },
+        ],
+    },
+    {
+        key: 'clinical',
+        label: 'Clinical',
+        icon: Stethoscope,
+        views: [
+            { key: 'inr', label: 'INR', icon: Activity },
+            { key: 'driver', label: 'Syringe driver', icon: Syringe },
+            { key: 'observations', label: 'Dose readings', icon: Stethoscope },
+        ],
+    },
+    {
+        key: 'history',
+        label: 'History',
+        icon: History,
+        views: [
+            { key: 'doses', label: 'Doses', icon: History },
+            { key: 'corrections', label: 'Corrections', icon: ClipboardList },
+            { key: 'changes', label: 'All changes', icon: History },
         ],
     },
 ];

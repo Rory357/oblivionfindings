@@ -49,7 +49,7 @@ const SUPPORT = {
     administer: ['Administer', 'Staff give this medicine'],
     assist: ['Assist', 'Help with the agreed parts'],
     prompt: ['Prompt', 'Remind the person to take it'],
-    independent: ['Independent', 'The person manages it'],
+    independent: ['Self-managed', 'The person manages it'],
 } as const;
 const STATUS = {
     active: ['Active', 'success'],

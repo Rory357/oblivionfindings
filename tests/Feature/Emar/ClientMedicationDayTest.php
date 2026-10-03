@@ -210,6 +210,47 @@ class ClientMedicationDayTest extends TestCase
     }
 
     /** @return array<string, mixed> */
+    public function test_prn_day_counts_reject_foreign_person_evidence_on_today_and_an_earlier_day(): void
+    {
+        $order = $this->order('Paracetamol', [], overrides: ['is_prn' => true]);
+        $other = Client::factory()->create(['site_id' => $this->site->id]);
+        foreach (['2026-06-14', '2026-06-15'] as $date) {
+            foreach ([[$this->aroha->id, '09:00'], [$other->id, '13:00']] as [$person, $time]) {
+                ClientMedicationAdministration::query()->create(['client_id' => $person, 'client_medication_id' => $order->id, 'administered_by' => $this->reader->id, 'administered_at' => Carbon::parse($date.' '.$time, 'Pacific/Auckland')->utc(), 'status' => 'given']);
+            }
+        }
+        $this->at('2026-06-15 14:00');
+        foreach (['2026-06-14', '2026-06-15'] as $date) {
+            $row = $this->day($date)['prn']['rows'][0];
+            $this->assertSame(1, $row['given_on_day']);
+            $this->assertSame('09:00', $row['last_given_on_day']);
+        }
+    }
+
+    public function test_a_past_day_keeps_stopped_and_superseded_orders_and_their_doses(): void
+    {
+        $scheduled = $this->order('Old scheduled', ['08:00'], overrides: ['dosage' => '5 mg']);
+        $prn = $this->order('Old PRN', [], overrides: ['is_prn' => true]);
+        $replaced = $this->order('Replacement history', ['10:00'], overrides: ['dosage' => '2 tablets']);
+        $this->at('2026-06-14 00:00');
+        $this->artisan('emar:generate-dose-slots')->assertSuccessful();
+        $this->record($scheduled, '2026-06-14 08:00', 'given');
+        ClientMedicationAdministration::query()->create(['client_id' => $this->aroha->id, 'client_medication_id' => $prn->id, 'administered_by' => $this->reader->id, 'administered_at' => Carbon::parse('2026-06-14 11:00', 'Pacific/Auckland')->utc(), 'status' => 'given']);
+        $this->at('2026-06-15 07:00');
+        foreach ([$scheduled, $prn] as $order) $order->update(['active' => false, 'state' => 'ceased', 'ceased_at' => now(), 'ceased_reason' => 'Written stop', 'ceased_by' => $this->reader->id]);
+        $replacement = $replaced->createVersion($this->reader->id, 'Written change');
+        $replacement->update(['dosage' => '3 tablets']);
+        $this->artisan('emar:generate-dose-slots')->assertSuccessful();
+        $day = $this->day('2026-06-14');
+        $this->assertSame('given', $this->cells($day)['Old scheduled 08:00']['status']);
+        $this->assertSame('5 mg', $this->cells($day)['Old scheduled 08:00']['dose']);
+        $this->assertSame('2 tablets', $this->cells($day)['Replacement history 10:00']['dose']);
+        $this->assertSame('Old PRN', $day['prn']['rows'][0]['name']);
+        $this->assertSame(1, $day['prn']['rows'][0]['given_on_day']);
+        $this->assertNotContains('Old scheduled', array_column($this->day()['medicines'], 'name'));
+    }
+
+    /** @return array<string, mixed> */
     private function day(?string $date = null): array
     {
         return $this->actingAs($this->reader->fresh())

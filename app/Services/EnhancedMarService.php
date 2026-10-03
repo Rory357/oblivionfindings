@@ -1488,9 +1488,9 @@ class EnhancedMarService
                     );
                 }
 
-                if ($admin->status === 'given') {
-                    $this->mirrorClinicalObservations($admin, $medication, $data, $userId);
-                }
+                // P02 Q-D: dose-linked readings belong to this administration.
+                // Keep historical ClinicalObservation copies, but create no
+                // new second clinical record with a medication name in notes.
 
                 // Handle controlled drug register entry
                 if ($medication->controlled_drug && $admin->status === 'given') {

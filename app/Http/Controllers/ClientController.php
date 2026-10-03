@@ -928,12 +928,14 @@ class ClientController extends Controller
                 })
                 ->values() : null,
             'audit_history' => $sectionAccess['audit']
-                ? AuditLog::query()
+                ? app(\App\Services\Medication\MedicationProfileAuditPrivacy::class)->apply(AuditLog::query(), $request->user(), $client)
                     ->where('client_id', $client->id)
                     ->with('user:id,name,email')
                     ->orderByDesc('created_at')
                     ->limit(200)
                     ->get()
+                    ->reject(fn ($log) => ! $canViewControlledMedication && app(\App\Services\Medication\MedicationProfileAuditPrivacy::class)->containsControlledSnapshot($log->meta))
+                    ->values()
                     ->map(fn ($log) => [
                         'id' => $log->id,
                         'action' => $log->action,
@@ -2990,11 +2992,13 @@ class ClientController extends Controller
 
     private function syncClientMedicalProfile(Client $client, array $medical): void
     {
+        $canonical = $client->medicalProfile()->whereNotNull('allergies_canonical_at')->exists();
+        if ($canonical) app(\App\Services\Medication\ClientAllergyRecordService::class)->guardLegacyEdit($client, $medical['allergies'] ?? []);
         $medicalFilled = collect($medical)->contains(
             fn ($v) => is_array($v) ? count($v) > 0 : (filled($v) && $v !== false && $v !== '0')
         );
 
-        if (! $medicalFilled) {
+        if (! $medicalFilled && ! $canonical) {
             $client->medicalProfile()->delete();
 
             return;

@@ -121,6 +121,7 @@ class ClientMedicalController extends Controller
         }
 
         $profile = ClientMedicalProfile::firstOrNew(['client_id' => $client->id]);
+        app(\App\Services\Medication\ClientAllergyRecordService::class)->guardLegacyEdit($client, $data['allergies']);
         $profile->fill($data);
         $profile->client_id = $client->id;
         $profile->save();

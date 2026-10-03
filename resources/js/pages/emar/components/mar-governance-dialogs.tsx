@@ -351,17 +351,20 @@ export function buildSyringeDriverRequest(data: SyringeDriverFormData) {
     };
 }
 
-function SyringeDriverDialog({
+export function SyringeDriverDialog({
     clientId,
     medications,
     witnesses,
     onClose,
+    commandUrl,
 }: {
     clientId: number;
     medications: ChartMedicationOption[];
     witnesses: WitnessOption[];
     onClose: () => void;
+    commandUrl?: string;
 }) {
+    const [requestUuid] = useState(() => crypto.randomUUID());
     // Contents reference the resident's charted medicine by id: the server
     // resolves the name, controlled status and witness requirement from that
     // canonical record, never from free text typed here.
@@ -386,8 +389,8 @@ function SyringeDriverDialog({
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
-        form.transform(buildSyringeDriverRequest);
-        form.post(`/emar/clients/${clientId}/syringe-drivers`, {
+        form.transform((data) => ({ ...buildSyringeDriverRequest(data), ...(commandUrl ? { request_uuid: requestUuid } : {}) }));
+        form.post(commandUrl ?? `/emar/clients/${clientId}/syringe-drivers`, {
             preserveScroll: true,
             onSuccess: onClose,
         });
@@ -530,7 +533,7 @@ function SyringeDriverDialog({
 }
 
 // ── Manage attention alerts ────────────────────────────────────────────────
-function ManageAlertsDialog({
+export function ManageAlertsDialog({
     clientId,
     suppression,
     onClose,

@@ -7,6 +7,9 @@ use App\Models\Client;
 use App\Models\ClientInrRecord;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\ClientMedicationAlert;
+use App\Models\MedicationInteraction;
+use App\Models\AuditLog;
 use App\Models\MedicationSelfAdminAssessment;
 use App\Models\MedicationSyringeDriver;
 use App\Models\User;
@@ -15,6 +18,7 @@ use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\MedicationConcealment;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
+use App\Services\Medication\MedicationProfileAuditPrivacy;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -73,7 +77,7 @@ class PersonMedicationRecordController extends Controller
             'person' => $this->person($client),
             'meters' => [
                 'medicines' => [
-                    'count' => $visible->count(),
+                    'count' => $current->count(),
                     'hidden' => $hidden->count(),
                     'as_needed' => $visible->where('is_prn', true)->count(),
                     'to_check' => $visible->filter(fn (ClientMedication $order) => $this->status($order) === 'awaiting')->count(),
@@ -85,6 +89,8 @@ class PersonMedicationRecordController extends Controller
             'can' => [
                 // Orders are added, changed and stopped in Orders & reviews (P04), never here.
                 'manage_orders' => $actor->canDo('medications.orders.manage'),
+                'view_controlled' => $actor->canDo('medications.controlled.view'),
+                'view_audit' => $actor->canDo('medications.audit.view'),
             ],
             'as_at' => Carbon::now($this->schedule->workerTimezone())->toIso8601String(),
         ]);
@@ -122,7 +128,7 @@ class PersonMedicationRecordController extends Controller
     {
         $actor = $this->actor($request);
         $client = $this->access->client($actor, $clientId);
-        $order = ClientMedication::query()->current()->where('client_id', $client->id)->findOrFail($medicationId);
+        $order = ClientMedication::withTrashed()->where('client_id', $client->id)->findOrFail($medicationId);
         // Inside the record a controlled medicine is listed, but its details need access.
         abort_if(MedicationConcealment::for($actor)->hides((bool) $order->controlled_drug), 404);
         $order->load(['verifiedByUser:id,name', 'ceasedByUser:id,name']);
@@ -193,12 +199,134 @@ class PersonMedicationRecordController extends Controller
         ]);
     }
 
+    public function safety(Request $request, int $clientId): JsonResponse
+    {
+        $actor = $this->actor($request);
+        $client = $this->access->client($actor, $clientId);
+        $concealment = MedicationConcealment::for($actor);
+        $allergies = collect(app(ClientAllergyRecordService::class)->forClient($client))->map(fn ($entry) => array_intersect_key($entry, array_flip(['allergen', 'severity', 'reaction', 'source'])))->values();
+        $hideText = app(\App\Services\Medication\MedicationRecordSafetyPrivacy::class)->hidesUnstructuredText($actor, $client);
+        $alerts = $client->medicationAlerts()->with(['createdBy:id,name', 'resolvedBy:id,name'])->orderByDesc('created_at')->get()->map(fn ($alert) => $hideText ? ['concealed' => true, 'key' => 'alert'.$alert->id] : [
+            'key' => (string) $alert->id,
+            'id' => $alert->id, 'type' => $alert->type, 'title' => $alert->title, 'detail' => $alert->detail,
+            'enabled' => $alert->enabled, 'prompt_on_open' => $alert->prompt_on_open,
+            'created_at' => $alert->created_at?->toIso8601String(), 'created_by' => $alert->createdBy?->name,
+            'resolved_at' => $alert->resolved_at?->toIso8601String(), 'resolved_by' => $alert->resolvedBy?->name,
+        ]);
+        $orders = $this->orders($client)->filter(fn ($order) => $this->status($order) !== 'stopped');
+        $names = $orders->groupBy(fn ($order) => mb_strtolower(trim($order->name)));
+        $interactions = MedicationInteraction::query()->active()->with('createdBy:id,name')->get()->filter(fn ($pair) => $names->has(mb_strtolower(trim($pair->medication_a))) && $names->has(mb_strtolower(trim($pair->medication_b))));
+        $pairs = $concealment->redact($interactions,
+            fn ($pair) => $names[mb_strtolower(trim($pair->medication_a))]->contains('controlled_drug', true) || $names[mb_strtolower(trim($pair->medication_b))]->contains('controlled_drug', true),
+            fn ($pair) => ['concealed' => true, 'key' => 'pair'.$pair->id],
+        );
+        return $this->privateJson([
+            'allergies' => app(ClientAllergyRecordService::class)->summary($client),
+            'alerts' => $alerts, 'interactions' => ['rows' => array_map(fn ($row) => $row instanceof MedicationInteraction ? [
+                'key' => (string) $row->id, 'a' => $row->medication_a, 'b' => $row->medication_b,
+                'severity' => $row->severity, 'description' => $row->description, 'management' => $row->management,
+                'by' => $row->createdBy?->name, 'at' => $row->created_at?->toIso8601String(),
+            ] : $row, $pairs['rows']), 'hidden' => $pairs['hidden']],
+            'suppression' => ['suppressed' => (bool) $client->suppress_med_admin_alerts, 'reason' => $hideText ? null : $client->med_alerts_suppressed_reason],
+            'can_manage' => $actor->canDo('medications.orders.manage'),
+            'can_check' => $actor->canDo('medications.administer.record'),
+        ]);
+    }
+
+    public function clinical(Request $request, int $clientId): JsonResponse
+    {
+        $actor = $this->actor($request);
+        $client = $this->access->client($actor, $clientId);
+        $scope = app(MedicationGovernanceScopeService::class);
+        $concealment = MedicationConcealment::for($actor);
+        $inr = $scope->scopeCanonicalClientMedicationRows(ClientInrRecord::query()->where('client_id', $client->id), [(int) $client->site_id])->with(['medication:id,client_id,name,controlled_drug', 'recordedBy:id,name'])->latest('tested_on')->latest('id')->get();
+        $inrRows = $concealment->redact($inr, fn ($result) => (bool) $result->medication?->controlled_drug, fn ($result) => ['concealed' => true, 'key' => 'inr'.$result->id]);
+        $drivers = MedicationSyringeDriver::query()->where('client_id', $client->id)->where('site_id', $client->site_id)->with(['commencedBy:id,name', 'checks.checkedBy:id,name'])->latest('commenced_at')->get()->map(function ($driver) use ($scope, $client, $concealment) {
+            $contents = $scope->visibleSyringeDriverContents($client, $driver->contents ?? [], $concealment->canViewControlled());
+            if ($contents === null) return ['concealed' => true, 'key' => 'driver'.$driver->id];
+            return ['key' => (string) $driver->id, 'id' => $driver->id, 'status' => $driver->status, 'commenced_at' => $driver->commenced_at?->toIso8601String(), 'by' => $driver->commencedBy?->name, 'rate' => $driver->rate, 'rate_unit' => $driver->rate_unit, 'contents' => $contents, 'site_of_insertion' => $driver->site_of_insertion, 'notes' => $driver->notes, 'checks' => $driver->checks->sortByDesc('checked_at')->map(fn ($check) => ['id' => $check->id, 'at' => $check->checked_at?->toIso8601String(), 'by' => $check->checkedBy?->name, 'running' => $check->infusion_running, 'site_condition' => $check->site_condition, 'volume_remaining' => $check->volume_remaining, 'notes' => $check->notes])->values()];
+        });
+        $observations = $scope->scopeCanonicalClientMedicationRows(ClientMedicationAdministration::query()->effectiveClinicalEvidence()->where('client_id', $client->id), [(int) $client->site_id], false)->where(function ($query) { $query->whereNotNull('blood_glucose_level')->orWhereNotNull('pulse_bpm')->orWhereNotNull('blood_pressure_systolic')->orWhereNotNull('blood_pressure_diastolic'); })->with(['medication:id,client_id,name,controlled_drug', 'administeredBy:id,name'])->latest('administered_at')->limit(100)->get();
+        $obsRows = $concealment->redact($observations, fn ($dose) => (bool) $dose->medication?->controlled_drug, fn ($dose) => ['concealed' => true, 'key' => 'obs'.$dose->id]);
+        $orders = $this->orders($client)->filter(fn ($order) => $this->status($order) !== 'stopped' && ! $concealment->hides((bool) $order->controlled_drug));
+        return $this->privateJson([
+            'inr' => ['rows' => array_map(fn ($row) => $row instanceof ClientInrRecord ? ['key' => (string) $row->id, 'id' => $row->id, 'medicine' => $row->medication?->name, 'medicine_id' => $row->client_medication_id, 'value' => (float) $row->inr_value, 'tested' => $row->tested_on?->toDateString(), 'target_low' => $row->target_range_low === null ? null : (float) $row->target_range_low, 'target_high' => $row->target_range_high === null ? null : (float) $row->target_range_high, 'dose' => $row->dose_mg, 'next' => $row->next_test_date?->toDateString(), 'notes' => $row->notes, 'by' => $row->recordedBy?->name, 'disabled' => $row->disabled_at !== null, 'unlinked_reason' => $row->unlinked_reason, 'instruction' => $row->instruction, 'instruction_source' => $row->instruction_source, 'disabled_reason' => $row->disabled_reason] : $row, $inrRows['rows']), 'hidden' => $inrRows['hidden']],
+            'drivers' => $drivers->values(),
+            'observations' => ['rows' => array_map(fn ($row) => $row instanceof ClientMedicationAdministration ? ['key' => (string) $row->id, 'medicine' => $row->medication?->name, 'at' => $row->administered_at?->toIso8601String(), 'by' => $row->administeredBy?->name, 'glucose' => $row->blood_glucose_level, 'pulse' => $row->pulse_bpm, 'systolic' => $row->blood_pressure_systolic, 'diastolic' => $row->blood_pressure_diastolic] : $row, $obsRows['rows']), 'hidden' => $obsRows['hidden']],
+            'medicines' => $orders->map(fn ($order) => ['id' => $order->id, 'name' => $order->name, 'dosage' => $order->dosage ?? '', 'controlled_drug' => (bool) $order->controlled_drug, 'witness_required' => $order->requiresWitness()])->values(),
+            'witnesses' => $actor->canDo('medications.orders.manage') ? $scope->controlledWitnessPicker([(int) $client->site_id], $actor->id) : [],
+            'can_check' => $actor->canDo('medications.administer.record'),
+            'can_manage' => $actor->canDo('medications.orders.manage'),
+        ]);
+    }
+
+    public function history(Request $request, int $clientId): JsonResponse
+    {
+        $actor = $this->actor($request);
+        $client = $this->access->client($actor, $clientId);
+        $data = $request->validate(['page' => ['nullable', 'integer', 'min:1'], 'view' => ['nullable', 'in:doses,corrections,changes']]);
+        if (($data['view'] ?? '') === 'changes') {
+            abort_unless($actor->canDo('medications.audit.view'), 403);
+            $privacy = app(MedicationProfileAuditPrivacy::class);
+            $query = AuditLog::query()->where('client_id', $client->id)->whereIn('auditable_type', [ClientMedication::class, ClientMedicationAdministration::class, ClientInrRecord::class, \App\Models\MedicationOrderVersion::class, \App\Models\ClientMedicalProfile::class]);
+            $logs = $privacy->apply($query, $actor, $client, true)->with('user:id,name')->latest('id')->paginate(25);
+            $logs->setCollection($logs->getCollection()->map(function ($log) use ($actor, $privacy) {
+                $record = $log->auditable;
+                $controlled = $privacy->containsControlledSnapshot($log->meta) || (bool) ($record?->controlled_drug ?? false) || (bool) ($record?->medication?->controlled_drug ?? false);
+                if (! $actor->canDo('medications.controlled.view') && $controlled) return ['concealed' => true, 'key' => 'audit'.$log->id];
+                return ['key' => (string) $log->id, 'action' => $log->action, 'at' => $log->created_at?->toIso8601String(), 'by' => $log->user?->name, 'meta' => $log->meta];
+            })->values());
+            return $this->privateJson(['page' => $logs]);
+        }
+        $scope = app(MedicationGovernanceScopeService::class);
+        $query = $scope->scopeCanonicalClientMedicationRows(ClientMedicationAdministration::query()->where('client_id', $client->id), [(int) $client->site_id], false)->with(['medication:id,client_id,name,controlled_drug', 'administeredBy:id,name', 'correctionRequestedBy:id,name']);
+        if (($data['view'] ?? 'doses') === 'corrections') $query->where('is_correction', true);
+        else $query->effectiveClinicalEvidence();
+        $records = $query->latest('administered_at')->latest('id')->paginate(25);
+        $concealment = MedicationConcealment::for($actor);
+        $records->setCollection($records->getCollection()->map(fn ($dose) => $concealment->hides((bool) $dose->medication?->controlled_drug) ? ['concealed' => true, 'key' => 'dose'.$dose->id] : ['key' => (string) $dose->id, 'id' => $dose->id, 'medicine' => $dose->medication?->name, 'status' => $dose->status, 'at' => $dose->administered_at?->toIso8601String(), 'scheduled_for' => $dose->scheduled_for?->toIso8601String(), 'by' => $dose->administeredBy?->name, 'dose' => $dose->dose_given, 'reason' => $dose->reason, 'notes' => $dose->notes, 'is_correction' => (bool) $dose->is_correction, 'correction_status' => $dose->correction_status, 'correction_reason' => $dose->correction_reason, 'requested_by' => $dose->correction_requested_by ?? $dose->administered_by]));
+        return $this->privateJson(['page' => $records, 'can_correct' => $actor->canDo('medications.administer.correct'), 'actor_id' => $actor->id]);
+    }
+
     private function actor(Request $request): User
     {
         $actor = $request->user();
         abort_unless($actor instanceof User, 403);
 
         return $actor;
+    }
+
+    public function week(Request $request, int $clientId): JsonResponse
+    {
+        $this->access->client($this->actor($request), $clientId);
+        $tomorrow = Carbon::now($this->schedule->workerTimezone())->addDay()->toDateString();
+        $data = $request->validate(['date' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:'.$tomorrow]]);
+        $to = Carbon::parse($data['date'] ?? Carbon::now($this->schedule->workerTimezone())->toDateString(), $this->schedule->workerTimezone())->startOfDay();
+        $original = $request->query('date');
+        $days = [];
+        try {
+            for ($offset = -6; $offset <= 0; $offset++) {
+                $request->query->set('date', $to->copy()->addDays($offset)->toDateString());
+                $days[] = app(ClientMedicationDayController::class)->show($request, $clientId)->getData(true);
+            }
+        } finally {
+            $original === null ? $request->query->remove('date') : $request->query->set('date', $original);
+        }
+        return $this->privateJson(['days' => $days]);
+    }
+
+    public function dose(Request $request, int $clientId, int $administrationId): JsonResponse
+    {
+        $actor = $this->actor($request);
+        $person = $this->access->client($actor, $clientId);
+        $scope = app(MedicationGovernanceScopeService::class);
+        $query = $scope->scopeCanonicalClientMedicationRows(ClientMedicationAdministration::query()->where('client_id', $person->id), [(int) $person->site_id], false);
+        if (! $actor->canDo('medications.controlled.view')) $scope->scopeWithoutControlledMedicationRows($query);
+        $dose = (clone $query)->with(['medication', 'administeredBy:id,name', 'witnessedBy:id,name'])->findOrFail($administrationId);
+        $rootId = $dose->corrected_of_id ?? $dose->id;
+        $chain = (clone $query)->where('client_medication_id', $dose->client_medication_id)->where(fn ($q) => $q->whereKey($rootId)->orWhere('corrected_of_id', $rootId)->orWhere('reoffer_of_id', $rootId))->with(['administeredBy:id,name', 'correctionRequestedBy:id,name', 'correctionApprovedBy:id,name'])->orderBy('id')->get();
+        $map = fn ($row) => ['id' => $row->id, 'medicine' => $row->medication?->name ?? $dose->medication->name, 'status' => $row->status, 'at' => $row->administered_at?->toIso8601String(), 'scheduled_for' => $row->scheduled_for?->toIso8601String(), 'by' => $row->administeredBy?->name, 'dose' => $row->dose_given, 'reason' => $row->reason, 'notes' => $row->notes, 'witness' => $row->witnessedBy?->name, 'is_correction' => (bool) $row->is_correction, 'correction_status' => $row->correction_status, 'correction_reason' => $row->correction_reason, 'requested_by' => $row->correction_requested_by ?? $row->administered_by, 'reviewed_by' => $row->correctionApprovedBy?->name, 'reviewed_at' => $row->correction_approved_at?->toIso8601String(), 'rejection_reason' => $row->correction_rejection_reason, 'glucose' => $row->blood_glucose_level, 'pulse' => $row->pulse_bpm, 'systolic' => $row->blood_pressure_systolic, 'diastolic' => $row->blood_pressure_diastolic];
+        return $this->privateJson(['dose' => $map($dose), 'chain' => $chain->map($map)->values()]);
     }
 
     private function privateJson(array $data): JsonResponse
@@ -209,8 +337,7 @@ class PersonMedicationRecordController extends Controller
     /** @return Collection<int, ClientMedication> the person's current (not superseded) orders */
     private function orders(Client $client): Collection
     {
-        return ClientMedication::query()
-            ->current()
+        return ClientMedication::withTrashed()
             ->where('client_id', $client->id)
             ->with(['ceasedByUser:id,name', 'verifiedByUser:id,name'])
             ->get();
@@ -219,7 +346,7 @@ class PersonMedicationRecordController extends Controller
     /** active · awaiting (waiting to be checked) · paused · stopped (ceased) */
     private function status(ClientMedication $order): string
     {
-        if ($order->state === 'ceased' || $order->ceased_at !== null) {
+        if ($order->state === 'ceased' || $order->ceased_at !== null || $order->superseded_by !== null || $order->trashed()) {
             return 'stopped';
         }
         if ($order->state === 'paused' || ! $order->active) {
@@ -336,14 +463,14 @@ class PersonMedicationRecordController extends Controller
     private function allergySummary(Client $client): array
     {
         try {
-            $count = count(app(ClientAllergyRecordService::class)->forClient($client));
+            $summary = app(ClientAllergyRecordService::class)->summary($client);
         } catch (\Throwable $e) {
             report($e);
 
             return ['status' => 'unavailable', 'count' => 0];
         }
 
-        return ['status' => $count > 0 ? 'recorded' : 'none', 'count' => $count];
+        return ['status' => $summary['status'], 'count' => count($summary['entries']), 'reviewed' => $summary['reviewed']];
     }
 
     /** @return array<string, mixed>|null the latest INR result in use */

@@ -108,6 +108,7 @@ import { RhythmsRoutinesTab } from '@/pages/operations/clients/tabs/rhythms-rout
 import { ClientTimelineTab } from '@/pages/operations/clients/tabs/timeline-tab';
 import { useCreateShiftLauncher } from '@/pages/operations/shifts/components/use-create-shift-launcher';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { AllergyRecord } from '@/components/emar/record/allergy-record';
 import {
     Activity,
     AlertTriangle,
@@ -3530,21 +3531,7 @@ export default function ClientShow({
 
                         {tab === 'medical' && (
                             <div className="space-y-4">
-                                {/* Allergy Alert */}
-                                {medical.profile?.allergies &&
-                                    medical.profile.allergies !== '-' && (
-                                        <div className="flex items-center gap-3 rounded-xl border-2 border-status-critical/30 bg-status-critical-bg p-4">
-                                            <ShieldAlert className="h-6 w-6 shrink-0 text-status-critical" />
-                                            <div>
-                                                <p className="text-sm font-bold text-status-critical">
-                                                    Allergies
-                                                </p>
-                                                <p className="text-sm text-status-critical">
-                                                    {medical.profile.allergies}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
+                                <AllergyRecord key={client.id} clientId={client.id} editable />
 
                                 {/* Quick Stats */}
                                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -4219,6 +4206,7 @@ export default function ClientShow({
                                 />
                                 <HealthMonitoringTab
                                     clientId={client.id}
+                                    canViewDoseReadings={canShowProfileTab('medical')}
                                     data={healthMonitoring}
                                     isLoading={!hasHealthMonitoringProp}
                                 />

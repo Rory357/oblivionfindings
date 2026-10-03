@@ -26,8 +26,12 @@ function dose(time: string, over: Partial<DayDose> = {}): DayDose {
         recorded: null,
         mar_url: '/emar/mar?client_id=7',
         state: 'not_due',
-        window_opens_at: null,
-        window_ends_at: null,
+        window_opens_at: new Date(
+            Date.parse(`2026-06-15T${time}:00+12:00`) - 30 * 60_000,
+        ).toISOString(),
+        window_ends_at: new Date(
+            Date.parse(`2026-06-15T${time}:00+12:00`) + 60 * 60_000,
+        ).toISOString(),
         ...over,
     };
 }
@@ -123,6 +127,11 @@ describe('dose cells', () => {
                 'Away · In hospital (since Mon 15 Jun)',
             ],
             [{ status: 'upcoming' }, true, 'Upcoming'],
+            [
+                { status: 'upcoming', state: 'self_managed' },
+                true,
+                'Self-managed',
+            ],
         ];
         for (const [over, isToday, label] of cases) {
             const d = dose('08:00', over);
@@ -130,6 +139,12 @@ describe('dose cells', () => {
         }
         const given = day().medicines[0].cells['08:00'][0];
         expect(cellLabel(given, cellKind(given, true))).toBe('Given ✓ 8:05 am');
+        expect(cellLabel({ ...given, support_mode: 'prompted' }, 'given')).toBe(
+            'Taken with prompting ✓ 8:05 am',
+        );
+        expect(cellLabel({ ...given, support_mode: 'assisted' }, 'given')).toBe(
+            'Taken with assistance ✓ 8:05 am',
+        );
     });
 
     it('says why a due dose can’t be recorded here', () => {

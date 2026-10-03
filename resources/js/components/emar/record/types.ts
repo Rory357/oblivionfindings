@@ -22,8 +22,9 @@ export interface RecordMeters {
         to_check: number;
     };
     allergies: {
-        status: 'recorded' | 'none' | 'unavailable';
+        status: 'recorded' | 'none' | 'no_known' | 'unavailable';
         count: number;
+        reviewed?: { at: string; by: string | null; how: string } | null;
     };
     inr: {
         value: number;
@@ -107,7 +108,11 @@ export type RecordPageProps =
           unavailable?: undefined;
           person: RecordPerson;
           meters: RecordMeters;
-          can: { manage_orders: boolean };
+          can: {
+              manage_orders: boolean;
+              view_controlled: boolean;
+              view_audit: boolean;
+          };
           as_at: string;
       }
     | { unavailable: 'no_access' | 'not_found' };

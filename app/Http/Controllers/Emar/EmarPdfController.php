@@ -54,8 +54,7 @@ class EmarPdfController extends Controller
         $this->recordAccess->assertReportable($actor, $client);
         $includeControlled = $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY);
 
-        $scheduledMedications = ClientMedication::where('client_id', $client->id)
-            ->where('active', true)
+        $scheduledMedications = $this->ordersForPeriod($client, $dateFrom, $dateTo, $fromUtc, $toUtc, 'scheduled_for')
             ->where('is_prn', false)
             ->when(! $includeControlled, fn ($query) => $query->where('controlled_drug', false))
             ->with(['administrations' => function ($query) use ($client, $fromUtc, $toUtc) {
@@ -66,8 +65,7 @@ class EmarPdfController extends Controller
             ->orderBy('name')
             ->get();
 
-        $prnMedications = ClientMedication::where('client_id', $client->id)
-            ->where('active', true)
+        $prnMedications = $this->ordersForPeriod($client, $dateFrom, $dateTo, $fromUtc, $toUtc, 'administered_at')
             ->where('is_prn', true)
             ->when(! $includeControlled, fn ($query) => $query->where('controlled_drug', false))
             // Leaving out as-needed medicines is the report's choice (P02-1b).
@@ -102,6 +100,19 @@ class EmarPdfController extends Controller
     /**
      * Generate a Controlled Drug Register PDF for a client.
      */
+    private function ordersForPeriod(Client $client, string $from, string $to, Carbon $fromUtc, Carbon $toUtc, string $recordTime): \Illuminate\Database\Eloquent\Builder
+    {
+        return ClientMedication::withTrashed()->where('client_id', $client->id)->where(function ($orders) use ($client, $from, $to, $fromUtc, $toUtc, $recordTime) {
+            $orders->where(function ($order) use ($from, $to, $fromUtc, $toUtc) {
+                $order->where('created_at', '<=', $toUtc)
+                    ->where(fn ($q) => $q->whereNull('start_date')->orWhereDate('start_date', '<=', $to))
+                    ->where(fn ($q) => $q->whereNull('end_date')->orWhereDate('end_date', '>=', $from))
+                    ->where(fn ($q) => $q->whereNull('ceased_at')->orWhere('ceased_at', '>', $fromUtc))
+                    ->where(fn ($q) => $q->whereNull('superseded_at')->orWhere('superseded_at', '>', $fromUtc));
+            })->orWhereHas('administrations', fn ($q) => $q->effectiveClinicalEvidence()->where('client_id', $client->id)->whereBetween($recordTime, [$fromUtc, $toUtc]));
+        });
+    }
+
     public function controlledDrugRegister(Request $request)
     {
         abort_unless($request->user()?->canDo('medications.controlled.view'), 403);
