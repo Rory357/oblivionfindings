@@ -1,6 +1,6 @@
 # eMAR implementation and verification status
 
-Updated 4 October 2026, 07:38 Pacific/Auckland. This file takes precedence over the dated historical checkpoints in this folder. Reviewed work is published in [draft PR #16](https://github.com/Rory357/oblivionfindings/pull/16); this is not a production or clinical release.
+Updated 4 October 2026 after the hero and navigation re-audit (Pacific/Auckland). This file takes precedence over the dated historical checkpoints in this folder. Reviewed work is published in [draft PR #16](https://github.com/Rory357/oblivionfindings/pull/16); this is not a production or clinical release.
 
 ## Scope and navigation
 
@@ -15,10 +15,16 @@ The application remains one organisation across approved sites. Current staff el
 - Shared medication recording, person MAR/day/week charts, allergies and clinical readings, support agreements, independently checked orders, medication reviews and reconciliation.
 - Stock and pharmacy foundations, controlled checks/register, follow-ups and handovers, medication errors and linked incidents, emergency access, downtime paper evidence, reporting and Settings.
 - Connections to My Day, Tasks, staff competency, person profiles, site calendars, transport, health monitoring and incident workflows.
-- Rory-aligned compact headers, connected counts and views, clearer status/action wording, phone cards, larger touch targets and contained chart scrolling. Initial review-dialog and Settings crashes were repaired.
+- Partial migration to compact headers and connected views, clearer status/action wording, phone cards, larger touch targets and contained chart scrolling. Initial review-dialog and Settings crashes were repaired. The header and tab migration is incomplete; see the re-audit below.
 - Export purpose and access checks, NZ calendar/date handling, retained history, canonical ownership checks and immutable evidence. Approved stock-pack infrastructure remains feature-gated.
 
 The implemented list describes code coverage, not certification that every workflow has passed its release gates. Held actions below remain unavailable or incomplete.
+
+## Hero and navigation re-audit — 4 October 2026
+
+**eMAR does not yet pass Rory's hero and tab rules.** The earlier blanket description of its headers as Rory-aligned is withdrawn. With the user's specific read-only approval, the seven live entry pages were inspected: six retain legacy heroes and white card tab strips; Settings is closer but uses older sub-tab geometry. The integration draft improves several pages, but canonical Stock still selects the legacy renderer, MAR remains configuration-dependent, and several new headers omit required anatomy. A separate Reviews → To check link defect was reproduced in the synthetic preview; Reconciliation has the same selector mismatch in source.
+
+The [focused re-audit](hero-tabs-reaudit-2026-10-04/README.md) records nine findings, the active route/variant inventory, source evidence, three synthetic screenshots and a correction order preserving all workflows. Earlier browser checks demonstrate only their stated journeys, not whole-module design acceptance. This audit changed documentation only; application fixes, permissions, feature flags and existing release holds are unchanged. No production client records or screenshots were exported into the report.
 
 ## Verification evidence
 
