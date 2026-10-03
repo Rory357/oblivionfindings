@@ -128,6 +128,23 @@ it('rejects a multi-person PDF when an included person moves during rendering', 
     expect($response->getContent())->not->toContain('%PDF-sensitive')->and(MedicationEvent::count())->toBe(0);
 });
 
+it('withholds buffered report bytes when account approval is withdrawn during rendering', function () {
+    $actor = p09Reader('admin', $this->site);
+    $renderer = Mockery::mock(Barryvdh\DomPDF\PDF::class);
+    Pdf::shouldReceive('setOption')->once()->andReturn($renderer);
+    $renderer->shouldReceive('loadView')->once()->andReturnSelf();
+    $renderer->shouldReceive('setPaper')->once()->andReturnSelf();
+    $renderer->shouldReceive('output')->once()->andReturnUsing(function () use ($actor) {
+        DB::table('users')->where('id', $actor->id)->update(['approved_at' => null]);
+
+        return '%PDF-sensitive-synthetic-person';
+    });
+    $response = $this->actingAs($actor)->postJson('/emar/reports/export', p09ExportData($this->site, 'round_sheet'));
+    $response->assertForbidden();
+    expect($response->getContent())->not->toContain('%PDF-sensitive-synthetic-person');
+    expect(MedicationEvent::where('kind', 'export.created')->count())->toBe(0);
+});
+
 it('buffers retained streaming routes before rechecking every person', function () {
     $other = Site::factory()->create(['is_active' => true]);
     Route::get('/p09-synthetic-export', function () use ($other) {

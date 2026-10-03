@@ -55,7 +55,7 @@ class MedicationReportsController extends Controller
             if ($report === 'errors' && $reach !== '') {
                 $data['rows'] = array_values(array_filter($data['rows'], fn ($row) => $row['reached'] === $reach));
                 $effective = collect($data['rows'])->where('in_error', 0);
-                $data['totals'] = ['reached' => $effective->where('reached', 'yes')->count(), 'near_misses' => $effective->where('reached', 'no')->count(), 'with_harm' => $effective->whereIn('harm', ['minor', 'moderate', 'severe', 'severe_permanent', 'death'])->count(), 'open' => $effective->whereNotIn('status', ['closed', 'resolved'])->count()];
+                $data['totals'] = ['reached' => $effective->where('reached', 'yes')->count(), 'near_misses' => $effective->where('reached', 'no')->count(), 'with_harm' => $effective->whereIn('harm', ['minor', 'moderate', 'severe', 'severe_permanent', 'death'])->count(), 'open' => $effective->where('status', '!=', 'closed')->count()];
             }
             if (($filters['q'] ?? '') !== '') {
                 $q = mb_strtolower($filters['q']);

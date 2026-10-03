@@ -28,7 +28,7 @@ final class MedicationExportAudit
         // immediately before appending and releasing the file.
         app(MedicationExportReleaseGuard::class)->run($actor, $siteIds, $clientId ? [$clientId] : [],
             function (User $current, CurrentAuthorizationReads $reads) use ($type, $siteIds, $clientId) {
-                abort_unless(app(MedicationReportAccess::class)->canExport($current, $type), 403);
+                abort_unless($current->isApproved() && app(MedicationReportAccess::class)->canExport($current, $type), 403);
                 $approved = app(MedicationReportAccess::class)->siteIds($current, null, $clientId, $type === 'stock' ? 'stock' : (in_array($type, ['controlled', 'cd_register'], true) ? 'controlled' : 'doses'), $reads);
                 abort_if(array_diff($siteIds, $approved) !== [], 404);
             },
