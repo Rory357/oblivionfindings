@@ -511,7 +511,6 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ])
         ->name('emar.audit.event.integrity');
     Route::get('/audit/event/{id}/export', [MedicationAuditEventController::class, 'export'])
-        ->middleware(\App\Http\Middleware\MedicationExportGuard::class.':audit')
         ->middleware([
             'permission:medications.view',
             'permission:medications.audit.view',
