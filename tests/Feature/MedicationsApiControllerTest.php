@@ -17,6 +17,7 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\MedicationScanVerificationService;
+use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -169,6 +170,20 @@ class MedicationsApiControllerTest extends TestCase
 
     public function test_controlled_api_administration_conceals_missing_and_foreign_witnesses_before_eligible_credentials_without_mutation(): void
     {
+        // The test records today's 09:00 dose: a fixed NZ morning, with the
+        // order entered the day before (P01 recording guard).
+        $this->travelTo(Carbon::parse('2026-07-01 09:10:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc()->subDay());
+        $medication = $this->createMedicationForClient($this->client, [
+            'name' => 'API controlled witness boundary',
+            'controlled_drug' => true,
+            'approval_status' => 'verified',
+        ]);
+        $this->travelTo(Carbon::parse('2026-07-01 09:10:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
+        // setUp dated the recorder's employment from the real clock; it must
+        // have started before the fixed morning this test records on.
+        HrEmployeeProfile::query()
+            ->where('user_id', $this->actor->id)
+            ->update(['start_date' => now()->subMonth()->toDateString()]);
         $administrationPermission = Permission::query()->where('key', 'medications.administer.record')->firstOrFail();
         $controlledPermission = Permission::query()->where('key', 'medications.controlled.record')->firstOrFail();
         $controlledViewPermission = Permission::query()->where('key', 'medications.controlled.view')->firstOrFail();
@@ -193,11 +208,6 @@ class MedicationsApiControllerTest extends TestCase
             'ends_at' => now()->addHours(2),
             'actual_starts_at' => now()->subHour(),
             'status' => 'in_progress',
-        ]);
-        $medication = $this->createMedicationForClient($this->client, [
-            'name' => 'API controlled witness boundary',
-            'controlled_drug' => true,
-            'approval_status' => 'verified',
         ]);
         $stock = ClientMedicationStock::create([
             'client_medication_id' => $medication->id,

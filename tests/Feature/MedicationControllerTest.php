@@ -230,6 +230,20 @@ class MedicationControllerTest extends TestCase
      */
     protected function createMedication(array $overrides = []): ClientMedication
     {
+        // The order is entered the day before: nothing is owed before an
+        // order exists (P01 recording guard), so a dose due at "now" or
+        // earlier today must belong to an order entered before it.
+        $now = Carbon::getTestNow();
+        Carbon::setTestNow(Carbon::now()->subDay());
+        try {
+            return $this->createMedicationNow($overrides);
+        } finally {
+            Carbon::setTestNow($now);
+        }
+    }
+
+    protected function createMedicationNow(array $overrides = []): ClientMedication
+    {
         return ClientMedication::create(array_merge([
             'client_id' => $this->client->id,
             'name' => 'Paracetamol',
@@ -3070,6 +3084,9 @@ class MedicationControllerTest extends TestCase
     {
         $this->mockNotificationService();
         $administrationAt = $this->workerNow();
+        // The order is entered now, so its dose is the next one: nothing is
+        // owed before an order exists (P01 recording guard).
+        $doseAt = $administrationAt->copy()->addMinutes(2);
 
         // 1. Create medication
         $this->actingAs($this->admin)
@@ -3077,7 +3094,7 @@ class MedicationControllerTest extends TestCase
                 'name' => 'Lifecycle Med',
                 'dosage' => '10mg',
                 'frequency' => 'Once daily',
-                'dose_times' => [$administrationAt->format('H:i')],
+                'dose_times' => [$doseAt->format('H:i')],
                 'state' => 'active',
             ])
             ->assertRedirect()
@@ -3106,7 +3123,7 @@ class MedicationControllerTest extends TestCase
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
                 'dose_given' => '10mg',
-                'scheduled_for' => $administrationAt->format('Y-m-d H:i:s'),
+                'scheduled_for' => $doseAt->format('Y-m-d H:i:s'),
                 'administered_at' => $administrationAt->format('Y-m-d H:i:s'),
             ])
             ->assertRedirect()

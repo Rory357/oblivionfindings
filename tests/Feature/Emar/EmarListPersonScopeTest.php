@@ -10,6 +10,7 @@ use App\Models\ClientMedicationStock;
 use App\Models\MedicationDestruction;
 use App\Models\MedicationError;
 use App\Models\MedicationReview;
+use App\Models\MedicationSelfAdminAssessment;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
@@ -22,7 +23,8 @@ use Tests\TestCase;
 
 /**
  * Site scope is not person scope. The Site-wide eMAR lists (PRN records,
- * Errors, Reviews, Destructions, Stock) show an ordinary support worker only
+ * Errors, Reviews, Destructions, Stock, the medicines register and
+ * self-administration) show an ordinary support worker only
  * the residents whose chart they may open (ClientPolicy::viewMedications):
  * assigned, or covered by their clocked-in shift. Leads and medication
  * operations roles keep the whole Site.
@@ -172,6 +174,62 @@ class EmarListPersonScopeTest extends TestCase
         $stockKeeper = $this->supportWorker(grant: ['medications.stock.update']);
         $page = $this->actingAs($stockKeeper)->get(route('emar.stock'))->assertOk();
         $this->assertSame($this->allIds(), $this->sortedIds($page->inertiaProps('stockItems'), 'client_id'));
+    }
+
+    public function test_the_medicines_register_lists_only_the_residents_a_support_worker_may_open(): void
+    {
+        foreach ($this->residents() as $client) {
+            $this->medication($client, 'Metformin');
+        }
+
+        $page = $this->actingAs($this->worker)->get(route('emar.medications'))->assertOk();
+        $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('medications'), 'client_id'));
+
+        // A named person passes the same per-person gate (P02): a resident the
+        // worker may not open is not found, like any other record.
+        $this->actingAs($this->worker)
+            ->get(route('emar.medications', ['client_id' => $this->unassigned->id]))
+            ->assertNotFound();
+        $this->actingAs($this->worker)
+            ->get(route('emar.medications', ['client_id' => $this->assigned->id]))
+            ->assertOk();
+
+        $lead = $this->actingAs($this->lead())->get(route('emar.medications'))->assertOk();
+        $this->assertSame($this->allIds(), $this->sortedIds($lead->inertiaProps('medications'), 'client_id'));
+    }
+
+    public function test_a_medicines_details_follow_the_per_person_gate(): void
+    {
+        $hidden = $this->medication($this->unassigned, 'Metformin');
+        $readable = $this->medication($this->assigned, 'Metformin');
+
+        $this->actingAs($this->worker)
+            ->getJson(route('emar.medications.detail', $hidden))
+            ->assertNotFound();
+        $this->actingAs($this->worker)
+            ->getJson(route('emar.medications.detail', $readable))
+            ->assertOk();
+    }
+
+    public function test_self_administration_lists_only_the_residents_a_support_worker_may_open(): void
+    {
+        foreach ($this->residents() as $client) {
+            MedicationSelfAdminAssessment::query()->create([
+                'client_id' => $client->id, 'status' => 'completed', 'outcome' => 'independent',
+                'assessment_date' => now()->toDateString(),
+                'cognitive_capacity' => 5, 'physical_dexterity' => 5, 'vision_ability' => 5,
+                'swallowing_ability' => 5, 'understanding_score' => 5,
+                'willing_to_self_admin' => true, 'wishes_to_self_administer' => true,
+            ]);
+        }
+
+        $page = $this->actingAs($this->worker)->get(route('emar.self_admin'))->assertOk();
+        $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('assessments'), 'client_id'));
+        $this->assertSame(2, $page->inertiaProps('kpis.total'));
+        $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('clients'), 'id'));
+
+        $lead = $this->actingAs($this->lead())->get(route('emar.self_admin'))->assertOk();
+        $this->assertSame($this->allIds(), $this->sortedIds($lead->inertiaProps('assessments'), 'client_id'));
     }
 
     /** @return array<int, Client> */

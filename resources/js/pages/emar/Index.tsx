@@ -799,7 +799,7 @@ export default function EmarHome(props: Props) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="eMAR" />
+            <Head title="Medication overview" />
             <div className="flex flex-col gap-4 p-6">
                 {/* ── Hero ── */}
                 <PageHero

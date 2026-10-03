@@ -741,7 +741,7 @@ export default function StockManagement({
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="eMAR - Stock Management" />
+            <Head title="Stock & pharmacy" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
                     rail={<EmarHubRail />}

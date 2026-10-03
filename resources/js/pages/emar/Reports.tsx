@@ -473,7 +473,7 @@ export default function Reports(props: Props) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="eMAR - Reports" />
+            <Head title="Medication reports" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
                     rail={<EmarHubRail />}

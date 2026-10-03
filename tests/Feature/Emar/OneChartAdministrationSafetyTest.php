@@ -36,6 +36,10 @@ class OneChartAdministrationSafetyTest extends TestCase
     {
         parent::setUp();
 
+        // A fixed NZ clock: the tests record the dose due at "now" (P01
+        // recording guard), so the minute must not roll over mid-test.
+        Carbon::setTestNow(Carbon::parse('2026-07-01 09:30:20', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
+
         $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create([
@@ -95,6 +99,13 @@ class OneChartAdministrationSafetyTest extends TestCase
             'started_by' => $this->admin->id,
             'status' => 'in_progress',
         ]);
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
     }
 
     public function test_not_given_administration_requires_structured_reason_code(): void
@@ -280,9 +291,14 @@ class OneChartAdministrationSafetyTest extends TestCase
             ->assertJsonPath('success', false)
             ->assertJsonPath('error_field', 'approval_status');
 
+        // Checked before the dose was due: a dose falling before the order's
+        // check isn't owed (P01 recording guard), so verify at 09:00.
+        $recordingAt = Carbon::now();
+        $this->travelTo(Carbon::parse('2026-07-01 09:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->actingAs($this->admin)
             ->post("/emar/medications/{$medication->id}/verify")
             ->assertRedirect();
+        $this->travelTo($recordingAt);
 
         $this->assertDatabaseHas('client_medications', [
             'id' => $medication->id,
@@ -413,18 +429,26 @@ class OneChartAdministrationSafetyTest extends TestCase
 
     private function createMedication(array $overrides = []): ClientMedication
     {
-        return ClientMedication::query()->create(array_merge([
-            'client_id' => $this->client->id,
-            'name' => 'Paracetamol',
-            'dosage' => '500mg',
-            'frequency' => 'Once daily',
-            'dose_times' => [now(config('app.worker_timezone', 'Pacific/Auckland'))->format('H:i')],
-            'controlled_drug' => false,
-            'witness_required' => false,
-            'active' => true,
-            'state' => 'active',
-            'approval_status' => 'verified',
-        ], $overrides));
+        $doseTime = now(config('app.worker_timezone', 'Pacific/Auckland'))->format('H:i');
+        // Entered the day before: nothing is owed before an order exists.
+        $now = Carbon::getTestNow();
+        Carbon::setTestNow(Carbon::now()->subDay());
+        try {
+            return ClientMedication::query()->create(array_merge([
+                'client_id' => $this->client->id,
+                'name' => 'Paracetamol',
+                'dosage' => '500mg',
+                'frequency' => 'Once daily',
+                'dose_times' => [$doseTime],
+                'controlled_drug' => false,
+                'witness_required' => false,
+                'active' => true,
+                'state' => 'active',
+                'approval_status' => 'verified',
+            ], $overrides));
+        } finally {
+            Carbon::setTestNow($now);
+        }
     }
 
     private function createWitness(string $password): User
