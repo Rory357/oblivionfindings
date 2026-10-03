@@ -8,6 +8,7 @@ import {
     PageHeader,
     PageHeaderFilterSelect,
     PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
     PageHeaderRail,
     PageHeaderSearch,
 } from '@/components/page';
@@ -147,6 +148,11 @@ export default function Orders(props: Props) {
     const covertContext = useEntityContextMenu<Covert>();
     const reconciliationContext = useEntityContextMenu<Reconciliation>();
     const view = props.filters.view ?? 'orders';
+    const entryUnavailableReason = !props.can.manage
+        ? 'Order management permission is required.'
+        : !props.clients.some((client) => client.can_enter)
+          ? 'A covering, clocked-in shift or emergency access for the person is required.'
+          : undefined;
     const close = () => {
         request.current?.abort();
         setModal(null);
@@ -397,7 +403,7 @@ export default function Orders(props: Props) {
     return (
         <AppLayout breadcrumbs={useEmarBreadcrumbs()}>
             <Head title="Medication orders" />
-            <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-5 [&_button]:min-h-11 [&_button]:min-w-11 [&_input[type=search]]:min-h-11">
                 <PageHeader
                     icon={Pill}
                     title="Medication orders"
@@ -413,26 +419,39 @@ export default function Orders(props: Props) {
                                 }}
                                 placeholder="Search medicine or person"
                             />
-                            <PageHeaderPrimaryButton
-                                onClick={() =>
-                                    setModal(
-                                        view === 'reconciliation'
-                                            ? { type: 'start_reconciliation' }
-                                            : { type: 'new' },
-                                    )
-                                }
-                                disabled={
-                                    !props.can.manage ||
-                                    !props.clients.some(
-                                        (client) => client.can_enter,
-                                    )
-                                }
+                            <div
+                                className="flex max-w-80 flex-col gap-2"
+                                title={entryUnavailableReason}
                             >
-                                <Plus className="size-4" />
-                                {view === 'reconciliation'
-                                    ? 'Reconcile medicines'
-                                    : 'Enter an order'}
-                            </PageHeaderPrimaryButton>
+                                <PageHeaderPrimaryButton
+                                    onClick={() =>
+                                        setModal(
+                                            view === 'reconciliation'
+                                                ? { type: 'start_reconciliation' }
+                                                : { type: 'new' },
+                                        )
+                                    }
+                                    disabled={Boolean(entryUnavailableReason)}
+                                    aria-describedby={
+                                        entryUnavailableReason
+                                            ? 'order-entry-unavailable'
+                                            : undefined
+                                    }
+                                >
+                                    <Plus className="size-4" />
+                                    {view === 'reconciliation'
+                                        ? 'Reconcile medicines'
+                                        : 'Enter an order'}
+                                </PageHeaderPrimaryButton>
+                                {entryUnavailableReason && (
+                                    <p
+                                        id="order-entry-unavailable"
+                                        className="text-sm text-band-foreground/85"
+                                    >
+                                        {entryUnavailableReason}
+                                    </p>
+                                )}
+                            </div>
                         </>
                     }
                     meters={
@@ -505,15 +524,15 @@ export default function Orders(props: Props) {
                                     value={meter.value}
                                     onClick={() => filter(meter.change)}
                                 >
-                                    <span className="text-caption">
+                                    <PageHeaderMeterCaption>
                                         {meter.caption}
-                                    </span>
+                                    </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                             ))}
                         </>
                     }
                     filters={
-                        <>
+                        <div className="flex flex-wrap items-center gap-2 [&>div]:min-h-11">
                             <PageHeaderFilterSelect
                                 label="All houses"
                                 value={props.filters.site_id ?? 'all'}
@@ -551,7 +570,7 @@ export default function Orders(props: Props) {
                                     })
                                 }
                             />
-                        </>
+                        </div>
                     }
                     rail={
                         <PageHeaderRail<View>
@@ -678,7 +697,7 @@ export default function Orders(props: Props) {
                         <p className="text-caption">
                             <Link
                                 href="/emar/prescriptions/legacy"
-                                className="underline"
+                                className="inline-flex min-h-11 items-center underline"
                             >
                                 Open supply and dispensing records
                             </Link>
