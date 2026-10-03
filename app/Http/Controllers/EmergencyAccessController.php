@@ -74,6 +74,7 @@ class EmergencyAccessController extends Controller
                 'can_extend' => $running && $own && $user->canDo('medications.breakglass')
                     && $grant->expires_at->lt($grant->created_at->copy()->addMinutes($grant->effectivePolicy()['max_minutes'])),
                 'own' => $own, 'can_review' => ! $running && $reviewer && $independent,
+                'can_report_error' => $user->canDo('medications.view') && $user->canDo('medications.administer.record'),
                 'review_denial' => $independent ? null : ($own ? 'You used it — someone else reviews it' : 'You confirmed it — someone else reviews it'),
                 'review_outcome' => $grant->review_outcome, 'reviewed_by' => $grant->reviewedBy?->name,
                 'incident_report_id' => $grant->incident_report_id,
@@ -97,7 +98,7 @@ class EmergencyAccessController extends Controller
         $discoverySites = $canStart ? $this->siteAccess->accessibleSiteIds($user) : [];
         $results = mb_strlen($q) >= 2 && $canStart ? Client::whereIn('site_id', array_intersect($scoped, $discoverySites))
             ->with('site:id,name')->where(fn ($w) => $w->where('first_name', 'like', '%'.$q.'%')->orWhere('last_name', 'like', '%'.$q.'%'))
-            ->orderBy('last_name')->limit(25)->get(['id', 'first_name', 'last_name', 'site_id'])->map(fn ($c) => $c->only(['id', 'first_name', 'last_name']) + ['site' => $c->site?->only(['id', 'name'])]) : collect();
+            ->orderBy('last_name')->limit(25)->get(['id', 'first_name', 'last_name', 'date_of_birth', 'site_id'])->map(fn ($c) => $c->only(['id', 'first_name', 'last_name']) + ['date_of_birth' => $c->date_of_birth?->toDateString(), 'site' => $c->site?->only(['id', 'name'])]) : collect();
         $requestClient = $canStart && $request->integer('request_client') ? Client::whereIn('site_id', array_intersect($scoped, $discoverySites))
             ->with('site:id,name')->find($request->integer('request_client')) : null;
         $candidates = User::whereNotNull('approved_at')->where('id', '!=', $user->id)->with(['roles.permissions', 'hrEmployeeProfile'])
@@ -157,7 +158,7 @@ class EmergencyAccessController extends Controller
 
             'sites' => Site::whereIn('id', $visible)->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'active_site' => $site?->only(['id', 'name']), 'site_brand_colour' => $site?->brand_colour,
-            'request_client' => $requestClient ? $requestClient->only(['id', 'first_name', 'last_name']) + ['site' => $requestClient->site?->only(['id', 'name'])] : null,
+            'request_client' => $requestClient ? $requestClient->only(['id', 'first_name', 'last_name']) + ['date_of_birth' => $requestClient->date_of_birth?->toDateString(), 'site' => $requestClient->site?->only(['id', 'name'])] : null,
         ]);
     }
 }
