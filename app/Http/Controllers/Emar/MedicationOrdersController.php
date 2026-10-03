@@ -104,6 +104,16 @@ final class MedicationOrdersController extends Controller
             $handoff = $item->only('id', 'client_id', 'client_medication_id', 'outcome', 'name_snapshot', 'recommendation') + ['entered' => $item->linked_order_version_id !== null];
         }
 
+        $openAction = in_array($request->input('action'), ['entry', 'check', 'covert'], true) ? $request->input('action') : 'view';
+        if ($request->integer('order_id') && $openAction === 'check') {
+            $opened = $this->readableOrder($actor, $request->integer('order_id'));
+            $waiting = MedicationOrderRevision::query()->canonicalVersion()->where('client_id', $opened->client_id)->where('client_medication_id', $opened->id)
+                ->where(fn ($q) => $q->where('status', 'pending')->orWhere(fn ($second) => $second->where('status', 'checked_alone')->whereNull('second_checked_at')))->exists();
+            if (! $waiting) {
+                $openAction = $opened->approval_status !== 'verified' && $actor->canDo('medications.orders.manage') ? 'entry' : 'view';
+            }
+        }
+
         return Inertia::render('emar/Orders', [
             'orders' => $page, 'counts' => $counts, 'houses' => $this->scope->sitePicker($sites),
             'clients' => $clients->map(fn ($client) => ['id' => $client->id, 'name' => trim($client->first_name.' '.$client->last_name), 'site_id' => $client->site_id, 'can_enter' => in_array($client->id, $writableIds, true)]),
@@ -114,6 +124,9 @@ final class MedicationOrdersController extends Controller
             'me' => ['id' => $actor->id, 'name' => $actor->name], 'loaded_at' => now()->toIso8601String(),
             'review_default' => now()->timezone('Pacific/Auckland')->addMonthsNoOverflow(3)->toDateString(),
             'open_order_id' => $request->integer('order_id') ?: null,
+            'open_order_action' => $openAction,
+            'open_check_mode' => in_array($request->input('mode'), ['send_back', 'second'], true) ? $request->input('mode') : 'independent',
+            'open_new_order' => $request->input('action') === 'entry' && ! $request->integer('order_id'),
             'review_handoff' => $handoff,
             'prefill_client_id' => in_array($request->integer('client_id'), $readableIds, true) ? $request->integer('client_id') : null,
             'filters' => $request->only('view', 'show', 'search', 'site_id'),

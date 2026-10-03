@@ -75,6 +75,7 @@ export function OrderDetail({
     onEnter,
     initialAction = 'view',
     review,
+    initialCheckMode = 'independent',
 }: {
     order: Order;
     detail: Detail;
@@ -84,6 +85,7 @@ export function OrderDetail({
     onEnter: () => void;
     initialAction?: Action;
     review?: ReviewHandoff;
+    initialCheckMode?: 'independent' | 'second' | 'send_back';
 }) {
     const [section, setSection] = useState(0);
     const [action, setAction] = useState<Action>(initialAction);
@@ -100,7 +102,7 @@ export function OrderDetail({
     );
     const [confirmStop, setConfirmStop] = useState(false);
     const form = useForm({
-        mode: 'independent',
+        mode: String(initialCheckMode),
         source_matches: false,
         dose_route_times_checked: false,
         allergies_interactions_checked: false,

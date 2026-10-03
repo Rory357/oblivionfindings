@@ -50,6 +50,7 @@ use App\Services\Medication\Followups\LegacyEffectFollowupAdapter;
 use App\Services\Medication\Followups\MedicationFollowupService;
 use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\MedicationLegacyOrderBridge;
 use App\Services\Medication\MedicationOrderLifecycleService;
 use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationRoundGenerationService;
@@ -4615,123 +4616,12 @@ class EmarController extends Controller
 
     public function storeCovert(Request $request)
     {
-        $actor = $request->user();
-        abort_unless($actor, 403);
-
-        return $this->governanceScope->forMedication(
-            $actor,
-            (int) $request->input('client_medication_id'),
-            'medications.orders.manage',
-            function (Client $client, ClientMedication $medication) use ($request, $actor) {
-                $this->assertActiveVerifiedPrescriptionMedication($medication);
-                abort_if(
-                    $medication->controlled_drug
-                        && (! $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)
-                            || ! $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_CAPABILITY)),
-                    404,
-                );
-                $validated = $request->validate([
-                    'client_id' => 'required|integer|min:1',
-                    'client_medication_id' => 'required|integer|min:1',
-                    'authorised_by_name' => 'required|string|max:255',
-                    'authorised_by_registration' => 'nullable|string|max:255',
-                    'clinical_justification' => 'required|string',
-                    'legal_basis' => 'nullable|string',
-                    'administration_method' => 'nullable|string|max:255',
-                    'pharmacist_advice' => 'nullable|string',
-                    'authorised_date' => 'required|date',
-                    'review_date' => 'required|date|after:authorised_date',
-                ]);
-                abort_unless(
-                    (int) $validated['client_id'] === (int) $client->id
-                        && (int) $validated['client_medication_id'] === (int) $medication->id,
-                    404,
-                );
-                $actionDate = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
-                if (Carbon::parse($validated['authorised_date'])->toDateString() > $actionDate) {
-                    throw ValidationException::withMessages([
-                        'authorised_date' => 'The authorisation date cannot be in the future.',
-                    ]);
-                }
-                if (Carbon::parse($validated['review_date'])->toDateString() < $actionDate) {
-                    throw ValidationException::withMessages([
-                        'review_date' => 'The review date must not already have lapsed.',
-                    ]);
-                }
-                $activeAuthorisations = MedicationCovertAuthorisation::query()
-                    ->where('client_id', $client->id)
-                    ->where('client_medication_id', $medication->id)
-                    ->where('status', 'active')
-                    ->orderBy('id')
-                    ->lockForUpdate()
-                    ->get();
-                if ($activeAuthorisations->isNotEmpty()) {
-                    throw ValidationException::withMessages([
-                        'clinical_justification' => 'Revoke the current covert authorisation before recording another one.',
-                    ]);
-                }
-
-                $authorisation = MedicationCovertAuthorisation::create(array_merge($validated, [
-                    'client_id' => $client->id,
-                    'client_medication_id' => $medication->id,
-                    'status' => 'active',
-                    'recorded_by' => $actor->id,
-                ]));
-                AuditLogger::logOrFail('medications.covert_authorisation.created', $authorisation, [
-                    'actor_id' => (int) $actor->id,
-                    'client_id' => (int) $client->id,
-                    'client_medication_id' => (int) $medication->id,
-                    'authorisation_id' => (int) $authorisation->id,
-                    'status_before' => null,
-                    'status_after' => 'active',
-                    'authorised_date' => $authorisation->authorised_date?->toDateString(),
-                    'review_date' => $authorisation->review_date?->toDateString(),
-                ]);
-
-                return redirect()->back();
-            },
-            (int) $request->input('client_id'),
-        );
+        return app(MedicationLegacyOrderBridge::class)->covert($request);
     }
 
     public function revokeCovert(Request $request, MedicationCovertAuthorisation $authorisation)
     {
-        $actor = $request->user();
-        abort_unless($actor, 403);
-
-        return $this->governanceScope->forCovertAuthorisation(
-            $actor,
-            $authorisation,
-            function (Client $client, ClientMedication $medication, MedicationCovertAuthorisation $lockedAuthorisation) use ($actor, $request) {
-                abort_if(
-                    $medication->controlled_drug
-                        && (! $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)
-                            || ! $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_CAPABILITY)),
-                    404,
-                );
-                if ($lockedAuthorisation->status !== 'active') {
-                    throw ValidationException::withMessages([
-                        'authorisation' => 'Only an active covert authorisation can be revoked.',
-                    ]);
-                }
-                $validated = $request->validate([
-                    'reason' => 'required|string|max:500',
-                ]);
-                $lockedAuthorisation->update(['status' => 'revoked']);
-                AuditLogger::logOrFail('medications.covert_authorisation.revoked', $lockedAuthorisation, [
-                    'actor_id' => (int) $actor->id,
-                    'client_id' => (int) $client->id,
-                    'client_medication_id' => (int) $medication->id,
-                    'authorisation_id' => (int) $lockedAuthorisation->id,
-                    'status_before' => 'active',
-                    'status_after' => 'revoked',
-                    'revoked_at' => now()->toIso8601String(),
-                    'reason' => trim($validated['reason']),
-                ]);
-
-                return redirect()->back();
-            },
-        );
+        return app(MedicationLegacyOrderBridge::class)->revokeCovert($request, $authorisation);
     }
 
     private function resolveMedicationReviewReviewer(
@@ -7871,287 +7761,17 @@ class EmarController extends Controller
 
     public function storeMedication(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user, 403);
-
-        return $this->medicationScope->forClient(
-            $user,
-            $request->integer('client_id'),
-            now(),
-            function (MedicationScopeDecision $scope) use ($request, $user) {
-                $validated = $request->validate([
-                    'client_id' => 'required|integer',
-                    'medication_name' => 'required|string|max:255',
-                    'brand_name' => 'nullable|string|max:255',
-                    'dose' => 'required|string|max:100',
-                    'dose_unit' => 'nullable|string|max:50',
-                    'frequency' => 'required|string|max:100',
-                    'route' => 'nullable|string|max:50',
-                    'form' => 'nullable|string|max:50',
-                    'instructions' => 'nullable|string|max:2000',
-                    'indication' => 'nullable|string|max:500',
-                    'is_prn' => 'nullable|boolean',
-                    'prn_reason' => 'nullable|string|max:500',
-                    'max_per_day' => 'nullable|integer|min:1',
-                    'max_doses_per_day' => 'nullable|integer|min:1',
-                    'min_hours_between_doses' => 'nullable|numeric|min:0',
-                    'controlled_drug' => 'nullable|boolean',
-                    'is_controlled_drug' => 'nullable|boolean',
-                    'high_risk' => 'nullable|boolean',
-                    'is_high_risk' => 'nullable|boolean',
-                    'witness_required' => 'nullable|boolean',
-                    'start_date' => 'nullable|date',
-                    'prescriber' => 'nullable|string|max:255',
-                    'prescriber_name' => 'nullable|string|max:255',
-                    'pharmac_therapeutic_group' => 'nullable|string|max:255',
-                    'pharmac_subgroup' => 'nullable|string|max:255',
-                ]);
-                $payload = $this->buildMedicationPayload($validated);
-                $this->assertControlledMedicationOrderWriteAuthority(
-                    $user,
-                    (bool) ($payload['controlled_drug'] ?? false),
-                );
-                $payload['client_id'] = $scope->client->id;
-
-                $medication = ClientMedication::create(array_merge(
-                    $payload,
-                    [
-                        'created_by' => $user->id,
-                        'start_date' => $validated['start_date'] ?? WorkerClock::today()->toDateString(),
-                        'state' => 'active',
-                        'active' => true,
-                        'approval_status' => 'pending_verification',
-                        'verified_by' => null,
-                        'verified_at' => null,
-                    ],
-                ));
-                $this->medicationScope->recordBreakGlassUse(
-                    $scope,
-                    'created_medication_order',
-                    'Medication '.$medication->id,
-                );
-
-                return redirect()->back();
-            },
-        );
+        return app(MedicationLegacyOrderBridge::class)->enter($request);
     }
 
     public function updateMedication(Request $request, ClientMedication $medication)
     {
-        $user = $request->user();
-        abort_unless($user, 403);
-
-        return $this->medicationScope->forMedication(
-            $user,
-            $medication,
-            now(),
-            function (MedicationScopeDecision $scope) use ($request, $user) {
-                $this->assertControlledMedicationOrderWriteAuthority(
-                    $user,
-                    (bool) $scope->medication->controlled_drug,
-                );
-                $validated = $request->validate([
-                    'client_id' => 'nullable|integer',
-                    'medication_name' => 'sometimes|string|max:255',
-                    'brand_name' => 'nullable|string|max:255',
-                    'dose' => 'sometimes|string|max:100',
-                    'dose_unit' => 'nullable|string|max:50',
-                    'frequency' => 'sometimes|string|max:100',
-                    'route' => 'nullable|string|max:50',
-                    'form' => 'nullable|string|max:50',
-                    'instructions' => 'nullable|string|max:2000',
-                    'indication' => 'nullable|string|max:500',
-                    'is_prn' => 'nullable|boolean',
-                    'prn_reason' => 'nullable|string|max:500',
-                    'max_per_day' => 'nullable|integer|min:1',
-                    'max_doses_per_day' => 'nullable|integer|min:1',
-                    'min_hours_between_doses' => 'nullable|numeric|min:0',
-                    'controlled_drug' => 'nullable|boolean',
-                    'is_controlled_drug' => 'nullable|boolean',
-                    'high_risk' => 'nullable|boolean',
-                    'is_high_risk' => 'nullable|boolean',
-                    'witness_required' => 'nullable|boolean',
-                    'start_date' => 'nullable|date',
-                    'prescriber' => 'nullable|string|max:255',
-                    'prescriber_name' => 'nullable|string|max:255',
-                    'pharmac_therapeutic_group' => 'nullable|string|max:255',
-                    'pharmac_subgroup' => 'nullable|string|max:255',
-                ]);
-                if (array_key_exists('client_id', $validated)
-                    && (int) $validated['client_id'] !== (int) $scope->client->id) {
-                    throw ValidationException::withMessages([
-                        'client_id' => 'The requested medication action is not available.',
-                    ]);
-                }
-
-                $payload = $this->buildMedicationPayload($validated);
-                unset($payload['client_id']);
-                if (array_key_exists('controlled_drug', $payload)) {
-                    $this->assertControlledMedicationOrderWriteAuthority(
-                        $user,
-                        (bool) $payload['controlled_drug'],
-                    );
-                    if ((bool) $payload['controlled_drug'] !== (bool) $scope->medication->controlled_drug) {
-                        throw ValidationException::withMessages([
-                            'controlled_drug' => 'Controlled-drug classification cannot be changed on an existing medication order.',
-                        ]);
-                    }
-                }
-                $payload['approval_status'] = 'pending_verification';
-                $payload['verified_by'] = null;
-                $payload['verified_at'] = null;
-                $payload['rejection_reason'] = null;
-
-                $scope->medication->update($payload);
-                $this->medicationScope->recordBreakGlassUse(
-                    $scope,
-                    'updated_medication_order',
-                    'Medication '.$scope->medication->id,
-                );
-
-                return redirect()->back();
-            },
-        );
+        return app(MedicationLegacyOrderBridge::class)->enter($request, $medication);
     }
 
     public function verifyMedication(Request $request, ClientMedication $medication)
     {
-        $verifier = $request->user();
-        abort_unless($this->canVerifyMedicationOrders($verifier), 403);
-
-        return $this->medicationScope->forMedication(
-            $verifier,
-            $medication,
-            now(),
-            function (MedicationScopeDecision $scope) use ($request, $verifier) {
-                $this->assertControlledMedicationOrderWriteAuthority(
-                    $verifier,
-                    (bool) $scope->medication->controlled_drug,
-                );
-                if ($scope->medication->approval_status === 'verified') {
-                    return redirect()->back()->with('success', 'Medication order was already verified.');
-                }
-
-                if ($scope->medication->approval_status !== 'pending_verification') {
-                    throw ValidationException::withMessages([
-                        'approval_status' => 'Only a medication order awaiting verification can be verified.',
-                    ]);
-                }
-
-                if ($scope->medication->state !== 'active' || ! (bool) $scope->medication->active) {
-                    throw ValidationException::withMessages([
-                        'medication' => 'Only an active medication order can be verified.',
-                    ]);
-                }
-
-                $validated = $request->validate([
-                    'waiver_reason' => [
-                        'nullable',
-                        'string',
-                        'max:1000',
-                        'required_with:waiver_approved_by,waiver_approver_credential',
-                    ],
-                    'waiver_approved_by' => [
-                        'nullable',
-                        'integer',
-                        'required_with:waiver_reason,waiver_approver_credential',
-                    ],
-                    'waiver_approver_credential' => [
-                        'nullable',
-                        'string',
-                        'max:255',
-                        'required_with:waiver_reason,waiver_approved_by',
-                    ],
-                    'scan_code' => ['nullable', 'string', 'max:255'],
-                    'scan_source' => ['nullable', 'string', 'in:manual,scanner'],
-                    'scan_verified' => ['nullable', 'boolean'],
-                    'scan_match_source' => ['nullable', 'string', 'max:50'],
-                ]);
-
-                $scanEvidenceSubmitted = collect([
-                    'scan_code',
-                    'scan_source',
-                    'scan_verified',
-                    'scan_match_source',
-                ])->contains(fn (string $key): bool => $request->exists($key));
-                $scanAudit = $scanEvidenceSubmitted
-                    ? $this->verifyMedicationScanOrFail(
-                        $scope->client,
-                        $scope->medication,
-                        $validated,
-                    )
-                    : null;
-
-                $requiresIndependentVerifier = $scope->medication->requiresIndependentVerification();
-                $creatorSeparationUnproved = $scope->medication->created_by === null
-                    || (int) $scope->medication->created_by === (int) $verifier->id;
-                $waiverApprover = null;
-                $waiverEvidenceSubmitted = collect([
-                    'waiver_reason',
-                    'waiver_approved_by',
-                    'waiver_approver_credential',
-                ])->contains(fn (string $key): bool => filled($validated[$key] ?? null));
-
-                if ($requiresIndependentVerifier && $creatorSeparationUnproved) {
-                    $waiverApprover = $this->resolveMedicationVerificationWaiverApprover(
-                        $scope,
-                        $verifier,
-                        $validated,
-                    );
-                } elseif ($waiverEvidenceSubmitted) {
-                    throw ValidationException::withMessages([
-                        'waiver_reason' => 'An emergency waiver is only available when a high-risk order creator must verify their own order.',
-                    ]);
-                }
-
-                $orderEvidenceHash = $scope->medication->verificationEvidenceHash();
-                $orderVersion = (int) ($scope->medication->version ?? 1);
-
-                $scope->medication->forceFill([
-                    'approval_status' => 'verified',
-                    'verified_by' => $verifier->id,
-                    'verified_at' => now(),
-                    'rejection_reason' => null,
-                ])->save();
-
-                $auditMeta = [
-                    'site_id' => $scope->siteId,
-                    'creator_user_id' => $scope->medication->created_by !== null
-                        ? (int) $scope->medication->created_by
-                        : null,
-                    'verifier_user_id' => (int) $verifier->id,
-                    'independent_verifier_required' => $requiresIndependentVerifier,
-                    'verification_mode' => $waiverApprover !== null
-                        ? 'emergency_waiver'
-                        : ($requiresIndependentVerifier ? 'independent_verifier' : 'standard'),
-                    'approval_status_from' => 'pending_verification',
-                    'approval_status_to' => 'verified',
-                    'order_version' => $orderVersion,
-                    'order_evidence_sha256' => $orderEvidenceHash,
-                    'scan_verification_used' => $scanAudit !== null,
-                ];
-                if ($waiverApprover !== null) {
-                    $auditMeta['waiver_reason'] = trim((string) $validated['waiver_reason']);
-                    $auditMeta['waiver_approved_by_user_id'] = (int) $waiverApprover->id;
-                }
-                if ($scanAudit !== null) {
-                    $auditMeta['scan_source'] = $scanAudit['scan_source'];
-                    $auditMeta['scan_match_source'] = $scanAudit['scan_match_source'];
-                    $auditMeta['scan_match_label'] = $scanAudit['scan_match_label'];
-                    $auditMeta['entered_code_suffix'] = $scanAudit['scan_code_suffix'];
-                }
-
-                AuditLogger::logOrFail('medications.order.verified', $scope->medication, $auditMeta);
-                $this->medicationScope->recordBreakGlassUse(
-                    $scope,
-                    'verified_medication_order',
-                    'Medication '.$scope->medication->id,
-                );
-
-                return redirect()->back()->with('success', 'Medication order verified.');
-            },
-            allowCeased: true,
-        );
+        return app(MedicationLegacyOrderBridge::class)->check($request, $medication);
     }
 
     /**
@@ -8202,84 +7822,12 @@ class EmarController extends Controller
 
     public function rejectMedication(Request $request, ClientMedication $medication)
     {
-        $reviewer = $request->user();
-        abort_unless($this->canVerifyMedicationOrders($reviewer), 403);
-
-        return $this->medicationScope->forMedication(
-            $reviewer,
-            $medication,
-            now(),
-            function (MedicationScopeDecision $scope) use ($request, $reviewer) {
-                $this->assertControlledMedicationOrderWriteAuthority(
-                    $reviewer,
-                    (bool) $scope->medication->controlled_drug,
-                );
-                if ($scope->medication->approval_status === 'rejected') {
-                    return redirect()->back()->with('success', 'Medication order was already rejected.');
-                }
-
-                if ($scope->medication->approval_status !== 'pending_verification') {
-                    throw ValidationException::withMessages([
-                        'approval_status' => 'Only a medication order awaiting verification can be rejected.',
-                    ]);
-                }
-
-                if ($scope->medication->state !== 'active' || ! (bool) $scope->medication->active) {
-                    throw ValidationException::withMessages([
-                        'medication' => 'Only an active medication order can be rejected.',
-                    ]);
-                }
-
-                $validated = $request->validate([
-                    'rejection_reason' => ['required', 'string', 'max:1000'],
-                ]);
-                $reason = trim($validated['rejection_reason']);
-                $orderEvidenceHash = $scope->medication->verificationEvidenceHash();
-                $orderVersion = (int) ($scope->medication->version ?? 1);
-
-                $scope->medication->forceFill([
-                    'approval_status' => 'rejected',
-                    'verified_by' => null,
-                    'verified_at' => null,
-                    'rejection_reason' => $reason,
-                ])->save();
-
-                AuditLogger::logOrFail('medications.order.rejected', $scope->medication, [
-                    'site_id' => $scope->siteId,
-                    'creator_user_id' => $scope->medication->created_by !== null
-                        ? (int) $scope->medication->created_by
-                        : null,
-                    'reviewer_user_id' => (int) $reviewer->id,
-                    'approval_status_from' => 'pending_verification',
-                    'approval_status_to' => 'rejected',
-                    'order_version' => $orderVersion,
-                    'order_evidence_sha256' => $orderEvidenceHash,
-                    'rejection_reason_sha256' => hash('sha256', $reason),
-                ]);
-                $this->medicationScope->recordBreakGlassUse(
-                    $scope,
-                    'rejected_medication_order',
-                    'Medication '.$scope->medication->id,
-                );
-
-                return redirect()->back()->with('success', 'Medication order rejected.');
-            },
-        );
+        return app(MedicationLegacyOrderBridge::class)->check($request, $medication, sendBack: true);
     }
 
     public function discontinueMedication(Request $request, ClientMedication $medication)
     {
-        $user = $request->user();
-        abort_unless($user, 403);
-
-        $this->medicationOrderLifecycle->discontinue(
-            $user,
-            $medication,
-            $request->input('reason'),
-            requestKey: $request->input('request_key'),
-        );
-
-        return redirect()->back()->with('success', 'Medication discontinued successfully.');
+        return app(MedicationOrdersController::class)->stop($request, $medication->id);
     }
 
     // ─── Controlled Drug Entry CRUD ──────────────────────

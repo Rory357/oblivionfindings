@@ -13,7 +13,7 @@ import {
 import { witnessIsSelectable, witnessOptionLabel } from '@/lib/witness-pin';
 import { AddMedicationDialog } from '@/pages/emar/_dialogs';
 import type { WitnessOption } from '@/pages/meds/today/types';
-import { useForm } from '@inertiajs/react';
+import { router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
     ClipboardCheck,
@@ -769,17 +769,13 @@ function VerifyOrderDialog({
     const form = useForm({ rejection_reason: '' });
 
     const verify = (id: number) =>
-        form.post(`/emar/medications/${id}/verify`, {
-            preserveScroll: true,
-            onSuccess: onClose,
-        });
+        router.visit(`/emar/prescriptions?order_id=${id}&action=check`);
     const reject = (e: React.FormEvent) => {
         e.preventDefault();
         if (rejectId)
-            form.post(`/emar/medications/${rejectId}/reject`, {
-                preserveScroll: true,
-                onSuccess: onClose,
-            });
+            router.visit(
+                `/emar/prescriptions?order_id=${rejectId}&action=check&mode=send_back`,
+            );
     };
 
     return (

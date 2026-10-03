@@ -190,6 +190,95 @@ class MedicationOrdersWorkflowTest extends TestCase
         $this->assertSame(0, MedicationOrderRevision::count());
     }
 
+    public function test_legacy_flat_create_and_edit_return_links_without_persisting_changes(): void
+    {
+        $input = ['client_id' => $this->client->id, 'medication_name' => 'Flat medicine', 'dose' => '20 mg', 'frequency' => 'Daily'];
+        $this->actingAs($this->enterer)->postJson('/emar/medications', $input)->assertStatus(409)
+            ->assertJsonPath('orders_url', '/emar/prescriptions?client_id='.$this->client->id.'&action=entry');
+        $this->assertSame(0, ClientMedication::count());
+        $order = $this->order();
+        $this->actingAs($this->enterer)->putJson('/emar/medications/'.$order->id, $input)->assertStatus(409)
+            ->assertJsonPath('orders_url', '/emar/prescriptions?client_id='.$this->client->id.'&order_id='.$order->id.'&action=entry');
+        $this->assertSame('10 mg', $order->refresh()->dosage);
+        $this->assertSame('verified', $order->approval_status);
+        $this->assertSame(1, $order->version);
+        $this->assertSame(0, MedicationOrderRevision::count());
+        $this->assertSame(0, MedicationEvent::count());
+    }
+
+    public function test_legacy_source_edit_replays_once_and_stale_version_is_denied(): void
+    {
+        $order = $this->order();
+        $input = $this->entryInput($order, ['dosage' => '20 mg']) + ['source_file' => UploadedFile::fake()->create('legacy-source.pdf', 1, 'application/pdf')];
+        $this->actingAs($this->enterer)->put('/emar/medications/'.$order->id, $input)->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs($this->enterer)->put('/emar/medications/'.$order->id, $input)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('10 mg', $order->refresh()->dosage);
+        $this->assertSame('verified', $order->approval_status);
+        $this->assertSame(1, MedicationOrderRevision::where('status', 'pending')->count());
+        $this->assertSame(1, MedicationEvent::where('kind', 'order.entered')->count());
+        $input['request_key'] = 'stale-legacy-source';
+        $input['expected_version'] = 0;
+        $this->actingAs($this->enterer)->putJson('/emar/medications/'.$order->id, $input)->assertUnprocessable()->assertJsonValidationErrors('expected_version');
+        $this->assertSame(1, MedicationEvent::where('kind', 'order.entered')->count());
+    }
+
+    public function test_legacy_verify_uses_exact_revision_independent_check_and_single_receipt(): void
+    {
+        $order = $this->order();
+        $revision = $this->enter($order, ['dosage' => '20 mg']);
+        $this->actingAs($this->checker)->postJson('/emar/medications/'.$order->id.'/verify')->assertStatus(409)
+            ->assertJsonPath('orders_url', '/emar/prescriptions?client_id='.$this->client->id.'&order_id='.$order->id.'&action=check');
+        $this->assertSame('10 mg', $order->refresh()->dosage);
+        $input = $this->checkInput() + ['revision_id' => $revision->id];
+        $this->actingAs($this->enterer)->postJson('/emar/medications/'.$order->id.'/verify', $input)->assertUnprocessable()->assertJsonValidationErrors('checker');
+        $this->actingAs($this->checker)->post('/emar/medications/'.$order->id.'/verify', $input)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('20 mg', $order->refresh()->dosage);
+        $this->actingAs($this->checker)->postJson('/emar/medications/'.$order->id.'/verify', $input)->assertUnprocessable();
+        $this->assertSame(1, MedicationEvent::where('kind', 'order.checked')->count());
+    }
+
+    public function test_legacy_reject_sends_back_only_the_proposed_revision(): void
+    {
+        $order = $this->order();
+        $revision = $this->enter($order, ['dosage' => '20 mg']);
+        $this->actingAs($this->checker)->postJson('/emar/medications/'.$order->id.'/reject', ['rejection_reason' => 'Source mismatch.'])->assertStatus(409);
+        $this->actingAs($this->checker)->post('/emar/medications/'.$order->id.'/reject', ['revision_id' => $revision->id, 'rejection_reason' => 'Source mismatch.'])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('sent_back', $revision->refresh()->status);
+        $this->assertSame('verified', $order->refresh()->approval_status);
+        $this->assertSame('10 mg', $order->dosage);
+    }
+
+    public function test_legacy_bridge_retains_shift_authority_and_canonical_revision_ownership(): void
+    {
+        $order = $this->order();
+        $revision = $this->enter($order, ['dosage' => '20 mg']);
+        $office = $this->staff(false);
+        $this->actingAs($office)->putJson('/emar/medications/'.$order->id, ['dose' => '30 mg'])->assertForbidden();
+        $this->actingAs($office)->postJson('/emar/medications/'.$order->id.'/verify', $this->checkInput() + ['revision_id' => $revision->id])->assertForbidden();
+        $other = $this->order(['name' => 'Another medicine']);
+        $this->actingAs($this->checker)->postJson('/emar/medications/'.$other->id.'/verify', $this->checkInput() + ['revision_id' => $revision->id])->assertNotFound();
+        $this->assertSame('pending', $revision->refresh()->status);
+        $this->assertSame('10 mg', $order->refresh()->dosage);
+    }
+
+    public function test_legacy_covert_without_signed_structured_source_saves_nothing(): void
+    {
+        $order = $this->order();
+        $this->actingAs($this->enterer)->postJson('/emar/prescriptions/covert', ['client_id' => $this->client->id, 'client_medication_id' => $order->id, 'authorised_by_name' => 'Dr Test', 'clinical_justification' => 'Flat evidence', 'authorised_date' => '2026-10-03', 'review_date' => '2027-01-03'])->assertStatus(409)
+            ->assertJsonPath('orders_url', '/emar/prescriptions?client_id='.$this->client->id.'&order_id='.$order->id.'&action=covert');
+        $this->assertSame(0, MedicationCovertAuthorisation::count());
+        $this->assertSame(0, MedicationOrderAction::count());
+    }
+
+    public function test_legacy_inertia_link_opens_the_source_wizard_without_writing(): void
+    {
+        $order = $this->order();
+        $url = '/emar/prescriptions?client_id='.$this->client->id.'&order_id='.$order->id.'&action=entry';
+        $this->actingAs($this->enterer)->withHeader('X-Inertia', 'true')->put('/emar/medications/'.$order->id, ['dose' => '20 mg'])->assertStatus(409)->assertHeader('X-Inertia-Location', $url);
+        $this->assertSame('10 mg', $order->refresh()->dosage);
+        $this->actingAs($this->enterer)->withHeader('X-Inertia', '')->get($url)->assertInertia(fn (Assert $page) => $page->where('open_order_action', 'entry')->where('open_order_id', $order->id));
+    }
+
     public function test_controlled_order_detail_source_and_candidates_are_concealed_from_restricted_reader(): void
     {
         $permissionIds = Permission::whereIn('key', ['medications.controlled.view', 'medications.controlled.record'])->pluck('id');
@@ -363,11 +452,14 @@ class MedicationOrdersWorkflowTest extends TestCase
         $missing = $input;
         $missing['capacity_lacking'] = false;
         $this->actingAs($this->enterer)->postJson('/emar/orders/'.$order->id.'/covert', $missing)->assertUnprocessable()->assertJsonValidationErrors('capacity_lacking');
-        $this->actingAs($this->enterer)->post('/emar/orders/'.$order->id.'/covert', $input)->assertSessionHasNoErrors();
+        $this->actingAs($this->enterer)->post('/emar/prescriptions/covert', $input + ['client_id' => $this->client->id, 'client_medication_id' => $order->id])->assertRedirect()->assertSessionHasNoErrors();
         $auth = MedicationCovertAuthorisation::sole();
         $this->actingAs($this->checker)->get('/emar/prescriptions?view=covert')->assertInertia(fn (Assert $page) => $page
             ->where('covert.0.authorised_date', '2026-10-03')->where('covert.0.review_date', '2027-01-03')->has('covert.0.files', 1)->missing('covert.0.files.0.file_path'));
         $this->assertSame('covert_review', MedicationFollowup::where('source_key', 'covert-review:'.$auth->id)->sole()->type);
+        $this->actingAs($this->enterer)->post('/emar/prescriptions/covert/'.$auth->id.'/revoke', ['reason' => 'The prescriber confirmed it will be offered openly.'])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('The prescriber confirmed it will be offered openly.', $auth->refresh()->revoke_reason);
+        $this->assertNotNull(MedicationFollowup::where('source_key', 'covert-review:'.$auth->id)->sole()->completed_at);
         Carbon::setTestNow(Carbon::parse('2027-01-03 23:59', 'Pacific/Auckland')->utc());
         $this->assertFalse($auth->isExpired());
         Carbon::setTestNow(Carbon::parse('2027-01-04 00:00', 'Pacific/Auckland')->utc());

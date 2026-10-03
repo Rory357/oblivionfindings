@@ -71,20 +71,23 @@ type OrderAction =
     | 'hold'
     | 'resume'
     | 'entry';
+type OpeningAction = OrderAction | 'covert';
 type Modal =
     | {
           type: 'detail' | 'entry';
           detail: Detail;
           action: OrderAction;
           review?: ReviewHandoff;
+          checkMode?: 'independent' | 'second' | 'send_back';
       }
     | { type: 'new'; clientId?: number; review?: ReviewHandoff }
     | {
           type: 'opening';
           id: number;
-          action: OrderAction;
+          action: OpeningAction;
           error?: string;
           review?: ReviewHandoff;
+          checkMode?: 'independent' | 'second' | 'send_back';
       }
     | { type: 'start_reconciliation' }
     | { type: 'reconciliation'; record: Reconciliation }
@@ -130,6 +133,9 @@ type Props = {
     filters: { view?: View; show?: string; search?: string; site_id?: string };
     respite_stays: RespiteStayChoice[];
     open_order_id: number | null;
+    open_order_action: OpeningAction;
+    open_check_mode: 'independent' | 'second' | 'send_back';
+    open_new_order: boolean;
 };
 
 export default function Orders(props: Props) {
@@ -154,23 +160,35 @@ export default function Orders(props: Props) {
         );
     const openOrder = (
         id: number,
-        action: OrderAction = 'view',
+        action: OpeningAction = 'view',
         review?: ReviewHandoff,
+        checkMode?: 'independent' | 'second' | 'send_back',
     ) => {
         request.current?.abort();
         const controller = new AbortController();
         request.current = controller;
-        setModal({ type: 'opening', id, action, review });
+        setModal({ type: 'opening', id, action, review, checkMode });
         axios
             .get<Detail>(`/emar/orders/${id}`, { signal: controller.signal })
             .then(({ data }) => {
-                if (!controller.signal.aborted)
+                if (!controller.signal.aborted) {
+                    if (action === 'covert') {
+                        setModal({
+                            type: 'covert',
+                            orderId: data.summary.id,
+                            medicine: data.summary.name,
+                            person: data.summary.person,
+                        });
+                        return;
+                    }
                     setModal({
                         type: action === 'entry' ? 'entry' : 'detail',
                         detail: data,
                         action,
                         review,
+                        checkMode,
                     });
+                }
             })
             .catch(() => {
                 if (!controller.signal.aborted)
@@ -179,13 +197,26 @@ export default function Orders(props: Props) {
                         id,
                         action,
                         review,
+                        checkMode,
                         error: 'This order could not be opened. Your access or the record may have changed.',
                     });
             });
     };
     useEffect(() => {
-        if (props.open_order_id) openOrder(props.open_order_id);
-    }, [props.open_order_id]);
+        if (props.open_order_id)
+            openOrder(props.open_order_id, props.open_order_action, undefined, props.open_check_mode);
+        else if (props.open_new_order)
+            setModal({
+                type: 'new',
+                clientId: props.prefill_client_id ?? undefined,
+            });
+    }, [
+        props.open_order_id,
+        props.open_order_action,
+        props.open_new_order,
+        props.prefill_client_id,
+        props.open_check_mode,
+    ]);
     useEffect(() => {
         const recommendation = props.review_handoff;
         if (
@@ -843,6 +874,7 @@ export default function Orders(props: Props) {
                                         modal.id,
                                         modal.action,
                                         modal.review,
+                                        modal.checkMode,
                                     )
                                 }
                             >
@@ -881,6 +913,7 @@ export default function Orders(props: Props) {
                         detail={modal.detail}
                         me={props.me.id}
                         canManage={modal.detail.summary.can_manage}
+                        initialCheckMode={modal.checkMode ?? 'independent'}
                         review={modal.review}
                         initialAction={
                             modal.action === 'entry' ? 'view' : modal.action

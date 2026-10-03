@@ -312,11 +312,7 @@ export default function Medications(props: Props) {
     ];
 
     const verify = (med: MedRow) => {
-        router.post(
-            `/emar/medications/${med.id}/verify`,
-            {},
-            { preserveScroll: true },
-        );
+        router.visit(`/emar/prescriptions?order_id=${med.id}&action=check`);
         setModal(null);
     };
 
