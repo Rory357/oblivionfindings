@@ -3,7 +3,9 @@
 namespace Tests\Feature\Emar;
 
 use App\Models\Client;
+use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationDoseScheduleVersion;
 use App\Models\MedicationRound;
 use App\Models\MedicationRoundTemplate;
 use App\Models\ServiceContext;
@@ -92,6 +94,17 @@ class MedicationRoundsDemoSeederTest extends TestCase
 
         $this->seed(MedicationRoundsDemoSeeder::class);
 
+        $morningAt = Carbon::parse('2026-06-15 08:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc();
+        $orders = ClientMedication::whereIn('client_id', Client::where('service_context_id', $this->demoContextId())->select('id'))->get();
+        $this->assertCount(16, $orders);
+        foreach ($orders as $order) {
+            $this->assertTrue($order->created_at->lessThan($morningAt));
+            $this->assertTrue($order->verified_at->lessThan($morningAt));
+            $history = MedicationDoseScheduleVersion::where('client_medication_id', $order->id)->sole();
+            $this->assertTrue($history->changed_at->equalTo($order->created_at));
+            $this->assertTrue($history->verified_at->equalTo($order->verified_at));
+        }
+
         $rounds = $this->todaysRounds();
         $this->assertSame(
             self::ROUNDS_BY_SITE,
@@ -137,7 +150,12 @@ class MedicationRoundsDemoSeederTest extends TestCase
         User::factory()->create(['role' => 'support_worker']);
 
         $this->seed(MedicationRoundsDemoSeeder::class);
+        $orderEvidence = ClientMedication::orderBy('id')->get()->map->getAttributes()->all();
+        $scheduleEvidence = MedicationDoseScheduleVersion::orderBy('id')->get()->map->getAttributes()->all();
+        Carbon::setTestNow(now()->addMinutes(30));
         $this->seed(MedicationRoundsDemoSeeder::class);
+        $this->assertSame($orderEvidence, ClientMedication::orderBy('id')->get()->map->getAttributes()->all());
+        $this->assertSame($scheduleEvidence, MedicationDoseScheduleVersion::orderBy('id')->get()->map->getAttributes()->all());
 
         $ctxId = $this->demoContextId();
         $this->assertSame(8, Client::where('service_context_id', $ctxId)->count());
