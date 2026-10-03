@@ -2564,7 +2564,7 @@ class PrescriptionsPageTest extends TestCase
             ->assertSessionHasErrors('reason');
         $this->actingAs($user)
             ->post(route('emar.covert.revoke', $controlledCovert), [
-                'reason' => str_repeat('x', 501),
+                'reason' => str_repeat('x', 2001),
             ])
             ->assertSessionHasErrors('reason');
         $this->assertSame('active', $controlledCovert->fresh()->status);

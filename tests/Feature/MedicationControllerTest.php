@@ -162,6 +162,9 @@ class MedicationControllerTest extends TestCase
     {
         $mock = \Mockery::mock(NotificationService::class);
         $mock->shouldReceive('notifyCrud')->andReturnNull();
+        // Keep eligible recipients intact; notification routing has its own focused coverage.
+        \Illuminate\Support\Facades\Notification::fake();
+        $mock->shouldReceive('applyPreferences')->andReturnUsing(fn ($recipients) => $recipients);
         $this->app->instance(NotificationService::class, $mock);
 
         return $mock;
@@ -3355,11 +3358,12 @@ class MedicationControllerTest extends TestCase
         $this->assertNotNull($med);
 
         // 2. Retain the signed source and independently check its revision.
+        $sourceRequest = 'lifecycle-source-'.bin2hex(random_bytes(8));
         $this->actingAs($this->admin)->post('/emar/orders', [
             'client_id' => $this->client->id,
             'medication_id' => $med->id,
             'expected_version' => $med->version,
-            'request_key' => 'lifecycle-source-'.bin2hex(random_bytes(8)),
+            'request_key' => $sourceRequest,
             'change_reason' => 'Enter the signed prescription.',
             'source' => [
                 'type' => 'written', 'prescriber' => 'Dr Lifecycle',
@@ -3373,7 +3377,8 @@ class MedicationControllerTest extends TestCase
                 'controlled_drug' => false, 'high_risk' => false, 'witness_required' => false,
             ],
         ])->assertRedirect()->assertSessionHasNoErrors();
-        $revision = MedicationOrderRevision::where('client_medication_id', $med->id)->sole();
+        $revision = MedicationOrderRevision::where('client_medication_id', $med->id)
+            ->where('status', 'pending')->whereHas('version', fn ($query) => $query->where('entry_request_key', $sourceRequest))->sole();
         $versionEvidence = $revision->version->fresh()->getAttributes();
         $this->actingAs($this->providerManager)
             ->post('/emar/order-revisions/'.$revision->id.'/check', [

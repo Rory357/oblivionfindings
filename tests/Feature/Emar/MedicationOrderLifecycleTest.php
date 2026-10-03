@@ -763,7 +763,18 @@ class MedicationOrderLifecycleTest extends TestCase
 
     public function test_legacy_soft_deleted_parent_remains_resolvable_in_history_and_export_without_a_fabricated_reason(): void
     {
-        $medication = $this->medication(['name' => 'Legacy retained administration order']);
+        $clock = Carbon::getTestNow();
+        $scheduledAt = now('Pacific/Auckland')->startOfMinute();
+        Carbon::setTestNow($scheduledAt->copy()->subHour()->utc());
+        try {
+            $medication = $this->medication([
+                'name' => 'Legacy retained administration order',
+                'dose_times' => [$scheduledAt->format('H:i')],
+                'controlled_drug' => false,
+            ]);
+        } finally {
+            Carbon::setTestNow($clock);
+        }
         $administration = ClientMedicationAdministration::query()->create([
             'client_id' => $this->client->id,
             'client_medication_id' => $medication->id,
