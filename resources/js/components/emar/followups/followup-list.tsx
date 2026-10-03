@@ -279,7 +279,7 @@ export function MedicationFollowupList({
                                                 {row.site.name}
                                             </p>
                                         </div>
-                                        <EntityKebab items={actions(row)} />
+                                        <EntityKebab actions={actions(row)} />
                                     </div>
                                     <p className="font-medium">{row.label}</p>
                                     <p className="text-subtle">
