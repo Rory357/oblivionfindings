@@ -95,6 +95,7 @@ class HandoverMedicationLensTest extends TestCase
             'expiry_date' => now()->addYear()->toDateString(),
             'assessor_declared_at' => now()->subMonth(),
             'staff_acknowledged_at' => now()->subMonth(),
+            'controlled_drugs' => true,
             'can_witness_controlled' => true,
         ]);
         $presenceClient = Client::factory()->create([

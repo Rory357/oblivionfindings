@@ -616,6 +616,7 @@ class GuidedRoundOfflineReplayTest extends TestCase
             'expiry_date' => now()->addYear()->toDateString(),
             'assessor_declared_at' => now()->subMonth(),
             'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+            'controlled_drugs' => true,
             'can_witness_controlled' => true,
         ]);
         Shift::factory()->create([

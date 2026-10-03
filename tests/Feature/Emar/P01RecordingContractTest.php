@@ -1100,6 +1100,7 @@ class P01RecordingContractTest extends TestCase
             'assessor_declared_at' => now()->subMonth(),
             'staff_acknowledged_at' => now()->subMonth()->addMinute(),
             'can_administer_unsupervised' => true,
+            'controlled_drugs' => true,
             'can_witness_controlled' => true,
         ]);
 
