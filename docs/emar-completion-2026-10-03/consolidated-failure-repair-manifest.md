@@ -127,3 +127,7 @@ P11 used a fresh branch at 50ee59735aa91d6ef2229304839effd9a771040a and mapped a
 Prepared source: f65be7c3a38617cad2add3538be35235bc5508d8 normalises explicit notification recipients while retaining role/user preferences; b053f76e271b749bc8299acf87f6e0888a663ab8 scopes page permissions to settingsCan and removes five duplicate Settings reads. The companion alert/test commit includes released report fixtures, missing preview coverage and complete strict JSON object comparisons. Navigation and site/auditor denials remain; no role/grant authority, held expiry behavior, MedicineRuleSettingsTest, downtime or export classes were changed.
 
 PHP/TSX syntax and whitespace checks pass. No backend/frontend suite, build, install or heavy queue was launched. Main must verify current routing and both unchanged query ceilings; the budget assertion now supplies SQL frequency counts if it still fails. This is candidate repair status, not a claim that the eleven cases passed.
+
+## Correction — 4 October, 05:28 NZDT
+
+The P11 page-can shadowing hypothesis above was disproved: shared navigation is auth.can.medications. Renaming settingsCan clarifies ownership; current permission fixtures and duplicate Settings reads were separately repaired. Both unchanged query ceilings and navigation cases subsequently passed. See CURRENT-STATUS.md for authoritative latest results; original393/78 is the historical baseline, not the remaining failure count.
