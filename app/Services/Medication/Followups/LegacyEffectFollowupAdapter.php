@@ -2,8 +2,6 @@
 
 namespace App\Services\Medication\Followups;
 
-use App\Models\ClientMedicationAdministration;
-use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,13 +15,8 @@ final class LegacyEffectFollowupAdapter
         abort_unless($actor?->canDo('medications.administer.record'), 403);
         $id = filter_var($request->input('client_medication_administration_id'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         abort_unless($id !== false, 404);
-        $source = new ClientMedicationAdministration;
-        $source->setAttribute($source->getKeyName(), (int) $id);
-        // Preserve the existing source's activity and clinical scope checks,
-        // then release them before canonical transition takes its full lock order.
-        $scopeService->forPrnEffectiveness($actor, $source, now(), static function (MedicationScopeDecision $scope): void {
-            abort_if($scope->medication->controlled_drug && ! $scope->performer->canDo('medications.controlled.record'), 404);
-        });
+        // Canonical transition holds the source, current authority and any
+        // emergency grant throughout the clinical write and audit receipt.
         $data = $request->validate([
             'request_uuid' => ['required', 'uuid'], 'revision' => ['required', 'integer', 'min:1'],
             'effectiveness' => ['required', 'in:effective,partially_effective,not_effective'],

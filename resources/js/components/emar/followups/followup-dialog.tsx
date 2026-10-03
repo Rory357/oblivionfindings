@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import DraftResumePrompt from '@/components/draft-resume-prompt';
 import DraftSavedIndicator from '@/components/draft-saved-indicator';
+import { SecondPersonConfirmationDialog } from '@/components/emar/second-person-confirmation-dialog';
 import { DateTimeField } from '@/components/fleet-assets/maintenance/date-time-field';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -59,6 +60,7 @@ import {
 import { useFormAutosave } from '@/hooks/use-form-autosave';
 import { useOfflineQueueState } from '@/hooks/use-offline-queue';
 import { formatDateTime } from '@/lib/datetime';
+import type { SharedData } from '@/types';
 import {
     createMedicationMutationReplayState,
     prepareMedicationMutationReplayState,
@@ -122,19 +124,35 @@ type Props = {
 };
 
 export function MedicationFollowupDialog(props: Props) {
+    const { auth } = usePage<SharedData>().props;
+    const actorId = auth.user?.id ?? null;
+    const mayRead = auth.can?.medications?.view !== false;
+    const loadKey = `${actorId}:${props.id}`;
     const [row, setRow] = useState<MedicationFollowup | null>(null);
+    const [loadedKey, setLoadedKey] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [attempt, setAttempt] = useState(0);
     useEffect(() => {
-        if (!props.id) return;
         const controller = new AbortController();
         setRow(null);
+        setLoadedKey(null);
         setError(null);
+        if (!props.id || actorId === null || !mayRead) {
+            setError('This follow-up is no longer available to you.');
+            return () => controller.abort();
+        }
         axios
             .get<MedicationFollowup>(`/medication-followups/${props.id}`, {
                 signal: controller.signal,
             })
-            .then((result) => setRow(result.data))
+            .then((result) => {
+                if (!controller.signal.aborted) {
+                    if (result.data.id !== props.id)
+                        throw new Error('Follow-up identity did not match.');
+                    setRow(result.data);
+                    setLoadedKey(loadKey);
+                }
+            })
             .catch((e) => {
                 if (!controller.signal.aborted)
                     setError(
@@ -144,9 +162,9 @@ export function MedicationFollowupDialog(props: Props) {
                     );
             });
         return () => controller.abort();
-    }, [props.id, attempt]);
+    }, [props.id, attempt, actorId, mayRead, loadKey]);
     if (!props.id) return null;
-    if (!row)
+    if (!row || loadedKey !== loadKey || !mayRead)
         return (
             <Dialog open onOpenChange={(open) => !open && props.onClose()}>
                 <DialogContent>
@@ -167,6 +185,30 @@ export function MedicationFollowupDialog(props: Props) {
                 </DialogContent>
             </Dialog>
         );
+    const nominationId = row.context?.nomination_id;
+    if (
+        row.type === 'confirm' &&
+        (props.mode ?? 'action') === 'action' &&
+        row.owner?.id === auth.user?.id &&
+        typeof nominationId === 'number' &&
+        Number.isSafeInteger(nominationId) &&
+        nominationId > 0
+    ) {
+        return (
+            <SecondPersonConfirmationDialog
+                open
+                nominationId={nominationId}
+                onOpenChange={(open) => !open && props.onClose()}
+                onAnswered={() => {
+                    // Source answer is committed. Parent refreshes the shared
+                    // list/meters/dose and reloads the canonical row. The
+                    // source fetch displays its retained terminal result.
+                    props.onSaved?.();
+                    setAttempt((n) => n + 1);
+                }}
+            />
+        );
+    }
     return (
         <FollowupBody
             key={row.id}
@@ -203,6 +245,7 @@ function FollowupBody({
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [step, setStep] = useState(0);
     const [sending, setSending] = useState(false);
+    const [emergencyEnded, setEmergencyEnded] = useState(false);
     const [saved, setSaved] = useState<'sent' | 'queued' | null>(null);
     const [discard, setDiscard] = useState(false);
     const [dirty, setDirty] = useState(false);
@@ -331,7 +374,15 @@ function FollowupBody({
                 ?.focus(),
         );
     const showErrors = (next: Record<string, string>) => {
-        setErrors(next);
+        const global = Object.entries(next).filter(
+            ([key]) => key !== 'save' && !(key in EMPTY),
+        );
+        setErrors({
+            ...next,
+            ...(!next.save && global.length
+                ? { save: global.map(([, value]) => value).join(' ') }
+                : {}),
+        });
         if (row.type === 'reoffer' && mode === 'action') {
             const assessmentKeys = [
                 'reason_category',
@@ -432,6 +483,7 @@ function FollowupBody({
             material,
         );
         setSending(true);
+        setEmergencyEnded(false);
         setErrors({});
         try {
             const result = await submitOffline({
@@ -487,8 +539,19 @@ function FollowupBody({
         } catch (error) {
             if (axios.isAxiosError(error)) {
                 const server = error.response?.data as
-                    | { errors?: Record<string, string[]>; message?: string }
+                    | {
+                          code?: string;
+                          errors?: Record<string, string[]>;
+                          message?: string;
+                      }
                     | undefined;
+                if (server?.code === 'emergency_access_ended') {
+                    setEmergencyEnded(true);
+                    showErrors({
+                        save: 'Emergency access ended. Your entries are retained. Start access again or ask someone on shift to complete this follow-up.',
+                    });
+                    return;
+                }
                 showErrors(
                     server?.errors
                         ? Object.fromEntries(
@@ -965,6 +1028,17 @@ function FollowupBody({
             Reload latest record
         </Button>
     );
+    const emergencyAccessButton = emergencyEnded && (
+        <Button variant="outline" asChild className="frontline-tap">
+            <Link
+                href={`/emar/emergency-access?request_client=${row.client.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+            >
+                Start emergency access in another tab
+            </Link>
+        </Button>
+    );
     const sharedHeader = (
         <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1174,6 +1248,7 @@ function FollowupBody({
                                   : actionBody}
                             <InputError message={errors.save} />
                             {reloadButton}
+                            {emergencyAccessButton}
                             <DraftSavedIndicator savedAt={autosave.savedAt} />
                         </div>
                     </WizardStepPane>
@@ -1272,6 +1347,7 @@ function FollowupBody({
                             actionBody
                         )}
                         <InputError message={errors.save} />
+                        {emergencyAccessButton}
                         {errors.save?.includes('reload') && (
                             <Button
                                 variant="outline"

@@ -3,7 +3,9 @@
 namespace Tests\Feature\Emar;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\BreakGlassPolicy;
 use App\Models\Client;
+use App\Models\ClientBreakGlassAccess;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationEvent;
@@ -512,6 +514,132 @@ class MedicationFollowupWorkflowTest extends TestCase
         $this->assertSame(1, $row->events()->count());
     }
 
+    public function test_current_emergency_grant_can_complete_effect_work_and_replay_records_one_use(): void
+    {
+        [, $row] = $this->effect();
+        $actor = $this->staff();
+        $access = $this->emergencyGrant($actor);
+        $this->actingAs($actor)->getJson('/medication-followups/'.$row->id)->assertOk()->assertJsonPath('can_complete', true);
+        $payload = ['action' => 'effect', 'outcome' => 'effective', 'revision' => 1, 'request_uuid' => (string) Str::uuid()];
+        $this->actingAs($actor)->postJson('/medication-followups/'.$row->id.'/transition', $payload)->assertOk();
+        $this->actingAs($actor)->postJson('/medication-followups/'.$row->id.'/transition', $payload)->assertOk()->assertJsonPath('duplicate', true);
+        $this->assertNotNull($row->fresh()->completed_at);
+        $this->assertSame(1, $access->accessEvents()->where('action', 'followup.effect')->count());
+        $this->assertSame(1, MedicationEvent::query()->where('subject_type', 'emergency_access')->where('subject_id', $access->id)->count());
+        $this->assertDatabaseCount('medication_prn_effectiveness', 1);
+    }
+
+    public function test_grant_ended_after_opening_returns_typed_conflict_without_followup_writes(): void
+    {
+        [, $row] = $this->effect();
+        $actor = $this->staff();
+        $access = $this->emergencyGrant($actor);
+        $this->actingAs($actor)->getJson('/medication-followups/'.$row->id)->assertOk();
+        $access->forceFill(['ended_at' => now(), 'ended_how' => 'done'])->save();
+        $access->delete();
+        $this->actingAs($actor)->postJson('/medication-followups/'.$row->id.'/transition', [
+            'action' => 'effect', 'outcome' => 'effective', 'revision' => 1, 'request_uuid' => (string) Str::uuid(),
+        ])->assertConflict()->assertJsonPath('code', 'emergency_access_ended');
+        $this->assertNull($row->fresh()->completed_at);
+        $this->assertSame(1, $row->fresh()->revision);
+        $this->assertDatabaseCount('medication_prn_effectiveness', 0);
+        $this->assertSame(0, $access->accessEvents()->count());
+    }
+
+    public function test_expired_grant_cannot_accept_an_offline_followup_claim(): void
+    {
+        [, $row] = $this->effect();
+        $actor = $this->staff();
+        $access = $this->emergencyGrant($actor);
+        $access->forceFill(['expires_at' => now()->subMinute()])->save();
+        $this->actingAs($actor)->postJson('/medication-followups/'.$row->id.'/transition', [
+            'action' => 'effect', 'outcome' => 'effective', 'revision' => 1, 'request_uuid' => (string) Str::uuid(),
+            'queued_offline' => true, 'captured_offline_at' => '2026-10-03T08:59:00+13:00',
+        ])->assertConflict()->assertJsonPath('code', 'emergency_access_ended');
+        $this->assertNull($row->fresh()->completed_at);
+        $this->assertDatabaseCount('medication_prn_effectiveness', 0);
+    }
+
+    public function test_followup_grant_uses_its_frozen_policy_and_not_a_later_policy_edit(): void
+    {
+        [, $row] = $this->effect();
+        $actor = $this->staff();
+        $this->emergencyGrant($actor);
+        BreakGlassPolicy::updateApplicationPolicy(['max_minutes' => 5, 'second_person' => 'required']);
+        $this->actingAs($actor)->postJson('/medication-followups/'.$row->id.'/transition', [
+            'action' => 'effect', 'outcome' => 'effective', 'revision' => 1, 'request_uuid' => (string) Str::uuid(),
+        ])->assertOk();
+        $this->assertNotNull($row->fresh()->completed_at);
+    }
+
+    public function test_invalid_emergency_acknowledgements_cannot_authorize_followup_work(): void
+    {
+        [, $row] = $this->effect();
+        $actor = $this->staff();
+        $this->emergencyGrant($actor, ['acknowledged_incident_report' => false]);
+        $this->actingAs($actor)->postJson('/medication-followups/'.$row->id.'/transition', [
+            'action' => 'effect', 'outcome' => 'effective', 'revision' => 1, 'request_uuid' => (string) Str::uuid(),
+        ])->assertNotFound();
+        $this->assertNull($row->fresh()->completed_at);
+        $this->assertDatabaseCount('medication_prn_effectiveness', 0);
+    }
+
+    public function test_effect_transition_rechecks_current_medication_activity(): void
+    {
+        [$dose, $row] = $this->effect();
+        $this->actingAs($this->worker)->getJson('/medication-followups/'.$row->id)->assertOk();
+        $dose->medication->update(['active' => false]);
+        $this->postFollowup($row, ['action' => 'effect', 'outcome' => 'effective'])->assertUnprocessable()->assertJsonValidationErrors('medication');
+        $this->assertNull($row->fresh()->completed_at);
+        $this->assertDatabaseCount('medication_prn_effectiveness', 0);
+    }
+
+    public function test_original_owner_cannot_use_the_loose_read_grant_fallback_for_a_clinical_write(): void
+    {
+        [, $row] = $this->effect();
+        $this->shift->update(['status' => 'completed', 'actual_ends_at' => now()->subMinute()]);
+        $this->emergencyGrant($this->worker, ['acknowledged_min_necessary' => false]);
+        $this->postFollowup($row, ['action' => 'effect', 'outcome' => 'effective'])->assertNotFound();
+        $this->assertNull($row->fresh()->completed_at);
+        $this->assertDatabaseCount('medication_prn_effectiveness', 0);
+    }
+
+    public function test_confirmation_affordance_requires_named_witness_authority_instead_of_recording_permission(): void
+    {
+        [$dose] = $this->effect();
+        $nominee = $this->staff();
+        $this->onShift($nominee);
+        $this->deny($nominee, ['medications.administer.record']);
+        $this->grant($nominee, ['medications.controlled.witness']);
+        $row = DB::transaction(fn () => $this->work()->ensureForSource('confirm', 123, $this->client,
+            $dose->medication, $dose, $nominee->id, now()->addMinutes(30), ['nomination_id' => 123]));
+        $this->actingAs($nominee)->getJson('/medication-followups/'.$row->id)->assertOk()->assertJsonPath('can_complete', true);
+        $this->actingAs($this->worker)->getJson('/medication-followups/'.$row->id)->assertOk()->assertJsonPath('can_complete', false);
+        $this->deny($nominee, ['medications.controlled.witness']);
+        $this->actingAs($nominee)->getJson('/medication-followups/'.$row->id)->assertOk()->assertJsonPath('can_complete', false);
+    }
+
+    public function test_emergency_use_evidence_rolls_back_when_final_audit_fails(): void
+    {
+        [, $row] = $this->effect();
+        $actor = $this->staff();
+        $access = $this->emergencyGrant($actor);
+        $mock = \Mockery::mock();
+        $mock->shouldReceive('appendMany')->once()->andThrow(new \RuntimeException('Synthetic emergency audit failure'));
+        $this->app->instance(MedicationEventRecorder::class, $mock);
+        try {
+            $this->work()->transition($actor, $row->id, ['action' => 'effect', 'outcome' => 'effective', 'revision' => 1, 'request_uuid' => (string) Str::uuid()]);
+            $this->fail('The emergency audit failure must propagate.');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('Synthetic emergency audit failure', $e->getMessage());
+        }
+        $this->assertNull($row->fresh()->completed_at);
+        $this->assertSame(1, $row->fresh()->revision);
+        $this->assertSame(0, $access->accessEvents()->count());
+        $this->assertDatabaseCount('medication_prn_effectiveness', 0);
+        $this->assertSame(1, $row->events()->count());
+    }
+
     public function test_history_cannot_be_edited_or_deleted(): void
     {
         [, $row] = $this->effect();
@@ -578,6 +706,22 @@ class MedicationFollowupWorkflowTest extends TestCase
     {
         $user->permissionOverrides()->syncWithoutDetaching(Permission::query()->whereIn('key', $keys)->pluck('id')->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])->all());
         $user->unsetRelation('roles')->unsetRelation('permissionOverrides');
+    }
+
+    private function emergencyGrant(User $actor, array $overrides = []): ClientBreakGlassAccess
+    {
+        $this->grant($actor, ['medications.breakglass']);
+
+        $access = new ClientBreakGlassAccess;
+        $access->forceFill([
+            'client_id' => $this->client->id, 'user_id' => $actor->id,
+            'reason' => 'Synthetic follow-up emergency regression only.', 'authorization_mode' => 'self',
+            'acknowledged_min_necessary' => true, 'acknowledged_incident_report' => true,
+            'created_at' => now()->subMinutes(10), 'expires_at' => now()->addMinutes(50),
+            'policy_snapshot' => BreakGlassPolicy::defaults(), ...$overrides,
+        ])->save();
+
+        return $access;
     }
 
     private function deny(User $user, array $keys): void

@@ -20,6 +20,8 @@ use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
+use App\Services\Medication\MedicationScopeDecision;
+use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Medication\RefusalEscalationPolicy;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\UserSiteAccessService;
@@ -28,6 +30,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
 final class MedicationFollowupService
@@ -71,6 +74,7 @@ final class MedicationFollowupService
         private readonly AuthorizationEvidenceLockService $evidence,
         private readonly HrCurrentStaffService $staff,
         private readonly RefusalEscalationPolicy $refusals,
+        private readonly MedicationFollowupClinicalScope $clinicalScope,
     ) {}
 
     /** Source adapters call this inside their canonical aggregate transaction. */
@@ -262,9 +266,15 @@ final class MedicationFollowupService
         $shift = $this->viewShifts[$shiftKey];
         $manage = $actor->canDo(self::MANAGE);
         $canComplete = $row->type === 'confirm'
-            ? (int) $row->owner_id === (int) $actor->id && $actor->canDo('medications.administer.record')
-            : ($lead ? $manage : ($shift !== null || (int) $row->owner_id === (int) $actor->id) && $actor->canDo('medications.administer.record'));
+            ? (int) $row->owner_id === (int) $actor->id && $actor->approved_at !== null
+                && $actor->canDo('medications.view') && $actor->canDo('medications.controlled.witness') && $this->staff->isCurrent($actor)
+            : ($lead ? $manage : (($shift !== null || (int) $row->owner_id === (int) $actor->id)
+                && $this->clinicalScope->hasOrdinaryPersonAccess($actor, $row->client, $shift)
+                || $this->clinicalScope->hasCurrentGrant($actor, $row->client)) && $actor->canDo('medications.administer.record'));
         if ($row->medication?->controlled_drug && ! $actor->canDo('medications.controlled.record')) {
+            $canComplete = false;
+        }
+        if ($actor->approved_at === null || ! $this->staff->isCurrent($actor)) {
             $canComplete = false;
         }
         if ($row->completed_at && ($row->type !== 'effect'
@@ -297,6 +307,7 @@ final class MedicationFollowupService
             'source_owned' => in_array($row->type, self::SOURCE_OWNED_TYPES, true),
             'source_url' => $row->context['source_url'] ?? null,
             'can_reassign' => ! $row->completed_at && $row->type !== 'confirm'
+                && $actor->approved_at !== null && $this->staff->isCurrent($actor)
                 && ($manage || (int) $row->owner_id === (int) $actor->id),
             'shift_end' => $shift ? $this->instant($shift, 'ends_at')?->toIso8601String() : null,
             'why' => $canComplete ? null : ($row->type === 'confirm' ? 'Only the named colleague can answer.'
@@ -328,11 +339,14 @@ final class MedicationFollowupService
 
     public function transition(User $actor, int $id, array $data): array
     {
-        $snapshot = $this->visibleQuery($actor)->findOrFail($id);
+        abort_unless($actor->canDo('medications.view'), 403);
+        // Resolve current person/privacy authority under lock. An ended grant
+        // receives the typed conflict without changing any clinical evidence.
+        $snapshot = MedicationFollowup::query()->findOrFail($id);
         $targetId = ($data['action'] ?? '') === 'reassign' ? (int) ($data['owner_id'] ?? 0) : null;
 
         return DB::transaction(function () use ($actor, $snapshot, $data, $targetId) {
-            // Clinical aggregate -> sorted Shift union -> sorted User/RBAC/profile -> Site -> workflow.
+            // Clinical aggregate -> sorted Shift union -> grant -> sorted User/RBAC/profile -> Site -> workflow.
             $client = Client::query()->whereKey($snapshot->client_id)->lockForUpdate()->firstOrFail();
             $medication = $snapshot->client_medication_id ? ClientMedication::withTrashed()
                 ->whereKey($snapshot->client_medication_id)->where('client_id', $client->id)->lockForUpdate()->firstOrFail() : null;
@@ -341,10 +355,15 @@ final class MedicationFollowupService
                 ->where('client_medication_id', $medication?->id)->lockForUpdate()->firstOrFail() : null;
             $userIds = array_values(array_unique(array_filter([(int) $actor->id, $targetId])));
             $shifts = $this->coveringShifts((int) $client->site_id, $userIds, lock: true);
+            $grant = $this->clinicalScope->lockLatestGrant($actor, $client);
+            if ($grant?->authorization_mode === 'co_sign' && $grant->co_signed_by) {
+                $userIds[] = (int) $grant->co_signed_by;
+                $userIds = array_values(array_unique($userIds));
+            }
             $users = $this->evidence->lockForUsers($userIds, [
                 'medications.view', self::MANAGE, 'medications.administer.record',
                 'medications.controlled.view', 'medications.controlled.record',
-                'medications.stock.update', 'medications.audit.view', 'medications.reports.export', 'reports.viewAny',
+                'medications.stock.update', 'medications.audit.view', 'medications.reports.export', 'medications.reports.view', 'reports.viewAny',
                 'clients.viewAny', 'clients.viewAssigned', 'medications.breakglass', 'clinical.accessAllSites', 'sites.viewAll',
             ]);
             $profiles = $this->governance->lockCurrentStaffProfiles($users, $userIds);
@@ -352,8 +371,16 @@ final class MedicationFollowupService
             $lockedActor = $users->get((int) $actor->id);
             $this->governance->lockCurrentMedicationSite((int) $client->site_id);
             abort_unless($lockedActor->canDo('medications.view'), 403);
+            abort_unless($lockedActor->approved_at !== null && $this->staff->isCurrent($lockedActor), 403);
             abort_unless(in_array((int) $client->site_id,
                 $this->sites->accessibleSiteIds($lockedActor, MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS), true), 404);
+            $actorShift = $shifts->first(fn (Shift $s) => (int) $s->user_id === (int) $lockedActor->id);
+            $ordinaryWorker = $actorShift !== null || (int) $snapshot->owner_id === (int) $lockedActor->id;
+            $lead = in_array($snapshot->type, self::LEAD_TYPES, true);
+            $requiresGrant = ! Gate::forUser($lockedActor)->allows('viewMedications', $client)
+                || ! $this->clinicalScope->hasOrdinaryPersonAccess($lockedActor, $client, $actorShift)
+                || (! $lead && $snapshot->type !== 'confirm' && ! $ordinaryWorker);
+            $usedGrant = $requiresGrant ? $this->clinicalScope->assertGrant($lockedActor, $client, $grant, $users) : null;
             $this->records->assertReadable($lockedActor, $client);
             if ($medication?->controlled_drug) {
                 abort_unless($lockedActor->canDo('medications.controlled.view') && $lockedActor->canDo('medications.controlled.record'), 404);
@@ -367,7 +394,6 @@ final class MedicationFollowupService
                     ->effectiveClinicalEvidence()->whereKey($administration->id)->exists(), 404);
             }
             $manage = $lockedActor->canDo(self::MANAGE);
-            $actorShift = $shifts->first(fn (Shift $s) => (int) $s->user_id === (int) $lockedActor->id);
             if ($action === 'reassign') {
                 abort_unless($row->type !== 'confirm' && ($manage || (int) $row->owner_id === (int) $lockedActor->id), 403);
                 $this->requireFields($data, ['reason']);
@@ -376,7 +402,7 @@ final class MedicationFollowupService
             } else {
                 abort_unless(in_array($row->type, self::LEAD_TYPES, true)
                     ? $manage : $lockedActor->canDo('medications.administer.record')
-                        && ($actorShift !== null || (int) $row->owner_id === (int) $lockedActor->id), 403);
+                        && ($actorShift !== null || (int) $row->owner_id === (int) $lockedActor->id || $usedGrant !== null), 403);
             }
             $fingerprintData = $data;
             unset($fingerprintData['request_uuid']);
@@ -394,19 +420,41 @@ final class MedicationFollowupService
             }
             abort_if((int) $data['revision'] !== $row->revision, 409, 'This follow-up changed. Refresh it and review your entries.');
             abort_if($row->completed_at && $action !== 'amend_effect', 409, 'This follow-up is already complete.');
+            if (in_array($action, ['effect', 'amend_effect'], true) && $medication) {
+                $this->clinicalScope->assertMedicationActive($medication);
+            }
             $result = $this->apply($row, $lockedActor, $action, $data, $actorShift, $shifts, $users, $administration);
             $row->increment('revision');
             $this->event($row, (int) $lockedActor->id, $action, $data, $data['request_uuid'], $fingerprint);
             $payload = $this->present($row->refresh(), $lockedActor) + $result;
             // P09 is the final lock/write in the transaction. Its failure rolls
             // back the source, workflow, history and idempotency receipt.
-            app(MedicationEventRecorder::class)->append(new MedicationEventData(
+            $audit = new MedicationEventData(
                 siteId: (int) $client->site_id, kind: 'followup.'.$action,
                 subjectType: 'medication_followup', subjectId: (string) $row->id,
                 actorId: (int) $lockedActor->id, occurredAt: CarbonImmutable::now('UTC'),
-                summary: 'Medication follow-up updated.', facts: ['action' => $action, 'revision' => $row->revision],
+                summary: 'Medication follow-up updated.', facts: ['action' => $action, 'revision' => $row->revision]
+                    + ($usedGrant ? ['break_glass_access_id' => (int) $usedGrant->id] : []),
                 clientId: (int) $client->id, controlled: (bool) $medication?->controlled_drug,
-            ));
+            );
+            if ($usedGrant) {
+                app(MedicationScopeDecisionService::class)->recordBreakGlassUse(new MedicationScopeDecision(
+                    performer: $lockedActor, client: $client, siteId: (int) $client->site_id,
+                    breakGlassAccess: $usedGrant, medication: $medication, administration: $administration,
+                ), 'followup.'.$action, 'Medication follow-up '.$row->id);
+                app(MedicationEventRecorder::class)->appendMany([
+                    new MedicationEventData(
+                        siteId: (int) $client->site_id, kind: 'emergency_access',
+                        subjectType: 'emergency_access', subjectId: (string) $usedGrant->id,
+                        actorId: (int) $lockedActor->id, occurredAt: CarbonImmutable::now('UTC'),
+                        summary: 'Emergency access used for medication follow-up.',
+                        facts: ['action' => 'used', 'break_glass_access_id' => (int) $usedGrant->id, 'followup_id' => (int) $row->id],
+                        clientId: (int) $client->id, controlled: (bool) $medication?->controlled_drug,
+                    ), $audit,
+                ]);
+            } else {
+                app(MedicationEventRecorder::class)->append($audit);
+            }
 
             return $payload;
         }, 5);
