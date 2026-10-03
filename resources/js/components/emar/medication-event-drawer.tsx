@@ -204,10 +204,12 @@ export function MedicationEventDrawer({
     event,
     onClose,
     initialSection,
+    onExport,
 }: {
     event: AuditEvent;
     onClose: () => void;
     initialSection?: string;
+    onExport?: () => void;
 }) {
     const meta = eventMeta(event.event_type);
     const Icon = meta.icon;
@@ -388,10 +390,10 @@ export function MedicationEventDrawer({
                                 <Icon className="h-5 w-5" />
                             </span>
                             <div className="min-w-0">
-                                <div className="truncate text-sm leading-tight font-bold">
+                                <div className="truncate text-sm font-bold leading-tight">
                                     {meta.label}
                                 </div>
-                                <div className="truncate text-[11px] text-muted-foreground">
+                                <div className="text-muted-foreground truncate text-[11px]">
                                     {event.source} · {event.id}
                                 </div>
                             </div>
@@ -419,7 +421,7 @@ export function MedicationEventDrawer({
                         })}
 
                         <div className="mt-auto pt-4">
-                            <div className="flex items-center gap-2 rounded-lg bg-status-success-bg px-3 py-2 text-[11px] font-semibold text-status-success">
+                            <div className="bg-status-success-bg text-status-success flex items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-semibold">
                                 <Shield className="h-3.5 w-3.5 shrink-0" />
                                 Append-only source record
                             </div>
@@ -428,7 +430,7 @@ export function MedicationEventDrawer({
 
                     {/* ── Main column ── */}
                     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-5 py-3.5">
+                        <header className="border-border flex shrink-0 items-start justify-between gap-3 border-b px-5 py-3.5">
                             <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
                                     <span
@@ -440,7 +442,7 @@ export function MedicationEventDrawer({
                                         <Icon className="h-3.5 w-3.5" />
                                         {meta.label}
                                     </span>
-                                    <span className="text-xs text-muted-foreground">
+                                    <span className="text-muted-foreground text-xs">
                                         {fmtDateTime(event.timestamp)}
                                     </span>
                                     {event.flags.map((f) => (
@@ -456,7 +458,7 @@ export function MedicationEventDrawer({
                                         </span>
                                     ))}
                                 </div>
-                                <h2 className="mt-1.5 text-[19px] leading-snug font-bold">
+                                <h2 className="mt-1.5 text-[19px] font-bold leading-snug">
                                     {event.description}
                                 </h2>
                             </div>
@@ -464,7 +466,7 @@ export function MedicationEventDrawer({
                                 type="button"
                                 onClick={onClose}
                                 aria-label="Close"
-                                className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted"
+                                className="text-muted-foreground hover:bg-muted grid h-8 w-8 shrink-0 place-items-center rounded-md"
                             >
                                 <X className="h-5 w-5" />
                             </button>
@@ -472,7 +474,7 @@ export function MedicationEventDrawer({
 
                         <div
                             ref={bodyRef}
-                            className="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-6 py-5"
+                            className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-5"
                         >
                             {/* What happened */}
                             <Section
@@ -481,14 +483,14 @@ export function MedicationEventDrawer({
                                 title="What happened"
                             >
                                 {event.flags.includes('missing_witness') && (
-                                    <div className="mb-3 rounded-lg border border-status-critical/30 bg-status-critical-bg/60 px-3 py-2 text-xs text-status-critical">
+                                    <div className="border-status-critical/30 bg-status-critical-bg/60 text-status-critical mb-3 rounded-lg border px-3 py-2 text-xs">
                                         Controlled-drug transaction without a
                                         recorded second signature — investigate
                                         and countersign in the CD register.
                                     </div>
                                 )}
                                 {event.flags.includes('omission') && (
-                                    <div className="mb-3 rounded-lg border border-dashed border-status-critical/40 bg-status-critical-bg/50 px-3 py-2 text-xs text-status-critical">
+                                    <div className="border-status-critical/40 bg-status-critical-bg/50 text-status-critical mb-3 rounded-lg border border-dashed px-3 py-2 text-xs">
                                         A scheduled dose was not recorded — a
                                         MAR omission must be reconciled with an
                                         outcome and reason.
@@ -536,7 +538,7 @@ export function MedicationEventDrawer({
                                                 : 'border-status-warning/40 bg-status-warning-bg/40',
                                         )}
                                     >
-                                        <div className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                        <div className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wide">
                                             Performed by
                                         </div>
                                         <div className="text-sm font-medium">
@@ -553,7 +555,7 @@ export function MedicationEventDrawer({
                                                     : 'border-status-critical/40 bg-status-critical-bg/40',
                                             )}
                                         >
-                                            <div className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                            <div className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wide">
                                                 Witness (2nd signature)
                                             </div>
                                             <div
@@ -587,15 +589,15 @@ export function MedicationEventDrawer({
                                                 key={i}
                                                 className="rounded-lg border px-3 py-2"
                                             >
-                                                <div className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                                <div className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wide">
                                                     {c.field}
                                                 </div>
                                                 <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
-                                                    <span className="rounded bg-muted px-2 py-0.5 text-muted-foreground line-through">
+                                                    <span className="bg-muted text-muted-foreground rounded px-2 py-0.5 line-through">
                                                         {c.from || '—'}
                                                     </span>
-                                                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-                                                    <span className="rounded bg-status-success-bg px-2 py-0.5 font-medium text-status-success">
+                                                    <ArrowRight className="text-muted-foreground h-3.5 w-3.5" />
+                                                    <span className="bg-status-success-bg text-status-success rounded px-2 py-0.5 font-medium">
                                                         {c.to || '—'}
                                                     </span>
                                                 </div>
@@ -614,11 +616,11 @@ export function MedicationEventDrawer({
                                 title="Record integrity"
                             >
                                 {integrity === null ? (
-                                    <div className="rounded-lg border px-4 py-3 text-sm text-muted-foreground">
+                                    <div className="text-muted-foreground rounded-lg border px-4 py-3 text-sm">
                                         Loading integrity…
                                     </div>
                                 ) : !integrity.backed ? (
-                                    <div className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
+                                    <div className="text-muted-foreground rounded-lg border border-dashed px-4 py-3 text-sm">
                                         No canonical stored record is available.
                                     </div>
                                 ) : (
@@ -630,7 +632,7 @@ export function MedicationEventDrawer({
                                         />
                                     </div>
                                 )}
-                                <p className="mt-2 text-[11px] text-muted-foreground">
+                                <p className="text-muted-foreground mt-2 text-[11px]">
                                     Confirms the event is backed by the
                                     authorized canonical medication record.
                                     Device, network and edit-history metadata
@@ -648,7 +650,7 @@ export function MedicationEventDrawer({
                                     {link && (
                                         <a
                                             href={link.href}
-                                            className="rounded-full border px-3 py-1 text-xs font-medium text-primary hover:bg-accent"
+                                            className="text-primary hover:bg-accent rounded-full border px-3 py-1 text-xs font-medium"
                                         >
                                             {link.label}
                                         </a>
@@ -656,7 +658,7 @@ export function MedicationEventDrawer({
                                     {event.client_id && (
                                         <a
                                             href={`/clients/${event.client_id}`}
-                                            className="rounded-full border px-3 py-1 text-xs font-medium text-primary hover:bg-accent"
+                                            className="text-primary hover:bg-accent rounded-full border px-3 py-1 text-xs font-medium"
                                         >
                                             Client profile
                                         </a>
@@ -704,14 +706,16 @@ export function MedicationEventDrawer({
                                     <Fingerprint className="h-4 w-4" />
                                     Verify integrity
                                 </Button>
-                                <a
-                                    href={`/emar/audit/event/${encodeURIComponent(event.id)}/export`}
-                                >
-                                    <Button variant="ghost" size="sm">
+                                {onExport && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={onExport}
+                                    >
                                         <Download className="h-4 w-4" />
                                         Export event
                                     </Button>
-                                </a>
+                                )}
                                 {integrity?.backed ? (
                                     <Button
                                         variant="ghost"
@@ -755,14 +759,14 @@ function Section({
         <div
             ref={refCb}
             className={cn(
-                'scroll-mt-4 border-t border-border/60 pt-5 transition-all duration-300 first:border-0 first:pt-0',
+                'border-border/60 scroll-mt-4 border-t pt-5 transition-all duration-300 first:border-0 first:pt-0',
                 flash &&
-                    '-mx-3 rounded-lg bg-primary/10 px-3 ring-1 ring-primary/40 ring-inset',
+                    'bg-primary/10 ring-primary/40 -mx-3 rounded-lg px-3 ring-1 ring-inset',
             )}
         >
             <div
                 className={cn(
-                    'mb-2 text-xs font-semibold tracking-wide uppercase transition-colors',
+                    'mb-2 text-xs font-semibold uppercase tracking-wide transition-colors',
                     flash ? 'text-primary' : 'text-muted-foreground',
                 )}
             >

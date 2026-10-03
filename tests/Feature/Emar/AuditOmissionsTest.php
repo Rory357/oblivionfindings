@@ -5,6 +5,8 @@ namespace Tests\Feature\Emar;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationOrderRevision;
+use App\Models\MedicationOrderVersion;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -102,6 +104,40 @@ class AuditOmissionsTest extends TestCase
 
         $this->assertSame(['Metformin 2026-06-15 07:00', 'Morphine 2026-06-15 07:00'], $this->omissions($this->reader(controlled: true)));
         $this->assertSame(['Controlled medicine 2026-06-15 07:00', 'Metformin 2026-06-15 07:00'], $this->omissions($this->reader(controlled: false)));
+    }
+
+    public function test_pending_amendment_keeps_the_checked_order_dose_in_omission_evidence(): void
+    {
+        $this->at('2026-06-15 00:00');
+        $order = $this->order('Checked medicine', ['07:00']);
+        $actor = $this->reader();
+        $checked = MedicationOrderVersion::query()->create([
+            'client_id' => $this->aroha->id, 'client_medication_id' => $order->id, 'version_number' => 1,
+            'name' => 'Checked medicine', 'dosage' => '1 tablet', 'route' => 'oral',
+            'changed_by' => $actor->id, 'changed_at' => now(),
+        ]);
+        MedicationOrderRevision::query()->create([
+            'client_id' => $this->aroha->id, 'client_medication_id' => $order->id,
+            'medication_order_version_id' => $checked->id, 'base_version' => 1,
+            'status' => 'checked', 'checked_at' => now(), 'checked_by' => $actor->id, 'entered_by' => $actor->id,
+        ]);
+        $this->at('2026-06-15 06:00');
+        $proposal = MedicationOrderVersion::query()->create([
+            'client_id' => $this->aroha->id, 'client_medication_id' => $order->id, 'version_number' => 2,
+            'name' => 'Proposed medicine name', 'dosage' => '99 tablets', 'route' => 'oral',
+            'changed_by' => $actor->id, 'changed_at' => now(),
+        ]);
+        MedicationOrderRevision::query()->create([
+            'client_id' => $this->aroha->id, 'client_medication_id' => $order->id,
+            'medication_order_version_id' => $proposal->id, 'base_version' => 1,
+            'status' => 'pending', 'entered_by' => $actor->id,
+        ]);
+        $this->at('2026-06-15 08:30');
+        $this->actingAs($actor)->get('/emar/reports?view=audit&sub=gaps&period=today')->assertOk()
+            ->assertInertia(fn ($page) => $page->has('page.data', 1)
+                ->where('page.data.0.medicine', 'Checked medicine')->where('page.data.0.dose', '1 tablet')
+                ->where('page.data.0.version_reference', 'order-version:'.$checked->id)
+                ->where('page.data.0.status', 'not_recorded'));
     }
 
     public function test_a_period_before_the_dose_record_says_so(): void

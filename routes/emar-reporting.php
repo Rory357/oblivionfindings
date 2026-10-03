@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\Emar\AuditLogController;
 use App\Http\Controllers\Emar\MedicationReportsController;
+use App\Http\Controllers\MedicationAuditController;
 use App\Http\Controllers\OperationalReportController;
 use Illuminate\Support\Facades\Route;
 
@@ -8,6 +10,10 @@ use Illuminate\Support\Facades\Route;
 // with other packages serially; no generic reports grant opens clinical data.
 Route::middleware('permission:medications.reports.view')->group(function () {
     Route::get('/reports', [MedicationReportsController::class, 'index'])->name('emar.reports');
+    Route::middleware(['permission:medications.view', 'permission:medications.audit.view'])->group(function () {
+        Route::get('/reports/history', [AuditLogController::class, 'index'])->name('emar.reports.history');
+        Route::get('/reports/history/logs', [MedicationAuditController::class, 'index'])->name('emar.reports.history_logs');
+    });
     Route::get('/reports/builder', [OperationalReportController::class, 'index'])->defaults('domain', 'medication')->name('emar.reports.builder');
     Route::get('/reports/people', [MedicationReportsController::class, 'people'])->name('emar.reports.people');
     Route::get('/reports/medicines', [MedicationReportsController::class, 'medicines'])->name('emar.reports.medicines');

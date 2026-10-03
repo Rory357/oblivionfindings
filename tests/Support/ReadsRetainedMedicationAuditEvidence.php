@@ -2,11 +2,7 @@
 
 namespace Tests\Support;
 
-use App\Http\Controllers\Emar\AuditLogController;
-use App\Http\Controllers\MedicationAuditController;
 use App\Models\User;
-use App\Services\Medication\DoseSlots\DoseOmissions;
-use Illuminate\Http\Request;
 use Illuminate\Testing\TestResponse;
 
 /** Keep retained evidence projection checks distinct from the canonical ledger screen. */
@@ -29,26 +25,15 @@ trait ReadsRetainedMedicationAuditEvidence
     {
         $this->canonicalGet($actor, 'emar.audit', $query)->assertOk()
             ->assertInertia(fn ($page) => $page->component('emar/reports/hub')->where('filters.view', 'audit')->where('can.audit', true));
-        $request = $this->auditEvidenceRequest($actor, $query);
 
-        return TestResponse::fromBaseResponse(app(AuditLogController::class)
-            ->index($request, app(DoseOmissions::class))->toResponse($request));
+        return $this->get(route('emar.reports.history', $query));
     }
 
     private function retainedAuditLogs(User $actor, array $query = []): TestResponse
     {
         $this->canonicalGet($actor, 'medications.audit.index', $query)->assertOk()
             ->assertInertia(fn ($page) => $page->component('emar/reports/hub')->where('filters.view', 'audit')->where('can.audit', true));
-        $request = $this->auditEvidenceRequest($actor, $query);
 
-        return TestResponse::fromBaseResponse(app(MedicationAuditController::class)->index($request)->toResponse($request));
-    }
-
-    private function auditEvidenceRequest(User $actor, array $query): Request
-    {
-        $request = Request::create('/retained-audit-evidence', 'GET', $query);
-        $request->setUserResolver(fn () => $actor);
-
-        return $request;
+        return $this->get(route('emar.reports.history_logs', $query));
     }
 }

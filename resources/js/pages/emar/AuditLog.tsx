@@ -3,6 +3,7 @@
 /* DESIGN REVIEW: docs/emar-redesign/audit-design-review.md — design spec, intended look,
    deliberate deviations, and a fidelity checklist for reviewing this page's design. */
 import { EmarHubRail } from '@/components/emar/emar-hub-rail';
+import { HistoricalAuditExportDialog } from '@/components/emar/historical-audit-export-dialog';
 import {
     eventMeta,
     eventPrimaryLink,
@@ -89,6 +90,9 @@ type Props = {
     user_first_name: string | null;
     /** "Not available before …" when the period starts before the dose record. */
     omissions_notice?: string | null;
+    history_notice?: string | null;
+    can_export_history: boolean;
+    export_purposes: Record<string, string>;
 };
 
 const CATEGORIES = [
@@ -219,6 +223,9 @@ export default function AuditLog({
     site_brand_colour: brandColour,
     user_first_name: userFirstName,
     omissions_notice: omissionsNotice = null,
+    history_notice: historyNotice = null,
+    can_export_history: canExportHistory,
+    export_purposes: exportPurposes,
 }: Props) {
     const breadcrumbs = useEmarBreadcrumbs();
     const [view, setView] = useState('timeline');
@@ -237,6 +244,7 @@ export default function AuditLog({
         undefined,
     );
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
+    const [exportUrl, setExportUrl] = useState<string | null>(null);
 
     // Open the read-only detail drawer; `section` focuses a panel (e.g. integrity).
     const openEvent = (e: AuditEvent, section?: string) => {
@@ -285,16 +293,19 @@ export default function AuditLog({
                 onClick: () => openEvent(e, 'integrity'),
             },
             { sep: true },
-            {
-                icon: <Download className="h-3.5 w-3.5" />,
-                label: 'Export this event',
-                sub: 'CSV',
-                onClick: () =>
-                    window.open(
-                        `/emar/audit/event/${encodeURIComponent(e.id)}/export`,
-                        '_blank',
-                    ),
-            },
+            ...(canExportHistory && !e.id.startsWith('omission_')
+                ? [
+                      {
+                          icon: <Download className="h-3.5 w-3.5" />,
+                          label: 'Export this event',
+                          sub: 'CSV',
+                          onClick: () =>
+                              setExportUrl(
+                                  `/emar/audit/event/${encodeURIComponent(e.id)}/export`,
+                              ),
+                      } satisfies ShiftCtxItem,
+                  ]
+                : []),
             {
                 icon: <Copy className="h-3.5 w-3.5" />,
                 label: 'Copy event ID',
@@ -479,7 +490,7 @@ export default function AuditLog({
 
     const onSite = (id: number | null) => {
         setSiteFilter(id);
-        router.get('/emar/audit', id ? { site_id: id } : {}, {
+        router.get('/emar/reports/history', id ? { site_id: id } : {}, {
             preserveState: true,
             preserveScroll: true,
         });
@@ -561,7 +572,12 @@ export default function AuditLog({
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Audit trail" />
+            <Head title="Medication clinical history" />
+            {historyNotice && (
+                <p className="text-subtle" role="status">
+                    {historyNotice}
+                </p>
+            )}
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
                     rail={<EmarHubRail />}
@@ -573,38 +589,36 @@ export default function AuditLog({
                     badges={heroBadges}
                     title={
                         <span>
-                            <span className="flex items-center gap-2 text-[10.5px] font-semibold tracking-wide text-primary-foreground/80 uppercase">
+                            <span className="text-primary-foreground/80 flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wide">
                                 <span
                                     aria-hidden
                                     className="relative inline-flex h-2 w-2"
                                 >
-                                    <span className="absolute inset-0 animate-ping rounded-full bg-status-success/70" />
-                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
+                                    <span className="bg-status-success/70 absolute inset-0 animate-ping rounded-full" />
+                                    <span className="bg-status-success relative inline-flex h-2 w-2 rounded-full" />
                                 </span>
-                                Append-only audit trail · live · refreshed{' '}
-                                {refreshed}
+                                Clinical history · refreshed {refreshed}
                             </span>
-                            <span className="mt-1 block text-[26px] leading-tight font-bold">
+                            <span className="mt-1 block text-[26px] font-bold leading-tight">
                                 {userFirstName ? (
-                                    <span className="font-normal text-primary-foreground/80">
+                                    <span className="text-primary-foreground/80 font-normal">
                                         Kia ora {userFirstName} —{' '}
                                     </span>
                                 ) : null}
-                                {userFirstName ? 'every' : 'Every'} medication
-                                action across{' '}
-                                <span className="border-b-2 border-primary-foreground/40">
+                                Medication history across{' '}
+                                <span className="border-primary-foreground/40 border-b-2">
                                     {activeSite?.name ?? 'your services'}
                                 </span>
                             </span>
                         </span>
                     }
-                    description={`A complete, time-stamped record of every dose, controlled-drug movement, prescriber order and review — append-only for CQC and internal governance.${stats.open_gaps > 0 ? ` ${stats.open_gaps} unexplained gap${stats.open_gaps === 1 ? '' : 's'} need a clinician.` : ''}`}
+                    description={`Retained dose, controlled-register, prescriber, pharmacy and review evidence. These historical records are separate from the event ledger and its chain check.${stats.open_gaps > 0 ? ` ${stats.open_gaps} recorded gap${stats.open_gaps === 1 ? '' : 's'} need review.` : ''}`}
                     stats={heroStats}
                     actions={
                         <>
-                            <PageHeaderPrimaryButton asChild icon={Download}>
-                                <a href="/emar/audit/export">
-                                    Export audit pack
+                            <PageHeaderPrimaryButton asChild icon={History}>
+                                <a href="/emar/reports/history/logs">
+                                    Change log
                                 </a>
                             </PageHeaderPrimaryButton>
                             <a href="/emar/reports">
@@ -626,7 +640,7 @@ export default function AuditLog({
                                     onClick={() =>
                                         setAnchor(addDays(anchor, -1))
                                     }
-                                    className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20"
+                                    className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-semibold"
                                 >
                                     <ChevronLeft className="h-3.5 w-3.5" />
                                     {stepLabel(addDays(anchor, -1))}
@@ -644,7 +658,7 @@ export default function AuditLog({
                                         setAnchor(addDays(anchor, 1))
                                     }
                                     disabled={isToday}
-                                    className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20 disabled:cursor-not-allowed disabled:opacity-40"
+                                    className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
                                 >
                                     {stepLabel(addDays(anchor, 1))}
                                     <ChevronRight className="h-3.5 w-3.5" />
@@ -653,22 +667,22 @@ export default function AuditLog({
                                     <button
                                         type="button"
                                         onClick={() => setAnchor(todayYmd)}
-                                        className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/35 bg-primary-foreground/20 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/30"
+                                        className="border-primary-foreground/35 bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/30 inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-semibold"
                                     >
                                         Back to today
                                     </button>
                                 ) : null}
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
-                                <div className="flex items-center gap-2 rounded-full bg-primary-foreground px-3 py-1.5">
-                                    <Search className="h-3.5 w-3.5 text-muted-foreground" />
+                                <div className="bg-primary-foreground flex items-center gap-2 rounded-full px-3 py-1.5">
+                                    <Search className="text-muted-foreground h-3.5 w-3.5" />
                                     <input
                                         value={search}
                                         onChange={(e) =>
                                             setSearch(e.target.value)
                                         }
                                         placeholder="Search client, medication, staff or NHI…"
-                                        className="w-64 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                                        className="text-foreground placeholder:text-muted-foreground w-64 bg-transparent text-sm outline-none"
                                     />
                                 </div>
                                 {sites.length > 0 && (
@@ -705,7 +719,7 @@ export default function AuditLog({
                         items={VIEW_TABS}
                         ariaLabel="Audit views"
                     />
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <div className="text-muted-foreground flex items-center gap-2 text-sm">
                         {view === 'gaps'
                             ? `${rows.length} gap${rows.length === 1 ? '' : 's'} detected`
                             : `Showing ${rows.length} of ${stats.total} events`}
@@ -729,7 +743,7 @@ export default function AuditLog({
                     </p>
                 ) : null}
 
-                <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                <div className="bg-card overflow-hidden rounded-2xl border shadow-sm">
                     {view !== 'gaps' && (
                         <div className="flex flex-col gap-3 border-b p-4">
                             <TabStrip
@@ -806,7 +820,7 @@ export default function AuditLog({
                     )}
 
                     {rows.length === 0 ? (
-                        <div className="px-5 py-16 text-center text-sm text-muted-foreground">
+                        <div className="text-muted-foreground px-5 py-16 text-center text-sm">
                             {view === 'gaps'
                                 ? 'No compliance gaps — every record is attributed and witnessed.'
                                 : 'No events match the current filters.'}
@@ -819,8 +833,8 @@ export default function AuditLog({
                                         <span className="text-xs font-bold">
                                             {day}
                                         </span>
-                                        <span className="h-px flex-1 bg-border" />
-                                        <span className="text-xs text-muted-foreground">
+                                        <span className="bg-border h-px flex-1" />
+                                        <span className="text-muted-foreground text-xs">
                                             {items.length} events
                                         </span>
                                     </div>
@@ -843,7 +857,7 @@ export default function AuditLog({
                         <div className="overflow-x-auto">
                             <table className="w-full min-w-[920px] text-sm">
                                 <thead>
-                                    <tr className="bg-muted/50 text-left text-[11px] tracking-wide text-muted-foreground uppercase">
+                                    <tr className="bg-muted/50 text-muted-foreground text-left text-[11px] uppercase tracking-wide">
                                         <th className="px-4 py-2.5">Time</th>
                                         <th className="px-4 py-2.5">Event</th>
                                         <th className="px-4 py-2.5">Client</th>
@@ -862,7 +876,7 @@ export default function AuditLog({
                                         return (
                                             <tr
                                                 key={e.id}
-                                                className="cursor-pointer border-b last:border-b-0 hover:bg-muted/30"
+                                                className="hover:bg-muted/30 cursor-pointer border-b last:border-b-0"
                                                 onClick={() => openEvent(e)}
                                                 onContextMenu={(ev) =>
                                                     openRowCtx(ev, e)
@@ -884,12 +898,12 @@ export default function AuditLog({
                                                 <td className="px-4 py-3">
                                                     {e.client_name}
                                                 </td>
-                                                <td className="px-4 py-3 text-muted-foreground">
+                                                <td className="text-muted-foreground px-4 py-3">
                                                     {e.outcome ?? '—'}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     {e.performed_by ?? (
-                                                        <span className="rounded-full bg-status-warning-bg px-1.5 py-0.5 text-[10px] font-semibold text-status-warning">
+                                                        <span className="bg-status-warning-bg text-status-warning rounded-full px-1.5 py-0.5 text-[10px] font-semibold">
                                                             Not captured
                                                         </span>
                                                     )}
@@ -901,7 +915,7 @@ export default function AuditLog({
                                                                 {e.witness}
                                                             </span>
                                                         ) : (
-                                                            <span className="rounded-full bg-status-critical-bg px-1.5 py-0.5 text-[10px] font-semibold text-status-critical">
+                                                            <span className="bg-status-critical-bg text-status-critical rounded-full px-1.5 py-0.5 text-[10px] font-semibold">
                                                                 Required —
                                                                 missing
                                                             </span>
@@ -911,7 +925,7 @@ export default function AuditLog({
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                                                    <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[11px]">
                                                         {e.source}
                                                     </span>
                                                 </td>
@@ -923,7 +937,7 @@ export default function AuditLog({
                         </div>
                     ) : (
                         <div className="flex flex-col gap-4 p-4">
-                            <div className="rounded-xl border border-status-critical/30 bg-status-critical-bg/50 px-4 py-3 text-sm text-status-critical">
+                            <div className="border-status-critical/30 bg-status-critical-bg/50 text-status-critical rounded-xl border px-4 py-3 text-sm">
                                 <span className="font-semibold">
                                     Why this matters:
                                 </span>{' '}
@@ -939,7 +953,7 @@ export default function AuditLog({
                                     return (
                                         <div
                                             key={e.id}
-                                            className="rounded-2xl border border-status-critical/30 bg-card p-4 shadow-sm"
+                                            className="border-status-critical/30 bg-card rounded-2xl border p-4 shadow-sm"
                                             onContextMenu={(ev) =>
                                                 openRowCtx(ev, e)
                                             }
@@ -964,7 +978,7 @@ export default function AuditLog({
                                             <div className="mt-2 text-sm">
                                                 {e.description}
                                             </div>
-                                            <div className="mt-1 text-xs text-muted-foreground">
+                                            <div className="text-muted-foreground mt-1 text-xs">
                                                 {e.performed_by ??
                                                     'Unattributed'}{' '}
                                                 ·{' '}
@@ -995,6 +1009,14 @@ export default function AuditLog({
                     key={`${selected.id}-${selectedSection ?? 'what'}`}
                     event={selected}
                     initialSection={selectedSection}
+                    onExport={
+                        canExportHistory && !selected.id.startsWith('omission_')
+                            ? () =>
+                                  setExportUrl(
+                                      `/emar/audit/event/${encodeURIComponent(selected.id)}/export`,
+                                  )
+                            : undefined
+                    }
                     onClose={() => {
                         setSelected(null);
                         setSelectedSection(undefined);
@@ -1002,6 +1024,13 @@ export default function AuditLog({
                 />
             )}
             {ctx && <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />}
+            {exportUrl && (
+                <HistoricalAuditExportDialog
+                    url={exportUrl}
+                    purposes={exportPurposes}
+                    onClose={() => setExportUrl(null)}
+                />
+            )}
         </AppLayout>
     );
 }
@@ -1035,7 +1064,7 @@ function AuditAlertRow({
                     type="button"
                     aria-label="Dismiss alert"
                     onClick={onDismiss}
-                    className="grid h-7 w-7 place-items-center rounded-md opacity-70 hover:bg-foreground/10 hover:opacity-100"
+                    className="hover:bg-foreground/10 grid h-7 w-7 place-items-center rounded-md opacity-70 hover:opacity-100"
                 >
                     <X className="h-4 w-4" />
                 </button>
@@ -1060,7 +1089,7 @@ function TimelineRow({
         <button
             onClick={onOpen}
             onContextMenu={onCtx}
-            className={`flex w-full items-center gap-3 rounded-[14px] border bg-card px-3 py-2.5 text-left transition hover:border-primary/40 hover:bg-muted/30 ${isGap ? 'border-dashed border-status-critical/50' : ''}`}
+            className={`bg-card hover:border-primary/40 hover:bg-muted/30 flex w-full items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left transition ${isGap ? 'border-status-critical/50 border-dashed' : ''}`}
         >
             <span
                 className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${m.cls}`}
@@ -1070,10 +1099,10 @@ function TimelineRow({
             <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-1.5">
                     <span className="text-xs font-semibold">{m.label}</span>
-                    <span className="font-mono text-[11px] text-muted-foreground">
+                    <span className="text-muted-foreground font-mono text-[11px]">
                         {fmtTime(e.timestamp)}
                     </span>
-                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                    <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[10px]">
                         {e.source}
                     </span>
                     {e.flags.map((f) => (
@@ -1088,8 +1117,8 @@ function TimelineRow({
                 <div className="truncate text-sm font-medium">
                     {e.description}
                 </div>
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary/10 text-[8px] font-bold text-primary">
+                <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                    <span className="bg-primary/10 text-primary flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold">
                         {e.performed_by ? initials(e.performed_by) : '?'}
                     </span>
                     {e.performed_by ?? (
@@ -1100,7 +1129,7 @@ function TimelineRow({
                     {e.site_name ? ` · ${e.site_name}` : ''}
                 </div>
             </div>
-            <span className="shrink-0 text-xs font-medium text-primary">
+            <span className="text-primary shrink-0 text-xs font-medium">
                 View record ›
             </span>
         </button>

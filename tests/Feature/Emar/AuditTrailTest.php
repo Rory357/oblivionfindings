@@ -55,6 +55,7 @@ class AuditTrailTest extends TestCase
             'quantity' => 2, 'unit' => 'tablets', 'on_hand_before' => 10, 'on_hand_after' => 8,
             'reason' => 'PRN dose', 'recorded_by' => $user->id, 'witnessed_by' => null, 'recorded_at' => now(),
         ]);
+        $this->assertDatabaseCount('medication_events', 0);
 
         $this->retainedAuditFeed($user, ['site_id' => $site->id])
             ->assertOk()

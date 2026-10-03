@@ -11,6 +11,8 @@ use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\Reporting\MedicationExportAudit;
+use App\Services\Medication\Reporting\MedicationReportAccess;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -85,6 +87,7 @@ class MedicationAuditController extends Controller
 
     public function index(Request $request)
     {
+        $request->validate(['client_id' => ['nullable', 'integer', 'min:1'], 'site_id' => ['nullable', 'integer', 'min:1'], 'user_id' => ['nullable', 'integer', 'min:1'], 'from' => ['nullable', 'date_format:Y-m-d'], 'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from']]);
         $user = $request->user();
         abort_unless($user, 403);
         $clientId = $request->integer('client_id') ?: null;
@@ -96,7 +99,9 @@ class MedicationAuditController extends Controller
             $clientId,
         );
         $readerSiteIds = $siteId !== null ? [$siteId] : $siteIds;
-        $clientIds = $this->clientIds($readerSiteIds);
+        $access = app(MedicationReportAccess::class);
+        $access->siteIds($user, $siteId, $clientId);
+        $clientIds = $access->clientIds($user, $readerSiteIds);
 
         $q = $this->baseQuery(
             $clientIds,
@@ -133,7 +138,7 @@ class MedicationAuditController extends Controller
             'meta' => $this->safeMeta($l->meta),
         ])->values();
 
-        return inertia('medications/audit', [
+        return inertia('emar/reports/history-logs', [
             'filters' => [
                 'client_id' => $request->query('client_id'),
                 'site_id' => $request->query('site_id'),
@@ -142,8 +147,11 @@ class MedicationAuditController extends Controller
                 'to' => $request->query('to'),
             ],
             'logs' => $logs,
-            'clients' => $this->governanceScope->clientPicker($readerSiteIds),
+            'clients' => Client::query()->whereIn('id', $clientIds)->orderBy('first_name')->get(['id', 'first_name', 'last_name'])
+                ->map(fn ($client) => ['id' => $client->id, 'name' => trim($client->first_name.' '.$client->last_name)]),
             'sites' => $this->governanceScope->sitePicker($siteIds),
+            'can_export_history' => $user->canDo('medications.audit.export'),
+            'export_purposes' => MedicationExportAudit::PURPOSES,
         ]);
     }
 

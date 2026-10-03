@@ -19,6 +19,8 @@ use App\Models\User;
 use App\Services\Medication\DoseSlots\DoseOmissions;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\Reporting\MedicationExportAudit;
+use App\Services\Medication\Reporting\MedicationReportAccess;
 use App\Services\Medication\Reviews\MedicationReviewReader;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
@@ -33,6 +35,7 @@ class AuditLogController extends Controller
 
     public function index(Request $request, DoseOmissions $omissions)
     {
+        $request->validate(['client_id' => ['nullable', 'integer', 'min:1'], 'site_id' => ['nullable', 'integer', 'min:1'], 'date_from' => ['nullable', 'date_format:Y-m-d'], 'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from']]);
         $user = $request->user();
         abort_unless($user, 403);
         $canViewControlled = $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY);
@@ -46,11 +49,9 @@ class AuditLogController extends Controller
             $clientId,
         );
         $readerSiteIds = $siteFilter !== null ? [$siteFilter] : $accessibleSiteIds;
-        $allowedClientIds = Client::query()
-            ->whereIn('site_id', $readerSiteIds)
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
+        $reportAccess = app(MedicationReportAccess::class);
+        $reportAccess->siteIds($user, $siteFilter, $clientId);
+        $allowedClientIds = $reportAccess->clientIds($user, $readerSiteIds);
         $dateFrom = $request->query('date_from');
         $dateTo = $request->query('date_to');
         $eventTypes = $request->query('event_types', []);
@@ -184,13 +185,13 @@ class AuditLogController extends Controller
             if ($dateFrom) {
                 $adminQuery->whereRaw(
                     "({$adminEventTimestampSql}) >= ?",
-                    [Carbon::parse($dateFrom)->startOfDay()],
+                    [Carbon::parse($dateFrom, 'Pacific/Auckland')->startOfDay()->utc()],
                 );
             }
             if ($dateTo) {
                 $adminQuery->whereRaw(
                     "({$adminEventTimestampSql}) <= ?",
-                    [Carbon::parse($dateTo)->endOfDay()],
+                    [Carbon::parse($dateTo, 'Pacific/Auckland')->endOfDay()->utc()],
                 );
             }
 
@@ -301,10 +302,10 @@ class AuditLogController extends Controller
                 $orderQuery->where('client_id', $clientId);
             }
             if ($dateFrom) {
-                $orderQuery->where('created_at', '>=', Carbon::parse($dateFrom)->startOfDay());
+                $orderQuery->where('created_at', '>=', Carbon::parse($dateFrom, 'Pacific/Auckland')->startOfDay()->utc());
             }
             if ($dateTo) {
-                $orderQuery->where('created_at', '<=', Carbon::parse($dateTo)->endOfDay());
+                $orderQuery->where('created_at', '<=', Carbon::parse($dateTo, 'Pacific/Auckland')->endOfDay()->utc());
             }
 
             foreach ($orderQuery->get() as $order) {
@@ -394,10 +395,10 @@ class AuditLogController extends Controller
                 $destructionQuery->where('client_id', $clientId);
             }
             if ($dateFrom) {
-                $destructionQuery->where('destroyed_at', '>=', Carbon::parse($dateFrom)->startOfDay());
+                $destructionQuery->where('destroyed_at', '>=', Carbon::parse($dateFrom, 'Pacific/Auckland')->startOfDay()->utc());
             }
             if ($dateTo) {
-                $destructionQuery->where('destroyed_at', '<=', Carbon::parse($dateTo)->endOfDay());
+                $destructionQuery->where('destroyed_at', '<=', Carbon::parse($dateTo, 'Pacific/Auckland')->endOfDay()->utc());
             }
 
             foreach ($destructionQuery->get() as $dest) {
@@ -444,10 +445,10 @@ class AuditLogController extends Controller
                 $versionQuery->where('client_id', $clientId);
             }
             if ($dateFrom) {
-                $versionQuery->where('created_at', '>=', Carbon::parse($dateFrom)->startOfDay());
+                $versionQuery->where('created_at', '>=', Carbon::parse($dateFrom, 'Pacific/Auckland')->startOfDay()->utc());
             }
             if ($dateTo) {
-                $versionQuery->where('created_at', '<=', Carbon::parse($dateTo)->endOfDay());
+                $versionQuery->where('created_at', '<=', Carbon::parse($dateTo, 'Pacific/Auckland')->endOfDay()->utc());
             }
 
             $versions = $versionQuery->get();
@@ -515,10 +516,10 @@ class AuditLogController extends Controller
                 $cdQuery->where('client_id', $clientId);
             }
             if ($dateFrom) {
-                $cdQuery->where('recorded_at', '>=', Carbon::parse($dateFrom)->startOfDay());
+                $cdQuery->where('recorded_at', '>=', Carbon::parse($dateFrom, 'Pacific/Auckland')->startOfDay()->utc());
             }
             if ($dateTo) {
-                $cdQuery->where('recorded_at', '<=', Carbon::parse($dateTo)->endOfDay());
+                $cdQuery->where('recorded_at', '<=', Carbon::parse($dateTo, 'Pacific/Auckland')->endOfDay()->utc());
             }
 
             // The CD register uses two naming conventions across its write paths
@@ -600,10 +601,10 @@ class AuditLogController extends Controller
                 $errorQuery->where('client_id', $clientId);
             }
             if ($dateFrom) {
-                $errorQuery->where('reported_at', '>=', Carbon::parse($dateFrom)->startOfDay());
+                $errorQuery->where('reported_at', '>=', Carbon::parse($dateFrom, 'Pacific/Auckland')->startOfDay()->utc());
             }
             if ($dateTo) {
-                $errorQuery->where('reported_at', '<=', Carbon::parse($dateTo)->endOfDay());
+                $errorQuery->where('reported_at', '<=', Carbon::parse($dateTo, 'Pacific/Auckland')->endOfDay()->utc());
             }
 
             foreach ($errorQuery->get() as $error) {
@@ -645,10 +646,10 @@ class AuditLogController extends Controller
                 $stockQuery->where('client_id', $clientId);
             }
             if ($dateFrom) {
-                $stockQuery->where('delivered_at', '>=', Carbon::parse($dateFrom)->startOfDay());
+                $stockQuery->where('delivered_at', '>=', Carbon::parse($dateFrom, 'Pacific/Auckland')->startOfDay()->utc());
             }
             if ($dateTo) {
-                $stockQuery->where('delivered_at', '<=', Carbon::parse($dateTo)->endOfDay());
+                $stockQuery->where('delivered_at', '<=', Carbon::parse($dateTo, 'Pacific/Auckland')->endOfDay()->utc());
             }
 
             foreach ($stockQuery->get() as $order) {
@@ -786,7 +787,7 @@ class AuditLogController extends Controller
         $events = $sorted->take(800)->values();
 
         $clients = Client::query()
-            ->whereIn('site_id', $readerSiteIds)
+            ->whereIn('id', $allowedClientIds)
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name'])
             ->map(fn ($c) => ['id' => $c->id, 'name' => trim($c->first_name.' '.$c->last_name)]);
@@ -820,6 +821,9 @@ class AuditLogController extends Controller
             // A period starting before the dose-slot projection's days:
             // omissions are "Not available before …" (C6g).
             'omissions_notice' => $omissionsNotice,
+            'history_notice' => $stats['total'] > 800 ? 'Showing the latest 800 historical records. Choose a shorter period to see the remaining records.' : null,
+            'can_export_history' => $user->canDo('medications.audit.export'),
+            'export_purposes' => MedicationExportAudit::PURPOSES,
         ]);
     }
 
@@ -831,10 +835,10 @@ class AuditLogController extends Controller
 
         $ts = $timestamp instanceof Carbon ? $timestamp : Carbon::parse($timestamp);
 
-        if ($dateFrom && $ts->lt(Carbon::parse($dateFrom)->startOfDay())) {
+        if ($dateFrom && $ts->lt(Carbon::parse($dateFrom, 'Pacific/Auckland')->startOfDay()->utc())) {
             return false;
         }
-        if ($dateTo && $ts->gt(Carbon::parse($dateTo)->endOfDay())) {
+        if ($dateTo && $ts->gt(Carbon::parse($dateTo, 'Pacific/Auckland')->endOfDay()->utc())) {
             return false;
         }
 
