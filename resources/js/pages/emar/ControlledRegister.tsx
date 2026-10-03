@@ -468,7 +468,7 @@ export default function ControlledRegister({
                                         label: 'Expected / counted',
                                         width: '1fr',
                                         cell: (record) =>
-                                            `${record.expected_balance} / ${record.actual_balance}`,
+                                            `${record.expected_balance ?? 'Not recorded'} / ${record.actual_balance ?? 'Not recorded'}`,
                                     },
                                     {
                                         key: 'owner',

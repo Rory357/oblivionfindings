@@ -110,7 +110,7 @@ export function EntryList({
                     width: '0.7fr',
                     cell: (entry) => (
                         <span className={entry.voided_at ? 'line-through' : ''}>
-                            {entry.quantity}
+                            {entry.quantity ?? 'Not recorded'}
                         </span>
                     ),
                 },
@@ -120,7 +120,8 @@ export function EntryList({
                     width: '0.8fr',
                     cell: (entry) => (
                         <span className={entry.voided_at ? 'line-through' : ''}>
-                            {entry.on_hand_before} → {entry.on_hand_after}
+                            {entry.on_hand_before ?? 'Not recorded'} →{' '}
+                            {entry.on_hand_after ?? 'Not recorded'}
                         </span>
                     ),
                 },
@@ -284,8 +285,11 @@ export function DetailDialog({
         rows.push(
             ['Medicine', medicineLabel(payload, entry.client_medication_id)],
             ['Type', entry.entry_type.replace(/_/g, ' ')],
-            ['Amount', entry.quantity],
-            ['Balance', `${entry.on_hand_before} → ${entry.on_hand_after}`],
+            ['Amount', entry.quantity ?? 'Not recorded'],
+            [
+                'Balance',
+                `${entry.on_hand_before ?? 'Not recorded'} → ${entry.on_hand_after ?? 'Not recorded'}`,
+            ],
             [
                 'Recorded',
                 `${dateTime(entry.recorded_at)} · ${entry.recorded_by_name ?? '—'}`,
@@ -339,11 +343,13 @@ export function DetailDialog({
                 medicineLabel(payload, discrepancy.client_medication_id),
             ],
             ['Status', <StateBadge status={discrepancy.status} />],
-            ['Expected', discrepancy.expected_balance],
+            ['Expected', discrepancy.expected_balance ?? 'Not recorded'],
             ['First count', discrepancy.first_count ?? '—'],
             [
                 'Second count',
-                discrepancy.recount_balance ?? discrepancy.actual_balance,
+                discrepancy.recount_balance ??
+                    discrepancy.actual_balance ??
+                    'Not recorded',
             ],
             ['Counted by', discrepancy.reported_by_name ?? '—'],
             ['Witness', discrepancy.witnessed_by_name ?? '—'],
@@ -436,7 +442,7 @@ export function DetailDialog({
                                 title={`${dateTime(note.created_at)} · ${note.created_by_name ?? '—'}`}
                                 icon={FileWarning}
                             >
-                                <p className="whitespace-pre-wrap text-sm">
+                                <p className="text-sm whitespace-pre-wrap">
                                     {note.notes}
                                 </p>
                             </ReviewCard>

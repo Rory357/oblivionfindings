@@ -89,6 +89,35 @@ class ControlledProductTest extends TestCase
         parent::tearDown();
     }
 
+    public function test_legacy_missing_register_quantities_remain_unknown_while_zero_and_fractional_values_are_preserved(): void
+    {
+        $base = ['client_id' => $this->client->id, 'client_medication_id' => $this->medication->id,
+            'entry_type' => 'balance_check', 'recorded_at' => now(), 'recorded_by' => $this->recorder->id];
+        $unknown = ClientControlledDrugEntry::query()->create([...$base,
+            'quantity' => null, 'on_hand_before' => null, 'on_hand_after' => null]);
+        $known = ClientControlledDrugEntry::query()->create([...$base,
+            'quantity' => '0.00', 'on_hand_before' => '0.00', 'on_hand_after' => '1.25']);
+        $discrepancy = ClientControlledDrugDiscrepancy::query()->create([
+            'client_id' => $this->client->id, 'client_medication_id' => $this->medication->id,
+            'on_hand_before' => null, 'on_hand_after' => '0.00', 'status' => 'open',
+            'reported_at' => now(), 'reported_by' => $this->recorder->id,
+        ]);
+        $payload = $this->actingAs($this->recorder->fresh())->getJson('/emar/controlled/product')->assertOk()->json();
+        $entries = collect($payload['entries'])->keyBy('id');
+        foreach (['quantity', 'on_hand_before', 'on_hand_after'] as $field) {
+            $this->assertNull($entries[$unknown->id][$field]);
+        }
+        $this->assertEquals(0, $entries[$known->id]['quantity']);
+        $this->assertEquals(0, $entries[$known->id]['on_hand_before']);
+        $this->assertEquals(1.25, $entries[$known->id]['on_hand_after']);
+        $row = collect($payload['discrepancies'])->firstWhere('id', $discrepancy->id);
+        $this->assertNull($row['expected_balance']);
+        $this->assertEquals(0, $row['actual_balance']);
+        $this->assertNull($unknown->fresh()->quantity);
+        $this->assertNull($unknown->fresh()->on_hand_after);
+        $this->assertSame('10.00', $this->stock->fresh()->on_hand);
+    }
+
     public function test_matching_witnessed_count_stamps_current_count_without_a_discrepancy(): void
     {
         $result = $this->perform('count', ['actual_balance' => 10]);

@@ -65,9 +65,9 @@ export interface ControlledEntry {
     id: number;
     client_medication_id: number;
     entry_type: string;
-    quantity: number;
-    on_hand_before: number;
-    on_hand_after: number;
+    quantity: number | null;
+    on_hand_before: number | null;
+    on_hand_after: number | null;
     recorded_at: string;
     recorded_by_name: string | null;
     witnessed_by_name: string | null;
@@ -84,8 +84,8 @@ export interface ControlledDiscrepancy {
     id: number;
     client_medication_id: number;
     status: string;
-    expected_balance: number;
-    actual_balance: number;
+    expected_balance: number | null;
+    actual_balance: number | null;
     first_count?: number | null;
     recount_balance?: number | null;
     reported_at: string;
