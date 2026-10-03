@@ -9,6 +9,11 @@ vi.mock('@/layouts/app-layout', () => ({
 vi.mock('@/hooks/use-emar-breadcrumbs', () => ({
     useEmarBreadcrumbs: () => [],
 }));
+vi.mock('@/components/emar/controlled/controlled-checks', () => ({
+    ControlledChecks: ({ search }: { search: string }) => (
+        <section aria-label="Controlled checks workspace">{search}</section>
+    ),
+}));
 vi.mock('@inertiajs/react', () => ({
     Head: () => null,
     Link: ({
@@ -305,6 +310,108 @@ function props(over: Partial<MedsTodayProps> = {}): MedsTodayProps {
 
 describe('Meds today (P01 C3)', () => {
     beforeEach(() => window.history.replaceState(null, '', '/meds/today'));
+
+    it('opens the controlled-checks deep link for a reader without recording authority', () => {
+        window.history.replaceState(
+            null,
+            '',
+            '/meds/today?view=controlled&q=Kōwhai',
+        );
+        render(
+            <MedsToday
+                {...props({
+                    board_can: {
+                        ...props().board_can,
+                        record_administration: false,
+                        view_controlled: true,
+                    },
+                })}
+            />,
+        );
+
+        expect(
+            screen.getByRole('region', { name: 'Controlled checks workspace' }),
+        ).toHaveTextContent('Kōwhai');
+        expect(
+            screen.getByRole('tab', { name: 'Controlled checks' }),
+        ).toHaveAttribute('aria-selected', 'true');
+        expect(
+            screen.queryByText('At Kōwhai House, not on your shift'),
+        ).not.toBeInTheDocument();
+    });
+
+    it('opens controlled checks from the rail and preserves existing query parameters', () => {
+        window.history.replaceState(null, '', '/meds/today?site_id=5');
+        render(
+            <MedsToday
+                {...props({
+                    board_can: { ...props().board_can, view_controlled: true },
+                })}
+            />,
+        );
+        fireEvent.click(screen.getByRole('tab', { name: 'Controlled checks' }));
+
+        expect(
+            screen.getByRole('region', { name: 'Controlled checks workspace' }),
+        ).toBeInTheDocument();
+        expect(new URLSearchParams(window.location.search).get('view')).toBe(
+            'controlled',
+        );
+        expect(new URLSearchParams(window.location.search).get('site_id')).toBe(
+            '5',
+        );
+    });
+
+    it('does not mount controlled checks or offer its tab without controlled read access', () => {
+        window.history.replaceState(null, '', '/meds/today?view=controlled');
+        render(<MedsToday {...props()} />);
+
+        expect(
+            screen.getByText('You can’t view controlled medicines'),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole('tab', { name: 'Controlled checks' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('region', {
+                name: 'Controlled checks workspace',
+            }),
+        ).not.toBeInTheDocument();
+    });
+
+    it('keeps undated open follow-ups visible without claiming none are open', () => {
+        const base = props();
+        render(
+            <MedsToday
+                {...props({
+                    refusal_follow_ups: [],
+                    prn_follow_ups: Array.from({ length: 4 }, (_, i) => ({
+                        ...base.prn_follow_ups[0],
+                        administration_id: 70 + i,
+                        check_due_at: null,
+                        check_at: null,
+                    })),
+                })}
+            />,
+        );
+        const followUps = screen.getByRole('button', {
+            name: 'View follow-ups, 0 overdue',
+        });
+        expect(followUps).toHaveTextContent('4');
+        expect(followUps).toHaveTextContent('Open follow-ups to check');
+        expect(
+            within(followUps).queryByText('None open'),
+        ).not.toBeInTheDocument();
+    });
+
+    it('describes the displayed people without claiming shift assignment when not clocked in', () => {
+        render(<MedsToday {...props({ clocked_in: false })} />);
+
+        expect(screen.getByText(/^Showing medicines for /)).toBeInTheDocument();
+        expect(
+            screen.queryByText(/^Showing the people on your shift/),
+        ).not.toBeInTheDocument();
+    });
 
     it('keeps a due-soon dose outside the Due now count until the canonical window opens', () => {
         const base = props();

@@ -464,7 +464,7 @@ export function ScheduleView({
             <p className="text-caption">
                 {[
                     people.length
-                        ? `Showing the people on your shift (${people.join(', ')}).`
+                        ? `Showing medicines for ${people.join(', ')}.`
                         : null,
                     `Times in ${tzLabel}.`,
                     ...notes,

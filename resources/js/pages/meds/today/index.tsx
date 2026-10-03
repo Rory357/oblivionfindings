@@ -10,6 +10,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import {
     Activity,
     CheckCircle2,
+    ClipboardCheck,
     Clock3,
     Flag,
     LogIn,
@@ -29,6 +30,7 @@ import {
     type MouseEvent,
 } from 'react';
 
+import { ControlledChecks } from '@/components/emar/controlled/controlled-checks';
 import {
     AsNeededPicker,
     WhyDialog,
@@ -59,6 +61,7 @@ import {
     PageHeaderViewToggle,
     PageLayout,
 } from '@/components/page';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { ReportErrorModal } from '@/pages/emar/components/report-error-modal';
@@ -106,6 +109,7 @@ type View =
     | 'asneeded'
     | 'followups'
     | 'stockalerts'
+    | 'controlled'
     | 'activity';
 const VIEWS: View[] = [
     'schedule',
@@ -113,6 +117,7 @@ const VIEWS: View[] = [
     'asneeded',
     'followups',
     'stockalerts',
+    'controlled',
     'activity',
 ];
 
@@ -569,7 +574,11 @@ export default function MedsToday(props: MedsTodayProps) {
             </PageHeaderMeterBlock>
             <PageHeaderMeterBlock
                 label="Follow-ups"
-                value={followUpsOpen ? String(followUpsOpen) : undefined}
+                value={
+                    followUpsOverdue && followUpsOpen
+                        ? String(followUpsOpen)
+                        : undefined
+                }
                 tone={followUpsOverdue ? 'critical' : 'brand'}
                 onClick={() => setView('followups')}
                 ariaLabel={`View follow-ups, ${followUpsOverdue} overdue`}
@@ -582,7 +591,9 @@ export default function MedsToday(props: MedsTodayProps) {
                 <PageHeaderMeterCaption>
                     {oldestFollowUp
                         ? `Oldest ${nzTime(oldestFollowUp)}${dayWord(oldestFollowUp)}`
-                        : 'None open'}
+                        : followUpsOpen
+                          ? 'Open follow-ups to check'
+                          : 'None open'}
                 </PageHeaderMeterCaption>
             </PageHeaderMeterBlock>
             {eligibility ? (
@@ -761,6 +772,15 @@ export default function MedsToday(props: MedsTodayProps) {
                         : {}),
                 },
                 { key: 'activity', label: 'Activity', icon: Activity },
+                ...(board_can.view_controlled
+                    ? [
+                          {
+                              key: 'controlled' as const,
+                              label: 'Controlled checks',
+                              icon: ClipboardCheck,
+                          },
+                      ]
+                    : []),
             ]}
         />
     );
@@ -922,6 +942,17 @@ export default function MedsToday(props: MedsTodayProps) {
                             houseLabel={props.house_label ?? null}
                             tzLabel={tz}
                         />
+                    ) : null}
+                    {view === 'controlled' ? (
+                        board_can.view_controlled ? (
+                            <ControlledChecks search={search} />
+                        ) : (
+                            <EmptyState
+                                icon={ClipboardCheck}
+                                title="You can’t view controlled medicines"
+                                description="Ask your manager if you need controlled-medicine access for your work."
+                            />
+                        )
                     ) : null}
                     {view === 'rounds' ? (
                         <>

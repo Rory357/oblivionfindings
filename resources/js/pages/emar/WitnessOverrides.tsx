@@ -241,7 +241,10 @@ export default function WitnessOverrides({
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Medication', href: '/meds/today' },
                 { title: 'Safety & oversight', href: '/emar' },
-                { title: 'Witness overrides', href: '/emar/witness-overrides' },
+                {
+                    title: 'Witness overrides',
+                    href: '/emar/safety/witness-overrides',
+                },
             ]}
         >
             <Head title="Witness overrides" />
@@ -361,9 +364,9 @@ export default function WitnessOverrides({
                                     },
                                 ]}
                             />
-                            <span className="text-caption text-band-foreground">
+                            <PageHeaderMeterCaption>
                                 As at {dateTime(payload?.as_at)}
-                            </span>
+                            </PageHeaderMeterCaption>
                         </>
                     }
                     rail={<EmarHubRail />}

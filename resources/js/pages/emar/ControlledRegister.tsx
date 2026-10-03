@@ -306,9 +306,9 @@ export default function ControlledRegister({
                         checked={filters.classReview}
                         onChange={(classReview) => change({ classReview })}
                     />
-                    <span className="text-caption text-band-foreground">
+                    <PageHeaderMeterCaption>
                         As at {dateTime(payload?.as_at)}
-                    </span>
+                    </PageHeaderMeterCaption>
                 </>
             }
             rail={
