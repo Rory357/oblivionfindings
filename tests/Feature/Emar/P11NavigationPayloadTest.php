@@ -27,8 +27,8 @@ it('exposes the existing house-alert capability and admits its own-house Setting
     $actor = p11NavigationActor($site, ['medications.alerts.manage_house']);
     $before = $actor->permissionOverrides()->count();
     $this->actingAs($actor)->get('/emar/settings')->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->component('emar/Settings')->where('can.medications.alertsManageHouse', true)->where('can.medications.witnessPinReset', false)
-        ->where('can.medications.view', false)->where('can.medications.settingsManage', false)
+        ->component('emar/Settings')->where('auth.can.medications.alertsManageHouse', true)->where('auth.can.medications.witnessPinReset', false)
+        ->where('auth.can.medications.view', false)->where('auth.can.medications.settingsManage', false)
         ->where('settingsCan.manage', false)->where('settingsCan.manage_global', false)
         ->where('settingsAccess', false)->where('alertAccess.view', true)->where('alertAccess.manage_org', false)
         ->where('alertAccess.house_ids', [$site->id])->where('sites.0.id', $site->id)->has('sites', 1)->where('witnessPin.can_reset', false));
@@ -41,7 +41,7 @@ it('keeps the existing PIN-only Settings entry read-only for policy and house al
     $site = Site::factory()->create(['type' => 'house']);
     $actor = p11NavigationActor($site, ['medications.witness_pin.reset']);
     $this->actingAs($actor)->get('/emar/settings')->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->component('emar/Settings')->where('can.medications.witnessPinReset', true)->where('can.medications.alertsManageHouse', false)
+        ->component('emar/Settings')->where('auth.can.medications.witnessPinReset', true)->where('auth.can.medications.alertsManageHouse', false)
         ->where('settingsCan.manage', false)->where('settingsCan.manage_global', false)
         ->where('settingsAccess', false)->where('witnessPin.can_reset', true)->where('alertAccess.view', false));
 });
@@ -55,7 +55,7 @@ it('preserves shared medication navigation alongside organisation Settings manag
     $site = Site::factory()->create(['is_active' => true]);
     $actor = p11NavigationActor($site, ['medications.view', 'medications.settings.manage', 'sites.viewAll']);
     $this->actingAs($actor)->get('/emar/settings')->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->component('emar/Settings')->where('can.medications.view', true)->where('can.medications.settingsManage', true)
+        ->component('emar/Settings')->where('auth.can.medications.view', true)->where('auth.can.medications.settingsManage', true)
         ->where('settingsCan.manage', true)->where('settingsCan.manage_global', true)
         ->where('settingsAccess', true)->where('settings.can_manage_organisation', true));
     expect($actor->roles()->count())->toBe(0);

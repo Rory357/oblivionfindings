@@ -250,15 +250,32 @@ it('uses saved delivery settings for a real emergency-access daily report', func
     medicationEmergencyReportGrant($site, $reviewer);
     $definition = app(MedicationSettingsRegistry::class)->definition('alerts', 'breakglass');
     AppSetting::updateOrCreate(['key' => $definition->storageKey], ['value' => json_encode([
-        'inapp' => false, 'email' => false, 'push' => false, 'follow_up' => false,
+        'inapp' => false, 'email' => true, 'push' => false, 'follow_up' => false,
         'groups' => [MedicationAlertCatalogue::EA_REVIEWERS], 'people' => [],
     ])]);
 
     $this->artisan('breakglass:daily-report')->assertExitCode(0);
 
     expect(MedicationAlert::where('type', 'breakglass')->sole()->subject['used_count'])->toBe(1);
-    medicationAlertNotTo($reviewer, 'breakglass');
-    Notification::assertNothingSent();
+    // The approved codec requires at least one channel; use a valid email-only choice.
+    $receipt = \App\Models\MedicationAlertRecipient::where('user_id', $reviewer->id)->sole();
+    expect($receipt->channels)->toBe(['email'])->and($receipt->notification_id)->toBeNull();
+    Notification::assertNotSentTo($reviewer, MedicationAlertNotification::class,
+        fn (MedicationAlertNotification $notice): bool => in_array('inapp', $notice->channels, true));
+});
+
+it('retains the in-app safeguard for an invalid stored daily-report choice with every channel off', function () {
+    Notification::fake();
+    $site = Site::factory()->create(['is_active' => true]);
+    $reviewer = medicationAlertStaff($site, 'auditor');
+    medicationEmergencyReportGrant($site, $reviewer);
+    $definition = app(MedicationSettingsRegistry::class)->definition('alerts', 'breakglass');
+    $invalid = json_encode(['inapp' => false, 'email' => false, 'push' => false, 'follow_up' => false,
+        'groups' => [MedicationAlertCatalogue::EA_REVIEWERS], 'people' => []]);
+    expect($definition->accepts($invalid))->toBeFalse();
+    AppSetting::updateOrCreate(['key' => $definition->storageKey], ['value' => $invalid]);
+    $this->artisan('breakglass:daily-report')->assertExitCode(0);
+    medicationAlertTo($reviewer, 'breakglass', fn (MedicationAlertNotification $notice): bool => $notice->channels === ['inapp']);
 });
 
 it('sends the emergency daily report through current reviewer authority and deduplicates retries', function () {
