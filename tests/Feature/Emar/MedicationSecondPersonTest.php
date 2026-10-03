@@ -125,7 +125,7 @@ class MedicationSecondPersonTest extends TestCase
         UserWitnessPin::query()->where('user_id', $this->secondPerson->id)->delete();
         $explicit = $this->order(['witness_required' => true]);
         $this->record($explicit, ['second_person_unavailable' => true])->assertStatus(422);
-        $this->record($explicit, $this->confirmation())->assertStatus(422)->assertJsonPath('error_field', 'witness_credential');
+        $this->record($explicit, $this->confirmation())->assertStatus(422)->assertJsonValidationErrors('witness_credential');
         $this->assertDatabaseCount('client_medication_administrations', 0);
 
         $this->rule();
@@ -140,7 +140,7 @@ class MedicationSecondPersonTest extends TestCase
         $order = $this->order(['witness_required' => true]);
         $this->record($order, [...$this->confirmation(), 'witnessed_by' => $this->recorder->id])->assertStatus(422);
         $this->record($order, [...$this->confirmation(), 'witness_credential' => 'password'])
-            ->assertStatus(422)->assertJsonPath('error_field', 'witness_credential');
+            ->assertStatus(422)->assertJsonValidationErrors('witness_credential');
         $this->assertDatabaseCount('client_medication_administrations', 0);
     }
 
@@ -254,7 +254,8 @@ class MedicationSecondPersonTest extends TestCase
         Carbon::setTestNow(Carbon::now('Pacific/Auckland')->startOfDay()->utc());
         $order = ClientMedication::query()->create([
             'client_id' => $this->client->id, 'name' => 'Ordinary medicine', 'dosage' => '1 tablet', 'frequency' => 'Daily',
-            'dose_times' => ['09:30'], 'is_prn' => false, 'active' => true, 'state' => 'active', ...$attributes,
+            'dose_times' => ['09:30'], 'is_prn' => false, 'controlled_drug' => false, 'high_risk' => false,
+            'witness_required' => false, 'approval_status' => 'verified', 'active' => true, 'state' => 'active', ...$attributes,
         ]);
         Carbon::setTestNow($now);
 

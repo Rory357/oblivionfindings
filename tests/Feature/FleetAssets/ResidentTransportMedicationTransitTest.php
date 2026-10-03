@@ -535,6 +535,25 @@ class ResidentTransportMedicationTransitTest extends TestCase
     public function test_controlled_drug_administration_rejects_label_only_packing_evidence(): void
     {
         [$transport, $client] = $this->createInProgressTransport(withMedicationCompetency: true);
+        $witness = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        $witness->roles()->attach(Role::query()->where('name', 'support_worker')->firstOrFail());
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $witness->id, 'primary_site_id' => $transport->site_id, 'secondary_site_ids' => [],
+            'start_date' => today()->subMonth(), 'end_date' => null, 'is_active' => true,
+        ]);
+        MedicationCompetencyAssessment::query()->create([
+            'user_id' => $witness->id, 'assessor_id' => $this->admin->id, 'assessment_type' => 'annual',
+            'status' => 'passed', 'assessment_date' => today()->subMonth(), 'expiry_date' => today()->addYear(),
+            'assessor_declared_at' => now()->subMonth(), 'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+            'can_administer_unsupervised' => true, 'can_witness_controlled' => true,
+            'controlled_drugs' => true, 'restricted' => false, 'not_seen_areas' => [],
+        ]);
+        \App\Models\Shift::factory()->create([
+            'user_id' => $witness->id, 'client_id' => $client->id, 'site_id' => $transport->site_id,
+            'starts_at' => now()->subHour(), 'ends_at' => now()->addHours(3),
+            'actual_starts_at' => now()->subMinutes(30), 'actual_ends_at' => null, 'status' => 'in_progress',
+        ]);
+        $this->assertTrue($witness->canDo('medications.controlled.witness'));
 
         $medication = ClientMedication::query()->create([
             'client_id' => $client->id,
@@ -566,7 +585,9 @@ class ResidentTransportMedicationTransitTest extends TestCase
         $this->actingAs($this->admin)
             ->from("/fleet-assets/transports/{$transport->id}")
             ->post("/fleet-assets/medication-transit/{$log->id}/administer", [
-                'witnessed_by_user_id' => null,
+                'witnessed_by_user_id' => $witness->id,
+                'witness_credential' => \Database\Factories\UserFactory::TEST_WITNESS_PIN,
+                'client_request_uuid' => (string) Str::uuid(),
                 'quantity_administered' => '1.00',
                 'notes' => 'Dose given during transport.',
                 'scan_code' => $scanCode,
@@ -578,6 +599,7 @@ class ResidentTransportMedicationTransitTest extends TestCase
             ->assertSessionHasErrors(['packing_attestation']);
 
         $this->assertNull($log->fresh()->administered_at);
+        $this->assertDatabaseCount('client_medication_administrations', 0);
     }
 
     public function test_pack_and_return_preserve_terminal_transit_consequences(): void

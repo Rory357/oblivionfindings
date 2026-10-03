@@ -528,6 +528,10 @@ class ForgottenWitnessPinTest extends TestCase
             'frequency' => 'Daily',
             'dose_times' => $doseTimes,
             'is_prn' => false,
+            'controlled_drug' => false,
+            'high_risk' => false,
+            'witness_required' => false,
+            'approval_status' => 'verified',
             'active' => true,
             'state' => 'active',
         ], $overrides));

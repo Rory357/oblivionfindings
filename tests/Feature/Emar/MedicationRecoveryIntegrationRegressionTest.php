@@ -99,7 +99,7 @@ class MedicationRecoveryIntegrationRegressionTest extends TestCase
     public function test_approval_route_retires_original_work_and_creates_only_accepted_replacement_work(): void
     {
         [$original, $old] = $this->prnSource();
-        $originalFacts = $original->getRawOriginal();
+        $originalFacts = $original->fresh()->getRawOriginal();
         $originalHistory = $old->mapWithKeys(fn ($row) => [$row->id => $row->events()->sole()->getRawOriginal()]);
         $correction = $this->requestCorrection($original, 'given');
         $this->assertSame('pending', $correction->correction_status);
@@ -132,10 +132,10 @@ class MedicationRecoveryIntegrationRegressionTest extends TestCase
         $this->assertEqualsCanonicalizing($replacement->map(fn ($row) => 'medication-followup-'.$row->id)->all(), $taskIds);
     }
 
-    public function test_not_given_approval_route_retires_the_effect_check_without_inventing_replacement_work(): void
+    public function test_withheld_approval_route_retires_the_effect_check_without_inventing_replacement_work(): void
     {
         [$original, $old] = $this->prnSource(false);
-        $correction = $this->requestCorrection($original, 'not_given');
+        $correction = $this->requestCorrection($original, 'withheld');
         $this->actingAs($this->manager)->post(route('emar.corrections.approve', $correction))
             ->assertRedirect()->assertSessionHasNoErrors()->assertSessionHas('success');
 
@@ -271,7 +271,10 @@ class MedicationRecoveryIntegrationRegressionTest extends TestCase
             'status' => 'given', 'amount_mode' => 'less', 'quantity_given' => 0.5,
             'amount_reason' => 'part_taken', 'witnessed_by' => $witness->id, 'second_person_pin_forgotten' => true,
         ];
-        $this->requirements($ordinary)->assertOk()->assertJsonPath('second_person.forgotten_pin_allowed', true);
+        // Requirements precede the smaller-amount selection which establishes the second-person kind.
+        $this->requirements($ordinary)->assertOk()->assertJsonPath('second_person.kind', null)
+            ->assertJsonPath('second_person.forgotten_pin_allowed', false);
+        $this->assertTrue(app(ForgottenWitnessPinService::class)->available());
         $this->record($ordinary, $fallback)->assertOk();
         $ordinaryDose = ClientMedicationAdministration::query()->where('client_medication_id', $ordinary->id)->sole();
         $nomination = MedicationSecondPersonConfirmation::query()->sole();
@@ -320,7 +323,8 @@ class MedicationRecoveryIntegrationRegressionTest extends TestCase
     {
         $order = ClientMedication::query()->create([
             'client_id' => $this->client->id, 'name' => 'Synthetic recovery PRN', 'dosage' => '1 tablet',
-            'frequency' => 'As needed', 'is_prn' => true, 'state' => 'active', 'active' => true,
+            'frequency' => 'As needed', 'is_prn' => true, 'controlled_drug' => false, 'high_risk' => false,
+            'witness_required' => false, 'approval_status' => 'verified', 'state' => 'active', 'active' => true,
         ]);
         $dose = ClientMedicationAdministration::query()->create([
             'client_id' => $this->client->id, 'client_medication_id' => $order->id, 'shift_id' => $this->shift->id,
@@ -407,7 +411,8 @@ class MedicationRecoveryIntegrationRegressionTest extends TestCase
             return ClientMedication::query()->create([
                 'client_id' => $this->client->id, 'name' => 'Synthetic recovery dose', 'dosage' => '1 tablet',
                 'dose_amount' => 1, 'dose_unit' => 'tablet', 'dose_times' => ['09:30'], 'frequency' => 'Daily',
-                'is_prn' => false, 'active' => true, 'state' => 'active', ...$attributes,
+                'is_prn' => false, 'controlled_drug' => false, 'high_risk' => false, 'witness_required' => false,
+                'approval_status' => 'verified', 'active' => true, 'state' => 'active', ...$attributes,
             ]);
         } finally {
             Carbon::setTestNow($clock);

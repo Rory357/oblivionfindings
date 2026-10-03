@@ -67,15 +67,9 @@ class ControlledDoseOverrideTest extends TestCase
         $this->client = Client::factory()->create(['site_id' => $this->site->id, 'service_context_id' => $context->id, 'status' => 'active']);
         $this->recorder = $this->staff('Recorder');
         $this->witness = $this->staff('Witness');
+        $this->client->supportWorkers()->attach($this->recorder->id);
         $this->manager = User::factory()->create(['role' => 'provider_manager', 'approved_at' => now()]);
-        $clock = Carbon::getTestNow();
-        Carbon::setTestNow(now('Pacific/Auckland')->startOfDay()->utc());
-        $this->medication = ClientMedication::query()->create([
-            'client_id' => $this->client->id, 'name' => 'Override test medicine', 'dosage' => '1 tablet',
-            'frequency' => 'Daily', 'dose_times' => ['09:30'], 'dose_amount' => 1, 'dose_unit' => 'tablet',
-            'is_prn' => false, 'controlled_drug' => true, 'witness_required' => false, 'active' => true, 'state' => 'active',
-        ]);
-        Carbon::setTestNow($clock);
+        $this->medication = $this->approvedOrder();
         $this->stock = ClientMedicationStock::query()->create(['client_medication_id' => $this->medication->id, 'on_hand' => 5, 'unit' => 'tablet']);
         $this->override = ControlledWitnessOverride::query()->create([
             'site_id' => $this->site->id, 'client_medication_id' => $this->medication->id, 'medicine_ids' => [$this->medication->id],
@@ -161,9 +155,13 @@ class ControlledDoseOverrideTest extends TestCase
         $this->override->update(['starts_at' => now()->addMinute()]);
         $this->record(['witness_override_id' => $this->override->id])->assertStatus(422);
         $this->override->update(['starts_at' => now()->subMinutes(10)]);
-        foreach ([now()->subMinutes(11), now()->addHours(2)] as $actionAt) {
-            $this->record(['witness_override_id' => $this->override->id, 'administered_at' => $actionAt->toIso8601String()])->assertStatus(422);
-        }
+        $this->record(['witness_override_id' => $this->override->id, 'administered_at' => now()->subMinutes(11)->toIso8601String()])
+            ->assertStatus(422)->assertJsonValidationErrors('witness_override_id');
+        $expiresAt = now()->addMinute();
+        $this->override->update(['expires_at' => $expiresAt]);
+        Carbon::setTestNow($expiresAt->copy()->addSecond());
+        $this->record(['witness_override_id' => $this->override->id, 'administered_at' => now()->toIso8601String()])
+            ->assertStatus(422)->assertJsonValidationErrors('witness_override_id');
         $this->assertNoDose();
     }
 
@@ -176,7 +174,10 @@ class ControlledDoseOverrideTest extends TestCase
 
     public function test_explicit_order_witness_requirement_wins_even_over_an_approved_grant(): void
     {
-        $this->medication->update(['witness_required' => true]);
+        // This order was approved with its witness requirement, not edited after approval.
+        $this->medication = $this->approvedOrder(witnessRequired: true);
+        $this->stock->update(['client_medication_id' => $this->medication->id]);
+        $this->override->update(['client_medication_id' => $this->medication->id, 'medicine_ids' => [$this->medication->id]]);
         $this->assertSame(RecordingContract::SECOND_WITNESS, app(RecordingContractEnforcer::class)
             ->secondPersonKind(['status' => 'given'], $this->medication, [], false, true));
         $this->requirements()->assertOk()->assertJsonPath('witness_override', null)->assertJsonPath('second_person.kind', 'witness');
@@ -347,6 +348,22 @@ class ControlledDoseOverrideTest extends TestCase
             ->where('subject_id', $dose->id)->where('action', 'signed_off')->count());
         $this->assertSame($eventCount, MedicationEvent::query()->count());
         $this->assertSame('4.00', $this->stock->fresh()->on_hand);
+    }
+
+    private function approvedOrder(bool $witnessRequired = false): ClientMedication
+    {
+        $clock = Carbon::getTestNow();
+        Carbon::setTestNow(now('Pacific/Auckland')->startOfDay()->utc());
+        try {
+            return ClientMedication::query()->create([
+                'client_id' => $this->client->id, 'name' => 'Override test medicine', 'dosage' => '1 tablet',
+                'frequency' => 'Daily', 'dose_times' => ['09:30'], 'dose_amount' => 1, 'dose_unit' => 'tablet',
+                'is_prn' => false, 'controlled_drug' => true, 'high_risk' => false, 'witness_required' => $witnessRequired,
+                'approval_status' => 'verified', 'active' => true, 'state' => 'active',
+            ]);
+        } finally {
+            Carbon::setTestNow($clock);
+        }
     }
 
     private function staff(string $name): User
