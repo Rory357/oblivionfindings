@@ -29,6 +29,13 @@ class ClientControlledDrugEntry extends Model
         'recorded_at',
         'recorded_by',
         'witnessed_by',
+        'reverses_entry_id',
+        'second_witness_id',
+        'first_count',
+        'recount',
+        'count_due_at',
+        'source_type',
+        'source_id',
     ];
 
     protected $casts = [
@@ -37,7 +44,16 @@ class ClientControlledDrugEntry extends Model
         'on_hand_after' => 'decimal:2',
         'recorded_at' => 'datetime',
         'expiry_date' => 'date',
+        'first_count' => 'decimal:2',
+        'recount' => 'decimal:2',
+        'count_due_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::updating(fn () => throw new \LogicException('Controlled register entries are append-only. Void and correct the original entry.'));
+        static::deleting(fn () => throw new \LogicException('Controlled register entries cannot be deleted.'));
+    }
 
     public function client()
     {

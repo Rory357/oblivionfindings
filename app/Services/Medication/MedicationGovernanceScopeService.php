@@ -60,6 +60,8 @@ final class MedicationGovernanceScopeService
         'medications.controlled.view',
         'medications.controlled.record',
         'medications.controlled.witness',
+        'medications.controlled.manage',
+        'medications.controlled.override',
         'medications.stock.update',
         'medications.orders.manage',
         'medications.breakglass',

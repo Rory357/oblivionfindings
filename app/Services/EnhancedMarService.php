@@ -21,6 +21,7 @@ use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationCompetencyRestrictionRules;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\MedicationSecondPersonService;
 use App\Services\Medication\Recording\RecordingContract;
 use App\Services\Medication\Recording\RecordingContractEnforcer;
 use App\Services\Medication\WitnessPinService;
@@ -1037,7 +1038,7 @@ class EnhancedMarService
                             'error_field' => 'witnessed_by',
                         ];
                     }
-                    if (! $this->recordingContract->nobodyCanConfirm($client, $userId, $adminAt)) {
+                    if (! $this->recordingContract->nobodyCanConfirm($client, $userId, $adminAt, (bool) $medication->controlled_drug)) {
                         return [
                             'success' => false,
                             'error' => 'A colleague on shift can confirm this dose. Choose them and ask them to type their witness PIN.',
@@ -2296,7 +2297,7 @@ class EnhancedMarService
                 'error_field' => 'witnessed_by',
             ];
         }
-        $witness = $this->medicationGovernanceScope->confirmedControlledWitness(
+        $witness = $medication->controlled_drug ? $this->medicationGovernanceScope->confirmedControlledWitness(
             $recorder,
             $client,
             (int) $data['witnessed_by'],
@@ -2305,7 +2306,11 @@ class EnhancedMarService
             lockedUsers: $lockedWitnessUsers,
             effectiveAt: $effectiveAt,
             lockedPresenceShifts: $lockedPresenceShifts,
-        );
+        ) : app(MedicationSecondPersonService::class)->authenticate(
+            $recorder, (int) $client->site_id, (int) $data['witnessed_by'],
+            $data['witness_credential'] ?? null, $effectiveAt,
+            $lockedWitnessUsers, $lockedPresenceShifts,
+        )['witness'];
 
         return [
             'success' => true,

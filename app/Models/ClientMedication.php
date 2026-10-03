@@ -370,7 +370,7 @@ class ClientMedication extends Model
      */
     public function requiresWitness(): bool
     {
-        return $this->witness_required || $this->controlled_drug;
+        return app(\App\Services\Medication\Controlled\ControlledPolicy::class)->witnessRequired($this);
     }
 
     /**

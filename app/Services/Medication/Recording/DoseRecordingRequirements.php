@@ -17,6 +17,7 @@ use App\Services\Medication\DoseSlots\DoseOrderTimelineFactory;
 use App\Services\Medication\DoseSlots\DoseWindowResolver;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationCompetencyRestrictionRules;
+use App\Services\Medication\MedicationSecondPersonService;
 use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Medication\Settings\MedicineRuleWording;
@@ -281,7 +282,8 @@ final class DoseRecordingRequirements
             (bool) ($adminRules['requires_countersign'] ?? false) => RecordingContract::SECOND_RULE,
             default => null,
         };
-        $candidates = $cache->candidates[$siteId] ??= $this->candidates($viewer, $siteId, $now);
+        $candidateKey = $siteId.($order->controlled_drug ? '/controlled' : '/ordinary');
+        $candidates = $cache->candidates[$candidateKey] ??= $this->candidates($viewer, $siteId, $now, (bool) $order->controlled_drug);
         $anyoneAvailable = $candidates->contains(fn (array $c): bool => $c['can_confirm']);
 
         $blockGiven = $this->blockGiven($order, $safetyCheck, $kind, $anyoneAvailable);
@@ -501,7 +503,7 @@ final class DoseRecordingRequirements
      *
      * @return Collection<int, array{id: int, name: string, can_confirm: bool}>
      */
-    private function candidates(User $viewer, int $siteId, CarbonImmutable $now): Collection
+    private function candidates(User $viewer, int $siteId, CarbonImmutable $now, bool $controlledDrug): Collection
     {
         if ($siteId <= 0) {
             return collect();
@@ -515,7 +517,9 @@ final class DoseRecordingRequirements
         }
 
         $users = User::query()->whereIn('id', $presentIds)->orderBy('name')->get();
-        $eligibleIds = $this->witnesses->eligibleWitnessesForSite($siteId, $now, (int) $viewer->id)
+        $eligibleIds = ($controlledDrug
+            ? $this->witnesses->eligibleWitnessesForSite($siteId, $now, (int) $viewer->id)
+            : app(MedicationSecondPersonService::class)->candidatesForSite($siteId, $now, (int) $viewer->id))
             ->map(fn (User $user): int => (int) $user->id)
             ->all();
         $pins = $this->pins->pickerRows($users)->keyBy('id');
@@ -531,6 +535,7 @@ final class DoseRecordingRequirements
     /** @return Collection<int, int> */
     private function presentUserIdsAtSite(int $siteId, CarbonImmutable $now): Collection
     {
+        $now = $now->utc();
         $attendance = HrAttendanceSession::query()
             ->where('site_id', $siteId)
             ->where('clock_in_at', '<=', $now)

@@ -4,6 +4,7 @@ use App\Http\Controllers\BreakGlassController;
 use App\Http\Controllers\Emar\AuditLogController;
 use App\Http\Controllers\Emar\CDLossReportController;
 use App\Http\Controllers\Emar\ClientMedicationDayController;
+use App\Http\Controllers\Emar\ControlledProductController;
 use App\Http\Controllers\Emar\CompetencyExemptionController;
 use App\Http\Controllers\Emar\DoseRequirementsController;
 use App\Http\Controllers\Emar\EmarController;
@@ -104,12 +105,21 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->name('emar.prn');
 
     // Controlled Drugs
-    Route::get('/controlled', [EmarController::class, 'controlled'])
+    Route::get('/controlled', [ControlledProductController::class, 'index'])
         ->middleware([
             'permission:medications.view',
             'permission:medications.controlled.view',
         ])
         ->name('emar.controlled');
+
+    Route::middleware(['permission:medications.view', 'permission:medications.controlled.view'])->group(function () {
+        Route::get('/controlled/product', [ControlledProductController::class, 'product'])->name('emar.controlled.product');
+        Route::post('/controlled/product/actions/{action}', [ControlledProductController::class, 'action'])
+            ->where('action', 'count|movement|void|resolve|loss_report|loss_note|loss_notify|loss_close|destruction|destruction_receipt|destruction_void|class_review|witness_request|witness_answer|witness_cancel|override_request|override_decide|override_signoff')
+            ->name('emar.controlled.product.action');
+        Route::get('/controlled/product/destructions/{destruction}/photo', [ControlledProductController::class, 'photo'])->name('emar.controlled.product.photo');
+        Route::get('/safety/witness-overrides', [ControlledProductController::class, 'overrides'])->name('emar.safety.witness_overrides');
+    });
 
     // Medications Database
     Route::get('/medications', [EmarController::class, 'medications'])

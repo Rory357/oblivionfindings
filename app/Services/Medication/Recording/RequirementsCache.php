@@ -21,7 +21,7 @@ final class RequirementsCache
     /** @var array<int, array<string, mixed>> competency decision by Site */
     public array $competency = [];
 
-    /** @var array<int, Collection<int, array<string, mixed>>> second-person candidates by Site */
+    /** @var array<string, Collection<int, array<string, mixed>>> second-person candidates by Site and controlled status */
     public array $candidates = [];
 
     /** @var array<int, list<array{id: int, name: string}>> */

@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\Medication\ControlledMedicationTransportWitnessService;
 use App\Services\Medication\DoseSlots\DoseOrderTimelineFactory;
 use App\Services\Medication\MedicationErrorReporter;
+use App\Services\Medication\MedicationSecondPersonService;
 use App\Services\Medication\RefusalEscalationPolicy;
 use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationIncidentIntegrationService;
@@ -150,16 +151,18 @@ final class RecordingContractEnforcer
     /**
      * True when nobody else on shift at the person's house can confirm a dose
      * now: no colleague present, qualified and holding a usable witness PIN.
-     * The same pool every second-person check uses today.
+     * Ordinary confirmations and controlled witnesses use their own authority.
      */
-    public function nobodyCanConfirm(Client $client, int $recorderId, CarbonInterface $at): bool
+    public function nobodyCanConfirm(Client $client, int $recorderId, CarbonInterface $at, bool $controlledDrug = false): bool
     {
         $siteId = (int) $client->site_id;
         if ($siteId <= 0) {
             return true;
         }
 
-        $eligible = $this->witnesses->eligibleWitnessesForSite($siteId, $at, $recorderId);
+        $eligible = $controlledDrug
+            ? $this->witnesses->eligibleWitnessesForSite($siteId, $at, $recorderId)
+            : app(MedicationSecondPersonService::class)->candidatesForSite($siteId, $at, $recorderId);
         if ($eligible->isEmpty()) {
             return true;
         }

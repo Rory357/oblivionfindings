@@ -270,6 +270,9 @@ final class ControlledMedicationTransportWitnessService
             $assessment === null
             || (int) $assessment->user_id !== (int) $witness->id
             || $assessment->status !== 'passed'
+            || $assessment->restricted
+            || ! $assessment->controlled_drugs
+            || in_array('controlled_drugs', $assessment->not_seen_areas ?? [], true)
             || ! $assessment->can_witness_controlled
             || $assessment->assessor_id === null
             || (int) $assessment->assessor_id === (int) $witness->id
