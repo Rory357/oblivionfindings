@@ -17,6 +17,7 @@ use App\Http\Controllers\Emar\MedicationErrorController;
 use App\Http\Controllers\Emar\MedicationFollowupController;
 use App\Http\Controllers\Emar\MedicationReviewController;
 use App\Http\Controllers\Emar\MedicationOrdersController;
+use App\Http\Controllers\Emar\MedicationSecondPersonConfirmationController;
 use App\Http\Controllers\Emar\MedicationSettingsController;
 use App\Http\Controllers\Emar\MedicationSupportController;
 use App\Http\Controllers\Emar\RefusalFollowUpController;
@@ -52,6 +53,14 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/medication-followups/{followup}/transition', [MedicationFollowupController::class, 'transition'])
         ->whereNumber('followup')->middleware('permission:medications.administer.record|medications.followups.manage')
         ->name('medication_followups.transition');
+
+    // Own-login PIN-2 attestation, projected through the canonical follow-up.
+    Route::get('/meds/confirmations/{confirmation}', [MedicationSecondPersonConfirmationController::class, 'show'])
+        ->whereNumber('confirmation')->middleware('permission:medications.view')
+        ->name('meds.confirmations.show');
+    Route::post('/meds/confirmations/{confirmation}', [MedicationSecondPersonConfirmationController::class, 'respond'])
+        ->whereNumber('confirmation')->middleware('permission:medications.view')->middleware('throttle:30,1')
+        ->name('meds.confirmations.respond');
 
     Route::get('/meds/today', [WorkerMedsController::class, 'today'])
         ->middleware('permission:medications.view|medications.administer.record')

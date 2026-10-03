@@ -469,7 +469,6 @@ final class WitnessPinService
         return (int) $pin->failed_attempts;
     }
 
-    /** Owner reset changes the credential generation and releases every old recorder budget. */
     /** Check credential infrastructure without asking for, or comparing, a PIN. */
     public function assertCredentialConfigured(UserWitnessPin $pin, string $errorKey): void
     {
@@ -485,6 +484,7 @@ final class WitnessPinService
         ));
     }
 
+    /** Owner reset changes the credential generation and releases every old recorder budget. */
     public function attemptBudgetKey(int $actorId, UserWitnessPin $pin): string
     {
         return 'medication-witness-pin:'.$actorId.':'.$pin->user_id.':'.hash('sha256', (string) $pin->pin_hash);

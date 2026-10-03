@@ -358,6 +358,60 @@ class ForgottenWitnessPinTest extends TestCase
         $this->assertNull(MedicationEvent::query()->where('kind', 'second_person.expired')->sole()->client_id);
     }
 
+    public function test_the_source_http_consumer_only_answers_in_the_named_colleagues_login(): void
+    {
+        [$dose, $confirmation, $witness] = $this->nominate();
+        $url = '/meds/confirmations/'.$confirmation->id;
+        $this->actingAs($this->worker)->getJson($url)->assertNotFound();
+        $this->actingAs($this->worker)->postJson($url, ['was_there' => true])->assertNotFound();
+        $this->actingAs($witness)->getJson($url)->assertOk()
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->assertJsonPath('person_name', 'Aroha Ngata')
+            ->assertJsonPath('status', 'pending')
+            ->assertJsonMissingPath('eligibility_evidence')
+            ->assertJsonMissingPath('pin_hash');
+        $this->postJson($url, ['was_there' => true])->assertOk()
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->assertJson(['status' => 'confirmed', 'replayed' => false]);
+        $this->postJson($url, ['was_there' => true])->assertOk()
+            ->assertJson(['status' => 'confirmed', 'replayed' => true]);
+        $this->postJson($url, ['was_there' => false])->assertUnprocessable()
+            ->assertJsonValidationErrors('was_there');
+        $this->getJson($url)->assertOk()->assertJsonPath('status', 'confirmed');
+        $this->assertSame($witness->id, $dose->refresh()->witnessed_by);
+        $this->assertSame(1, MedicationEvent::query()->where('kind', 'second_person.confirmed')->count());
+        $this->assertSame($witness->id, AuditLog::query()->where('action', 'medications.second_person.confirmed')->sole()->user_id);
+    }
+
+    public function test_source_http_reads_and_answers_recheck_current_person_and_witness_authority(): void
+    {
+        [$dose, $confirmation, $witness] = $this->nominate();
+        $url = '/meds/confirmations/'.$confirmation->id;
+        $this->deny($witness, ['medications.controlled.witness']);
+        $this->actingAs($witness->fresh())->getJson($url)->assertForbidden();
+        $this->postJson($url, ['was_there' => true])->assertForbidden();
+        $this->grant($witness, ['medications.controlled.witness']);
+        $this->client->forceFill(['site_id' => Site::factory()->create(['is_active' => true])->id])->save();
+        $this->actingAs($witness->fresh())->getJson($url)->assertNotFound();
+        $this->postJson($url, ['was_there' => true])->assertNotFound();
+        $this->assertNull($dose->refresh()->witnessed_by);
+    }
+
+    public function test_the_scheduled_expiry_command_runs_at_the_exact_deadline_and_replays_safely(): void
+    {
+        [$dose, $confirmation, $witness] = $this->nominate();
+        $this->travel(29)->minutes();
+        $this->artisan('emar:expire-second-person-confirmations')->assertSuccessful();
+        $this->assertSame('pending', $confirmation->refresh()->status);
+        $this->travel(1)->minutes();
+        $this->artisan('emar:expire-second-person-confirmations')->assertSuccessful();
+        $this->artisan('emar:expire-second-person-confirmations')->assertSuccessful();
+        $this->assertSame('expired', $confirmation->refresh()->status);
+        $this->assertTrue($dose->refresh()->review_required);
+        $this->assertSame(1, MedicationFollowup::query()->where('type', 'disputed')->count());
+        $this->assertSame(1, MedicationEvent::query()->where('kind', 'second_person.expired')->count());
+    }
+
     /** @return array<string, mixed> */
     private function fallback(User $witness, array $extra = []): array
     {
