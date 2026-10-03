@@ -38,6 +38,8 @@ return new class extends Migration
 
     public function down(): void
     {
-        // Retained medication evidence is deliberately not dropped by rollback.
+        // Fail before Laravel removes the migration receipt. Silent success
+        // would leave tables behind and break the next migrate's CREATE.
+        throw new RuntimeException('Medication evidence cannot be rolled back. Use a reviewed forward migration.');
     }
 };
