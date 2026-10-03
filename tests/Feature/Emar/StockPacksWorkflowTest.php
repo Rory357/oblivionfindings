@@ -62,6 +62,144 @@ class StockPacksWorkflowTest extends TestCase
             'expiry_month' => now('Pacific/Auckland')->addMonths(3)->format('m/Y'), 'expiry_not_printed' => false];
     }
 
+    private function delivery(int $medicationId, array $quantities): array
+    {
+        $base = $this->receipt($medicationId);
+        $fields = ['quantity', 'batch_number', 'batch_not_printed', 'expiry_month', 'expiry_not_printed', 'short_expiry_reason'];
+        $label = \Illuminate\Support\Arr::only($base, $fields);
+        return [...\Illuminate\Support\Arr::except($base, $fields),
+            'packs' => array_map(fn ($quantity, $index) => [...$label, 'quantity' => $quantity, 'batch_number' => 'SYNTHETIC-'.$index],
+                $quantities, array_keys($quantities))];
+    }
+
+    public function test_two_batch_delivery_uses_dispensed_quantity_closes_once_and_preserves_each_label(): void
+    {
+        extract($this->fixture());
+        $lastCounted = $stock->last_counted_at->toIso8601String();
+        $order = MedicationPharmacyOrder::create(['client_id' => $client->id, 'client_medication_id' => $med->id,
+            'pharmacy_name' => 'Synthetic Pharmacy', 'quantity_ordered' => 10, 'quantity_dispensed' => '6.00',
+            'quantity_received' => 0, 'status' => 'dispensed', 'ordered_by' => $actor->id]);
+        $data = [...$this->delivery($med->id, ['2.25', '3.75']), 'pharmacy_order_id' => $order->id];
+        $first = $this->actingAs($actor)->postJson('/emar/stock/packs/commands', $data)->assertOk();
+        $this->postJson('/emar/stock/packs/commands', $data)->assertOk()->assertJsonPath('duplicate', true)
+            ->assertJsonPath('lot_ids', $first->json('lot_ids'));
+        $this->assertCount(2, $first->json('lot_ids'));
+        $this->assertSame('16.00', $stock->fresh()->on_hand);
+        $this->assertSame($lastCounted, $stock->fresh()->last_counted_at->toIso8601String());
+        $this->assertSame('6.00', $order->fresh()->quantity_received);
+        $this->assertSame('delivered', $order->fresh()->status);
+        $this->assertSame(['SYNTHETIC-0', 'SYNTHETIC-1'], MedicationStockLot::where('pharmacy_order_id', $order->id)->orderBy('id')->pluck('batch_number')->all());
+        $this->assertSame(2, MedicationStockMovement::where('kind', 'received')->count());
+        $this->assertSame(1, MedicationEvent::where('kind', 'stock.receive')->count());
+    }
+
+    public function test_short_delivery_requires_explicit_outcome_and_reason_before_atomic_close_short(): void
+    {
+        extract($this->fixture());
+        $order = MedicationPharmacyOrder::create(['client_id' => $client->id, 'client_medication_id' => $med->id,
+            'pharmacy_name' => 'Synthetic Pharmacy', 'quantity_ordered' => 10, 'quantity_dispensed' => '10.00',
+            'quantity_received' => 0, 'status' => 'dispensed', 'ordered_by' => $actor->id]);
+        $data = [...$this->delivery($med->id, ['2.00', '3.00']), 'pharmacy_order_id' => $order->id];
+        $this->actingAs($actor)->postJson('/emar/stock/packs/commands', $data)->assertUnprocessable()->assertJsonValidationErrors('delivery_outcome');
+        $this->postJson('/emar/stock/packs/commands', [...$data, 'delivery_outcome' => 'closed_short'])
+            ->assertUnprocessable()->assertJsonValidationErrors('delivery_outcome');
+        $this->assertSame('10.00', $stock->fresh()->on_hand);
+        $this->assertSame('dispensed', $order->fresh()->status);
+        $this->assertSame(0, MedicationStockLot::where('pharmacy_order_id', $order->id)->count());
+        $data = [...$data, 'delivery_outcome' => 'closed_short', 'closure_reason' => 'Synthetic pharmacy confirmed no more coming'];
+        $this->postJson('/emar/stock/packs/commands', $data)->assertOk();
+        $this->postJson('/emar/stock/packs/commands', $data)->assertOk()->assertJsonPath('duplicate', true);
+        $this->assertSame('closed_short', $order->fresh()->status);
+        $this->assertSame($data['closure_reason'], $order->fresh()->closure_reason);
+        $this->assertSame('5.00', $order->fresh()->quantity_received);
+        $this->assertSame('15.00', $stock->fresh()->on_hand);
+    }
+
+    public function test_invalid_second_batch_rolls_back_all_packs_pharmacy_totals_and_replay_receipt(): void
+    {
+        extract($this->fixture());
+        $order = MedicationPharmacyOrder::create(['client_id' => $client->id, 'client_medication_id' => $med->id,
+            'pharmacy_name' => 'Synthetic Pharmacy', 'quantity_ordered' => 6, 'quantity_dispensed' => '6.00',
+            'quantity_received' => 0, 'status' => 'dispensed', 'ordered_by' => $actor->id]);
+        $data = [...$this->delivery($med->id, ['2.25', '3.75']), 'pharmacy_order_id' => $order->id];
+        $data['packs'][1]['expiry_month'] = now('Pacific/Auckland')->subMonths(2)->format('m/Y');
+        $this->actingAs($actor)->postJson('/emar/stock/packs/commands', $data)->assertUnprocessable()->assertJsonValidationErrors('packs.1.expiry_month');
+        $this->assertSame('10.00', $stock->fresh()->on_hand);
+        $this->assertSame('0.00', $order->fresh()->quantity_received);
+        $this->assertSame('dispensed', $order->fresh()->status);
+        $this->assertSame(0, MedicationStockLot::where('pharmacy_order_id', $order->id)->count());
+        $this->assertSame(0, MedicationStockMovement::where('kind', 'received')->count());
+        $this->assertSame(0, MedicationEvent::where('kind', 'stock.receive')->count());
+        $data['packs'][1]['expiry_month'] = now('Pacific/Auckland')->addMonths(3)->format('m/Y');
+        $this->postJson('/emar/stock/packs/commands', $data)->assertOk();
+        $this->assertSame('16.00', $stock->fresh()->on_hand);
+    }
+
+    public function test_receipt_on_last_printed_day_requires_short_expiry_reason_then_remains_usable(): void
+    {
+        $clock = \Carbon\CarbonImmutable::parse('2026-10-31 09:00:00', 'Pacific/Auckland');
+        \Carbon\Carbon::setTestNow($clock);
+        \Carbon\CarbonImmutable::setTestNow($clock);
+        try {
+            extract($this->fixture());
+            $data = [...$this->receipt($med->id), 'expiry_month' => '10/2026'];
+            $this->actingAs($actor)->postJson('/emar/stock/packs/commands', $data)->assertUnprocessable()->assertJsonValidationErrors('short_expiry_reason');
+            $data['short_expiry_reason'] = 'Synthetic acceptance reason on the printed expiry day';
+            $this->postJson('/emar/stock/packs/commands', $data)->assertOk();
+            $this->assertSame('14.25', $stock->fresh()->availableQuantity());
+            $nextDay = $clock->addDay();
+            \Carbon\Carbon::setTestNow($nextDay); \Carbon\CarbonImmutable::setTestNow($nextDay);
+            $this->assertSame('10.00', $stock->fresh()->availableQuantity());
+            $this->assertSame('14.25', $stock->fresh()->on_hand);
+        } finally {
+            \Carbon\Carbon::setTestNow(); \Carbon\CarbonImmutable::setTestNow();
+        }
+    }
+
+    public function test_nested_pack_cannot_override_operation_identity_or_stock_unit(): void
+    {
+        extract($this->fixture());
+        $data = $this->delivery($med->id, ['2.00']);
+        $data['packs'][0]['request_uuid'] = (string) Str::uuid();
+        $this->actingAs($actor)->postJson('/emar/stock/packs/commands', $data)->assertUnprocessable()->assertJsonValidationErrors('packs.0');
+        $this->assertSame('10.00', $stock->fresh()->on_hand);
+        $this->assertSame(0, MedicationStockMovement::where('kind', 'received')->count());
+    }
+
+    public function test_empty_pack_count_requires_physical_confirmation_and_rejects_a_new_receipt_race(): void
+    {
+        extract($this->fixture(null, false));
+        $stock->update(['on_hand' => '0.00']);
+        DB::transaction(fn () => app(MedicationStockService::class)->startLots($stock, $actor, (string) Str::uuid()));
+        $lastCounted = $stock->last_counted_at->toIso8601String();
+        $data = ['action' => 'count', 'client_medication_id' => $med->id, 'request_uuid' => (string) Str::uuid(), 'lines' => []];
+        $this->actingAs($actor)->postJson('/emar/stock/packs/commands', $data)->assertUnprocessable()->assertJsonValidationErrors('confirm_empty');
+        $this->assertSame(0, MedicationStockCountRecord::count());
+        $this->postJson('/emar/stock/packs/commands', [...$data, 'confirm_empty' => true])->assertOk();
+        $this->assertSame([], MedicationStockCountRecord::sole()->lines);
+        $this->assertNotSame($lastCounted, $stock->fresh()->last_counted_at->toIso8601String());
+        $this->postJson('/emar/stock/packs/commands', $this->receipt($med->id))->assertOk();
+        $this->postJson('/emar/stock/packs/commands', [...$data, 'request_uuid' => (string) Str::uuid(), 'confirm_empty' => true])
+            ->assertUnprocessable()->assertJsonValidationErrors('lines');
+        $this->assertSame(1, MedicationStockCountRecord::count());
+        $this->assertSame('4.25', $stock->fresh()->on_hand);
+    }
+
+    public function test_followup_count_link_returns_exact_scoped_record_and_denies_a_mismatched_medicine_filter(): void
+    {
+        extract($this->fixture());
+        $lot = MedicationStockLot::where('client_medication_stock_id', $stock->id)->sole();
+        $countId = $this->actingAs($actor)->postJson('/emar/stock/packs/commands', [
+            'action' => 'count', 'client_medication_id' => $med->id, 'request_uuid' => (string) Str::uuid(),
+            'lines' => [['lot_id' => $lot->id, 'revision' => $lot->revision, 'quantity' => '9.00']], 'reason' => 'Synthetic discrepancy',
+        ])->assertOk()->json('count_id');
+        $this->get('/emar/stock/packs?view=counts&count_id='.$countId, ['X-Inertia' => 'true'])->assertOk()
+            ->assertJsonPath('props.focused_count.id', $countId)->assertJsonPath('props.focused_count.medication_id', $med->id);
+        $other = $med->replicate()->forceFill(['name' => 'Synthetic different medicine']);
+        $other->save();
+        $this->get('/emar/stock/packs?view=counts&count_id='.$countId.'&medication_id='.$other->id, ['X-Inertia' => 'true'])->assertNotFound();
+    }
+
     public function test_started_pack_stock_rejects_legacy_receipt_adjustment_and_profile_aliases_without_changes(): void
     {
         extract($this->fixture());
@@ -167,7 +305,7 @@ class StockPacksWorkflowTest extends TestCase
         $countedAt = $stock->last_counted_at;
         $order = MedicationPharmacyOrder::create(['client_id' => $client->id, 'client_medication_id' => $med->id,
             'pharmacy_name' => 'Synthetic Pharmacy', 'quantity_ordered' => 10, 'quantity_received' => 0, 'status' => 'dispensed', 'ordered_by' => $actor->id]);
-        $data = [...$this->receipt($med->id), 'pharmacy_order_id' => $order->id];
+        $data = [...$this->receipt($med->id), 'pharmacy_order_id' => $order->id, 'delivery_outcome' => 'still_to_come'];
         $first = $this->actingAs($actor)->postJson('/emar/stock/packs/commands', $data)->assertOk()->assertJson(['success' => true]);
         $this->postJson('/emar/stock/packs/commands', $data)->assertOk()->assertJson(['success' => true, 'duplicate' => true]);
         $this->assertSame('14.25', $stock->fresh()->on_hand);

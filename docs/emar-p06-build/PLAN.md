@@ -62,3 +62,10 @@ Light checks: changed PHP files pass syntax; six TS/JSX files pass syntax-only t
 Main's shared heavy guard repair hold is active: P06 has no queued or active test process. Next frozen focused snapshot must wait for verified resume and use the repaired FIFO guard.
 
 Remaining acceptance gaps include multi-batch receipt / explicit short-delivery outcome, receipt last-printed-day boundary alignment, zero-pack blind counts and stale-count supersession, focused follow-up count link, supplemental photo/day-supply seams and final integrated reader/alert/CD runtime coverage. This snapshot is not launch approval.
+
+## Approved receipt/count fidelity candidate (4 October 2026)
+- Multi-batch delivery uses one command UUID and one transaction, retains each printed batch/expiry, validates nested pack keys and combined quantity, and rolls all packs/order changes back when any later pack fails. Optional photo remains separate and retryable, attached only to the selected pack.
+- Expected delivery uses the pharmacy's actual dispensed quantity (legacy orders without it use their recorded order quantity). A short arrival requires an explicit still-to-come / close-short decision and a reason for closure.
+- Printed month expiry's final NZ day is usable; accepting within seven days still needs the approved short-expiry reason. This aligns the approved P06 source predicate (expired only when daysFrom < 0).
+- Empty pack counts require explicit physical confirmation before comparing or saving; adding a pack before submission invalidates that empty snapshot. Follow-up count_id links fetch and open the exact canonically scoped record.
+- Seven additional backend regressions and one additional actual WizardShell UI regression authored, for 26 backend tests and two blind-count frontend tests. Backend execution remains delegated to Main's consolidated run. No role or alert hold is bypassed.

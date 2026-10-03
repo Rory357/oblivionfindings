@@ -43,7 +43,7 @@ type Props = {
     sites: { id: number; name: string }[]; pharmacies: string[];
     filters: { view: View; search: string; site_id: number | null; show?: string };
     metrics: { tracked: number; out: number; expiring: number; orders: number; counts: number };
-    can: Capabilities; lots_enabled: boolean;
+    can: Capabilities; lots_enabled: boolean; focused_count?: StockCount | null;
 };
 type Modal = { kind: 'item'; id: number; action?: 'receive' | 'count' | 'order' | 'move' | 'going_out' | 'coming_back'; order?: SupplyOrder } | { kind: 'order'; order: SupplyOrder } | { kind: 'count'; record: StockCount } | null;
 
@@ -61,9 +61,10 @@ function TableList<T extends { id: number }>({ title, pager, name, subline, colu
     </div>;
 }
 
-export default function StockHub({ items, orders, counts, movements, sites, pharmacies = [], filters, metrics, can, lots_enabled }: Props) {
+export default function StockHub({ items, orders, counts, movements, sites, pharmacies = [], filters, metrics, can, lots_enabled, focused_count = null }: Props) {
     const [search, setSearch] = useState(filters.search);
     const [modal, setModal] = useState<Modal>(null);
+    useEffect(() => { if (focused_count) setModal({ kind: 'count', record: focused_count }); }, [focused_count]);
     const refresh = () => router.reload({ only: ['items', 'orders', 'counts', 'movements', 'metrics', 'pharmacies'], preserveScroll: true });
     const visit = (changes: Record<string, string | number | null>) => router.get('/emar/stock/packs', { ...filters, search, ...changes }, { preserveState: true, preserveScroll: true });
     const openItem = (item: StockItem, action?: Exclude<Extract<Modal, { kind: 'item' }>['action'], undefined>) => setModal({ kind: 'item', id: item.id, action });
@@ -179,7 +180,7 @@ function ItemWorkspace({ id, initialAction, order, pharmacies, can, lotsEnabled,
                     {Object.values(command.errors).map((message) => <SettingsNotice key={message}>{message}</SettingsNotice>)}
                     {!item.lots_started && lotsEnabled && can.manage && !item.controlled && <Button disabled={command.saving || item.on_hand === null} onClick={() => setSetupConfirm(true)}>Use the checked recorded balance</Button>}
                     <div className="flex flex-wrap gap-2">
-                        {can.receive && !item.controlled && <><Button disabled={!item.lots_started && item.stock_id !== null} onClick={() => setAction('receive')}>Receive a delivery</Button><Button variant="outline" disabled={!item.lots_started || !item.pack_count} onClick={() => setAction('count')}>Count it</Button><Button variant="outline" disabled={!item.lots_started || !item.pack_count} onClick={() => setAction('going_out')}>Going out</Button>{item.outward.length > 0 && <Button variant="outline" onClick={() => setAction('coming_back')}>Coming back</Button>}</>}
+                        {can.receive && !item.controlled && <><Button disabled={!item.lots_started && item.stock_id !== null} onClick={() => setAction('receive')}>Receive a delivery</Button><Button variant="outline" disabled={!item.lots_started} onClick={() => setAction('count')}>Count it</Button><Button variant="outline" disabled={!item.lots_started || !item.pack_count} onClick={() => setAction('going_out')}>Going out</Button>{item.outward.length > 0 && <Button variant="outline" onClick={() => setAction('coming_back')}>Coming back</Button>}</>}
                         {can.manage && !item.controlled && <><Button variant="outline" onClick={() => setAction('order')}>Order from pharmacy</Button>{item.lots_started && <Button variant="outline" onClick={() => setAction('move')}>Adjust or remove</Button>}</>}
                         {item.controlled && <Button variant="outline" onClick={() => router.visit('/emar/controlled')}>Open the controlled register</Button>}
                     </div>

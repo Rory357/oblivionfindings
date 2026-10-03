@@ -4,6 +4,7 @@ import InputError from '@/components/input-error';
 import { RecordPicker } from '@/components/people-locations/record-picker';
 import { SettingsModal } from '@/components/settings/settings-modal';
 import { SettingsNotice } from '@/components/settings/settings-notice';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -125,21 +126,22 @@ export function MovementDialog({ item, mode, onClose, onSaved }: { item: ItemDet
 }
 export function CountWizard({ item, onClose, onSaved }: { item: ItemDetail; onClose: () => void; onSaved: () => void }) {
     const packs = item.packs.filter((pack) => Number(pack.quantity_remaining) > 0);
+    const [confirmedEmpty, setConfirmedEmpty] = useState(false);
     const [values, setValues] = useState<Record<number, string>>({});
     const [step, setStep] = useState(0);
     const [reason, setReason] = useState('');
     const [saved, setSaved] = useState(false);
     const [discard, setDiscard] = useState(false);
     const command = useStockCommand();
-    const complete = packs.length > 0 && packs.every((pack) => /^\d+(?:\.\d{1,2})?$/.test(values[pack.id] ?? '') && Number.isFinite(Number(values[pack.id])));
+    const complete = packs.length === 0 ? confirmedEmpty : packs.every((pack) => /^\d+(?:\.\d{1,2})?$/.test(values[pack.id] ?? '') && Number.isFinite(Number(values[pack.id])));
     const navigate = (index: number) => {
         if (command.saving || (index > 0 && !complete) || (index === 2 && different && !reason.trim())) return;
         setStep(index);
     };
     const different = packs.some((pack) => Number(values[pack.id]) !== Number(pack.quantity_remaining));
-    const close = () => { if (!command.saving) { if (!saved && Object.keys(values).length) setDiscard(true); else onClose(); } };
+    const close = () => { if (!command.saving) { if (!saved && (Object.keys(values).length || confirmedEmpty)) setDiscard(true); else onClose(); } };
     const save = async () => {
-        const result = await command.run({ action: 'count', client_medication_id: item.id, reason,
+        const result = await command.run({ action: 'count', client_medication_id: item.id, reason, confirm_empty: confirmedEmpty,
             lines: packs.map((pack) => ({ lot_id: pack.id, revision: pack.revision, quantity: values[pack.id] })),
         });
         if (result) { setSaved(true); onSaved(); }
@@ -151,8 +153,8 @@ export function CountWizard({ item, onClose, onSaved }: { item: ItemDetail; onCl
             footerEnd={<><Button variant="outline" disabled={step === 0 || command.saving} onClick={() => setStep(step - 1)}>Back</Button><Button disabled={command.saving || !complete || (step > 0 && different && !reason.trim())} onClick={() => step < 2 ? navigate(step + 1) : void save()}>{command.saving ? 'Saving…' : step === 2 ? 'Save count' : 'Continue'}</Button></>}
             success={saved ? <WizardSuccessPane title="Count saved" blurb={different ? 'The difference is kept for the house lead to review. The stock balance has not been changed.' : 'The count matches. Last counted has been updated.'} actions={<Button onClick={onClose}>Done</Button>} /> : undefined}>
             <WizardStepPane><Errors values={command.errors} /><div className="space-y-4">
-                {step === 0 && <><SettingsNotice role="note">Count the packs physically. The recorded quantities stay hidden until you have entered every count.</SettingsNotice>{packs.map((pack) => <div key={pack.id}><Label htmlFor={`count-${pack.id}`}>{pack.batch_number ?? (pack.batch_not_printed ? 'Batch not printed' : 'Batch unknown')} · {pack.expiry_date?.slice(0, 10) ?? 'Expiry unknown'}</Label><Input id={`count-${pack.id}`} type="number" min="0" step="0.01" value={values[pack.id] ?? ''} onChange={(event) => setValues({ ...values, [pack.id]: event.target.value })} /></div>)}</>}
-                {step > 0 && <>{packs.map((pack) => <ReviewCard key={pack.id} icon={Package} title={pack.batch_number ?? 'Pack'}><ReviewRow label="Counted" value={values[pack.id]} /><ReviewRow label="Recorded at start" value={pack.quantity_remaining} /></ReviewCard>)}{different && <><Label htmlFor="reason">Explain the difference</Label><Textarea id="reason" value={reason} onChange={(event) => setReason(event.target.value)} /><SettingsNotice role="note">A house lead reviews differences. Counts never silently overwrite stock. If stock moved while you counted, recount before saving.</SettingsNotice></>}</>}
+                {step === 0 && <><SettingsNotice role="note">Count the packs physically. The recorded quantities stay hidden until you have entered every count.</SettingsNotice>{packs.length === 0 && <label className="frontline-tap flex items-center gap-2"><Checkbox checked={confirmedEmpty} onCheckedChange={(value) => setConfirmedEmpty(value === true)} />I physically checked and there are no packs to count.</label>}{packs.map((pack) => <div key={pack.id}><Label htmlFor={`count-${pack.id}`}>{pack.batch_number ?? (pack.batch_not_printed ? 'Batch not printed' : 'Batch unknown')} · {pack.expiry_date?.slice(0, 10) ?? 'Expiry unknown'}</Label><Input id={`count-${pack.id}`} type="number" min="0" step="0.01" value={values[pack.id] ?? ''} onChange={(event) => setValues({ ...values, [pack.id]: event.target.value })} /></div>)}</>}
+                {step > 0 && <>{packs.length === 0 && <ReviewCard icon={Package} title="Empty stock checked"><ReviewRow label="Physically counted" value="No packs" /><ReviewRow label="Recorded" value="No remaining packs" /></ReviewCard>}{packs.map((pack) => <ReviewCard key={pack.id} icon={Package} title={pack.batch_number ?? 'Pack'}><ReviewRow label="Counted" value={values[pack.id]} /><ReviewRow label="Recorded at start" value={pack.quantity_remaining} /></ReviewCard>)}{different && <><Label htmlFor="reason">Explain the difference</Label><Textarea id="reason" value={reason} onChange={(event) => setReason(event.target.value)} /><SettingsNotice role="note">A house lead reviews differences. Counts never silently overwrite stock. If stock moved while you counted, recount before saving.</SettingsNotice></>}</>}
             </div></WizardStepPane>
         </WizardShell>
         <ConfirmDialog open={discard} onClose={() => setDiscard(false)} onConfirm={onClose} title="Discard this count?" description="Your unsaved counts will be discarded." confirmText="Discard draft" />

@@ -136,7 +136,7 @@ final class MedicationStockController extends Controller
         if ($action === 'receive') {
             $order = empty($data['pharmacy_order_id']) ? null : MedicationPharmacyOrder::where('client_id', $med->client_id)
                 ->where('client_medication_id', $med->id)->lockForUpdate()->findOrFail($data['pharmacy_order_id']);
-            return ['lot_id' => $this->stock->receive($stock, $actor, $data, $order)->id];
+            return $this->stock->receiveDelivery($stock, $actor, $data, $order);
         }
         if ($action === 'count') {
             return ['count_id' => $this->stock->count($stock, $actor, $data)->id];
@@ -190,8 +190,16 @@ final class MedicationStockController extends Controller
         return match ($action) {
             'initialise' => ['confirm_balance' => 'accepted'],
             'receive' => [
-                'unit' => 'nullable|string|max:50', 'quantity' => $positive, 'batch_number' => 'nullable|string|max:100', 'batch_not_printed' => 'required|boolean',
-                'expiry_month' => 'nullable|string|max:7', 'expiry_not_printed' => 'required|boolean',
+                'unit' => 'nullable|string|max:50',
+                'packs' => 'required_without:quantity|array|min:1|max:25',
+                'quantity' => [...array_diff($positive, ['required']), 'required_without:packs', 'prohibited_with:packs'],
+                'batch_number' => 'nullable|string|max:100', 'batch_not_printed' => 'required_without:packs|boolean',
+                'expiry_month' => 'nullable|string|max:7', 'expiry_not_printed' => 'required_without:packs|boolean',
+                'packs.*' => 'required|array:quantity,batch_number,batch_not_printed,expiry_month,expiry_not_printed,short_expiry_reason',
+                'packs.*.quantity' => $positive, 'packs.*.batch_number' => 'nullable|string|max:100', 'packs.*.batch_not_printed' => 'required|boolean',
+                'packs.*.expiry_month' => 'nullable|string|max:7', 'packs.*.expiry_not_printed' => 'required|boolean',
+                'packs.*.short_expiry_reason' => 'nullable|string|max:2000',
+                'delivery_outcome' => 'nullable|in:still_to_come,closed_short', 'closure_reason' => 'nullable|string|max:2000',
                 'short_expiry_reason' => 'nullable|string|max:2000', 'notes' => 'nullable|string|max:2000', 'label_checked' => 'accepted',
                 'source' => 'required|in:pharmacy,family,hospital,respite,other', 'source_reference' => 'required|string|max:255',
                 'pharmacy_order_id' => 'nullable|integer|min:1',
@@ -199,7 +207,7 @@ final class MedicationStockController extends Controller
             'move' => ['lot_id' => 'required|integer|min:1', 'kind' => 'required|in:returned_pharmacy,removed_expired,damaged,quarantined', 'quantity' => $positive, ...$reason],
             'going_out' => ['lot_id' => 'required|integer|min:1', 'quantity' => $positive, ...$reason],
             'coming_back' => ['return_of_id' => 'required|integer|min:1', 'quantity' => $nonNegative, 'used_away' => $nonNegative, ...$reason],
-            'count' => ['lines' => 'required|array|min:1', 'lines.*.lot_id' => 'required|integer|min:1', 'lines.*.revision' => 'required|integer|min:0', 'lines.*.quantity' => $nonNegative, 'reason' => 'nullable|string|max:2000'],
+            'count' => ['lines' => 'present|array', 'confirm_empty' => 'nullable|boolean', 'lines.*.lot_id' => 'required|integer|min:1', 'lines.*.revision' => 'required|integer|min:0', 'lines.*.quantity' => $nonNegative, 'reason' => 'nullable|string|max:2000'],
             'count_review' => ['count_id' => 'required|integer|min:1', ...$reason],
             'order' => ['pharmacy_name' => 'required|string|max:255', 'quantity_ordered' => 'required|integer|min:1|max:100000', 'needed_by' => 'required|date_format:Y-m-d', 'order_notes' => 'nullable|string|max:2000'],
             'order_update' => [

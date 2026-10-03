@@ -7,5 +7,5 @@ export type SupplyOrder = { id: number; client_medication_id: number; medication
 export type StockCount = { id: number; medication_id: number; medication_name: string; client_name: string; state: string; counted_at: string; counted_by_name: string | null; reason: string | null; review_reason: string | null; lines: { lot_id: number; expected: string; counted: string; revision: number }[] };
 export type Movement = { id: number; medication_id: number; medication_name: string; client_name: string; kind: string; quantity: string; balance_before: string; balance_after: string; reason: string; notes: string | null; recorded_at: string; recorded_by_name: string | null };
 export type Capabilities = { receive: boolean; manage: boolean; controlled: boolean };
-export type StockResponse = { success: true; lot_id?: number; order_id?: number; count_id?: number; movement_id?: number; stock_id?: number };
+export type StockResponse = { success: true; lot_id?: number; lot_ids?: number[]; quantity_received?: string; order_id?: number; count_id?: number; movement_id?: number; stock_id?: number };
 

@@ -73,8 +73,9 @@ final class StockReadPayload
         ]);
         $counts = MedicationStockCountRecord::whereIn('client_medication_stock_id', (clone $stocks)->select('id'));
         $countsPage = (clone $counts)->when($search !== '', fn ($q) => $q->whereHas('stock.medication', fn ($m) => $m->where('name', 'like', '%'.$search.'%')))->with(['stock.medication.client', 'countedBy'])->latest('id')->paginate(25, ['*'], 'counts_page')->withQueryString();
-        $countsPage->through(fn ($c) => [...$c->only(['id', 'state', 'lines', 'reason', 'counted_at', 'review_reason']), 'medication_id' => $c->stock->client_medication_id,
-            'medication_name' => $c->stock->medication->name, 'client_name' => $c->stock->medication->client->full_name, 'counted_by_name' => $c->countedBy?->name]);
+        $countsPage->through(fn ($c) => $this->countPresentation($c));
+        $focusedCount = $request->filled('count_id') ? $this->countPresentation((clone $counts)
+            ->with(['stock.medication.client', 'countedBy'])->findOrFail($request->integer('count_id'))) : null;
         $movements = MedicationStockMovement::query()->when($search !== '', fn ($q) => $q->whereHas('lot.stock.medication', fn ($m) => $m->where('name', 'like', '%'.$search.'%')))->whereIn('medication_stock_lot_id', (clone $lots)->select('id'))->with(['lot.stock.medication.client', 'recordedBy'])
             ->when($view === 'removals', fn ($q) => $q->whereIn('kind', ['returned_pharmacy', 'removed_expired', 'damaged', 'quarantined']))
             ->latest('id')->paginate(25, ['*'], 'moves_page')->withQueryString();
@@ -83,7 +84,7 @@ final class StockReadPayload
             'client_name' => $m->lot->stock->medication->client->full_name, 'recorded_by_name' => $m->recordedBy?->name]);
 
         return [
-            'items' => $items, 'orders' => $ordersPage, 'counts' => $countsPage, 'movements' => $movements,
+            'items' => $items, 'orders' => $ordersPage, 'counts' => $countsPage, 'movements' => $movements, 'focused_count' => $focusedCount,
             'sites' => $this->scope->sitePicker($allSites)->map->only(['id', 'name']),
             'pharmacies' => (clone $orders)->distinct()->orderBy('pharmacy_name')->pluck('pharmacy_name')->filter()->values(),
             'filters' => ['view' => $view, 'search' => $search, 'site_id' => $site, 'show' => $show, 'medication_id' => $medicineId],
@@ -133,6 +134,13 @@ final class StockReadPayload
             ])->all();
 
         return $item;
+    }
+
+    private function countPresentation(MedicationStockCountRecord $count): array
+    {
+        return [...$count->only(['id', 'state', 'lines', 'reason', 'counted_at', 'review_reason']),
+            'medication_id' => $count->stock->client_medication_id, 'medication_name' => $count->stock->medication->name,
+            'client_name' => $count->stock->medication->client->full_name, 'counted_by_name' => $count->countedBy?->name];
     }
 
     private function item(ClientMedication $med): array

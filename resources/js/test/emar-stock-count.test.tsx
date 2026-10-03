@@ -50,3 +50,16 @@ it('keeps expected quantities hidden until every physical count is entered, incl
     expect(screen.getByLabelText(/TEST-B/)).toHaveValue(5);
     expect(screen.queryByText('Recorded at start')).not.toBeInTheDocument();
 });
+
+it('requires explicit physical confirmation before revealing or recording an empty pack count', () => {
+    render(<CountWizard item={{ ...item, on_hand: 0, pack_count: 0, packs: [] }} onClose={vi.fn()} onSaved={vi.fn()} />);
+    const compare = screen.getByRole('button', { name: /Check differences/ });
+    expect(compare).toBeDisabled();
+    fireEvent.click(compare);
+    expect(screen.queryByText('No remaining packs')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox'));
+    expect(compare).toBeEnabled();
+    fireEvent.click(compare);
+    expect(screen.getByText('No remaining packs')).toBeInTheDocument();
+    expect(screen.getByText('No packs')).toBeInTheDocument();
+});

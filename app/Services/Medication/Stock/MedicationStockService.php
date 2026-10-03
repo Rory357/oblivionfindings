@@ -69,6 +69,63 @@ final class MedicationStockService
         AuditLogger::logOrFail('medications.stock.lots_started', $stock, ['actor_id' => $actor->id, 'recorded_balance' => $stock->on_hand]);
     }
 
+    /** One delivery can contain several printed batches; the caller transaction commits all packs or none. */
+    public function receiveDelivery(ClientMedicationStock $stock, User $actor, array $data, ?MedicationPharmacyOrder $order = null): array
+    {
+        $this->requireLots($stock);
+        $packs = $data['packs'] ?? [collect($data)->only([
+            'quantity', 'batch_number', 'batch_not_printed', 'expiry_month', 'expiry_not_printed', 'short_expiry_reason',
+        ])->all()];
+        try {
+            $total = '0.00';
+            foreach ($packs as $pack) {
+                $total = Qty::add($total, $pack['quantity']);
+            }
+            // Validate the combined usable balance before creating any pack.
+            Qty::add($stock->availableQuantity() ?? '0.00', $total);
+        } catch (InvalidArgumentException $error) {
+            throw ValidationException::withMessages(['packs' => $error->getMessage()]);
+        }
+        if ($order) {
+            try {
+                $expected = $order->quantity_dispensed ?? $order->quantity_ordered;
+                $next = PharmacySupplyRules::afterReceipt($order->status, $expected, $order->quantity_received ?? 0, $total);
+                if ($next['status'] === 'part_received') {
+                    if (! in_array($data['delivery_outcome'] ?? null, ['still_to_come', 'closed_short'], true)) {
+                        throw new InvalidArgumentException('Fewer arrived than the pharmacy sent. Say whether the rest is coming.');
+                    }
+                    if ($data['delivery_outcome'] === 'closed_short' && trim((string) ($data['closure_reason'] ?? '')) === '') {
+                        throw new InvalidArgumentException('Enter why no more is coming before closing this order short.');
+                    }
+                }
+            } catch (InvalidArgumentException $error) {
+                throw ValidationException::withMessages(['delivery_outcome' => $error->getMessage()]);
+            }
+        }
+        $lotIds = [];
+        foreach ($packs as $index => $pack) {
+            try {
+                $lotIds[] = $this->receive($stock, $actor, [...$data, ...$pack], $order)->id;
+            } catch (ValidationException $error) {
+                // Preserve per-pack field positions when a later label fails; the outer transaction rolls back every pack.
+                if (isset($data['packs'])) {
+                    throw ValidationException::withMessages(collect($error->errors())->mapWithKeys(
+                        fn ($messages, $field) => ['packs.'.$index.'.'.$field => $messages],
+                    )->all());
+                }
+                throw $error;
+            }
+        }
+        if ($order && $order->status === 'part_received' && ($data['delivery_outcome'] ?? null) === 'closed_short') {
+            $order->forceFill(['status' => 'closed_short', 'closed_at' => now(), 'closed_by' => $actor->id,
+                'closure_reason' => trim($data['closure_reason'])])->save();
+            AuditLogger::logOrFail('medications.stock.supply_order_closed_short', $order, [
+                'actor_id' => $actor->id, 'reason' => $data['closure_reason'], 'request_uuid' => $data['request_uuid'],
+            ]);
+        }
+        return ['lot_id' => $lotIds[0], 'lot_ids' => $lotIds, 'quantity_received' => $total];
+    }
+
     /** Creates exactly one counted pack; pharmacy total and balance change together. */
     public function receive(ClientMedicationStock $stock, User $actor, array $data, ?MedicationPharmacyOrder $order = null): MedicationStockLot
     {
@@ -95,7 +152,7 @@ final class MedicationStockService
                 abort(404);
             }
             try {
-                $next = PharmacySupplyRules::afterReceipt($order->status, $order->quantity_ordered, $order->quantity_received ?? 0, $quantity);
+                $next = PharmacySupplyRules::afterReceipt($order->status, $order->quantity_dispensed ?? $order->quantity_ordered, $order->quantity_received ?? 0, $quantity);
             } catch (InvalidArgumentException $error) {
                 throw ValidationException::withMessages(['quantity' => $error->getMessage()]);
             }
@@ -288,6 +345,9 @@ final class MedicationStockService
             throw ValidationException::withMessages(['lines' => 'Controlled counts keep their witnessed register process.']);
         }
         $lots = $this->lots($stock)->filter(fn ($lot) => Qty::greaterThan($lot->quantity_remaining, 0));
+        if ($lots->isEmpty() && ! ($data['confirm_empty'] ?? false)) {
+            throw ValidationException::withMessages(['confirm_empty' => 'Confirm that you physically checked and there are no packs to count.']);
+        }
         $submitted = collect($data['lines'])->keyBy('lot_id');
         if ($submitted->count() !== count($data['lines']) || $submitted->keys()->map(fn ($id) => (int) $id)->sort()->values()->all() !== $lots->pluck('id')->sort()->values()->all()) {
             throw ValidationException::withMessages(['lines' => 'The packs changed. Reload the list and count every remaining pack.']);
@@ -382,7 +442,7 @@ final class MedicationStockService
             } catch (InvalidArgumentException $error) {
                 throw ValidationException::withMessages(['expiry_month' => $error->getMessage()]);
             }
-            if ($expiry <= $this->today()) {
+            if ($expiry < $this->today()) {
                 throw ValidationException::withMessages(['expiry_month' => 'This pack has expired. Keep it out of use and contact the pharmacy.']);
             }
             if ($expiry <= CarbonImmutable::parse($this->today())->addDays(7)->toDateString()
