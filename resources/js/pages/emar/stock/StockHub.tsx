@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FilePreviewDialog, type PreviewFile } from '@/components/files/file-preview-dialog';
 import { EntityContextMenu, type MenuItem } from '@/components/lists/entity-menu';
 import { EntityTable, type EntityTableColumn } from '@/components/lists/entity-table';
@@ -19,6 +20,7 @@ import { ArrowLeftRight, Camera, ClipboardCheck, Eye, Package, Pill, ShieldCheck
 import { useEffect, useState, type MouseEvent } from 'react';
 import { CountReview, CountWizard, MovementDialog, NewSupplyOrder, SupplyOrderDialog } from './_dialogs';
 import { ReceiveWizard } from './_receive';
+import { PackPhotoDialog } from './_photo';
 import { useStockCommand } from './_requests';
 import type { Capabilities, ItemDetail, Movement, Pager, StockCount, StockItem, SupplyOrder } from './_types';
 
@@ -129,7 +131,7 @@ export default function StockHub({ items, orders, counts, movements, sites, phar
         </div>
         {modal?.kind === 'item' && <ItemWorkspace id={modal.id} initialAction={modal.action} order={modal.order} pharmacies={pharmacies} can={can} lotsEnabled={lots_enabled} onClose={() => setModal(null)} onSaved={refresh} />}
         {modal?.kind === 'order' && <SupplyOrderDialog order={modal.order} canManage={can.manage} onClose={() => setModal(null)} onSaved={refresh} onReceive={() => setModal({ kind: 'item', id: modal.order.client_medication_id, action: 'receive', order: modal.order })} />}
-        {modal?.kind === 'count' && <CountReview record={modal.record} onClose={() => setModal(null)} onSaved={refresh} />}
+        {modal?.kind === 'count' && <CountReview record={modal.record} canManage={can.manage} onClose={() => setModal(null)} onSaved={refresh} />}
     </AppLayout>;
 }
 
@@ -139,7 +141,9 @@ function ItemWorkspace({ id, initialAction, order, pharmacies, can, lotsEnabled,
     const [item, setItem] = useState<ItemDetail | null>(null);
     const [error, setError] = useState(false);
     const [retry, setRetry] = useState(0);
-    const [action, setAction] = useState(initialAction);
+    const [action, setAction] = useState<typeof initialAction | 'photo' | 'order_detail'>(initialAction);
+    const [selectedOrder, setSelectedOrder] = useState<SupplyOrder | null>(null);
+    const [setupConfirm, setSetupConfirm] = useState(false);
     const [section, setSection] = useState(0);
     const [file, setFile] = useState<PreviewFile | null>(null);
     const command = useStockCommand();
@@ -152,36 +156,41 @@ function ItemWorkspace({ id, initialAction, order, pharmacies, can, lotsEnabled,
         return () => controller.abort();
     }, [id, retry]);
     if (!item || error) return <SettingsModal title="Stock item" description="Person-owned pack and movement records" onClose={onClose}>{error ? <ErrorState title="We cannot show this record" message="It may be unavailable or outside your medication access." onRetry={() => { setError(false); setRetry(retry + 1); }} /> : <SkeletonTable rows={3} />}</SettingsModal>;
-    const back = () => { setAction(undefined); setRetry(retry + 1); };
-    if (action === 'receive') return <ReceiveWizard item={item} order={order} onClose={back} onSaved={onSaved} />;
+    const back = () => { setAction(undefined); setSelectedOrder(null); setRetry(retry + 1); };
+    if (action === 'photo') return <PackPhotoDialog item={item} onClose={back} onSaved={onSaved} />;
+    if (action === 'order_detail' && selectedOrder) return <SupplyOrderDialog order={selectedOrder} canManage={can.manage} onClose={back} onSaved={onSaved} onReceive={() => setAction('receive')} />;
+    if (action === 'receive') return <ReceiveWizard item={item} order={selectedOrder ?? order} onClose={back} onSaved={onSaved} />;
     if (action === 'count') return <CountWizard item={item} onClose={back} onSaved={onSaved} />;
     if (action === 'order') return <NewSupplyOrder item={item} pharmacies={pharmacies} onClose={back} onSaved={onSaved} />;
     if (action === 'move' || action === 'going_out' || action === 'coming_back') return <MovementDialog item={item} mode={action} onClose={back} onSaved={onSaved} />;
     const photos = item.packs.flatMap((pack) => pack.photos.map((photo) => ({ pack, photo })));
     const setup = async () => {
         const result = await command.run({ action: 'initialise', client_medication_id: item.id, confirm_balance: true });
-        if (result) { setRetry(retry + 1); onSaved(); }
+        if (result) { setSetupConfirm(false); setRetry(retry + 1); onSaved(); }
     };
     return <>
         <WizardShell open onClose={onClose} title={item.name} description={item.client_name} railIcon={Pill} railTitle={item.name} railSub={item.client_name} sequential={false}
-            steps={[{ key: 'medicine', label: 'This medicine', blurb: item.client_name, icon: Pill }, { key: 'packs', label: 'Packs', blurb: `${item.packs.length} kept`, icon: Package }, { key: 'photos', label: 'Pack photos', blurb: `${photos.length} kept`, icon: Camera }]} stepIndex={section} onStepClick={setSection} headerLabel={['This medicine', 'Packs', 'Pack photos'][section]}
+            steps={[{ key: 'medicine', label: 'This medicine', blurb: item.client_name, icon: Pill }, { key: 'packs', label: 'Packs', blurb: `${item.packs.length} kept`, icon: Package }, { key: 'movements', label: 'Movements', blurb: 'Permanent history', icon: ArrowLeftRight }, { key: 'orders', label: 'Pharmacy orders', blurb: 'Supply and deliveries', icon: Truck }, { key: 'photos', label: 'Pack photos', blurb: `${photos.length} kept`, icon: Camera }]} stepIndex={section} onStepClick={setSection} headerLabel={['This medicine', 'Packs', 'Movements', 'Pharmacy orders', 'Pack photos'][section]}
             footerEnd={<Button onClick={onClose}>Close</Button>}>
             <div className="grid gap-5">
                 {section === 0 && <>
                     <State value={item.state} /><ReviewCard icon={Pill} title={item.name}><ReviewRow label="Person" value={item.client_name} /><ReviewRow label="House" value={item.site_name} /><ReviewRow label={item.controlled ? 'Register balance' : 'Usable on hand'} value={item.on_hand === null ? 'Unknown' : `${item.on_hand} ${item.unit}`} /><ReviewRow label="Last counted" value={item.last_counted_at ? formatDateTime(item.last_counted_at) : 'Not counted yet'} /><ReviewRow label="Days of supply" value={item.days_supply === null ? 'Not available — stock-use quantity is not configured' : item.days_supply} /></ReviewCard>
                     {!item.lots_started && <SettingsNotice role="note">{lotsEnabled ? 'The recorded stock balance has not been set up as packs yet. Check the recorded balance before carrying it forward.' : 'Pack tracking is awaiting integration review. Existing balances and history are retained.'}</SettingsNotice>}
                     {Object.values(command.errors).map((message) => <SettingsNotice key={message}>{message}</SettingsNotice>)}
-                    {!item.lots_started && lotsEnabled && can.manage && !item.controlled && <Button disabled={command.saving || item.on_hand === null} onClick={() => void setup()}>Use the checked recorded balance</Button>}
+                    {!item.lots_started && lotsEnabled && can.manage && !item.controlled && <Button disabled={command.saving || item.on_hand === null} onClick={() => setSetupConfirm(true)}>Use the checked recorded balance</Button>}
                     <div className="flex flex-wrap gap-2">
-                        {can.receive && !item.controlled && <><Button disabled={!item.lots_started && item.stock_id !== null} onClick={() => setAction('receive')}>Receive a delivery</Button><Button variant="outline" onClick={() => setAction('count')}>Count it</Button><Button variant="outline" onClick={() => setAction('going_out')}>Going out</Button>{item.outward.length > 0 && <Button variant="outline" onClick={() => setAction('coming_back')}>Coming back</Button>}</>}
+                        {can.receive && !item.controlled && <><Button disabled={!item.lots_started && item.stock_id !== null} onClick={() => setAction('receive')}>Receive a delivery</Button><Button variant="outline" disabled={!item.lots_started || !item.pack_count} onClick={() => setAction('count')}>Count it</Button><Button variant="outline" disabled={!item.lots_started || !item.pack_count} onClick={() => setAction('going_out')}>Going out</Button>{item.outward.length > 0 && <Button variant="outline" onClick={() => setAction('coming_back')}>Coming back</Button>}</>}
                         {can.manage && !item.controlled && <><Button variant="outline" onClick={() => setAction('order')}>Order from pharmacy</Button>{item.lots_started && <Button variant="outline" onClick={() => setAction('move')}>Adjust or remove</Button>}</>}
                         {item.controlled && <Button variant="outline" onClick={() => router.visit('/emar/controlled')}>Open the controlled register</Button>}
                     </div>
                 </>}
                 {section === 1 && (item.packs.length ? item.packs.map((pack) => <ReviewCard key={pack.id} icon={Package} title={pack.batch_number ?? (pack.batch_not_printed ? 'Batch not printed on the pack' : 'Batch unknown')}><ReviewRow label="Remaining" value={`${pack.quantity_remaining} ${item.unit}`} /><ReviewRow label="Expiry" value={pack.expiry_date ? formatDateOnly(pack.expiry_date.slice(0, 10)) : pack.expiry_not_printed ? 'Not printed on the pack' : 'Unknown'} /><ReviewRow label="Source" value={pack.source_reference ?? pack.source.replaceAll('_', ' ')} /><ReviewRow label="Recorded" value={formatDateTime(pack.received_at)} /><ReviewRow label="Pack state" value={pack.state === 'quarantined' ? 'Out of use' : 'Open'} />{pack.source === 'recorded_balance' && <p className="text-caption">Carried forward from the recorded balance. Original receipt date and label checks are unknown.</p>}</ReviewCard>) : <EmptyState icon={Package} title="No packs yet" description="No pack receipts have been recorded." />)}
-                {section === 2 && <><SettingsNotice role="note">Photos are supplemental identification. Check the current order and pack label. A changed pack or brand needs a new photo.</SettingsNotice>{photos.length ? photos.map(({ pack, photo }) => <ReviewCard key={photo.id} icon={Camera} title={photo.original_name}><ReviewRow label="Pack" value={pack.batch_number ?? 'Batch unknown'} /><ReviewRow label="Added" value={`${formatDateTime(photo.taken_at)} · ${photo.taken_by_name ?? 'Unknown'}`} /><Button variant="outline" onClick={() => setFile({ id: photo.id, name: 'Medicine pack photo', filename: photo.original_name, mime: photo.mime, bytes: photo.bytes, source: pack.batch_number ?? 'Batch unknown', previewUrl: photo.preview_url, downloadUrl: photo.download_url })}>View and download</Button></ReviewCard>) : <EmptyState icon={Camera} title="No pack photos yet" description="A receipt can be saved without a photo." />}</>}
+                {section === 2 && ((item.movements ?? []).length ? <>{item.movements?.map((move) => <ReviewCard key={move.id} icon={ArrowLeftRight} title={moveLabels[move.kind] ?? move.kind.replaceAll('_', ' ')}><ReviewRow label="Quantity" value={`${move.quantity} ${item.unit}`} /><ReviewRow label="Pack balance before / after" value={`${move.balance_before} / ${move.balance_after}`} /><ReviewRow label="Reason" value={move.reason} /><ReviewRow label="Recorded" value={`${formatDateTime(move.recorded_at)} · ${move.recorded_by_name ?? 'Unknown'}`} />{move.notes && <p>{move.notes}</p>}</ReviewCard>)}{item.history_truncated && <Button variant="outline" onClick={() => router.visit(`/emar/stock/packs?view=movements&medication_id=${item.id}`)}>Open all movements</Button>}</> : <EmptyState icon={ArrowLeftRight} title="No movements yet" description="Recorded receipts, doses, returns and adjustments appear here." />)}
+                {section === 3 && ((item.orders ?? []).length ? item.orders?.map((supply) => <ReviewCard key={supply.id} icon={Truck} title={`${supply.pharmacy_name} · #${supply.id}`}><State value={supply.status} /><ReviewRow label="Received / ordered" value={`${Number(supply.quantity_received ?? 0)} / ${supply.quantity_ordered}`} /><ReviewRow label="Due to arrive" value={supply.expected_delivery ? formatDateOnly(supply.expected_delivery) : 'Not recorded'} /><Button variant="outline" onClick={() => { setSelectedOrder(supply); setAction('order_detail'); }}>Open supply record</Button></ReviewCard>) : <EmptyState icon={Truck} title="No pharmacy orders yet" description="Supply records for this person and medicine appear here." />)}
+                {section === 4 && <>{can.manage && item.packs.length > 0 && <Button onClick={() => setAction('photo')}>Add or replace a pack photo</Button>}<SettingsNotice role="note">Photos are supplemental identification. Check the current order and pack label. A changed pack or brand needs a new photo.</SettingsNotice>{photos.length ? photos.map(({ pack, photo }) => <ReviewCard key={photo.id} icon={Camera} title={photo.original_name}><ReviewRow label="Pack" value={pack.batch_number ?? 'Batch unknown'} /><ReviewRow label="Added" value={`${formatDateTime(photo.taken_at)} · ${photo.taken_by_name ?? 'Unknown'}`} /><Button variant="outline" onClick={() => setFile({ id: photo.id, name: 'Medicine pack photo', filename: photo.original_name, mime: photo.mime, bytes: photo.bytes, source: pack.batch_number ?? 'Batch unknown', previewUrl: photo.preview_url, downloadUrl: photo.download_url })}>View and download</Button></ReviewCard>) : <EmptyState icon={Camera} title="No pack photos yet" description="A receipt can be saved without a photo." />}</>}
             </div>
         </WizardShell>
+        <ConfirmDialog open={setupConfirm} onClose={() => setSetupConfirm(false)} onConfirm={() => void setup()} processing={command.saving} title="Carry forward this checked balance?" description={`This creates pack records from ${item.on_hand ?? 'unknown'} ${item.unit ?? ''}. Original receipt dates and label checks remain unknown. Existing stock history is retained.`} confirmText="Use checked balance" variant="default" />
         <FilePreviewDialog file={file} onClose={() => setFile(null)} />
     </>;
 }

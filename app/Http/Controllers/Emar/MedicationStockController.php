@@ -73,6 +73,7 @@ final class MedicationStockController extends Controller
                 $result = $this->execute($med, $actor, $action, $data);
                 $payload = ['success' => true, ...$result];
                 $this->scope->rememberIdempotencyResult('emar-p06-command', $replay, $payload, $fingerprint, durable: true);
+                $auditEvents = [];
                 if ($action === 'count') {
                     $count = MedicationStockCountRecord::findOrFail($result['count_id']);
                     if ($count->state === 'needs_review') {
@@ -83,20 +84,21 @@ final class MedicationStockController extends Controller
                     }
                 } elseif ($action === 'count_review') {
                     // All source locks, writes and the durable receipt are done.
-                    // Completion appends P09; only audit appends follow it.
+                    // Collect completion audit before appending this whole batch.
                     app(MedicationFollowupService::class)->completeFromSource(
                         'stock-discrepancy:'.$result['count_id'], $actor, 'count_reviewed',
-                        ['count_id' => $result['count_id']],
+                        ['count_id' => $result['count_id']], $auditEvents,
                     );
                 }
                 $subjectKey = array_key_first($result);
-                app(MedicationEventRecorder::class)->append(new MedicationEventData(
+                $auditEvents[] = new MedicationEventData(
                     siteId: (int) $client->site_id, kind: 'stock.'.$action,
                     subjectType: match ($subjectKey) { 'lot_id' => 'stock_lot', 'order_id' => 'pharmacy_supply', 'count_id' => 'stock_count', 'movement_id' => 'stock_movement', default => 'stock' },
                     subjectId: (string) ($result[$subjectKey] ?? $med->id), actorId: $actor->id, occurredAt: CarbonImmutable::now('UTC'),
                     summary: match ($action) { 'receive' => 'Stock received', 'order' => 'Pharmacy supply record created', 'order_update' => 'Pharmacy supply evidence updated', 'count' => 'Stock counted', 'count_review' => 'Stock count reviewed', 'initialise' => 'Recorded stock balance carried forward', default => 'Stock movement recorded' },
                     facts: ['request_uuid' => $data['request_uuid'], 'client_medication_id' => $med->id, ...$result], clientId: $client->id,
-                ));
+                );
+                app(MedicationEventRecorder::class)->appendMany($auditEvents);
                 return response()->json($payload);
             }), 5);
     }

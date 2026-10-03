@@ -33,6 +33,11 @@ final class StockReadPayload
         $clientIds = $this->access->readableClientIds($actor, Client::whereIn('site_id', $siteIds)->pluck('id'));
         $medications = ClientMedication::query()->current()->whereIn('client_id', $clientIds)
             ->when(! $actor->canDo('medications.controlled.view'), fn ($query) => $query->where('controlled_drug', false));
+        $medicineId = $request->filled('medication_id') ? $request->integer('medication_id') : null;
+        if ($medicineId !== null) {
+            $this->access->medication($actor, $medicineId);
+            $medications->whereKey($medicineId);
+        }
         $medicationIds = (clone $medications)->select('id');
         $stocks = ClientMedicationStock::whereIn('client_medication_id', $medicationIds);
         $lots = MedicationStockLot::whereIn('client_medication_stock_id', (clone $stocks)->select('id'));
@@ -45,11 +50,13 @@ final class StockReadPayload
         if (! in_array($show, ['all', 'out', 'low'], true)) {
             $show = 'all';
         }
+        $quantitySql = $this->currentQuantitySql();
+        $today = $this->stock->today();
         $itemsQuery = (clone $medications)
             ->when($view === 'expiring', fn ($q) => $q->whereHas('stock.lots', fn ($l) => $l->where('quantity_remaining', '>', 0)
                 ->whereNotNull('expiry_date')->where('expiry_date', '<=', \Carbon\CarbonImmutable::parse($this->stock->today())->addDays(30)->toDateString())))
-            ->when($view === 'stock' && $show === 'out', fn ($q) => $q->whereHas('stock', fn ($s) => $s->whereNotNull('on_hand')->where('on_hand', '<=', 0)))
-            ->when($view === 'stock' && $show === 'low', fn ($q) => $q->whereHas('stock', fn ($s) => $s->whereNotNull('reorder_level')->whereColumn('on_hand', '<=', 'reorder_level')));
+            ->when($view === 'stock' && $show === 'out', fn ($q) => $q->whereHas('stock', fn ($s) => $s->whereRaw('('.$quantitySql.') <= 0', [$today])))
+            ->when($view === 'stock' && $show === 'low', fn ($q) => $q->whereHas('stock', fn ($s) => $s->whereNotNull('reorder_level')->whereRaw('('.$quantitySql.') <= client_medication_stocks.reorder_level', [$today])));
         $items = $itemsQuery->with(['client.site', 'stock.lots'])
             ->when($search !== '', fn ($query) => $query->where(fn ($q) => $q->where('name', 'like', '%'.$search.'%')
                 ->orWhereHas('client', fn ($c) => $c->where('first_name', 'like', '%'.$search.'%')->orWhere('last_name', 'like', '%'.$search.'%'))
@@ -79,9 +86,9 @@ final class StockReadPayload
             'items' => $items, 'orders' => $ordersPage, 'counts' => $countsPage, 'movements' => $movements,
             'sites' => $this->scope->sitePicker($allSites)->map->only(['id', 'name']),
             'pharmacies' => (clone $orders)->distinct()->orderBy('pharmacy_name')->pluck('pharmacy_name')->filter()->values(),
-            'filters' => ['view' => $view, 'search' => $search, 'site_id' => $site, 'show' => $show],
+            'filters' => ['view' => $view, 'search' => $search, 'site_id' => $site, 'show' => $show, 'medication_id' => $medicineId],
             'metrics' => [
-                'tracked' => (clone $stocks)->count(), 'out' => (clone $stocks)->whereNotNull('on_hand')->where('on_hand', '<=', 0)->count(),
+                'tracked' => (clone $stocks)->count(), 'out' => (clone $stocks)->whereRaw('('.$quantitySql.') <= 0', [$today])->count(),
                 'expiring' => (clone $lots)->where('quantity_remaining', '>', 0)->whereNotNull('expiry_date')->where('expiry_date', '<=', \Carbon\CarbonImmutable::parse($this->stock->today())->addDays(30)->toDateString())->count(),
                 'orders' => (clone $orders)->whereNotIn('status', PharmacySupplyRules::CLOSED)->count(),
                 'counts' => (clone $counts)->where('state', 'needs_review')->count(),
@@ -109,7 +116,29 @@ final class StockReadPayload
             ->whereHas('lot', fn ($q) => $q->where('client_medication_stock_id', $med->stock->id))->whereDoesntHave('returns')
             ->get(['id', 'quantity', 'medication_stock_lot_id', 'recorded_at', 'reason'])->toArray() : [];
 
+        $recentMoves = $med->stock ? MedicationStockMovement::whereHas('lot', fn ($q) => $q->where('client_medication_stock_id', $med->stock->id))
+            ->with('recordedBy')->latest('id')->limit(51)->get() : collect();
+        $item['history_truncated'] = $recentMoves->count() > 50;
+        $item['movements'] = $recentMoves->take(50)->map(fn ($move) => [
+            ...$move->only(['id', 'kind', 'quantity', 'balance_before', 'balance_after', 'reason', 'notes', 'recorded_at']),
+            'medication_id' => $med->id, 'medication_name' => $med->name, 'client_name' => $med->client->full_name,
+            'recorded_by_name' => $move->recordedBy?->name,
+        ])->values()->all();
+        $item['orders'] = MedicationPharmacyOrder::where('client_id', $med->client_id)->where('client_medication_id', $med->id)
+            ->latest('id')->limit(50)->get()->map(fn ($supply) => [
+                ...$supply->only(['id', 'client_medication_id', 'pharmacy_name', 'status', 'quantity_ordered', 'quantity_received',
+                    'quantity_dispensed', 'order_notes', 'needed_by', 'expected_delivery', 'communication_method',
+                    'communication_reference', 'communication_recorded_at', 'closure_reason', 'batch_number', 'batch_expiry']),
+                'medication_name' => $med->name, 'client_name' => $med->client->full_name, 'controlled' => (bool) $med->controlled_drug,
+            ])->all();
+
         return $item;
+    }
+
+    /** Mirrors StockLotRules::onHand at read time; controlled stock remains the register's physical balance. */
+    private function currentQuantitySql(): string
+    {
+        return 'CASE WHEN client_medication_stocks.lots_started_at IS NULL OR EXISTS (SELECT 1 FROM client_medications AS stock_medicine WHERE stock_medicine.id = client_medication_stocks.client_medication_id AND stock_medicine.controlled_drug = 1) THEN client_medication_stocks.on_hand ELSE (SELECT COALESCE(SUM(stock_pack.quantity_remaining), 0) FROM medication_stock_lots AS stock_pack WHERE stock_pack.client_medication_stock_id = client_medication_stocks.id AND stock_pack.state = \'open\' AND stock_pack.quantity_remaining > 0 AND (stock_pack.expiry_date IS NULL OR stock_pack.expiry_date >= ?)) END';
     }
 
     private function item(ClientMedication $med): array

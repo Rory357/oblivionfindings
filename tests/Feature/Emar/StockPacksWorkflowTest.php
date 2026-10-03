@@ -30,7 +30,7 @@ class StockPacksWorkflowTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function fixture(): array
+    private function fixture(?string $expiryDate = null): array
     {
         config(['medications.stock_lots_enabled' => true]);
         $this->seed(RbacSeeder::class);
@@ -42,7 +42,7 @@ class StockPacksWorkflowTest extends TestCase
         $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
         $med = ClientMedication::query()->forceCreate(['client_id' => $client->id, 'name' => 'Synthetic test medicine', 'dosage' => '1 tablet',
             'frequency' => 'PRN', 'is_prn' => true, 'controlled_drug' => false, 'active' => true, 'state' => 'active', 'approval_status' => 'verified']);
-        $stock = ClientMedicationStock::create(['client_medication_id' => $med->id, 'on_hand' => '10.00', 'unit' => 'tablets', 'last_counted_at' => now()->subDays(3)]);
+        $stock = ClientMedicationStock::create(['client_medication_id' => $med->id, 'on_hand' => '10.00', 'unit' => 'tablets', 'expiry_date' => $expiryDate, 'last_counted_at' => now()->subDays(3)]);
         DB::transaction(function () use ($stock, $actor) {
             app(MedicationStockService::class)->startLots($stock, $actor, (string) Str::uuid());
         });
@@ -314,6 +314,104 @@ PHP;
             }
             usleep(10_000);
         }
+    }
+
+    public function test_expiry_crossing_without_a_write_keeps_stock_row_meter_and_filter_consistent(): void
+    {
+        $clock = \Carbon\CarbonImmutable::parse('2026-10-03 23:59:00', 'Pacific/Auckland');
+        \Carbon\Carbon::setTestNow($clock);
+        \Carbon\CarbonImmutable::setTestNow($clock);
+        try {
+            extract($this->fixture('2026-10-03'));
+            $controlled = $med->replicate()->forceFill(['name' => 'Synthetic controlled medicine', 'controlled_drug' => true]);
+            $controlled->save();
+            $controlledStock = ClientMedicationStock::create(['client_medication_id' => $controlled->id, 'on_hand' => '10.00',
+                'unit' => 'tablets', 'expiry_date' => '2026-10-03']);
+            DB::transaction(fn () => app(MedicationStockService::class)->startLots($controlledStock, $actor, (string) Str::uuid()));
+            $unknown = $med->replicate()->forceFill(['name' => 'Synthetic unknown balance']);
+            $unknown->save();
+            ClientMedicationStock::create(['client_medication_id' => $unknown->id, 'on_hand' => null, 'unit' => 'tablets']);
+            $lot = MedicationStockLot::where('client_medication_stock_id', $stock->id)->sole();
+            $revision = $lot->revision;
+            $countedAt = $stock->last_counted_at;
+
+            $this->actingAs($actor)->getJson('/emar/stock/packs/medicine/'.$med->id)->assertOk()->assertJsonPath('on_hand', 10);
+            $this->get('/emar/stock/packs', ['X-Inertia' => 'true'])->assertOk()->assertJsonPath('props.metrics.out', 0);
+
+            $nextDay = $clock->addMinutes(2);
+            \Carbon\Carbon::setTestNow($nextDay);
+            \Carbon\CarbonImmutable::setTestNow($nextDay);
+            $this->getJson('/emar/stock/packs/medicine/'.$med->id)->assertOk()->assertJsonPath('on_hand', 0);
+            $this->getJson('/emar/stock/packs/medicine/'.$controlled->id)->assertOk()->assertJsonPath('on_hand', 10);
+            $this->getJson('/emar/stock/packs/medicine/'.$unknown->id)->assertOk()->assertJsonPath('on_hand', null);
+            $this->get('/emar/stock/packs?show=out', ['X-Inertia' => 'true'])->assertOk()
+                ->assertJsonPath('props.metrics.out', 1)->assertJsonPath('props.items.total', 1)
+                ->assertJsonPath('props.items.data.0.id', $med->id)->assertJsonPath('props.items.data.0.on_hand', 0);
+            $this->assertSame('10.00', $stock->fresh()->on_hand);
+            $this->assertSame('10.00', $lot->fresh()->quantity_remaining);
+            $this->assertSame($revision, $lot->fresh()->revision);
+            $this->assertSame($countedAt->toIso8601String(), $stock->fresh()->last_counted_at->toIso8601String());
+        } finally {
+            \Carbon\Carbon::setTestNow();
+            \Carbon\CarbonImmutable::setTestNow();
+        }
+    }
+
+    public function test_audit_failure_rolls_back_count_correction_workflow_and_receipt_then_retry_succeeds(): void
+    {
+        extract($this->fixture());
+        $lot = MedicationStockLot::firstOrFail();
+        $countId = $this->actingAs($actor)->postJson('/emar/stock/packs/commands', [
+            'action' => 'count', 'client_medication_id' => $med->id, 'request_uuid' => (string) Str::uuid(),
+            'lines' => [['lot_id' => $lot->id, 'revision' => $lot->revision, 'quantity' => '9.00']], 'reason' => 'Synthetic discrepancy',
+        ])->assertOk()->json('count_id');
+        $review = ['action' => 'count_review', 'client_medication_id' => $med->id, 'count_id' => $countId,
+            'request_uuid' => (string) Str::uuid(), 'reason' => 'Synthetic verified count'];
+        $this->app->instance(\App\Services\Medication\Audit\MedicationEventRecorder::class, new class {
+            public function appendMany(array $events): never
+            {
+                throw new \RuntimeException('Synthetic audit storage failure');
+            }
+        });
+        $this->withoutExceptionHandling();
+        try {
+            $this->postJson('/emar/stock/packs/commands', $review);
+            $this->fail('The count should not commit without its audit batch.');
+        } catch (\RuntimeException $error) {
+            $this->assertSame('Synthetic audit storage failure', $error->getMessage());
+        }
+        $this->assertSame('10.00', $stock->fresh()->on_hand);
+        $this->assertSame('10.00', $lot->fresh()->quantity_remaining);
+        $this->assertSame('needs_review', MedicationStockCountRecord::findOrFail($countId)->state);
+        $this->assertNull(MedicationFollowup::where('source_key', 'stock-discrepancy:'.$countId)->sole()->completed_at);
+        $this->assertSame(0, MedicationStockMovement::where('kind', 'count_correction')->count());
+        $this->app->forgetInstance(\App\Services\Medication\Audit\MedicationEventRecorder::class);
+        $this->postJson('/emar/stock/packs/commands', $review)->assertOk();
+        $this->assertSame('9.00', $stock->fresh()->on_hand);
+    }
+
+    public function test_photo_audit_failure_removes_only_its_new_file_and_rolls_back_its_row(): void
+    {
+        extract($this->fixture());
+        Storage::fake('private');
+        $lot = MedicationStockLot::firstOrFail();
+        $this->app->instance(\App\Services\Medication\Audit\MedicationEventRecorder::class, new class {
+            public function append(\App\Services\Medication\Audit\MedicationEventData $event): never
+            {
+                throw new \RuntimeException('Synthetic photo audit failure');
+            }
+        });
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($actor)->postJson('/emar/stock/packs/'.$lot->id.'/photos', [
+                'photo' => UploadedFile::fake()->image('synthetic-failed-photo.png'), 'request_uuid' => (string) Str::uuid(),
+            ]);
+            $this->fail('The photo should not commit without its audit.');
+        } catch (\RuntimeException $error) {
+            $this->assertSame('Synthetic photo audit failure', $error->getMessage());
+        }
+        $this->assertSame(0, MedicationStockPhoto::count());
+        $this->assertSame([], Storage::disk('private')->allFiles());
     }
 
     public function test_photo_bytes_are_private_and_upload_retries_do_not_create_history_duplicates(): void

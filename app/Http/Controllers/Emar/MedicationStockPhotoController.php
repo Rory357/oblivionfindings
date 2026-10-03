@@ -38,7 +38,8 @@ final class MedicationStockPhotoController extends Controller
         $submitted = MedicationStockLot::with('stock')->findOrFail($lot);
         $writtenPath = null;
         try {
-            $response = DB::transaction(fn () => $this->scope->forMedication($request->user(), $submitted->stock->client_medication_id, 'medications.stock.update',
+            $response = DB::transaction(function () use ($request, $submitted, $lot, $data, &$writtenPath) {
+                return $this->scope->forMedication($request->user(), $submitted->stock->client_medication_id, 'medications.stock.update',
                 function (Client $client, ClientMedication $med, User $actor) use ($lot, $data, $request, &$writtenPath) {
                     $this->access->assertReadable($actor, $client);
                     abort_if($med->controlled_drug && ! $actor->canDo('medications.controlled.view'), 404);
@@ -73,7 +74,8 @@ final class MedicationStockPhotoController extends Controller
                         facts: ['lot_id' => $pack->id, 'request_uuid' => $data['request_uuid']], clientId: $client->id, controlled: (bool) $med->controlled_drug,
                     ));
                     return response()->json(['success' => true, 'photo_id' => $photo->id]);
-                }), 5);
+                });
+            }, 5);
             if ($writtenPath && ($response->getData(true)['duplicate'] ?? false)) {
                 Storage::disk('private')->delete($writtenPath);
             }

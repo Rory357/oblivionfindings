@@ -152,13 +152,13 @@ export function CountWizard({ item, onClose, onSaved }: { item: ItemDetail; onCl
             success={saved ? <WizardSuccessPane title="Count saved" blurb={different ? 'The difference is kept for the house lead to review. The stock balance has not been changed.' : 'The count matches. Last counted has been updated.'} actions={<Button onClick={onClose}>Done</Button>} /> : undefined}>
             <WizardStepPane><Errors values={command.errors} /><div className="space-y-4">
                 {step === 0 && <><SettingsNotice role="note">Count the packs physically. The recorded quantities stay hidden until you have entered every count.</SettingsNotice>{packs.map((pack) => <div key={pack.id}><Label htmlFor={`count-${pack.id}`}>{pack.batch_number ?? (pack.batch_not_printed ? 'Batch not printed' : 'Batch unknown')} · {pack.expiry_date?.slice(0, 10) ?? 'Expiry unknown'}</Label><Input id={`count-${pack.id}`} type="number" min="0" step="0.01" value={values[pack.id] ?? ''} onChange={(event) => setValues({ ...values, [pack.id]: event.target.value })} /></div>)}</>}
-                {step > 0 && <>{packs.map((pack) => <ReviewCard key={pack.id} icon={Package} title={pack.batch_number ?? 'Pack'}><ReviewRow label="Counted" value={values[pack.id]} /><ReviewRow label="Recorded at start" value={pack.quantity_remaining} /></ReviewCard>)}{different && <><Label htmlFor="reason">Explain the difference</Label><Textarea id="reason" value={reason} onChange={(event) => setReason(event.target.value)} /><SettingsNotice role="note">A house lead reviews differences. Counts never silently overwrite stock. If stock moved while you counted, recount before saving.</SettingsNotice>}</>}
+                {step > 0 && <>{packs.map((pack) => <ReviewCard key={pack.id} icon={Package} title={pack.batch_number ?? 'Pack'}><ReviewRow label="Counted" value={values[pack.id]} /><ReviewRow label="Recorded at start" value={pack.quantity_remaining} /></ReviewCard>)}{different && <><Label htmlFor="reason">Explain the difference</Label><Textarea id="reason" value={reason} onChange={(event) => setReason(event.target.value)} /><SettingsNotice role="note">A house lead reviews differences. Counts never silently overwrite stock. If stock moved while you counted, recount before saving.</SettingsNotice></>}</>}
             </div></WizardStepPane>
         </WizardShell>
         <ConfirmDialog open={discard} onClose={() => setDiscard(false)} onConfirm={onClose} title="Discard this count?" description="Your unsaved counts will be discarded." confirmText="Discard draft" />
     </>;
 }
-export function CountReview({ record, onClose, onSaved }: { record: StockCount; onClose: () => void; onSaved: () => void }) {
+export function CountReview({ record, canManage = false, onClose, onSaved }: { record: StockCount; canManage?: boolean; onClose: () => void; onSaved: () => void }) {
     const [reason, setReason] = useState('');
     const [confirm, setConfirm] = useState(false);
     const command = useStockCommand();
@@ -167,9 +167,9 @@ export function CountReview({ record, onClose, onSaved }: { record: StockCount; 
         if (result) { onSaved(); onClose(); }
     };
     return <>
-        <SettingsModal title="Sign off this count" description={`${record.client_name} · ${record.medication_name}`} width={720} onClose={() => !command.saving && onClose()} footer={<><Button variant="outline" disabled={command.saving} onClick={onClose}>Close</Button>{record.state === 'needs_review' && <Button disabled={command.saving || !reason.trim()} onClick={() => setConfirm(true)}>Review adjustment</Button>}</>}>
+        <SettingsModal title="Sign off this count" description={`${record.client_name} · ${record.medication_name}`} width={720} onClose={() => !command.saving && onClose()} footer={<><Button variant="outline" disabled={command.saving} onClick={onClose}>Close</Button>{record.state === 'needs_review' && canManage && <Button disabled={command.saving || !reason.trim()} onClick={() => setConfirm(true)}>Review adjustment</Button>}</>}>
             <Errors values={command.errors} />{record.lines.map((line) => <ReviewCard key={line.lot_id} icon={Package} title={`Pack #${line.lot_id}`}><ReviewRow label="Counted" value={line.counted} /><ReviewRow label="Expected" value={line.expected} /></ReviewCard>)}
-            <p>{record.reason ?? 'No difference recorded.'}</p>{record.state === 'needs_review' && <><Label htmlFor="reason">Your review and reason</Label><Textarea id="reason" value={reason} onChange={(event) => setReason(event.target.value)} /><SettingsNotice role="note">Signing off changes each pack to the counted quantity. If any stock moved after this count, the server requires a new count.</SettingsNotice></>}
+            <p>{record.reason ?? 'No difference recorded.'}</p>{record.state === 'needs_review' && canManage && <><Label htmlFor="reason">Your review and reason</Label><Textarea id="reason" value={reason} onChange={(event) => setReason(event.target.value)} /><SettingsNotice role="note">Signing off changes each pack to the counted quantity. If any stock moved after this count, the server requires a new count.</SettingsNotice></>}
         </SettingsModal>
         <ConfirmDialog open={confirm} onClose={() => setConfirm(false)} onConfirm={() => void save()} processing={command.saving} title="Apply these counted quantities?" description="This changes the stock balance and records your reason. Historic receipts, movements and this count stay intact." confirmText="Apply count" variant="default" />
     </>;
