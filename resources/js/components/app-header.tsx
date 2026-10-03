@@ -154,7 +154,7 @@ export function AppHeader({
                         href="/dashboard"
                         prefetch
                         aria-label={`${resolveWordmarkName(branding?.name)} — home`}
-                        className="flex min-w-0 items-center rounded-lg px-1.5 py-1.5 transition-colors outline-none hover:bg-sidebar-accent/50 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+                        className="flex min-w-0 items-center rounded-lg px-1.5 py-1.5 transition-colors outline-none hover:bg-sidebar-accent/50 focus-visible:ring-2 focus-visible:ring-sidebar-ring min-[1320px]:max-w-[228px]"
                     >
                         <EventHorizonWordmark
                             name={branding?.name}
