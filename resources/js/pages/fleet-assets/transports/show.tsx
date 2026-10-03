@@ -924,8 +924,7 @@ export default function TransportShow({
                                                                             </Button>
                                                                         )}
                                                                     {canManageMedicationTransit &&
-                                                                        (log.witness_required ||
-                                                                            log.is_controlled_drug) && (
+                                                                        log.witness_required && (
                                                                             <Button
                                                                                 size="sm"
                                                                                 variant="ghost"

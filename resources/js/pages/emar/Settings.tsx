@@ -59,6 +59,7 @@ import {
     type SettingsContext,
 } from './settings/_context';
 import { DialogHost } from './settings/_dialogs';
+import { ControlledProductSettings } from './settings/_controlled-product';
 import {
     AllChanges,
     HISTORY_FILTERS,
@@ -132,6 +133,7 @@ type Props = {
     witnessPin: WitnessPinProps;
     /** false = a house lead who can only reset PINs sees Staff & PINs, read-only. */
     settingsAccess: boolean;
+    controlledSettingsAccess: { view: boolean; manageable_site_ids: number[] };
     /** An auditor: every view and the change history, read-only (P11 answer 6). */
     readOnlyAudit: boolean;
     /** Round templates this person can read (Rounds & timing › Round templates). */
@@ -291,7 +293,7 @@ export default function EmarSettings(props: Props) {
     const templatesOnly = !settingsAccess && props.templateAccess.read;
     const built: Built = useMemo(
         () => ({
-            rules: settingsAccess ? ['overview', 'medicines', 'safety'] : [],
+            rules: settingsAccess ? ['overview', 'medicines', 'safety', ...(props.controlledSettingsAccess.view ? ['controlled'] : [])] : [],
             // P11 F1: whoever manages a house's round templates reaches them
             // here, and nothing else they couldn't already reach.
             rounds: settingsAccess
@@ -817,6 +819,9 @@ export default function EmarSettings(props: Props) {
                     setF({ ...f, show: 'all' });
                 }}
             />
+        ) : view === 'rules' && sec === 'controlled' ? (
+            <ControlledProductSettings q={query} show={f.show} clear={() => { clearQ(); setF({ ...f, show: 'all' }); }}
+                houses={props.sites} houseIds={props.controlledSettingsAccess.manageable_site_ids} readOnlyAudit={readOnlyAudit} />
         ) : view === 'rounds' && sec === 'overview' ? (
             <RoundsOverview q={query} templates={props.roundTemplates} />
         ) : view === 'rounds' && sec === 'templates' ? (

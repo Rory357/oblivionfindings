@@ -278,7 +278,7 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     });
 
     // Destruction / Disposal Records
-    Route::get('/destructions', [EmarController::class, 'destructions'])
+    Route::get('/destructions', [ControlledProductController::class, 'destructions'])
         ->middleware([
             'permission:medications.view',
             'permission:medications.controlled.view',
@@ -369,15 +369,15 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
 
     Route::middleware('permission:medications.controlled.record')->group(function () {
         // Controlled Drug Entries
-        Route::post('/controlled/entries', [EmarController::class, 'storeCDEntry'])->name('emar.controlled.entries.store');
-        Route::post('/controlled/balance-check', [EmarController::class, 'storeBalanceCheck'])->name('emar.controlled.balance_check.store');
+        Route::post('/controlled/entries', [ControlledProductController::class, 'legacy'])->name('emar.controlled.entries.store');
+        Route::post('/controlled/balance-check', [ControlledProductController::class, 'legacy'])->name('emar.controlled.balance_check.store');
         Route::post('/stock/pharmacy-orders/{order}/controlled-delivery', [EmarController::class, 'receiveControlledPharmacyOrder'])
             ->name('emar.pharmacy_orders.controlled_delivery');
-        Route::post('/controlled/discrepancies/{discrepancy}/resolve', [EmarController::class, 'resolveDiscrepancy'])->name('emar.controlled.discrepancies.resolve');
+        Route::post('/controlled/discrepancies/{discrepancy}/resolve', [ControlledProductController::class, 'legacy'])->middleware('permission:medications.controlled.manage')->name('emar.controlled.discrepancies.resolve');
 
         // The destruction register is immutable; erroneous records are voided, not deleted.
-        Route::post('/destructions', [EmarController::class, 'storeDestruction'])->name('emar.destructions.store');
-        Route::post('/destructions/{destruction}/void', [EmarController::class, 'voidDestruction'])->name('emar.destructions.void');
+        Route::post('/destructions', [ControlledProductController::class, 'legacy'])->name('emar.destructions.store');
+        Route::post('/destructions/{destruction}/void', [ControlledProductController::class, 'legacy'])->middleware('permission:medications.controlled.manage')->name('emar.destructions.void');
     });
 
     Route::middleware('permission:medications.stock.update')->group(function () {
@@ -562,20 +562,20 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->name('emar.refusal_followups.notify_gp');
 
     // ─── Controlled Drug Loss Reports ─────────────────────
-    Route::get('/controlled/loss-reports', [CDLossReportController::class, 'index'])
+    Route::get('/controlled/loss-reports', [ControlledProductController::class, 'losses'])
         ->middleware([
             'permission:medications.view',
             'permission:medications.controlled.view',
         ])
         ->name('emar.cd_loss.index');
-    Route::post('/controlled/loss-reports', [CDLossReportController::class, 'store'])
+    Route::post('/controlled/loss-reports', [ControlledProductController::class, 'legacy'])
         ->middleware('permission:medications.controlled.record')
         ->name('emar.cd_loss.store');
-    Route::post('/controlled/loss-reports/{report}/investigate', [CDLossReportController::class, 'investigate'])
+    Route::post('/controlled/loss-reports/{report}/investigate', [ControlledProductController::class, 'legacy'])
         ->middleware('permission:medications.controlled.record')
         ->name('emar.cd_loss.investigate');
-    Route::post('/controlled/loss-reports/{report}/resolve', [CDLossReportController::class, 'resolve'])
-        ->middleware('permission:medications.controlled.record')
+    Route::post('/controlled/loss-reports/{report}/resolve', [ControlledProductController::class, 'legacy'])
+        ->middleware('permission:medications.controlled.manage')
         ->name('emar.cd_loss.resolve');
 
     // ─── Medication Errors ──────────────────────────────────

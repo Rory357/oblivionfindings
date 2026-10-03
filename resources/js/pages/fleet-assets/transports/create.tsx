@@ -440,8 +440,7 @@ export function TransportWizard({
                               medication_name:
                                   m.name + (m.dosage ? ` ${m.dosage}` : ''),
                               is_controlled_drug: m.controlled_drug,
-                              witness_required:
-                                  m.witness_required || m.controlled_drug,
+                              witness_required: m.witness_required,
                               attestation_state: 'accepted' as const,
                               witnessed_by_user_id: witnessIds[m.id]
                                   ? Number(witnessIds[m.id])
@@ -627,12 +626,12 @@ export function TransportWizard({
                                                         )
                                                     }
                                                     className={cn(
-                                                        'h-auto flex-col gap-2 rounded-xl border-2 px-4 py-5 whitespace-normal transition-all',
+                                                        'h-auto flex-col gap-2 whitespace-normal rounded-xl border-2 px-4 py-5 transition-all',
                                                         form.data
                                                             .transport_type ===
                                                             type.value
                                                             ? `${type.color} shadow-md`
-                                                            : 'border-transparent bg-muted/30 text-muted-foreground hover:border-muted-foreground/20 hover:bg-muted/60',
+                                                            : 'bg-muted/30 text-muted-foreground hover:border-muted-foreground/20 hover:bg-muted/60 border-transparent',
                                                     )}
                                                 >
                                                     <IconComp className="h-7 w-7" />
@@ -1160,8 +1159,7 @@ export function TransportWizard({
 
                                                 {/* Authenticated second checker for governed medication custody */}
                                                 {isSelected &&
-                                                    (med.witness_required ||
-                                                        med.controlled_drug) && (
+                                                    med.witness_required && (
                                                         <div className="mt-3 ml-7 space-y-3 rounded-md border p-3">
                                                             <label
                                                                 htmlFor={`transport-witness-${med.id}`}

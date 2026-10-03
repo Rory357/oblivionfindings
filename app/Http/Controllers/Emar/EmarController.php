@@ -45,12 +45,13 @@ use App\Services\Emar\ShiftMedicationSnapshotService;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
 use App\Services\Medication\Alerts\MedicationAlertSources;
-use App\Services\Medication\MarLinkService;
-use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\CompetencyPolicySettings;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
+use App\Services\Medication\Followups\MedicationFollowupService;
+use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationOrderLifecycleService;
+use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationRoundGenerationService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
@@ -1461,7 +1462,7 @@ class EmarController extends Controller
         // dose at 03:00), as the schedule rows carry it.
         $doses = app(ScheduledDoseStates::class)->dosesOn($scheduled, $date, now());
 
-        $scheduledPayload = $scheduled->map(function ($med) use ($client, $date, $ruleService, $scheduleService, $doses) {
+        $scheduledPayload = $scheduled->map(function ($med) use ($client, $ruleService, $scheduleService, $doses) {
             $adminRules = $ruleService->requirementsFor($med);
             $medDoses = collect($doses[(int) $med->id] ?? []);
             $doseTimes = $medDoses
@@ -2498,6 +2499,7 @@ class EmarController extends Controller
                 'controlled_drug' => (bool) $m->controlled_drug,
                 'high_risk' => (bool) $m->high_risk,
                 'witness_required' => (bool) $m->witness_required,
+                'requires_witness' => $m->requiresWitness(),
                 'state' => $m->state,
                 'approval_status' => $m->approval_status,
                 'rejection_reason' => $m->rejection_reason,
@@ -6915,7 +6917,7 @@ class EmarController extends Controller
                     $shift,
                     $auth->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
                 ),
-                'followups' => app(\App\Services\Medication\Followups\MedicationFollowupService::class)->forClient($auth, (int) $shift->client_id),
+                'followups' => app(MedicationFollowupService::class)->forClient($auth, (int) $shift->client_id),
             ],
         ]);
     }

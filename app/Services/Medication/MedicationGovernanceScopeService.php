@@ -444,13 +444,14 @@ final class MedicationGovernanceScopeService
         ?int $expectedClientId = null,
         array $authorizationUserIds = [],
         ?CarbonInterface $authorizationEffectiveAt = null,
+        bool $currentOnly = true,
     ): mixed {
-        return DB::transaction(function () use ($actor, $medicationId, $capability, $callback, $expectedClientId, $authorizationUserIds, $authorizationEffectiveAt) {
+        return DB::transaction(function () use ($actor, $medicationId, $capability, $callback, $expectedClientId, $authorizationUserIds, $authorizationEffectiveAt, $currentOnly) {
             $this->assertCapability($actor, $capability);
 
-            $snapshot = ClientMedication::query()
+            $snapshot = ClientMedication::withTrashed()
                 ->whereKey($medicationId)
-                ->whereNull('deleted_at')
+                ->when($currentOnly, fn ($q) => $q->whereNull('deleted_at'))
                 ->first(['id', 'client_id']);
             $this->notFoundUnless($snapshot !== null);
 
@@ -460,11 +461,10 @@ final class MedicationGovernanceScopeService
             $client = Client::query()->whereKey($clientId)->lockForUpdate()->first();
             $this->notFoundUnless($client !== null && $this->positiveId($client->site_id) !== null);
 
-            $medication = ClientMedication::query()
+            $medication = ClientMedication::withTrashed()
                 ->whereKey($medicationId)
                 ->where('client_id', $client->id)
-                ->whereNull('deleted_at')
-                ->whereNull('superseded_by')
+                ->when($currentOnly, fn ($q) => $q->whereNull('deleted_at')->whereNull('superseded_by'))
                 ->lockForUpdate()
                 ->first();
             $this->notFoundUnless($medication !== null);

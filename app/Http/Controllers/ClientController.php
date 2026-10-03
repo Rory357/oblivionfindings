@@ -98,6 +98,7 @@ use App\Services\Clients\ClientStaffPreparationProjection;
 use App\Services\Clients\ClientWorkerEligibility;
 use App\Services\ConsentValidationService;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
+use App\Services\Fleet\TransportRequestService;
 use App\Services\HealthSafety\HsModuleSummaryService;
 use App\Services\Medication\DoseSlots\ClientCalendarDoses;
 use App\Services\Medication\MedicationGovernanceScopeService;
@@ -108,8 +109,8 @@ use App\Services\Respite\ClientRespiteAllocationSummary;
 use App\Services\ShiftCoverageService;
 use App\Services\Tracking\ClientLocationAccessService;
 use App\Services\Tracking\ClientLocationHistoryService;
-use App\Services\Tracking\ClientTrackerStatusService;
 use App\Services\Tracking\ClientLocationLocateService;
+use App\Services\Tracking\ClientTrackerStatusService;
 use App\Services\Tracking\GeofenceStatusService;
 use App\Services\UserSiteAccessService;
 use App\Support\ClientSafetyPayload;
@@ -1830,6 +1831,7 @@ class ClientController extends Controller
     private function medicationPayload(ClientMedication $medication): array
     {
         $payload = $medication->toArray();
+        $payload['requires_witness'] = $medication->requiresWitness();
         $stock = $medication->stock;
 
         // The profile records as-needed doses only: its endpoint carries no
@@ -3341,7 +3343,7 @@ class ClientController extends Controller
         // Client-scoped transport bookings (Book transport workflow)
         $transportViewer = auth()->user();
         $workspaceIds = $transportViewer && ($transportViewer->canDo('fleet.viewAny') || $transportViewer->canDo('assets.viewAny'))
-            ? app(\App\Services\Fleet\TransportRequestService::class)->query($transportViewer)->where('client_id', $client->id)->pluck('id')->all()
+            ? app(TransportRequestService::class)->query($transportViewer)->where('client_id', $client->id)->pluck('id')->all()
             : [];
         $bookings = SchemaCache::hasTable('client_transport_bookings')
             ? ClientTransportBooking::query()

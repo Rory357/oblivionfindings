@@ -310,6 +310,13 @@ export const EMAR_HUBS: EmarHub[] = [
                 aliases: ['/emar/competency'],
             },
             {
+                key: 'witness-overrides',
+                label: 'Witness overrides',
+                href: '/emar/safety/witness-overrides',
+                icon: ShieldCheck,
+                visible: all(view, controlledView, hasManagerCapability),
+            },
+            {
                 // Request and active grants. Review for audit.view holders
                 // (NF-12) joins when P10 builds it; the route is break-glass.
                 key: 'emergency',

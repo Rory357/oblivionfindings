@@ -127,14 +127,14 @@ final class RecordingContractEnforcer
      * @param  array<string, mixed>  $data
      * @param  array<string, mixed>  $adminRules
      */
-    public function secondPersonKind(array $data, ClientMedication $medication, array $adminRules, bool $requiresCosigner): ?string
+    public function secondPersonKind(array $data, ClientMedication $medication, array $adminRules, bool $requiresCosigner, bool $controlledWitnessWaived = false): ?string
     {
         if (($data['status'] ?? null) !== 'given') {
             return null;
         }
 
         return match (true) {
-            $medication->requiresWitness() => RecordingContract::SECOND_WITNESS,
+            ($medication->witness_required || ! $controlledWitnessWaived) && $medication->requiresWitness() => RecordingContract::SECOND_WITNESS,
             $requiresCosigner => RecordingContract::SECOND_COSIGNER,
             (bool) ($adminRules['requires_countersign'] ?? false) => RecordingContract::SECOND_RULE,
             ($data['amount_mode'] ?? null) === RecordingContract::AMOUNT_LESS => RecordingContract::SECOND_AMOUNT,

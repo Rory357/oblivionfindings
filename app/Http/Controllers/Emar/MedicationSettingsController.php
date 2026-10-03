@@ -34,12 +34,12 @@ use App\Services\Medication\WitnessPinResetAuthority;
 use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationRuleService;
 use App\Services\UserSiteAccessService;
-use Illuminate\Database\Eloquent\Builder;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -232,6 +232,9 @@ class MedicationSettingsController extends Controller
      */
     private function assertSettingsAuthority(User $actor, array $items): void
     {
+        if (collect($items)->contains(fn ($item) => str_starts_with($item['definition']->group, 'controlled_'))) {
+            abort_unless($actor->canDo('medications.controlled.view'), 403);
+        }
         if (! $this->canManageSettings($actor)) {
             abort_unless($this->canManageHouseAlerts($actor) && $this->onlyHouseManaged($items), 403);
         }
@@ -456,6 +459,7 @@ class MedicationSettingsController extends Controller
      */
     private function assertCurrentSettingsAuthority(User $lockedActor, array $items): void
     {
+        $this->assertSettingsAuthority($lockedActor, $items);
         $this->assertSettingsAuthority($lockedActor, $items);
         $siteIds = collect($items)->pluck('site_id')->filter()->unique()->values()->all();
         if ($siteIds === []) {
@@ -762,6 +766,7 @@ class MedicationSettingsController extends Controller
                 ...$roundTemplates,
                 ...$alertPayload,
                 'settingsAccess' => false,
+                'controlledSettingsAccess' => ['view' => false, 'manageable_site_ids' => []],
                 'readOnlyAudit' => false,
                 'rules' => [],
                 'ruleOptions' => ['names' => [], 'routes' => [], 'nzulm' => []],
@@ -841,6 +846,8 @@ class MedicationSettingsController extends Controller
             ...$roundTemplates,
             ...$alertPayload,
             'settingsAccess' => true,
+            'controlledSettingsAccess' => ['view' => $canSeeControlled, 'manageable_site_ids' => $canManage && $canSeeControlled
+                ? array_values(array_filter($siteIds, fn ($id) => $this->canUseRuleSiteNow($actor, (int) $id))) : []],
             'readOnlyAudit' => $readOnlyAudit,
             'rules' => $rules,
             // A concealed rule's medicine never becomes a choice either.
@@ -1262,7 +1269,6 @@ class MedicationSettingsController extends Controller
             ->map(fn (mixed $id): int => (int) $id)
             ->all();
     }
-
 
     /**
      * A person's own houses: their current HR profile's primary and other

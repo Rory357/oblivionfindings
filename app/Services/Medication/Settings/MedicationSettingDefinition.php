@@ -142,6 +142,9 @@ final class MedicationSettingDefinition
 
     public function format(string $value): string
     {
+        if ($this->whenNotConfigured !== null && $this->options !== [] && $value === '' && $this->default === '') {
+            return 'Not configured';
+        }
         if ($this->codec !== null) {
             return $this->codec->format($value);
         }

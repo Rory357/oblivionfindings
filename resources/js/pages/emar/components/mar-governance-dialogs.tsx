@@ -50,16 +50,16 @@ export type ChartMedicationOption = {
     dosage: string;
     controlled_drug: boolean;
     witness_required: boolean;
+    requires_witness?: boolean;
 };
 
 /**
- * Mirrors ClientMedication::requiresWitness() on the server: a controlled
- * medicine always needs a witness, whatever its witness_required flag says.
+ * The server evaluates the organisation, house and explicit order witness policy.
  */
 export function syringeDriverRequiresWitness(
     medication: ChartMedicationOption | undefined,
 ): boolean {
-    return Boolean(medication?.witness_required || medication?.controlled_drug);
+    return Boolean(medication?.requires_witness ?? medication?.witness_required);
 }
 
 export type PendingCorrection = {

@@ -73,6 +73,9 @@ final class RecordingContract
 
     public const SECOND_NOT_VERIFIED = 'not_verified';
 
+    /** Approved CD dose override, awaiting witnessed count and source sign-off. */
+    public const SECOND_OVERRIDE_PENDING = 'override_pending';
+
     /** Nobody eligible on the roster could confirm it (Stephan Q2). */
     public const SECOND_NOT_CONFIRMED = 'not_confirmed';
 
@@ -106,6 +109,7 @@ final class RecordingContract
             'more_immediate_action' => ['nullable', 'string', 'max:2000'],
             'second_person_pin_forgotten' => ['nullable', 'boolean'],
             'second_person_unavailable' => ['nullable', 'boolean'],
+            'witness_override_id' => ['nullable', 'integer', 'min:1'],
             'reoffer_of_id' => ['nullable', 'integer', 'min:1'],
             'follow_up_due_at' => ['nullable', 'date'],
             'effect_check_due_at' => ['nullable', 'date'],

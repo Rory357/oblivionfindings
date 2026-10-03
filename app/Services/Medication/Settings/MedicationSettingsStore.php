@@ -382,7 +382,7 @@ class MedicationSettingsStore
                 'note' => $change->note,
                 'event' => $change->audit_event,
                 'concealed' => false,
-            ], ! $canSeeControlled && ($change->controlled || ($change->setting_group === self::RULES_GROUP && isset($concealedKeys[$change->setting_key])))));
+            ], ! $canSeeControlled && ($change->controlled || str_starts_with($change->setting_group, 'controlled_') || ($change->setting_group === self::RULES_GROUP && isset($concealedKeys[$change->setting_key])))));
     }
 
     /**

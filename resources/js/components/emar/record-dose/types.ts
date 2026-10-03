@@ -52,6 +52,7 @@ export interface Observation {
 }
 
 export interface DoseRequirements {
+    witness_override?: { id: number; expires_at: string; followup_due_at: string } | null;
     kind: 'scheduled' | 'prn';
     order: {
         id: number;

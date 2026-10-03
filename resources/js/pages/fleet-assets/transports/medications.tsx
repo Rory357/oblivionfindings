@@ -636,8 +636,7 @@ export default function MedicationTransitIndex({
                                                                     </Button>
                                                                 )}
                                                             {canManageMedicationTransit &&
-                                                                (log.witness_required ||
-                                                                    log.is_controlled_drug) && (
+                                                                log.witness_required && (
                                                                     <Button
                                                                         size="sm"
                                                                         variant="ghost"

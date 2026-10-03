@@ -15,6 +15,7 @@ use App\Models\MedicationRound;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\User;
+use App\Services\Medication\Controlled\ControlledDoseOverrideService;
 use App\Services\Medication\DoseSlots\DoseOrderTimelineFactory;
 use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
@@ -976,6 +977,8 @@ class EnhancedMarService
                     && ! $lockedActor->canDo('medications.controlled.record'),
                     403,
                 );
+                $doseOverride = app(ControlledDoseOverrideService::class)->forAdministration($lockedActor, $client, $medication, $data, $adminAt, $lockedPresenceShifts);
+                $secondPersonKind = $this->recordingContract->secondPersonKind($data, $medication, $currentAdminRules, $requiresCosigner, $doseOverride !== null);
                 if (is_array($data['safety_override'] ?? null)
                     && ! $lockedActor->canDo('medications.administer.override_safety')) {
                     return [
@@ -1032,7 +1035,7 @@ class EnhancedMarService
                 if ($secondPersonKind !== null
                     && empty($data['witnessed_by'])
                     && filter_var($data['second_person_unavailable'] ?? false, FILTER_VALIDATE_BOOL)) {
-                    if (! $this->recordingContract->mayGoUnconfirmed($secondPersonKind)) {
+                    if ($doseOverride !== null || ! $this->recordingContract->mayGoUnconfirmed($secondPersonKind)) {
                         return [
                             'success' => false,
                             'error' => $secondPersonKind === RecordingContract::SECOND_COSIGNER
@@ -1079,6 +1082,7 @@ class EnhancedMarService
                         $lockedPresenceShifts,
                         $requiresCosigner,
                         $secondPersonKind === RecordingContract::SECOND_AMOUNT,
+                        $doseOverride !== null,
                     );
                 }
                 if (! ($witnessValidation['success'] ?? false)) {
@@ -1389,8 +1393,10 @@ class EnhancedMarService
                     ? ($data['amount_reason'] ?? null)
                     : null;
                 $admin->quantity_given = $this->recordingContract->quantityGiven($data, $medication);
-                $admin->second_person_kind = $secondPersonKind;
+                $admin->witness_override_id = $doseOverride?->id;
+                $admin->second_person_kind = $secondPersonKind ?? ($doseOverride !== null ? RecordingContract::SECOND_WITNESS : null);
                 $admin->second_person_status = match (true) {
+                    $doseOverride !== null => RecordingContract::SECOND_OVERRIDE_PENDING,
                     $secondPersonKind === null => null,
                     $secondPersonUnconfirmed => RecordingContract::SECOND_NOT_CONFIRMED,
                     $forgottenPin => RecordingContract::SECOND_NOT_VERIFIED,
@@ -1488,6 +1494,7 @@ class EnhancedMarService
                     $this->recordingContract->raiseMoreThanOrderedError($client, $medication, $admin, $lockedActor, $data);
                 }
 
+                app(ControlledDoseOverrideService::class)->recordApplied($doseOverride, $admin, $lockedActor, $medication);
                 app(MedicationFollowupService::class)->syncAdministration($admin);
 
                 AuditLogger::logOrFail('medications.administration.record', $admin, [
@@ -1502,6 +1509,7 @@ class EnhancedMarService
                     'witnessed_by' => $admin->witnessed_by,
                     'second_person_kind' => $admin->second_person_kind,
                     'second_person_status' => $admin->second_person_status,
+                    'witness_override_id' => $admin->witness_override_id,
                     'reoffer_of_id' => $admin->reoffer_of_id,
                     'amount_mode' => $admin->amount_mode,
                 ]);
@@ -1967,6 +1975,7 @@ class EnhancedMarService
 
         if (in_array($key, [
             'witnessed_by',
+            'witness_override_id',
             'pulse_bpm',
             'blood_pressure_systolic',
             'blood_pressure_diastolic',
@@ -2300,8 +2309,9 @@ class EnhancedMarService
         Collection $lockedPresenceShifts,
         bool $requireCosigner = false,
         bool $requireAmountConfirmation = false,
+        bool $controlledWitnessWaived = false,
     ): array {
-        $medicationRequiresWitness = $medication->requiresWitness() || ($adminRules['requires_countersign'] ?? false);
+        $medicationRequiresWitness = (($medication->witness_required || ! $controlledWitnessWaived) && $medication->requiresWitness()) || ($adminRules['requires_countersign'] ?? false);
         $requiresWitness = $medicationRequiresWitness || $requireCosigner || $requireAmountConfirmation;
 
         if (($data['status'] ?? null) !== 'given' || ! $requiresWitness) {

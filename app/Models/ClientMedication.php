@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Services\Medication\Controlled\ControlledPolicy;
 use App\Services\Medication\DoseSlots\DoseSlotOrderSync;
 use App\Services\Medication\OverdueDoseAlerts;
 use App\Support\WorkerClock;
@@ -172,7 +173,12 @@ class ClientMedication extends Model
             $wasCeased = $medication->getOriginal('state') === 'ceased'
                 || $medication->getRawOriginal('ceased_at') !== null;
 
-            if ($wasCeased && $medication->isDirty()) {
+            // A reviewed NZ register classification annotates retained stock evidence;
+            // cessation, the prescription and the legacy schedule stay immutable.
+            $classificationOnly = array_diff(array_keys($medication->getDirty()), [
+                'nz_controlled_class', 'controlled_class_reviewed_by', 'controlled_class_reviewed_at', 'controlled_class_source', 'updated_at',
+            ]) === [];
+            if ($wasCeased && $medication->isDirty() && ! $classificationOnly) {
                 throw new \LogicException('Ceased medication orders are immutable.');
             }
 
@@ -370,7 +376,7 @@ class ClientMedication extends Model
      */
     public function requiresWitness(): bool
     {
-        return app(\App\Services\Medication\Controlled\ControlledPolicy::class)->witnessRequired($this);
+        return app(ControlledPolicy::class)->witnessRequired($this);
     }
 
     /**

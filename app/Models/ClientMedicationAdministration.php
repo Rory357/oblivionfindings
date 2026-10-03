@@ -104,6 +104,7 @@ class ClientMedicationAdministration extends Model
         'correction_rejection_reason',
         'witnessed_at',
         'witness_method',
+        'witness_override_id',
         // P01 C1 recording contract.
         'late_reason',
         'amount_mode',
@@ -118,6 +119,7 @@ class ClientMedicationAdministration extends Model
 
     protected $casts = [
         'quantity_given' => 'decimal:2',
+        'witness_override_id' => 'integer',
         'reoffer_of_id' => 'integer',
         'effect_check_due_at' => 'datetime',
         'scheduled_for' => 'datetime',

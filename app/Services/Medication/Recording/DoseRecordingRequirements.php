@@ -13,16 +13,17 @@ use App\Models\User;
 use App\Services\MarScheduleService;
 use App\Services\Medication\Alerts\OnCallResolver;
 use App\Services\Medication\ClientAllergyRecordService;
+use App\Services\Medication\Controlled\ControlledDoseOverrideService;
 use App\Services\Medication\ControlledMedicationTransportWitnessService;
 use App\Services\Medication\DoseSlots\DoseOrderTimelineFactory;
 use App\Services\Medication\DoseSlots\DoseWindowResolver;
 use App\Services\Medication\ForgottenWitnessPinService;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationCompetencyRestrictionRules;
-use App\Services\Medication\MedicationSecondPersonService;
 use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationSafetyPolicySettings;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\Medication\MedicationSecondPersonService;
 use App\Services\Medication\Settings\MedicineRuleWording;
 use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationRuleService;
@@ -279,8 +280,9 @@ final class DoseRecordingRequirements
         $competency = $this->competencyFor($viewer, $order, $siteId, $now, $cache);
         $requiresCosigner = $competency['state'] === 'cosigner';
 
+        $doseOverride = app(ControlledDoseOverrideService::class)->preview($viewer, $order, $now);
         $kind = match (true) {
-            $order->requiresWitness() => RecordingContract::SECOND_WITNESS,
+            $doseOverride === null && $order->requiresWitness() => RecordingContract::SECOND_WITNESS,
             $requiresCosigner => RecordingContract::SECOND_COSIGNER,
             (bool) ($adminRules['requires_countersign'] ?? false) => RecordingContract::SECOND_RULE,
             default => null,
@@ -303,6 +305,7 @@ final class DoseRecordingRequirements
             'block_all' => null,
             'block_given' => $blockGiven,
             'competency' => $competency,
+            'witness_override' => $doseOverride === null ? null : ['id' => (int) $doseOverride->id, 'expires_at' => $doseOverride->expires_at->toIso8601String(), 'followup_due_at' => $doseOverride->followup_due_at->toIso8601String()],
             'second_person' => [
                 'kind' => $kind,
                 // PIN-2 stays off until its own-login consumer and expiry job
@@ -318,7 +321,7 @@ final class DoseRecordingRequirements
                 // Q2: a rule's second person (or a smaller amount) may go
                 // unconfirmed only when nobody on shift can confirm. A
                 // witness or a restricted worker's co-signer never can.
-                'may_go_unconfirmed' => ! $anyoneAvailable
+                'may_go_unconfirmed' => $doseOverride === null && ! $anyoneAvailable
                     && ! in_array($kind, [RecordingContract::SECOND_WITNESS, RecordingContract::SECOND_COSIGNER], true),
                 'candidates' => $detail ? $candidates->values()->all() : [],
             ],
