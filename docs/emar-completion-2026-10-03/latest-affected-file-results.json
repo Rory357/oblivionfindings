@@ -310,9 +310,9 @@
   {
     "File": "tests/Feature/Tasks/TaskProviderRowScopeTest.php",
     "OriginalFailures": 2,
-    "LastBatch": "eighth-repair",
+    "LastBatch": "ninth-repair",
     "Tests": 5,
-    "Failures": 1
+    "Failures": 0
   },
   {
     "File": "tests/Feature/Emar/MedicationReviewCadenceMigrationTest.php",
@@ -422,9 +422,9 @@
   {
     "File": "tests/Feature/Emar/WorkerMedsTodayPayloadTest.php",
     "OriginalFailures": 1,
-    "LastBatch": "eighth-repair",
+    "LastBatch": "ninth-repair",
     "Tests": 3,
-    "Failures": 1
+    "Failures": 0
   },
   {
     "File": "tests/Feature/Emar/PrescriptionsPageTest.php",
@@ -464,9 +464,9 @@
   {
     "File": "tests/Feature/Emar/MedicationGovernanceAuthorizationTest.php",
     "OriginalFailures": 31,
-    "LastBatch": "eighth-repair",
+    "LastBatch": "ninth-repair",
     "Tests": 41,
-    "Failures": 9
+    "Failures": 6
   },
   {
     "File": "tests/Feature/Emar/EmarReportsTest.php",
@@ -478,9 +478,9 @@
   {
     "File": "tests/Feature/Emar/ControlledDrugsTest.php",
     "OriginalFailures": 25,
-    "LastBatch": "eighth-repair",
+    "LastBatch": "ninth-repair",
     "Tests": 27,
-    "Failures": 17
+    "Failures": 16
   },
   {
     "File": "tests/Feature/Emar/MedicationPrescriberOrderAuditVisibilityTest.php",

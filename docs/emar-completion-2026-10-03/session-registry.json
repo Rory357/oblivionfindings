@@ -1,7 +1,7 @@
 {
   "date": "2026-10-03",
   "coordinator": "01a0e70d-f675-77b2-bbaf-2394094c898c",
-  "phase": "Final UI build and bounded P01 regression repair; reviewed draft handoff in preparation; clinical release blocked",
+  "phase": "Reviewed work pushed to draft PR 16; page and review chats finished and unpinned; clinical release remains blocked by recorded approvals and regressions",
   "userAuthority": "Complete Claude's eMAR work, improve UI/UX, use Sol 6.1 Extra high sessions, pin active/unpin completed, orchestrate approvals and push reviewed work.",
   "baseline": "9747cf7cb654c2ef441e8f60c7ea1b5918081925",
   "integrationPath": "C:/Users/steph/.codex/worktrees/emar-completion-integration/oblivionfindings",
@@ -12,7 +12,7 @@
       "threadId": "01a100f9-b959-7771-8506-d71fab164809",
       "model": "gpt-6.1-sol",
       "effort": "xhigh",
-      "status": "delegated work complete and unpinned; reviewed commits integrated; holds and verification recorded in CURRENT-STATUS.md",
+      "status": "delegated work complete and unpinned; reviewed commits integrated; unresolved holds and release verification recorded in CURRENT-STATUS.md",
       "pinned": false
     },
     {
@@ -20,15 +20,15 @@
       "threadId": "01a100fb-e787-7e91-8dd5-372cd68c5792",
       "model": "gpt-6.1-sol",
       "effort": "xhigh",
-      "status": "active: remaining query budget and Tasks module-parity diagnosis",
-      "pinned": true
+      "status": "delegated work complete and unpinned; reviewed commits integrated; unresolved holds and release verification recorded in CURRENT-STATUS.md",
+      "pinned": false
     },
     {
       "key": "p02",
       "threadId": "01a100fc-0a3d-7dd1-a919-1467972b4477",
       "model": "gpt-6.1-sol",
       "effort": "xhigh",
-      "status": "delegated work complete and unpinned; reviewed commits integrated; holds and verification recorded in CURRENT-STATUS.md",
+      "status": "delegated work complete and unpinned; reviewed commits integrated; unresolved holds and release verification recorded in CURRENT-STATUS.md",
       "pinned": false
     },
     {
@@ -36,7 +36,7 @@
       "threadId": "01a100fc-227e-7f73-9991-be9bc96d038a",
       "model": "gpt-6.1-sol",
       "effort": "xhigh",
-      "status": "delegated work complete and unpinned; reviewed commits integrated; holds and verification recorded in CURRENT-STATUS.md",
+      "status": "delegated work complete and unpinned; reviewed commits integrated; unresolved holds and release verification recorded in CURRENT-STATUS.md",
       "pinned": false
     },
     {
@@ -44,7 +44,7 @@
       "threadId": "01a100fc-3d01-7fb2-9e8c-794dc1794321",
       "model": "gpt-6.1-sol",
       "effort": "xhigh",
-      "status": "delegated work complete and unpinned; reviewed commits integrated; holds and verification recorded in CURRENT-STATUS.md",
+      "status": "delegated work complete and unpinned; reviewed commits integrated; unresolved holds and release verification recorded in CURRENT-STATUS.md",
       "pinned": false
     },
     {
@@ -52,7 +52,7 @@
       "threadId": "01a100fd-c2af-7512-a529-69374371e415",
       "model": "gpt-6.1-sol",
       "effort": "xhigh",
-      "status": "delegated work complete and unpinned; reviewed commits integrated; holds and verification recorded in CURRENT-STATUS.md",
+      "status": "delegated work complete and unpinned; reviewed commits integrated; unresolved holds and release verification recorded in CURRENT-STATUS.md",
       "pinned": false
     },
     {
@@ -60,7 +60,7 @@
       "threadId": "01a100fd-d9ad-7a32-9e55-409ba73fc7a6",
       "model": "gpt-6.1-sol",
       "effort": "xhigh",
-      "status": "delegated work complete and unpinned; reviewed commits integrated; holds and verification recorded in CURRENT-STATUS.md",
+      "status": "delegated work complete and unpinned; reviewed commits integrated; unresolved holds and release verification recorded in CURRENT-STATUS.md",
       "pinned": false
     },
     {
@@ -68,7 +68,7 @@
       "threadId": "01a100fd-efb3-7bb1-9f7d-1714780a01c9",
       "model": "gpt-6.1-sol",
       "effort": "xhigh",
-      "status": "delegated work complete and unpinned; reviewed commits integrated; holds and verification recorded in CURRENT-STATUS.md",
+      "status": "delegated work complete and unpinned; reviewed commits integrated; unresolved holds and release verification recorded in CURRENT-STATUS.md",
       "pinned": false
     },
     {
@@ -76,7 +76,7 @@
       "threadId": "01a1010b-16f3-7780-865e-fd6b91821c92",
       "model": "gpt-6.1-sol",
       "effort": "xhigh",
-      "status": "delegated work complete and unpinned; reviewed commits integrated; holds and verification recorded in CURRENT-STATUS.md",
+      "status": "delegated work complete and unpinned; reviewed commits integrated; unresolved holds and release verification recorded in CURRENT-STATUS.md",
       "pinned": false
     },
     {
@@ -84,7 +84,7 @@
       "threadId": "01a1010b-2e23-7422-8436-b5e7ac69c62e",
       "model": "gpt-6.1-sol",
       "effort": "xhigh",
-      "status": "delegated work complete and unpinned; reviewed commits integrated; holds and verification recorded in CURRENT-STATUS.md",
+      "status": "delegated work complete and unpinned; reviewed commits integrated; unresolved holds and release verification recorded in CURRENT-STATUS.md",
       "pinned": false
     },
     {
@@ -92,7 +92,7 @@
       "threadId": "01a1010b-4af4-7e61-ab92-3613b80a48fe",
       "model": "gpt-6.1-sol",
       "effort": "xhigh",
-      "status": "delegated work complete and unpinned; reviewed commits integrated; holds and verification recorded in CURRENT-STATUS.md",
+      "status": "delegated work complete and unpinned; reviewed commits integrated; unresolved holds and release verification recorded in CURRENT-STATUS.md",
       "pinned": false
     },
     {
@@ -100,7 +100,7 @@
       "threadId": "01a1010c-3512-7443-b7ca-b08d999b0117",
       "model": "gpt-6.1-sol",
       "effort": "xhigh",
-      "status": "delegated work complete and unpinned; reviewed commits integrated; holds and verification recorded in CURRENT-STATUS.md",
+      "status": "delegated work complete and unpinned; reviewed commits integrated; unresolved holds and release verification recorded in CURRENT-STATUS.md",
       "pinned": false
     },
     {
@@ -108,7 +108,7 @@
       "threadId": "01a1010c-4bf3-7633-9c38-383e89eda00f",
       "model": "gpt-6.1-sol",
       "effort": "xhigh",
-      "status": "delegated work complete and unpinned; reviewed commits integrated; holds and verification recorded in CURRENT-STATUS.md",
+      "status": "delegated work complete and unpinned; reviewed commits integrated; unresolved holds and release verification recorded in CURRENT-STATUS.md",
       "pinned": false
     },
     {
@@ -116,7 +116,7 @@
       "threadId": "01a1010c-6443-7352-928b-6c053edb8233",
       "model": "gpt-6.1-sol",
       "effort": "xhigh",
-      "status": "delegated work complete and unpinned; reviewed commits integrated; holds and verification recorded in CURRENT-STATUS.md",
+      "status": "delegated work complete and unpinned; reviewed commits integrated; unresolved holds and release verification recorded in CURRENT-STATUS.md",
       "pinned": false
     },
     {
@@ -124,7 +124,7 @@
       "threadId": "01a1011f-41e9-76d3-be22-d99b85296ec0",
       "model": "gpt-6.1-sol",
       "effort": "xhigh",
-      "status": "delegated work complete and unpinned; reviewed commits integrated; holds and verification recorded in CURRENT-STATUS.md",
+      "status": "delegated work complete and unpinned; reviewed commits integrated; unresolved holds and release verification recorded in CURRENT-STATUS.md",
       "pinned": false
     },
     {
@@ -132,7 +132,7 @@
       "threadId": "01a1011f-625a-7060-b17a-9dcb1ec3533d",
       "model": "gpt-6.1-sol",
       "effort": "xhigh",
-      "status": "delegated work complete and unpinned; reviewed commits integrated; holds and verification recorded in CURRENT-STATUS.md",
+      "status": "delegated work complete and unpinned; reviewed commits integrated; unresolved holds and release verification recorded in CURRENT-STATUS.md",
       "pinned": false
     }
   ],

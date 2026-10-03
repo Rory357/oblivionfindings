@@ -48,7 +48,7 @@ These are latest results per originally failing file, from overlapping follow-up
 | tests/Feature/Emar/MedicationOrderLifecycleTest.php | eighth-repair | 17 | 0 |
 | tests/Feature/Emar/P11EventIntegrationTest.php | fourth-repair | 5 | 0 |
 | tests/Feature/MyDayMedicationsDuePayloadTest.php | eighth-repair | 7 | 0 |
-| tests/Feature/Tasks/TaskProviderRowScopeTest.php | eighth-repair | 5 | 1 |
+| tests/Feature/Tasks/TaskProviderRowScopeTest.php | ninth-repair | 5 | 0 |
 | tests/Feature/Emar/MedicationReviewCadenceMigrationTest.php | second-repair | 8 | 0 |
 | tests/Feature/Emar/MedicationRecoveryIntegrationRegressionTest.php | eighth-repair | 8 | 0 |
 | tests/Feature/Emar/P11NavigationPayloadTest.php | fifth-repair | 4 | 0 |
@@ -64,15 +64,15 @@ These are latest results per originally failing file, from overlapping follow-up
 | tests/Feature/Emar/MedicationGovernanceAuditTest.php | seventh-repair | 6 | 0 |
 | tests/Feature/Emar/MedicationIntegrityAuditTest.php | seventh-repair | 8 | 0 |
 | tests/Feature/Emar/DestructionsTest.php | eighth-repair | 16 | 14 |
-| tests/Feature/Emar/WorkerMedsTodayPayloadTest.php | eighth-repair | 3 | 1 |
+| tests/Feature/Emar/WorkerMedsTodayPayloadTest.php | ninth-repair | 3 | 0 |
 | tests/Feature/Emar/PrescriptionsPageTest.php | seventh-repair | 23 | 0 |
 | tests/Feature/Emar/MedicationGovernanceResidualSurfaceTest.php | fifth-repair | 4 | 0 |
 | tests/Feature/Emar/WorkerMedsRecordDoseTest.php | eighth-repair | 30 | 0 |
 | tests/Feature/Emar/MedicationNzCalendarTest.php | fifth-repair | 55 | 0 |
 | tests/Feature/Emar/ControlledMedicationReportAuthorizationTest.php | fifth-repair | 5 | 0 |
-| tests/Feature/Emar/MedicationGovernanceAuthorizationTest.php | eighth-repair | 41 | 9 |
+| tests/Feature/Emar/MedicationGovernanceAuthorizationTest.php | ninth-repair | 41 | 6 |
 | tests/Feature/Emar/EmarReportsTest.php | fifth-repair | 5 | 0 |
-| tests/Feature/Emar/ControlledDrugsTest.php | eighth-repair | 27 | 17 |
+| tests/Feature/Emar/ControlledDrugsTest.php | ninth-repair | 27 | 16 |
 | tests/Feature/Emar/MedicationPrescriberOrderAuditVisibilityTest.php | fifth-repair | 1 | 0 |
 | tests/Feature/Emar/CompetencyRestrictionRulesTest.php | sixth-repair | 7 | 0 |
 | tests/Feature/Emar/MedicationRoundsDemoSeederTest.php | fifth-repair | 3 | 0 |
@@ -94,23 +94,22 @@ Each case below remains unresolved at its recorded revision. See CURRENT-STATUS.
 
 ### tests/Feature/Emar/ControlledDrugsTest.php
 
-- Cd witness confirms with their witness pin not their login password — eighth-repair.
-- Manual controlled entry rejects incomplete or contradictory offline provenance — eighth-repair.
-- Manual controlled balance check rejects incomplete or contradictory offline provenance — eighth-repair.
-- Manual controlled entry and balance accept online idempotency uuids without provenance — eighth-repair.
-- Controlled inertia forms redirect while json replays return sync payloads — eighth-repair.
-- Controlled entry and balance check replays remain durable after pruning — eighth-repair.
-- Controlled offline entry and balance audit failures roll back receipts stock and replay bindings — eighth-repair.
-- Page serves brand colour — eighth-repair.
-- Loss report captures accountable officer and regulator — eighth-repair.
-- Loss report rejects incomplete or contradictory offline provenance — eighth-repair.
-- Loss report replay is bound to authority target and report semantics — eighth-repair.
-- Loss report and durable replay result commit atomically — eighth-repair.
-- Loss report audit failure rolls back report incident and replay binding — eighth-repair.
-- Controlled loss mutations require canonical local ownership — eighth-repair.
-- Balance check mismatch links incident to discrepancy — eighth-repair.
-- Overdue cd check command raises then balance check resolves alert — eighth-repair.
-- Cd entry classifies schedule on medication — eighth-repair.
+- Cd witness confirms with their witness pin not their login password — ninth-repair.
+- Manual controlled entry rejects incomplete or contradictory offline provenance — ninth-repair.
+- Manual controlled balance check rejects incomplete or contradictory offline provenance — ninth-repair.
+- Manual controlled entry and balance accept online idempotency uuids without provenance — ninth-repair.
+- Controlled inertia forms redirect while json replays return sync payloads — ninth-repair.
+- Controlled entry and balance check replays remain durable after pruning — ninth-repair.
+- Controlled offline entry and balance audit failures roll back receipts stock and replay bindings — ninth-repair.
+- Page serves brand colour — ninth-repair.
+- Loss report captures accountable officer and regulator — ninth-repair.
+- Loss report rejects incomplete or contradictory offline provenance — ninth-repair.
+- Loss report replay is bound to authority target and report semantics — ninth-repair.
+- Loss report and durable replay result commit atomically — ninth-repair.
+- Loss report audit failure rolls back report incident and replay binding — ninth-repair.
+- Controlled loss mutations require canonical local ownership — ninth-repair.
+- Overdue cd check command raises then balance check resolves alert — ninth-repair.
+- Cd entry classifies schedule on medication — ninth-repair.
 
 ### tests/Feature/Emar/DestructionsTest.php
 
@@ -151,15 +150,12 @@ Each case below remains unresolved at its recorded revision. See CURRENT-STATUS.
 
 ### tests/Feature/Emar/MedicationGovernanceAuthorizationTest.php
 
-- Reader routes and sidebar require module plus exact operational capabilities — eighth-repair.
-- Omitted filters intersect reader rows pickers and dashboard with allowed sites — eighth-repair.
-- Explicit global site permission broadens reader scope but never replaces page capability — eighth-repair.
-- Explicit global site role still requires and honours each exact capability — eighth-repair.
-- Controlled entry replay is bound to the canonical action payload — eighth-repair.
-- Controlled balance check replay is bound to the canonical action payload — eighth-repair.
-- Controlled mutations bind to the locked canonical medication identity — eighth-repair.
-- Stock movement requires a complete valid transition and constrained initialization — eighth-repair.
-- Balance check requires existing locked stock and canonical medication — eighth-repair.
+- Explicit global site role still requires and honours each exact capability — ninth-repair.
+- Controlled entry replay is bound to the canonical action payload — ninth-repair.
+- Controlled balance check replay is bound to the canonical action payload — ninth-repair.
+- Controlled mutations bind to the locked canonical medication identity — ninth-repair.
+- Stock movement requires a complete valid transition and constrained initialization — ninth-repair.
+- Balance check requires existing locked stock and canonical medication — ninth-repair.
 
 ### tests/Feature/Emar/MedicationRbacAuthorizationTest.php
 
@@ -173,12 +169,4 @@ Each case below remains unresolved at its recorded revision. See CURRENT-STATUS.
 - Controlled pharmacy delivery rejects forged medication and incomplete or stale balance without effects — seventh-repair.
 - Controlled pharmacy delivery audit failure rolls back order stock register and replay result — seventh-repair.
 - A controlled delivery keeps the earlier batch and expiry — seventh-repair.
-
-### tests/Feature/Emar/WorkerMedsTodayPayloadTest.php
-
-- Meds due matches administrations with a single query — eighth-repair.
-
-### tests/Feature/Tasks/TaskProviderRowScopeTest.php
-
-- it keeps list counts csv detail lookup reports my day and watchers in parity for every provider — eighth-repair.
 

@@ -113,3 +113,15 @@ At frontend revision 43c66c616, compiled asset app-EgGhS2mP.js:
 - A native date-input fill through this browser driver changes the DOM value without sending React's expected change event; ArrowUp does send it. The checks used native key entry before Apply. This automation behaviour was not treated as an application defect.
 
 Browser findings led to two final UI repairs: badd1bb53 names the nested breadcrumb Medication history and hides absent optional outcome/witness text; 66777fe40 uses event-specific destinations in both the menu and drawer. The drawer's timestamp uses the shared NZ formatter in d90605140. These three changes require the final rebuilt browser check below. The earlier history-desktop.jpg is a checkpoint, not final proof of those repairs.
+
+### 4 October 2026, 07:25–07:30 NZDT — final compiled phone and desktop acceptance
+
+Full TypeScript and Vite passed at `029b7558f`; the build took 6m17s. The actual browser loaded `app-DBMoLwNr.js`.
+
+- Controlled register retains Noah Williams and 4 October 2026 after browser Back, refresh and a full reload. The person filter shows one medicine; the selected history day has zero entries while current stock remains four tablets and count cadence remains explicitly not configured. The empty message now says **No entries in this view**, with date/person/search guidance.
+- At CSS390 the register's date field, medicine link and action-menu trigger each measure44px high; the trigger is44px wide. Its enabled menu item measures44px and disabled items remain larger with visible reasons. The record, balance and filtered-empty state fit the viewport. Saved `screenshots/controlled-register-phone.jpg` from the normal viewport capture; a driver full-page capture clipped the image, so it was replaced rather than used as layout evidence.
+- The history breadcrumb reads **Medication history**. Amelia's3October selection has nine records. A medicine-start record opens a drawer with the NZ timestamp **3 October 2026, 10:45 pm** and medicine links to `/emar/medications?client_id=10`. Absent optional outcome/witness messages are not added to medicine-start records. The action says **Review source record** rather than promising to resolve a gap through navigation.
+- At CSS390 the drawer is366.975px wide with365px scroll width; its close buttons, record links and footer actions all measure44px high. There are zero nested link/button interactive elements. The body has its own scroller and the footer stays accessible. Saved `screenshots/history-drawer-phone.jpg` and updated `screenshots/history-phone.jpg`.
+- At CSS1440 the history document is1428px wide; the compact header, seven medication hubs, NZ filters and record list fit. The organisation wordmark and global date remain separate. Replaced `screenshots/history-desktop.jpg` with this final build. Restored the normal viewport and retained the preview tab for handoff.
+
+These checks made no new clinical record or settings change. They verify these observed UI paths, not the held controlled writers or an entire clinical release. Actual200% browser zoom remains unverified.
