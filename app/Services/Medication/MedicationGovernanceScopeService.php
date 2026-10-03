@@ -133,7 +133,7 @@ final class MedicationGovernanceScopeService
         bool $controlled = false,
     ): array {
         abort_unless(
-            $actor->canDo('medications.reports.export') || $actor->canDo('reports.viewAny'),
+            $actor->canDo('medications.reports.view'),
             403,
         );
         if ($controlled) {

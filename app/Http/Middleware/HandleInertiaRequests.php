@@ -119,7 +119,7 @@ class HandleInertiaRequests extends Middleware
                 || (($can['medications']['view'] ?? false) && ($can['medications']['stockUpdate'] ?? false))
                 || ($can['medications']['auditView'] ?? false)
                 || ($can['medications']['reportsExport'] ?? false)
-                || ($can['reports']['viewAny'] ?? false)
+                || ($can['medications']['reportsView'] ?? false)
             ) && (
                 ($can['medications']['administerRecord'] ?? false)
                 || ($can['medications']['view'] ?? false)
@@ -611,6 +611,8 @@ class HandleInertiaRequests extends Middleware
                 'administerCorrect' => $user->canDo('medications.administer.correct'),
                 'auditView' => $user->canDo('medications.audit.view'),
                 'reportsExport' => $user->canDo('medications.reports.export'),
+                'reportsView' => $user->canDo('medications.reports.view'),
+                'auditExport' => $user->canDo('medications.audit.export'),
                 'stockUpdate' => $user->canDo('medications.stock.update'),
                 'controlledView' => $user->canDo('medications.controlled.view'),
                 'controlledRecord' => $user->canDo('medications.controlled.record'),

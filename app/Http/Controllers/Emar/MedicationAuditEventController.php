@@ -126,7 +126,7 @@ class MedicationAuditEventController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
         $siteIds = $this->governanceScope->readerSiteIds($user, 'medications.audit.view');
-        $this->governanceScope->readerSiteIds($user, 'medications.reports.export');
+        $this->governanceScope->readerSiteIds($user, 'medications.audit.export');
         $model = $this->resolveModelOrFail(
             $id,
             $siteIds,

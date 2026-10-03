@@ -72,32 +72,6 @@ trait SanitizesCsvOutput
      */
     protected function sanitizeCsvCell(mixed $value): mixed
     {
-        if (! is_string($value) || $value === '') {
-            return $value;
-        }
-
-        // Ignore harmless visual spacing without stripping the tab/CR control
-        // prefixes that spreadsheet applications treat as executable input.
-        $trimmed = ltrim($value, " \v\f");
-
-        $firstMeaningful = $trimmed[0] ?? '';
-
-        if (in_array($firstMeaningful, ["\t", "\r"], true)) {
-            return "'".$value;
-        }
-
-        // A purely numeric cell (negative numbers, "+64…" phone numbers) is not
-        // a formula threat — leave it so the spreadsheet keeps it as a number and
-        // exact-value expectations aren't disturbed. Real payloads (=cmd, @SUM,
-        // -2+cmd) are never numeric.
-        if (is_numeric($trimmed)) {
-            return $value;
-        }
-
-        if (in_array($firstMeaningful, ['=', '+', '-', '@'], true)) {
-            return "'".$value;
-        }
-
-        return $value;
+        return \App\Support\CsvCell::sanitize($value);
     }
 }

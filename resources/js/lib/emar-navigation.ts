@@ -47,6 +47,8 @@ export interface EmarNavigationPermissions {
         controlledWitness?: boolean;
         auditView?: boolean;
         reportsExport?: boolean;
+        reportsView?: boolean;
+        auditExport?: boolean;
         breakGlass?: boolean;
     };
     reports?: { viewAny?: boolean };
@@ -108,6 +110,7 @@ export const isFrontlineMedication: Visibility = (can) => {
         m.stockUpdate ||
         m.auditView ||
         m.reportsExport ||
+        m.reportsView ||
         m.settingsManage ||
         m.breakGlass
     );
@@ -150,10 +153,9 @@ const administer = flag('administerRecord');
 const stockUpdate = flag('stockUpdate');
 const controlledView = flag('controlledView');
 const auditView = flag('auditView');
-const reportsExport = flag('reportsExport');
+const reportsView = flag('reportsView');
 const settingsManage = flag('settingsManage');
 const breakGlass = flag('breakGlass');
-const reportsViewAny: Visibility = (can) => Boolean(can?.reports?.viewAny);
 
 export const EMAR_HUBS: EmarHub[] = [
     {
@@ -331,24 +333,25 @@ export const EMAR_HUBS: EmarHub[] = [
         key: 'reports',
         label: 'Reports & audit',
         icon: BarChart3,
-        // reports.viewAny alone reveals this hub only — never the module's
-        // other hubs (eMAR second review §3).
-        visible: any(reportsExport, auditView, reportsViewAny),
+        visible: reportsView,
+        ownRail: true,
         views: [
             {
                 key: 'reports',
-                label: 'Reports',
+                label: 'Standard reports',
                 href: '/emar/reports',
                 icon: BarChart3,
-                visible: any(reportsExport, reportsViewAny),
+                visible: reportsView,
             },
             {
                 key: 'audit',
                 label: 'Audit trail',
-                href: '/emar/audit',
+                href: '/emar/reports?view=audit',
                 icon: Activity,
                 visible: auditView,
             },
+            { key: 'builder', label: 'Report builder', href: '/emar/reports/builder', icon: BarChart3, visible: reportsView },
+            { key: 'exports', label: 'Print & exports', href: '/emar/reports?view=exports', icon: FileText, visible: reportsView },
         ],
     },
     {

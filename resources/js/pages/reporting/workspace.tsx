@@ -915,7 +915,7 @@ export function ReportWorkspace(props: Props) {
                               ? 'Client tracker reports'
                               : domain === 'staff'
                                 ? 'Staff safety reports'
-                                : 'My safety history'
+                                : domain === 'medication' ? 'Medication reports' : 'My safety history'
                 }
                 subline={
                     focusedView?.note ??
@@ -1572,7 +1572,7 @@ export function ReportWorkspace(props: Props) {
                                                     {domain === 'fleet'
                                                         ? 'Find a resource'
                                                         : 'Find an authorised ' +
-                                                          (domain === 'client'
+                                                          (domain === 'medication' ? 'person' : domain === 'client'
                                                               ? 'client'
                                                               : 'session')}
                                                 </Label>
@@ -3606,7 +3606,7 @@ function ReportChart({
 }
 export default function Workspace(props: Props) {
     const base =
-        props.domain === 'fleet'
+        props.domain === 'medication' ? '/emar/reports' : props.domain === 'fleet'
             ? '/fleet-assets'
             : props.domain === 'self'
               ? '/my-day'
@@ -3617,7 +3617,7 @@ export default function Workspace(props: Props) {
                 { title: 'Home', href: '/dashboard' },
                 {
                     title:
-                        props.domain === 'fleet'
+                        props.domain === 'medication' ? 'Medication' : props.domain === 'fleet'
                             ? 'Fleet & Assets'
                             : props.domain === 'self'
                               ? 'My Day'
@@ -3625,9 +3625,9 @@ export default function Workspace(props: Props) {
                     href: base,
                 },
                 {
-                    title: 'Reports',
+                    title: props.domain === 'medication' ? 'Reports & audit' : 'Reports',
                     href:
-                        props.domain === 'fleet'
+                        props.domain === 'medication' ? '/emar/reports' : props.domain === 'fleet'
                             ? '/fleet-assets/reports'
                             : props.domain === 'self'
                               ? '/my-day/safety-reports'

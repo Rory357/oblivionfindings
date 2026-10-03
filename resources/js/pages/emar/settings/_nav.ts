@@ -15,6 +15,7 @@ export const SET_VIEWS: Record<
             ['safety', 'Safety checks'],
             ['controlled', 'Controlled drugs'],
             ['photos', 'Medicine photos'],
+            ['records', 'Records & reporting'],
         ],
     },
     rounds: {

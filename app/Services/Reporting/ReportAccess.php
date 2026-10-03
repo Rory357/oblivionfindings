@@ -37,6 +37,7 @@ final class ReportAccess
                 'client' => $actor->canDo('assets.telemetry.view'),
                 'staff' => $actor->canDo('hazards.view'),
                 'self' => true,
+                'medication' => $actor->canDo('medications.reports.view') && (! app(\App\Services\Medication\Reporting\MedicationReportAccess::class)->financeOnly($actor) || $key === 'medication_stock'),
                 default => false,
             };
             if (in_array($key, ['client_alerts', 'staff_alerts'], true)) {
@@ -61,7 +62,16 @@ final class ReportAccess
         abort_if(in_array($source['domain'], ['client', 'self']) && $definition['site_ids'] !== [], 422, 'The authorised person or own-session scope determines the Site.');
         $sites = new UserSiteAccessService;
         $context = ['actor' => $actor, 'domain' => $source['domain']];
-        if ($source['domain'] === 'fleet') {
+        if ($source['domain'] === 'medication') {
+            $access = app(\App\Services\Medication\Reporting\MedicationReportAccess::class);
+            $report = \App\Services\Medication\Reporting\MedicationReportDataset::SOURCES[$definition['source']];
+            $siteIds = $access->siteIds($actor, null, $definition['subject_id'] ?? null, $report);
+            abort_if(array_diff($definition['site_ids'], $siteIds), 403);
+            $selected = $definition['site_ids'] ?: $siteIds;
+            $people = $access->clientIds($actor, $selected);
+            $context += ['site_ids' => $selected, 'client_ids' => $people];
+            $authority = [$selected, $people, $access->financeOnly($actor), $actor->canDo('medications.controlled.view')];
+        } elseif ($source['domain'] === 'fleet') {
             $siteIds = $sites->accessibleSiteIds($actor, ['fleet.manage']);
             if (in_array($definition['source'], ['costs', 'finance_bills', 'resource_costs'])) {
                 $siteIds = array_values(array_intersect($siteIds, app(VehicleFinanceService::class)->financeSiteIds($actor)));

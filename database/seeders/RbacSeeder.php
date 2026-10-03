@@ -1091,5 +1091,6 @@ class RbacSeeder extends Seeder
                     }
                 }
             });
+        \App\Services\Medication\Reporting\MedicationReportingPermissions::install();
     }
 }

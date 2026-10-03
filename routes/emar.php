@@ -465,17 +465,18 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->name('emar.handovers.destroy');
 
     // Audit trail
-    Route::get('/audit', [AuditLogController::class, 'index'])
+    Route::get('/audit', [\App\Http\Controllers\Emar\MedicationReportsController::class, 'redirect'])
         ->middleware([
             'permission:medications.view',
             'permission:medications.audit.view',
         ])
         ->name('emar.audit');
     Route::get('/audit/export', [MedicationAuditController::class, 'exportCsv'])
+        ->middleware(\App\Http\Middleware\MedicationExportGuard::class.':audit')
         ->middleware([
             'permission:medications.view',
             'permission:medications.audit.view',
-            'permission:medications.reports.export',
+            'permission:medications.audit.export',
         ])
         ->name('emar.audit.export');
     // Per-event drawer actions (synthetic id → backing record; see controller).
@@ -486,10 +487,11 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ])
         ->name('emar.audit.event.integrity');
     Route::get('/audit/event/{id}/export', [MedicationAuditEventController::class, 'export'])
+        ->middleware(\App\Http\Middleware\MedicationExportGuard::class.':audit')
         ->middleware([
             'permission:medications.view',
             'permission:medications.audit.view',
-            'permission:medications.reports.export',
+            'permission:medications.audit.export',
         ])
         ->name('emar.audit.event.export');
     Route::post('/audit/event/{id}/flag', [MedicationAuditEventController::class, 'flag'])
@@ -538,14 +540,13 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->name('emar.corrections.reject');
 
     // Reports
-    Route::middleware('permission:medications.reports.export|reports.viewAny')->group(function () {
-        Route::get('/reports', [EmarReportController::class, 'index'])
-            ->name('emar.reports');
-        Route::get('/reports/export', [EmarReportController::class, 'export'])
-            ->name('emar.reports.export');
+    require __DIR__.'/emar-reporting.php';
+    Route::middleware(['permission:medications.reports.view', 'permission:medications.reports.export'])->group(function () {
         Route::get('/reports/export-mar', [MedicationsReportController::class, 'exportMarCsv'])
+            ->middleware(\App\Http\Middleware\MedicationExportGuard::class.':doses')
             ->name('emar.reports.export_mar');
         Route::get('/reports/export-controlled-discrepancies', [MedicationsReportController::class, 'exportDiscrepanciesCsv'])
+            ->middleware(\App\Http\Middleware\MedicationExportGuard::class.':controlled')
             ->middleware('permission:medications.controlled.view')
             ->name('emar.reports.export_discrepancies');
     });
@@ -614,12 +615,13 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     Route::post('/errors/{error}/reopen', [MedicationErrorController::class, 'reopen'])->middleware('permission:medications.errors.manage')->name('emar.errors.reopen');
 
     // ─── PDF Exports ─────────────────────────────────────────
-    Route::middleware('permission:medications.reports.export|reports.viewAny')->group(function () {
-        Route::get('/pdf/mar-chart', [EmarPdfController::class, 'marChart'])->name('emar.pdf.mar');
+    Route::middleware(['permission:medications.reports.view', 'permission:medications.reports.export'])->group(function () {
+        Route::get('/pdf/mar-chart', [EmarPdfController::class, 'marChart'])->middleware(\App\Http\Middleware\MedicationExportGuard::class.':mar')->name('emar.pdf.mar');
         Route::get('/pdf/controlled-register', [EmarPdfController::class, 'controlledDrugRegister'])
+            ->middleware(\App\Http\Middleware\MedicationExportGuard::class.':cd_register')
             ->middleware('permission:medications.controlled.view')
             ->name('emar.pdf.cd_register');
-        Route::get('/pdf/round-sheet', [EmarPdfController::class, 'roundSheet'])->name('emar.pdf.round_sheet');
+        Route::get('/pdf/round-sheet', [\App\Http\Controllers\Emar\MedicationReportsController::class, 'legacyRoundSheet'])->name('emar.pdf.round_sheet');
     });
 });
 

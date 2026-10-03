@@ -122,6 +122,7 @@ import {
 } from './settings/_templates';
 import { DoseTiming, RoundsOverview } from './settings/_timing';
 import { SaveBar, StatusMessage } from './settings/_ui';
+import { RecordsReporting } from './settings/_records-reporting';
 
 type Props = {
     rules: MedicineRule[];
@@ -293,7 +294,7 @@ export default function EmarSettings(props: Props) {
     const templatesOnly = !settingsAccess && props.templateAccess.read;
     const built: Built = useMemo(
         () => ({
-            rules: settingsAccess ? ['overview', 'medicines', 'safety', ...(props.controlledSettingsAccess.view ? ['controlled'] : [])] : [],
+            rules: settingsAccess ? ['overview', 'medicines', 'safety', 'records', ...(props.controlledSettingsAccess.view ? ['controlled'] : [])] : [],
             // P11 F1: whoever manages a house's round templates reaches them
             // here, and nothing else they couldn't already reach.
             rounds: settingsAccess
@@ -822,6 +823,8 @@ export default function EmarSettings(props: Props) {
         ) : view === 'rules' && sec === 'controlled' ? (
             <ControlledProductSettings q={query} show={f.show} clear={() => { clearQ(); setF({ ...f, show: 'all' }); }}
                 houses={props.sites} houseIds={props.controlledSettingsAccess.manageable_site_ids} readOnlyAudit={readOnlyAudit} />
+        ) : view === 'rules' && sec === 'records' ? (
+            <RecordsReporting q={query} show={f.show} />
         ) : view === 'rounds' && sec === 'overview' ? (
             <RoundsOverview q={query} templates={props.roundTemplates} />
         ) : view === 'rounds' && sec === 'templates' ? (

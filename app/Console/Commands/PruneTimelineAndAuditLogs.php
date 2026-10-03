@@ -50,7 +50,10 @@ class PruneTimelineAndAuditLogs extends Command
         $auditCutoff = Carbon::now()->subYears($auditYears);
         $timelineCutoff = Carbon::now()->subYears($timelineYears);
 
-        $auditQuery = AuditLog::query()->where('created_at', '<', $auditCutoff);
+        // P09: medication evidence has its own reviewed retention policy.
+        // Never apply the generic two-year audit cleanup to these records.
+        $auditQuery = AuditLog::query()->where('created_at', '<', $auditCutoff)
+            ->where(fn ($query) => $query->whereNull('action')->orWhere(fn ($action) => $action->where('action', 'not like', 'medications.%')->where('action', 'not like', 'emar.%')));
         $timelineQuery = TimelineEvent::query()
             ->where('occurred_at', '<', $timelineCutoff)
             ->where(function ($q) {

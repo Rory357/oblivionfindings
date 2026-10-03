@@ -141,6 +141,7 @@ class MedicationSettingsRegistry
             $this->errorTriage(),
             MedicationReviewCadence::settingsGroup(),
             ...ControlledSettingsFragment::groups(),
+            \App\Services\Medication\Reporting\RecordsReportingSettings::group(),
         ];
     }
 

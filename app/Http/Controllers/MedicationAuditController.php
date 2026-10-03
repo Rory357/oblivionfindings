@@ -161,7 +161,7 @@ class MedicationAuditController extends Controller
         );
         $this->governanceScope->readerSiteIds(
             $user,
-            'medications.reports.export',
+            'medications.audit.export',
             $siteId,
             $clientId,
         );
