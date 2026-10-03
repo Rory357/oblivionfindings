@@ -23,16 +23,29 @@ use Illuminate\Support\Str;
  * push", on by default): email and push then say what happened and link to
  * the app — the subject, the push title and the body carry no client name or
  * medicine. The bell always shows the full message: it's inside the app.
+ *
+ * Follow up (B2 chunk 3): a re-alert says "Reminder:" and an escalation
+ * "Escalated:" before the title. A Follow up alert that counts as attended
+ * when someone acknowledges it asks for an acknowledgement in the bell
+ * (`ack_required`, the inbox's acknowledge action).
  */
 class MedicationAlertNotification extends Notification
 {
     use Queueable;
+
+    public const FIRST = 'first';
+
+    public const REALERT = 'realert';
+
+    public const ESCALATION = 'escalation';
 
     /** @param list<string> $channels inapp, email and/or push: how this person is told. */
     public function __construct(
         public readonly MedicationAlert $alert,
         public readonly array $channels = ['inapp'],
         public readonly bool $private = true,
+        public readonly string $kind = self::FIRST,
+        public readonly bool $ackRequired = false,
     ) {}
 
     /** @return list<string> */
@@ -53,11 +66,13 @@ class MedicationAlertNotification extends Notification
             'alert_key' => $this->alert->type,
             'medication_alert_id' => $this->alert->id,
             'module' => 'medication',
-            'title' => $this->alert->title,
+            'title' => $this->title(),
             'message' => $this->alert->message,
             'severity' => $this->alert->severity,
             'action_url' => $this->alert->action_url,
             'controlled' => $this->alert->controlled,
+            'follow_up_step' => $this->kind,
+            'ack_required' => $this->ackRequired,
             ...($this->alert->subject ?? []),
         ];
     }
@@ -75,7 +90,7 @@ class MedicationAlertNotification extends Notification
     public function toPush(object $notifiable): array
     {
         return [
-            'title' => (string) $this->alert->title,
+            'title' => $this->title(),
             'body' => $this->body(),
             'data' => [
                 'url' => (string) ($this->alert->action_url ?: '/emar'),
@@ -93,16 +108,28 @@ class MedicationAlertNotification extends Notification
      */
     public function subject(): string
     {
-        $title = (string) $this->alert->title;
+        $title = $this->title();
         if ($this->private) {
             return $title;
         }
         $parts = array_values(array_filter(
             array_map('trim', explode(' — ', (string) $this->alert->message)),
-            fn (string $part): bool => $part !== '' && $part !== $title,
+            fn (string $part): bool => $part !== '' && $part !== (string) $this->alert->title,
         ));
 
         return $parts === [] ? $title : Str::limit($title.' — '.$parts[0], 150);
+    }
+
+    /** The title, with "Reminder:" or "Escalated:" for a follow-up step. */
+    public function title(): string
+    {
+        $title = (string) $this->alert->title;
+
+        return match ($this->kind) {
+            self::REALERT => 'Reminder: '.$title,
+            self::ESCALATION => 'Escalated: '.$title,
+            default => $title,
+        };
     }
 
     /** Email and push text: the short message with privacy on, else the full one. */

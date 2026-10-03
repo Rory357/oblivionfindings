@@ -392,7 +392,7 @@ export default function SelfAdmin({
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="eMAR - Self-Administration" />
+            <Head title="Support & self-administration" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
                     rail={<EmarHubRail />}

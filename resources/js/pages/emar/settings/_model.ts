@@ -35,8 +35,8 @@ export type SettingDefinition = {
         off: string | null;
         off_is_loosest: boolean;
     } | null;
-    /** A value that isn't one option or number (P11 B2): who gets an alert, a list of people. */
-    kind?: 'alert' | 'people' | null;
+    /** A value that isn't one option or number (P11 B2): who gets an alert, a list of people, a list of groups. */
+    kind?: 'alert' | 'people' | 'groups' | null;
     /** The name "Still to decide" uses ("Alert: Overdue doses"). */
     decide_label?: string | null;
     /** A house setting house managers change for their own houses (B2 Q3). */
@@ -44,7 +44,29 @@ export type SettingDefinition = {
     alert?: AlertMeta;
     /** The words for an empty list of people ("Nobody extra"). */
     empty_label?: string;
+    /** The groups a list of groups can hold, in order ("Escalate to", B2 C3). */
+    group_options?: { value: string; label: string }[];
 };
+
+/** A list of recipient groups, or null when it isn't one. */
+export function parseGroups(value: string): string[] | null {
+    try {
+        const v = JSON.parse(value);
+        return Array.isArray(v) && v.every((g) => typeof g === 'string')
+            ? v
+            : null;
+    } catch {
+        return null;
+    }
+}
+
+/** The server's canonical form: the offered groups, in order. */
+export const encodeGroups = (def: SettingDefinition, groups: string[]) =>
+    JSON.stringify(
+        (def.group_options ?? [])
+            .map((o) => o.value)
+            .filter((g) => groups.includes(g)),
+    );
 
 /** One medication alert in the catalogue (P11 v5 `ALERTS`). */
 export type AlertMeta = {
@@ -339,6 +361,12 @@ export function accepts(def: SettingDefinition, value: string): boolean {
         return !!a && a.groups.every((g) => def.alert!.groups.includes(g));
     }
     if (def.kind === 'people') return parsePeople(value) !== null;
+    if (def.kind === 'groups') {
+        const g = parseGroups(value);
+        return (
+            !!g && g.every((x) => def.group_options?.some((o) => o.value === x))
+        );
+    }
     if (isNumber(def)) {
         if (offValue(def) !== null && value === offValue(def)) return true;
         const [min, max] = def.range!;
@@ -369,9 +397,24 @@ export function format(
             ...a.groups.map((g) => meta.group_labels[g]?.label ?? g),
             ...a.people.map((id) => personName(names, id)),
         ];
-        return [...channels, who.length ? who.join(', ') : 'nobody'].join(
-            ' · ',
-        );
+        // v5: follow up after the channels (Follow up since B2 C3).
+        return [
+            ...channels,
+            `follow up ${a.follow_up ? 'on' : 'off'}`,
+            who.length ? who.join(', ') : 'nobody',
+        ].join(' · ');
+    }
+    if (def.kind === 'groups') {
+        const g = parseGroups(value) ?? [];
+        return g.length
+            ? g
+                  .map(
+                      (x) =>
+                          def.group_options?.find((o) => o.value === x)
+                              ?.label ?? x,
+                  )
+                  .join(', ')
+            : 'Nobody chosen';
     }
     if (def.kind === 'people') {
         const ids = parsePeople(value) ?? [];
@@ -415,6 +458,10 @@ export function loosens(
     if (def.kind === 'people') {
         const b = parsePeople(to) ?? [];
         return (parsePeople(from) ?? []).some((p) => !b.includes(p));
+    }
+    if (def.kind === 'groups') {
+        const b = parseGroups(to) ?? [];
+        return (parseGroups(from) ?? []).some((g) => !b.includes(g));
     }
     if (def.rank) {
         const before = def.rank.indexOf(from);
@@ -681,6 +728,17 @@ export function validateView(
                     `“${def.alert.label}”: turn on ${channelWords(def.alert.channels)} — otherwise nobody is told.`;
         });
     });
+    // Follow-up settings that only work together (B2 C3; the server checks the same).
+    if (s.groups.delivery?.view === view && draft.delivery) {
+        const v = (key: string) => draftValue(s, draft, 'delivery', key);
+        const off = definitionOf(s, 'delivery', 'escalate_after')?.numeric?.off;
+        if (
+            definitionOf(s, 'delivery', 'escalate_to') &&
+            v('escalate_after') !== off &&
+            !(parseGroups(v('escalate_to')) ?? []).length
+        )
+            errors['delivery.escalate_to'] = 'Choose who it escalates to.';
+    }
     return errors;
 }
 

@@ -203,7 +203,7 @@ class MedicationAdministrationOwnershipTest extends TestCase
 
         $this->actingAs($corrector)
             ->post(route('emar.corrections.approve', $correction))
-            ->assertSessionHas('error');
+            ->assertSessionHasErrors('correction');
         $this->assertSame('pending', $correction->fresh()->correction_status);
 
         $this->actingAs($approver)
@@ -241,7 +241,7 @@ class MedicationAdministrationOwnershipTest extends TestCase
         $this->assertNull($legacyCorrection->correction_requested_by);
         $this->actingAs($legacyRequester)
             ->post(route('emar.corrections.approve', $legacyCorrection))
-            ->assertSessionHas('error');
+            ->assertSessionHasErrors('correction');
         $this->assertSame('pending', $legacyCorrection->fresh()->correction_status);
 
         $this->actingAs($independentApprover)
@@ -407,7 +407,7 @@ class MedicationAdministrationOwnershipTest extends TestCase
 
         $this->actingAs($submitter)
             ->post(route('clients.mar.administrations.corrections.store', [$client, $original]), $payload)
-            ->assertSessionHas('error');
+            ->assertSessionHasErrors('correction');
         $this->actingAs($submitter)
             ->postJson(route('api.medications.administrations.correct', [
                 'client' => $client,

@@ -561,7 +561,7 @@ export default function AuditLog({
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="eMAR - Audit Trail" />
+            <Head title="Audit trail" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
                     rail={<EmarHubRail />}

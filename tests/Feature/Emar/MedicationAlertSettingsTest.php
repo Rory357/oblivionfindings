@@ -86,8 +86,8 @@ it('saves who gets an alert in the change history, asking before it loosens', fu
 
     $row = MedicationSettingChange::query()->where('setting_group', 'alerts')->where('setting_key', 'stock')->firstOrFail();
     expect($row->loosens)->toBeTrue()
-        ->and($row->before_text)->toBe('In-app on · email off · push off · House lead, People who update stock here')
-        ->and($row->after_text)->toBe('In-app on · email off · push off · House lead')
+        ->and($row->before_text)->toBe('In-app on · email off · push off · follow up off · House lead, People who update stock here')
+        ->and($row->after_text)->toBe('In-app on · email off · push off · follow up off · House lead')
         ->and($row->actor_id)->toBe($manager->id)
         ->and($row->audit_event)->toBe('medications.alert_recipients.updated');
 });
@@ -165,7 +165,7 @@ it('lets in-app be switched off once email or push is on (B2 C2: at least one ch
 
     expect(json_decode(DB::table('app_settings')->where('key', 'medications.alerts.stock')->value('value'), true))->toBe($emailOnly);
     expect(MedicationSettingChange::query()->where('setting_key', 'stock')->value('after_text'))
-        ->toBe('In-app off · email on · push off · House lead, People who update stock here');
+        ->toBe('In-app off · email on · push off · follow up off · House lead, People who update stock here');
 });
 
 it('saves the privacy switch for email and push, asking before it is switched off', function () {
@@ -330,4 +330,45 @@ it('keeps the Settings page’s queries bounded as the organisation grows', func
 
     expect($small)->toBeLessThanOrEqual(110)
         ->and($large - $small)->toBeLessThanOrEqual(33);
+});
+
+/*
+ * B2 chunk 3: the follow-up settings.
+ */
+it('saves follow-up settings that work together, and refuses ones that don’t', function () {
+    $manager = b2SettingsActor('provider_manager', Site::factory()->create());
+    $change = fn (string $key, string $value, string $from) => ['group' => 'delivery', 'key' => $key, 'site_id' => null, 'value' => $value, 'from' => $from];
+    $save = fn (array $changes, bool $confirm = false) => $this->actingAs($manager)
+        ->from(route('emar.settings'))
+        ->put(route('emar.settings.changes.save'), ['view' => 'alerts', 'changes' => $changes, 'confirm_loosening' => $confirm]);
+
+    // A re-alert needs both how often and how many times.
+    $save([$change('realert_every', '30', 'off')])->assertSessionHasErrors([
+        'changes.0.value' => 'Re-alerting needs both how often and how many times — or switch it off.',
+    ]);
+    $save([$change('realert_every', '30', 'off'), $change('realert_max', '3', 'off')])->assertSessionHasNoErrors();
+    expect(app(MedicationAlertSettings::class)->followUp())->toMatchArray(['realert_every' => 30, 'realert_max' => 3]);
+
+    // An escalation needs someone to escalate to.
+    $save([$change('escalate_after', '60', 'off')])->assertSessionHasErrors([
+        'changes.0.value' => 'Choose who it escalates to.',
+    ]);
+    $save([$change('escalate_after', '60', 'off'), $change('escalate_to', '["clinicalLead","houseLead"]', '[]')])->assertSessionHasNoErrors();
+    expect(app(MedicationAlertSettings::class)->followUp())->toMatchArray(['escalate_after' => 60, 'escalate_to' => ['houseLead', 'clinicalLead']])
+        ->and(MedicationSettingChange::query()->where('setting_key', 'escalate_to')->value('after_text'))->toBe('House lead, Clinical lead');
+});
+
+it('treats moving what counts as attended towards “opened” as a loosening', function () {
+    $manager = b2SettingsActor('provider_manager', Site::factory()->create());
+    $attended = fn (string $value, string $from) => ['group' => 'delivery', 'key' => 'attended', 'site_id' => null, 'value' => $value, 'from' => $from];
+
+    // Stronger (dealt with) is never a loosening.
+    b2Save($this, $manager, $attended('done', 'ack'))->assertSessionHasNoErrors();
+    // Back towards "opened" asks first.
+    b2Save($this, $manager, $attended('open', 'done'))->assertSessionHasErrors('confirm_loosening');
+    b2Save($this, $manager, $attended('open', 'done'), confirm: true)->assertSessionHasNoErrors();
+
+    expect(MedicationSettingChange::query()->where('setting_key', 'attended')->latest('id')->first())
+        ->loosens->toBeTrue()
+        ->after_text->toBe('Someone opens it');
 });

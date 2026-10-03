@@ -365,7 +365,7 @@ export default function EmergencyAccess({
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="eMAR - Emergency Access" />
+            <Head title="Emergency access" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
                     rail={<EmarHubRail />}

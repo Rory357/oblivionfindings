@@ -23,6 +23,18 @@ class MedicationAlertEvent extends Model
     /** "Nobody could be told", with the reason. */
     public const NOBODY_TOLD = 'nobody_told';
 
+    /** Follow-up (B2 chunk 3): someone opened or acknowledged it; it counts as attended. */
+    public const OPENED = 'opened';
+
+    public const ACKNOWLEDGED = 'acknowledged';
+
+    public const ATTENDED = 'attended';
+
+    /** Follow-up steps: everyone told so far told again; more groups told. */
+    public const RE_ALERTED = 're_alerted';
+
+    public const ESCALATED = 'escalated';
+
     /** Written at deploy for a subject people were told about before B2; nothing was sent. */
     public const CARRIED_OVER = 'carried_over_at_deploy';
 

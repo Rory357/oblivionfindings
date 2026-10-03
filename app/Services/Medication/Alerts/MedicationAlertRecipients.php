@@ -171,6 +171,46 @@ class MedicationAlertRecipients
     }
 
     /**
+     * Who an escalation adds (B2 chunk 3): the chosen groups at the alert's
+     * house, through the same gate as the first message, leaving out anyone
+     * already told.
+     *
+     * @param  list<string>  $groups
+     * @param  list<int>  $alreadyTold
+     * @return list<array{user: User, reason: string}>
+     */
+    public function escalationTargets(array $groups, MedicationAlertSubject $subject, CarbonInterface $at, array $alreadyTold): array
+    {
+        $candidates = [];
+        foreach ($groups as $group) {
+            foreach ($this->members($group, $subject, $at) as $user) {
+                if (! in_array((int) $user->id, $alreadyTold, true)) {
+                    $candidates[(int) $user->id] ??= ['user' => $user, 'reason' => $group];
+                }
+            }
+        }
+
+        return $this->gated($candidates, $subject)[0];
+    }
+
+    /**
+     * Those told so far who can still get the alert (a re-alert): approved,
+     * and still through the gate for why they were first told.
+     *
+     * @param  array<int, string>  $reasonsById  user id => why they were first told
+     * @return list<array{user: User, reason: string}>
+     */
+    public function stillAllowed(array $reasonsById, MedicationAlertSubject $subject): array
+    {
+        $candidates = [];
+        foreach ($this->approved(array_map('intval', array_keys($reasonsById))) as $user) {
+            $candidates[(int) $user->id] = ['user' => $user, 'reason' => $reasonsById[(int) $user->id]];
+        }
+
+        return $this->gated($candidates, $subject)[0];
+    }
+
+    /**
      * @param  array<int, array{user: User, reason: string}>  $candidates
      * @return array{0: list<array{user: User, reason: string}>, 1: list<int>}
      */

@@ -3,7 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Governance\Services\BoardPackAccessService;
+use App\Models\User;
+use App\Services\Medication\Alerts\MedicationAlertAttendance;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\DatabaseNotification;
+use Throwable;
 
 class NotificationInboxController extends Controller
 {
@@ -21,6 +25,8 @@ class NotificationInboxController extends Controller
             ->where('id', $notification)
             ->firstOrFail();
         $n->markAsRead();
+        // Opening a medication alert can attend it (P11 B2 chunk 3).
+        $this->attend($n, $user, MedicationAlertAttendance::OPENED);
 
         // Keep UX snappy when called from header dropdown
         return back()->with('success', 'Notification marked as read.');
@@ -57,7 +63,21 @@ class NotificationInboxController extends Controller
         if (is_null($n->acknowledged_at)) {
             $n->forceFill(['acknowledged_at' => now()])->save();
         }
+        $this->attend($n, $user, MedicationAlertAttendance::ACKNOWLEDGED);
 
         return back()->with('success', 'Notification acknowledged.');
+    }
+
+    /**
+     * A medication alert's shared "attended" record (P11 B2 chunk 3). Never
+     * stops the bell action itself.
+     */
+    private function attend(DatabaseNotification $notification, User $user, string $how): void
+    {
+        try {
+            app(MedicationAlertAttendance::class)->fromNotification($notification, $user, $how);
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 }

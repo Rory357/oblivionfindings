@@ -322,12 +322,16 @@ class MedicationGovernanceAuthorizationTest extends TestCase
                 ->assertNotFound();
         }
 
-        // P11 chunk 6: /emar/competency only redirects to Staff eligibility,
-        // which reads no Site from the URL and lists the reader's own houses.
+        // P11: /emar/competency redirects to Staff eligibility, after checking
+        // a named Site like any eMAR reader (B2 C1 review): another house, or
+        // none, is not found. Staff eligibility lists the reader's own houses.
         $foreignSiteId = (int) $context['foreign_site']->id;
         $this->actingAs($actor)
             ->get(route('emar.competency', ['site_id' => $foreignSiteId]))
-            ->assertRedirect(route('emar.safety.eligibility', ['house' => $foreignSiteId]));
+            ->assertNotFound();
+        $this->actingAs($actor)
+            ->get(route('emar.competency', ['site_id' => 999999]))
+            ->assertNotFound();
         $this->actingAs($actor)
             ->get(route('emar.safety.eligibility', ['house' => $foreignSiteId]))
             ->assertOk()
@@ -385,9 +389,12 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     public function test_medication_detail_conceals_forged_client_relationships(): void
     {
         $context = $this->context();
+        // A Site-wide reader (clients.viewAny): a medicine's details follow
+        // the per-person record gate (P02), so a bare reader opens no one's.
         $actor = $this->userWithPermissions([
             MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
             MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
+            'clients.viewAny',
         ], $context['local_site']);
 
         ClientMedicationAdministration::query()->create([

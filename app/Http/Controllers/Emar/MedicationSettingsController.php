@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Emar;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\PeopleMutationLockService;
 use App\Http\Controllers\Controller;
+use App\Models\AppSetting;
 use App\Models\ClientMedication;
 use App\Models\MedicationAdminRule;
 use App\Models\MedicationAlert;
@@ -113,6 +114,7 @@ class MedicationSettingsController extends Controller
             // Who may be named is checked once authority over each house is
             // (another house's extras: 403, never a validation message).
             $this->assertAlertPeople($changes);
+            $this->assertFollowUpConsistent($changes);
 
             return $this->settingsStore->apply($lockedActor, $changes, (bool) ($validated['confirm_loosening'] ?? false));
         }, 3);
@@ -325,6 +327,56 @@ class MedicationSettingsController extends Controller
             ->filter()
             ->values()
             ->all();
+    }
+
+    /**
+     * Follow-up settings that only work together (P11 B2 chunk 3): a re-alert
+     * needs both how often and how many times, and an escalation needs
+     * someone to escalate to — whatever this save changes and what's saved.
+     *
+     * @param  list<array{definition: MedicationSettingDefinition, site_id: int|null, value: string, from: string}>  $changes
+     */
+    private function assertFollowUpConsistent(array $changes): void
+    {
+        $changed = [];
+        foreach ($changes as $index => $change) {
+            if ($change['definition']->group === 'delivery') {
+                $changed[$change['definition']->key] = [$change['value'], $index];
+            }
+        }
+        if ($changed === []) {
+            return;
+        }
+        $value = function (string $key) use ($changed): string {
+            if (isset($changed[$key])) {
+                return $changed[$key][0];
+            }
+            $definition = $this->settingsRegistry->definition('delivery', $key);
+
+            return $definition === null
+                ? MedicationSettingsRegistry::FOLLOW_UP_OFF
+                : $definition->normalise(AppSetting::query()->where('key', $definition->storageKey)->value('value'));
+        };
+        $field = function (string ...$keys) use ($changed): string {
+            foreach ($keys as $key) {
+                if (isset($changed[$key])) {
+                    return 'changes.'.$changed[$key][1].'.value';
+                }
+            }
+
+            return 'changes.0.value';
+        };
+        $off = MedicationSettingsRegistry::FOLLOW_UP_OFF;
+        if (($value('realert_every') === $off) !== ($value('realert_max') === $off)) {
+            throw ValidationException::withMessages([
+                $field('realert_every', 'realert_max') => 'Re-alerting needs both how often and how many times — or switch it off.',
+            ]);
+        }
+        if ($value('escalate_after') !== $off && (json_decode($value('escalate_to'), true) ?: []) === []) {
+            throw ValidationException::withMessages([
+                $field('escalate_to', 'escalate_after') => 'Choose who it escalates to.',
+            ]);
+        }
     }
 
     /**

@@ -12,6 +12,7 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -35,6 +36,10 @@ class MedicationsApiControllerIdempotencyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // A fixed NZ clock: the dose is due at "now", so the minute must not
+        // roll over mid-test (P01 recording guard).
+        Carbon::setTestNow(Carbon::parse('2026-07-01 10:15:20', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
 
         $this->seed(RbacSeeder::class);
         Cache::flush();
@@ -100,6 +105,8 @@ class MedicationsApiControllerIdempotencyTest extends TestCase
         $workerSlot = now(config('app.worker_timezone', 'Pacific/Auckland'))->startOfMinute();
         $this->slot = $workerSlot->copy()->utc();
 
+        // Entered the day before: nothing is owed before an order exists.
+        Carbon::setTestNow(Carbon::now()->subDay());
         $this->medication = ClientMedication::query()->create([
             'client_id' => $this->client->id,
             'name' => 'Metformin',
@@ -109,6 +116,14 @@ class MedicationsApiControllerIdempotencyTest extends TestCase
             'active' => true,
             'state' => 'active',
         ]);
+        Carbon::setTestNow(Carbon::now()->addDay());
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
     }
 
     public function test_duplicate_uuid_returns_cached_sync_payload(): void

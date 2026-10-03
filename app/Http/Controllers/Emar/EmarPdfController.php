@@ -9,6 +9,7 @@ use App\Models\ClientMedication;
 use App\Models\MedicationAllergy;
 use App\Models\MedicationRound;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\MedicationRecordAccess;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
@@ -18,6 +19,7 @@ class EmarPdfController extends Controller
 {
     public function __construct(
         private MedicationGovernanceScopeService $governanceScope,
+        private MedicationRecordAccess $recordAccess,
     ) {}
 
     /**
@@ -41,7 +43,9 @@ class EmarPdfController extends Controller
             $actor,
             requestedClientId: $clientId,
         );
-        $client = Client::query()->findOrFail($clientId);
+        // The report scope limits the house; the person rule follows (P02).
+        $client = Client::query()->find($clientId);
+        $this->recordAccess->assertReportable($actor, $client);
         $includeControlled = $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY);
 
         $scheduledMedications = ClientMedication::where('client_id', $client->id)
@@ -117,7 +121,9 @@ class EmarPdfController extends Controller
             requestedClientId: $clientId,
             controlled: true,
         );
-        $client = Client::query()->findOrFail($clientId);
+        // The report scope limits the house; the person rule follows (P02).
+        $client = Client::query()->find($clientId);
+        $this->recordAccess->assertReportable($actor, $client);
 
         $entries = $this->governanceScope->scopeCanonicalClientMedicationRows(
             ClientControlledDrugEntry::query()->where('client_id', $client->id),

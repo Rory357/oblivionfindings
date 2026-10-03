@@ -52,7 +52,11 @@ class MedicationAdministrationCorrectionController extends Controller
             $requesterId = $lockedCorrection->correction_requested_by
                 ?? $lockedCorrection->administered_by;
             if ((int) $requesterId === (int) $user->id) {
-                return back()->with('error', 'A correction must be approved by someone other than the person who raised it.');
+                // A validation error, not a flash: Inertia treats a flash
+                // redirect as success and the dialog would close (P02).
+                throw ValidationException::withMessages([
+                    'correction' => 'A correction must be approved by someone other than the person who raised it.',
+                ]);
             }
 
             $approvedAt = now();
@@ -158,7 +162,9 @@ class MedicationAdministrationCorrectionController extends Controller
                 $pendingSibling = $corrections
                     ->first(fn (ClientMedicationAdministration $candidate): bool => $candidate->correction_status === 'pending');
                 if ($pendingSibling !== null) {
-                    return back()->with('error', 'A correction for this administration is already awaiting approval.');
+                    throw ValidationException::withMessages([
+                        'correction' => 'A correction for this administration is already awaiting approval.',
+                    ]);
                 }
 
                 // Guardrail: allow quick edits within 30 minutes, otherwise require a correction reason.

@@ -964,6 +964,15 @@ class MedicationsApiController extends Controller
             'scan_match_source' => ['nullable', 'string', 'max:50'],
         ]);
 
+        // A scheduled order's dose is identified by its scheduled time: without
+        // it the record can't be matched to the dose (no duplicate check, no
+        // slot outcome), so say which field is missing instead of "not found".
+        if (! $medication->is_prn && blank($data['scheduled_for'] ?? null)) {
+            throw ValidationException::withMessages([
+                'scheduled_for' => 'Send the scheduled time of the dose you are recording (scheduled_for). Scheduled medicines are recorded against their dose.',
+            ]);
+        }
+
         $scheduledFor = filled($data['scheduled_for'] ?? null)
             ? $this->scheduleService->parseWorkerDateTime((string) $data['scheduled_for'])
             : null;

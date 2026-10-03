@@ -12,7 +12,7 @@ type Props = {
 export default function EmarPlaceholder({ feature }: Props) {
     return (
         <AppLayout>
-            <Head title={`eMAR — ${feature}`} />
+            <Head title={`Medication — ${feature}`} />
             <PageHero
                 variant="compact"
                 title={feature}
