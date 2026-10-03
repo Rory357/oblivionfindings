@@ -100,6 +100,7 @@ import {
     type OnCallData,
 } from './settings/_oncall';
 import { ReachDialogHost, type ReachGap } from './settings/_reach';
+import { ReviewCadenceSettings } from './settings/_reviews';
 import {
     MedicineRules,
     RuleDialogHost,
@@ -186,6 +187,7 @@ const SEC_ICON: Record<string, LucideIcon> = {
     overview: Activity,
     medicines: Pill,
     safety: Shield,
+    reviews: Repeat,
     controlled: LockKeyhole,
     photos: FileText,
     templates: Repeat,
@@ -205,6 +207,7 @@ const SEC_ICON: Record<string, LucideIcon> = {
 /** Tabs whose settings are saved through the save bar. */
 const SAVED_SECTIONS = [
     'safety',
+    'reviews',
     'timing',
     'competency',
     'exemptions',
@@ -314,7 +317,16 @@ export default function EmarSettings(props: Props) {
     const templatesOnly = !settingsAccess && props.templateAccess.read;
     const built: Built = useMemo(
         () => ({
-            rules: settingsAccess ? ['overview', 'medicines', 'safety', 'records', ...(props.controlledSettingsAccess.view ? ['controlled'] : [])] : [],
+            rules: settingsAccess
+                ? [
+                      'overview',
+                      'medicines',
+                      'safety',
+                      ...(s.groups.review_cadence ? ['reviews'] : []),
+                      'records',
+                      ...(props.controlledSettingsAccess.view ? ['controlled'] : []),
+                  ]
+                : [],
             // P11 F1: whoever manages a house's round templates reaches them
             // here, and nothing else they couldn't already reach.
             rounds: settingsAccess
@@ -341,7 +353,13 @@ export default function EmarSettings(props: Props) {
                 : [],
             history: settingsAccess ? ['decide', 'changes'] : [],
         }),
-        [settingsAccess, templatesOnly, witnessPin.can_reset, alertAccess.view],
+        [
+            settingsAccess,
+            templatesOnly,
+            witnessPin.can_reset,
+            alertAccess.view,
+            s.groups.review_cadence,
+        ],
     );
     const [route, setRoute] = useState(() =>
         parseHash(window.location.hash, built),
@@ -895,6 +913,15 @@ export default function EmarSettings(props: Props) {
                 houses={props.sites} houseIds={props.controlledSettingsAccess.manageable_site_ids} readOnlyAudit={readOnlyAudit} />
         ) : view === 'rules' && sec === 'records' ? (
             <RecordsReporting q={query} show={f.show} />
+        ) : view === 'rules' && sec === 'reviews' ? (
+            <ReviewCadenceSettings
+                q={query}
+                show={f.show}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+            />
         ) : view === 'rounds' && sec === 'overview' ? (
             <RoundsOverview q={query} templates={props.roundTemplates} />
         ) : view === 'rounds' && sec === 'templates' ? (

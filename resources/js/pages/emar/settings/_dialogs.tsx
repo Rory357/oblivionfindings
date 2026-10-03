@@ -89,6 +89,7 @@ const GROUP_ICON: Record<string, typeof Layers> = {
     alerts: Bell,
     alertExtra: Bell,
     ea: Shield,
+    review_cadence: Repeat,
 };
 
 /** Review → save (Fleet "Review … changes"), with failure and conflict states. */

@@ -25,7 +25,7 @@ final class MedicationReviewCadence
             definitions: [new MedicationSettingDefinition(
                 group: 'review_cadence', key: 'months', storageKey: self::STORAGE_KEY,
                 scope: MedicationSettingDefinition::SCOPE_ORGANISATION,
-                section: 'Medication reviews', label: 'Regular medication review interval',
+                section: 'reviews', label: 'Regular medication review interval',
                 options: [], default: (string) self::DEFAULT_MONTHS, range: [1, 12], unit: 'months',
                 numeric: ['direction' => MedicationSettingDefinition::HIGHER_IS_LOOSER, 'off' => null, 'off_is_loosest' => false],
             )],

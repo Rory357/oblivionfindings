@@ -13,6 +13,7 @@ export const SET_VIEWS: Record<
             ['overview', 'Overview'],
             ['medicines', 'Medicine rules'],
             ['safety', 'Safety checks'],
+            ['reviews', 'Medication reviews'],
             ['controlled', 'Controlled drugs'],
             ['photos', 'Medicine photos'],
             ['records', 'Records & reporting'],
