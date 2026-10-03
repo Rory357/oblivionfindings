@@ -1,15 +1,12 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FilePreviewDialog, type PreviewFile } from '@/components/files/file-preview-dialog';
-import { EntityContextMenu, type MenuItem } from '@/components/lists/entity-menu';
-import { EntityTable, type EntityTableColumn } from '@/components/lists/entity-table';
-import { ListCaption } from '@/components/lists/list-caption';
+import { type MenuItem } from '@/components/lists/entity-menu';
 import { PageHeader, PageHeaderFilterSelect, PageHeaderMeterBig, PageHeaderMeterBlock, PageHeaderMeterCaption, PageHeaderRail, PageHeaderSearch, PageHeaderStatusChip } from '@/components/page/page-header';
 import { SettingsModal } from '@/components/settings/settings-modal';
 import { SettingsNotice } from '@/components/settings/settings-notice';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
-import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { SkeletonTable } from '@/components/ui/skeleton-table';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { ReviewCard, ReviewRow, WizardShell } from '@/components/wizard/shell';
@@ -17,11 +14,12 @@ import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTime } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
 import { ArrowLeftRight, Camera, ClipboardCheck, Eye, Package, Pill, ShieldCheck, Truck } from 'lucide-react';
-import { useEffect, useState, type MouseEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { CountReview, CountWizard, MovementDialog, NewSupplyOrder, SupplyOrderDialog } from './_dialogs';
 import { ReceiveWizard } from './_receive';
 import { PackPhotoDialog } from './_photo';
 import { useStockCommand } from './_requests';
+import { TableList } from './_table-list';
 import type { Capabilities, ItemDetail, Movement, Pager, StockCount, StockItem, SupplyOrder } from './_types';
 
 const states: Record<string, { label: string; variant: StatusVariant }> = {
@@ -46,20 +44,6 @@ type Props = {
     can: Capabilities; lots_enabled: boolean; focused_count?: StockCount | null;
 };
 type Modal = { kind: 'item'; id: number; action?: 'receive' | 'count' | 'order' | 'move' | 'going_out' | 'coming_back'; order?: SupplyOrder } | { kind: 'order'; order: SupplyOrder } | { kind: 'count'; record: StockCount } | null;
-
-function TableList<T extends { id: number }>({ title, pager, name, subline, columns, actions, open }: {
-    title: string; pager: Pager<T>; name: (row: T) => string; subline: (row: T) => string;
-    columns: EntityTableColumn<T>[]; actions: (row: T) => MenuItem[]; open: (row: T) => void;
-}) {
-    const [context, setContext] = useState<{ x: number; y: number; row: T } | null>(null);
-    const showMenu = (event: MouseEvent, row: T) => { event.preventDefault(); setContext({ x: event.clientX, y: event.clientY, row }); };
-    return <div className="grid gap-5">
-        <ListCaption title={title} caption={`${pager.data.length} of ${pager.total} shown`} />
-        {pager.data.length ? <EntityTable rows={pager.data} rowKey={(row) => row.id} identity={(row) => ({ name: name(row), subline: subline(row), icon: Package })} columns={columns} actionsFor={actions} onOpen={open} onRowContextMenu={showMenu} rowHeight="content" minWidth={860} /> : <EmptyState icon={Package} title="Nothing to show" description="No visible records match this view. Change the filters or open another stock view." />}
-        <LaravelPagination links={pager.links} lastPage={pager.last_page} />
-        {context && <EntityContextMenu x={context.x} y={context.y} title={name(context.row)} icon={Package} items={actions(context.row)} onClose={() => setContext(null)} />}
-    </div>;
-}
 
 export default function StockHub({ items, orders, counts, movements, sites, pharmacies = [], filters, metrics, can, lots_enabled, focused_count = null }: Props) {
     const [search, setSearch] = useState(filters.search);
@@ -96,7 +80,7 @@ export default function StockHub({ items, orders, counts, movements, sites, phar
     return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Medication', href: '/emar' }, { title: 'Stock & controlled drugs', href: '/emar/stock/packs' }]}>
         <Head title="Stock & controlled drugs" />
         <div className="grid gap-5">
-            <PageHeader title="Stock & controlled drugs" icon={Package} titleChip={<PageHeaderStatusChip variant="neutral">Supply and pack records</PageHeaderStatusChip>} subline="Person-owned medicines, deliveries and counts"
+            <PageHeader frontline title="Stock & controlled drugs" icon={Package} titleChip={<PageHeaderStatusChip variant="neutral">Supply and pack records</PageHeaderStatusChip>} subline="Person-owned medicines, deliveries and counts"
                 actions={<PageHeaderSearch value={search} onChange={setSearch} placeholder="Search medicines or batches" onKeyDown={(event) => event.key === 'Enter' && visit({})} />}
                 meters={<>
                     <PageHeaderMeterBlock label="Tracked" onClick={() => visit({ view: 'stock', show: 'all' })}><PageHeaderMeterBig>{metrics.tracked}</PageHeaderMeterBig><PageHeaderMeterCaption>Stock records</PageHeaderMeterCaption></PageHeaderMeterBlock>
