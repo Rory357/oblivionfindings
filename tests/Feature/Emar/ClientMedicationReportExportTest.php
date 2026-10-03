@@ -92,6 +92,39 @@ class ClientMedicationReportExportTest extends TestCase
             ->assertHeader('content-type', 'application/pdf');
     }
 
+    public function test_the_mar_chart_reads_a_reoffered_dose_as_its_latest_record_and_keeps_the_refusal(): void
+    {
+        $order = $this->order('Metformin', prn: false);
+        $due = Carbon::parse('2026-06-15 07:00', 'Pacific/Auckland')->utc();
+        $refused = ClientMedicationAdministration::query()->create([
+            'client_id' => $this->aroha->id, 'client_medication_id' => $order->id,
+            'administered_by' => $this->reader->id, 'scheduled_for' => $due,
+            'administered_at' => $due, 'status' => 'refused',
+        ]);
+        $given = ClientMedicationAdministration::query()->create([
+            'client_id' => $this->aroha->id, 'client_medication_id' => $order->id,
+            'administered_by' => $this->reader->id, 'scheduled_for' => $due,
+            'administered_at' => $due->copy()->addMinutes(25), 'status' => 'given',
+        ]);
+        $given->forceFill(['reoffer_of_id' => $refused->id])->save();
+
+        $this->actingAs($this->reader); // the chart names who generated it
+        $html = view('pdf.mar-chart', [
+            'client' => $this->aroha,
+            'scheduledMedications' => ClientMedication::query()->whereKey($order->id)
+                ->with(['administrations' => fn ($query) => $query->effectiveClinicalEvidence()])
+                ->get(),
+            'prnMedications' => collect(),
+            'allergies' => collect(),
+            'dates' => ['2026-06-15'],
+            'dateFrom' => '2026-06-15',
+            'dateTo' => '2026-06-15',
+        ])->render();
+
+        // The slot reads Given; the refusal stays, greyed, as history.
+        $this->assertStringContainsString('<span class="status-given">G</span><span style="color: #999;">(R)</span>', $html);
+    }
+
     /** @param  array<string, string>  $query */
     private function csv(array $query): string
     {

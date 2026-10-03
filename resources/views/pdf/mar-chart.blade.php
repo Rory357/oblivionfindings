@@ -78,8 +78,12 @@
                             return $a->scheduled_for && $a->scheduled_for->copy()->timezone(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString() === $date;
                         });
                     @endphp
-                    @foreach($admins as $admin)
-                        <span class="status-{{ $admin->status }}">{{ strtoupper(substr($admin->status, 0, 1)) }}</span>
+                    {{-- One dose time can hold more than one record (a refusal, then a
+                         re-offer given): the slot reads as its latest record; the
+                         earlier ones stay, greyed, as history. --}}
+                    @foreach($admins->groupBy(fn ($a) => $a->getRawOriginal('scheduled_for'))->sortKeys() as $slotRecords)
+                        @php $slotRecords = $slotRecords->sortBy('id')->values(); $latest = $slotRecords->last(); @endphp
+                        <span class="status-{{ $latest->status }}">{{ strtoupper(substr($latest->status, 0, 1)) }}</span>@foreach($slotRecords->slice(0, -1) as $earlier)<span style="color: #999;">({{ strtoupper(substr($earlier->status, 0, 1)) }})</span>@endforeach
                     @endforeach
                 </td>
                 @endforeach

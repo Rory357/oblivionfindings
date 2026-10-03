@@ -103,6 +103,27 @@ class ClientMedicationDayTest extends TestCase
         $this->assertSame('pending_check', $cells['Metformin 08:00']['status']);
     }
 
+    public function test_a_given_reoffer_after_a_refusal_reads_as_given(): void
+    {
+        // Since P01 C1 a re-offer is a second record in the same slot: the
+        // slot reads as the latest, never the first.
+        $order = $this->order('Metformin', ['08:00']);
+        $this->at('2026-06-15 00:00');
+        $this->artisan('emar:generate-dose-slots')->assertSuccessful();
+        $refused = $this->record($order, '2026-06-15 08:00', 'refused');
+        $given = $this->record($order, '2026-06-15 08:00', 'given');
+        $given->forceFill([
+            'reoffer_of_id' => $refused->id,
+            'administered_at' => Carbon::parse('2026-06-15 08:25', 'Pacific/Auckland')->utc(),
+        ])->save();
+
+        $this->at('2026-06-15 10:00');
+        $cell = $this->cells($this->day())['Metformin 08:00'];
+
+        $this->assertSame('given', $cell['status']);
+        $this->assertSame($given->id, $cell['recorded']['id']);
+    }
+
     public function test_controlled_medicines_are_left_out_and_counted_for_a_reader_without_access(): void
     {
         $this->order('Metformin', ['08:00']);
