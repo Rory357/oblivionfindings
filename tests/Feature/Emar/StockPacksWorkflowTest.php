@@ -442,7 +442,8 @@ class StockPacksWorkflowTest extends TestCase
             'request_uuid' => (string) Str::uuid(), 'order_id' => $order->id, 'next' => 'cancelled', 'reason' => 'Synthetic cancellation'])
             ->assertUnprocessable()->assertJsonValidationErrors('next');
         $this->postJson('/emar/stock/packs/commands', [...$this->receipt($med->id), 'pharmacy_order_id' => $order->id])
-            ->assertUnprocessable()->assertJsonValidationErrors('quantity');
+            ->assertUnprocessable()->assertJsonValidationErrors('delivery_outcome')
+            ->assertJsonPath('errors.delivery_outcome.0', 'This order is closed. Its record is read only.');
         $this->assertSame('10.00', $stock->fresh()->on_hand);
         $this->assertSame('delivered', $order->fresh()->status);
     }

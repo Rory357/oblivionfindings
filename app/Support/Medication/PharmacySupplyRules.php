@@ -17,6 +17,7 @@ final class PharmacySupplyRules
 
     public static function afterReceipt(string $status, int|float|string $ordered, int|float|string $alreadyReceived, int|float|string $arrived): array
     {
+        self::assertEditable($status);
         if (! in_array($status, ['dispensed', 'part_received'], true)) {
             throw new InvalidArgumentException('Record what the pharmacy dispensed before receiving this delivery.');
         }
@@ -49,4 +50,3 @@ final class PharmacySupplyRules
         }
     }
 }
-
