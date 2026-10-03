@@ -137,7 +137,7 @@ class StockPacksWorkflowTest extends TestCase
 
     public function test_receipt_on_last_printed_day_requires_short_expiry_reason_then_remains_usable(): void
     {
-        $clock = \Carbon\CarbonImmutable::parse('2026-10-31 09:00:00', 'Pacific/Auckland');
+        $clock = \Carbon\CarbonImmutable::parse('2026-10-31 09:00:00', 'Pacific/Auckland')->utc();
         \Carbon\Carbon::setTestNow($clock);
         \Carbon\CarbonImmutable::setTestNow($clock);
         try {
@@ -154,6 +154,17 @@ class StockPacksWorkflowTest extends TestCase
         } finally {
             \Carbon\Carbon::setTestNow(); \Carbon\CarbonImmutable::setTestNow();
         }
+    }
+
+    public function test_receipt_rejects_scalar_and_pack_quantities_together_without_writing(): void
+    {
+        extract($this->fixture());
+        $data = $this->delivery($med->id, ['2.00']);
+        $data['quantity'] = '3.00';
+        $this->actingAs($actor)->postJson('/emar/stock/packs/commands', $data)
+            ->assertUnprocessable()->assertJsonValidationErrors('quantity');
+        $this->assertSame('10.00', $stock->fresh()->on_hand);
+        $this->assertSame(0, MedicationStockMovement::where('kind', 'received')->count());
     }
 
     public function test_nested_pack_cannot_override_operation_identity_or_stock_unit(): void
@@ -193,11 +204,11 @@ class StockPacksWorkflowTest extends TestCase
             'action' => 'count', 'client_medication_id' => $med->id, 'request_uuid' => (string) Str::uuid(),
             'lines' => [['lot_id' => $lot->id, 'revision' => $lot->revision, 'quantity' => '9.00']], 'reason' => 'Synthetic discrepancy',
         ])->assertOk()->json('count_id');
-        $this->get('/emar/stock/packs?view=counts&count_id='.$countId, ['X-Inertia' => 'true'])->assertOk()
+        $this->get('/emar/stock/packs?view=counts&count_id='.$countId, $this->inertiaPartialHeaders('emar/stock/StockHub', 'focused_count,metrics,items'))->assertOk()
             ->assertJsonPath('props.focused_count.id', $countId)->assertJsonPath('props.focused_count.medication_id', $med->id);
         $other = $med->replicate()->forceFill(['name' => 'Synthetic different medicine']);
         $other->save();
-        $this->get('/emar/stock/packs?view=counts&count_id='.$countId.'&medication_id='.$other->id, ['X-Inertia' => 'true'])->assertNotFound();
+        $this->get('/emar/stock/packs?view=counts&count_id='.$countId.'&medication_id='.$other->id, $this->inertiaPartialHeaders('emar/stock/StockHub', 'focused_count,metrics,items'))->assertNotFound();
     }
 
     public function test_started_pack_stock_rejects_legacy_receipt_adjustment_and_profile_aliases_without_changes(): void
@@ -207,6 +218,7 @@ class StockPacksWorkflowTest extends TestCase
         $lot = MedicationStockLot::where('client_medication_stock_id', $stock->id)->sole();
         $this->actingAs($actor)->postJson('/emar/stock/receive', [
             'client_medication_id' => $med->id, 'quantity' => '2.00',
+            'scan_verified' => true, 'scan_code' => app(\App\Services\MedicationScanVerificationService::class)->internalCode($client, $med),
         ])->assertUnprocessable()->assertJsonValidationErrors('quantity')
             ->assertJsonPath('errors.stock_workflow_url.0', $stock->packWorkflowUrl());
         $this->postJson('/emar/stock/adjust', [
@@ -273,6 +285,7 @@ class StockPacksWorkflowTest extends TestCase
         config(['medications.stock_lots_enabled' => false]);
         $this->actingAs($actor)->postJson('/emar/stock/receive', [
             'client_medication_id' => $med->id, 'quantity' => '2.25', 'client_request_uuid' => (string) Str::uuid(),
+            'scan_verified' => true, 'scan_code' => app(\App\Services\MedicationScanVerificationService::class)->internalCode($client, $med),
         ])->assertOk();
         $this->assertSame('12.25', $stock->fresh()->on_hand);
         $this->assertNull($stock->fresh()->lots_started_at);
@@ -560,7 +573,7 @@ PHP;
 
     public function test_expiry_crossing_without_a_write_keeps_stock_row_meter_and_filter_consistent(): void
     {
-        $clock = \Carbon\CarbonImmutable::parse('2026-10-03 23:59:00', 'Pacific/Auckland');
+        $clock = \Carbon\CarbonImmutable::parse('2026-10-03 23:59:00', 'Pacific/Auckland')->utc();
         \Carbon\Carbon::setTestNow($clock);
         \Carbon\CarbonImmutable::setTestNow($clock);
         try {
@@ -578,7 +591,7 @@ PHP;
             $countedAt = $stock->last_counted_at;
 
             $this->actingAs($actor)->getJson('/emar/stock/packs/medicine/'.$med->id)->assertOk()->assertJsonPath('on_hand', 10);
-            $this->get('/emar/stock/packs', ['X-Inertia' => 'true'])->assertOk()->assertJsonPath('props.metrics.out', 0);
+            $this->get('/emar/stock/packs', $this->inertiaPartialHeaders('emar/stock/StockHub', 'focused_count,metrics,items'))->assertOk()->assertJsonPath('props.metrics.out', 0);
 
             $nextDay = $clock->addMinutes(2);
             \Carbon\Carbon::setTestNow($nextDay);
@@ -586,7 +599,7 @@ PHP;
             $this->getJson('/emar/stock/packs/medicine/'.$med->id)->assertOk()->assertJsonPath('on_hand', 0);
             $this->getJson('/emar/stock/packs/medicine/'.$controlled->id)->assertOk()->assertJsonPath('on_hand', 10);
             $this->getJson('/emar/stock/packs/medicine/'.$unknown->id)->assertOk()->assertJsonPath('on_hand', null);
-            $this->get('/emar/stock/packs?show=out', ['X-Inertia' => 'true'])->assertOk()
+            $this->get('/emar/stock/packs?show=out', $this->inertiaPartialHeaders('emar/stock/StockHub', 'focused_count,metrics,items'))->assertOk()
                 ->assertJsonPath('props.metrics.out', 1)->assertJsonPath('props.items.total', 1)
                 ->assertJsonPath('props.items.data.0.id', $med->id)->assertJsonPath('props.items.data.0.on_hand', 0);
             $this->assertSame('10.00', $stock->fresh()->on_hand);
