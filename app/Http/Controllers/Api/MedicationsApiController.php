@@ -92,7 +92,7 @@ class MedicationsApiController extends Controller
     private function reportSiteIds(User $user, ?int $requestedSiteId, ?int $requestedClientId): array
     {
         abort_unless(
-            $user->canDo('reports.viewAny') || $user->canDo('medications.reports.export'),
+            $user->canDo('medications.reports.view'),
             403,
         );
 
