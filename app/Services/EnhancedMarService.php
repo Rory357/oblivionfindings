@@ -27,6 +27,7 @@ use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationSecondPersonService;
 use App\Services\Medication\Recording\RecordingContract;
 use App\Services\Medication\Recording\RecordingContractEnforcer;
+use App\Services\Medication\Stock\MedicationStockService;
 use App\Services\Medication\WitnessPinService;
 use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
@@ -1350,6 +1351,30 @@ class EnhancedMarService
                     }
                 }
 
+                // Once pack tracking has started it remains authoritative,
+                // including when the rollout flag is subsequently disabled.
+                // Unstarted legacy stock is not migrated by a clinical dose.
+                $ordinaryStockQuantity = null;
+                if (! $medication->controlled_drug && ($data['status'] ?? null) === 'given') {
+                    $ordinaryStock = $medication->stock()->lockForUpdate()->first();
+                    if ($ordinaryStock?->lots_started_at !== null) {
+                        if (blank($ordinaryStock->unit)) {
+                            return ['success' => false, 'error_field' => 'quantity_administered',
+                                'error' => 'The stock unit is unknown. Ask the house lead to reconcile the stock before recording this dose.'];
+                        }
+                        $comparable = $this->recordingContract->stockQuantity($data, $medication, $ordinaryStock->unit);
+                        $ordinaryStockQuantity = $data['quantity_administered'] ?? $comparable;
+                        if ($ordinaryStockQuantity === null || ! MedicationStockQuantity::greaterThan($ordinaryStockQuantity, 0)) {
+                            return ['success' => false, 'error_field' => 'quantity_administered',
+                                'error' => 'Enter the quantity given from stock, in '.$ordinaryStock->unit.'. The dose and stock units cannot be converted here.'];
+                        }
+                        if ($comparable !== null && ! MedicationStockQuantity::equals($ordinaryStockQuantity, $comparable)) {
+                            return ['success' => false, 'error_field' => 'quantity_administered',
+                                'error' => 'Enter the stock quantity actually given for this dose. Record any damaged or wasted stock separately with the house lead.'];
+                        }
+                    }
+                }
+
                 // Create administration record
                 $admin = new ClientMedicationAdministration;
                 $admin->client_request_uuid = $clientRequestUuid;
@@ -1437,6 +1462,12 @@ class EnhancedMarService
                 }
 
                 $admin->save();
+
+                if ($ordinaryStockQuantity !== null) {
+                    $admin->setRelation('medication', $medication);
+                    app(MedicationStockService::class)
+                        ->ordinaryDose($admin, $lockedActor, $ordinaryStockQuantity);
+                }
 
                 $secondPersonNomination = null;
                 if ($forgottenPin) {

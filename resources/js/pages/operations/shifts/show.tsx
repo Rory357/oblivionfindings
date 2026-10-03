@@ -2706,6 +2706,7 @@ export default function ShiftShow({
                             {can.view_medication ? (
                                 <ShiftMedicationCard
                                     clientId={shift.client.id}
+                                    clientName={`${shift.client.first_name} ${shift.client.last_name}`}
                                     shiftId={shift.id}
                                     shiftStatus={shift.status}
                                     canRecord={can.record_medication}

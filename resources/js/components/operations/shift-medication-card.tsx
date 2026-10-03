@@ -73,6 +73,7 @@ type MedicationSummary = {
 
 type Props = {
     clientId: number;
+    clientName?: string;
     shiftId: number;
     shiftStatus: string;
     canRecord: boolean;
@@ -90,6 +91,7 @@ function sentenceCase(value: string) {
 
 export default function ShiftMedicationCard({
     clientId,
+    clientName,
     shiftId,
     shiftStatus,
     canRecord,
@@ -411,6 +413,7 @@ export default function ShiftMedicationCard({
                                   kind: 'prn',
                                   orderId: activeRow.medication.id,
                                   label: {
+                                      person: clientName ?? 'This person',
                                       medicine: activeRow.medication.name,
                                   },
                               }
@@ -419,6 +422,7 @@ export default function ShiftMedicationCard({
                                   orderId: activeRow.medication.id,
                                   scheduledFor: activeRow.scheduled_for!,
                                   label: {
+                                      person: clientName ?? 'This person',
                                       medicine: activeRow.medication.name,
                                   },
                               }

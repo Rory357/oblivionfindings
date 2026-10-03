@@ -768,17 +768,20 @@ final class DoseRecordingRequirements
             // NF-18: for a controlled medicine, whether the stock taken can be
             // worked out from the order (its amount is in the stock's unit);
             // otherwise the dialog asks for it.
-            'stock' => $order->controlled_drug ? $this->stockFacts($order) : null,
+            'stock' => $order->controlled_drug || $order->stock()->whereNotNull('lots_started_at')->exists()
+                ? $this->stockFacts($order) : null,
         ];
     }
 
-    /** @return array{unit: ?string, from_order: bool} */
+    /** @return array{unit: ?string, from_order: bool, tracked: bool} */
     private function stockFacts(ClientMedication $order): array
     {
-        $unit = $order->stock()->value('unit');
+        $stock = $order->stock()->first();
+        $unit = $stock?->unit;
 
         return [
             'unit' => $unit,
+            'tracked' => $stock?->lots_started_at !== null,
             'from_order' => $this->contract->stockQuantity(
                 ['status' => 'given', 'amount_mode' => RecordingContract::AMOUNT_AS_ORDERED],
                 $order,
@@ -921,6 +924,9 @@ final class DoseRecordingRequirements
         }
         if ($req['order']['awaiting_check']) {
             $out[] = 'order_check';
+        }
+        if (($req['order']['stock']['tracked'] ?? false) && ! ($req['order']['stock']['from_order'] ?? false)) {
+            $out[] = 'stock_quantity';
         }
 
         return array_values(array_unique($out));

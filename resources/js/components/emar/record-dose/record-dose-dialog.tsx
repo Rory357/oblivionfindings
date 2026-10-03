@@ -605,11 +605,14 @@ function RecordDoseForm({
 
     /* ── controlled stock (NF-18, P0-2) ── */
     const controlledGiven = givenLike && req.order.controlled;
+    const trackedOrdinaryGiven =
+        givenLike && !req.order.controlled && req.order.stock?.tracked === true;
+    const stockGiven = controlledGiven || trackedOrdinaryGiven;
     const fromOrder = req.order.stock?.from_order ?? false;
     // Less or more is always counted out of the stock; as ordered only when
     // the order's amount isn't in the stock's unit.
     const needsStockQuantity =
-        controlledGiven && (!fromOrder || f.amount.mode !== 'asOrdered');
+        stockGiven && (!fromOrder || f.amount.mode !== 'asOrdered');
     const givenInStock = fromOrder
         ? f.amount.mode === 'asOrdered'
             ? req.order.dose_amount
@@ -733,8 +736,9 @@ function RecordDoseForm({
                     e.pin = 'Enter their 6-digit PIN.';
             }
             if (needsStockQuantity && !(Number(f.stockQuantity) > 0))
-                e.stockQuantity =
-                    'Enter how many were taken from the controlled-drug stock.';
+                e.stockQuantity = controlledGiven
+                    ? 'Enter how many were taken from the controlled-drug stock.'
+                    : 'Enter how many were given from stock, in its own unit.';
             else if (
                 needsStockQuantity &&
                 givenInStock != null &&
@@ -742,6 +746,14 @@ function RecordDoseForm({
             )
                 e.stockQuantity =
                     'More was given than was taken from the stock. Enter how many were taken from the controlled-drug stock.';
+            if (
+                trackedOrdinaryGiven &&
+                needsStockQuantity &&
+                givenInStock != null &&
+                Number(f.stockQuantity) !== givenInStock
+            )
+                e.stockQuantity =
+                    'Enter the stock quantity actually given. Record any damaged or wasted stock separately with the house lead.';
             if (
                 controlledGiven &&
                 !/^\d+(\.\d{1,2})?$/.test(f.cdBalance.trim())
@@ -1008,6 +1020,8 @@ function RecordDoseForm({
     }
 
     const OUTCOME_FIELDS: Record<string, string> = {
+        scan_code: 'scan',
+        scan_verified: 'scan',
         witnessed_by: 'second',
         witness_credential: 'pin',
         late_reason: 'lateReason',
@@ -1068,7 +1082,7 @@ function RecordDoseForm({
         if (Object.keys(fieldErrors).length) {
             setPhase('edit');
             setErrors(fieldErrors);
-            setF((x) => ({ ...x, step: 1 }));
+            setF((x) => ({ ...x, step: fieldErrors.scan ? 0 : 1 }));
             focusFirst(fieldErrors);
             return;
         }
@@ -1618,7 +1632,7 @@ function RecordDoseForm({
                             secondKind === 'amount' ? secondPerson : null
                         }
                     />
-                    {controlledGiven ? (
+                    {stockGiven ? (
                         <section
                             role="group"
                             aria-labelledby="rd-cd-l"
@@ -1632,19 +1646,25 @@ function RecordDoseForm({
                                     className="size-4"
                                     aria-hidden="true"
                                 />{' '}
-                                Controlled-drug stock
+                                {controlledGiven
+                                    ? 'Controlled-drug stock'
+                                    : 'Medicine stock'}
                             </p>
                             <div className="grid gap-3 sm:grid-cols-2">
                                 {needsStockQuantity ? (
                                     <Field
                                         id="stockQuantity"
-                                        label="Taken from the stock for this dose"
+                                        label={
+                                            controlledGiven
+                                                ? 'Taken from the stock for this dose'
+                                                : 'Given from stock for this dose'
+                                        }
                                         required
                                         error={errors.stockQuantity}
                                         hint={
                                             stockUnit
                                                 ? `In the stock’s unit: ${stockUnit}.`
-                                                : 'In the stock’s own unit.'
+                                                : 'The stock unit is unknown. Ask the house lead to reconcile it before recording.'
                                         }
                                     >
                                         <Input
@@ -1670,7 +1690,9 @@ function RecordDoseForm({
                                 ) : (
                                     <div className="space-y-1.5 text-sm">
                                         <p className="font-medium">
-                                            Taken from the stock for this dose
+                                            {controlledGiven
+                                                ? 'Taken from the stock for this dose'
+                                                : 'Given from stock for this dose'}
                                         </p>
                                         <p>
                                             {formatAmount(
@@ -1683,31 +1705,33 @@ function RecordDoseForm({
                                         </p>
                                     </div>
                                 )}
-                                <Field
-                                    id="cdBalance"
-                                    label="Balance left after this dose"
-                                    required
-                                    error={errors.cdBalance}
-                                    hint="Count what’s left in the stock. It’s checked against the register when you save."
-                                >
-                                    <Input
-                                        id="rd-cdBalance"
-                                        inputMode="decimal"
-                                        autoComplete="off"
-                                        className="max-w-xs"
-                                        value={f.cdBalance}
-                                        aria-invalid={!!errors.cdBalance}
-                                        onChange={(e) =>
-                                            set({
-                                                cdBalance:
-                                                    e.target.value.replace(
-                                                        /[^\d.]/g,
-                                                        '',
-                                                    ),
-                                            })
-                                        }
-                                    />
-                                </Field>
+                                {controlledGiven ? (
+                                    <Field
+                                        id="cdBalance"
+                                        label="Balance left after this dose"
+                                        required
+                                        error={errors.cdBalance}
+                                        hint="Count what’s left in the stock. It’s checked against the register when you save."
+                                    >
+                                        <Input
+                                            id="rd-cdBalance"
+                                            inputMode="decimal"
+                                            autoComplete="off"
+                                            className="max-w-xs"
+                                            value={f.cdBalance}
+                                            aria-invalid={!!errors.cdBalance}
+                                            onChange={(e) =>
+                                                set({
+                                                    cdBalance:
+                                                        e.target.value.replace(
+                                                            /[^\d.]/g,
+                                                            '',
+                                                        ),
+                                                })
+                                            }
+                                        />
+                                    </Field>
+                                ) : null}
                             </div>
                             {wasted > 0 ? (
                                 <Notice
@@ -1937,7 +1961,7 @@ function RecordDoseForm({
                         value={`A medication error (severity: ${f.amount.severity}) and one linked incident are created. Immediate action: ${f.amount.immediate}`}
                     />
                 ) : null}
-                {controlledGiven ? (
+                {stockGiven ? (
                     <ReviewRow
                         label="Taken from the stock"
                         value={formatAmount(takenFromStock, stockUnit)}

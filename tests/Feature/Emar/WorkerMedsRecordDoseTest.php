@@ -12,6 +12,9 @@ use App\Models\ClientMedicationStock;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoomAlert;
 use App\Models\MedicationCompetencyAssessment;
+use App\Models\MedicationEvent;
+use App\Models\MedicationStockLot;
+use App\Models\MedicationStockMovement;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
@@ -217,6 +220,106 @@ class WorkerMedsRecordDoseTest extends TestCase
         $this->assertDatabaseCount('client_medication_administrations', 0);
         $this->assertDatabaseCount('medication_followups', 0);
         $this->assertDatabaseCount('medication_events', 0);
+    }
+
+    public function test_started_ordinary_stock_allocates_fefo_once_even_with_the_rollout_flag_off(): void
+    {
+        config(['medications.stock_lots_enabled' => false]);
+        $medication = $this->scheduledMedication(['09:30'], ['dose_amount' => 1, 'dose_unit' => 'tablet']);
+        [$stock, $early, $later, $expired] = $this->trackedStock($medication);
+        $payload = ['client_medication_id' => $medication->id, 'scheduled_for' => now()->toIso8601String(),
+            'administered_at' => now()->toIso8601String(), 'status' => 'given', 'amount_mode' => 'as_ordered',
+            'client_request_uuid' => '48b2537a-d389-41c0-8f12-6763be829a33'];
+        $this->actingAs($this->worker)->postJson('/meds/today/record', $payload)->assertOk();
+        $this->postJson('/meds/today/record', $payload)->assertOk();
+
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+        $this->assertSame('0.00', $early->fresh()->quantity_remaining);
+        $this->assertSame('4.00', $later->fresh()->quantity_remaining);
+        $this->assertSame('20.00', $expired->fresh()->quantity_remaining);
+        $this->assertSame('4.00', $stock->fresh()->on_hand);
+        $this->assertSame(2, MedicationStockMovement::where('kind', 'given')->count());
+        $this->assertSame(1, MedicationEvent::where('kind', 'dose.recorded')->count());
+    }
+
+    public function test_tracked_ordinary_stock_requires_explicit_quantity_in_an_unmatched_stock_unit(): void
+    {
+        $medication = $this->scheduledMedication(['09:30'], ['dose_amount' => 500, 'dose_unit' => 'mg']);
+        [$stock] = $this->trackedStock($medication);
+        $payload = ['client_medication_id' => $medication->id, 'scheduled_for' => now()->toIso8601String(),
+            'administered_at' => now()->toIso8601String(), 'status' => 'given', 'amount_mode' => 'as_ordered'];
+        $this->actingAs($this->worker)->postJson('/meds/today/record', $payload)
+            ->assertUnprocessable()->assertJsonValidationErrors('quantity_administered');
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertSame('25.00', $stock->fresh()->on_hand);
+        $payload['quantity_administered'] = '0.333';
+        $this->postJson('/meds/today/record', $payload)->assertUnprocessable()->assertJsonValidationErrors('quantity_administered');
+        $payload['quantity_administered'] = '1.25';
+        $this->postJson('/meds/today/record', $payload)->assertOk();
+        $this->assertSame('3.75', $stock->fresh()->on_hand);
+    }
+
+    public function test_insufficient_usable_packs_roll_back_the_clinical_dose_and_audit(): void
+    {
+        $medication = $this->scheduledMedication(['09:30'], ['dose_amount' => 6, 'dose_unit' => 'tablet']);
+        [$stock, $early, $later, $expired] = $this->trackedStock($medication);
+        $this->actingAs($this->worker)->postJson('/meds/today/record', [
+            'client_medication_id' => $medication->id, 'scheduled_for' => now()->toIso8601String(),
+            'administered_at' => now()->toIso8601String(), 'status' => 'given', 'amount_mode' => 'as_ordered',
+        ])->assertUnprocessable()->assertJsonValidationErrors('quantity_administered');
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertDatabaseCount('medication_stock_movements', 0);
+        $this->assertDatabaseCount('medication_events', 0);
+        $this->assertSame('0.75', $early->fresh()->quantity_remaining);
+        $this->assertSame('4.25', $later->fresh()->quantity_remaining);
+        $this->assertSame('20.00', $expired->fresh()->quantity_remaining);
+        $this->assertSame('25.00', $stock->fresh()->on_hand);
+    }
+
+    public function test_a_final_audit_failure_rolls_back_all_ordinary_pack_allocations(): void
+    {
+        $medication = $this->scheduledMedication(['09:30'], ['dose_amount' => 1, 'dose_unit' => 'tablet']);
+        [$stock, $early, $later] = $this->trackedStock($medication);
+        $this->mock(MedicationEventRecorder::class)->shouldReceive('append')->once()->andThrow(new RuntimeException('Synthetic audit failure'));
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($this->worker)->postJson('/meds/today/record', [
+                'client_medication_id' => $medication->id, 'scheduled_for' => now()->toIso8601String(),
+                'administered_at' => now()->toIso8601String(), 'status' => 'given', 'amount_mode' => 'as_ordered',
+            ]);
+            $this->fail('The audit failure must propagate.');
+        } catch (RuntimeException $error) {
+            $this->assertSame('Synthetic audit failure', $error->getMessage());
+        }
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertDatabaseCount('medication_stock_movements', 0);
+        $this->assertSame('0.75', $early->fresh()->quantity_remaining);
+        $this->assertSame('4.25', $later->fresh()->quantity_remaining);
+        $this->assertSame('25.00', $stock->fresh()->on_hand);
+    }
+
+    public function test_refusing_an_ordinary_tracked_dose_does_not_allocate_stock(): void
+    {
+        $medication = $this->scheduledMedication(['09:30']);
+        [$stock] = $this->trackedStock($medication);
+        $this->actingAs($this->worker)->postJson('/meds/today/record', [
+            'client_medication_id' => $medication->id, 'scheduled_for' => now()->toIso8601String(),
+            'administered_at' => now()->toIso8601String(), 'status' => 'refused', 'reason' => 'Person declined.',
+        ])->assertOk();
+        $this->assertDatabaseCount('medication_stock_movements', 0);
+        $this->assertSame('25.00', $stock->fresh()->on_hand);
+    }
+
+    private function trackedStock(ClientMedication $medication): array
+    {
+        $stock = ClientMedicationStock::create(['client_medication_id' => $medication->id, 'unit' => 'tablets',
+            'on_hand' => '25.00', 'lots_started_at' => now()]);
+        $create = fn (string $quantity, string $expiry) => MedicationStockLot::create([
+            'client_medication_stock_id' => $stock->id, 'quantity_received' => $quantity, 'quantity_remaining' => $quantity,
+            'expiry_date' => $expiry, 'source' => 'pharmacy', 'received_at' => now(), 'received_by' => $this->worker->id,
+        ]);
+
+        return [$stock, $create('0.75', '2026-05-01'), $create('4.25', '2026-06-01'), $create('20.00', '2026-04-29')];
     }
 
     public function test_late_recording_outside_the_window_requires_a_reason(): void
