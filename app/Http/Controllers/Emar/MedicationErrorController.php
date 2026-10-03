@@ -174,9 +174,6 @@ class MedicationErrorController extends Controller
         if ($status) {
             $query->where('status', $status);
         }
-        if ($tab === 'actions') {
-            $query->whereHas('actions', fn ($q) => $q->whereNull('completed_at'));
-        }
         if ($tab === 'incidents') {
             $query->whereHas('incident', fn ($q) => $q->where('status', '!=', 'closed'));
         }
@@ -190,7 +187,7 @@ class MedicationErrorController extends Controller
         if (in_array($request->input('reach'), ['no', 'yes', 'unknown'], true)) {
             $query->where('reached_client', $request->input('reach'));
         }
-        $relations = ['client.site', 'medication', 'incident', 'reportedBy:id,name', 'reviewedBy:id,name', 'owner:id,name', 'entries.actor:id,name', 'actions.owner:id,name', 'attachments.uploadedBy:id,name'];
+        $relations = ['client.site', 'medication' => fn ($q) => $q->withTrashed(), 'incident', 'reportedBy:id,name', 'reviewedBy:id,name', 'owner:id,name', 'entries.actor:id,name', 'actions.owner:id,name', 'attachments.uploadedBy:id,name'];
         if ($tab === 'triage') {
             $query->orderBy('triage_due_at')->orderBy('reported_at')->orderBy('id');
         } elseif ($tab === 'investigating') {
@@ -224,7 +221,7 @@ class MedicationErrorController extends Controller
             'filters' => ['tab' => $tab, 'q' => $request->input('q', ''), 'reach' => $request->input('reach', 'all'), 'site_id' => $siteFilter],
             'stats' => [
                 'triage' => (clone $base)->where('status', 'reported')->count(), 'investigating' => (clone $base)->where('status', 'investigating')->count(),
-                'actions' => (clone $base)->where('status', '!=', 'closed')->whereHas('actions', fn ($q) => $q->whereNull('completed_at'))->count(), 'closed' => (clone $base)->where('status', 'closed')->count(),
+                'actions' => (clone $base)->where('status', 'resolved')->count(), 'closed' => (clone $base)->where('status', 'closed')->count(),
                 'total_open' => (clone $base)->where('status', '!=', 'closed')->count(), 'recent' => (clone $recent)->count(),
                 'reached' => (clone $recent)->where('reached_client', 'yes')->count(), 'near_miss' => (clone $recent)->where('reached_client', 'no')->count(),
                 'unknown_reach' => (clone $recent)->where(fn ($q) => $q->where('reached_client', 'unknown')->orWhereNull('reached_client'))->count(), 'trend' => $trend,

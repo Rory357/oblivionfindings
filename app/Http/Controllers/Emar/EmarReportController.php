@@ -19,6 +19,7 @@ use App\Services\GuidedRoundService;
 use App\Services\Medication\CompetencyPolicySettings;
 use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
+use App\Services\Medication\MedicationErrorSummary;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\MedicationReportingService;
 use App\Support\Medication\MedicationStockQuantity;
@@ -753,7 +754,7 @@ class EmarReportController extends Controller
 
     private function exportErrors($out, Carbon $dateFrom, Carbon $dateTo, ?int $clientId, ?string $careLevel, array $siteIds, bool $canViewControlled): void
     {
-        $this->putCsv($out, ['Date', 'Client', 'Care Level', 'Type', 'Severity', 'Status', 'Description']);
+        $this->putCsv($out, ['Date', 'Client', 'Care Level', 'Type', 'Severity', 'Status', 'Summary']);
 
         $query = $this->governanceScope->scopeCanonicalClientMedicationRows(
             MedicationError::query(),
@@ -780,7 +781,7 @@ class EmarReportController extends Controller
                         $e->error_type,
                         $e->severity,
                         $e->status,
-                        $e->description,
+                        MedicationErrorSummary::for($e),
                     ]);
                 }
             });

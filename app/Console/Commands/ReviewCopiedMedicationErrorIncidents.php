@@ -15,7 +15,7 @@ class ReviewCopiedMedicationErrorIncidents extends Command
     public function handle(): int
     {
         $rows = [];
-        MedicationError::query()->whereNotNull('client_incident_id')->with('incident')->chunkById(200, function ($errors) use (&$rows): void {
+        MedicationError::withTrashed()->whereNotNull('client_incident_id')->with('incident')->chunkById(200, function ($errors) use (&$rows): void {
             foreach ($errors as $error) {
                 $incident = $error->incident;
                 if (! $incident || (int) $incident->client_id !== (int) $error->client_id) {

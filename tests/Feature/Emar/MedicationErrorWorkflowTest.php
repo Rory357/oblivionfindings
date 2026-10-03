@@ -8,6 +8,7 @@ use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\ControlRoom\Signal;
+use App\Models\ControlRoomAlert;
 use App\Models\MedicationError;
 use App\Models\Permission;
 use App\Models\Role;
@@ -72,6 +73,7 @@ class MedicationErrorWorkflowTest extends TestCase
     protected function grantPermissions(User $user, array $keys): void
     {
         $user->permissionOverrides()->syncWithoutDetaching(Permission::query()->whereIn('key', $keys)->pluck('id')->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])->all());
+        $user->unsetRelation('permissionOverrides')->unsetRelation('roles');
     }
 
     private function payload(array $extra = []): array
@@ -95,14 +97,15 @@ class MedicationErrorWorkflowTest extends TestCase
         $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/review', [
             'owner_id' => $this->manager->id, 'investigation_due_at' => now('Pacific/Auckland')->addDay()->format('Y-m-d\TH:i'),
             'reached_client' => $error->reached_client, 'harm_level' => $error->harm_level, 'review_notes' => 'Synthetic triage.',
-        ])->assertSessionHasNoErrors();
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('investigating', $error->fresh()->stage());
     }
 
     public function test_report_has_account_nz_deadline_and_one_event_on_retry(): void
     {
         $payload = $this->payload();
-        $this->actingAs($this->reporter)->post('/emar/errors', $payload)->assertSessionHasNoErrors();
-        $this->actingAs($this->reporter)->post('/emar/errors', $payload)->assertSessionHasNoErrors();
+        $this->actingAs($this->reporter)->post('/emar/errors', $payload)->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs($this->reporter)->post('/emar/errors', $payload)->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseCount('medication_errors', 1);
         $this->assertDatabaseCount('medication_error_entries', 1);
         $this->assertDatabaseCount('medication_events', 1);
@@ -110,7 +113,7 @@ class MedicationErrorWorkflowTest extends TestCase
         $error = MedicationError::query()->first();
         $this->assertSame('triage', $error->stage());
         $this->assertSame(now('Pacific/Auckland')->addDay()->toDateString(), $error->triage_due_at->tz('Pacific/Auckland')->toDateString());
-        $this->assertSame('23:59', $error->triage_due_at->format('H:i'));
+        $this->assertSame('23:59', $error->triage_due_at->tz('Pacific/Auckland')->format('H:i'));
     }
 
     public function test_support_worker_cannot_manage_even_with_dose_correction_permission(): void
@@ -126,14 +129,15 @@ class MedicationErrorWorkflowTest extends TestCase
     {
         $error = $this->report(['reached_client' => 'yes', 'harm_level' => 'none']);
         $this->triage($error);
-        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/actions', ['owner_id' => $this->manager->id, 'due_at' => now('Pacific/Auckland')->addDay()->format('Y-m-d\TH:i'), 'description' => 'Synthetic action'])->assertSessionHasNoErrors();
+        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/actions', ['owner_id' => $this->manager->id, 'due_at' => now('Pacific/Auckland')->addDay()->format('Y-m-d\TH:i'), 'description' => 'Synthetic action'])->assertRedirect()->assertSessionHasNoErrors();
         $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/close', ['close_note' => 'Synthetic close'])->assertSessionHasErrors('status');
         $action = $error->actions()->first();
-        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/actions/'.$action->id.'/complete', ['completion_note' => 'Synthetic complete'])->assertSessionHasNoErrors();
-        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/disclosure', ['state' => 'told', 'who' => ['person'], 'by' => 'Synthetic manager', 'at' => now('Pacific/Auckland')->subMinute()->format('Y-m-d\TH:i'), 'how' => 'In person'])->assertSessionHasNoErrors();
-        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/close', ['close_note' => 'Synthetic close'])->assertSessionHasNoErrors();
+        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/actions/'.$action->id.'/complete', ['completion_note' => 'Synthetic complete'])->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs($this->manager)->get('/emar/errors?tab=actions')->assertInertia(fn (Assert $page) => $page->has('errors', 1)->where('stats.actions', 1));
+        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/disclosure', ['state' => 'told', 'who' => ['person'], 'by' => 'Synthetic manager', 'at' => now('Pacific/Auckland')->subMinute()->format('Y-m-d\TH:i'), 'how' => 'In person'])->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/close', ['close_note' => 'Synthetic close'])->assertRedirect()->assertSessionHasNoErrors();
         $closedEntry = $error->entries()->where('kind', 'closed')->firstOrFail();
-        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/reopen', ['reason' => 'New synthetic evidence'])->assertSessionHasNoErrors();
+        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/reopen', ['reason' => 'New synthetic evidence'])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame('investigating', $error->fresh()->stage());
         $this->assertSame('Synthetic close', $closedEntry->fresh()->text);
         $this->assertSame(1, $error->entries()->where('kind', 'reopened')->count());
@@ -145,17 +149,17 @@ class MedicationErrorWorkflowTest extends TestCase
         $this->triage($error);
         $this->grantPermissions($this->reporter, ['medications.errors.manage']);
         $this->actingAs($this->reporter)->post('/emar/errors/'.$error->id.'/close', ['close_note' => 'Own close'])->assertSessionHasErrors('status');
-        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/close', ['close_note' => 'Independent'])->assertSessionHasNoErrors();
+        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/close', ['close_note' => 'Independent'])->assertRedirect()->assertSessionHasNoErrors();
         $this->actingAs($this->reporter)->post('/emar/errors/'.$error->id.'/reopen', ['reason' => 'Own reopen'])->assertSessionHasErrors('status');
     }
 
     public function test_moderate_harm_creates_one_neutral_incident_and_no_private_signal_payload(): void
     {
         $payload = $this->payload(['reached_client' => 'yes', 'harm_level' => 'moderate', 'description' => 'PRIVATE synthetic medication narrative', 'immediate_action' => 'PRIVATE response']);
-        $this->actingAs($this->reporter)->post('/emar/errors', $payload)->assertSessionHasNoErrors();
+        $this->actingAs($this->reporter)->post('/emar/errors', $payload)->assertRedirect()->assertSessionHasNoErrors();
         $error = MedicationError::query()->firstOrFail();
-        $this->actingAs($this->reporter)->post('/emar/errors', $payload)->assertSessionHasNoErrors();
-        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/link-incident')->assertSessionHasNoErrors();
+        $this->actingAs($this->reporter)->post('/emar/errors', $payload)->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/link-incident')->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseCount('client_incidents', 1);
         $incident = ClientIncident::query()->first();
         $this->assertStringNotContainsString('PRIVATE', $incident->description.$incident->immediate_action_taken);
@@ -168,8 +172,8 @@ class MedicationErrorWorkflowTest extends TestCase
     {
         $error = $this->report(['reached_client' => 'yes', 'harm_level' => 'moderate']);
         $this->triage($error);
-        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/disclosure', ['state' => 'told', 'who' => ['person'], 'by' => 'Synthetic manager', 'at' => now('Pacific/Auckland')->subMinute()->format('Y-m-d\TH:i'), 'how' => 'In person'])->assertSessionHasNoErrors();
-        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/close', ['close_note' => 'PRIVATE close narrative'])->assertSessionHasNoErrors();
+        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/disclosure', ['state' => 'told', 'who' => ['person'], 'by' => 'Synthetic manager', 'at' => now('Pacific/Auckland')->subMinute()->format('Y-m-d\TH:i'), 'how' => 'In person'])->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/close', ['close_note' => 'PRIVATE close narrative'])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame('closed', $error->fresh()->status);
         $this->assertSame('submitted', $error->incident()->first()->status);
         $this->actingAs($this->manager)->get('/emar/errors?tab=closed&error='.$error->id)->assertInertia(fn (Assert $page) => $page->where('detail.incident.ready_to_close', true));
@@ -181,8 +185,8 @@ class MedicationErrorWorkflowTest extends TestCase
         $payload = $this->payload();
         $this->actingAs($this->reporter)->post('/emar/errors', $payload)->assertSessionHasErrors('duplicate');
         $payload['duplicate_id'] = $error->id;
-        $this->actingAs($this->reporter)->post('/emar/errors', $payload)->assertSessionHasNoErrors();
-        $this->actingAs($this->reporter)->post('/emar/errors', $payload)->assertSessionHasNoErrors();
+        $this->actingAs($this->reporter)->post('/emar/errors', $payload)->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs($this->reporter)->post('/emar/errors', $payload)->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseCount('medication_errors', 1);
         $this->assertSame(1, $error->entries()->where('kind', 'account')->count());
     }
@@ -213,7 +217,7 @@ class MedicationErrorWorkflowTest extends TestCase
     {
         $error = $this->report();
         $this->triage($error);
-        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/notes', ['text' => 'PRIVATE investigator note'])->assertSessionHasNoErrors();
+        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/notes', ['text' => 'PRIVATE investigator note'])->assertRedirect()->assertSessionHasNoErrors();
         $this->actingAs($this->reporter)->get('/emar/errors?error='.$error->id)->assertInertia(fn (Assert $page) => $page
             ->where('detail.entries.1.kind', 'triaged')->where('detail.entries.1.text', null)->where('detail.entries.1.data', [])
             ->has('detail.entries', 2)->where('detail.review_notes', null)->where('detail.close_blockers', []));
@@ -226,6 +230,30 @@ class MedicationErrorWorkflowTest extends TestCase
         $response = $this->actingAs($this->manager)->get('/emar/errors/export?purpose=Synthetic+safety+review')->assertOk();
         $this->assertStringNotContainsString('PRIVATE', $response->streamedContent());
         $this->assertStringContainsString('Details are held', $response->streamedContent());
+    }
+
+    public function test_manual_operational_alert_uses_neutral_summary_and_canonical_read_scope(): void
+    {
+        $error = $this->report(['description' => 'PRIVATE manual alert account']);
+        $this->grantPermissions($this->manager, ['controlRoom.alerts.create']);
+        $this->actingAs($this->manager)->post('/control-room/incidents/create-alert', [
+            'source_type' => 'medication_error', 'source_id' => $error->id, 'severity' => 'low',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $alert = ControlRoomAlert::query()->sole();
+        $this->assertStringNotContainsString('PRIVATE', json_encode($alert->context));
+        $this->assertStringContainsString('Details are held', $alert->context['description']);
+
+        $otherPerson = Client::factory()->create(['site_id' => $this->site->id, 'status' => 'active']);
+        $unreadable = MedicationError::query()->create([
+            'client_id' => $otherPerson->id, 'error_type' => 'other', 'severity' => 'minor',
+            'description' => 'PRIVATE unassigned source', 'reported_by' => $this->reporter->id,
+            'reported_at' => now(), 'status' => 'reported',
+        ]);
+        $this->grantPermissions($this->reporter, ['controlRoom.alerts.create']);
+        $this->actingAs($this->reporter)->post('/control-room/incidents/create-alert', [
+            'source_type' => 'medication_error', 'source_id' => $unreadable->id, 'severity' => 'low',
+        ])->assertNotFound();
+        $this->assertDatabaseCount('control_room_alerts', 1);
     }
 
     public function test_serious_incident_requires_recorded_actual_action_and_does_not_copy_it(): void
@@ -287,7 +315,7 @@ class MedicationErrorWorkflowTest extends TestCase
     {
         $error = MedicationError::query()->create(['client_id' => $this->client->id, 'error_type' => 'other', 'severity' => 'minor', 'description' => 'Synthetic other reporter', 'reported_by' => $this->manager->id, 'reported_at' => now(), 'status' => 'reported']);
         $this->actingAs($this->reporter)->get('/emar/errors?tab=mine')->assertInertia(fn (Assert $page) => $page->has('errors', 0));
-        $this->actingAs($this->reporter)->post('/emar/errors', $this->payload(['duplicate_id' => $error->id]))->assertSessionHasNoErrors();
+        $this->actingAs($this->reporter)->post('/emar/errors', $this->payload(['duplicate_id' => $error->id]))->assertRedirect()->assertSessionHasNoErrors();
         $this->actingAs($this->reporter)->get('/emar/errors?tab=mine')->assertInertia(fn (Assert $page) => $page->has('errors', 1)->where('errors.0.id', $error->id));
         $this->assertCount(1, app(MedicationErrorProvider::class)->authorizedTasks($this->reporter));
     }
@@ -297,11 +325,11 @@ class MedicationErrorWorkflowTest extends TestCase
         AppSetting::query()->updateOrCreate(['key' => RecordsReportingSettings::SAC], ['value' => 'on']);
         $error = $this->report(['reached_client' => 'yes', 'harm_level' => 'minor']);
         $this->triage($error);
-        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/disclosure', ['state' => 'told', 'who' => ['person'], 'by' => 'Synthetic manager', 'at' => now('Pacific/Auckland')->subMinute()->format('Y-m-d\TH:i'), 'how' => 'In person'])->assertSessionHasNoErrors();
+        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/disclosure', ['state' => 'told', 'who' => ['person'], 'by' => 'Synthetic manager', 'at' => now('Pacific/Auckland')->subMinute()->format('Y-m-d\TH:i'), 'how' => 'In person'])->assertRedirect()->assertSessionHasNoErrors();
         $this->actingAs($this->manager)->get('/emar/errors?error='.$error->id)->assertInertia(fn (Assert $page) => $page->where('detail.sac.proposed', 4)->where('detail.sac.confirmed', null));
         $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/close', ['close_note' => 'Synthetic close'])->assertSessionHasErrors('confirmed_sac');
         $this->assertNotSame('closed', $error->fresh()->status);
-        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/close', ['close_note' => 'Synthetic close', 'confirmed_sac' => '4'])->assertSessionHasNoErrors();
+        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/close', ['close_note' => 'Synthetic close', 'confirmed_sac' => '4'])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame(4, $error->fresh()->confirmed_sac);
         $this->assertSame($this->manager->id, (int) $error->fresh()->sac_confirmed_by);
         $this->assertNotNull($error->fresh()->sac_confirmed_at);
@@ -312,7 +340,7 @@ class MedicationErrorWorkflowTest extends TestCase
         AppSetting::query()->updateOrCreate(['key' => RecordsReportingSettings::SAC], ['value' => 'on']);
         $error = $this->report();
         $this->triage($error);
-        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/close', ['close_note' => 'Synthetic near miss close', 'confirmed_sac' => '1'])->assertSessionHasNoErrors();
+        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/close', ['close_note' => 'Synthetic near miss close', 'confirmed_sac' => '1'])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertNull($error->fresh()->confirmed_sac);
     }
 }

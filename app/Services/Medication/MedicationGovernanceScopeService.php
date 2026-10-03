@@ -71,6 +71,12 @@ final class MedicationGovernanceScopeService
         'clients.viewAny',
         'medications.reports.export',
         'reports.viewAny',
+        // Error commands also check report-only chart access and linked
+        // Incidents closure from this bounded, current permission snapshot.
+        'medications.reports.view',
+        'incidents.approve',
+        'incidents.manage',
+        'healthSafety.viewAllSites',
         'fleet.manage',
         'fleet.medication.manage',
         'clinical.accessAllSites',

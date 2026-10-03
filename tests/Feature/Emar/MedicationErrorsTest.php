@@ -264,6 +264,9 @@ class MedicationErrorsTest extends TestCase
             'uploaded_by' => $viewer->id,
         ]);
 
+        // Historical controlled classification still governs attachment props.
+        $controlledMedication->delete();
+
         $this->actingAs($viewer)
             ->get('/emar/errors?site_id='.$site->id)
             ->assertOk()
@@ -809,7 +812,7 @@ class MedicationErrorsTest extends TestCase
         $this->withoutExceptionHandling();
 
         try {
-            $this->actingAs($user)->post('/emar/errors', $this->majorOperationalPayload($client));
+            $this->createLegacyOperationalError($user, $client);
             $this->fail('A required event-backed medication alert must fail closed when its source is unavailable.');
         } catch (\RuntimeException $exception) {
             $this->assertSame(
@@ -839,7 +842,7 @@ class MedicationErrorsTest extends TestCase
         $this->withoutExceptionHandling();
 
         try {
-            $this->actingAs($user)->post('/emar/errors', $this->majorOperationalPayload($client));
+            $this->createLegacyOperationalError($user, $client);
             $this->fail('A required event-backed medication alert must roll back its error when processing fails.');
         } catch (\RuntimeException $exception) {
             $this->assertSame('Forced unlinked medication error processing failure', $exception->getMessage());
@@ -864,9 +867,10 @@ class MedicationErrorsTest extends TestCase
         $signal = Signal::query()->sole();
         $alert = ControlRoomAlert::query()->sole();
 
-        $this->assertNull($error->client_incident_id);
+        $this->assertSame(ClientIncident::query()->sole()->id, $error->client_incident_id);
         $this->assertSame($error->id, data_get($signal->normalized_data, 'medication_error_id'));
-        $this->assertSame($alert->id, $signal->alert_id);
+        $this->assertNull($signal->alert_id);
+        $this->assertSame($alert->id, $signal->correlated_alert_id);
         $this->assertSame('high', $alert->severity);
         $this->assertDatabaseCount('client_incidents', 1);
         $this->assertDatabaseCount('hs_events', 1);

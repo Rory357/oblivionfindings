@@ -96,7 +96,7 @@ type ErrorView = 'triage' | 'investigating' | 'actions' | 'closed' | 'incidents'
 const views: ReadonlyArray<readonly [ErrorView, string]> = [
     ['triage', 'To triage'],
     ['investigating', 'Investigating'],
-    ['actions', 'Open actions'],
+    ['actions', 'Actions & close'],
     ['closed', 'Closed'],
     ['incidents', 'Incidents'],
     ['trends', 'Trends'],
@@ -230,7 +230,7 @@ export default function MedicationErrors({
                                 [
                                     ['triage', 'To triage'],
                                     ['investigating', 'Investigating'],
-                                    ['actions', 'Open actions'],
+                                    ['actions', 'Actions & close'],
                                     ['closed', 'Closed'],
                                 ] as const
                             ).map(([key, label]) => (
@@ -249,7 +249,7 @@ export default function MedicationErrors({
                                     </PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
                                         {key === 'actions'
-                                            ? 'Errors with actions to finish'
+                                            ? 'Errors to finish or close'
                                             : 'In your permitted scope'}
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
@@ -388,17 +388,18 @@ export default function MedicationErrors({
                                                             variant={
                                                                 e.reached_client ===
                                                                 'no'
-                                                                    ? 'neutral'
+                                                                    ? 'info'
                                                                     : [
-                                                                            'moderate',
                                                                             'severe',
                                                                             'death',
                                                                         ].includes(
                                                                             e.harm_level ??
                                                                                 '',
                                                                         )
-                                                                      ? 'warning'
-                                                                      : 'info'
+                                                                      ? 'critical'
+                                                                      : ['minor', 'moderate'].includes(e.harm_level ?? '')
+                                                                        ? 'warning'
+                                                                        : 'neutral'
                                                             }
                                                         >
                                                             {labelFor(
