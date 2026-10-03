@@ -4988,21 +4988,27 @@ class EmarController extends Controller
         $actor = $request->user();
         abort_unless($actor, 403);
 
-        return $this->governanceScope->forClient($actor, (int) $client->id, 'medications.orders.manage', function (Client $lockedClient) use ($request) {
+        return $this->governanceScope->forClient($actor, (int) $client->id, 'medications.orders.manage', function (Client $lockedClient, User $lockedActor) use ($request) {
+            $this->recordAccess()->assertReadable($lockedActor, $lockedClient);
+            $reviewMessage = 'Use Medication reviews to change the interval, or book or move a review.';
             $validated = $request->validate([
-                'care_level' => ['nullable', 'string', 'max:60'],
-                'chart_review_interval_months' => ['nullable', 'integer', 'min:1', 'max:12'],
-                'next_chart_review_date' => ['nullable', 'date'],
+                'care_level' => ['sometimes', 'nullable', 'string', 'max:60'],
+                // Cadence decisions and booked dates belong to the Reviews workflow.
+                'chart_review_interval_months' => ['missing'],
+                'medication_review_interval_months' => ['missing'],
+                'next_chart_review_date' => ['missing'],
+            ], [
+                'chart_review_interval_months.missing' => $reviewMessage,
+                'medication_review_interval_months.missing' => $reviewMessage,
+                'next_chart_review_date.missing' => $reviewMessage,
             ]);
 
-            $lockedClient->forceFill([
-                'care_level' => $validated['care_level'] ?? null,
-                'chart_review_interval_months' => $validated['chart_review_interval_months'] ?? $lockedClient->chart_review_interval_months ?? 3,
-                'next_chart_review_date' => $validated['next_chart_review_date'] ?? null,
-            ])->save();
-            app(MedicationAlertService::class)->generateClientAlerts($lockedClient->fresh());
+            if (array_key_exists('care_level', $validated)) {
+                $lockedClient->forceFill(['care_level' => $validated['care_level']])->save();
+                app(MedicationAlertService::class)->generateClientAlerts($lockedClient->fresh());
+            }
 
-            return redirect()->back()->with('success', 'Medication chart settings updated.');
+            return redirect()->back()->with('success', 'Care level settings updated.');
         });
     }
 
