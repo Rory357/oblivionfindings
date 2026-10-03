@@ -57,7 +57,7 @@ export function AdministrationFollowupDialog({
                 <DialogHeader>
                     <DialogTitle>Medication effect check</DialogTitle>
                     <DialogDescription>
-                        Opening the canonical dose follow-up.
+                        Opening the dose follow-up.
                     </DialogDescription>
                 </DialogHeader>
                 {error ? (
