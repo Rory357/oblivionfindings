@@ -32,19 +32,24 @@ class MedicationAlertReachGaps
     /**
      * @param  list<array{id: int, name: string, role: string, houses: list<string>, site_ids: list<int>, all_houses: bool, controlled: bool}>  $people  People who can get alerts.
      * @param  list<array<string, mixed>>  $onCallHouses  The on-call contacts payload: each house's rule and roster.
+     * @param  array<int, User>  $loaded  Those people already loaded with roles, grants and HR profile.
      * @return list<array{id: int, name: string, role: string, houses: string, site_ids: list<int>, controlled: bool, groups: list<string>, work_email: bool, push: bool, phone: bool, leave: string|null, backup_for: list<string>, on_call: bool}>
      */
-    public function rows(array $people, array $onCallHouses, CarbonInterface $now): array
+    public function rows(array $people, array $onCallHouses, CarbonInterface $now, array $loaded = []): array
     {
         if ($people === []) {
             return [];
         }
         $ids = array_column($people, 'id');
-        $users = User::query()
-            ->whereIn('id', $ids)
-            ->with(['roles.permissions', 'permissionOverrides', 'hrEmployeeProfile'])
-            ->get()
-            ->keyBy('id');
+        $missing = array_values(array_diff($ids, array_keys($loaded)));
+        $users = collect($loaded)->only($ids);
+        if ($missing !== []) {
+            $users = $users->union(User::query()
+                ->whereIn('id', $missing)
+                ->with(['roles.permissions', 'permissionOverrides', 'hrEmployeeProfile'])
+                ->get()
+                ->keyBy('id'));
+        }
         $push = UserPushSubscription::query()
             ->whereIn('user_id', $ids)
             ->where('enabled', true)

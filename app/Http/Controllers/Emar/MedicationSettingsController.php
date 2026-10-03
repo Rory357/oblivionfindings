@@ -74,6 +74,9 @@ class MedicationSettingsController extends Controller
 
     private const WITNESS_PIN_STAFF_LIMIT = 500;
 
+    /** @var array<int, User> People alertPeople() loaded, with roles, grants and HR profile — reused, not reloaded. */
+    private array $alertUsers = [];
+
     /** Permissions that make someone a possible second person (witness, co-signer, read-back, waiver). */
     private const SECOND_PERSON_PERMISSIONS = [
         'medications.controlled.witness',
@@ -309,6 +312,7 @@ class MedicationSettingsController extends Controller
             ->get()
             ->filter(fn (User $user): bool => $user->canDo('medications.view'))
             ->map(function (User $user) use ($allSites, $siteIds): ?array {
+                $this->alertUsers[(int) $user->id] = $user;
                 $everywhere = $this->siteAccess->canBypass($user, MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS);
                 $sites = $everywhere
                     ? $allSites->keys()->map(fn (mixed $id): int => (int) $id)->all()
@@ -1204,10 +1208,13 @@ class MedicationSettingsController extends Controller
             // On-call contacts (B2 chunk 4): one per house this person sees.
             'onCall' => $onCall,
             // Quiet hours (B2 chunk 5): one row per house this person sees.
-            'alertHouses' => $this->siteChoices($alertHouseIds),
+            'alertHouses' => array_map(
+                fn (array $house): array => ['id' => (int) $house['site_id'], 'name' => (string) $house['name']],
+                $onCall['houses'],
+            ),
             // Who can't be reached (B2 chunk 5): people with a contact gap;
             // the page works out from its draft which gaps matter.
-            'alertReachGaps' => app(MedicationAlertReachGaps::class)->rows($visiblePeople, $onCall['houses'], now()),
+            'alertReachGaps' => app(MedicationAlertReachGaps::class)->rows($visiblePeople, $onCall['houses'], now(), $this->alertUsers),
             // Message preview (B2 chunk 2): synthetic samples through the real
             // notification, with the privacy switch on and off.
             'alertPreviews' => app(MedicationAlertPreviews::class)->all(),
