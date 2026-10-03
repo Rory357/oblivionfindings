@@ -82,7 +82,7 @@ class RoundsPagePayloadTest extends TestCase
         $this->assertSame('pending', $round->fresh()->status);
 
         $this->actingAs($user)
-            ->post(route('meds.round.start', $round))
+            ->post(route('meds.round.start', $round), ['return_to' => 'meds-today'])
             ->assertRedirect($target);
 
         $started = $round->fresh();
@@ -92,7 +92,7 @@ class RoundsPagePayloadTest extends TestCase
         $startedAt = $started->started_at->toIso8601String();
 
         $this->actingAs($user)
-            ->post(route('meds.round.start', $round))
+            ->post(route('meds.round.start', $round), ['return_to' => 'meds-today'])
             ->assertRedirect($target);
         $this->assertSame($startedAt, $round->fresh()->started_at?->toIso8601String());
 
