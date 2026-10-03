@@ -12,13 +12,15 @@ The candidate adds a uniquely named `p07ControlledWitness` helper. It retains th
 
 This is fixture repair based on current source and the supplied failures, not a new passing-test claim. PHP 8.4 syntax and scoped whitespace checks passed. Main owns the next runtime check; P07 ran no suite, build, install, browser or queue.
 
-## Earlier candidates still ready for separate review
+## Earlier candidate status
 
-- `bc03e0c35a2a7b076b036db1ba822f3703c198cb`: canonical governance/audit fixtures, four test files.
-- `9af304b972d5fb0ec939f7a491c7821ea2279af7`: witness/recovery/ownership fixtures plus one Fleet transit method, six test files.
-- `1033a1f0dd08d0e811160ff9331a57402fe91c95`: bounded controlled reader ownership, destruction snapshot/details, confirmed PIN audit method and second witness PIN flash exclusion; two controlled test files and the earlier handoff note. It is on preserved branch `codex/emar-p07-governance-repair-20261004`. Its only register service method changes are `destruction` snapshot fields and `write` audit metadata. Main can review/cherry-pick it independently of held P07 proposals.
+- `bc03e0c35a2a7b076b036db1ba822f3703c198cb`: canonical governance/audit fixtures, four test files; Main reports integrated.
+- `9af304b972d5fb0ec939f7a491c7821ea2279af7`: witness/recovery/ownership fixtures plus one Fleet transit method, six test files; Main reports integrated.
+- **Held, not applied by Main:** `1033a1f0dd08d0e811160ff9331a57402fe91c95`. Main's automatic approval review rejected the combined controlled/destruction test rewrite and production changes: substantial production changes, about 1,600 deleted test lines, potentially weakened or misleading coverage, retained unresolved assertions and insufficiently narrow review. Do not retry this commit or an equivalent change through another path. It is preserved only on `codex/emar-p07-governance-repair-20261004` for inspection.
 
-The full prior residual ledger is in `p07-bounded-governance-repairs.md` within `1033a1f0d`. This new branch does not reapply that source group or silently fold the queued groups into the follow-up.
+The prior residual ledger is in `p07-bounded-governance-repairs.md` within the held `1033a1f0d`; its former ready/cherry-pick status is superseded by this hold. This new branch contains only the narrow sixth-batch fixtures and does not reapply that source group or test rewrite.
+
+Main identified a concrete coverage gap: the proposed replacement for `ControlledDrugsTest::test_date_param_scopes_movements_window` creates one old row without testing the requested date filter. Keep the original test and flag the unresolved date-filter contract. Main may independently review a separate, smaller reader/privacy candidate with additive focused tests and no replacement of `ControlledDrugsTest` or `DestructionsTest`; P07 has not applied or prepared an equivalent retry here.
 
 ## Precise remaining source and hold boundaries
 
