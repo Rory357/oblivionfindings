@@ -79,7 +79,7 @@ export default function StockHub({ items, orders, counts, movements, sites, phar
     ];
     return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Medication', href: '/emar' }, { title: 'Stock & controlled drugs', href: '/emar/stock/packs' }]}>
         <Head title="Stock & controlled drugs" />
-        <div className="grid gap-5">
+        <div className="grid min-w-0 grid-cols-1 gap-5">
             <PageHeader frontline title="Stock & controlled drugs" icon={Package} titleChip={<PageHeaderStatusChip variant="neutral">Supply and pack records</PageHeaderStatusChip>} subline="Person-owned medicines, deliveries and counts"
                 actions={<PageHeaderSearch value={search} onChange={setSearch} placeholder="Search medicines or batches" onKeyDown={(event) => event.key === 'Enter' && visit({})} />}
                 meters={<>
