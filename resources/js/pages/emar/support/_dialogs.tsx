@@ -59,7 +59,7 @@ import {
     type SupportMode,
     type SupportPlan,
 } from './types';
-import { firstAssessmentError } from './validation';
+import { firstAgreementError, firstAssessmentError } from './validation';
 
 function Field({
     id,
@@ -962,6 +962,28 @@ export function AgreementDialog({
         [saved, setSaved] = useState(false),
         [discard, setDiscard] = useState(false),
         [confirm, setConfirm] = useState(false);
+    const [focusRequest, setFocusRequest] = useState<{
+        field: string;
+        attempt: number;
+    } | null>(null);
+    const revealErrors = (errors: Record<string, string>) => {
+        const target = firstAgreementError(errors);
+        setStep(target.step);
+        setFocusRequest((previous) => ({
+            field: target.field,
+            attempt: (previous?.attempt ?? 0) + 1,
+        }));
+    };
+    useEffect(() => {
+        if (!focusRequest) return;
+        const animation = requestAnimationFrame(() => {
+            const field =
+                document.getElementById(focusRequest.field) ??
+                document.getElementById('agreement-errors');
+            field?.focus();
+        });
+        return () => cancelAnimationFrame(animation);
+    }, [step, focusRequest]);
     const close = () => {
         if (form.processing) return;
         if (form.isDirty && !saved) setDiscard(true);
@@ -978,10 +1000,7 @@ export function AgreementDialog({
             forceFormData: true,
             preserveScroll: true,
             onSuccess: () => setSaved(true),
-            onError: (e) => {
-                setStep(0);
-                focusError(e);
-            },
+            onError: revealErrors,
         });
     };
     return (
@@ -1059,7 +1078,9 @@ export function AgreementDialog({
             >
                 <WizardStepPane>
                     <div className="space-y-5">
-                        <Errors errors={form.errors} />
+                        <div id="agreement-errors" tabIndex={-1}>
+                            <Errors errors={form.errors} />
+                        </div>
                         {step === 0 && (
                             <>
                                 <Choice
@@ -1245,7 +1266,11 @@ export function AgreementDialog({
                                         }
                                     />
                                 </Field>
-                                <Field id="agreement-storage" label="Storage">
+                                <Field
+                                    id="agreement-storage"
+                                    label="Storage"
+                                    error={form.errors.storage_notes}
+                                >
                                     <Textarea
                                         id="agreement-storage"
                                         value={form.data.storage_notes}

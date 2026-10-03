@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { supportTimeCandidates } from './time';
 import { allowedModes, assessmentCap } from './types';
-import { firstAssessmentError } from './validation';
+import { firstAgreementError, firstAssessmentError } from './validation';
 
 describe('approved medication support rules', () => {
     it('preserves the existing five-score boundaries and consent-first outcome', () => {
@@ -66,5 +66,25 @@ describe('assessment field routing', () => {
                 storage_location: 'Choose',
             }),
         ).toEqual({ step: 2, field: 'med_scope' });
+    });
+});
+
+describe('agreement field routing', () => {
+    it('reveals the terms step and maps its storage field before focusing', () => {
+        expect(
+            firstAgreementError({
+                confirm_loosening: 'Confirm',
+                storage_notes: 'Too long',
+            }),
+        ).toEqual({ step: 1, field: 'agreement-storage' });
+        expect(
+            firstAgreementError({
+                person_responsibilities: 'Required',
+                witness_id: 'Choose',
+            }),
+        ).toEqual({ step: 0, field: 'witness_id' });
+        expect(
+            firstAgreementError({ client_request_uuid: 'Retry conflict' }),
+        ).toEqual({ step: 2, field: 'client_request_uuid' });
     });
 });

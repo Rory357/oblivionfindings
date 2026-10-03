@@ -37,3 +37,32 @@ export function firstAssessmentError(errors: Record<string, string>): {
             : field.split('.')[0],
     };
 }
+
+export function agreementErrorStep(field: string): number {
+    const key = field.split('.')[0];
+    if (
+        [
+            'ordering_responsibility',
+            'person_responsibilities',
+            'staff_responsibilities',
+            'storage_notes',
+        ].includes(key)
+    )
+        return 1;
+    if (key === 'confirm_loosening' || key === 'client_request_uuid') return 2;
+    return 0;
+}
+export function firstAgreementError(errors: Record<string, string>): {
+    step: number;
+    field: string;
+} {
+    const field =
+        Object.keys(errors).sort(
+            (a, b) => agreementErrorStep(a) - agreementErrorStep(b),
+        )[0] ?? '';
+    const key = field.split('.')[0];
+    return {
+        step: agreementErrorStep(field),
+        field: key === 'storage_notes' ? 'agreement-storage' : key,
+    };
+}
