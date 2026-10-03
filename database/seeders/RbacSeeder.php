@@ -288,6 +288,7 @@ class RbacSeeder extends Seeder
 
             // Medications
             ['key' => 'medications.view', 'description' => 'View medications module', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.reviews.manage', 'description' => 'Book and record medication reviews', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.orders.manage', 'description' => 'Create/update medication orders', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.orders.verify', 'description' => 'Verify medication orders before administration', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.settings.manage', 'description' => 'Manage facility medication administration rules', 'group' => 'medications', 'module' => 'Clinical'],
@@ -665,7 +666,7 @@ class RbacSeeder extends Seeder
             'timesheets.viewAny', 'timesheets.create', 'timesheets.update', 'timesheets.approve', 'timesheets.manageAny',
             'clients.viewAny', 'clients.create', 'clients.update', 'clients.assignments.update', 'clients.onboarding.manage',
             'family_portal.viewAny', 'family_portal.manage',
-            'medications.view', 'medications.orders.manage', 'medications.orders.verify', 'medications.settings.manage', 'medications.followups.manage', 'medications.administer.record', 'medications.administer.override_safety', 'medications.competency.exempt',
+            'medications.view', 'medications.orders.manage', 'medications.orders.verify', 'medications.settings.manage', 'medications.reviews.manage', 'medications.followups.manage', 'medications.administer.record', 'medications.administer.override_safety', 'medications.competency.exempt',
             'medications.administer.correct', 'medications.stock.update', 'medications.controlled.view',
             'medications.controlled.record', 'medications.controlled.witness', 'medications.controlled.override',
             'medications.audit.view', 'medications.reports.export', 'medications.breakglass',
@@ -723,7 +724,7 @@ class RbacSeeder extends Seeder
             'staff.viewAny', 'staff.credentials.viewAny', 'staff.credentials.updateAny',
             'staff.availability.updateAny', 'clients.viewAny', 'clients.assignments.update',
             'clients.onboarding.manage', 'family_portal.viewAny', 'family_portal.manage',
-            'medications.view', 'medications.orders.manage', 'medications.orders.verify', 'medications.settings.manage',
+            'medications.view', 'medications.orders.manage', 'medications.orders.verify', 'medications.settings.manage', 'medications.reviews.manage',
             'medications.alerts.manage_house', 'medications.followups.manage',
             'medications.administer.record', 'medications.administer.correct', 'medications.stock.update',
             'medications.controlled.view', 'medications.controlled.record', 'medications.controlled.witness',
@@ -921,7 +922,7 @@ class RbacSeeder extends Seeder
             'clinical.assessments.viewAny', 'clinical.assessments.record',
             'clinical.protocols.viewAny',
             'clinical.dashboard',
-            'medications.view', 'medications.orders.verify', 'medications.witness_pin.reset',
+            'medications.view', 'medications.orders.verify', 'medications.reviews.manage', 'medications.witness_pin.reset',
             // P11 B2 Q3: their own houses' alert extras, quiet hours and on-call contact.
             'medications.alerts.manage_house', 'medications.followups.manage',
             // eMAR role baseline (1 Oct 2026): house leads give medicines, see
@@ -1009,7 +1010,7 @@ class RbacSeeder extends Seeder
             'clinical.mealRestrictions.author', 'clinical.mealRestrictions.approve',
             'clinical.protocols.viewAny', 'clinical.protocols.manage',
             'clinical.dashboard', 'clinical.accessAllSites',
-            'medications.view', 'medications.orders.manage', 'medications.orders.verify', 'medications.settings.manage',
+            'medications.view', 'medications.orders.manage', 'medications.orders.verify', 'medications.settings.manage', 'medications.reviews.manage',
             'medications.administer.record', 'medications.followups.manage', 'medications.administer.override_safety', 'medications.competency.exempt', 'medications.audit.view', 'medications.witness_pin.reset',
             'clients.viewAny',
         ]);

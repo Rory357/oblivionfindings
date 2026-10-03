@@ -2,9 +2,13 @@
 
 namespace App\Services\Sites\Calendar\Providers;
 
+use App\Models\Client;
 use App\Models\ClientMedicationStock;
 use App\Models\MedicationReview;
+use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Sites\Calendar\CalendarItem;
+use App\Support\WorkerClock;
 use Illuminate\Support\Carbon;
 
 /**
@@ -21,6 +25,12 @@ class MedicationObligationProvider extends ObligationProvider
 
     public function obligations(array $siteIds, Carbon $start, Carbon $end): array
     {
+        $actor = auth()->user();
+        if (! $actor || ! $actor->canDo('medications.view')) {
+            return [];
+        }
+        $approved = app(MedicationGovernanceScopeService::class)->readerSiteIds($actor, 'medications.view');
+        $siteIds = array_values(array_intersect($siteIds, $approved));
         if ($siteIds === []) {
             return [];
         }
@@ -36,7 +46,10 @@ class MedicationObligationProvider extends ObligationProvider
     {
         $items = [];
 
+        $readable = app(MedicationRecordAccess::class)->readableClientIds(auth()->user(),
+            Client::query()->whereIn('site_id', $siteIds)->pluck('id'));
         $reviews = MedicationReview::query()
+            ->whereIn('client_id', $readable)
             ->whereIn('status', ['scheduled', 'overdue'])
             ->whereBetween('scheduled_date', [$start->toDateString(), $end->toDateString()])
             ->whereHas('client', fn ($q) => $q->whereIn('site_id', $siteIds))
@@ -58,10 +71,10 @@ class MedicationObligationProvider extends ObligationProvider
                 title: ($clientName !== '' ? $clientName.' — ' : '').'Medication review due',
                 start: $this->isoDate($due),
                 allDay: true,
-                status: $this->dueStatus($due, false),
+                status: WorkerClock::daysUntil($due) < 0 ? 'overdue' : 'scheduled',
                 ref: strtoupper((string) $review->review_type),
                 site: $this->siteArray($review->client?->site),
-                link: '/emar/reviews',
+                link: '/emar/reviews?review='.$review->id,
             );
         }
 
@@ -73,7 +86,16 @@ class MedicationObligationProvider extends ObligationProvider
     {
         $items = [];
 
+        $actor = auth()->user();
+        $readable = app(MedicationRecordAccess::class)->readableClientIds($actor,
+            Client::query()->whereIn('site_id', $siteIds)->pluck('id'));
         $stocks = ClientMedicationStock::query()
+            ->whereHas('medication', function ($q) use ($actor, $readable): void {
+                $q->whereIn('client_id', $readable);
+                if (! $actor->canDo('medications.controlled.view')) {
+                    $q->where('controlled_drug', false);
+                }
+            })
             ->whereNotNull('expiry_date')
             ->whereBetween('expiry_date', [$start->toDateString(), $end->toDateString()])
             ->whereHas('medication', fn ($q) => $q->where('active', true)->where('state', 'active')

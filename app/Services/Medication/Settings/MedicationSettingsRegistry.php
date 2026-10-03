@@ -7,6 +7,7 @@ use App\Services\Medication\CompetencyPolicySettings;
 use App\Services\Medication\DoseTimingSettings;
 use App\Services\Medication\MedicationErrorWorkflow;
 use App\Services\Medication\MedicationSafetyPolicySettings;
+use App\Services\Medication\Reviews\MedicationReviewCadence;
 use App\Services\Medication\WitnessPinSettings;
 
 /**
@@ -137,6 +138,7 @@ class MedicationSettingsRegistry
             $this->alertDelivery(),
             $this->quietHouses(),
             $this->errorTriage(),
+            MedicationReviewCadence::settingsGroup(),
         ];
     }
 

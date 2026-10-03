@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Services\Medication\DoseSlots\DoseOmissions;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\Reviews\MedicationReviewReader;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -331,9 +332,9 @@ class AuditLogController extends Controller
         if (empty($eventTypes) || in_array('review_completed', $eventTypes)) {
             $reviewQuery = MedicationReview::query()
                 ->whereIn('client_id', $allowedClientIds)
-                ->with(['client:id,first_name,last_name', 'reviewer:id,name'])
+                ->with(['client:id,first_name,last_name', 'reviewer:id,name', 'completedBy:id,name'])
                 ->whereNotNull('completed_date')
-                ->select('id', 'client_id', 'review_type', 'completed_date', 'reviewer_name', 'reviewer_user_id', 'clinical_summary');
+                ->select('id', 'client_id', 'review_type', 'status', 'completed_date', 'happened_at', 'completed_by', 'reviewer_name', 'reviewer_user_id', 'clinical_summary');
 
             if ($clientId) {
                 $reviewQuery->where('client_id', $clientId);
@@ -347,19 +348,20 @@ class AuditLogController extends Controller
 
             foreach ($reviewQuery->get() as $review) {
                 $clientName = $review->client ? trim($review->client->first_name.' '.$review->client->last_name) : 'Unknown';
-                $reviewerName = $review->reviewer->name ?? $review->reviewer_name ?? null;
+                $reviewerName = $review->completedBy?->name ?? $review->reviewer?->name ?? $review->reviewer_name;
+                $mayReadSummary = app(MedicationReviewReader::class)->canReadSource($review, $user);
 
                 $events->push([
                     'id' => 'review_'.$review->id,
                     'event_type' => 'review_completed',
-                    'timestamp' => Carbon::parse($review->completed_date)->toIso8601String(),
+                    'timestamp' => $review->happened_at?->toIso8601String() ?? Carbon::parse($review->completed_date)->toIso8601String(),
                     'description' => "Medication review ({$review->review_type}) completed for {$clientName}",
                     'performed_by' => $reviewerName,
                     'client_id' => $review->client_id,
                     'client_name' => $clientName,
                     'details' => [
                         'review_type' => $review->review_type,
-                        'summary' => $review->clinical_summary,
+                        'summary' => $mayReadSummary ? $review->clinical_summary : null,
                     ],
                 ]);
             }

@@ -88,6 +88,8 @@ class TaskAggregator
             new Providers\MedicationErrorProvider,
             new Providers\MedicationFollowupProvider,
             new Providers\MedicationErrorActionProvider,
+            new Providers\MedicationReviewProvider,
+            new Providers\MedicationReviewChangeProvider,
             new Providers\CdLossReportProvider,
             new Providers\DataBreachProvider,
             new Providers\DataSubjectRequestProvider,

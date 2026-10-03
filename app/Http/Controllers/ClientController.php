@@ -1660,9 +1660,8 @@ class ClientController extends Controller
                 'last_administration' => $lastMedicationAdministration,
                 'pending_alerts_count' => $pendingMedicationAlertsCount,
                 'next_review_date' => MedicationReview::where('client_id', $client->id)
-                    ->where('status', '!=', 'completed')
+                    ->whereIn('status', ['scheduled', 'overdue', 'in_progress'])
                     ->whereNotNull('scheduled_date')
-                    ->where('scheduled_date', '>=', now((string) config('app.worker_timezone', 'Pacific/Auckland'))->toDateString())
                     ->orderBy('scheduled_date')
                     ->value('scheduled_date'),
             ] : null,

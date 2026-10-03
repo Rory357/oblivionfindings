@@ -13,6 +13,8 @@ use App\Http\Controllers\Emar\EmarReportController;
 use App\Http\Controllers\Emar\GuidedRoundController;
 use App\Http\Controllers\Emar\MedicationAuditEventController;
 use App\Http\Controllers\Emar\MedicationErrorController;
+use App\Http\Controllers\Emar\MedicationFollowupController;
+use App\Http\Controllers\Emar\MedicationReviewController;
 use App\Http\Controllers\Emar\MedicationSettingsController;
 use App\Http\Controllers\Emar\MedicationSupportController;
 use App\Http\Controllers\Emar\RefusalFollowUpController;
@@ -39,11 +41,11 @@ use Illuminate\Support\Facades\Route;
 // administer/update permissions so support workers can load it, with manager
 // permissions also allowed for oversight roles that want the operational view.
 Route::middleware(['auth'])->group(function () {
-    Route::get('/medication-followups', [\App\Http\Controllers\Emar\MedicationFollowupController::class, 'index'])
+    Route::get('/medication-followups', [MedicationFollowupController::class, 'index'])
         ->middleware('permission:medications.view')->name('medication_followups.index');
-    Route::get('/medication-followups/{followup}', [\App\Http\Controllers\Emar\MedicationFollowupController::class, 'show'])
+    Route::get('/medication-followups/{followup}', [MedicationFollowupController::class, 'show'])
         ->whereNumber('followup')->middleware('permission:medications.view')->name('medication_followups.show');
-    Route::post('/medication-followups/{followup}/transition', [\App\Http\Controllers\Emar\MedicationFollowupController::class, 'transition'])
+    Route::post('/medication-followups/{followup}/transition', [MedicationFollowupController::class, 'transition'])
         ->whereNumber('followup')->middleware('permission:medications.administer.record|medications.followups.manage')
         ->name('medication_followups.transition');
 
@@ -142,9 +144,27 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->name('emar.competency');
 
     // Medication Reviews
-    Route::get('/reviews', [EmarController::class, 'reviews'])
+    Route::get('/reviews', [MedicationReviewController::class, 'index'])
         ->middleware('permission:medications.view')
         ->name('emar.reviews');
+
+    Route::get('/reviews/pickers', [MedicationReviewController::class, 'pickers'])
+        ->middleware('permission:medications.reviews.manage')->name('emar.reviews.pickers');
+    Route::get('/reviews/{review}/source', [MedicationReviewController::class, 'source'])
+        ->middleware('permission:medications.view')->name('emar.reviews.source');
+    Route::get('/reviews/{review}/items/{item}/decision-source', [MedicationReviewController::class, 'source'])
+        ->whereNumber('item')->middleware('permission:medications.view')->name('emar.reviews.decision_source');
+    Route::middleware('permission:medications.reviews.manage')->group(function () {
+        Route::post('/reviews', [MedicationReviewController::class, 'store'])->name('emar.reviews.store');
+        Route::put('/reviews/{review}', [MedicationReviewController::class, 'update'])->name('emar.reviews.update');
+        Route::put('/reviews/{review}/appointment', [MedicationReviewController::class, 'appointment'])->name('emar.reviews.appointment');
+        Route::post('/reviews/{review}/complete', [MedicationReviewController::class, 'complete'])->name('emar.reviews.complete');
+        Route::post('/reviews/{review}/actions/advance', [MedicationReviewController::class, 'advance'])->name('emar.reviews.actions.advance');
+        Route::delete('/reviews/{review}', [MedicationReviewController::class, 'destroy'])->name('emar.reviews.destroy');
+        Route::post('/reviews/{review}/items/{item}/decision', [MedicationReviewController::class, 'decision'])->whereNumber('item')->name('emar.reviews.decision');
+        Route::post('/reviews/{review}/items/{item}/outcome', [MedicationReviewController::class, 'outcome'])->whereNumber('item')->name('emar.reviews.outcome');
+        Route::put('/clients/{client}/review-interval', [MedicationReviewController::class, 'interval'])->name('emar.clients.review_interval');
+    });
 
     Route::get('/clients/{client}/inr', [EmarController::class, 'inrHistory'])
         ->middleware('permission:medications.view')
@@ -238,13 +258,6 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         // Covert Authorisations
         Route::post('/prescriptions/covert', [EmarController::class, 'storeCovert'])->name('emar.covert.store');
         Route::post('/prescriptions/covert/{authorisation}/revoke', [EmarController::class, 'revokeCovert'])->name('emar.covert.revoke');
-
-        // Reviews
-        Route::post('/reviews', [EmarController::class, 'storeReview'])->name('emar.reviews.store');
-        Route::put('/reviews/{review}', [EmarController::class, 'updateReview'])->name('emar.reviews.update');
-        Route::post('/reviews/{review}/complete', [EmarController::class, 'completeReview'])->name('emar.reviews.complete');
-        Route::post('/reviews/{review}/actions/advance', [EmarController::class, 'advanceReviewAction'])->name('emar.reviews.actions.advance');
-        Route::delete('/reviews/{review}', [EmarController::class, 'destroyReview'])->name('emar.reviews.destroy');
 
         // 1CHART attention, INR, and syringe-driver workflows
         Route::post('/clients/{client}/attention-alerts', [EmarController::class, 'storeAttentionAlert'])->name('emar.clients.attention_alerts.store');
