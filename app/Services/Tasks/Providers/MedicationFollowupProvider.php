@@ -36,7 +36,7 @@ final class MedicationFollowupProvider implements HasModelClass, SiteScopedTaskP
     public function authorizedTasks(User $user, array $filters = []): array
     {
         $work = app(MedicationFollowupService::class);
-        $query = MedicationFollowup::query()->with(['client.site', 'medication', 'owner', 'originalOwner'])
+        $query = MedicationFollowup::query()->with(['client.site', 'medication', 'administration', 'owner', 'originalOwner'])
             ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->when(empty($filters['include_done']), fn ($q) => $q->whereNull('completed_at'))
             ->orderBy('due_at')->orderBy('id');
