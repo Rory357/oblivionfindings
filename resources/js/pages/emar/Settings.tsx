@@ -95,8 +95,8 @@ import {
     MedicineRules,
     RuleDialogHost,
     RulesOverview,
+    settingsRuleData,
     type MedicineRule,
-    type RuleData,
     type RuleOptions,
 } from './settings/_rules';
 import {
@@ -476,13 +476,7 @@ export default function EmarSettings(props: Props) {
         staff: props.templateStaff,
         readOnlyAudit,
     };
-    const ruleData: RuleData = {
-        rules: props.rules,
-        options: props.ruleOptions,
-        sites: props.sites,
-        can: props.settingsCan,
-        readOnlyAudit,
-    };
+    const ruleData = settingsRuleData({ ...props, readOnlyAudit });
     const onCallData: OnCallData = props.onCall ?? { houses: [], staff: {} };
     const alertData: AlertData = {
         access: alertAccess,

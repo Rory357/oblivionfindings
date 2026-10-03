@@ -1,7 +1,9 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AppSetting;
 use App\Models\Client;
+use App\Models\ClientBreakGlassAccess;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
@@ -10,10 +12,10 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
-use App\Models\UserNotificationPreference;
 use App\Models\MedicationAlert;
-use App\Notifications\AppEventNotification;
 use App\Notifications\MedicationAlertNotification;
+use App\Services\Medication\Alerts\MedicationAlertCatalogue;
+use App\Services\Medication\Settings\MedicationSettingsRegistry;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -229,37 +231,78 @@ it('does not send a renewal reminder for an assessment that has already been ren
     medicationAlertTo($notRenewed, 'renewals');
 });
 
-it('sends the break-glass daily report under its catalogued key so notification settings apply', function () {
-    Notification::fake();
-    $site = Site::factory()->create();
-    $optedOutAdmin = medicationAlertStaff($site, 'admin');
-    UserNotificationPreference::query()->create([
-        'user_id' => $optedOutAdmin->id,
-        'key' => 'breakglass.daily_report',
-        'enabled' => false,
+function medicationEmergencyReportGrant(Site $site, User $owner): ClientBreakGlassAccess
+{
+    $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+    $created = now('Pacific/Auckland')->subDay()->setTime(10, 0)->utc();
+
+    return ClientBreakGlassAccess::forceCreate([
+        'client_id' => $client->id, 'user_id' => $owner->id,
+        'reason' => 'Historical emergency cover in the previous NZ day',
+        'created_at' => $created, 'expires_at' => $created->copy()->addHour(),
     ]);
+}
+
+it('uses saved delivery settings for a real emergency-access daily report', function () {
+    Notification::fake();
+    $site = Site::factory()->create(['is_active' => true]);
+    $reviewer = medicationAlertStaff($site, 'auditor');
+    medicationEmergencyReportGrant($site, $reviewer);
+    $definition = app(MedicationSettingsRegistry::class)->definition('alerts', 'breakglass');
+    AppSetting::updateOrCreate(['key' => $definition->storageKey], ['value' => json_encode([
+        'inapp' => false, 'email' => false, 'push' => false, 'follow_up' => false,
+        'groups' => [MedicationAlertCatalogue::EA_REVIEWERS], 'people' => [],
+    ])]);
 
     $this->artisan('breakglass:daily-report')->assertExitCode(0);
 
-    Notification::assertNotSentTo($optedOutAdmin, AppEventNotification::class);
+    expect(MedicationAlert::where('type', 'breakglass')->sole()->subject['used_count'])->toBe(1);
+    medicationAlertNotTo($reviewer, 'breakglass');
+    Notification::assertNothingSent();
 });
 
-it('sends the break-glass daily report only to provider managers, admins and auditors', function () {
+it('sends the emergency daily report through current reviewer authority and deduplicates retries', function () {
     Notification::fake();
-    $site = Site::factory()->create();
-    $recipients = collect(['admin', 'provider_manager', 'auditor'])
+    $site = Site::factory()->create(['is_active' => true]);
+    $recipients = collect(['admin', 'provider_manager', 'auditor', 'coordinator', 'clinical_lead'])
         ->map(fn (string $role) => medicationAlertStaff($site, $role));
-    $others = collect(['coordinator', 'hr', 'finance', 'team_lead', 'support_worker'])
+    // Existing permission evidence qualifies a reviewer independently of role.
+    $recipients->push(medicationAlertStaff($site, 'support_worker', ['medications.audit.view']));
+    $others = collect(['hr', 'finance', 'team_lead', 'support_worker'])
         ->map(fn (string $role) => medicationAlertStaff($site, $role));
+    $revoked = medicationAlertStaff($site, 'provider_manager');
+    $revoked->permissionOverrides()->syncWithoutDetaching([
+        Permission::where('key', 'medications.audit.view')->sole()->id => ['allowed' => false],
+    ]);
+    $unapproved = medicationAlertStaff($site, 'auditor');
+    $unapproved->update(['approved_at' => null]);
+    $others->push($revoked, $unapproved);
+    $grant = medicationEmergencyReportGrant($site, $recipients->first());
 
     $this->artisan('breakglass:daily-report')->assertExitCode(0);
 
-    $recipients->each(fn (User $user) => Notification::assertSentTo(
-        $user,
-        AppEventNotification::class,
-        fn (AppEventNotification $notification) => $notification->payload['event_key'] === 'breakglass.daily_report',
-    ));
-    $others->each(fn (User $user) => Notification::assertNotSentTo($user, AppEventNotification::class));
+    $recipients->each(fn (User $user) => medicationAlertTo($user, 'breakglass',
+        fn (MedicationAlertNotification $notification): bool =>
+            $notification->alert->site_id === $site->id
+            && $notification->alert->subject['used_count'] === 1
+            && $notification->alert->subject['nz_date'] === '2026-06-07'
+            && str_contains($notification->alert->message, 'EA-'.$grant->id)
+            && $notification->alert->action_url === '/emar/emergency-access?view=review&site_id='.$site->id));
+    $others->each(fn (User $user) => medicationAlertNotTo($user, 'breakglass'));
+    $recipients->each(fn (User $user) => Notification::assertSentToTimes($user, MedicationAlertNotification::class, 1));
+    $this->artisan('breakglass:daily-report')->assertExitCode(0);
+    expect(MedicationAlert::where('type', 'breakglass')->count())->toBe(1);
+    $recipients->each(fn (User $user) => Notification::assertSentToTimes($user, MedicationAlertNotification::class, 1));
+});
+
+it('does not notify about a day and house with no emergency grants or waiting reviews', function () {
+    Notification::fake();
+    medicationAlertStaff(Site::factory()->create(), 'auditor');
+
+    $this->artisan('breakglass:daily-report')->assertExitCode(0);
+
+    expect(MedicationAlert::where('type', 'breakglass')->count())->toBe(0);
+    Notification::assertNothingSent();
 });
 
 it('still sends the low-stock notification after the 06:00 stock check has run', function () {

@@ -68,13 +68,15 @@ it('offers every alert that has a source, with v5’s defaults, not yet reviewed
     $definitions = $response->inertiaProps('settings.definitions.alerts');
     expect(array_keys($definitions))->toBe([
         'overdue', 'followups', 'stock', 'expiry', 'refusals', 'renewals', 'errors',
-        'cdDiscrepancy', 'prnLimit', 'outOfStock', 'cdCheck', 'reviewDue',
+        'breakglass', 'cdDiscrepancy', 'prnLimit', 'outOfStock', 'cdCheck', 'reviewDue',
     ]);
     expect($response->inertiaProps('settings.values.alerts.stock'))->toBe(b2AlertValue(['houseLead', 'stockStaff']))
         ->and($response->inertiaProps('settings.reviewed.alerts.stock'))->toBeNull()
         ->and($definitions['followups']['alert']['locked'])->toBe(['rostered', 'houseLead'])
         // The on-call person since on-call contacts (B2 chunk 4).
         ->and($definitions['errors']['alert']['groups'])->toBe(['houseLead', 'onCall', 'clinicalLead', 'providerManager'])
+        ->and($definitions['breakglass']['alert']['groups'])->toBe(['eaReviewers', 'providerManager', 'clinicalLead'])
+        ->and($response->inertiaProps('settings.values.alerts.breakglass'))->toBe(b2AlertValue(['eaReviewers']))
         ->and($response->inertiaProps('alertAccess'))->toMatchArray(['view' => true, 'manage_org' => true]);
 });
 
@@ -205,6 +207,11 @@ it('previews each alert from the real notification, with the privacy switch on a
         ->and($response->inertiaProps('alertPreviews.cdDiscrepancy.open.email.subject'))
         ->toBe('Controlled-drug count doesn’t match — Methylphenidate at Kōwhai House: 1 short.')
         ->and($response->inertiaProps('alertPreviews.cdDiscrepancy.controlled'))->toBeTrue()
+        ->and($response->inertiaProps('alertPreviews.errors.open.push.body'))
+        ->toBe('Medication error MED-2026-0042. Reach not known yet. Details are held in the medication error record.')
+        ->and($response->inertiaProps('alertPreviews.breakglass.private.push.body'))
+        ->not->toContain('Aroha N.', 'Daniel Ahn')
+        ->and($response->inertiaProps('alertPreviews.breakglass.open.push.body'))->toContain('EA-101')
         ->and(array_keys($response->inertiaProps('alertPreviews')))->toBe(array_keys($response->inertiaProps('settings.definitions.alerts')))
         ->and($response->inertiaProps('alertDelivery'))->toMatchArray(['push_ready' => 0]);
 });
@@ -306,12 +313,14 @@ function b2MedicationPeople(array $sites, int $perHouse): void
     }
 }
 
-function b2SettingsQueries($test, User $viewer): int
+function b2SettingsQueries($test, User $viewer, ?array &$queryCounts = null): int
 {
     DB::flushQueryLog();
     DB::enableQueryLog();
     $test->actingAs($viewer)->get(route('emar.settings'))->assertOk();
-    $count = count(DB::getQueryLog());
+    $queries = DB::getQueryLog();
+    $count = count($queries);
+    $queryCounts = collect($queries)->countBy('query')->sortDesc()->all();
     DB::disableQueryLog();
 
     return $count;
@@ -324,14 +333,15 @@ it('keeps the Settings page’s queries bounded as the organisation grows', func
     // The first request also fills once-per-process caches (schema checks and
     // the like); measure from the second.
     b2SettingsQueries($this, $manager);
-    $small = b2SettingsQueries($this, $manager);
+    $smallQueries = [];
+    $small = b2SettingsQueries($this, $manager, $smallQueries);
 
     // Ten more medication staff and another house lead at each house: 33 people.
     b2MedicationPeople($sites->all(), 10);
     $large = b2SettingsQueries($this, $manager);
 
-    expect($small)->toBeLessThanOrEqual(110)
-        ->and($large - $small)->toBeLessThanOrEqual(33);
+    $this->assertLessThanOrEqual(110, $small, 'Settings query counts: '.json_encode($smallQueries));
+    expect($large - $small)->toBeLessThanOrEqual(33);
 });
 
 /*

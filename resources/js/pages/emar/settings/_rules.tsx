@@ -103,6 +103,22 @@ export type RuleData = {
     readOnlyAudit: boolean;
 };
 
+/** Bind page rule authority without using shared navigation capabilities. */
+export function settingsRuleData(
+    props: Pick<RuleData, 'rules' | 'sites' | 'readOnlyAudit'> & {
+        ruleOptions: RuleOptions;
+        settingsCan: RuleData['can'];
+    },
+): RuleData {
+    return {
+        rules: props.rules,
+        options: props.ruleOptions,
+        sites: props.sites,
+        can: props.settingsCan,
+        readOnlyAudit: props.readOnlyAudit,
+    };
+}
+
 export const ALL_HOUSES = 'All houses';
 
 /* ── Wording: the same words as the server's MedicineRuleWording ── */

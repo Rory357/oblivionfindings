@@ -40,7 +40,15 @@ it('appends one setting event per approved affected Site and no duplicate for an
     expect($events)->toHaveCount(2)->and($events->pluck('site_id')->all())->toBe([$first->id, $second->id])
         ->and($events->pluck('sequence')->all())->toBe([1, 1])->and($events->pluck('kind')->unique()->all())->toBe(['settings.changed']);
     $change = MedicationSettingChange::where('setting_group', 'delivery')->sole();
-    expect($events[0]->facts['changes'][0])->toBe(['group' => 'delivery', 'key' => 'pin_unattended', 'change_id' => $change->id]);
+    // MySQL normalises JSON object key order; compare every fact semantically.
+    foreach ($events as $event) {
+        $this->assertCount(1, $event->facts['changes']);
+        $expected = ['group' => 'delivery', 'key' => 'pin_unattended', 'change_id' => $change->id];
+        $actual = $event->facts['changes'][0];
+        ksort($expected);
+        ksort($actual);
+        $this->assertSame($expected, $actual);
+    }
     $this->put('/emar/settings/changes', ['view' => 'alerts', 'changes' => [['group' => 'delivery', 'key' => 'pin_unattended', 'from' => 'yes', 'value' => 'yes']]])->assertSessionHasNoErrors();
     $this->put('/emar/settings/changes', $payload)->assertSessionHasErrors('conflict');
     expect(MedicationEvent::count())->toBe(2)->and(MedicationEvent::where('site_id', $archived->id)->exists())->toBeFalse();

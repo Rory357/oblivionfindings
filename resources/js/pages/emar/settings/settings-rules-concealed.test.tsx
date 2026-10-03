@@ -6,6 +6,7 @@ import type { SettingsPayload } from './_model';
 import {
     MedicineRules,
     RuleView,
+    settingsRuleData,
     type MedicineRule,
     type RuleData,
 } from './_rules';
@@ -136,4 +137,44 @@ describe('a rule naming a controlled medicine, for someone without controlled ac
             screen.queryByText('Would apply now to', { exact: false }),
         ).toBeNull();
     });
+});
+
+describe('Settings rule authority with shared navigation in the renderer fixture', () => {
+    it.each([
+        { manage: false, navigation: true, audit: false, canAdd: false },
+        { manage: true, navigation: false, audit: false, canAdd: true },
+        { manage: true, navigation: true, audit: true, canAdd: false },
+    ])(
+        'keeps add-rule authority scoped when manage=$manage, navigation=$navigation, audit=$audit',
+        ({ manage, navigation, audit, canAdd }) => {
+            const page = {
+                rules: data.rules,
+                ruleOptions: data.options,
+                sites: data.sites,
+                settingsCan: { manage, manage_global: manage },
+                can: { medications: { settingsManage: navigation } },
+                readOnlyAudit: audit,
+            };
+            const { ctx } = renderWith(
+                <MedicineRules
+                    data={settingsRuleData(page)}
+                    q=""
+                    where="all"
+                    state="all"
+                    clear={vi.fn()}
+                />,
+            );
+            const add = screen.queryByRole('button', { name: 'Add a rule' });
+            if (canAdd) {
+                expect(add).toBeInTheDocument();
+                fireEvent.click(add!);
+                expect(ctx.open).toHaveBeenCalledWith({
+                    kind: 'rule',
+                    id: 'new',
+                });
+            } else {
+                expect(add).toBeNull();
+            }
+        },
+    );
 });
