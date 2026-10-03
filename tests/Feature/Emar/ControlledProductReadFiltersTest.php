@@ -71,6 +71,45 @@ class ControlledProductReadFiltersTest extends TestCase
         parent::tearDown();
     }
 
+    public function test_selected_house_branding_reaches_the_page_and_product_without_changing_evidence(): void
+    {
+        $this->site->update(['brand_colour' => '#2E7D32']);
+        $this->entry();
+        $before = $this->clinicalSnapshot();
+        $filters = ['site_id' => $this->site->id, 'client_id' => $this->person->id];
+
+        $product = $this->product($filters)->assertOk()
+            ->assertJsonPath('site_brand_colour', '#2E7D32')
+            ->assertJsonPath('sites.0', ['id' => $this->site->id, 'name' => $this->site->name])
+            ->assertJsonCount(1, 'medicines')
+            ->assertJsonPath('medicines.0.client_id', $this->person->id)
+            ->json();
+        $page = $this->actingAs($this->reader)->get(route('emar.controlled', $filters))->assertOk();
+        $this->assertSame('#2E7D32', $page->inertiaProps('site_brand_colour'));
+        $this->assertSame('#2E7D32', $page->inertiaProps('product.site_brand_colour'));
+        $this->assertSame($product['can'], $page->inertiaProps('product.can'));
+        $this->assertSame($before, $this->clinicalSnapshot(), 'Branding readers must not change clinical evidence');
+    }
+
+    public function test_all_house_branding_is_null_and_foreign_house_branding_is_concealed(): void
+    {
+        $this->site->update(['brand_colour' => '#2E7D32']);
+        $foreign = Site::factory()->create(['is_active' => true, 'brand_colour' => '#FF00FF']);
+
+        $product = $this->actingAs($this->reader)->getJson(route('emar.controlled.product'))->assertOk()
+            ->assertJsonPath('site_brand_colour', null)
+            ->assertJsonCount(1, 'sites')
+            ->assertDontSee('#FF00FF')->json();
+        $page = $this->actingAs($this->reader)->get(route('emar.controlled'))->assertOk();
+        $this->assertNull($page->inertiaProps('site_brand_colour'));
+        $this->assertNull($page->inertiaProps('product.site_brand_colour'));
+        $this->assertSame($product['can'], $page->inertiaProps('product.can'));
+
+        $this->product(['site_id' => $foreign->id])->assertNotFound()->assertDontSee('#FF00FF');
+        $this->actingAs($this->reader)->get(route('emar.controlled', ['site_id' => $foreign->id]))
+            ->assertNotFound()->assertDontSee('#FF00FF');
+    }
+
     public function test_person_scope_and_nz_day_boundaries_include_dst_transition_days(): void
     {
         $otherMedicine = $this->medicine($this->other);

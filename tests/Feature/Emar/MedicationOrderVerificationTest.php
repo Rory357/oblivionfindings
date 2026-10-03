@@ -91,7 +91,6 @@ class MedicationOrderVerificationTest extends TestCase
         $this->assertSame(1, $medication->version);
     }
 
-
     public function test_model_defaults_and_clinical_edits_cannot_bypass_fresh_verification(): void
     {
         $creator = User::factory()->create();
@@ -209,7 +208,6 @@ class MedicationOrderVerificationTest extends TestCase
         $this->assertSame($globalVerifier->id, (int) $medication->verified_by);
     }
 
-
     public function test_high_risk_order_classes_deny_creator_self_verification_without_a_lone_check(): void
     {
         $creator = $this->makeSiteUser(['medications.orders.verify', 'medications.controlled.view', 'medications.controlled.record'], $this->site, $this->client);
@@ -222,7 +220,6 @@ class MedicationOrderVerificationTest extends TestCase
         }
         $this->assertSame(0, AuditLog::where('action', 'medication_order.checked')->count());
     }
-
 
     public function test_distinct_verifier_succeeds_and_replay_does_not_duplicate_the_effect(): void
     {
@@ -258,7 +255,6 @@ class MedicationOrderVerificationTest extends TestCase
         $this->assertSame($versionBefore, $revision->version->fresh()->getRawOriginal());
     }
 
-
     public function test_legacy_scan_evidence_cannot_publish_or_replace_the_source_comparison(): void
     {
         $verifier = $this->makeSiteUser(['medications.orders.verify'], $this->site, $this->client);
@@ -274,7 +270,6 @@ class MedicationOrderVerificationTest extends TestCase
         $this->assertSame('pending', $revision->refresh()->status);
         $this->assertDatabaseMissing('audit_logs', ['action' => 'medication_order.checked', 'auditable_id' => $medication->id]);
     }
-
 
     public function test_non_pending_or_inactive_orders_cannot_enter_the_verification_transition(): void
     {
@@ -292,7 +287,6 @@ class MedicationOrderVerificationTest extends TestCase
         $this->assertSame('pending_verification', $ceased->refresh()->approval_status);
         $this->assertSame(0, AuditLog::where('action', 'medication_order.checked')->count());
     }
-
 
     public function test_legacy_waiver_cannot_publish_and_lone_check_requires_reason_and_independent_followup(): void
     {
@@ -326,7 +320,6 @@ class MedicationOrderVerificationTest extends TestCase
         $this->assertSame($reason, $audit->meta['lone_reason']);
         $this->assertStringNotContainsString(UserFactory::TEST_WITNESS_PIN, $audit->toJson());
     }
-
 
     public function test_foreign_site_medication_is_concealed_before_waiver_validation(): void
     {
@@ -401,14 +394,15 @@ class MedicationOrderVerificationTest extends TestCase
         $this->assertSame($versionBefore, $revision->version->fresh()->getRawOriginal());
     }
 
-
     public function test_audit_failure_rolls_back_the_verification_transition(): void
     {
         $verifier = $this->makeSiteUser(['medications.orders.verify'], $this->site, $this->client);
         $medication = $this->pendingMedication(['created_by' => User::factory()->create()->id, 'high_risk' => true]);
         $revision = $this->pendingRevision($medication);
         $event = 'eloquent.creating: '.AuditLog::class;
-        Event::listen($event, static function (): never { throw new RuntimeException('Injected medication verification audit failure.'); });
+        Event::listen($event, static function (): never {
+            throw new RuntimeException('Injected medication verification audit failure.');
+        });
         $this->withoutExceptionHandling();
         try {
             $this->actingAs($verifier)->post('/emar/order-revisions/'.$revision->id.'/check', $this->checkInput());
@@ -425,14 +419,15 @@ class MedicationOrderVerificationTest extends TestCase
         $this->assertNull($revision->checked_at);
     }
 
-
     public function test_audit_failure_rolls_back_the_rejection_transition(): void
     {
         $reviewer = $this->makeSiteUser(['medications.orders.verify'], $this->site, $this->client);
         $medication = $this->pendingMedication(['created_by' => User::factory()->create()->id]);
         $revision = $this->pendingRevision($medication);
         $event = 'eloquent.creating: '.AuditLog::class;
-        Event::listen($event, static function (): never { throw new RuntimeException('Injected medication rejection audit failure.'); });
+        Event::listen($event, static function (): never {
+            throw new RuntimeException('Injected medication rejection audit failure.');
+        });
         $this->withoutExceptionHandling();
         try {
             $this->actingAs($reviewer)->post('/emar/order-revisions/'.$revision->id.'/send-back', ['reason' => 'This write must roll back with its audit.']);
@@ -448,6 +443,66 @@ class MedicationOrderVerificationTest extends TestCase
         $this->assertNull($revision->rejection_reason);
     }
 
+    public function test_csv_import_reports_validation_errors_when_no_rows_can_be_imported(): void
+    {
+        $manager = $this->makeSiteUser(['medications.orders.manage'], $this->site);
+        $this->client->update(['first_name' => 'Local', 'last_name' => 'Resident']);
+        Client::factory()->create([
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->client->service_context_id,
+            'first_name' => 'Local', 'last_name' => 'Resident', 'status' => 'active',
+        ]);
+        $header = "client_name,medication_name,dose,frequency,route\n";
+
+        foreach ([
+            $header,
+            "\n\n",
+            $header."Local Resident,Missing columns\n",
+            $header."Local Resident,Missing dose,,Once daily,oral\n",
+            $header."OneName,Invalid name,5 mg,Once daily,oral\n",
+            $header."Unknown Person,Unmatched medicine,5 mg,Once daily,oral\n",
+            $header."Local Resident,Ambiguous medicine,5 mg,Once daily,oral\n",
+        ] as $csv) {
+            $this->actingAs($manager)->post('/emar/medications/import', [
+                'csv_file' => UploadedFile::fake()->createWithContent('medications.csv', $csv),
+            ])->assertRedirect()->assertSessionHasErrors('csv_file')->assertSessionMissing('success');
+            $this->assertDatabaseCount('client_medications', 0);
+        }
+    }
+
+    public function test_csv_import_reports_validation_errors_when_the_actor_has_no_accessible_house(): void
+    {
+        $manager = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        $this->grantPermissions($manager, ['medications.view', 'medications.orders.manage']);
+        $this->client->update(['first_name' => 'Local', 'last_name' => 'Resident']);
+
+        $this->actingAs($manager)->post('/emar/medications/import', [
+            'csv_file' => UploadedFile::fake()->createWithContent('medications.csv',
+                "client_name,medication_name,dose,frequency,route\n"
+                ."Local Resident,Inaccessible medicine,5 mg,Once daily,oral\n"),
+        ])->assertRedirect()->assertSessionHasErrors('csv_file')->assertSessionMissing('success');
+        $this->assertDatabaseCount('client_medications', 0);
+    }
+
+    public function test_csv_import_success_reports_actual_imported_and_skipped_rows(): void
+    {
+        $manager = $this->makeSiteUser(['medications.orders.manage'], $this->site);
+        $this->client->update(['first_name' => 'Local', 'last_name' => 'Resident']);
+
+        $this->actingAs($manager)->post('/emar/medications/import', [
+            'csv_file' => UploadedFile::fake()->createWithContent('medications.csv',
+                "client_name,medication_name,dose,frequency,route\n"
+                ."\nLocal Resident,Imported medicine,5 mg,Once daily,oral\n"
+                ."Local Resident,Invalid row\n"
+                ."Unknown Person,Unmatched medicine,5 mg,Once daily,oral\n"),
+        ])->assertRedirect()->assertSessionHasNoErrors()
+            ->assertSessionHas('success', '1 medication order imported for checking; 2 rows skipped.');
+        $this->assertDatabaseCount('client_medications', 1);
+        $this->assertDatabaseHas('client_medications', [
+            'client_id' => $this->client->id, 'name' => 'Imported medicine',
+            'approval_status' => 'pending_verification', 'verified_by' => null, 'verified_at' => null,
+        ]);
+    }
 
     public function test_csv_import_resolves_only_one_canonical_accessible_client_and_creates_pending_orders(): void
     {
@@ -485,7 +540,8 @@ class MedicationOrderVerificationTest extends TestCase
                     ."Foreign Only,Concealed medicine,10 mg,Once daily,oral\n",
                 ),
             ])
-            ->assertRedirect();
+            ->assertRedirect()->assertSessionHasNoErrors()
+            ->assertSessionHas('success', '1 medication order imported for checking; 1 row skipped.');
 
         $accessibleMedication = ClientMedication::query()
             ->where('name', 'Accessible medicine')
@@ -513,7 +569,7 @@ class MedicationOrderVerificationTest extends TestCase
                     ."\"Resident, Local\",Ambiguous medicine,5 mg,Once daily,oral\n",
                 ),
             ])
-            ->assertRedirect();
+            ->assertRedirect()->assertSessionHasErrors('csv_file');
         $this->assertDatabaseMissing('client_medications', [
             'name' => 'Ambiguous medicine',
         ]);

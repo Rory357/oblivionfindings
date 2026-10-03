@@ -1736,7 +1736,7 @@ class EmarController extends Controller
         // Eager loads shared by the register + History archive (both serialize
         // through serializePrnAdministration()).
         $prnWith = [
-            'client:id,first_name,last_name,room_id',
+            'client:id,first_name,last_name,room_id,site_id',
             'client.room:id,name',
             'client.site:id,name',
             'medication:id,name,dosage,route,max_per_day,indication,controlled_drug,deleted_at',
@@ -5995,15 +5995,18 @@ class EmarController extends Controller
                 ->all(),
         ];
 
+        $message = sprintf(
+            '%d %s created (%d already existed and %d skipped).',
+            $summary['created'],
+            $summary['created'] === 1 ? 'round' : 'rounds',
+            $summary['already_exists'],
+            $summary['skipped'],
+        );
+
         return redirect()->back()
             ->with('round_generation', $summary)
-            ->with('medication_settings_saved', sprintf(
-                '%d %s created (%d already existed and %s skipped).',
-                $summary['created'],
-                $summary['created'] === 1 ? 'round' : 'rounds',
-                $summary['already_exists'],
-                $summary['already_exists'] === 1 ? 'was' : 'were',
-            ));
+            ->with('medication_settings_saved', $message)
+            ->with('success', $message);
     }
 
     public function startRound(Request $request, MedicationRound $round)
@@ -8589,6 +8592,7 @@ class EmarController extends Controller
 
         $rows = [];
         $rowNumber = 0;
+        $importRowCount = 0;
 
         try {
             while (($row = fgetcsv($handle)) !== false) {
@@ -8601,6 +8605,8 @@ class EmarController extends Controller
                 if ($rowNumber === 1 && stripos($row[0] ?? '', 'client') !== false) {
                     continue;
                 }
+
+                $importRowCount++;
 
                 if (count($row) < 4) {
                     continue;
@@ -8649,7 +8655,9 @@ class EmarController extends Controller
             ['clinical.accessAllSites', 'sites.viewAll'],
         );
         if ($rows === [] || $accessibleSiteIds === []) {
-            return redirect()->back();
+            throw ValidationException::withMessages([
+                'csv_file' => 'No medication rows could be imported. Check the CSV format and person names.',
+            ]);
         }
 
         $resolvedRows = [];
@@ -8672,7 +8680,9 @@ class EmarController extends Controller
         }
 
         if ($resolvedRows === []) {
-            return redirect()->back();
+            throw ValidationException::withMessages([
+                'csv_file' => 'No medication rows could be imported. Check the CSV format and person names.',
+            ]);
         }
 
         DB::transaction(function () use ($resolvedRows, $accessibleSiteIds, $user): void {
@@ -8721,6 +8731,15 @@ class EmarController extends Controller
             }
         }, 3);
 
-        return redirect()->back();
+        $importedCount = count($resolvedRows);
+        $skippedCount = $importRowCount - $importedCount;
+
+        return redirect()->back()->with('success', sprintf(
+            '%d medication %s imported for checking; %d %s skipped.',
+            $importedCount,
+            $importedCount === 1 ? 'order' : 'orders',
+            $skippedCount,
+            $skippedCount === 1 ? 'row' : 'rows',
+        ));
     }
 }

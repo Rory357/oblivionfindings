@@ -50,6 +50,8 @@ class PrnRecordsPageTest extends TestCase
                 ->has('administrations', 1)
                 ->where('administrations.0.medication_name', 'Paracetamol PRN')
                 ->where('administrations.0.client_name', 'Aroha Ngata')
+                ->where('administrations.0.client_site', $site->name)
+                ->where('history.data.0.client_site', $site->name)
                 ->has('prn_medications', 1)
                 ->where('prn_medications.0.id', $med->id)
                 ->has('pending_reviews', 1)

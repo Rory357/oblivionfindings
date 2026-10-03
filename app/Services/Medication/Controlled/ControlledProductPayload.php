@@ -99,7 +99,8 @@ final class ControlledProductPayload
         $names = $names->union(User::query()->whereIn('id', $allUserIds)->pluck('name', 'id'));
         $manage = $actor->canDo(ControlledRegisterService::MANAGE);
         $record = $actor->canDo('medications.controlled.record');
-        $siteRows = Site::query()->whereIn('id', $siteIds)->orderBy('name')->get(['id', 'name']);
+        $siteRows = Site::query()->whereIn('id', $siteIds)->orderBy('name')->get(['id', 'name', 'brand_colour']);
+        $activeSite = $siteId !== null ? $siteRows->firstWhere('id', $siteId) : null;
         $presentSites = HrAttendanceSession::query()->where('user_id', $actor->id)->whereIn('site_id', $siteIds)->where('status', 'open')->whereNull('clock_out_at')->where('clock_in_at', '<=', now()->utc())->pluck('site_id')->all();
         // Canonical active Shift evidence remains supported alongside attendance.
         foreach (Shift::query()->where('user_id', $actor->id)->whereIn('status', ['in_progress', 'active', 'clocked_in', 'started'])->where('starts_at', '<=', now()->utc())->where('ends_at', '>=', now()->utc())->with('client:id,site_id')->get() as $shift) {
@@ -121,7 +122,9 @@ final class ControlledProductPayload
 
         return [
             'filters' => ['site_id' => $siteId, 'client_medication_id' => $medicationId, 'client_id' => $clientId, 'date' => $date], 'people' => $people,
-            'current_user_id' => $actor->id, 'current_user_name' => $actor->name, 'sites' => $siteRows,
+            'current_user_id' => $actor->id, 'current_user_name' => $actor->name,
+            'sites' => $siteRows->map(fn (Site $site): array => $site->only(['id', 'name'])),
+            'site_brand_colour' => $activeSite?->brand_colour,
             'as_at' => now()->toIso8601String(), 'witnesses_by_site' => $witnessRows,
             'on_site_destruction_allowed' => $this->policy->onsiteAllowed($siteId),
             'can' => ['view' => true, 'record' => $record, 'manage' => $manage, 'override' => $actor->canDo('medications.controlled.override'), 'close_loss' => $manage && $actor->hasRole('provider_manager')],

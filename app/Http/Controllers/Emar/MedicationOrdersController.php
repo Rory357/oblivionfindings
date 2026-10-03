@@ -44,6 +44,16 @@ final class MedicationOrdersController extends Controller
     {
         $actor = $request->user();
         $sites = $this->scope->readerSiteIds($actor, 'medications.view', $request->integer('site_id') ?: null);
+        $view = match ($request->query('view')) {
+            'to_check', 'check' => 'to_check',
+            'covert' => 'covert',
+            'reconciliation', 'reconcile' => 'reconciliation',
+            'reviews' => 'reviews',
+            default => 'orders',
+        };
+        if ($view === 'reviews') {
+            return to_route('emar.reviews', $request->only('site_id', 'client_id', 'search'));
+        }
         $clients = Client::query()->whereIn('site_id', $sites)->with('site:id,name')->orderBy('last_name')->get();
         $readableIds = $this->access->readableClientIds($actor, $clients->modelKeys());
         $clients = $clients->whereIn('id', $readableIds)->values();
@@ -68,7 +78,7 @@ final class MedicationOrdersController extends Controller
         if ($filter === 'ending') {
             $query->whereBetween('end_date', [now()->timezone('Pacific/Auckland')->toDateString(), now()->timezone('Pacific/Auckland')->addDays(14)->toDateString()]);
         }
-        if ($request->string('view')->toString() === 'to_check' || $filter === 'attention') {
+        if ($view === 'to_check' || $filter === 'attention') {
             $query->where(function ($q) {
                 $q->where('approval_status', '!=', 'verified')->orWhereIn('id', $this->actionableRevisionIds());
             });
@@ -130,7 +140,7 @@ final class MedicationOrdersController extends Controller
             'open_new_order' => $request->input('action') === 'entry' && ! $request->integer('order_id'),
             'review_handoff' => $handoff,
             'prefill_client_id' => in_array($request->integer('client_id'), $readableIds, true) ? $request->integer('client_id') : null,
-            'filters' => $request->only('view', 'show', 'search', 'site_id'),
+            'filters' => array_merge($request->only('show', 'search', 'site_id'), ['view' => $view]),
         ]);
     }
 

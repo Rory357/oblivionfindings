@@ -75,7 +75,12 @@ final class ControlledProductController extends Controller
 
     public function index(Request $request)
     {
-        return Inertia::render('emar/ControlledRegister', ['product' => $this->read($request)]);
+        $product = $this->read($request);
+
+        return Inertia::render('emar/ControlledRegister', [
+            'product' => $product,
+            'site_brand_colour' => $product['site_brand_colour'],
+        ]);
     }
 
     public function overrides(Request $request)

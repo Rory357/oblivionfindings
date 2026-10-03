@@ -67,6 +67,93 @@ class MedicationOrdersWorkflowTest extends TestCase
         parent::tearDown();
     }
 
+    public function test_orders_navigation_accepts_every_canonical_panel_selector(): void
+    {
+        $checked = $this->order(['name' => 'Checked medicine']);
+        $waiting = $this->order(['name' => 'Needs check']);
+        $waiting->forceFill(['approval_status' => 'pending'])->saveQuietly();
+
+        foreach (['orders', 'to_check', 'covert', 'reconciliation'] as $view) {
+            $expectedIds = $view === 'to_check' ? [$waiting->id] : [$checked->id, $waiting->id];
+            $this->actingAs($this->checker)->get('/emar/prescriptions?view='.$view)
+                ->assertOk()->assertInertia(fn (Assert $page) => $page
+                ->component('emar/Orders')->where('filters.view', $view)
+                ->where('orders.data', fn ($rows) => collect($rows)->pluck('id')->all() === $expectedIds));
+        }
+    }
+
+    public function test_orders_navigation_aliases_use_canonical_filtering_and_keep_context(): void
+    {
+        $this->order(['name' => 'Checked medicine']);
+        $waiting = $this->order(['name' => 'Needs check']);
+        $waiting->forceFill(['approval_status' => 'pending'])->saveQuietly();
+
+        foreach (['check' => 'to_check', 'reconcile' => 'reconciliation'] as $alias => $view) {
+            $this->actingAs($this->checker)->get('/emar/prescriptions?view='.$alias)
+                ->assertOk()->assertInertia(fn (Assert $page) => $page
+                ->where('filters.view', $view)->has('orders.data', $view === 'to_check' ? 1 : 2));
+            $query = ['view' => $alias, 'site_id' => $this->site->id, 'client_id' => $this->client->id, 'search' => 'Needs', 'show' => 'attention'];
+            $this->actingAs($this->checker)->get('/emar/prescriptions?'.http_build_query($query))
+                ->assertOk()->assertInertia(fn (Assert $page) => $page
+                ->where('filters.view', $view)->where('filters.site_id', (string) $this->site->id)
+                ->where('filters.search', 'Needs')->where('filters.show', 'attention')
+                ->where('prefill_client_id', $this->client->id)
+                ->has('orders.data', 1)->where('orders.data.0.id', $waiting->id));
+        }
+    }
+
+    public function test_orders_navigation_missing_unknown_and_malformed_selectors_fall_back_to_orders(): void
+    {
+        $order = $this->order();
+
+        foreach ([null, '', 'unsupported', 'TO_CHECK', 42, ['check'], ['nested' => ['check']]] as $view) {
+            $this->actingAs($this->checker)->get('/emar/prescriptions?'.http_build_query(['view' => $view]))
+                ->assertOk()->assertInertia(fn (Assert $page) => $page
+                ->where('filters.view', 'orders')->has('orders.data', 1)->where('orders.data.0.id', $order->id));
+        }
+        $this->assertSame(0, MedicationOrderAction::count());
+        $this->assertSame(0, MedicationOrderRevision::count());
+        $this->assertSame(0, MedicationEvent::count());
+    }
+
+    public function test_orders_navigation_does_not_widen_house_or_person_access(): void
+    {
+        $order = $this->order();
+        $order->forceFill(['approval_status' => 'pending'])->saveQuietly();
+        $unassigned = Client::factory()->create(['site_id' => $this->site->id, 'service_context_id' => $this->client->service_context_id, 'status' => 'active']);
+        $foreignSite = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
+        $foreign = Client::factory()->create(['site_id' => $foreignSite->id, 'status' => 'active']);
+        foreach ([$unassigned, $foreign] as $person) {
+            $this->order(['client_id' => $person->id, 'name' => 'Restricted medicine']);
+        }
+
+        foreach (['to_check', 'check', 'reconcile', 'unsupported'] as $view) {
+            $query = ['view' => $view, 'site_id' => $this->site->id, 'client_id' => $this->client->id];
+            $this->actingAs($this->checker)->get('/emar/prescriptions?'.http_build_query($query))
+                ->assertOk()->assertInertia(fn (Assert $page) => $page
+                ->where('filters.site_id', (string) $this->site->id)->where('prefill_client_id', $this->client->id)
+                ->has('orders.data', 1)->where('orders.data.0.id', $order->id)
+                ->has('clients', 1)->where('clients.0.id', $this->client->id));
+            $this->actingAs($this->checker)->get('/emar/prescriptions?'.http_build_query(['view' => $view, 'client_id' => $foreign->id]))
+                ->assertOk()->assertInertia(fn (Assert $page) => $page
+                ->where('prefill_client_id', null)->has('orders.data', 1)->where('orders.data.0.id', $order->id));
+            $this->actingAs($this->checker)->get('/emar/prescriptions?'.http_build_query(['view' => $view, 'site_id' => $foreignSite->id]))
+                ->assertNotFound();
+        }
+    }
+
+    public function test_orders_navigation_reviews_selector_opens_reviews_with_scope_and_search(): void
+    {
+        $query = ['site_id' => $this->site->id, 'client_id' => $this->client->id, 'search' => 'Example'];
+        $this->actingAs($this->checker)->get('/emar/prescriptions?'.http_build_query(['view' => 'reviews'] + $query))
+            ->assertRedirect(route('emar.reviews', $query));
+        $this->actingAs($this->checker)->get(route('emar.reviews', $query))
+            ->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('emar/reviews/index')->where('filters.view', 'due')
+            ->where('filters.site_id', $this->site->id)->where('filters.client_id', $this->client->id)
+            ->where('filters.search', 'Example'));
+    }
+
     public function test_pending_change_keeps_checked_prescription_and_check_publishes_it_atomically(): void
     {
         $order = $this->order();

@@ -279,9 +279,40 @@ class RoundTemplateSettingsTest extends TestCase
 
         $this->actingAs($lead)
             ->post(route('emar.rounds.generate'), ['date' => '2026-05-04', 'site_id' => $this->site->id])
-            ->assertSessionHas('medication_settings_saved', '1 round created (0 already existed and were skipped).');
+            ->assertSessionHas('medication_settings_saved', '1 round created (0 already existed and 0 skipped).');
 
         $this->assertSame([$active->id], MedicationRound::query()->pluck('round_template_id')->map(fn ($id): int => (int) $id)->all());
+    }
+
+    public function test_generation_reports_actual_counts_when_no_new_round_is_created(): void
+    {
+        $lead = $this->staff(['medications.orders.manage', 'medications.view']);
+        $this->template('Morning round', $this->site);
+        $offDay = $this->template('Tuesday round', $this->site);
+        $offDay->forceFill(['days_of_week' => [2]])->save();
+        $payload = ['date' => '2026-05-04', 'site_id' => $this->site->id];
+
+        $this->actingAs($lead)->post(route('emar.rounds.generate'), $payload)
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('medication_rounds', 1);
+
+        $message = '0 rounds created (1 already existed and 1 skipped).';
+        $this->actingAs($lead)->from('/emar/rounds')->post(route('emar.rounds.generate'), $payload)
+            ->assertRedirect('/emar/rounds')
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('round_generation', [
+                'created' => 0,
+                'already_exists' => 1,
+                'skipped' => 1,
+                'skipped_by_reason' => ['not_scheduled' => 1],
+            ])
+            ->assertSessionHas('medication_settings_saved', $message)
+            ->assertSessionHas('success', $message);
+        $this->assertDatabaseCount('medication_rounds', 1);
+
+        $this->get('/emar/rounds')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('flash.success', $message));
     }
 
     public function test_create_rounds_for_one_house_previews_first_and_existing_callers_are_unchanged(): void
