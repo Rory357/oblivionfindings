@@ -310,7 +310,6 @@ class WorkerMedsTodayPayloadTest extends TestCase
         $foreign->supportWorkers()->attach($worker->id);
         $hidden = [
             $createOrder($unassigned, ['10:00']), $createOrder($foreign, ['10:00']),
-            $createOrder($client, ['10:00'], controlled: true),
         ];
         $orders = [$orders[0]];
 
@@ -363,6 +362,19 @@ class WorkerMedsTodayPayloadTest extends TestCase
             ], MedicationReadQueryInventory::counts($reads), MedicationReadQueryInventory::describe($reads));
             $this->assertDatabaseCount('client_medication_administrations', 0);
         }
+        // Concealed controlled doses have their own canonical count read.
+        // Check that privacy contract after the ordinary board/badge growth budget.
+        $hidden[] = $createOrder($client, ['10:00'], controlled: true);
+        app()->forgetScopedInstances();
+        auth()->forgetUser();
+        $response = $this->actingAs($worker->fresh())->get('/meds/today')->assertOk();
+        $this->assertSame(1, $response->inertiaProps('concealed_schedule.total'));
+        $this->assertCount(25, $response->inertiaProps('schedule'));
+        $this->assertSame(
+            collect($orders)->pluck('id')->sort()->values()->all(),
+            collect($response->inertiaProps('schedule'))->pluck('medication_id')->unique()->sort()->values()->all(),
+        );
+        $this->assertDatabaseCount('client_medication_administrations', 0);
         foreach ($hidden as $order) {
             $this->actingAs($worker->fresh())->getJson(route('emar.medications.detail', $order))->assertNotFound();
         }

@@ -915,6 +915,9 @@ it('keeps list counts csv detail lookup reports my day and watchers in parity fo
     $hidden = taskRbacRows($matrix, 'hidden');
     $visibleIds = collect($visible)->pluck('id')->sort()->values()->all();
     $hiddenIds = collect($hidden)->pluck('id')->sort()->values()->all();
+    // Reports group by provider; composite providers retain separate detail aliases.
+    $expectedModuleKeys = collect($matrix)->filter(fn (array $rows) => count($rows['visible']) > 0)
+        ->keys()->sort()->values()->all();
     $aggregator = new TaskAggregator;
 
     expect(array_keys($matrix))->toBe(collect(TaskAggregator::defaultProviders())->map->sourceKey()->all());
@@ -945,7 +948,7 @@ it('keeps list counts csv detail lookup reports my day and watchers in parity fo
             ->where('totals.open', count($visibleIds))
             ->where('totals.done', 0)
             ->where('modules', fn ($modules) => collect($modules)->pluck('key')->sort()->values()->all()
-                === collect($visible)->pluck('source')->unique()->sort()->values()->all())
+                === $expectedModuleKeys)
             ->where('modules', fn ($modules) => collect($modules)->sum('open') === count($visibleIds))
             ->where('sources', fn ($sources) => collect($sources)->pluck('key')->sort()->values()->all()
                 === collect(TaskAggregator::defaultProviders())->filter(fn ($provider) => $provider->canView($actor))
