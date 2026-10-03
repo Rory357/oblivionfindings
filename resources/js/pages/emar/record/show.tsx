@@ -8,8 +8,8 @@ import { HistorySection } from '@/components/emar/record/history';
 import {
     MedicinesSection,
     RecordMedicineDialog,
-    SupportSection,
 } from '@/components/emar/record/reading';
+import { CanonicalSupportSection } from '@/components/emar/record/support';
 import { RecordDoseLaunch } from '@/components/emar/record/record-dose-launch';
 import { SafetySection } from '@/components/emar/record/safety';
 import {
@@ -92,7 +92,7 @@ function AvailableRecord({
     const sections = RECORD_SECTIONS.map((item) => ({
         ...item,
         views: item.views.filter(
-            (view) => view.key !== 'changes' || can.view_audit,
+            (view) => item.key !== 'history' || view.key !== 'changes' || can.view_audit,
         ),
     }));
     const [location, setLocation] = useState(() =>
@@ -333,10 +333,9 @@ function AvailableRecord({
                             onMedicine={setMedicine}
                         />
                     ) : location.tab === 'support' ? (
-                        <SupportSection
+                        <CanonicalSupportSection
                             clientId={person.id}
-                            assessment={location.view === 'assessment'}
-                            onMedicine={setMedicine}
+                            view={activeView}
                         />
                     ) : location.tab === 'chart' ? (
                         <ChartSection
@@ -362,8 +361,11 @@ function AvailableRecord({
                         />
                     ) : (
                         <HistorySection
+                            key={`${person.id}:${query.get('dose_id') ?? ''}:${activeView}`}
                             clientId={person.id}
                             view={activeView}
+                            initialDoseId={Number(query.get('dose_id')) > 0 ? Number(query.get('dose_id')) : null}
+                            onDetailClose={() => navigateQuery({ dose_id: null })}
                             page={historyPage}
                             onPage={(next) =>
                                 navigateQuery({

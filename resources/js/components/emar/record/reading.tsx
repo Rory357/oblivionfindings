@@ -154,7 +154,7 @@ function MedicineTable({
                   {
                       label: 'Details need controlled-medicine access',
                       icon: Pill,
-                      disabled: true,
+                      disabled: 'Controlled-medicine access is needed to open these details.',
                   },
               ]
             : [

@@ -46,10 +46,11 @@
     <div class="allergy-banner">
         <strong>ALLERGIES:</strong>
         @foreach($allergies as $allergy)
-            {{ $allergy->allergen }} ({{ $allergy->severity }})@if(!$loop->last), @endif
+            {{ $allergy->allergen }}@if($allergy->severity) ({{ $allergy->severity }})@endif@if($allergy->reaction) — {{ $allergy->reaction }}@endif@if(!$loop->last), @endif
         @endforeach
     </div>
     @endif
+    <p>{{ ($allergySummary['reviewed'] ?? null) ? (($allergySummary['status'] ?? '') === 'no_known' ? 'No known allergies — reviewed' : 'Allergy record reviewed') : 'Allergy record not reviewed' }}</p>
 
     <h2>Scheduled Medications</h2>
     <table class="med-table">

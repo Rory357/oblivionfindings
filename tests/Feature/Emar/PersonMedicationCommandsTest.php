@@ -145,4 +145,100 @@ class PersonMedicationCommandsTest extends TestCase
     {
         return '/emar/clients/'.$this->person->id.'/record'.$suffix;
     }
+
+    public function test_allergy_copy_command_defaults_to_no_writes_and_repeats_without_duplicate_events(): void
+    {
+        $source = MedicationAllergy::create(['client_id' => $this->person->id, 'allergen' => 'Peanut', 'reaction' => 'Swelling', 'severity' => 'severe', 'recorded_by' => $this->lead->id]);
+        $before = $source->getAttributes();
+        $this->artisan('emar:copy-allergies', ['--client' => [$this->person->id]])->assertSuccessful();
+        $this->assertDatabaseMissing('client_medical_profiles', ['client_id' => $this->person->id]);
+        $this->assertDatabaseCount('medication_events', 0);
+        $this->artisan('emar:copy-allergies', ['--apply' => true])->assertFailed();
+        $this->artisan('emar:copy-allergies', ['--client' => [$this->person->id], '--apply' => true])->assertSuccessful();
+        $this->artisan('emar:copy-allergies', ['--client' => [$this->person->id], '--apply' => true])->assertSuccessful();
+        $this->assertSame(1, MedicationEvent::where('kind', 'allergy.source-copied')->count());
+        $this->assertEquals($before, $source->fresh()->getAttributes());
+
+        // The clinical content stays equal, but the new source must survive
+        // exact deduplication and receive its own copy event.
+        $duplicate = MedicationAllergy::create(['client_id' => $this->person->id, 'allergen' => 'Peanut', 'reaction' => 'Swelling', 'severity' => 'severe', 'recorded_by' => $this->lead->id]);
+        $this->artisan('emar:copy-allergies', ['--client' => [$this->person->id], '--apply' => true])->assertSuccessful();
+        $records = ClientMedicalProfile::where('client_id', $this->person->id)->firstOrFail()->allergy_records;
+        $this->assertCount(1, $records);
+        $this->assertEqualsCanonicalizing([$source->id, $duplicate->id], $records[0]['source_register_ids']);
+        $this->assertSame(2, MedicationEvent::where('kind', 'allergy.source-copied')->count());
+    }
+
+    public function test_person_correction_retry_appends_one_event_and_one_receipt(): void
+    {
+        $original = $this->correctionOriginal();
+        $payload = ['request_uuid' => (string) Str::uuid(), 'status' => 'given', 'dose_given' => '1 tablet', 'correction_reason' => 'Clarify the recorded note', 'notes' => 'Correct note'];
+        $url = $this->url('/doses/'.$original->id.'/corrections/request');
+        $this->postJson($url, $payload)->assertOk();
+        $this->postJson($url, $payload)->assertOk();
+        $this->assertSame(1, ClientMedicationAdministration::where('corrected_of_id', $original->id)->count());
+        $this->assertSame(1, MedicationEvent::where('kind', 'correction.requested')->count());
+        $this->assertDatabaseCount('medication_idempotency_results', 1);
+    }
+
+    public function test_legacy_correction_creation_rolls_back_when_the_final_event_fails(): void
+    {
+        $original = $this->correctionOriginal();
+        $before = $this->correctionCounts();
+        $this->expectCorrectionEventFailure(fn () => $this->postJson('/clients/'.$this->person->id.'/mar/administrations/'.$original->id.'/corrections', ['status' => 'given', 'dose_given' => '1 tablet', 'correction_reason' => 'Correct note', 'notes' => 'Updated note']));
+        $this->assertSame($before, $this->correctionCounts());
+        $this->assertSame('Original note', $original->fresh()->notes);
+    }
+
+    public function test_legacy_correction_approval_rolls_back_when_the_final_event_fails(): void
+    {
+        $correction = $this->pendingCorrection();
+        $before = $this->correctionCounts();
+        $this->expectCorrectionEventFailure(fn () => $this->postJson('/emar/corrections/'.$correction->id.'/approve'));
+        $this->assertSame($before, $this->correctionCounts());
+        $this->assertSame('pending', $correction->fresh()->correction_status);
+        $this->assertNull($correction->fresh()->correction_approved_by);
+    }
+
+    public function test_legacy_correction_rejection_rolls_back_when_the_final_event_fails(): void
+    {
+        $correction = $this->pendingCorrection();
+        $before = $this->correctionCounts();
+        $this->expectCorrectionEventFailure(fn () => $this->postJson('/emar/corrections/'.$correction->id.'/reject', ['reason' => 'Original note confirmed']));
+        $this->assertSame($before, $this->correctionCounts());
+        $this->assertSame('pending', $correction->fresh()->correction_status);
+        $this->assertNull($correction->fresh()->correction_rejection_reason);
+    }
+
+    private function correctionOriginal(): ClientMedicationAdministration
+    {
+        $med = ClientMedication::create(['client_id' => $this->person->id, 'name' => 'Paracetamol', 'dosage' => '1 tablet', 'state' => 'active', 'active' => true]);
+        return ClientMedicationAdministration::create(['client_id' => $this->person->id, 'client_medication_id' => $med->id, 'administered_by' => $this->lead->id, 'administered_at' => now(), 'status' => 'given', 'dose_given' => '1 tablet', 'notes' => 'Original note']);
+    }
+
+    private function pendingCorrection(): ClientMedicationAdministration
+    {
+        $original = $this->correctionOriginal();
+        $requester = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        $correction = $original->replicate();
+        $correction->forceFill(['is_correction' => true, 'corrected_of_id' => $original->id, 'correction_requested_by' => $requester->id, 'correction_status' => 'pending', 'correction_reason' => 'Clarify note', 'notes' => 'Corrected note'])->save();
+        return $correction;
+    }
+
+    private function correctionCounts(): array
+    {
+        return collect(['client_medication_administrations', 'audit_logs', 'medication_events', 'medication_followups', 'medication_idempotency_results'])->mapWithKeys(fn ($table) => [$table => DB::table($table)->count()])->all();
+    }
+
+    private function expectCorrectionEventFailure(\Closure $action): void
+    {
+        $this->mock(MedicationEventRecorder::class)->shouldReceive('append')->once()->andThrow(new \RuntimeException('synthetic final event failure'));
+        $this->withoutExceptionHandling();
+        try {
+            $action();
+            $this->fail('The final event failure must escape and roll back the domain transaction.');
+        } catch (\RuntimeException $error) {
+            $this->assertSame('synthetic final event failure', $error->getMessage());
+        }
+    }
 }

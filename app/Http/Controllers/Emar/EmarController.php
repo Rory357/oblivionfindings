@@ -1248,6 +1248,9 @@ class EmarController extends Controller
         if (config('medications.person_record') === 'p02' && $request->filled('client_id')) {
             return app(PersonMedicationRecordController::class)->show($request, $request->integer('client_id'));
         }
+        if (config('medications.person_record') === 'p02') {
+            return app(MedicationRecordHubController::class)->show($request, 'charts');
+        }
 
         $actor = $request->user();
         abort_unless($actor, 403);
@@ -1682,6 +1685,9 @@ class EmarController extends Controller
     // ─── PRN Records ───────────────────────────────────────
     public function prn(Request $request)
     {
+        if (config('medications.person_record') === 'p02') {
+            return app(MedicationRecordHubController::class)->show($request, 'asneeded');
+        }
         $user = $request->user();
         $canViewControlled = $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY);
         $viewableClientIds = $this->medicationViewableClientIds($user);
@@ -2402,6 +2408,9 @@ class EmarController extends Controller
 
     public function medications(Request $request)
     {
+        if (config('medications.person_record') === 'p02') {
+            return app(MedicationRecordHubController::class)->show($request, 'medicines');
+        }
         $user = $request->user();
         abort_unless($user, 403);
         $clientFilter = $request->integer('client_id') ?: null;

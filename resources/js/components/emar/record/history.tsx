@@ -68,16 +68,20 @@ export function HistorySection({
     view,
     page,
     onPage,
+    initialDoseId,
+    onDetailClose,
 }: {
     clientId: number;
     view: string;
     page: number;
     onPage: (page: number) => void;
+    initialDoseId?: number | null;
+    onDetailClose?: () => void;
 }) {
     const { data, load, reload } = useRecordJson<HistoryData>(
         `/emar/clients/${clientId}/record/history?view=${view}&page=${page}`,
     );
-    const [detail, setDetail] = useState<number | null>(null);
+    const [detail, setDetail] = useState<number | null>(initialDoseId ?? null);
     const [command, setCommand] = useState<{
         row: Dose;
         action: 'request' | 'approve' | 'reject';
@@ -275,7 +279,7 @@ export function HistorySection({
                 <DoseDetail
                     clientId={clientId}
                     doseId={detail}
-                    onClose={() => setDetail(null)}
+                    onClose={() => { setDetail(null); onDetailClose?.(); }}
                 />
             )}
             {change && (

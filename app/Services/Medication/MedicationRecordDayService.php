@@ -50,6 +50,7 @@ final class MedicationRecordDayService
                     'scheduled_for' => $due->toIso8601String(), 'time' => $due->format('H:i'),
                     'round_label' => $board->roundLabelFor($due), 'status' => $status,
                     'state' => $dose['state'], 'window_opens_at' => $dose['window_opens_at']->toIso8601String(),
+                    'support_mode' => $dose['support_mode'] ?? 'staff_given',
                     'window_ends_at' => $dose['window_ends_at']->toIso8601String(),
                     'away_reason' => $status === 'away' ? $dose['away_reason'] : null,
                     'recorded' => $record ? $board->recordedPayload($record, $timezone) : null,

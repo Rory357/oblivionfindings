@@ -59,6 +59,8 @@ export const RECORD_SECTIONS: RecordSection[] = [
         views: [
             { key: 'bymedicine', label: 'By medicine', icon: Users },
             { key: 'assessment', label: 'Assessment', icon: ClipboardList },
+            { key: 'agreement', label: 'Agreement', icon: Users },
+            { key: 'changes', label: 'Support changes', icon: History },
         ],
     },
     {

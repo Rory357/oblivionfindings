@@ -8,11 +8,9 @@ use App\Models\Client;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationIdempotencyResult;
 use App\Models\User;
-use App\Services\Medication\Audit\MedicationEventData;
 use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
-use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -35,14 +33,15 @@ final class PersonMedicationCorrectionController extends Controller
             }
             $record = ClientMedicationAdministration::query()->where('client_id', $person->id)->findOrFail($administration);
             $handler = app(MedicationAdministrationCorrectionController::class);
+            $events = [];
             match ($command) {
-                'request' => $handler->store($request, $person, $record),
-                'approve' => $handler->approve($request, $record),
-                'reject' => $handler->reject($request, $record),
+                'request' => $handler->store($request, $person, $record, $events),
+                'approve' => $handler->approve($request, $record, $events),
+                'reject' => $handler->reject($request, $record, $events),
             };
             $result = ['saved' => true];
             MedicationIdempotencyResult::query()->create(['scope' => $scope, 'request_uuid' => $valid['request_uuid'], 'response_payload' => ['fingerprint' => $fingerprint, 'result' => $result], 'expires_at' => now()->addDays(30)]);
-            app(MedicationEventRecorder::class)->append(new MedicationEventData(siteId: (int) $person->site_id, kind: 'correction.'.$command, subjectType: 'administration', subjectId: (string) $record->id, actorId: $lockedActor->id, occurredAt: CarbonImmutable::now(), summary: 'Medication correction '.$command.' saved', clientId: (int) $person->id, controlled: (bool) $record->medication?->controlled_drug));
+            app(MedicationEventRecorder::class)->appendMany($events);
             return $result;
         }), 5);
         return response()->json($result)->header('Cache-Control', 'private, no-store');

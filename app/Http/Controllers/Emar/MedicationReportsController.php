@@ -152,7 +152,7 @@ class MedicationReportsController extends Controller
 
     public function export(Request $request)
     {
-        $data = $request->validate(['type' => ['required', Rule::in(['mar', 'cd_register', 'round_sheet', 'doses', 'errors', 'stock', 'audit'])], 'site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'], 'medication_id' => ['nullable', 'integer', 'min:1'], 'kind' => ['nullable', 'string', 'max:100'], 'q' => ['nullable', 'string', 'max:80'], 'include_in_error' => ['nullable', 'boolean']]);
+        $data = $request->validate(['type' => ['required', Rule::in(['mar', 'cd_register', 'round_sheet', 'doses', 'errors', 'stock', 'audit'])], 'site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'], 'medication_id' => ['nullable', 'integer', 'min:1'], 'kind' => ['nullable', 'string', 'max:100'], 'q' => ['nullable', 'string', 'max:80'], 'include_in_error' => ['nullable', 'boolean'], 'include_prn' => ['nullable', 'boolean']]);
         $actor = $request->user();
         $type = $data['type'];
         abort_unless($this->access->canExport($actor, $type), 403);
@@ -162,11 +162,11 @@ class MedicationReportsController extends Controller
         $clientId = $request->integer('client_id') ?: null;
         $sites = $this->access->siteIds($actor, $request->integer('site_id') ?: null, $clientId, $type === 'stock' ? 'stock' : ($type === 'cd_register' ? 'controlled' : 'doses'));
         if (in_array($type, ['mar', 'cd_register', 'round_sheet'], true)) {
-            $read = fn (User $current) => app(MedicationPdfDataset::class)->read($current, $type, $period, $sites, $clientId, $request->integer('medication_id') ?: null);
+            $read = fn (User $current) => app(MedicationPdfDataset::class)->read($current, $type, $period, $sites, $clientId, $request->integer('medication_id') ?: null, ! $request->has('include_prn') || $request->boolean('include_prn'));
             $evidence = $read($actor);
             $digest = hash('sha256', json_encode($evidence, JSON_THROW_ON_ERROR));
             $bytes = Pdf::setOption(['defaultFont' => 'DejaVu Sans', 'isRemoteEnabled' => false])->loadView('pdf.medication-report', ['evidence' => $evidence, 'actor' => $actor, 'generated' => CarbonImmutable::now('UTC'), 'purpose' => $purpose])->setPaper('a4', 'landscape')->output();
-            app(MedicationExportAudit::class)->record($actor, $type, $sites, $period, $purpose, $clientId, ['rows' => count($evidence['rows']), 'medication_id' => $request->integer('medication_id') ?: null], function (User $current) use ($read, $digest) {
+            app(MedicationExportAudit::class)->record($actor, $type, $sites, $period, $purpose, $clientId, ['rows' => count($evidence['rows']), 'include_prn' => ! $request->has('include_prn') || $request->boolean('include_prn'), 'medication_id' => $request->integer('medication_id') ?: null], function (User $current) use ($read, $digest) {
                 abort_unless(hash_equals($digest, hash('sha256', json_encode($read($current), JSON_THROW_ON_ERROR))), 409, 'The records or your access changed while the file was being prepared. Refresh and try again.');
             });
 
@@ -194,7 +194,7 @@ class MedicationReportsController extends Controller
         rewind($handle);
         $bytes = stream_get_contents($handle);
         fclose($handle);
-        app(MedicationExportAudit::class)->record($actor, $type, $sites, $period, $purpose, $clientId, ['rows' => count($rows), 'include_in_error' => $request->boolean('include_in_error')], function (User $current) use ($read, $digest) {
+        app(MedicationExportAudit::class)->record($actor, $type, $sites, $period, $purpose, $clientId, ['rows' => count($rows), 'include_prn' => ! $request->has('include_prn') || $request->boolean('include_prn'), 'include_in_error' => $request->boolean('include_in_error')], function (User $current) use ($read, $digest) {
             abort_unless(hash_equals($digest, hash('sha256', json_encode($read($current), JSON_THROW_ON_ERROR))), 409, 'The report or your access changed while the file was being prepared. Refresh the report and try again.');
         });
 
@@ -217,6 +217,11 @@ class MedicationReportsController extends Controller
             $rows = $query->get()->map(fn ($e) => $this->events->present($actor, $e, true))->all();
         } elseif ($type === 'doses') {
             $rows = $this->datasets->doseRows($actor, $period, $sites, $clientId);
+            if (! array_key_exists('include_prn', $data) || $data['include_prn']) {
+                $rows = [...$rows, ...$this->datasets->prnDoseRows($actor, $period, $sites, $clientId)];
+                abort_if(count($rows) > MedicationReportDataset::MAX_ROWS, 422, 'Choose a shorter period; no partial result was created.');
+                usort($rows, fn ($a, $b) => [$a['date'], $a['recorded_at'] ?? $a['due_at'], $a['reference']] <=> [$b['date'], $b['recorded_at'] ?? $b['due_at'], $b['reference']]);
+            }
         } else {
             $rows = $this->datasets->read($actor, $type, $period, $sites, $clientId)['rows'];
             if ($type === 'errors' && ! $includeInError) {

@@ -200,6 +200,28 @@ final class MedicationReportDataset
         })->all();
     }
 
+    /** Retained as-needed outcomes in the same column contract as scheduled doses. */
+    public function prnDoseRows(User $actor, MedicationReportPeriod $period, array $sites, ?int $clientId = null): array
+    {
+        $ids = $this->access->clientIds($actor, $sites);
+        if ($clientId !== null) {
+            abort_unless(in_array($clientId, $ids, true), 404);
+            $ids = [$clientId];
+        }
+        $clients = Client::query()->whereIn('id', $ids)->with('site:id,name')->get()->keyBy('id');
+        $query = $this->canonical(ClientMedicationAdministration::query()->effectiveClinicalEvidence(), $sites, $ids)
+            ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
+            ->whereBetween('administered_at', $period->bounds())->with('medication')->orderBy('administered_at')->orderBy('id');
+        if (! $actor->canDo('medications.controlled.view')) $this->scope->scopeWithoutControlledMedicationRows($query);
+        $this->limit((clone $query)->count());
+
+        return $query->get()->map(fn ($a) => $this->person($clients->get($a->client_id), $period) + [
+            'reference' => 'administration:'.$a->id, 'date' => $a->administered_at->timezone('Pacific/Auckland')->toDateString(),
+            'medicine' => $a->medication?->historicalDisplayName(), 'dose' => $a->dose_given, 'route' => $a->medication?->route,
+            'status' => $a->status, 'due_at' => null, 'window_ends_at' => null, 'recorded_at' => $a->administered_at->toIso8601String(), 'late' => 0, 'away' => 0,
+        ])->all();
+    }
+
     private function canonical(Builder $query, array $sites, array $clients, bool $nullMedicine = false): Builder
     {
         return $this->scope->scopeCanonicalClientMedicationRows($query, $sites, $nullMedicine)->whereIn($query->qualifyColumn('client_id'), $clients);

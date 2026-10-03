@@ -10,15 +10,19 @@ use App\Models\MedicationRound;
 use App\Models\User;
 use App\Notifications\AppEventNotification;
 use App\Services\Medication\Followups\MedicationFollowupService;
+use App\Services\Medication\Audit\MedicationEventData;
+use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\UserSiteAccessService;
 use App\Support\EmarUrl;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB;
 
 class MedicationAdministrationCorrectionController extends Controller
 {
@@ -26,7 +30,7 @@ class MedicationAdministrationCorrectionController extends Controller
         private readonly MedicationGovernanceScopeService $governanceScope,
     ) {}
 
-    public function approve(Request $request, ClientMedicationAdministration $correction)
+    public function approve(Request $request, ClientMedicationAdministration $correction, ?array &$auditEvents = null)
     {
         $user = $this->correctionActor($request);
 
@@ -37,7 +41,8 @@ class MedicationAdministrationCorrectionController extends Controller
             ClientMedicationAdministration $effectiveAdministration,
             Collection $corrections,
             ?MedicationRound $round,
-        ) use ($user) {
+            Client $client,
+        ) use ($user, &$auditEvents) {
             $this->assertPendingCorrection($lockedCorrection);
             $this->assertControlledStockNeutralCorrection(
                 $medication,
@@ -113,15 +118,17 @@ class MedicationAdministrationCorrectionController extends Controller
                 $followups->syncAdministration($source);
             }
 
+            $this->recordCorrectionEvent('approved', $lockedCorrection, $original, $client, $medication, $user, $auditEvents);
+
             return back()->with('success', 'Correction approved.');
         });
     }
 
-    public function reject(Request $request, ClientMedicationAdministration $correction)
+    public function reject(Request $request, ClientMedicationAdministration $correction, ?array &$auditEvents = null)
     {
         $user = $this->correctionActor($request);
 
-        return $this->withCanonicalCorrection($user, $correction, function (ClientMedicationAdministration $lockedCorrection) use ($request, $user) {
+        return $this->withCanonicalCorrection($user, $correction, function (ClientMedicationAdministration $lockedCorrection, ClientMedicationAdministration $original, ?ClientMedication $medication, ClientMedicationAdministration $effective, Collection $corrections, ?MedicationRound $round, Client $client) use ($request, $user, &$auditEvents) {
             $this->assertPendingCorrection($lockedCorrection);
             $validated = $request->validate(['reason' => 'required|string|max:1000']);
 
@@ -139,11 +146,13 @@ class MedicationAdministrationCorrectionController extends Controller
             );
             app(MedicationFollowupService::class)->syncAdministration($lockedCorrection);
 
+            $this->recordCorrectionEvent('rejected', $lockedCorrection, $original, $client, $medication, $user, $auditEvents);
+
             return back()->with('success', 'Correction rejected.');
         });
     }
 
-    public function store(Request $request, Client $client, ClientMedicationAdministration $administration)
+    public function store(Request $request, Client $client, ClientMedicationAdministration $administration, ?array &$auditEvents = null)
     {
         $user = $this->correctionActor($request);
 
@@ -155,7 +164,7 @@ class MedicationAdministrationCorrectionController extends Controller
             $user,
             (int) $client->id,
             'medications.administer.correct',
-            function (Client $canonicalClient) use ($request, $user, $administration) {
+            function (Client $canonicalClient) use ($request, $user, $administration, &$auditEvents) {
                 $administrationSnapshot = $this->administrationSnapshot($canonicalClient, $administration);
                 $lockedMedication = $this->lockMedicationForAdministration($canonicalClient, $administrationSnapshot);
                 $this->assertControlledMutationAuthority($user, $lockedMedication);
@@ -255,11 +264,15 @@ class MedicationAdministrationCorrectionController extends Controller
                     'url' => url(EmarUrl::mar($canonicalClient)),
                     'actor' => ['id' => $user->id, 'name' => $user->name],
                 ]);
-                $this->correctionRecipients(
+                $recipients = $this->correctionRecipients(
                     $user,
                     $canonicalClient,
                     (bool) $lockedMedication?->controlled_drug,
-                )->each(fn (User $recipient) => $recipient->notify($notification));
+                );
+                // A failed final event append must not send a pending-correction
+                // notification for a domain transaction that rolls back.
+                DB::afterCommit(fn () => $recipients->each(fn (User $recipient) => $recipient->notify($notification)));
+                $this->recordCorrectionEvent('requested', $correction, $rootAdministration, $canonicalClient, $lockedMedication, $user, $auditEvents);
 
                 return back()->with('success', 'Correction submitted for approval.');
             },
@@ -272,6 +285,19 @@ class MedicationAdministrationCorrectionController extends Controller
         abort_unless($user?->canDo('medications.administer.correct'), 403);
 
         return $user;
+    }
+
+    /** Pass a collection only when a caller owns a receipt and will append it last. */
+    private function recordCorrectionEvent(string $outcome, ClientMedicationAdministration $correction, ClientMedicationAdministration $original, Client $client, ?ClientMedication $medication, User $actor, ?array &$auditEvents): void
+    {
+        $event = new MedicationEventData(siteId: (int) $client->site_id, kind: 'correction.'.$outcome,
+            subjectType: 'administration', subjectId: (string) $correction->id, actorId: (int) $actor->id,
+            occurredAt: CarbonImmutable::now('UTC'), summary: 'Medication correction '.$outcome,
+            facts: ['original_administration_id' => (int) $original->id, 'client_medication_id' => $medication?->id,
+                'correction_status' => $correction->correction_status, 'requested_by' => $correction->correction_requested_by ?? $correction->administered_by],
+            clientId: (int) $client->id, controlled: (bool) $medication?->controlled_drug);
+        if ($auditEvents !== null) $auditEvents[] = $event;
+        else app(MedicationEventRecorder::class)->append($event);
     }
 
     private function withCanonicalCorrection(
@@ -302,6 +328,7 @@ class MedicationAdministrationCorrectionController extends Controller
                     $effectiveAdministration,
                     $corrections,
                     $round,
+                    $client,
                 );
             },
         );

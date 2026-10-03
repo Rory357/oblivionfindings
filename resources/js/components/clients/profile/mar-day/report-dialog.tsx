@@ -2,13 +2,12 @@ import {
     CalendarDays,
     CalendarRange,
     Clock,
-    FileDown,
-    FileText,
     Sun,
 } from 'lucide-react';
 import { useState } from 'react';
 
 import { LeaveCalendarRange } from '@/components/hr/leave-calendar-range';
+import { MedicationExportButton } from '@/components/emar/medication-export-button';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -81,24 +80,6 @@ export function reportRange(
     }
 }
 
-/** The existing exports' URLs for one person and range (no new report engine — P09 owns that). */
-export function reportUrls(
-    clientId: number,
-    range: { from: string; to: string },
-    includePrn: boolean,
-): { pdf: string; csv: string } {
-    const query = new URLSearchParams({
-        client_id: String(clientId),
-        date_from: range.from,
-        date_to: range.to,
-        include_prn: includePrn ? '1' : '0',
-    }).toString();
-    return {
-        pdf: `/emar/pdf/mar-chart?${query}`,
-        csv: `/emar/reports/export-mar?${query}`,
-    };
-}
-
 /**
  * Report for this person from the profile's MAR tab (P02-1b): the MAR chart
  * PDF and the dose history CSV, for a range, through the exports that exist.
@@ -130,8 +111,7 @@ export function MarReportDialog({
     const [includePrn, setIncludePrn] = useState(true);
     const chosen = reportRange(range, today, custom);
     const tooLate = chosen !== null && chosen.to > today;
-    const urls =
-        chosen && !tooLate ? reportUrls(clientId, chosen, includePrn) : null;
+    const ready = chosen !== null && !tooLate && chosen.from <= chosen.to;
 
     return (
         <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
@@ -211,23 +191,25 @@ export function MarReportDialog({
                     <Button variant="outline" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button
-                        variant="outline"
-                        disabled={!urls}
-                        onClick={() => urls && window.location.assign(urls.csv)}
+                    <MedicationExportButton
+                        type="doses"
+                        clientId={clientId}
+                        dateFrom={chosen?.from ?? today}
+                        dateTo={chosen?.to ?? today}
+                        includePrn={includePrn}
+                        disabled={!ready}
                     >
-                        <FileDown className="size-4" />
                         Dose history (CSV)
-                    </Button>
-                    <Button
-                        disabled={!urls}
-                        onClick={() =>
-                            urls && window.open(urls.pdf, '_blank', 'noopener')
-                        }
+                    </MedicationExportButton>
+                    <MedicationExportButton
+                        clientId={clientId}
+                        dateFrom={chosen?.from ?? today}
+                        dateTo={chosen?.to ?? today}
+                        includePrn={includePrn}
+                        disabled={!ready}
                     >
-                        <FileText className="size-4" />
                         MAR chart (PDF)
-                    </Button>
+                    </MedicationExportButton>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

@@ -173,7 +173,7 @@ class ClientAllergyRecordService
         $profile->allergies_canonical_at ??= now();
         // Compatibility labels are a projection, never a second clinical list.
         $profile->allergies = collect($records)->filter(fn ($entry) => empty($entry['removed_at']))->pluck('allergen')->unique()->values()->all();
-        $profile->saveOrFail();
+        if (! $profile->exists || $profile->isDirty()) $profile->saveOrFail();
         return $profile;
     }
 

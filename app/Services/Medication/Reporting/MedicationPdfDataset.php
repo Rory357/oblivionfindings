@@ -6,7 +6,7 @@ use App\Models\Client;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
-use App\Models\MedicationAllergy;
+use App\Services\Medication\ClientAllergyRecordService;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\MedicationGovernanceScopeService;
@@ -16,7 +16,7 @@ use Carbon\CarbonPeriod;
 /** Buffered PDF evidence, shared with its fresh release check. No live record writes. */
 final class MedicationPdfDataset
 {
-    public function read(User $actor, string $type, MedicationReportPeriod $period, array $sites, ?int $clientId, ?int $medicineId): array
+    public function read(User $actor, string $type, MedicationReportPeriod $period, array $sites, ?int $clientId, ?int $medicineId, bool $includePrn = true): array
     {
         $access = app(MedicationReportAccess::class);
         abort_unless($access->canExport($actor, $type), 403);
@@ -34,7 +34,9 @@ final class MedicationPdfDataset
             abort_unless($clientId, 422, 'Choose one person for a MAR chart.');
             $client = Client::findOrFail($clientId);
             $result['scope'] = trim($client->first_name.' '.$client->last_name).' · '.$result['scope'];
-            $result['allergies'] = MedicationAllergy::query()->where('client_id', $clientId)->orderBy('id')->get()->map(fn ($a) => $a->allergen.' ('.$a->severity.')')->all();
+            $allergies = app(ClientAllergyRecordService::class)->summary($client);
+            $result['allergies'] = array_map(fn ($a) => $a['allergen'].($a['severity'] ? ' ('.$a['severity'].')' : '').($a['reaction'] ? ' · '.$a['reaction'] : ''), $allergies['entries']);
+            $result['allergies'][] = $allergies['reviewed'] ? ($allergies['status'] === 'no_known' ? 'No known allergies — reviewed' : 'Allergy record reviewed') : 'Allergy record not reviewed';
             $slots = app(MedicationReportDataset::class)->doseRows($actor, $period, $sites, $clientId);
             $orders = ClientMedication::withTrashed()->where('client_id', $clientId)
                 ->where(fn ($q) => $q->whereNull('start_date')->orWhere('start_date', '<=', $period->to))
@@ -43,6 +45,7 @@ final class MedicationPdfDataset
                 ->where(fn ($q) => $q->whereNull('superseded_at')->orWhere('superseded_at', '>=', $period->bounds()[0]))
                 ->where(fn ($q) => $q->whereNull('deleted_at')->orWhere('deleted_at', '>=', $period->bounds()[0]))
                 ->when(! $actor->canDo('medications.controlled.view'), fn ($q) => $q->where('controlled_drug', false))
+                ->when(! $includePrn, fn ($q) => $q->where('is_prn', false))
                 ->orderBy('id')->get();
             // Ceased/superseded orders stay in the period; active-only is never
             // an acceptable historical MAR filter. The slots supply each day.
@@ -52,7 +55,8 @@ final class MedicationPdfDataset
             $prn = app(MedicationGovernanceScopeService::class)->scopeCanonicalClientMedicationRows(ClientMedicationAdministration::query()->effectiveClinicalEvidence(), $sites, false)
                 ->where('client_id', $clientId)->whereHas('medication', fn ($q) => $q->where('is_prn', true))
                 ->whereBetween('administered_at', $period->bounds())->with('medication')->orderBy('administered_at')->orderBy('id')
-                ->when(! $actor->canDo('medications.controlled.view'), fn ($q) => $q->whereHas('medication', fn ($q) => $q->where('controlled_drug', false)))->get();
+                ->when(! $actor->canDo('medications.controlled.view'), fn ($q) => app(MedicationGovernanceScopeService::class)->scopeWithoutControlledMedicationRows($q))
+                ->when(! $includePrn, fn ($q) => $q->whereRaw('1 = 0'))->get();
             $result['columns'] = ['When (NZDT/NZST)', 'As-needed medicine', 'Recorded result'];
             $result['rows'] = $prn->map(fn ($a) => [$a->administered_at->timezone('Pacific/Auckland')->format('j M Y H:i T'), $a->medication?->historicalDisplayName(), $a->status])->all();
             $result['notes'] = ['The chart shows recorded scheduled slots, including Away and Not recorded. A blank cell means no slot is available, not that a dose was given.', 'Dose and route use the immutable version checked by the due time. Not recorded means no such version evidence is available; no historical instruction has been guessed.', 'Ceased and superseded orders in this period are listed below. Current order instructions are shown separately from each day’s dose evidence.'];

@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
-use App\Models\MedicationAllergy;
+use App\Services\Medication\ClientAllergyRecordService;
 use App\Models\MedicationRound;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
@@ -78,7 +78,8 @@ class EmarPdfController extends Controller
             ->orderBy('name')
             ->get();
 
-        $allergies = MedicationAllergy::where('client_id', $client->id)->get();
+        $allergySummary = app(ClientAllergyRecordService::class)->summary($client);
+        $allergies = collect($allergySummary['entries'])->map(fn ($entry) => (object) $entry);
 
         $dates = collect(CarbonPeriod::create($dateFrom, $dateTo))->map(fn ($d) => $d->toDateString())->toArray();
 
@@ -87,6 +88,7 @@ class EmarPdfController extends Controller
             'scheduledMedications' => $scheduledMedications,
             'prnMedications' => $prnMedications,
             'allergies' => $allergies,
+            'allergySummary' => $allergySummary,
             'dates' => $dates,
             'dateFrom' => $dateFrom,
             'dateTo' => $dateTo,
@@ -97,9 +99,7 @@ class EmarPdfController extends Controller
         return $pdf->download("mar-chart-{$client->last_name}.pdf");
     }
 
-    /**
-     * Generate a Controlled Drug Register PDF for a client.
-     */
+    /** Retained orders overlapping this period or containing actual dose evidence. */
     private function ordersForPeriod(Client $client, string $from, string $to, Carbon $fromUtc, Carbon $toUtc, string $recordTime): \Illuminate\Database\Eloquent\Builder
     {
         return ClientMedication::withTrashed()->where('client_id', $client->id)->where(function ($orders) use ($client, $from, $to, $fromUtc, $toUtc, $recordTime) {

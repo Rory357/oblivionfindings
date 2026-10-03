@@ -37,7 +37,7 @@ class ClientMedicationReportExportTest extends TestCase
         Carbon::setTestNow(Carbon::parse('2026-06-16 12:00', 'Pacific/Auckland')->utc());
         $this->site = Site::factory()->create(['is_active' => true]);
         $this->aroha = Client::factory()->create(['site_id' => $this->site->id, 'status' => 'active']);
-        $this->reader = $this->staff(['medications.view', 'medications.reports.export', 'clients.viewAny']);
+        $this->reader = $this->staff(['medications.view', 'medications.reports.view', 'medications.reports.export', 'clients.viewAny']);
     }
 
     protected function tearDown(): void
@@ -71,7 +71,7 @@ class ClientMedicationReportExportTest extends TestCase
         $elsewhere = Client::factory()->create(['site_id' => Site::factory()->create(['is_active' => true])->id]);
         foreach (['emar.pdf.mar', 'emar.reports.export_mar'] as $route) {
             $this->actingAs($this->reader)
-                ->get(route($route, ['client_id' => $elsewhere->id]))
+                ->get(route($route, ['client_id' => $elsewhere->id, 'purpose' => 'care']))
                 ->assertNotFound();
         }
 
@@ -87,6 +87,7 @@ class ClientMedicationReportExportTest extends TestCase
                 'date_from' => '2026-06-15',
                 'date_to' => '2026-06-16',
                 'include_prn' => '0',
+                'purpose' => 'care',
             ]))
             ->assertOk()
             ->assertHeader('content-type', 'application/pdf');
@@ -129,9 +130,9 @@ class ClientMedicationReportExportTest extends TestCase
     private function csv(array $query): string
     {
         return $this->actingAs($this->reader)
-            ->get(route('emar.reports.export_mar', ['client_id' => $this->aroha->id, ...$query]))
+            ->get(route('emar.reports.export_mar', ['client_id' => $this->aroha->id, 'purpose' => 'care', ...$query]))
             ->assertOk()
-            ->streamedContent();
+            ->getContent();
     }
 
     private function order(string $name, bool $prn): ClientMedication

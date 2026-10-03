@@ -1,6 +1,6 @@
 export type Row = Record<string, string | number | boolean | null | Record<string, unknown>>;
 export type Person = { id: number; name: string };
-export type Filters = { view: 'standard' | 'audit' | 'exports'; report: string; sub: string; period: string; date_from: string; date_to: string; site_id: number | null; client_id: number | null; kind: string; q: string; reached?: string };
+export type Filters = { view: 'standard' | 'audit' | 'exports'; report: string; sub: string; period: string; date_from: string; date_to: string; site_id: number | null; client_id: number | null; kind: string; q: string; reached?: string; include_prn?: boolean };
 export type ExportOption = { type: string; label: string; format: string; description: string; allowed: boolean };
 export type Props = {
     filters: Filters; reports: Record<string, string>; sites: Person[]; people: Person[];
