@@ -74,7 +74,7 @@ export async function recordControlledAction(
             'You’re offline — nothing was saved. Your entries are still here. Try again when you’re online.',
         );
     try {
-        const fields = {
+        const fields: ControlledActionValues = {
             ...values,
             action,
             client_request_uuid: clientRequestUuid,

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { ActionDialog, type ActionSpec } from './action-dialog';
 import { CountDialog } from './count-dialog';
 import { OverrideFollowupDialog } from './override-followup-dialog';
@@ -22,7 +22,7 @@ export function useControlledDialogs(workspace: ControlledWorkspace) {
         setModal({ type: 'count', medicineIds });
     const followup = (override: ControlledOverride) =>
         setModal({ type: 'followup', override });
-    let node = null;
+    let node: ReactNode = null;
     if (payload && modal) {
         if (modal.type === 'action')
             node = (
