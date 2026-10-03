@@ -56,15 +56,40 @@ const columns: EntityTableColumn<Log>[] = [
         key: 'record',
         label: 'Record',
         width: '1fr',
-        cell: (row) => `${row.auditable_type} · ${row.auditable_id}`,
+        cell: recordLabel,
     },
     {
         key: 'meta',
         label: 'Changed fields',
         width: '1.4fr',
-        cell: (row) => JSON.stringify(row.meta),
+        cell: changedFields,
     },
 ];
+function words(value: string): string {
+    const label = value
+        .replace(/([a-z])([A-Z])/g, '$1 $2')
+        .replace(/[_.-]+/g, ' ')
+        .trim();
+    return label ? label[0].toUpperCase() + label.slice(1) : 'Not recorded';
+}
+function recordLabel(row: Log): string {
+    const labels: Record<string, string> = {
+        ClientMedication: 'Medicine order',
+        ClientMedicationAdministration: 'Dose record',
+        ClientControlledDrugEntry: 'Controlled register entry',
+        ClientControlledDrugDiscrepancy: 'Controlled discrepancy',
+        ClientBreakGlassAccess: 'Emergency access record',
+    };
+    return `${labels[row.auditable_type] ?? words(row.auditable_type)} ${row.auditable_id}`;
+}
+function changedFields(row: Log): string {
+    const fields = Array.isArray(row.meta.fields)
+        ? row.meta.fields
+              .filter((field): field is string => typeof field === 'string')
+              .map(words)
+        : [];
+    return fields.length ? fields.join(', ') : 'Fields not recorded';
+}
 export default function HistoricalChangeLogs(props: Props) {
     const [exportOpen, setExportOpen] = useState(false);
     const query = new URLSearchParams(
@@ -99,6 +124,7 @@ export default function HistoricalChangeLogs(props: Props) {
                     actions={
                         <>
                             <PageHeaderGlassButton
+                                className="min-h-11"
                                 onClick={() =>
                                     router.visit('/emar/reports/history')
                                 }
@@ -107,6 +133,7 @@ export default function HistoricalChangeLogs(props: Props) {
                             </PageHeaderGlassButton>
                             {props.can_export_history && (
                                 <PageHeaderPrimaryButton
+                                    className="min-h-11"
                                     icon={Download}
                                     onClick={() => setExportOpen(true)}
                                 >
@@ -158,19 +185,59 @@ export default function HistoricalChangeLogs(props: Props) {
                     Clinical history and the event ledger remain available from
                     Reports & audit.
                 </p>
-                <EntityTable
-                    rows={props.logs}
-                    rowKey={(row) => String(row.id)}
-                    identity={(row) => ({
-                        name: row.action,
-                        subline: row.client?.name ?? 'Person not recorded',
-                    })}
-                    identityLabel="Change"
-                    columns={columns}
-                    actionsFor={() => []}
-                    rowHeight="content"
-                    minWidth={800}
-                />
+                <div className="hidden md:block">
+                    <EntityTable
+                        rows={props.logs}
+                        rowKey={(row) => String(row.id)}
+                        identity={(row) => ({
+                            name: words(row.action),
+                            subline: row.client?.name ?? 'Person not recorded',
+                        })}
+                        identityLabel="Change"
+                        columns={columns}
+                        actionsFor={() => []}
+                        rowHeight="content"
+                        minWidth={800}
+                    />
+                </div>
+                <div className="space-y-3 md:hidden">
+                    {props.logs.map((row) => (
+                        <article
+                            key={row.id}
+                            className="border-border bg-card space-y-3 rounded-xl border p-4"
+                            aria-label={`${words(row.action)} for ${row.client?.name ?? 'person not recorded'}`}
+                        >
+                            <div>
+                                <h2 className="text-section-title">
+                                    {words(row.action)}
+                                </h2>
+                                <p className="text-subtle">
+                                    {row.client?.name ?? 'Person not recorded'}
+                                </p>
+                            </div>
+                            <dl className="space-y-2">
+                                {[
+                                    ['When', formatDateTime(row.created_at)],
+                                    [
+                                        'Recorded by',
+                                        row.user?.name ?? 'Not recorded',
+                                    ],
+                                    ['Record', recordLabel(row)],
+                                    ['Changed fields', changedFields(row)],
+                                ].map(([label, value]) => (
+                                    <div key={label}>
+                                        <dt className="text-caption">
+                                            {label}
+                                        </dt>
+                                        <dd className="text-subtle break-words">
+                                            {value}
+                                        </dd>
+                                    </div>
+                                ))}
+                            </dl>
+                        </article>
+                    ))}
+                </div>
             </div>
             {exportOpen && (
                 <HistoricalAuditExportDialog

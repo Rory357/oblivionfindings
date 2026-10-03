@@ -25,7 +25,8 @@ export function HistoricalAuditExportDialog({
     const [purpose, setPurpose] = useState(''),
         [detail, setDetail] = useState(''),
         [busy, setBusy] = useState(false),
-        [error, setError] = useState('');
+        [error, setError] = useState(''),
+        [done, setDone] = useState(false);
     async function download() {
         setBusy(true);
         setError('');
@@ -50,7 +51,7 @@ export function HistoricalAuditExportDialog({
             anchor.click();
             anchor.remove();
             setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
-            onClose();
+            setDone(true);
         } catch (e) {
             setError(
                 e instanceof Error
@@ -72,50 +73,76 @@ export function HistoricalAuditExportDialog({
                         audit trail.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-3">
-                    <RecordPicker
-                        label="Purpose"
-                        value={purpose}
-                        options={Object.entries(purposes).map(
-                            ([value, label]) => ({ value, label }),
+                {done ? (
+                    <p role="status" aria-live="polite" className="text-subtle">
+                        File ready. The download has started, and your export
+                        purpose has been recorded.
+                    </p>
+                ) : (
+                    <div className="space-y-3">
+                        <RecordPicker
+                            label="Purpose"
+                            value={purpose}
+                            options={Object.entries(purposes).map(
+                                ([value, label]) => ({ value, label }),
+                            )}
+                            onChange={setPurpose}
+                        />
+                        {purpose === 'other' && (
+                            <div className="space-y-2">
+                                <Label htmlFor="history-export-purpose">
+                                    Describe the purpose
+                                </Label>
+                                <Textarea
+                                    id="history-export-purpose"
+                                    value={detail}
+                                    onChange={(event) =>
+                                        setDetail(event.target.value)
+                                    }
+                                    maxLength={500}
+                                />
+                            </div>
                         )}
-                        onChange={setPurpose}
-                    />
-                    {purpose === 'other' && (
-                        <div className="space-y-2">
-                            <Label htmlFor="history-export-purpose">
-                                Describe the purpose
-                            </Label>
-                            <Textarea
-                                id="history-export-purpose"
-                                value={detail}
-                                onChange={(event) =>
-                                    setDetail(event.target.value)
-                                }
-                                maxLength={500}
-                            />
-                        </div>
-                    )}
-                    {error && (
-                        <p role="alert" className="text-status-critical">
-                            {error}
-                        </p>
-                    )}
-                </div>
+                        {error && (
+                            <p role="alert" className="text-status-critical">
+                                {error}
+                            </p>
+                        )}
+                    </div>
+                )}
                 <DialogFooter>
-                    <Button variant="outline" onClick={onClose} disabled={busy}>
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={download}
-                        disabled={
-                            busy ||
-                            !purpose ||
-                            (purpose === 'other' && detail.trim().length < 3)
-                        }
-                    >
-                        {busy ? 'Making file…' : 'Download CSV'}
-                    </Button>
+                    {done ? (
+                        <Button
+                            autoFocus
+                            className="min-h-11"
+                            onClick={onClose}
+                        >
+                            Done
+                        </Button>
+                    ) : (
+                        <>
+                            <Button
+                                className="min-h-11"
+                                variant="outline"
+                                onClick={onClose}
+                                disabled={busy}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                className="min-h-11"
+                                onClick={download}
+                                disabled={
+                                    busy ||
+                                    !purpose ||
+                                    (purpose === 'other' &&
+                                        detail.trim().length < 3)
+                                }
+                            >
+                                {busy ? 'Making file…' : 'Download CSV'}
+                            </Button>
+                        </>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>
