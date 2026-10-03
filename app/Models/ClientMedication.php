@@ -20,6 +20,22 @@ class ClientMedication extends Model
     use HasFactory;
     use SoftDeletes;
 
+    private bool $publishingCheckedPrescription = false;
+
+    /** Only the locked P04 workflow publishes a proposed prescription. */
+    public function publishCheckedPrescription(array $payload, int $version, int $verifierId): void
+    {
+        $this->publishingCheckedPrescription = true;
+        try {
+            $this->forceFill(array_merge($payload, [
+                'version' => $version, 'approval_status' => 'verified',
+                'verified_by' => $verifierId, 'verified_at' => now(), 'rejection_reason' => null,
+            ]))->save();
+        } finally {
+            $this->publishingCheckedPrescription = false;
+        }
+    }
+
     private const VERIFICATION_SENSITIVE_FIELDS = [
         'client_id',
         'created_by',
@@ -140,7 +156,7 @@ class ClientMedication extends Model
         });
 
         static::updating(function (self $medication): void {
-            if (! $medication->isDirty(self::VERIFICATION_SENSITIVE_FIELDS)) {
+            if ($medication->publishingCheckedPrescription || ! $medication->isDirty(self::VERIFICATION_SENSITIVE_FIELDS)) {
                 return;
             }
 

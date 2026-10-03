@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\MedicationAllergy;
 use App\Models\MedicationInteraction;
+use App\Services\Medication\CheckedOrderAllergyConfirmation;
 use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\MedicationSafetyPolicySettings;
 use Carbon\Carbon;
@@ -64,8 +65,20 @@ class MedicationSafetyService
         $allergyCheck = $this->checkAllergies($client, $medication);
         if ($allergyCheck['has_match']) {
             $blockUnratedProfileMatches = ($allergyCheck['profile_match_policy'] ?? 'warn') === 'block';
+            $prescriberConfirmation = app(CheckedOrderAllergyConfirmation::class)->forOrder($medication);
 
             foreach ($allergyCheck['matches'] as $index => $allergy) {
+                $confirmedMatch = $prescriberConfirmation !== null && collect($prescriberConfirmation['matches'] ?? [])
+                    ->contains(fn ($match) => mb_strtolower(trim($match['allergen'])) === mb_strtolower(trim($allergy->allergen)));
+                if ($confirmedMatch) {
+                    $warnings[] = [
+                        'type' => 'allergy', 'severity' => 'warning',
+                        'message' => 'Recorded allergy to '.$allergy->allergen.'. The prescriber confirmed this checked version is safe: '.$prescriberConfirmation['instruction'],
+                        'details' => ['allergen' => $allergy->allergen, 'prescriber_confirmation' => $prescriberConfirmation],
+                    ];
+
+                    continue;
+                }
                 $fromProfile = ($allergyCheck['sources'][$index] ?? ClientAllergyRecordService::SOURCE_REGISTER)
                     === ClientAllergyRecordService::SOURCE_PROFILE;
 

@@ -15,6 +15,7 @@ use App\Http\Controllers\Emar\MedicationAuditEventController;
 use App\Http\Controllers\Emar\MedicationErrorController;
 use App\Http\Controllers\Emar\MedicationFollowupController;
 use App\Http\Controllers\Emar\MedicationReviewController;
+use App\Http\Controllers\Emar\MedicationOrdersController;
 use App\Http\Controllers\Emar\MedicationSettingsController;
 use App\Http\Controllers\Emar\MedicationSupportController;
 use App\Http\Controllers\Emar\RefusalFollowUpController;
@@ -129,9 +130,54 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->name('emar.stock');
 
     // Prescriptions & Prescriber Orders
-    Route::get('/prescriptions', [EmarController::class, 'prescriptions'])
+    Route::get('/prescriptions', [MedicationOrdersController::class, 'index'])
         ->middleware('permission:medications.view')
         ->name('emar.prescriptions');
+
+    // Preserve existing source records and dispensing capabilities while P06
+    // integrates supply. New prescriptions use the single chart-order flow.
+    Route::get('/prescriptions/legacy', [EmarController::class, 'prescriptions'])
+        ->middleware('permission:medications.view')->name('emar.prescriptions.legacy');
+    Route::get('/orders/{medication}', [MedicationOrdersController::class, 'detail'])
+        ->whereNumber('medication')->middleware('permission:medications.view')->name('emar.orders.detail');
+    Route::get('/orders/allergies/{client}', [MedicationOrdersController::class, 'allergyCheck'])
+        ->whereNumber('client')->middleware('permission:medications.orders.manage')->name('emar.orders.allergies');
+    Route::post('/orders', [MedicationOrdersController::class, 'enter'])
+        ->middleware('permission:medications.orders.manage')->name('emar.orders.enter');
+    Route::get('/orders/witnesses/{client}', [MedicationOrdersController::class, 'witnesses'])
+        ->whereNumber('client')->middleware('permission:medications.orders.manage')->name('emar.orders.witnesses');
+    Route::post('/order-revisions/{revision}/check', [MedicationOrdersController::class, 'check'])
+        ->middleware('permission:medications.orders.verify')->name('emar.orders.check');
+    Route::post('/order-revisions/{revision}/send-back', [MedicationOrdersController::class, 'sendBack'])
+        ->middleware('permission:medications.orders.verify')->name('emar.orders.send-back');
+    Route::post('/order-revisions/{revision}/allergy-confirmation', [MedicationOrdersController::class, 'confirmAllergy'])
+        ->middleware('permission:medications.orders.manage')->name('emar.orders.allergy-confirmation');
+    Route::post('/order-revisions/{revision}/written-confirmation', [MedicationOrdersController::class, 'confirmWritten'])
+        ->middleware('permission:medications.orders.manage')->name('emar.orders.written-confirmation');
+    Route::post('/orders/{medication}/stop', [MedicationOrdersController::class, 'stop'])
+        ->middleware('permission:medications.orders.manage')->name('emar.orders.stop');
+    Route::post('/orders/{medication}/hold', [MedicationOrdersController::class, 'hold'])
+        ->middleware('permission:medications.orders.manage')->name('emar.orders.hold');
+    Route::post('/orders/{medication}/resume', [MedicationOrdersController::class, 'resume'])
+        ->middleware('permission:medications.orders.manage')->name('emar.orders.resume');
+    Route::get('/order-files/{file}', [MedicationOrdersController::class, 'file'])
+        ->middleware('permission:medications.view')->name('emar.orders.file');
+    Route::post('/orders/{medication}/covert', [MedicationOrdersController::class, 'authoriseCovert'])
+        ->middleware('permission:medications.orders.manage')->name('emar.orders.covert');
+    Route::post('/order-covert/{authorisation}/revoke', [MedicationOrdersController::class, 'revokeCovert'])
+        ->middleware('permission:medications.orders.manage')->name('emar.orders.covert-revoke');
+    Route::post('/reconciliations', [MedicationOrdersController::class, 'startReconciliation'])
+        ->middleware('permission:medications.orders.manage')->name('emar.reconciliations.start');
+    Route::put('/reconciliations/{reconciliation}', [MedicationOrdersController::class, 'saveReconciliation'])
+        ->middleware('permission:medications.orders.manage')->name('emar.reconciliations.save');
+    Route::post('/reconciliations/{reconciliation}/apply', [MedicationOrdersController::class, 'applyReconciliation'])
+        ->middleware('permission:medications.orders.manage')->name('emar.reconciliations.apply');
+    Route::post('/reconciliations/{reconciliation}/sign-off', [MedicationOrdersController::class, 'signOffReconciliation'])
+        ->middleware('permission:medications.orders.manage')->name('emar.reconciliations.sign-off');
+    Route::post('/reconciliations/{reconciliation}/items/{item}/query', [MedicationOrdersController::class, 'resolveReconciliationQuery'])
+        ->middleware('permission:medications.orders.verify')->name('emar.reconciliations.query');
+    Route::get('/orders/candidates/{client}', [MedicationOrdersController::class, 'candidates'])
+        ->middleware('permission:medications.view')->name('emar.orders.candidates');
 
     // P11 chunk 6: Safety & oversight › Staff eligibility replaces
     // Medication › Competency; old links land on it — a ?site_id only after

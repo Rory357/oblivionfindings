@@ -47,19 +47,21 @@ final class MedicationFollowupService
         'written_confirmation' => 'Prescriber written confirmation', 'second_check' => 'Independent second check',
         'reconciliation_query' => 'Reconciliation query', 'review_watch' => 'Medication review watch item',
         'stock_discrepancy' => 'Stock discrepancy follow-up',
+        'covert_review' => 'Review covert authorisation',
     ];
 
     public const LEAD_TYPES = ['unconfirmed', 'partial', 'disputed', 'override', 'countersign', 'handover', 'reconciliation',
-        'reassess_support', 'order_check', 'written_confirmation', 'second_check', 'reconciliation_query', 'stock_discrepancy'];
+        'reassess_support', 'order_check', 'written_confirmation', 'second_check', 'reconciliation_query', 'stock_discrepancy', 'covert_review'];
 
     public const SOURCE_OWNED_TYPES = ['confirm', 'override', 'countersign', 'reconciliation',
-        'reassess_support', 'order_check', 'written_confirmation', 'second_check', 'reconciliation_query', 'stock_discrepancy'];
+        'reassess_support', 'order_check', 'written_confirmation', 'second_check', 'reconciliation_query', 'stock_discrepancy', 'covert_review'];
 
     public const SOURCE_TYPES = [
         'support-reassessment' => 'reassess_support', 'order-check' => 'order_check',
         'phone-written-confirmation' => 'written_confirmation', 'second-check' => 'second_check',
         'reconciliation-query' => 'reconciliation_query', 'review-watch' => 'review_watch',
         'stock-discrepancy' => 'stock_discrepancy', 'confirm' => 'confirm', 'witness-override' => 'override',
+        'covert-review' => 'covert_review',
     ];
 
     public function __construct(
