@@ -10,6 +10,7 @@ use App\Models\MedicationAdminRule;
 use App\Models\Shift;
 use App\Models\User;
 use App\Services\MarScheduleService;
+use App\Services\Medication\Alerts\OnCallResolver;
 use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\ControlledMedicationTransportWitnessService;
 use App\Services\Medication\DoseSlots\DoseOrderTimelineFactory;
@@ -332,6 +333,7 @@ final class DoseRecordingRequirements
             $result['person'] = $this->personFacts($client);
             $result['who_can_give'] = $this->whoCanGive($viewer, $siteId, $now, $candidates, $cache);
             $result['house_lead'] = $cache->houseLead[$siteId] ??= $this->houseLead($siteId, $now);
+            $result['on_call'] = $this->onCallFor($siteId, $now);
             $result['prn'] = $order->is_prn ? $this->prnFacts($order) : null;
             $result['reoffer'] = $due !== null ? $this->reofferFacts($client, $order, $dueAt, $now) : null;
             $result['options'] = [
@@ -589,6 +591,30 @@ final class DoseRecordingRequirements
             ->map(fn (User $user): array => ['id' => (int) $user->id, 'name' => (string) $user->name])
             ->values()
             ->all();
+    }
+
+    /**
+     * The house's on-call contact now (Settings › On-call, P11 B2): who, their
+     * work phone, or why there's nobody ("Nobody — … is on leave").
+     *
+     * @return array{configured: bool, name: ?string, phone: ?string, warning: ?string}
+     */
+    private function onCallFor(int $siteId, CarbonImmutable $now): array
+    {
+        if ($siteId <= 0) {
+            return ['configured' => false, 'name' => null, 'phone' => null, 'warning' => null];
+        }
+        // A fresh resolver: it keeps each house's rule for its own lifetime,
+        // and this service can outlive a request (a cached controller).
+        $onCall = app(OnCallResolver::class);
+        $resolved = $onCall->at($siteId, $now);
+
+        return [
+            'configured' => $resolved['configured'],
+            'name' => $resolved['user']?->name,
+            'phone' => $onCall->phoneOf($resolved['user']),
+            'warning' => $resolved['warning'],
+        ];
     }
 
     /** The house lead rostered at the house today (for "Message the house lead"). */

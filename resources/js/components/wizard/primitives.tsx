@@ -15,7 +15,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { AlertTriangle, Check } from 'lucide-react';
+import { AlertTriangle, Check, XCircle } from 'lucide-react';
 import {
     cloneElement,
     Fragment,
@@ -340,6 +340,10 @@ export function TilePicker({
     onChange,
     options,
     cols = 3,
+    labelledBy,
+    describedBy,
+    invalid = false,
+    frontline = false,
 }: {
     value: string;
     onChange: (v: string) => void;
@@ -351,12 +355,26 @@ export function TilePicker({
         accent?: string;
         /** Optional highlighted line under the description (e.g. eligibility). */
         meta?: string;
+        /** Why this tile can't be chosen right now: shown on the tile, which stays focusable and inert. */
+        disabled?: string | null;
     }[];
     /** Most columns the picker may use when wide (default 3). */
     cols?: 2 | 3;
+    /** The visible label that names the group (its element id). */
+    labelledBy?: string;
+    describedBy?: string;
+    /** Marks every tile while the choice is missing (validation). */
+    invalid?: boolean;
+    /** 44 px frontline tap targets (eMAR recording). */
+    frontline?: boolean;
 }) {
     return (
-        <div className="@container">
+        <div
+            className="@container"
+            role={labelledBy ? 'group' : undefined}
+            aria-labelledby={labelledBy}
+            aria-describedby={describedBy}
+        >
             <div className={tilePickerGridClass(options.length, cols)}>
                 {options.map((o) => {
                     const Icon = o.icon;
@@ -365,13 +383,24 @@ export function TilePicker({
                         <button
                             key={o.key}
                             type="button"
+                            data-tile={o.key}
                             aria-pressed={active}
-                            onClick={() => onChange(o.key)}
+                            aria-disabled={o.disabled ? true : undefined}
+                            aria-invalid={invalid || undefined}
+                            onClick={() => {
+                                if (!o.disabled) onChange(o.key);
+                            }}
                             className={cn(
-                                'flex items-start gap-2.5 rounded-lg border bg-card/50 p-3 text-left transition-all hover:border-primary/50 hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                                'flex items-start gap-2.5 rounded-lg border bg-card/50 p-3 text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                                frontline && 'frontline-tap',
+                                o.disabled
+                                    ? 'cursor-not-allowed opacity-80'
+                                    : 'hover:border-primary/50 hover:bg-card',
                                 active
                                     ? 'border-primary bg-primary/10 ring-1 ring-primary/40'
-                                    : 'border-border',
+                                    : invalid
+                                      ? 'border-status-critical/60'
+                                      : 'border-border',
                             )}
                         >
                             {Icon ? (
@@ -404,6 +433,15 @@ export function TilePicker({
                                 {o.meta ? (
                                     <span className="mt-1 block text-[11px] font-medium text-primary">
                                         {o.meta}
+                                    </span>
+                                ) : null}
+                                {o.disabled ? (
+                                    <span className="mt-1 flex items-start gap-1 text-xs font-semibold text-status-critical">
+                                        <XCircle
+                                            className="mt-0.5 size-3 shrink-0"
+                                            aria-hidden="true"
+                                        />
+                                        {o.disabled}
                                     </span>
                                 ) : null}
                             </span>

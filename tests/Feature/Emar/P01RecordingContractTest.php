@@ -13,6 +13,7 @@ use App\Models\MedicationAllergy;
 use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationDoseSlot;
 use App\Models\MedicationError;
+use App\Models\MedicationOnCallRule;
 use App\Models\MedicationRefusalFollowup;
 use App\Models\Permission;
 use App\Models\Role;
@@ -965,6 +966,62 @@ class P01RecordingContractTest extends TestCase
         $this->assertSame('given', $reoffer->status);
         $this->assertSame($refusal->id, (int) $reoffer->reoffer_of_id);
         $this->assertNotNull(MedicationRefusalFollowup::query()->sole()->follow_up_completed_at);
+    }
+
+    public function test_requirements_name_the_houses_on_call_contact(): void
+    {
+        $order = $this->order(['09:30'], ['name' => 'Losartan 50mg']);
+
+        $this->requirements($order, '09:30')
+            ->assertOk()
+            ->assertJsonPath('on_call.configured', false)
+            ->assertJsonPath('on_call.name', null);
+
+        $rangi = $this->staffAt($this->site, 'Rangi Parata');
+        HrEmployeeProfile::query()->where('user_id', $rangi->id)->update(['work_phone' => '021 555 0142']);
+        MedicationOnCallRule::query()->create([
+            'site_id' => $this->site->id,
+            'mode' => MedicationOnCallRule::FIXED,
+            'team_lead' => false,
+            'backup_user_id' => $rangi->id,
+        ]);
+
+        $this->requirements($order, '09:30')
+            ->assertOk()
+            ->assertJsonPath('on_call.configured', true)
+            ->assertJsonPath('on_call.name', 'Rangi Parata')
+            ->assertJsonPath('on_call.phone', '021 555 0142');
+    }
+
+    public function test_a_controlled_as_needed_dose_checks_the_balance_left(): void
+    {
+        $witness = $this->witnessOnShift();
+        $order = $this->order([], [
+            'name' => 'Oxycodone 5mg (as needed)',
+            'is_prn' => true,
+            'prn_reason' => 'Pain',
+            'max_per_day' => 4,
+            'controlled_drug' => true,
+            'dose_amount' => 1,
+            'dose_unit' => 'tablet',
+        ]);
+        $stock = ClientMedicationStock::query()->create(['client_medication_id' => $order->id, 'on_hand' => 10, 'unit' => 'tablets']);
+        $prn = fn (array $extra) => $this->actingAs($this->worker)->postJson('/meds/today/prn', [
+            'client_medication_id' => $order->id,
+            'reason' => 'Pain',
+            'administered_at' => now()->toIso8601String(),
+            'quantity_administered' => 1,
+            'witnessed_by' => $witness->id,
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
+            ...$extra,
+        ]);
+
+        // A balance that doesn't match the register is refused; nothing moves.
+        $prn(['cd_balance' => 7])->assertStatus(422)->assertJsonPath('error_field', 'cd_balance');
+        $this->assertSame(10.0, (float) $stock->refresh()->on_hand);
+
+        $prn(['cd_balance' => 9])->assertOk();
+        $this->assertSame(9.0, (float) $stock->refresh()->on_hand);
     }
 
     // ─── helpers ─────────────────────────────────────────────

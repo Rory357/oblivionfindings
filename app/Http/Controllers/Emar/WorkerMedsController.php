@@ -418,6 +418,9 @@ class WorkerMedsController extends Controller
             'reason' => ['required', 'string', 'max:500'],
             'dose_given' => ['nullable', 'string', 'max:255'],
             'quantity_administered' => ['nullable', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0.01', 'max:10000'],
+            // P01 Q-C2a: a controlled as-needed dose states the balance left,
+            // checked against the register as a scheduled dose's is.
+            'cd_balance' => ['nullable', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0', 'max:100000'],
             'administered_at' => ['nullable', 'date'],
             'witnessed_by' => ['nullable', 'integer', 'min:1'],
             'witness_credential' => ['nullable', 'string', 'max:255'],
@@ -457,6 +460,7 @@ class WorkerMedsController extends Controller
                         'reason' => trim($data['reason']),
                         'dose_given' => $data['dose_given'] ?? null,
                         'quantity_administered' => $data['quantity_administered'] ?? null,
+                        'cd_balance' => $data['cd_balance'] ?? null,
                         'witnessed_by' => $data['witnessed_by'] ?? null,
                         'witness_credential' => $data['witness_credential'] ?? null,
                         'blood_glucose_level' => $data['blood_glucose_level'] ?? null,

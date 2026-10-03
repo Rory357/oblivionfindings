@@ -101,9 +101,9 @@ import {
     DayPickerChip,
     parseYmd,
 } from '@/components/meds/day-picker-chip';
+import { AsNeededPicker } from '@/components/emar/record-dose/dialogs';
+import { RecordDoseDialog } from '@/components/emar/record-dose/record-dose-dialog';
 import { PrnEffectDialog } from './components/prn-effect-dialog';
-import { PrnWizard } from './components/prn-wizard';
-import { RecordDoseWizard } from './components/record-dose-wizard';
 import { RecordedDetailDialog } from './components/recorded-detail-dialog';
 import {
     awaitsOrderCheck,
@@ -1248,8 +1248,6 @@ export default function MedsToday(props: MedsTodayProps) {
         prn_follow_ups,
         stock_alerts,
         activity,
-        witnesses,
-        not_given_reasons,
         board_user,
         board_can,
         date,
@@ -1292,6 +1290,34 @@ export default function MedsToday(props: MedsTodayProps) {
         () => new Map(clients.map((c) => [c.id, c])),
         [clients],
     );
+
+    /** The names the as-needed row shows, for the dialog's "nothing can be recorded" answer. */
+    const prnLabel = (medId: number) => {
+        const medication = prn_medications.find((m) => m.id === medId);
+        return medication
+            ? {
+                  person:
+                      clientById.get(medication.client_id)?.preferred ??
+                      medication.client_name,
+                  medicine: medication.name,
+              }
+            : undefined;
+    };
+
+    /** P01 "Next due": the next open dose the worker can record — same time first, then later. */
+    const nextDueAfter = (row: ScheduleRow): ScheduleRow | null => {
+        const open = schedule.filter(
+            (r) =>
+                r.key !== row.key &&
+                (r.status === 'due' || r.status === 'overdue') &&
+                canRecordMedication(r.is_controlled),
+        );
+        return (
+            open.find((r) => r.scheduled_for === row.scheduled_for) ??
+            [...open].sort((a, b) => a.scheduled_for.localeCompare(b.scheduled_for))[0] ??
+            null
+        );
+    };
 
     const overlayOpen =
         wizard !== null ||
@@ -2019,30 +2045,76 @@ export default function MedsToday(props: MedsTodayProps) {
             </div>
 
             {/* ── Overlays ── */}
+            {/* eMAR P01: one recording dialog for every dose (scheduled and
+                as-needed); the server says what each dose needs and allows. */}
             {wizard?.type === 'dose' &&
             canRecordMedication(wizard.row.is_controlled) ? (
-                <RecordDoseWizard
-                    row={wizard.row}
-                    client={clientById.get(wizard.row.client_id)}
-                    date={date}
-                    witnesses={witnesses}
-                    notGivenReasons={not_given_reasons}
+                <RecordDoseDialog
+                    key={`${wizard.row.key}:${wizard.initialOutcome ?? 'given'}`}
+                    target={{
+                        kind: 'scheduled',
+                        orderId: wizard.row.medication_id,
+                        scheduledFor: wizard.row.scheduled_for,
+                        label: {
+                            person:
+                                clientById.get(wizard.row.client_id)
+                                    ?.preferred ?? wizard.row.client_name,
+                            medicine: wizard.row.medication_name,
+                        },
+                    }}
+                    entry="meds-today"
+                    mode={wizard.initialOutcome === 'withheld' ? 'notgiven' : 'record'}
                     signedAs={board_user}
-                    initialOutcome={wizard.initialOutcome ?? 'given'}
+                    onEligibility={() => {
+                        setWizard(null);
+                        setMeOpen(true);
+                    }}
+                    onRecorded={(result) => {
+                        if (result.status !== 'queued') {
+                            router.reload({ preserveScroll: true });
+                        }
+                    }}
+                    nextLabel={
+                        nextDueAfter(wizard.row)
+                            ? `Next due: ${clientById.get(nextDueAfter(wizard.row)!.client_id)?.preferred ?? nextDueAfter(wizard.row)!.client_name} · ${nextDueAfter(wizard.row)!.medication_name}`
+                            : null
+                    }
+                    onNext={() => {
+                        const next = nextDueAfter(wizard.row);
+                        setWizard(next ? { type: 'dose', row: next } : null);
+                    }}
                     onClose={() => setWizard(null)}
                 />
             ) : null}
-            {canRecord && wizard?.type === 'prn' ? (
-                <PrnWizard
-                    medications={prn_medications.filter(
+            {canRecord && wizard?.type === 'prn' && wizard.medId == null ? (
+                <AsNeededPicker
+                    choices={prn_medications.filter(
                         (medication) =>
                             !medication.is_controlled || canRecordControlled,
                     )}
-                    clients={clientById}
-                    date={date}
-                    witnesses={witnesses}
+                    onClose={() => setWizard(null)}
+                    onPick={(medId) => setWizard({ type: 'prn', medId })}
+                />
+            ) : null}
+            {canRecord && wizard?.type === 'prn' && wizard.medId != null ? (
+                <RecordDoseDialog
+                    key={`prn:${wizard.medId}`}
+                    target={{
+                        kind: 'prn',
+                        orderId: wizard.medId,
+                        label: prnLabel(wizard.medId),
+                    }}
+                    entry="as-needed"
                     signedAs={board_user}
-                    initialMedId={wizard.medId ?? null}
+                    onEligibility={() => {
+                        setWizard(null);
+                        setMeOpen(true);
+                    }}
+                    onRecorded={(result) => {
+                        if (result.status !== 'queued') {
+                            router.reload({ preserveScroll: true });
+                        }
+                    }}
                     onClose={() => setWizard(null)}
                 />
             ) : null}

@@ -63,7 +63,7 @@ import {
     DayPickerChip,
     parseYmd,
 } from '@/components/meds/day-picker-chip';
-import { RecordDoseWizard } from '@/pages/meds/today/components/record-dose-wizard';
+import { RecordDoseDialog } from '@/components/emar/record-dose/record-dose-dialog';
 import type {
     ClientInfo,
     CompetencyNotice,
@@ -473,7 +473,6 @@ export default function EmarHome(props: Props) {
         medicationOptions,
         witnesses,
         orderCheckUrl,
-        notGivenReasons,
         signedAs,
         can,
         canManageSettings,
@@ -509,9 +508,6 @@ export default function EmarHome(props: Props) {
         setModalClientId(clientId);
         setModal(key);
     };
-
-    // Witnesses for the reused RecordDoseWizard, excluding the signer.
-    const recordWitnesses = witnesses.filter((w) => w.id !== currentUserId);
 
     // Compliance delta across the 7-day window (for the card pill + the chart
     // caption): first to last day that had a rate (a day with nothing due,
@@ -2090,13 +2086,25 @@ export default function EmarHome(props: Props) {
             {recordWizard &&
             can.record &&
             (!recordWizard.row.is_controlled || can.record_controlled) ? (
-                <RecordDoseWizard
-                    row={recordWizard.row}
-                    client={recordWizard.client}
-                    date={date}
-                    witnesses={recordWitnesses}
-                    notGivenReasons={notGivenReasons}
+                <RecordDoseDialog
+                    target={{
+                        kind: 'scheduled',
+                        orderId: recordWizard.row.medication_id,
+                        scheduledFor: recordWizard.row.scheduled_for,
+                        label: {
+                            person:
+                                recordWizard.client?.preferred ??
+                                recordWizard.row.client_name,
+                            medicine: recordWizard.row.medication_name,
+                        },
+                    }}
+                    entry="dashboard"
                     signedAs={signedAs}
+                    onRecorded={(result) => {
+                        if (result.status !== 'queued') {
+                            router.reload({ preserveScroll: true });
+                        }
+                    }}
                     onClose={() => setRecordWizard(null)}
                 />
             ) : null}
