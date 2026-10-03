@@ -57,12 +57,14 @@ class MedicationRbacAuthorizationTest extends TestCase
                 'emar.destructions.void',
                 'emar.cd_loss.store',
                 'emar.cd_loss.investigate',
-                'clients.medical.controlled_discrepancies.close',
             ],
             'medications.controlled.manage' => [
                 'emar.controlled.discrepancies.resolve', 'emar.destructions.void',
                 'emar.cd_loss.resolve', 'clients.medical.controlled_discrepancies.close',
             ],
+            // The client-scoped close route uses independent management authority.
+            'medications.view' => ['clients.medical.controlled_discrepancies.close'],
+            'medications.controlled.view' => ['clients.medical.controlled_discrepancies.close'],
             'medications.stock.update' => [
                 'emar.pharmacy_orders.store',
                 'emar.pharmacy_orders.update',
@@ -280,6 +282,7 @@ class MedicationRbacAuthorizationTest extends TestCase
         $actor = $this->userWithPermissions([
             'medications.view',
             'medications.administer.correct',
+            'medications.reports.view',
             'medications.reports.export',
             'shifts.manageAny',
         ], $site);
@@ -782,9 +785,11 @@ class MedicationRbacAuthorizationTest extends TestCase
             "/label: 'Stock & pharmacy',\\s*href: '\\/emar\\/stock',\\s*icon: \\w+,\\s*visible: all\\(view, stockUpdate\\)/s",
             $navigation,
         );
-        // reports.viewAny reveals Reports & audit › Reports only (§3).
+        // Standard reports need the exact module reader; audit adds its own gate.
+        $this->assertStringContainsString('export const canOpenEmarReports = reportsView;', $navigation);
+        $this->assertStringContainsString('export const canOpenEmarAudit = all(reportsView, auditView);', $navigation);
         $this->assertMatchesRegularExpression(
-            "/label: 'Reports',\\s*href: '\\/emar\\/reports',\\s*icon: \\w+,\\s*visible: any\\(reportsExport, reportsViewAny\\)/s",
+            "/label: 'Standard reports',\\s*href: '\\/emar\\/reports',\\s*icon: \\w+,\\s*visible: reportsView/s",
             $navigation,
         );
     }
