@@ -141,6 +141,8 @@ export type SettingsPayload = {
     site_names?: Record<string, string>;
     /** Who each alert group would tell at each house (added by the page). */
     alert_reach?: AlertReach;
+    /** On-call contacts (B2 C4): each house this person sees, and whether it has one. */
+    oncall_houses?: { site_id: number; name: string; configured: boolean }[];
 };
 
 /**
@@ -626,6 +628,8 @@ export type Pending = {
     state: 'default' | 'nc';
     /** What happens until someone decides. */
     until: string;
+    /** Where it applies, when that isn't every house ("Kōwhai House"). */
+    scope?: string;
 };
 
 /** The second of a pair is decided with the first, so it isn't listed on its own. */
@@ -695,6 +699,21 @@ export function stillToDecide(s: SettingsPayload): Pending[] {
             });
         });
     });
+    // On-call contacts (B2 C4): a house without one, until someone sets it up.
+    (s.oncall_houses ?? [])
+        .filter((h) => !h.configured)
+        .forEach((h) =>
+            out.push({
+                group: 'oncall',
+                key: `oncall:${h.site_id}`,
+                view: 'alerts',
+                section: 'oncall',
+                label: `On-call contact — ${h.name}`,
+                state: 'nc',
+                until: 'Screens say “On-call contact: Not configured” and give no number',
+                scope: h.name,
+            }),
+        );
     return out;
 }
 

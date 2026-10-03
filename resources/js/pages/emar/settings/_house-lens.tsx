@@ -2,9 +2,10 @@
  * medication setting in force at one house — the organisation's and the
  * house's own — read-only, opened from Settings' "At a house".
  *
- * Only what the app has today: v5's controlled-drug witness card (P07a), its
- * phone-instructions rule and its Alerts & on-call section (P11 B2) aren't
- * built, so they aren't shown. Every value here is an organisation value
+ * Only what the app has today: v5's controlled-drug witness card (P07a) and
+ * its phone-instructions rule aren't built, so they aren't shown. Alerts &
+ * on-call (step 4) since P11 B2 chunk 4; quiet hours and emergency access
+ * arrive with their chunks. Every value here is an organisation value
  * today, apart from medicine rules set for the house itself.
  *
  * v5 switches between a house lead's houses in the footer; past a handful
@@ -19,9 +20,11 @@ import {
 } from '@/components/wizard/shell';
 import {
     ArrowUpRight,
+    Bell,
     Clock,
     Home,
     KeyRound,
+    Phone,
     Pill,
     Repeat,
     Shield,
@@ -34,6 +37,7 @@ import {
     type SettingsPayload,
     type ViewKey,
 } from './_model';
+import { resolveNight, type OnCallData } from './_oncall';
 import type { MedicineRule } from './_rules';
 import type { WitnessPinStaffRow } from './_sections';
 import type { RoundTemplate } from './_templates';
@@ -108,10 +112,13 @@ export function HouseLens({
     rules,
     templates,
     pins,
+    oncall,
     onOpen,
     onClose,
 }: {
     s: SettingsPayload;
+    /** On-call contacts, for someone who sees Alerts & access (step 4). */
+    oncall?: OnCallData;
     houses: { id: number; name: string }[];
     rules: MedicineRule[];
     templates: RoundTemplate[];
@@ -122,6 +129,59 @@ export function HouseLens({
 }) {
     const [houseId, setHouseId] = useState(houses[0]?.id ?? 0);
     const [step, setStep] = useState(0);
+    const steps = oncall
+        ? [
+              ...STEPS,
+              {
+                  key: 'alerts' as ViewKey,
+                  label: 'Alerts & on-call',
+                  blurb: 'Who is told, and who to call',
+                  icon: Bell,
+              },
+          ]
+        : STEPS;
+    const oc = oncall?.houses.find((h) => h.site_id === houseId);
+    const tonight =
+        oc?.rule && oc.roster[0]
+            ? resolveNight(
+                  oc.rule,
+                  oc.rule.backup
+                      ? {
+                            ...oc.rule.backup,
+                            away:
+                                oncall?.staff[String(oc.site_id)]?.find(
+                                    (x) => x.id === oc.rule?.backup?.id,
+                                )?.away ?? [],
+                        }
+                      : null,
+                  oc.roster[0],
+                  0,
+              )
+            : null;
+    const alertKeys = s.groups.alerts?.keys ?? [];
+    const channelCount = (c: 'inapp' | 'email' | 'push') =>
+        alertKeys.filter((k) => {
+            try {
+                return JSON.parse(savedValue(s, 'alerts', k))?.[c];
+            } catch {
+                return false;
+            }
+        }).length;
+    const extras = alertKeys
+        .map((k) => {
+            const raw = s.site_values?.[String(houseId)]?.alertExtra?.[k];
+            let ids: number[] = [];
+            try {
+                ids = raw ? JSON.parse(raw) : [];
+            } catch {
+                ids = [];
+            }
+            return ids.length
+                ? `${s.definitions.alerts?.[k]?.alert?.label ?? k}: ${ids.map((id) => s.people_names?.[id] ?? 'A former staff member').join(', ')}`
+                : null;
+        })
+        .filter(Boolean) as string[];
+    const realert = savedValue(s, 'delivery', 'realert_every');
     const house = houses.find((h) => h.id === houseId);
     const name = house?.name ?? 'this house';
     const word = (group: string, key: string) => {
@@ -151,12 +211,12 @@ export function HouseLens({
             railIcon={Home}
             railTitle={name}
             railSub="Read-only summary"
-            steps={STEPS}
+            steps={steps}
             stepIndex={step}
             onStepClick={setStep}
             sequential={false}
             pct={null}
-            headerLabel={STEPS[step].label}
+            headerLabel={steps[step].label}
             footerStart={
                 houses.length > 1 && houses.length <= FOOTER_HOUSES ? (
                     <Choice
@@ -314,7 +374,7 @@ export function HouseLens({
                             />
                         </ReviewCard>
                     </div>
-                ) : (
+                ) : step === 2 ? (
                     <div className="grid gap-4 sm:grid-cols-2">
                         <ReviewCard icon={Users} title="Competency">
                             <ReviewRow
@@ -376,14 +436,83 @@ export function HouseLens({
                             />
                         </ReviewCard>
                     </div>
+                ) : (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <ReviewCard icon={Bell} title="Alerts">
+                            <ReviewRow
+                                label="Channels"
+                                value={
+                                    <V
+                                        v={`In-app ${channelCount('inapp')} · email ${channelCount('email')} · push ${channelCount('push')} of ${alertKeys.length}`}
+                                    />
+                                }
+                            />
+                            <ReviewRow
+                                label="Re-alert until attended"
+                                value={
+                                    <V
+                                        v={
+                                            realert && realert !== 'off'
+                                                ? `Every ${realert} minutes`
+                                                : 'Off'
+                                        }
+                                    />
+                                }
+                            />
+                            <ReviewRow
+                                label="Extra people here"
+                                value={
+                                    <V
+                                        v={
+                                            extras.length
+                                                ? extras.join('; ')
+                                                : 'None'
+                                        }
+                                        house={extras.length > 0}
+                                    />
+                                }
+                            />
+                        </ReviewCard>
+                        <ReviewCard icon={Phone} title="On-call contact">
+                            <ReviewRow
+                                label="How it’s decided"
+                                value={
+                                    <V
+                                        v={
+                                            oc?.rule
+                                                ? oc.rule.mode === 'roster'
+                                                    ? `The roster${oc.rule.team_lead ? ', then the team lead on shift' : ''}`
+                                                    : 'Always the same person'
+                                                : 'Not configured'
+                                        }
+                                        house
+                                    />
+                                }
+                            />
+                            <ReviewRow
+                                label="Tonight"
+                                value={
+                                    tonight
+                                        ? tonight.who
+                                            ? `${tonight.who.name} · ${tonight.who.phone ?? 'no work phone'}`
+                                            : (tonight.warning ?? '—')
+                                        : 'Screens give no number'
+                                }
+                            />
+                            <ReviewRow
+                                label="Backup"
+                                value={oc?.rule?.backup?.name ?? '—'}
+                            />
+                        </ReviewCard>
+                    </div>
                 )}
                 <p className="text-caption mt-4">
                     Saved settings only — unsaved changes aren’t shown.{' '}
                     <Button
                         variant="link"
-                        onClick={() => onOpen(STEPS[step].key)}
+                        onClick={() => onOpen(steps[step].key)}
                     >
-                        Open {STEPS[step].label}
+                        Open {steps[step].label}
                         <ArrowUpRight className="size-4" />
                     </Button>
                 </p>

@@ -48,7 +48,9 @@ export function StillToDecide({ q }: { q: string }) {
     const { s, go, open, canEdit } = useSettings();
     const menu = useEntityContextMenu<Pending>();
     const all = stillToDecide(s);
-    const rows = all.filter((r) => match(q, r.label, 'All houses', r.until));
+    const rows = all.filter((r) =>
+        match(q, r.label, r.scope ?? 'All houses', r.until),
+    );
     const canKeep = (r: Pending) => r.state === 'default' && canEdit(r.group);
     const actions = (r: Pending): MenuItem[] =>
         compactMenu([
@@ -98,7 +100,7 @@ export function StillToDecide({ q }: { q: string }) {
                     identity={(r) => ({
                         icon: HelpCircle,
                         name: r.label,
-                        subline: 'All houses',
+                        subline: r.scope ?? 'All houses',
                     })}
                     columns={[
                         {

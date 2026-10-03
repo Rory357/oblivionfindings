@@ -58,6 +58,8 @@ final class MedicationAlertCatalogue
     public const GROUPS_BUILT = [
         self::ROSTERED,
         self::HOUSE_LEAD,
+        // B2 chunk 4: the house's on-call contact (off on every alert by default, Q9).
+        self::ON_CALL,
         self::CLINICAL_LEAD,
         self::PROVIDER_MANAGER,
         self::STOCK_STAFF,

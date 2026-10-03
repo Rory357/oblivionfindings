@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Emar;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Services\PeopleMutationLockService;
 use App\Http\Controllers\Controller;
 use App\Models\AppSetting;
 use App\Models\ClientMedication;
 use App\Models\MedicationAdminRule;
 use App\Models\MedicationAlert;
+use App\Models\MedicationOnCallRule;
 use App\Models\Site;
 use App\Models\User;
 use App\Models\UserPushSubscription;
@@ -17,6 +19,7 @@ use App\Notifications\WitnessPinReminderNotification;
 use App\Services\AuditLogger;
 use App\Services\Medication\Alerts\MedicationAlertPreviews;
 use App\Services\Medication\Alerts\MedicationAlertRecipients;
+use App\Services\Medication\Alerts\OnCallResolver;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\RoundTemplateCatalogue;
 use App\Services\Medication\Settings\MedicationSettingDefinition;
@@ -29,9 +32,11 @@ use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationRuleService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
+use Carbon\CarbonInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -794,6 +799,269 @@ class MedicationSettingsController extends Controller
     }
 
     /**
+     * Set a house's on-call contact (P11 B2 chunk 4). It saves straight away —
+     * not through the page draft — and is recorded in the change history and
+     * the audit log. The backup must be an employed staff member with access
+     * to the house and a work phone on their staff record.
+     */
+    public function saveOnCall(Request $request, Site $site)
+    {
+        $actor = $request->user();
+        abort_unless($actor && $this->canManageOnCall($actor, (int) $site->id), 403);
+        $validated = $request->validate([
+            'mode' => ['required', Rule::in([MedicationOnCallRule::ROSTER, MedicationOnCallRule::FIXED])],
+            'team_lead' => ['required', 'boolean'],
+            'backup_user_id' => ['nullable', 'integer'],
+        ]);
+        $roster = $validated['mode'] === MedicationOnCallRule::ROSTER;
+        $pick = collect($this->onCallStaff([(int) $site->id], now())[(int) $site->id] ?? [])
+            ->firstWhere('id', (int) ($validated['backup_user_id'] ?? 0));
+        if ($pick === null || ! $pick['ok']) {
+            throw ValidationException::withMessages([
+                'backup_user_id' => $roster ? 'Choose who staff call when nobody is rostered on call.' : 'Choose the on-call person.',
+            ]);
+        }
+
+        DB::transaction(function () use ($actor, $site, $validated, $roster): void {
+            $lockedActor = $this->lockCurrentRuleActor($actor, true);
+            abort_unless($this->canManageOnCall($lockedActor, (int) $site->id), 403);
+            $resolver = app(OnCallResolver::class);
+            $rule = MedicationOnCallRule::query()->with('backup')->where('site_id', $site->id)->lockForUpdate()->first();
+            $before = $resolver->describe($rule);
+            $rule ??= new MedicationOnCallRule(['site_id' => $site->id]);
+            $rule->fill([
+                'mode' => $validated['mode'],
+                'team_lead' => $roster && (bool) $validated['team_lead'],
+                'backup_user_id' => (int) $validated['backup_user_id'],
+                'updated_by' => $lockedActor->id,
+            ])->save();
+            $rule->load('backup');
+            $after = $resolver->describe($rule);
+            if ($before === $after) {
+                return;
+            }
+            $this->settingsStore->recordOnCallChange($lockedActor, (int) $site->id, 'On-call contact', $before, $after, false, 'medications.oncall_contact.updated');
+            AuditLogger::logOrFail('medications.oncall_contact.updated', $rule, [
+                'actor_id' => (int) $lockedActor->id,
+                'site_id' => (int) $site->id,
+                'before' => $before,
+                'after' => $after,
+            ]);
+        }, 3);
+
+        return redirect()->back()->with('medication_settings_saved', 'On-call contact saved for '.$site->name.'.');
+    }
+
+    /** Remove a house's on-call contact: screens there say "Not configured" again (P11 B2 chunk 4). */
+    public function removeOnCall(Request $request, Site $site)
+    {
+        $actor = $request->user();
+        abort_unless($actor && $this->canManageOnCall($actor, (int) $site->id), 403);
+
+        DB::transaction(function () use ($actor, $site): void {
+            $lockedActor = $this->lockCurrentRuleActor($actor, true);
+            abort_unless($this->canManageOnCall($lockedActor, (int) $site->id), 403);
+            $rule = MedicationOnCallRule::query()->with('backup')->where('site_id', $site->id)->lockForUpdate()->first();
+            if ($rule === null) {
+                return;
+            }
+            $before = app(OnCallResolver::class)->describe($rule);
+            $rule->delete();
+            $this->settingsStore->recordOnCallChange($lockedActor, (int) $site->id, 'On-call contact removed', $before, 'Not configured', true, 'medications.oncall_contact.removed');
+            AuditLogger::logOrFail('medications.oncall_contact.removed', null, [
+                'actor_id' => (int) $lockedActor->id,
+                'site_id' => (int) $site->id,
+                'before' => $before,
+            ]);
+        }, 3);
+
+        return redirect()->back()->with('medication_settings_saved', 'On-call contact removed for '.$site->name.'. Screens show “Not configured” again.');
+    }
+
+    /**
+     * Who changes a house's on-call contact (v5 canHouse): a medication
+     * settings manager with access to the house, or a house manager at one
+     * of their own houses (B2 Q3). Only houses that count (Q12).
+     */
+    private function canManageOnCall(User $actor, int $siteId): bool
+    {
+        return $this->alertHouseIds([$siteId]) !== [] && $this->onCallManageable($actor, [$siteId]) === [$siteId];
+    }
+
+    /**
+     * Of these houses (already counted as houses), those whose on-call
+     * contact this person changes — the permission checks done once.
+     *
+     * @param  list<int>  $houseIds
+     * @return list<int>
+     */
+    private function onCallManageable(User $actor, array $houseIds): array
+    {
+        $settings = $actor->canDo('medications.settings.manage');
+        $all = $settings && $this->canManageGlobalRules($actor);
+        $accessible = $settings && ! $all ? $this->accessibleSiteIds($actor) : [];
+        $own = $actor->canDo('medications.alerts.manage_house') ? $this->ownHouseSiteIds($actor) : [];
+
+        return array_values(array_filter(
+            $houseIds,
+            fn (int $id): bool => $all || in_array($id, $accessible, true) || in_array($id, $own, true),
+        ));
+    }
+
+    /**
+     * On-call contacts for the houses this person sees: each house's rule,
+     * its house leads, the roster for the next nights (to preview a rule),
+     * and — where they can change it — the staff who can be the backup.
+     *
+     * @param  list<int>  $houseIds
+     * @return array{houses: list<array<string, mixed>>, staff: array<int, list<array<string, mixed>>>}
+     */
+    private function onCallPayload(User $actor, array $houseIds): array
+    {
+        if ($houseIds === []) {
+            return ['houses' => [], 'staff' => []];
+        }
+        $resolver = app(OnCallResolver::class);
+        $now = now();
+        $rules = MedicationOnCallRule::query()
+            ->with(['backup.hrEmployeeProfile', 'updatedBy:id,name'])
+            ->whereIn('site_id', $houseIds)
+            ->get()
+            ->keyBy('site_id');
+        $leads = User::query()
+            ->whereNotNull('approved_at')
+            ->whereHas('roles', fn ($roles) => $roles->where('name', 'team_lead'))
+            ->with('hrEmployeeProfile')
+            ->orderBy('name')
+            ->get();
+        $person = fn (?User $user): ?array => $user === null ? null : [
+            'id' => (int) $user->id,
+            'name' => (string) $user->name,
+            'phone' => $resolver->phoneOf($user),
+        ];
+        $manageable = $this->onCallManageable($actor, array_map('intval', $houseIds));
+        $rosters = $resolver->rosters(array_map('intval', $houseIds), $now);
+        $houses = [];
+        foreach (Site::query()->whereIn('id', $houseIds)->orderBy('name')->get(['id', 'name']) as $site) {
+            $siteId = (int) $site->id;
+            $rule = $rules->get($siteId);
+            $can = in_array($siteId, $manageable, true);
+            $houses[] = [
+                'site_id' => $siteId,
+                'name' => (string) $site->name,
+                'house_leads' => $leads
+                    ->filter(fn (User $lead): bool => in_array($siteId, $this->profileSiteIds($lead->hrEmployeeProfile), true))
+                    ->pluck('name')
+                    ->values()
+                    ->all(),
+                'rule' => $rule === null ? null : [
+                    'mode' => (string) $rule->mode,
+                    'team_lead' => (bool) $rule->team_lead,
+                    'backup' => $person($rule->backup),
+                    'describe' => $resolver->describe($rule),
+                    'changed_by' => $rule->updatedBy?->name,
+                    'changed_at' => $rule->updated_at?->toIso8601String(),
+                ],
+                'roster' => array_map(fn (array $night): array => [
+                    'label' => $night['label'],
+                    'hours' => $night['hours'],
+                    'on_call' => $person($night['on_call']),
+                    'team_lead' => $person($night['team_lead']),
+                ], $rosters[$siteId] ?? []),
+                'can_manage' => $can,
+            ];
+        }
+
+        return ['houses' => $houses, 'staff' => $this->onCallStaff($manageable, $now)];
+    }
+
+    /**
+     * Who can be a house's on-call backup (v5): employed staff with access to
+     * the house. Without a work phone on their staff record they're listed but
+     * can't be chosen; nights they're on approved leave are marked.
+     *
+     * @param  list<int>  $siteIds
+     * @return array<int, list<array{id: int, name: string, role: string, phone: string|null, ok: bool, why: string|null, away: list<int>, leave: string|null}>>
+     */
+    private function onCallStaff(array $siteIds, CarbonInterface $now): array
+    {
+        if ($siteIds === []) {
+            return [];
+        }
+        $resolver = app(OnCallResolver::class);
+        $windows = $resolver->windows($now);
+        $today = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+        $profiles = HrEmployeeProfile::query()
+            ->where('is_active', true)
+            ->where(fn ($q) => $q->whereNull('start_date')->orWhereDate('start_date', '<=', $today))
+            ->where(fn ($q) => $q->whereNull('end_date')->orWhereDate('end_date', '>=', $today))
+            ->whereHas('user', fn ($u) => $u->whereNotNull('approved_at'))
+            ->with(['user.roles:id,name,label'])
+            ->get();
+        $leave = HrLeaveRequest::query()
+            ->approved()
+            ->whereIn('user_id', $profiles->pluck('user_id')->all())
+            ->where('starts_at', '<', end($windows)['until'])
+            ->where('ends_at', '>', $windows[0]['from'])
+            ->get(['user_id', 'starts_at', 'ends_at'])
+            ->groupBy('user_id');
+        $timezone = config('app.worker_timezone', 'Pacific/Auckland');
+        $out = [];
+        foreach ($siteIds as $siteId) {
+            $rows = [];
+            foreach ($profiles as $profile) {
+                if (! in_array((int) $siteId, $this->profileSiteIds($profile), true) || ! $profile->user instanceof User) {
+                    continue;
+                }
+                $user = $profile->user;
+                $user->setRelation('hrEmployeeProfile', $profile);
+                $phone = $resolver->phoneOf($user);
+                $theirs = $leave->get($user->id, collect());
+                $away = [];
+                foreach ($windows as $i => $night) {
+                    if ($theirs->contains(fn ($l): bool => $l->starts_at < $night['until'] && $l->ends_at > $night['from'])) {
+                        $away[] = $i;
+                    }
+                }
+                $first = $theirs->sortBy('starts_at')->first();
+                $rows[] = [
+                    'id' => (int) $user->id,
+                    'name' => (string) $user->name,
+                    'role' => (string) ($user->roles->first()?->label ?? $user->roles->first()?->name ?? 'Staff'),
+                    'phone' => $phone,
+                    'ok' => $phone !== null,
+                    'why' => $phone === null ? 'no work phone on their staff record' : null,
+                    'away' => $away,
+                    'leave' => $first === null ? null : sprintf(
+                        'On leave %s – %s (Leave hub)',
+                        Carbon::parse($first->starts_at)->timezone($timezone)->format('D j'),
+                        Carbon::parse($first->ends_at)->timezone($timezone)->format('D j M'),
+                    ),
+                ];
+            }
+            usort($rows, fn (array $a, array $b): int => strcmp($a['name'], $b['name']));
+            $out[(int) $siteId] = $rows;
+        }
+
+        return $out;
+    }
+
+    /** @return list<int> A profile's primary and other houses. */
+    private function profileSiteIds(?HrEmployeeProfile $profile): array
+    {
+        if (! $profile instanceof HrEmployeeProfile) {
+            return [];
+        }
+
+        return collect([$profile->primary_site_id, ...($profile->secondary_site_ids ?? [])])
+            ->filter()
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
      * Alerts & access (P11 B2): whether this person sees it, whether they set
      * who gets each alert organisation-wide, the houses whose extras they
      * change, the people they can name, and the names of everyone already
@@ -801,7 +1069,7 @@ class MedicationSettingsController extends Controller
      *
      * @param  list<int>  $siteIds  Houses whose settings this person reads.
      * @param  list<int>  $houseSiteIds  Their own houses (HR profile).
-     * @return array{alertAccess: array<string, mixed>, alertPeople: list<array<string, mixed>>, alertNames: array<int, string>, alertReach: array<string, mixed>, alertNobodyOpen: int, alertPreviews: array<string, mixed>, alertDelivery: array{push_ready: int, people: int}}
+     * @return array{alertAccess: array<string, mixed>, alertPeople: list<array<string, mixed>>, alertNames: array<int, string>, alertReach: array<string, mixed>, alertNobodyOpen: int, alertPreviews: array<string, mixed>, alertDelivery: array{push_ready: int, people: int}, onCall: array<string, mixed>}
      */
     private function alertPayload(User $actor, bool $canView, bool $canManage, bool $canManageGlobal, bool $canHouseAlerts, array $siteIds, array $houseSiteIds): array
     {
@@ -819,6 +1087,7 @@ class MedicationSettingsController extends Controller
                 'alertNobodyOpen' => 0,
                 'alertPreviews' => [],
                 'alertDelivery' => ['push_ready' => 0, 'people' => 0],
+                'onCall' => ['houses' => [], 'staff' => []],
             ];
         }
 
@@ -859,6 +1128,8 @@ class MedicationSettingsController extends Controller
                 ->count(),
             // Organisation editors name anyone; house managers people at their houses.
             'alertPeople' => $people,
+            // On-call contacts (B2 chunk 4): one per house this person sees.
+            'onCall' => $this->onCallPayload($actor, $this->alertHouseIds($siteIds)),
             // Message preview (B2 chunk 2): synthetic samples through the real
             // notification, with the privacy switch on and off.
             'alertPreviews' => app(MedicationAlertPreviews::class)->all(),
@@ -897,8 +1168,9 @@ class MedicationSettingsController extends Controller
             ->whereIn('id', $siteIds)
             ->where('is_active', true)
             ->where(fn ($sites) => $sites
-                ->where('type', '!=', 'head_office')
+                ->whereIn('type', ['house', 'residential'])
                 ->orWhereNull('type')
+                ->orWhere(fn ($facility) => $facility->where('type', 'facility')->whereHas('clients'))
                 ->orWhereHas('clients.medications', fn ($orders) => $orders->active()))
             ->orderBy('name')
             ->pluck('id')

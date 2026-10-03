@@ -19,6 +19,7 @@ import { Head, router } from '@inertiajs/react';
 import {
     Activity,
     Bell,
+    BellRing,
     ClipboardCheck,
     Clock,
     FileText,
@@ -28,7 +29,6 @@ import {
     KeyRound,
     Layers,
     LockKeyhole,
-    Mail,
     Pencil,
     Pill,
     RefreshCw,
@@ -83,6 +83,11 @@ import {
     visibleViews,
     type Built,
 } from './settings/_nav';
+import {
+    OnCallContacts,
+    OnCallDialogHost,
+    type OnCallData,
+} from './settings/_oncall';
 import {
     MedicineRules,
     RuleDialogHost,
@@ -145,6 +150,8 @@ type Props = {
     alertPreviews: Record<string, AlertPreview>;
     /** Of the people who can get alerts, how many have push set up. */
     alertDelivery: { push_ready: number; people: number };
+    /** On-call contacts (B2 C4), one per house this person sees. */
+    onCall: OnCallData;
 };
 
 const VIEW_ICON: Record<ViewKey, LucideIcon> = {
@@ -169,7 +176,8 @@ const SEC_ICON: Record<string, LucideIcon> = {
     decide: HelpCircle,
     changes: History,
     alerts: Bell,
-    delivery: Mail,
+    delivery: BellRing,
+    oncall: Bell,
 };
 /** Tabs whose settings are saved through the save bar. */
 const SAVED_SECTIONS = [
@@ -239,6 +247,11 @@ export default function EmarSettings(props: Props) {
             site_names: Object.fromEntries(
                 props.sites.map((x) => [x.id, x.name]),
             ),
+            oncall_houses: (props.onCall?.houses ?? []).map((h) => ({
+                site_id: h.site_id,
+                name: h.name,
+                configured: !!h.rule,
+            })),
             alert_reach: {
                 houses: props.alertReach.houses,
                 people: {
@@ -262,6 +275,7 @@ export default function EmarSettings(props: Props) {
             props.alertPeople,
             props.alertReach,
             props.sites,
+            props.onCall?.houses,
         ],
     );
     // P11 F1 + Q2: people who manage or read a house's round templates
@@ -283,7 +297,9 @@ export default function EmarSettings(props: Props) {
                   ? ['pins', 'status']
                   : [],
             // P11 B2: settings readers, and house managers for their houses' extras.
-            alerts: alertAccess.view ? ['overview', 'alerts', 'delivery'] : [],
+            alerts: alertAccess.view
+                ? ['overview', 'alerts', 'delivery', 'oncall']
+                : [],
             history: settingsAccess ? ['decide', 'changes'] : [],
         }),
         [settingsAccess, templatesOnly, witnessPin.can_reset, alertAccess.view],
@@ -428,6 +444,7 @@ export default function EmarSettings(props: Props) {
         can: props.can,
         readOnlyAudit,
     };
+    const onCallData: OnCallData = props.onCall ?? { houses: [], staff: {} };
     const alertData: AlertData = {
         access: alertAccess,
         people: props.alertPeople,
@@ -436,6 +453,7 @@ export default function EmarSettings(props: Props) {
         nobodyOpen: props.alertNobodyOpen,
         previews: props.alertPreviews ?? {},
         delivery: props.alertDelivery ?? { push_ready: 0, people: 0 },
+        onCall: onCallData,
     };
     // House extras: their own houses' managers (B2 Q3); everything else
     // needs all-sites authority.
@@ -495,6 +513,7 @@ export default function EmarSettings(props: Props) {
                 'alertReach',
                 'alertNobodyOpen',
                 'alertDelivery',
+                'onCall',
             ],
             onSuccess: () => setLoadedAt(new Date()),
         });
@@ -664,6 +683,7 @@ export default function EmarSettings(props: Props) {
             rules={props.rules}
             templates={props.roundTemplates}
             pins={witnessPin.staff}
+            oncall={s.oncall_houses ?? []}
         />
     ) : undefined;
 
@@ -868,6 +888,13 @@ export default function EmarSettings(props: Props) {
                     setF({ ...f, show: 'all' });
                 }}
             />
+        ) : view === 'alerts' && sec === 'oncall' ? (
+            <OnCallContacts
+                q={query}
+                data={onCallData}
+                readOnlyAudit={readOnlyAudit}
+                clear={clearQ}
+            />
         ) : view === 'history' && sec === 'decide' ? (
             <StillToDecide q={query} />
         ) : view === 'history' && sec === 'changes' ? (
@@ -925,6 +952,7 @@ export default function EmarSettings(props: Props) {
                         rules={props.rules}
                         templates={props.roundTemplates}
                         pins={witnessPin.staff}
+                        oncall={alertAccess.view ? onCallData : undefined}
                         onOpen={(v) => {
                             setLensOpen(false);
                             go(v);
@@ -934,6 +962,7 @@ export default function EmarSettings(props: Props) {
                 ) : null}
                 <RuleDialogHost dialog={dialog} data={ruleData} />
                 <AlertDialogHost dialog={dialog} data={alertData} />
+                <OnCallDialogHost dialog={dialog} data={onCallData} />
                 <TemplateDialogHost dialog={dialog} data={templateData} />
             </SettingsCtx.Provider>
         </AppLayout>

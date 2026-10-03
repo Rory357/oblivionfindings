@@ -24,7 +24,10 @@ export type Dialog =
     | { kind: 'gen' }
     | { kind: 'alertwho'; key: string }
     | { kind: 'alertperson'; key: string }
-    | { kind: 'msgpreview'; key: string };
+    | { kind: 'msgpreview'; key: string }
+    | { kind: 'oncall'; siteId: number }
+    | { kind: 'oncallview'; siteId: number }
+    | { kind: 'oncallremove'; siteId: number };
 
 export type SettingsContext = {
     s: SettingsPayload;

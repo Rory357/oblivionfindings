@@ -24,6 +24,8 @@ use Illuminate\Support\Collection;
  *    that covers the alert time — scheduled or in progress, published when
  *    publishing is on (B2 Q10: the rostered window, not clocked in).
  *  - House lead: the team_lead role at the house (B2 Q2; today's routing).
+ *  - On-call person: the house's on-call contact at the alert time
+ *    (OnCallResolver, B2 chunk 4) — nobody where it isn't configured.
  *  - Clinical lead / Provider manager: that role, with access to the house.
  *  - People who update stock here: `medications.stock.update` at the house.
  *  - The staff member: the person the alert is about.
@@ -58,6 +60,7 @@ class MedicationAlertRecipients
     public function __construct(
         private readonly MedicationAlertSettings $settings,
         private readonly UserSiteAccessService $siteAccess,
+        private readonly OnCallResolver $onCall,
     ) {}
 
     /**
@@ -270,6 +273,7 @@ class MedicationAlertRecipients
         return match ($group) {
             MedicationAlertCatalogue::ROSTERED => $this->rostered($subject->siteId, $at),
             MedicationAlertCatalogue::HOUSE_LEAD => $this->withRole('team_lead'),
+            MedicationAlertCatalogue::ON_CALL => $this->onCall($subject->siteId, $at),
             MedicationAlertCatalogue::CLINICAL_LEAD => $this->withRole('clinical_lead'),
             MedicationAlertCatalogue::PROVIDER_MANAGER => $this->withRole('provider_manager'),
             MedicationAlertCatalogue::STOCK_STAFF => $this->withPermission('medications.stock.update'),
@@ -303,6 +307,17 @@ class MedicationAlertRecipients
             ->all();
 
         return $this->approved($userIds);
+    }
+
+    /** @return Collection<int, User> The house's on-call contact at that moment (B2 chunk 4), if anyone. */
+    private function onCall(?int $siteId, CarbonInterface $at): Collection
+    {
+        if ($siteId === null) {
+            return collect();
+        }
+        $user = $this->onCall->at($siteId, $at)['user'];
+
+        return $user === null ? collect() : $this->approved([(int) $user->id]);
     }
 
     /** @return Collection<int, User> */

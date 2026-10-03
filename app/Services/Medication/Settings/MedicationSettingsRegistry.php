@@ -50,9 +50,10 @@ class MedicationSettingsRegistry
     /** "Off" for the follow-up numbers: each alert is sent once, nobody else is told. */
     public const FOLLOW_UP_OFF = 'off';
 
-    /** Who an escalation can add (v5 FOLLOW_TO; the on-call person arrives with B2 chunk 4). */
+    /** Who an escalation can add (v5 FOLLOW_TO; the on-call person since B2 chunk 4). */
     public const ESCALATE_TO_GROUPS = [
         MedicationAlertCatalogue::HOUSE_LEAD,
+        MedicationAlertCatalogue::ON_CALL,
         MedicationAlertCatalogue::CLINICAL_LEAD,
         MedicationAlertCatalogue::PROVIDER_MANAGER,
     ];

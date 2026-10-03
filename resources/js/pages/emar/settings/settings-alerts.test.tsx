@@ -460,6 +460,7 @@ const orgEditor: AlertData = {
     nobodyOpen: 0,
     previews: { stock: STOCK_PREVIEW },
     delivery: { push_ready: 2, people: 3 },
+    onCall: { houses: [], staff: {} },
 };
 const houseLead: AlertData = {
     access: { view: true, manage_org: false, house_ids: [3] },
@@ -469,6 +470,7 @@ const houseLead: AlertData = {
     nobodyOpen: 0,
     previews: { stock: STOCK_PREVIEW },
     delivery: { push_ready: 1, people: 2 },
+    onCall: { houses: [], staff: {} },
 };
 
 afterEach(cleanup);

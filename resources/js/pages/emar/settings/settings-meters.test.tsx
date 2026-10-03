@@ -131,10 +131,38 @@ describe('Settings header meters', () => {
             }),
         ).toBeInTheDocument();
         // A template-only manager keeps the round templates meter; someone
-        // with no Settings view has none. No on-call meter is shown to
-        // anyone until P11 B2 builds on-call contacts.
+        // with no Settings view has none. No on-call meter without the
+        // Alerts & access view.
         expect(hasSettingsMeters({ rounds: ['templates'] })).toBe(true);
         expect(hasSettingsMeters({})).toBe(false);
         expect(screen.queryByText(/on-call/i)).toBeNull();
+    });
+
+    it('counts houses with an on-call contact as a donut, linked to On-call contacts (B2 C4)', () => {
+        const go = vi.fn();
+        render(
+            <SettingsMeters
+                built={{ alerts: ['overview', 'oncall'] }}
+                view="alerts"
+                sec="overview"
+                go={go}
+                pending={[]}
+                rules={[]}
+                templates={[]}
+                pins={[]}
+                oncall={[
+                    { configured: true },
+                    { configured: false },
+                    { configured: false },
+                ]}
+            />,
+        );
+        const meter = screen.getByRole('button', {
+            name: 'View on-call contacts, 1 of 3 set',
+        });
+        expect(meter).toHaveTextContent('1 of 3 set');
+        expect(meter).toHaveTextContent('2 not configured');
+        meter.click();
+        expect(go).toHaveBeenCalledWith('alerts', 'oncall');
     });
 });

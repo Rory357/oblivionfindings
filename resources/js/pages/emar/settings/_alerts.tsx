@@ -49,6 +49,7 @@ import {
     Home,
     LockKeyhole,
     Mail,
+    Phone,
     Plus,
     Shield,
     Siren,
@@ -82,6 +83,7 @@ import {
     type AlertSetting,
     type SettingsPayload,
 } from './_model';
+import type { OnCallData } from './_oncall';
 import { NoMatches, useRow } from './_sections';
 import {
     Changed,
@@ -144,6 +146,8 @@ export type AlertData = {
     previews: Record<string, AlertPreview>;
     /** Of the people who can get alerts, how many have push set up. */
     delivery: { push_ready: number; people: number };
+    /** On-call contacts (B2 C4), one per house this person sees. */
+    onCall: OnCallData;
 };
 
 const G = 'alerts';
@@ -214,6 +218,9 @@ export function AlertsOverview({ q, data }: { q: string; data: AlertData }) {
     const open = keys.filter((k) => !decisionReviewer(s, G, k)).length;
     const priv = draftValue(s, {}, D, 'private') !== 'no';
     const saved = (key: string) => draftValue(s, {}, D, key);
+    const ocHouses = data.onCall.houses;
+    const ocSet = ocHouses.filter((h) => h.rule).length;
+    const ocRoster = ocHouses.filter((h) => h.rule?.mode === 'roster').length;
     const off = s.definitions[D]?.realert_every?.numeric?.off ?? 'off';
     const deliveryOpen = [
         'realert_every',
@@ -289,6 +296,26 @@ export function AlertsOverview({ q, data }: { q: string; data: AlertData }) {
                     ),
                     cta: 'Review delivery & follow-up',
                     onClick: () => go('alerts', 'delivery'),
+                },
+                {
+                    icon: Phone,
+                    title: 'On-call contacts',
+                    lines: [
+                        `${ocSet} of ${ocHouses.length} houses have one · ${ocRoster} follow the roster.`,
+                        'Whoever is rostered on call is shown after hours, with a backup person.',
+                    ],
+                    badge:
+                        ocSet < ocHouses.length ? (
+                            <StatusBadge variant="warning" size="sm">
+                                {ocHouses.length - ocSet} not configured
+                            </StatusBadge>
+                        ) : (
+                            <StatusBadge variant="success" size="sm">
+                                Every house has one
+                            </StatusBadge>
+                        ),
+                    cta: 'Review on-call contacts',
+                    onClick: () => go('alerts', 'oncall'),
                 },
             ]}
         />
@@ -649,6 +676,9 @@ export function AlertsDelivery({
     const escOn = value('escalate_after') !== off;
     const fu = keys.filter((k) => valueOf(s, draft, k).follow_up);
     const fuLabels = fu.map((k) => metaOf(s, k)?.label ?? k);
+    const toOnCall = keys
+        .filter((k) => valueOf(s, draft, k).groups.includes('onCall'))
+        .map((k) => metaOf(s, k)?.label ?? k);
     const groups = def('escalate_to')?.group_options ?? [];
     const escalateTo = parseGroups(value('escalate_to')) ?? [];
     const err = (key: string) => errors[`${D}.${key}`];
@@ -1032,6 +1062,50 @@ export function AlertsDelivery({
                         hint="Decided alerts are always in-app; any other alert stays in-app unless email or push is on."
                         hidden={!link('Alert types sent in-app', 'in-app')}
                         control={counted('inapp')}
+                    />
+                </SettingGroup>
+                <SettingGroup
+                    id="afterhours"
+                    icon={Phone}
+                    title="After hours"
+                    caption="Nobody is phoned automatically"
+                >
+                    <GroupRow
+                        id="dl-oncall"
+                        label="On-call contacts"
+                        hint="Follows the roster: on-call shift, then the team lead on shift, then a backup person."
+                        hidden={!link('On-call contacts', 'after hours')}
+                        control={
+                            <Button
+                                variant="link"
+                                onClick={() => go('alerts', 'oncall')}
+                            >
+                                {
+                                    data.onCall.houses.filter((h) => h.rule)
+                                        .length
+                                }{' '}
+                                of {data.onCall.houses.length} houses
+                                <ArrowUpRight className="size-4" />
+                            </Button>
+                        }
+                    />
+                    <GroupRow
+                        id="dl-oncallgets"
+                        label="Alerts that go to the on-call person"
+                        hint={
+                            toOnCall.length
+                                ? toOnCall.join(', ')
+                                : escOn && escalateTo.includes('onCall')
+                                  ? 'Only through escalation.'
+                                  : 'None yet — add them in an alert’s groups, or escalate to them.'
+                        }
+                        hidden={
+                            !link(
+                                'Alerts that go to the on-call person',
+                                'on-call',
+                            )
+                        }
+                        control={toAlerts}
                     />
                 </SettingGroup>
                 {show === 'all' ? <FollowUpPreview /> : null}
@@ -1508,6 +1582,14 @@ export function AlertWho({ k, data }: { k: string; data: AlertData }) {
     const canH = (h: number) =>
         !data.readOnlyAudit && data.access.house_ids.includes(h);
     const houses = data.sites;
+    // v5: the on-call group says which houses have no contact yet (B2 C4).
+    const noOnCall = data.onCall.houses
+        .filter((h) => !h.rule)
+        .map((h) => h.name);
+    const groupCaption = (g: string, description?: string) =>
+        g === 'onCall' && noOnCall.length
+            ? `${description ?? ''}. ${noOnCall.length > 2 ? `${noOnCall.slice(0, 2).join(', ')} and ${noOnCall.length - 2} more houses have` : `${noOnCall.join(' and ')} ${noOnCall.length === 1 ? 'has' : 'have'}`} no on-call contact yet.`
+            : description;
     const [x, setX] = useState<AlertSetting>(() => valueOf(s, draft, k));
     const [extra, setExtra] = useState<Record<number, number[]>>(() =>
         Object.fromEntries(
@@ -1648,8 +1730,12 @@ export function AlertWho({ k, data }: { k: string; data: AlertData }) {
                                                 <p className="text-caption">
                                                     {locked
                                                         ? 'Always on'
-                                                        : meta.group_labels[g]
-                                                              ?.description}
+                                                        : groupCaption(
+                                                              g,
+                                                              meta.group_labels[
+                                                                  g
+                                                              ]?.description,
+                                                          )}
                                                 </p>
                                             </div>
                                             <OnOff

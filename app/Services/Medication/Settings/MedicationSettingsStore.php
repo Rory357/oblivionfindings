@@ -39,6 +39,9 @@ class MedicationSettingsStore
     /** History entries for round templates use this group, keyed "template:{id}". */
     public const TEMPLATES_GROUP = 'round_templates';
 
+    /** On-call contacts (P11 B2 chunk 4): saved straight away, one per house. */
+    public const ONCALL_GROUP = 'oncall';
+
     public function __construct(private readonly MedicationSettingsRegistry $registry) {}
 
     /** @return array<string, array<string, string>> Saved organisation values, by group then key. */
@@ -220,6 +223,39 @@ class MedicationSettingsStore
             'after_text' => $after,
             'loosens' => $loosens,
             'controlled' => $controlled,
+            'actor_id' => $actor->id,
+            'audit_event' => $auditEvent,
+        ]);
+    }
+
+    /**
+     * Record an on-call contact saved or removed for a house (P11 B2 chunk 4),
+     * at that house. The audit entry is written by the caller; it saves
+     * straight away, so it isn't "put back" from the history.
+     */
+    public function recordOnCallChange(
+        User $actor,
+        int $siteId,
+        string $label,
+        string $before,
+        string $after,
+        bool $loosens,
+        string $auditEvent,
+    ): MedicationSettingChange {
+        return MedicationSettingChange::query()->create([
+            'setting_group' => self::ONCALL_GROUP,
+            'setting_key' => 'oncall:'.$siteId,
+            'site_id' => $siteId,
+            'action' => MedicationSettingChange::ACTION_CHANGED,
+            'view' => MedicationSettingsRegistry::VIEW_ALERTS,
+            'section' => 'oncall',
+            'label' => $label,
+            'before_value' => null,
+            'after_value' => null,
+            'before_text' => $before,
+            'after_text' => $after,
+            'loosens' => $loosens,
+            'controlled' => false,
             'actor_id' => $actor->id,
             'audit_event' => $auditEvent,
         ]);

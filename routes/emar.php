@@ -321,6 +321,14 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     Route::put('/settings/changes', [MedicationSettingsController::class, 'saveChanges'])
         ->middleware('permission:medications.settings.manage|medications.alerts.manage_house')
         ->name('emar.settings.changes.save');
+    // P11 B2 chunk 4: a house's on-call contact saves (and is removed) straight
+    // away; the controller checks authority over that house.
+    Route::put('/settings/oncall/{site}', [MedicationSettingsController::class, 'saveOnCall'])
+        ->middleware('permission:medications.settings.manage|medications.alerts.manage_house')
+        ->name('emar.settings.oncall.save');
+    Route::delete('/settings/oncall/{site}', [MedicationSettingsController::class, 'removeOnCall'])
+        ->middleware('permission:medications.settings.manage|medications.alerts.manage_house')
+        ->name('emar.settings.oncall.remove');
 
     // ─── End CRUD Routes ────────────────────────────────────
 

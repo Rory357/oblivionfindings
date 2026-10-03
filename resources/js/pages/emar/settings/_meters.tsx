@@ -1,7 +1,7 @@
 /* Settings' header meters (eMAR P11 v5): each a link to where its number
- * lives, and each shown only when that view is open to this person. v5's
- * on-call meter arrives with P11 B2, which builds on-call contacts — until
- * then there is nothing true to count, so it isn't shown (no fake meters). */
+ * lives, and each shown only when that view is open to this person. The
+ * on-call meter counts the houses with an on-call contact (B2 C4) — a donut,
+ * linked to On-call contacts (Rory). */
 import {
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
@@ -19,6 +19,7 @@ const METERS: [ViewKey, string][] = [
     ['rules', 'medicines'],
     ['rounds', 'templates'],
     ['staff', 'status'],
+    ['alerts', 'oncall'],
 ];
 const opens = (built: Built, v: ViewKey, k: string) =>
     built[v]?.includes(k) ?? false;
@@ -36,6 +37,7 @@ export function SettingsMeters({
     rules,
     templates,
     pins,
+    oncall = [],
 }: {
     built: Built;
     view: ViewKey;
@@ -45,8 +47,11 @@ export function SettingsMeters({
     rules: MedicineRule[];
     templates: RoundTemplate[];
     pins: WitnessPinStaffRow[];
+    /** Houses this person sees, and whether each has an on-call contact. */
+    oncall?: { configured: boolean }[];
 }) {
     const has = (v: ViewKey, k: string) => opens(built, v, k);
+    const ocSet = oncall.filter((h) => h.configured).length;
     const activeRules = rules.filter((r) => r.active);
     const activeTemplates = templates.filter((t) => t.status === 'active');
     const pinCount = (...st: string[]) =>
@@ -139,6 +144,28 @@ export function SettingsMeters({
                             </PageHeaderMeterCaption>
                         </>
                     )}
+                </PageHeaderMeterBlock>
+            ) : null}
+            {has('alerts', 'oncall') && oncall.length ? (
+                <PageHeaderMeterBlock
+                    label="On-call contacts"
+                    tone={ocSet < oncall.length ? 'warning' : 'success'}
+                    ariaLabel={`View on-call contacts, ${ocSet} of ${oncall.length} set`}
+                    pressed={view === 'alerts' && sec === 'oncall'}
+                    onClick={() => go('alerts', 'oncall')}
+                >
+                    <PageHeaderMeterDonut
+                        percent={(ocSet / oncall.length) * 100}
+                        caption={
+                            <>
+                                {ocSet} of {oncall.length} set
+                                <br />
+                                {ocSet === oncall.length
+                                    ? 'Every house has one'
+                                    : `${oncall.length - ocSet} not configured`}
+                            </>
+                        }
+                    />
                 </PageHeaderMeterBlock>
             ) : null}
         </>

@@ -3,6 +3,7 @@
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\ControlRoom\SignalRule;
 use App\Models\MedicationSettingChange;
+use App\Models\MedicationOnCallRule;
 use App\Models\MedicationSiteSetting;
 use App\Models\Permission;
 use App\Models\Role;
@@ -71,8 +72,8 @@ it('offers every alert that has a source, with v5’s defaults, not yet reviewed
     expect($response->inertiaProps('settings.values.alerts.stock'))->toBe(b2AlertValue(['houseLead', 'stockStaff']))
         ->and($response->inertiaProps('settings.reviewed.alerts.stock'))->toBeNull()
         ->and($definitions['followups']['alert']['locked'])->toBe(['rostered', 'houseLead'])
-        // The on-call person arrives with on-call contacts (B2 chunk 4).
-        ->and($definitions['errors']['alert']['groups'])->toBe(['houseLead', 'clinicalLead', 'providerManager'])
+        // The on-call person since on-call contacts (B2 chunk 4).
+        ->and($definitions['errors']['alert']['groups'])->toBe(['houseLead', 'onCall', 'clinicalLead', 'providerManager'])
         ->and($response->inertiaProps('alertAccess'))->toMatchArray(['view' => true, 'manage_org' => true]);
 });
 
@@ -371,4 +372,101 @@ it('treats moving what counts as attended towards “opened” as a loosening', 
     expect(MedicationSettingChange::query()->where('setting_key', 'attended')->latest('id')->first())
         ->loosens->toBeTrue()
         ->after_text->toBe('Someone opens it');
+});
+
+/*
+ * B2 chunk 4: on-call contacts save straight away, per house.
+ */
+function b2OnCallStaff(Site $site, ?string $phone, string $role = 'support_worker'): User
+{
+    $user = b2SettingsActor($role, $site);
+    HrEmployeeProfile::query()->where('user_id', $user->id)->update(['work_phone' => $phone]);
+
+    return $user;
+}
+
+it('saves a house’s on-call contact straight away, in the change history, and removes it after a confirm', function () {
+    $site = Site::factory()->create(['is_active' => true, 'type' => 'house', 'name' => 'Kōwhai House']);
+    $manager = b2SettingsActor('provider_manager', $site);
+    $backup = b2OnCallStaff($site, '021 555 0142');
+
+    $this->actingAs($manager)->from(route('emar.settings'))
+        ->put(route('emar.settings.oncall.save', $site), ['mode' => 'roster', 'team_lead' => true, 'backup_user_id' => $backup->id])
+        ->assertSessionHasNoErrors()
+        ->assertSessionHas('medication_settings_saved', 'On-call contact saved for Kōwhai House.');
+
+    $rule = MedicationOnCallRule::query()->where('site_id', $site->id)->sole();
+    expect($rule->only(['mode', 'team_lead', 'backup_user_id', 'updated_by']))
+        ->toBe(['mode' => 'roster', 'team_lead' => true, 'backup_user_id' => $backup->id, 'updated_by' => $manager->id]);
+    $row = MedicationSettingChange::query()->where('setting_group', 'oncall')->sole();
+    expect($row->only(['site_id', 'label', 'before_text', 'after_text', 'loosens', 'audit_event']))->toBe([
+        'site_id' => $site->id,
+        'label' => 'On-call contact',
+        'before_text' => 'Not configured',
+        'after_text' => 'Follows the roster, then the team lead on shift · backup '.$backup->name,
+        'loosens' => false,
+        'audit_event' => 'medications.oncall_contact.updated',
+    ]);
+
+    $response = $this->actingAs($manager)->get(route('emar.settings'))->assertOk();
+    $house = collect($response->inertiaProps('onCall.houses'))->firstWhere('site_id', $site->id);
+    expect($house['rule'])->toMatchArray(['mode' => 'roster', 'backup' => ['id' => $backup->id, 'name' => $backup->name, 'phone' => '021 555 0142']])
+        ->and($house['can_manage'])->toBeTrue()
+        ->and($house['roster'])->toHaveCount(3);
+
+    $this->actingAs($manager)->from(route('emar.settings'))
+        ->delete(route('emar.settings.oncall.remove', $site))
+        ->assertSessionHas('medication_settings_saved', 'On-call contact removed for Kōwhai House. Screens show “Not configured” again.');
+    expect(MedicationOnCallRule::query()->count())->toBe(0)
+        ->and(MedicationSettingChange::query()->where('label', 'On-call contact removed')->value('loosens'))->toBeTrue();
+});
+
+it('only takes a backup with access to the house and a work phone', function () {
+    $site = Site::factory()->create(['is_active' => true, 'type' => 'house']);
+    $manager = b2SettingsActor('provider_manager', $site);
+    $noPhone = b2OnCallStaff($site, null);
+    $elsewhere = b2OnCallStaff(Site::factory()->create(['is_active' => true]), '021 555 0000');
+    $save = fn (User $backup, string $mode = 'roster') => $this->actingAs($manager)->from(route('emar.settings'))
+        ->put(route('emar.settings.oncall.save', $site), ['mode' => $mode, 'team_lead' => true, 'backup_user_id' => $backup->id]);
+
+    $save($noPhone)->assertSessionHasErrors(['backup_user_id' => 'Choose who staff call when nobody is rostered on call.']);
+    $save($elsewhere, 'fixed')->assertSessionHasErrors(['backup_user_id' => 'Choose the on-call person.']);
+    expect(MedicationOnCallRule::query()->count())->toBe(0);
+});
+
+it('lets a house lead set only their own house’s on-call contact', function () {
+    $home = Site::factory()->create(['is_active' => true, 'type' => 'house']);
+    $other = Site::factory()->create(['is_active' => true, 'type' => 'house']);
+    $lead = b2SettingsActor('team_lead', $home);
+    $homeBackup = b2OnCallStaff($home, '021 555 0001');
+    $otherBackup = b2OnCallStaff($other, '021 555 0002');
+
+    $this->actingAs($lead)->from(route('emar.settings'))
+        ->put(route('emar.settings.oncall.save', $home), ['mode' => 'fixed', 'team_lead' => false, 'backup_user_id' => $homeBackup->id])
+        ->assertSessionHasNoErrors();
+    $this->actingAs($lead)->put(route('emar.settings.oncall.save', $other), ['mode' => 'fixed', 'team_lead' => false, 'backup_user_id' => $otherBackup->id])
+        ->assertForbidden();
+    $this->actingAs($lead)->delete(route('emar.settings.oncall.remove', $other))->assertForbidden();
+    expect(MedicationOnCallRule::query()->pluck('site_id')->all())->toBe([$home->id]);
+});
+
+it('counts a Site as a house by its type, a facility that holds people, or any Site with active orders (Q12)', function () {
+    $manager = b2SettingsActor('provider_manager', Site::factory()->create(['is_active' => true, 'type' => 'house', 'name' => 'A house']));
+    Site::factory()->create(['is_active' => true, 'type' => 'residential', 'name' => 'B residential']);
+    Site::factory()->create(['is_active' => true, 'type' => 'head_office', 'name' => 'C head office']);
+    Site::factory()->create(['is_active' => true, 'type' => 'facility', 'name' => 'D empty facility']);
+    $facility = Site::factory()->create(['is_active' => true, 'type' => 'facility', 'name' => 'E facility with people']);
+    App\Models\Client::factory()->create(['site_id' => $facility->id]);
+    $office = Site::factory()->create(['is_active' => true, 'type' => 'head_office', 'name' => 'F head office with orders']);
+    App\Models\ClientMedication::factory()->create([
+        'client_id' => App\Models\Client::factory()->create(['site_id' => $office->id])->id,
+        'active' => true,
+        'state' => 'active',
+    ]);
+
+    $names = collect($this->actingAs($manager)->get(route('emar.settings'))->assertOk()->inertiaProps('onCall.houses'))->pluck('name')->all();
+
+    expect($names)->toContain('A house', 'B residential', 'E facility with people', 'F head office with orders')
+        ->not->toContain('C head office')
+        ->not->toContain('D empty facility');
 });

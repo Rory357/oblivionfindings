@@ -151,7 +151,8 @@ describe('What applies at a house', () => {
         expect(screen.getByText('Insulin glargine')).toBeInTheDocument();
         expect(screen.queryByText('Morphine')).toBeNull();
         expect(screen.getAllByText('This house')).toHaveLength(1);
-        // Not built yet: P07a's controlled-drug witness and B2's alerts.
+        // Not built yet: P07a's controlled-drug witness. Alerts & on-call
+        // shows only for someone who sees Alerts & access (below).
         expect(screen.queryByText(/Controlled drugs/)).toBeNull();
         expect(screen.queryByText(/Alerts & on-call/)).toBeNull();
     });
@@ -252,5 +253,61 @@ describe('What applies at a house', () => {
         );
         expect(screen.queryByRole('button', { name: 'House 2' })).toBeNull();
         expect(document.getElementById('lens-house')).not.toBeNull();
+    });
+
+    it('adds Alerts & on-call for someone who sees Alerts & access (B2 C4)', () => {
+        render(
+            <HouseLens
+                s={s}
+                houses={houses}
+                rules={[]}
+                templates={[]}
+                pins={[]}
+                oncall={{
+                    houses: [
+                        {
+                            site_id: houses[0].id,
+                            name: houses[0].name,
+                            house_leads: [],
+                            rule: {
+                                mode: 'roster',
+                                team_lead: true,
+                                backup: {
+                                    id: 7,
+                                    name: 'Hana Kereama',
+                                    phone: '021 555 0142',
+                                },
+                                describe:
+                                    'Follows the roster, then the team lead on shift · backup Hana Kereama',
+                                changed_by: null,
+                                changed_at: null,
+                            },
+                            roster: [
+                                {
+                                    label: 'Tonight',
+                                    hours: '5:00 pm – 7:00 am',
+                                    on_call: null,
+                                    team_lead: null,
+                                },
+                            ],
+                            can_manage: false,
+                        },
+                    ],
+                    staff: {},
+                }}
+                onOpen={vi.fn()}
+                onClose={vi.fn()}
+            />,
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: /Alerts & on-call/ }),
+        );
+        expect(
+            screen.getByText('The roster, then the team lead on shift'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Hana Kereama · 021 555 0142'),
+        ).toBeInTheDocument();
+        expect(screen.getByText('On-call contact')).toBeInTheDocument();
     });
 });

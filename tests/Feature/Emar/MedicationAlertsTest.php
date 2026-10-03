@@ -11,6 +11,7 @@ use App\Models\MedicationAlert;
 use App\Models\MedicationAlertEvent;
 use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationError;
+use App\Models\MedicationOnCallRule;
 use App\Models\MedicationRefusalFollowup;
 use App\Models\MedicationSiteSetting;
 use App\Models\Permission;
@@ -28,6 +29,7 @@ use App\Services\Medication\Alerts\MedicationAlerts;
 use App\Services\Medication\Alerts\MedicationAlertSettings;
 use App\Services\Medication\Alerts\MedicationAlertSources;
 use App\Services\Medication\Alerts\MedicationAlertSubject;
+use App\Services\Medication\Alerts\OnCallResolver;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\Settings\MedicationSettingsRegistry;
 use App\Services\MedicationAlertService;
@@ -928,4 +930,98 @@ it('runs the follow-up tick every 15 minutes, one run at a time on one server', 
         ->and($event->expression)->toBe('*/15 * * * *')
         ->and($event->withoutOverlapping)->toBeTrue()
         ->and($event->onOneServer)->toBeTrue();
+});
+
+/*
+ * B2 chunk 4: on-call contacts — the resolver, the on-call group and
+ * escalating to the on-call person.
+ */
+
+function b2Phone(User $user, ?string $phone): void
+{
+    HrEmployeeProfile::query()->where('user_id', $user->id)->update(['work_phone' => $phone]);
+    $user->unsetRelation('hrEmployeeProfile');
+}
+
+function b2OnCall(Site $site, User $backup, string $mode = 'roster', bool $teamLead = true): MedicationOnCallRule
+{
+    return MedicationOnCallRule::query()->create([
+        'site_id' => $site->id,
+        'mode' => $mode,
+        'team_lead' => $teamLead,
+        'backup_user_id' => $backup->id,
+    ]);
+}
+
+it('works out the on-call contact: on-call shift, then the team lead on shift, then the backup — nobody when the backup is on leave', function () {
+    $site = Site::factory()->create();
+    $backup = b2Staff($site, 'clinical_lead');
+    b2Phone($backup, '021 555 0142');
+    $lead = b2Staff($site, 'team_lead');
+    $onCall = b2Staff($site, 'support_worker');
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $rule = b2OnCall($site, $backup);
+    $resolver = fn () => app(OnCallResolver::class);
+
+    expect($resolver()->at($site->id, now()))->toMatchArray(['how' => 'Backup — nobody rostered'])
+        ->and($resolver()->at($site->id, now())['user']->id)->toBe($backup->id)
+        ->and($resolver()->phoneOf($backup))->toBe('021 555 0142');
+
+    Shift::factory()->create(['client_id' => $client->id, 'site_id' => $site->id, 'user_id' => $lead->id, 'starts_at' => now()->subHour(), 'ends_at' => now()->addHours(6), 'status' => 'in_progress']);
+    expect($resolver()->at($site->id, now()))->toMatchArray(['how' => 'Team lead on shift'])
+        ->and($resolver()->at($site->id, now())['user']->id)->toBe($lead->id);
+
+    Shift::factory()->create(['client_id' => $client->id, 'site_id' => $site->id, 'user_id' => $onCall->id, 'starts_at' => now()->subHour(), 'ends_at' => now()->addHours(10), 'status' => 'scheduled', 'is_on_call' => true]);
+    expect($resolver()->at($site->id, now())['user']->id)->toBe($onCall->id)
+        ->and($resolver()->at($site->id, now())['how'])->toBe('On an on-call shift');
+    // Settings' batched roster agrees: tonight (5 pm – 7 am) both shifts overlap.
+    $tonight = $resolver()->rosters([$site->id], now())[$site->id][0];
+    expect($tonight['label'])->toBe('Tonight')
+        ->and($tonight['on_call']->id)->toBe($onCall->id)
+        ->and($tonight['team_lead']->id)->toBe($lead->id)
+        ->and($resolver()->rosters([$site->id], now())[$site->id][1]['on_call'])->toBeNull();
+
+    // Always the same person.
+    $rule->update(['mode' => 'fixed', 'team_lead' => false]);
+    expect($resolver()->at($site->id, now()))->toMatchArray(['how' => 'Always this person']);
+
+    // The backup on approved leave: nobody.
+    App\Domain\Hr\Models\HrLeaveRequest::query()->create([
+        'tenant_id' => 1,
+        'user_id' => $backup->id,
+        'leave_type' => 'annual',
+        'starts_at' => now()->subDay(),
+        'ends_at' => now()->addDays(3),
+        'hours_requested' => 32,
+        'status' => 'approved',
+    ]);
+    expect($resolver()->at($site->id, now()))->toMatchArray([
+        'user' => null,
+        'how' => 'Backup on leave',
+        'warning' => 'Nobody — '.$backup->name.' is on leave',
+    ]);
+    // Not configured: nobody.
+    expect($resolver()->at(Site::factory()->create()->id, now()))->toMatchArray(['configured' => false, 'user' => null]);
+});
+
+it('tells the on-call person when an alert includes them, and escalates to them', function () {
+    $site = Site::factory()->create();
+    $lead = b2Staff($site, 'team_lead');
+    $backup = b2Staff($site, 'clinical_lead');
+    b2OnCall($site, $backup, 'fixed', false);
+
+    // "Medication errors reported" offers the on-call person (off by default, Q9).
+    b2Setting('errors', ['inapp' => true, 'email' => false, 'push' => false, 'follow_up' => false, 'groups' => ['onCall'], 'people' => []]);
+    $alert = app(MedicationAlerts::class)->raise('errors', b2Subject($site, 'error:1'));
+    expect($alert->recipients()->pluck('reason', 'user_id')->all())->toBe([$backup->id => 'onCall']);
+
+    b2Setting('errors', ['inapp' => true, 'email' => false, 'push' => false, 'follow_up' => true, 'groups' => ['houseLead'], 'people' => []]);
+    b2FollowUp(['escalate_after' => '30', 'escalate_to' => '["onCall"]']);
+    $error = app(MedicationAlerts::class)->raise('errors', b2Subject($site, 'error:2'));
+    expect(b2Kinds($backup, 'errors'))->toBe(['first']);
+    expect(app(MedicationAlertFollowUps::class)->tick(now()->addMinutes(30)))->toBe(1);
+    expect(b2Kinds($backup, 'errors'))->toBe(['first', 'escalation'])
+        ->and(b2Kinds($lead, 'errors'))->toBe(['first'])
+        ->and($error->recipients()->where('user_id', $backup->id)->count())->toBe(1)
+        ->and($error->recipients()->where('user_id', $backup->id)->value('reason'))->toBe('onCall');
 });
