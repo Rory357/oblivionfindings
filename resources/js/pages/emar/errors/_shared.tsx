@@ -38,6 +38,12 @@ export type ErrorRecord = {
     error_type: string;
     severity: string;
     stage: string;
+    sac: {
+        enabled: boolean;
+        proposed: number | null;
+        confirmed: number | null;
+        confirmed_at: string | null;
+    };
     status: string;
     reached_client: string | null;
     harm_level: string | null;

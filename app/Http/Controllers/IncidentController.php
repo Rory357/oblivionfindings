@@ -23,6 +23,7 @@ use App\Services\Incidents\IncidentJourney;
 use App\Services\Incidents\IncidentJourneyPresenter;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\Incidents\IncidentReportDraftService;
+use App\Services\Medication\MedicationErrorSummary;
 use App\Services\NotificationService;
 use App\Services\UserSiteAccessService;
 use App\Support\Incidents\LinkedOperationalEvidencePresenter;
@@ -525,7 +526,8 @@ class IncidentController extends Controller
         // incident side carries a back-link into the eMAR error report.
         $medicationError = MedicationError::query()
             ->where('client_incident_id', $incident->id)
-            ->with('medication:id,name')
+            ->where('client_id', $incident->client_id)
+            ->whereHas('client', fn ($q) => $q->where('site_id', $incident->site_id))
             ->first();
 
         return [
@@ -608,9 +610,11 @@ class IncidentController extends Controller
                 'error_type' => $medicationError->error_type,
                 'severity' => $medicationError->severity,
                 'status' => $medicationError->status,
-                'medication' => $medicationError->medication?->name,
+                'medication' => null,
+                'summary' => MedicationErrorSummary::for($medicationError),
+                'ready_to_close' => $medicationError->stage() === 'closed' && $incident->status !== 'closed',
                 'reported_at' => $medicationError->reported_at,
-                'url' => '/emar/errors',
+                'url' => '/emar/errors?error='.$medicationError->id,
             ] : null,
             'control_room_alert' => $linkedControlRoomAlert ? [
                 'id' => $linkedControlRoomAlert->id,

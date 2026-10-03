@@ -49,6 +49,9 @@ class MedicationError extends Model
         'triage_due_at',
         'owner_id',
         'investigation_due_at',
+        'confirmed_sac',
+        'sac_confirmed_by',
+        'sac_confirmed_at',
         // P01 C1: the dose whose "more than ordered" record raised this error.
         'client_medication_administration_id',
     ];
@@ -60,6 +63,8 @@ class MedicationError extends Model
         'occurred_at' => 'datetime',
         'triage_due_at' => 'datetime',
         'investigation_due_at' => 'datetime',
+        'confirmed_sac' => 'integer',
+        'sac_confirmed_at' => 'datetime',
     ];
 
     // ─── Relationships ────────────────────────────────────

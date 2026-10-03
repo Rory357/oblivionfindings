@@ -157,6 +157,7 @@ export function ErrorDetail({
         setData(
             kind === 'review'
                 ? {
+                      error_type: e.error_type,
                       owner_id: e.owner?.id ?? null,
                       investigation_due_at: nzLocal(e.investigation_due_at),
                       reached_client: e.reached_client ?? 'unknown',
@@ -251,6 +252,12 @@ export function ErrorDetail({
         <div className="flex flex-col gap-5">
             {command === 'review' ? (
                 <>
+                    <Choices
+                        label="What went wrong?"
+                        value={field('error_type')}
+                        options={TYPES}
+                        onChange={(value) => set('error_type', value)}
+                    />
                     <Choices
                         label="Did it reach the person?"
                         value={field('reached_client')}
@@ -349,6 +356,37 @@ export function ErrorDetail({
             {command === 'close' ? (
                 <>
                     {text('close_note', 'Close note')}
+                    {e.sac.enabled && e.reached_client !== 'no' ? (
+                        <>
+                            <Choices
+                                label="Confirm the SAC rating"
+                                value={field('confirmed_sac')}
+                                options={
+                                    (e.harm_level === 'severe'
+                                        ? [
+                                              ['1', 'SAC 1'],
+                                              ['2', 'SAC 2'],
+                                          ]
+                                        : [
+                                              ['1', 'SAC 1'],
+                                              ['2', 'SAC 2'],
+                                              ['3', 'SAC 3'],
+                                              ['4', 'SAC 4'],
+                                          ]) as [string, string][]
+                                }
+                                onChange={(value) =>
+                                    set('confirmed_sac', value)
+                                }
+                            />
+                            <p className="text-caption">
+                                {e.sac.proposed
+                                    ? `Settings suggests SAC ${e.sac.proposed}. Confirm the rating for this error; the suggestion is not a confirmation.`
+                                    : e.harm_level === 'severe'
+                                      ? 'For severe or permanent harm, explicitly confirm SAC 1 or SAC 2.'
+                                      : 'Confirm the rating for this error.'}
+                            </p>
+                        </>
+                    ) : null}
                     <p className="text-caption">
                         The note stays in this error. A linked incident receives
                         a neutral summary and closes only when its own checks
@@ -516,7 +554,13 @@ export function ErrorDetail({
                 footerEnd={
                     command ? (
                         <Button
-                            disabled={saving}
+                            disabled={
+                                saving ||
+                                (command === 'close' &&
+                                    e.sac.enabled &&
+                                    e.reached_client !== 'no' &&
+                                    !field('confirmed_sac'))
+                            }
                             onClick={() =>
                                 review
                                     ? command === 'close'

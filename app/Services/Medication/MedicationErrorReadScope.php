@@ -19,7 +19,8 @@ final class MedicationErrorReadScope
             $this->governance->scopeWithoutControlledMedicationRows($query);
         }
         if (! $actor->canDo(MedicationErrorWorkflow::MANAGE) && ! $actor->canDo('medications.audit.view')) {
-            $query->where('reported_by', $actor->id);
+            $query->where(fn ($q) => $q->where('reported_by', $actor->id)
+                ->orWhereHas('entries', fn ($entries) => $entries->where('kind', 'account')->where('actor_id', $actor->id)));
         }
 
         return $query;

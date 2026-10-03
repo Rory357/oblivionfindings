@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\Incidents\IncidentAlertLifecycleSignalService;
 use App\Services\Incidents\IncidentClosureService;
 use App\Services\Medication\Alerts\MedicationAlertSources;
+use App\Services\Medication\Reporting\RecordsReportingSettings;
 use App\Services\MedicationIncidentIntegrationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -46,6 +47,13 @@ final class MedicationErrorCommands
                 throw ValidationException::withMessages(['client_medication_id' => 'Your account names a controlled medicine. Choose it from the chart so its details are protected.']);
             }
         }
+        $receipt = DB::table('medication_error_report_receipts')->where('token', $data['report_token'])->lockForUpdate()->first();
+        if ($receipt !== null) {
+            abort_unless((int) $receipt->client_id === (int) $client->id && (int) $receipt->actor_id === (int) $actor->id, 404);
+            $this->assertReplay($receipt->fingerprint, $fingerprint);
+
+            return back()->with('success', 'Your report or account is already saved.');
+        }
         $existing = MedicationError::query()->where('report_token', $data['report_token'])->lockForUpdate()->first();
         if ($existing) {
             abort_unless((int) $existing->client_id === (int) $client->id && (int) $existing->reported_by === (int) $actor->id, 404);
@@ -71,10 +79,15 @@ final class MedicationErrorCommands
             ->lockForUpdate()->latest('id')->first();
         if ($duplicate && isset($data['duplicate_id'])) {
             abort_unless((int) $duplicate->id === (int) $data['duplicate_id'], 404);
+            if (! $this->claimReceipt($data['report_token'], $client, $actor, $fingerprint, 'account')) {
+                return back()->with('success', 'Account already saved.');
+            }
             $this->workflow->append($duplicate, $actor, 'account', $data['description'], [
                 'immediate_action' => $data['immediate_action'] ?? null, 'contributing_factors' => $data['contributing_factors'] ?? null,
                 'report_token' => $data['report_token'], 'fingerprint' => $fingerprint,
             ]);
+
+            DB::table('medication_error_report_receipts')->where('token', $data['report_token'])->update(['medication_error_id' => $duplicate->id]);
 
             return back()->with('success', 'Your account was added to '.$duplicate->reference_number.'.');
         }
@@ -87,7 +100,11 @@ final class MedicationErrorCommands
         $attributes['severity'] = $this->workflow->severity($data['reached_client'], $attributes['harm_level']);
         $attributes['report_source'] = 'page';
         $attributes['report_fingerprint'] = $fingerprint;
+        if (! $this->claimReceipt($data['report_token'], $client, $actor, $fingerprint, 'report')) {
+            return back()->with('success', 'Report already saved.');
+        }
         $error = $this->reports->report($client, (int) $client->site_id, $actor, $attributes, $request->boolean('create_incident'));
+        DB::table('medication_error_report_receipts')->where('token', $data['report_token'])->update(['medication_error_id' => $error->id]);
         if ($duplicate) {
             $this->workflow->append($error, $actor, 'separate_report', $data['separate_reason'], ['related_error_id' => $duplicate->id]);
         }
@@ -103,16 +120,18 @@ final class MedicationErrorCommands
         switch ($command) {
             case 'account':
             case 'note':
-                $data = $request->validate(['text' => 'required|string|max:5000']);
+                $data = $request->validate(['text' => 'required|string|max:5000', 'description' => 'prohibited', 'error_type' => 'prohibited', 'severity' => 'prohibited']);
                 $this->workflow->append($error, $actor, $command, $data['text']);
                 break;
             case 'triage':
                 $data = $request->validate([
+                    'error_type' => 'sometimes|required|in:wrong_medication,wrong_client,wrong_dose,wrong_time,wrong_route,omission,unauthorised,documentation,other',
                     'owner_id' => 'required|integer|min:1', 'investigation_due_at' => 'required|date_format:Y-m-d\\TH:i',
                     'reached_client' => 'required|in:no,yes,unknown', 'harm_level' => ['required', Rule::in($this->workflow::HARMS)], 'review_notes' => 'required|string|max:5000',
                 ]);
                 $this->assertOwner($client, (int) $data['owner_id'], true, $error);
                 $error->forceFill([
+                    'error_type' => $data['error_type'] ?? $error->error_type,
                     'owner_id' => $data['owner_id'], 'investigation_due_at' => $this->workflow->time($data['investigation_due_at'], 'investigation_due_at'),
                     'reached_client' => $data['reached_client'], 'harm_level' => $data['reached_client'] === 'no' ? 'none' : $data['harm_level'],
                     'severity' => $this->workflow->severity($data['reached_client'], $data['harm_level']),
@@ -120,7 +139,7 @@ final class MedicationErrorCommands
                 ])->save();
                 $this->workflow->append($error, $actor, 'triaged', $data['review_notes'], [
                     'owner_id' => (int) $data['owner_id'], 'reached_client' => $error->reached_client,
-                    'harm_level' => $error->harm_level, 'investigation_due_at' => $error->investigation_due_at->toIso8601String(),
+                    'harm_level' => $error->harm_level, 'error_type' => $error->error_type, 'investigation_due_at' => $error->investigation_due_at->toIso8601String(),
                 ]);
                 if (trim((string) $request->input('immediate_action')) !== '') {
                     $immediate = $request->validate(['immediate_action' => 'required|string|max:5000']);
@@ -150,8 +169,11 @@ final class MedicationErrorCommands
             case 'complete':
                 $action = $error->actions()->whereKey($actionId)->lockForUpdate()->first();
                 abort_unless($action, 404);
+                $data = $request->validate(['completion_note' => 'required|string|max:5000']);
+                if ($action->completed_at !== null && trim($action->completion_note) !== trim($data['completion_note'])) {
+                    throw ValidationException::withMessages(['completion_note' => 'This action is already completed with different details. Its original completion is kept.'])->status(409);
+                }
                 if ($action->completed_at === null) {
-                    $data = $request->validate(['completion_note' => 'required|string|max:5000']);
                     $action->forceFill(['completed_at' => now(), 'completed_by' => $actor->id, 'completion_note' => $data['completion_note']])->save();
                     $this->workflow->append($error, $actor, 'action_completed', null, ['action_id' => $action->id]);
                 }
@@ -180,6 +202,11 @@ final class MedicationErrorCommands
                 $error->forceFill(['open_disclosure' => $data['state'] === 'told' ? 'done' : 'pending'])->save();
                 break;
             case 'incident':
+                if ($error->client_incident_id !== null) {
+                    $this->reports->ensureIncident($error, $actor);
+
+                    return back()->with('success', 'The existing incident is already linked.');
+                }
                 $data = $request->validate(['immediate_action' => 'nullable|string|max:5000']);
                 if (trim((string) ($data['immediate_action'] ?? '')) !== '') {
                     $this->workflow->append($error, $actor, 'immediate_action', $data['immediate_action']);
@@ -195,8 +222,11 @@ final class MedicationErrorCommands
                 if ($blockers = $this->workflow->closeBlockers($error, $actor)) {
                     throw ValidationException::withMessages(['status' => implode(' ', $blockers)]);
                 }
-                $error->forceFill(['workflow_stage' => 'closed', 'status' => 'closed', 'closed_at' => now(), 'closed_by' => $actor->id])->save();
-                $this->workflow->append($error, $actor, 'closed', $data['close_note']);
+                $sac = app(RecordsReportingSettings::class)->confirmation($error->reached_client, $error->harm_level, $request->input('confirmed_sac'));
+                $error->forceFill(['workflow_stage' => 'closed', 'status' => 'closed', 'closed_at' => now(), 'closed_by' => $actor->id,
+                    'confirmed_sac' => $sac, 'sac_confirmed_by' => $sac === null ? null : $actor->id, 'sac_confirmed_at' => $sac === null ? null : now(),
+                ])->save();
+                $this->workflow->append($error, $actor, 'closed', $data['close_note'], ['confirmed_sac' => $sac]);
                 app(MedicationIncidentIntegrationService::class)->resolveMedicationError($error, 'Medication error closed.', $actor->id);
                 $incident = $error->incident;
                 $message = 'Medication error closed.';
@@ -245,11 +275,25 @@ final class MedicationErrorCommands
         }
     }
 
+    private function claimReceipt(string $token, Client $client, User $actor, string $fingerprint, string $kind): bool
+    {
+        DB::table('medication_error_report_receipts')->insertOrIgnore([
+            'token' => $token, 'client_id' => $client->id, 'actor_id' => $actor->id,
+            'fingerprint' => $fingerprint, 'kind' => $kind, 'created_at' => now(),
+        ]);
+        $receipt = DB::table('medication_error_report_receipts')->where('token', $token)->lockForUpdate()->first();
+        abort_unless($receipt !== null && (int) $receipt->client_id === (int) $client->id && (int) $receipt->actor_id === (int) $actor->id, 404);
+        $this->assertReplay($receipt->fingerprint, $fingerprint);
+
+        return $receipt->medication_error_id === null;
+    }
+
     private function assertOwner(Client $client, int $id, bool $manager, MedicationError $error): void
     {
         $candidate = User::query()->find($id);
         $visible = app(MedicationGovernanceScopeService::class)->staffPicker([(int) $client->site_id])->contains('id', $id);
-        if (! $candidate || ! $visible || ($manager && ! $candidate->canDo(MedicationErrorWorkflow::MANAGE)) || ($error->medication?->controlled_drug && ! $candidate->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY))) {
+        $controlled = $error->client_medication_id !== null && ClientMedication::withTrashed()->whereKey($error->client_medication_id)->where('controlled_drug', true)->exists();
+        if (! $candidate || ! $visible || ! Gate::forUser($candidate)->allows('viewMedications', $client) || ($manager && ! $candidate->canDo(MedicationErrorWorkflow::MANAGE)) || ($controlled && ! $candidate->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY))) {
             throw ValidationException::withMessages(['owner_id' => 'Choose a permitted owner at this house.']);
         }
     }

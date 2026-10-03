@@ -22,6 +22,7 @@ use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\Medication\Reporting\RecordsReportingSettings;
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Http\Request;
@@ -96,6 +97,7 @@ class MedicationErrorController extends Controller
 
         return [
             'stage' => $error->stage(),
+            'sac' => ['enabled' => app(RecordsReportingSettings::class)->enabled(), 'proposed' => app(RecordsReportingSettings::class)->preselection($error->reached_client, $error->harm_level), 'confirmed' => $error->confirmed_sac, 'confirmed_at' => $error->sac_confirmed_at?->toIso8601String()],
             'summary' => MedicationErrorSummary::for($error),
             'occurred_at' => ($error->occurred_at ?? $error->reported_at)?->toIso8601String(),
             'triage_due_at' => $error->triage_due_at?->toIso8601String(),
@@ -179,7 +181,7 @@ class MedicationErrorController extends Controller
             $query->whereHas('incident', fn ($q) => $q->where('status', '!=', 'closed'));
         }
         if ($tab === 'mine') {
-            $query->where('reported_by', $actor->id);
+            $query->where(fn ($q) => $q->where('reported_by', $actor->id)->orWhereHas('entries', fn ($entries) => $entries->where('kind', 'account')->where('actor_id', $actor->id)));
         }
         if ($request->filled('q')) {
             $term = '%'.addcslashes(mb_substr($request->string('q')->toString(), 0, 100), '%_\\').'%';
@@ -189,7 +191,16 @@ class MedicationErrorController extends Controller
             $query->where('reached_client', $request->input('reach'));
         }
         $relations = ['client.site', 'medication', 'incident', 'reportedBy:id,name', 'reviewedBy:id,name', 'owner:id,name', 'entries.actor:id,name', 'actions.owner:id,name', 'attachments.uploadedBy:id,name'];
-        $page = $query->with($relations)->orderByDesc('reported_at')->orderByDesc('id')->paginate(25)->withQueryString();
+        if ($tab === 'triage') {
+            $query->orderBy('triage_due_at')->orderBy('reported_at')->orderBy('id');
+        } elseif ($tab === 'investigating') {
+            $query->orderBy('investigation_due_at')->orderBy('id');
+        } elseif ($tab === 'closed') {
+            $query->orderByDesc('closed_at')->orderByDesc('id');
+        } else {
+            $query->orderByDesc('reported_at')->orderByDesc('id');
+        }
+        $page = $query->with($relations)->paginate(25)->withQueryString();
         $errors = $page->getCollection()->map(fn ($e) => $this->serializeError($e, $request, (bool) $e->medication?->controlled_drug));
         $detail = null;
         if ($request->integer('error') > 0) {

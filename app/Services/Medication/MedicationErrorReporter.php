@@ -49,7 +49,7 @@ final class MedicationErrorReporter
         $error = MedicationError::create($attributes);
         $workflow->append($error, $reporter, 'reported', $error->description, [
             'reached_client' => $error->reached_client, 'harm_level' => $error->harm_level,
-            'source' => $error->report_source,
+            'source' => $error->report_source, 'error_type' => $error->error_type,
         ]);
         if ($createIncident || $workflow->incidentRequired($error)) {
             $this->ensureIncident($error, $reporter);
@@ -92,11 +92,11 @@ final class MedicationErrorReporter
         ]));
         $error->forceFill(['client_incident_id' => $incident->id])->save();
         $signals = app(MedicationSignalService::class);
-        $signals->emitError($error);
         $existingAlert = $signals->attachExistingErrorSignalToIncident($error);
         $journeys = app(IncidentJourneyService::class);
         $journey = $existingAlert === null ? $journeys->ensureForSubmittedIncident($incident, $actor)
             : $journeys->attachAlertToIncident($incident, $existingAlert, $actor);
+        $signals->emitError($error);
         app(TimelineEmitter::class)->project($journey->incident);
 
         $incidentId = (int) $incident->id;

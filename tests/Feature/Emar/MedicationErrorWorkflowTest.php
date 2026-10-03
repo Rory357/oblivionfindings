@@ -3,6 +3,7 @@
 namespace Tests\Feature\Emar;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AppSetting;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
@@ -14,6 +15,7 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\Audit\MedicationEventRecorder;
+use App\Services\Medication\Reporting\RecordsReportingSettings;
 use App\Services\Tasks\Providers\MedicationErrorProvider;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -104,6 +106,7 @@ class MedicationErrorWorkflowTest extends TestCase
         $this->assertDatabaseCount('medication_errors', 1);
         $this->assertDatabaseCount('medication_error_entries', 1);
         $this->assertDatabaseCount('medication_events', 1);
+        $this->assertDatabaseCount('medication_error_report_receipts', 1);
         $error = MedicationError::query()->first();
         $this->assertSame('triage', $error->stage());
         $this->assertSame(now('Pacific/Auckland')->addDay()->toDateString(), $error->triage_due_at->tz('Pacific/Auckland')->toDateString());
@@ -201,7 +204,7 @@ class MedicationErrorWorkflowTest extends TestCase
         } catch (\RuntimeException $exception) {
             $this->assertSame('Synthetic event failure', $exception->getMessage());
         }
-        foreach (['medication_errors', 'medication_error_entries', 'client_incidents', 'medication_events'] as $table) {
+        foreach (['medication_errors', 'medication_error_entries', 'client_incidents', 'medication_events', 'medication_error_report_receipts'] as $table) {
             $this->assertDatabaseCount($table, 0);
         }
     }
@@ -278,5 +281,38 @@ class MedicationErrorWorkflowTest extends TestCase
         $this->assertCount(0, app(MedicationErrorProvider::class)->authorizedTasks($reader));
         $this->actingAs($reader)->get('/emar/errors?tab=triage')->assertInertia(fn (Assert $page) => $page->has('errors', 0)->where('stats.total_open', 0));
         $this->actingAs($reader)->get('/emar/errors?error='.$error->id)->assertNotFound();
+    }
+
+    public function test_added_account_makes_the_error_visible_in_your_reports(): void
+    {
+        $error = MedicationError::query()->create(['client_id' => $this->client->id, 'error_type' => 'other', 'severity' => 'minor', 'description' => 'Synthetic other reporter', 'reported_by' => $this->manager->id, 'reported_at' => now(), 'status' => 'reported']);
+        $this->actingAs($this->reporter)->get('/emar/errors?tab=mine')->assertInertia(fn (Assert $page) => $page->has('errors', 0));
+        $this->actingAs($this->reporter)->post('/emar/errors', $this->payload(['duplicate_id' => $error->id]))->assertSessionHasNoErrors();
+        $this->actingAs($this->reporter)->get('/emar/errors?tab=mine')->assertInertia(fn (Assert $page) => $page->has('errors', 1)->where('errors.0.id', $error->id));
+        $this->assertCount(1, app(MedicationErrorProvider::class)->authorizedTasks($this->reporter));
+    }
+
+    public function test_sac_proposal_never_closes_without_explicit_confirmation(): void
+    {
+        AppSetting::query()->updateOrCreate(['key' => RecordsReportingSettings::SAC], ['value' => 'on']);
+        $error = $this->report(['reached_client' => 'yes', 'harm_level' => 'minor']);
+        $this->triage($error);
+        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/disclosure', ['state' => 'told', 'who' => ['person'], 'by' => 'Synthetic manager', 'at' => now('Pacific/Auckland')->subMinute()->format('Y-m-d\TH:i'), 'how' => 'In person'])->assertSessionHasNoErrors();
+        $this->actingAs($this->manager)->get('/emar/errors?error='.$error->id)->assertInertia(fn (Assert $page) => $page->where('detail.sac.proposed', 4)->where('detail.sac.confirmed', null));
+        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/close', ['close_note' => 'Synthetic close'])->assertSessionHasErrors('confirmed_sac');
+        $this->assertNotSame('closed', $error->fresh()->status);
+        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/close', ['close_note' => 'Synthetic close', 'confirmed_sac' => '4'])->assertSessionHasNoErrors();
+        $this->assertSame(4, $error->fresh()->confirmed_sac);
+        $this->assertSame($this->manager->id, (int) $error->fresh()->sac_confirmed_by);
+        $this->assertNotNull($error->fresh()->sac_confirmed_at);
+    }
+
+    public function test_near_miss_never_receives_sac_even_when_enabled(): void
+    {
+        AppSetting::query()->updateOrCreate(['key' => RecordsReportingSettings::SAC], ['value' => 'on']);
+        $error = $this->report();
+        $this->triage($error);
+        $this->actingAs($this->manager)->post('/emar/errors/'.$error->id.'/close', ['close_note' => 'Synthetic near miss close', 'confirmed_sac' => '1'])->assertSessionHasNoErrors();
+        $this->assertNull($error->fresh()->confirmed_sac);
     }
 }
