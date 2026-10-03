@@ -86,6 +86,7 @@ class TaskAggregator
             new Providers\FleetMaintenanceProvider,
             new Providers\FleetFinanceReviewProvider,
             new Providers\MedicationErrorProvider,
+            new Providers\MedicationFollowupProvider,
             new Providers\CdLossReportProvider,
             new Providers\DataBreachProvider,
             new Providers\DataSubjectRequestProvider,

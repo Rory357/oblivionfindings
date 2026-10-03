@@ -6904,10 +6904,13 @@ class EmarController extends Controller
         );
 
         return response()->json([
-            'snapshot' => app(ShiftMedicationSnapshotService::class)->forShift(
-                $shift,
-                $auth->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
-            ),
+            'snapshot' => [
+                ...app(ShiftMedicationSnapshotService::class)->forShift(
+                    $shift,
+                    $auth->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
+                ),
+                'followups' => app(\App\Services\Medication\Followups\MedicationFollowupService::class)->forClient($auth, (int) $shift->client_id),
+            ],
         ]);
     }
 

@@ -36,6 +36,14 @@ use Illuminate\Support\Facades\Route;
 // administer/update permissions so support workers can load it, with manager
 // permissions also allowed for oversight roles that want the operational view.
 Route::middleware(['auth'])->group(function () {
+    Route::get('/medication-followups', [\App\Http\Controllers\Emar\MedicationFollowupController::class, 'index'])
+        ->middleware('permission:medications.view')->name('medication_followups.index');
+    Route::get('/medication-followups/{followup}', [\App\Http\Controllers\Emar\MedicationFollowupController::class, 'show'])
+        ->whereNumber('followup')->middleware('permission:medications.view')->name('medication_followups.show');
+    Route::post('/medication-followups/{followup}/transition', [\App\Http\Controllers\Emar\MedicationFollowupController::class, 'transition'])
+        ->whereNumber('followup')->middleware('permission:medications.administer.record|medications.followups.manage')
+        ->name('medication_followups.transition');
+
     Route::get('/meds/today', [WorkerMedsController::class, 'today'])
         ->middleware('permission:medications.view|medications.administer.record')
         ->name('meds.today');

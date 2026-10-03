@@ -1462,6 +1462,8 @@ class EnhancedMarService
                     $this->recordingContract->raiseMoreThanOrderedError($client, $medication, $admin, $lockedActor, $data);
                 }
 
+                app(\App\Services\Medication\Followups\MedicationFollowupService::class)->syncAdministration($admin);
+
                 AuditLogger::logOrFail('medications.administration.record', $admin, [
                     'actor_id' => $userId,
                     'client_id' => $client->id,

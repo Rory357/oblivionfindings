@@ -978,3 +978,7 @@ Artisan::command('finance:review-reminders', function () {
 app(Schedule::class)->command('finance:review-notices')->everyMinute()->withoutOverlapping();
 app(Schedule::class)->command('finance:review-reminders')->dailyAt('08:30')->timezone('Pacific/Auckland')->withoutOverlapping();
 Illuminate\Support\Facades\Schedule::command('reports:run-schedules')->everyFiveMinutes()->withoutOverlapping();
+
+// Medication work is visible independently of Delivery. This creates one
+// lead heads-up for a handover still unread an hour into the incoming shift.
+app(Schedule::class)->command('emar:workflow-followups')->everyMinute()->withoutOverlapping()->onOneServer();

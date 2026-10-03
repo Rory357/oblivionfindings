@@ -117,7 +117,12 @@ class RefusalFollowUpController extends Controller
                     }
                 }
 
-                $followup = MedicationRefusalFollowup::create($attributes);
+                $followup = MedicationRefusalFollowup::query()->firstOrCreate([
+                    'client_id' => $scope->client->id,
+                    'client_medication_administration_id' => $rootAdministration->id,
+                ], $attributes);
+                if (! $followup->wasRecentlyCreated) { $followup->fill($attributes)->save(); }
+                app(\App\Services\Medication\Followups\MedicationFollowupService::class)->syncAdministration($rootAdministration);
 
                 if (! empty($attributes['escalated_to_manager'])) {
                     app(MedicationIncidentIntegrationService::class)
@@ -152,6 +157,8 @@ class RefusalFollowUpController extends Controller
                 'follow_up_completed_by' => $user->id,
                 'follow_up_outcome' => $validated['outcome'],
             ]);
+
+            app(\App\Services\Medication\Followups\MedicationFollowupService::class)->syncAdministration($lockedFollowup->administration);
 
             app(MedicationIncidentIntegrationService::class)->resolveRefusalEscalation(
                 $lockedFollowup,
