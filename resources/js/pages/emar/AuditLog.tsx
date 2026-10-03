@@ -268,9 +268,18 @@ export default function AuditLog({
               : filters.date_to
                 ? `Up to ${formatDateOnly(filters.date_to)}`
                 : 'All available history';
-    const scopedHref = (path: string) => {
-        const query = historyQuery('', filters, siteFilter);
-        return `${path}?${new URLSearchParams(Object.entries(query).map(([key, value]) => [key, String(value)]))}`;
+    const scopedHref = (
+        path: '/emar/reports' | '/emar/reports/history/logs',
+    ) => {
+        // Both destination readers accept these scope/date fields. Neither has
+        // an equivalent for the historical projection's event_types filter.
+        const query = new URLSearchParams();
+        if (filters.client_id)
+            query.set('client_id', String(filters.client_id));
+        if (siteFilter) query.set('site_id', String(siteFilter));
+        if (filters.date_from) query.set('date_from', filters.date_from);
+        if (filters.date_to) query.set('date_to', filters.date_to);
+        return `${path}?${query}`;
     };
     const [selected, setSelected] = useState<AuditEvent | null>(null);
     const [selectedSection, setSelectedSection] = useState<string | undefined>(

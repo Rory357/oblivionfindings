@@ -121,6 +121,42 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('Medication history server periods and frontline controls', () => {
+    it('carries only supported person, Site and NZ dates in actual navigation anchors with multiple history types selected', () => {
+        inertia.url += '&history_view=table&history_staff=Jo';
+        render(
+            <AuditLog
+                {...props}
+                filters={{
+                    ...props.filters,
+                    date_from: '2026-09-21',
+                    date_to: '2026-09-27',
+                    event_types: ['dose_administered', 'correction_approved'],
+                }}
+            />,
+        );
+        for (const [label, path] of [
+            ['Change log', '/emar/reports/history/logs'],
+            ['Print MAR & CD register', '/emar/reports'],
+        ]) {
+            const link = screen.getByRole('link', { name: label });
+            const destination = new URL(
+                link.getAttribute('href')!,
+                'https://oblivionfindings.test',
+            );
+            expect(destination.pathname).toBe(path);
+            expect([...destination.searchParams.entries()]).toEqual([
+                ['client_id', '42'],
+                ['site_id', '8'],
+                ['date_from', '2026-09-21'],
+                ['date_to', '2026-09-27'],
+            ]);
+            expect(destination.searchParams.has('event_types')).toBe(false);
+            expect(destination.searchParams.has('event_types[]')).toBe(false);
+            expect(destination.searchParams.has('history_view')).toBe(false);
+            expect(destination.searchParams.has('history_staff')).toBe(false);
+        }
+    });
+
     it('initializes from returned dates, renders both NZ records and requests explicit dates with current scope', () => {
         render(<AuditLog {...props} />);
         expect(screen.getByLabelText('From (NZ date)')).toHaveValue(
