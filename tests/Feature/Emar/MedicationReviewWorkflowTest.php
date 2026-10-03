@@ -26,6 +26,7 @@ use App\Services\Tasks\Providers\MedicationReviewProvider;
 use App\Support\WorkerClock;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -173,7 +174,7 @@ class MedicationReviewWorkflowTest extends TestCase
 
         $firstEvent = MedicationReviewEvent::query()->where('review_id', $review->id)
             ->where('event', 'moved')->sole();
-        $firstEvidence = $firstEvent->getRawOriginal();
+        $firstEvidence = $this->persistedEvidence($firstEvent);
         $this->assertStringContainsString($originalDate, json_encode($firstEvent->details));
         $this->assertStringContainsString($firstDate, json_encode($firstEvent->details));
         $this->assertStringContainsString('Clinician appointment changed.', json_encode($firstEvent->details));
@@ -185,7 +186,7 @@ class MedicationReviewWorkflowTest extends TestCase
         $this->assertSame($firstDate, $review->fresh()->scheduled_date->toDateString());
 
         $this->move($actor, $review, $secondDate, 'unwell', 'Person was unwell.');
-        $this->assertSame($firstEvidence, $firstEvent->fresh()->getRawOriginal());
+        $this->assertSame($firstEvidence, $this->persistedEvidence($firstEvent));
         $this->assertSame(2, MedicationReviewEvent::query()->where('review_id', $review->id)
             ->where('event', 'moved')->count());
         $this->assertSame(3, $review->fresh()->revision);
@@ -224,7 +225,7 @@ class MedicationReviewWorkflowTest extends TestCase
         ['actor' => $actor, 'site' => $site, 'client' => $client] = $this->context();
         $review = $this->book($actor, $client, 'triggered');
         $ordersOnly = $this->userAt($site, ['medications.view', 'medications.orders.manage']);
-        $before = $review->getRawOriginal();
+        $before = $this->persistedEvidence($review);
         $eventCount = MedicationReviewEvent::query()->count();
 
         $this->actingAs($ordersOnly)->postJson('/emar/reviews', $this->bookingPayload($actor, $client))
@@ -242,7 +243,7 @@ class MedicationReviewWorkflowTest extends TestCase
             'months' => 6, 'reason' => 'Not authorised.',
         ])->assertForbidden();
 
-        $this->assertSame($before, $review->fresh()->getRawOriginal());
+        $this->assertSame($before, $this->persistedEvidence($review));
         $this->assertSame($eventCount, MedicationReviewEvent::query()->count());
         $this->assertDatabaseCount('medication_review_items', 0);
     }
@@ -254,7 +255,7 @@ class MedicationReviewWorkflowTest extends TestCase
         $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id, 'status' => 'active']);
         $foreignActor = $this->userAt($foreignSite, ['medications.view', 'medications.reviews.manage']);
         $foreignReview = $this->book($foreignActor, $foreignClient, 'triggered');
-        $before = $foreignReview->getRawOriginal();
+        $before = $this->persistedEvidence($foreignReview);
 
         $this->actingAs($actor)->postJson('/emar/reviews', ['client_id' => $foreignClient->id])
             ->assertNotFound();
@@ -269,7 +270,7 @@ class MedicationReviewWorkflowTest extends TestCase
         $this->actingAs($actor)->get("/emar/reviews?site_id={$foreignSite->id}")->assertNotFound();
         $this->actingAs($actor)->get("/emar/reviews?client_id={$foreignClient->id}")->assertNotFound();
 
-        $this->assertSame($before, $foreignReview->fresh()->getRawOriginal());
+        $this->assertSame($before, $this->persistedEvidence($foreignReview));
         $this->assertNotSame($localSite->id, $foreignClient->site_id);
     }
 
@@ -331,7 +332,7 @@ class MedicationReviewWorkflowTest extends TestCase
         ['actor' => $actor, 'site' => $site, 'client' => $client] = $this->context();
         $this->medication($client, 'Synthetic rollback medicine');
         $review = $this->book($actor, $client);
-        $before = $review->getRawOriginal();
+        $before = $this->persistedEvidence($review);
         $reviewIds = MedicationReview::query()->where('client_id', $client->id)->pluck('id')->all();
         $eventCount = MedicationReviewEvent::query()->count();
         $chainCount = MedicationEvent::query()->count();
@@ -357,7 +358,7 @@ class MedicationReviewWorkflowTest extends TestCase
             $this->assertSame('Injected canonical medication audit failure.', $exception->getMessage());
         }
 
-        $this->assertSame($before, $review->fresh()->getRawOriginal());
+        $this->assertSame($before, $this->persistedEvidence($review));
         $this->assertSame($reviewIds, MedicationReview::query()->where('client_id', $client->id)->pluck('id')->all());
         $this->assertDatabaseCount('medication_review_items', 0);
         $this->assertSame($eventCount, MedicationReviewEvent::query()->count());
@@ -373,12 +374,12 @@ class MedicationReviewWorkflowTest extends TestCase
         $regular = $this->book($actor, $client, 'regular', [
             'scheduled_date' => WorkerClock::today()->addMonths(2)->toDateString(),
         ]);
-        $before = $regular->getRawOriginal();
+        $before = $this->persistedEvidence($regular);
         $triggered = $this->book($actor, $client, 'triggered');
 
         $this->complete($actor, $triggered);
 
-        $this->assertSame($before, $regular->fresh()->getRawOriginal());
+        $this->assertSame($before, $this->persistedEvidence($regular));
         $this->assertSame(1, MedicationReview::query()->where('client_id', $client->id)
             ->where('review_type', 'regular')->where('status', 'scheduled')->count());
         $this->assertSame('completed', $triggered->fresh()->status);
@@ -407,14 +408,14 @@ class MedicationReviewWorkflowTest extends TestCase
         ['actor' => $actor, 'client' => $client] = $this->context();
         $regular = $this->book($actor, $client, 'regular', ['scheduled_date' => '2026-12-03']);
         $booked = MedicationReviewEvent::query()->where('review_id', $regular->id)->where('event', 'booked')->sole();
-        $bookedEvidence = $booked->getRawOriginal();
+        $bookedEvidence = $this->persistedEvidence($booked);
         $triggered = $this->book($actor, $client, 'triggered');
 
         $this->complete($actor, $triggered, ['earlier_review_date' => '2026-11-03']);
 
         $this->assertSame('2026-11-03', $regular->fresh()->scheduled_date->toDateString());
         $this->assertSame(2, $regular->fresh()->revision);
-        $this->assertSame($bookedEvidence, $booked->fresh()->getRawOriginal());
+        $this->assertSame($bookedEvidence, $this->persistedEvidence($booked));
         $move = MedicationReviewEvent::query()->where('review_id', $regular->id)->where('event', 'moved')->sole();
         $this->assertSame('2026-12-03', $move->details['from_date']);
         $this->assertSame('2026-11-03', $move->details['to_date']);
@@ -484,7 +485,7 @@ class MedicationReviewWorkflowTest extends TestCase
     {
         ['actor' => $actor, 'client' => $client] = $this->context();
         $medicine = $this->medication($client, 'Synthetic watch medicine');
-        $prescription = $medicine->getRawOriginal();
+        $prescription = $this->persistedEvidence($medicine);
         $review = $this->book($actor, $client, 'triggered');
 
         $this->actingAs($actor)->postJson("/emar/reviews/{$review->id}/complete", $this->completionPayload($review, [
@@ -508,7 +509,7 @@ class MedicationReviewWorkflowTest extends TestCase
         $this->assertSame('watch', $item->outcome);
         $this->assertSame('2026-10-10', $item->watch_until->toDateString());
         $this->assertStringContainsString('record dizziness', $item->watch_text);
-        $this->assertSame($prescription, $medicine->fresh()->getRawOriginal());
+        $this->assertSame($prescription, $this->persistedEvidence($medicine));
     }
 
     public function test_completion_requires_an_outcome_for_each_current_order_and_rejects_foreign_order_ids(): void
@@ -551,7 +552,7 @@ class MedicationReviewWorkflowTest extends TestCase
             $effective = $this->orderVersion($actor, $medicine, 1, '10 mg', 'Synthetic checked effective baseline.');
             $draft = $this->orderVersion($actor, $medicine, 2, '20 mg', 'Synthetic '.$draftStatus.' change that is not published.');
             $medicine->forceFill(['version' => 1, 'approval_status' => $draftStatus])->saveQuietly();
-            $before = $medicine->getRawOriginal();
+            $before = $this->persistedEvidence($medicine);
             $review = $this->book($actor, $client, 'triggered');
 
             $this->complete($actor, $review);
@@ -559,7 +560,7 @@ class MedicationReviewWorkflowTest extends TestCase
             $item = MedicationReviewItem::query()->where('review_id', $review->id)->sole();
             $this->assertSame($effective->id, $item->order_version_id);
             $this->assertNotSame($draft->id, $item->order_version_id);
-            $this->assertSame($before, $medicine->fresh()->getRawOriginal());
+            $this->assertSame($before, $this->persistedEvidence($medicine));
             $this->assertSame('10 mg', $effective->fresh()->dosage);
             $this->assertSame('20 mg', $draft->fresh()->dosage);
         }
@@ -595,7 +596,7 @@ class MedicationReviewWorkflowTest extends TestCase
             'medications.administer.record', 'medications.followups.manage',
         ]);
         $medicine = $this->medication($client, 'Synthetic watched medicine');
-        $prescription = $medicine->getRawOriginal();
+        $prescription = $this->persistedEvidence($medicine);
         $review = $this->book($owner, $client, 'triggered');
         $this->complete($owner, $review, ['items' => [[
             'client_medication_id' => $medicine->id, 'outcome' => 'watch',
@@ -646,7 +647,7 @@ class MedicationReviewWorkflowTest extends TestCase
         $this->assertSame('done', $doneTasks[0]->bucket);
         $after = $this->actingAs($owner)->get('/emar/reviews?review='.$review->id.'&view=recorded')->assertOk();
         $this->assertTrue($after->inertiaProps('selected.items.0.watch_completed'));
-        $this->assertSame($prescription, $medicine->fresh()->getRawOriginal());
+        $this->assertSame($prescription, $this->persistedEvidence($medicine));
     }
 
     public function test_legacy_audit_review_summary_requires_review_and_controlled_access_and_names_the_recorder(): void
@@ -687,14 +688,14 @@ class MedicationReviewWorkflowTest extends TestCase
         $controlled = $this->medication($client, 'Hidden synthetic controlled medicine', true);
         $managerWithoutControlled = $this->userAt($site, ['medications.view', 'medications.reviews.manage']);
         $review = $this->book($managerWithoutControlled, $client, 'triggered');
-        $prescription = $controlled->getRawOriginal();
+        $prescription = $this->persistedEvidence($controlled);
 
         $this->complete($managerWithoutControlled, $review, ['items' => []]);
 
         $item = MedicationReviewItem::query()->where('review_id', $review->id)->sole();
         $this->assertSame('pending_controlled', $item->outcome);
         $this->assertNull($item->recommendation);
-        $this->assertSame($prescription, $controlled->fresh()->getRawOriginal());
+        $this->assertSame($prescription, $this->persistedEvidence($controlled));
 
         $this->actingAs($managerWithoutControlled)->postJson("/emar/reviews/{$review->id}/items/{$item->id}/outcome", [
             'revision' => $review->fresh()->revision, 'outcome' => 'continue',
@@ -705,7 +706,7 @@ class MedicationReviewWorkflowTest extends TestCase
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $this->assertSame('change', $item->fresh()->outcome);
-        $this->assertSame($prescription, $controlled->fresh()->getRawOriginal());
+        $this->assertSame($prescription, $this->persistedEvidence($controlled));
         $this->assertDatabaseHas('medication_review_events', [
             'review_id' => $review->id, 'actor_id' => $actor->id, 'event' => 'outcome_added',
         ]);
@@ -715,7 +716,7 @@ class MedicationReviewWorkflowTest extends TestCase
     {
         ['actor' => $actor, 'site' => $site, 'client' => $client] = $this->context();
         $medication = $this->medication($client, 'Synthetic unchanged medicine');
-        $prescription = $medication->getRawOriginal();
+        $prescription = $this->persistedEvidence($medication);
         $review = $this->book($actor, $client, 'triggered');
         $this->complete($actor, $review, [
             'items' => [[
@@ -735,7 +736,7 @@ class MedicationReviewWorkflowTest extends TestCase
 
         $this->assertSame('agreed', $item->fresh()->decision);
         $this->assertSame('phone', $item->fresh()->decision_method);
-        $this->assertSame($prescription, $medication->fresh()->getRawOriginal());
+        $this->assertSame($prescription, $this->persistedEvidence($medication));
         $this->assertNull($item->fresh()->linked_order_version_id);
 
         $this->actingAs($manager)->postJson("/emar/reviews/{$review->id}/items/{$item->id}/decision", [
@@ -762,7 +763,7 @@ class MedicationReviewWorkflowTest extends TestCase
         ]);
         $item = MedicationReviewItem::query()->where('review_id', $first->id)->sole();
         $this->complete($actor, $second);
-        $before = $item->getRawOriginal();
+        $before = $this->persistedEvidence($item);
         $ordersOnly = $this->userAt($site, ['medications.view', 'medications.orders.manage']);
 
         $this->actingAs($actor)->postJson("/emar/reviews/{$second->id}/items/{$item->id}/decision", [
@@ -778,7 +779,7 @@ class MedicationReviewWorkflowTest extends TestCase
         $this->actingAs($ordersOnly)->postJson("/emar/reviews/{$first->id}/items/{$item->id}/outcome", [])
             ->assertForbidden();
 
-        $this->assertSame($before, $item->fresh()->getRawOriginal());
+        $this->assertSame($before, $this->persistedEvidence($item));
     }
 
     public function test_reader_pagination_meters_and_direct_selection_follow_the_same_person_boundary(): void
@@ -900,7 +901,7 @@ class MedicationReviewWorkflowTest extends TestCase
             ['actor' => $actor, 'client' => $client] = $this->context();
             $recorded = $this->book($actor, $client, 'triggered');
             $this->complete($actor, $recorded);
-            $recordedEvidence = $recorded->fresh()->getRawOriginal();
+            $recordedEvidence = $this->persistedEvidence($recorded);
             $regular = $this->book($actor, $client);
             $triggered = $this->book($actor, $client, 'triggered');
 
@@ -914,7 +915,7 @@ class MedicationReviewWorkflowTest extends TestCase
                 $this->assertSame($departureStatus, $closed->details['service_status']);
                 $this->assertStringContainsString('left the service', $closed->details['reason']);
             }
-            $this->assertSame($recordedEvidence, $recorded->fresh()->getRawOriginal());
+            $this->assertSame($recordedEvidence, $this->persistedEvidence($recorded));
             $this->assertNull($client->fresh()->next_chart_review_date);
             $client->forceFill(['first_name' => 'Synthetic departed person'])->save();
             $this->assertSame(2, MedicationReviewEvent::query()->where('client_id', $client->id)->where('event', 'closed')->count());
@@ -983,6 +984,48 @@ class MedicationReviewWorkflowTest extends TestCase
         ]);
         $this->actingAs($otherActor)->get("/emar/reviews/{$review->id}/source?download=1")
             ->assertNotFound();
+    }
+
+    /**
+     * Capture every persisted column, including defaults and private evidence.
+     * JSON object key order is storage formatting; its values and list order count.
+     *
+     * @return array<string, mixed>
+     */
+    private function persistedEvidence(Model $record): array
+    {
+        $record = $record->fresh();
+        $this->assertNotNull($record);
+        $attributes = $record->getRawOriginal();
+        foreach ($attributes as $key => $value) {
+            if ($value !== null && $record->hasCast($key, ['array', 'json', 'object', 'collection'])) {
+                $attributes[$key] = json_encode(
+                    $this->canonicalJson(json_decode($value, false, 512, JSON_THROW_ON_ERROR)),
+                    JSON_THROW_ON_ERROR,
+                );
+            }
+        }
+        ksort($attributes);
+
+        return $attributes;
+    }
+
+    private function canonicalJson(mixed $value): mixed
+    {
+        if ($value instanceof \stdClass) {
+            $properties = get_object_vars($value);
+            ksort($properties);
+            foreach ($properties as $key => $property) {
+                $properties[$key] = $this->canonicalJson($property);
+            }
+
+            return (object) $properties;
+        }
+        if (is_array($value)) {
+            return array_map(fn (mixed $item) => $this->canonicalJson($item), $value);
+        }
+
+        return $value;
     }
 
     /** @return array{actor: User, site: Site, client: Client} */
