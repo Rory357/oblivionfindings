@@ -3,30 +3,34 @@
 namespace App\Services\Medication\Reporting;
 
 use App\Models\Client;
+use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
+use App\Models\ControlledDrugLossReport;
 use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationError;
+use App\Models\MedicationOrderRevision;
 use App\Models\MedicationReview;
 use App\Models\MedicationRound;
-use App\Models\MedicationOrderRevision;
+use App\Models\MedicationSyringeDriver;
 use App\Models\User;
 use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\MedicationGovernanceScopeService;
-use App\Support\Medication\StockLotRules;
 use App\Support\Medication\MedicationStockQuantity as Quantity;
+use App\Support\Medication\StockLotRules;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Collection;
 
 /** Shared factual datasets for the P09 hub and the existing report builder. */
 final class MedicationReportDataset
 {
-    public const REPORTS = ['doses' => 'Doses', 'rounds' => 'Rounds', 'prn' => 'As needed', 'controlled' => 'Controlled medicines', 'errors' => 'Medication errors', 'reviews' => 'Reviews', 'stock' => 'Stock', 'competency' => 'Competency'];
+    public const REPORTS = ['doses' => 'Doses', 'rounds' => 'Rounds', 'prn' => 'As needed', 'syringe_drivers' => 'Syringe drivers', 'controlled' => 'Controlled medicines', 'errors' => 'Medication errors', 'reviews' => 'Reviews', 'stock' => 'Stock', 'competency' => 'Competency'];
+
     public const SOURCES = ['dose_slots' => 'doses', 'medication_rounds' => 'rounds', 'prn_doses' => 'prn', 'medication_errors' => 'errors', 'medication_stock' => 'stock', 'controlled_register' => 'controlled'];
+
     public const MAX_ROWS = 100000;
 
     public function __construct(private readonly MedicationReportAccess $access, private readonly DoseSlotProjection $projection, private readonly MedicationGovernanceScopeService $scope) {}
@@ -98,6 +102,27 @@ final class MedicationReportDataset
             $records = $this->canonical(ClientMedicationAdministration::query()->effectiveClinicalEvidence(), $siteIds, $clientIds)->whereHas('medication', fn ($q) => $q->where('is_prn', true))->where('status', 'given')->whereBetween('administered_at', $period->bounds())->with('prnEffectiveness')->get();
             $rows = $records->groupBy('client_id')->map(fn ($items, $id) => $this->person($clients->get($id), $period) + ['given' => $items->count(), 'effect_recorded' => $items->filter(fn ($a) => $a->prnEffectiveness !== null && (int) $a->prnEffectiveness->client_id === (int) $a->client_id && (int) $a->prnEffectiveness->client_medication_id === (int) $a->client_medication_id)->count(), 'last_given_at' => $items->max('administered_at')?->toIso8601String()])->values();
             $totals = ['given' => $records->count(), 'effect_recorded' => $rows->sum('effect_recorded'), 'effect_pct' => $records->count() ? round($rows->sum('effect_recorded') * 100 / $records->count(), 1) : null];
+        } elseif ($report === 'syringe_drivers') {
+            $query = MedicationSyringeDriver::query()->whereIn('client_id', $clientIds)
+                ->where(fn ($q) => $q->whereNull('site_id')->orWhereIn('site_id', $siteIds))
+                ->whereBetween('commenced_at', $period->bounds())->orderBy('commenced_at')->orderBy('id');
+            $this->limit((clone $query)->count());
+            $rows = $query->get()->map(function ($driver) use ($clients, $period, $actor) {
+                $client = $clients->get($driver->client_id);
+                $contents = $this->scope->visibleSyringeDriverContents($client, $driver->contents ?? [], $actor->canDo('medications.controlled.view'));
+                if ($contents === null) {
+                    return null;
+                }
+
+                return $this->person($client, $period) + [
+                    'reference' => 'driver:'.$driver->id, 'status' => $driver->status,
+                    'commenced_at' => $driver->commenced_at?->toIso8601String(),
+                    'completed_at' => $driver->completed_at?->toIso8601String(),
+                    'rate' => $driver->rate, 'rate_unit' => $driver->rate_unit,
+                    'duration_hours' => $driver->duration_hours, 'contents' => $contents,
+                ];
+            })->filter()->values();
+            $totals = ['drivers' => $rows->count(), 'running' => $rows->where('status', 'running')->count(), 'completed' => $rows->where('status', 'completed')->count()];
         } elseif ($report === 'controlled') {
             abort_unless($actor->canDo('medications.controlled.view'), 403);
             $entries = $this->canonical(ClientControlledDrugEntry::query(), $siteIds, $clientIds)->whereBetween('recorded_at', $period->bounds())->with('medication')->orderBy('recorded_at')->get();
@@ -105,8 +130,8 @@ final class MedicationReportDataset
             // P07's real witnessed ledger entry is the count evidence. A task
             // marked complete is not a substitute for a recorded count.
             $counts = $entries->where('entry_type', 'balance_check')->count();
-            $discrepancies = $this->canonical(\App\Models\ClientControlledDrugDiscrepancy::query(), $siteIds, $clientIds)->whereBetween('reported_at', $period->bounds())->count();
-            $losses = $this->canonical(\App\Models\ControlledDrugLossReport::query(), $siteIds, $clientIds)->whereBetween('discovered_at', $period->bounds())->count();
+            $discrepancies = $this->canonical(ClientControlledDrugDiscrepancy::query(), $siteIds, $clientIds)->whereBetween('reported_at', $period->bounds())->count();
+            $losses = $this->canonical(ControlledDrugLossReport::query(), $siteIds, $clientIds)->whereBetween('discovered_at', $period->bounds())->count();
             $given = $this->canonical(ClientMedicationAdministration::query()->effectiveClinicalEvidence(), $siteIds, $clientIds)->whereHas('medication', fn ($q) => $q->where('controlled_drug', true))->where('status', 'given')->whereBetween('administered_at', $period->bounds())->count();
             $totals = ['movements' => $rows->count(), 'witnessed' => $rows->sum('witnessed'), 'receipts' => $rows->where('movement', 'receipt')->count(), 'disposals' => $rows->whereIn('movement', ['disposal', 'destruction'])->count(), 'counts' => $counts, 'discrepancies' => $discrepancies, 'losses' => $losses, 'given' => $given];
         } elseif ($report === 'errors') {
@@ -212,7 +237,9 @@ final class MedicationReportDataset
         $query = $this->canonical(ClientMedicationAdministration::query()->effectiveClinicalEvidence(), $sites, $ids)
             ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
             ->whereBetween('administered_at', $period->bounds())->with('medication')->orderBy('administered_at')->orderBy('id');
-        if (! $actor->canDo('medications.controlled.view')) $this->scope->scopeWithoutControlledMedicationRows($query);
+        if (! $actor->canDo('medications.controlled.view')) {
+            $this->scope->scopeWithoutControlledMedicationRows($query);
+        }
         $this->limit((clone $query)->count());
 
         return $query->get()->map(fn ($a) => $this->person($clients->get($a->client_id), $period) + [

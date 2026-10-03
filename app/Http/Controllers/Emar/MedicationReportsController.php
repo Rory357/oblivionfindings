@@ -7,12 +7,15 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\User;
+use App\Services\AuthorizationEvidenceLockService;
+use App\Services\CurrentAuthorizationReads;
 use App\Services\Medication\Audit\MedicationEventChain;
 use App\Services\Medication\Audit\MedicationEventData;
 use App\Services\Medication\Audit\MedicationEventReader;
 use App\Services\Medication\Audit\MedicationEventRecorder;
-use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\Downtime\DowntimePackService;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\Reporting\MedicationExportAudit;
 use App\Services\Medication\Reporting\MedicationPdfDataset;
 use App\Services\Medication\Reporting\MedicationReportAccess;
@@ -68,7 +71,7 @@ class MedicationReportsController extends Controller
             if (! $actor->canDo('medications.audit.view') || $finance) {
                 $locked = 'The audit trail is for clinical leads, coordinators, provider managers and auditors.';
             } elseif ($sub === 'gaps') {
-                $data['notice'] = app(\App\Services\Medication\DoseSlots\DoseSlotProjection::class)->coverage($period->from, CarbonImmutable::now('UTC'))['notice'];
+                $data['notice'] = app(DoseSlotProjection::class)->coverage($period->from, CarbonImmutable::now('UTC'))['notice'];
                 $rows = array_values(array_filter($this->datasets->doseRows($actor, $period, $siteIds, $clientId), fn ($r) => in_array($r['status'], ['late', 'not_recorded'], true)));
                 $page = $this->paginate($rows, $request);
                 $data['totals'] = ['not_recorded' => count($rows)];
@@ -89,7 +92,7 @@ class MedicationReportsController extends Controller
             'sites' => app(MedicationGovernanceScopeService::class)->sitePicker($allSites)->map->only(['id', 'name'])->values(), 'people' => $people,
             'data' => $data, 'page' => $page, 'locked' => $locked, 'finance' => $finance,
             'can' => ['audit' => $actor->canDo('medications.audit.view') && ! $finance, 'controlled' => $actor->canDo('medications.controlled.view'), 'verify' => $actor->canDo('medications.audit.view') && ! $finance, 'history' => $actor->canDo('medications.audit.view') && $actor->canDo('medications.view') && ! $finance],
-            'exports' => collect(['mar' => ['MAR chart', 'PDF', 'One person, up to 31 NZ days; includes medicines ceased in the period.'], 'cd_register' => ['Controlled drug register', 'PDF', 'One medicine, up to 31 NZ days.'], 'round_sheet' => ['Round sheet', 'PDF', 'One house, one NZ day.'], 'doses' => ['Doses', 'CSV', 'Scheduled dose slots by NZ day, including Away.'], 'errors' => ['Medication errors', 'CSV', 'Factual account; in-error records are excluded unless requested.'], 'stock' => ['Stock', 'CSV', 'Current stock by house and medicine.'], 'audit' => ['Audit trail', 'CSV', 'The same filtered event list as the screen, over the whole period.']])->map(fn ($spec, $type) => ['type' => $type, 'label' => $spec[0], 'format' => $spec[1], 'description' => $spec[2], 'allowed' => $this->access->canExport($actor, $type)])->filter(fn ($e) => ! $finance || $e['type'] === 'stock')->values(),
+            'exports' => collect(['mar' => ['MAR chart', 'PDF', 'One person, up to 31 NZ days; includes medicines ceased in the period.'], 'cd_register' => ['Controlled drug register', 'PDF', 'One medicine, up to 31 NZ days.'], 'round_sheet' => ['Round sheet', 'PDF', 'One house, one NZ day.'], 'doses' => ['Doses', 'CSV', 'Scheduled dose slots by NZ day, including Away.'], 'errors' => ['Medication errors', 'CSV', 'Factual account; in-error records are excluded unless requested.'], 'stock' => ['Stock', 'CSV', 'Current stock by house and medicine.'], 'syringe_drivers' => ['Syringe drivers', 'CSV', 'Recorded driver use and canonical medicine contents; free-text notes are excluded.'], 'audit' => ['Audit trail', 'CSV', 'The same filtered event list as the screen, over the whole period.']])->map(fn ($spec, $type) => ['type' => $type, 'label' => $spec[0], 'format' => $spec[1], 'description' => $spec[2], 'allowed' => $this->access->canExport($actor, $type)])->filter(fn ($e) => ! $finance || $e['type'] === 'stock')->values(),
             'purposes' => MedicationExportAudit::PURPOSES, 'as_at' => CarbonImmutable::now('UTC')->toIso8601String(),
             'downtime_pack' => $finance ? null : ['allowed' => $actor->isApproved() && $this->access->canExport($actor, 'doses'), 'today' => CarbonImmutable::now('Pacific/Auckland')->toDateString(), 'tomorrow' => CarbonImmutable::now('Pacific/Auckland')->addDay()->toDateString(), 'purpose' => DowntimePackService::PURPOSE],
         ]);
@@ -125,14 +128,14 @@ class MedicationReportsController extends Controller
     /** Small context endpoint for the shared record-page export prompt (P02). */
     public function exportOptions(Request $request)
     {
-        $data = $request->validate(['type' => ['required', Rule::in(['mar', 'cd_register', 'round_sheet', 'doses', 'errors', 'stock', 'audit'])], 'site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1']]);
+        $data = $request->validate(['type' => ['required', Rule::in(['mar', 'cd_register', 'round_sheet', 'doses', 'errors', 'stock', 'audit', 'syringe_drivers'])], 'site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1']]);
         $actor = $request->user();
         $type = $data['type'];
         abort_unless($this->access->canExport($actor, $type), 403);
         $period = MedicationReportPeriod::fromRequest($request);
         $sites = $this->access->siteIds($actor, $request->integer('site_id') ?: null, $request->integer('client_id') ?: null, $type === 'stock' ? 'stock' : ($type === 'cd_register' ? 'controlled' : 'doses'));
         $people = Client::query()->whereIn('id', $this->access->clientIds($actor, $sites))->when($request->integer('client_id'), fn ($q) => $q->whereKey($request->integer('client_id')))->orderBy('first_name')->limit(100)->get()->map(fn ($p) => ['id' => $p->id, 'name' => trim($p->first_name.' '.$p->last_name)]);
-        $spec = ['mar' => ['MAR chart', 'PDF', 'One person, up to 31 NZ days. Ceased and superseded medicines stay in the period.'], 'cd_register' => ['Controlled drug register', 'PDF', 'One person and one medicine, up to 31 NZ days.'], 'round_sheet' => ['Round sheet', 'PDF', 'One house and one NZ day.'], 'doses' => ['Doses', 'CSV', 'Scheduled dose slots, including Away.'], 'errors' => ['Medication errors', 'CSV', 'Factual accounts, with in-error records excluded unless requested.'], 'stock' => ['Stock', 'CSV', 'Stock as at now.'], 'audit' => ['Audit trail', 'CSV', 'Filtered events over the selected period.']][$type];
+        $spec = ['mar' => ['MAR chart', 'PDF', 'One person, up to 31 NZ days. Ceased and superseded medicines stay in the period.'], 'cd_register' => ['Controlled drug register', 'PDF', 'One person and one medicine, up to 31 NZ days.'], 'round_sheet' => ['Round sheet', 'PDF', 'One house and one NZ day.'], 'doses' => ['Doses', 'CSV', 'Scheduled dose slots, including Away.'], 'errors' => ['Medication errors', 'CSV', 'Factual accounts, with in-error records excluded unless requested.'], 'stock' => ['Stock', 'CSV', 'Stock as at now.'], 'syringe_drivers' => ['Syringe drivers', 'CSV', 'Recorded driver use and canonical medicine contents; free-text notes are excluded.'], 'audit' => ['Audit trail', 'CSV', 'Filtered events over the selected period.']][$type];
 
         return response()->json(['filters' => ['view' => 'exports', 'report' => 'doses', 'sub' => 'events', 'period' => 'custom', 'date_from' => $period->from, 'date_to' => $period->to, 'site_id' => count($sites) === 1 ? $sites[0] : null, 'client_id' => $request->integer('client_id') ?: null, 'kind' => '', 'q' => ''], 'sites' => app(MedicationGovernanceScopeService::class)->sitePicker($sites)->map->only(['id', 'name'])->values(), 'people' => $people, 'finance' => $this->access->financeOnly($actor), 'exports' => [['type' => $type, 'label' => $spec[0], 'format' => $spec[1], 'description' => $spec[2], 'allowed' => true]], 'purposes' => MedicationExportAudit::PURPOSES], 200, ['Cache-Control' => 'no-store']);
     }
@@ -143,9 +146,9 @@ class MedicationReportsController extends Controller
         $data = $request->validate(['site_id' => ['required', 'integer', 'min:1']]);
         $this->access->siteIds($request->user(), (int) $data['site_id']);
         $result = DB::transaction(function () use ($request, $data) {
-            $actor = app(\App\Services\AuthorizationEvidenceLockService::class)->lockForUserWithoutWaiting($request->user(), ['*']);
+            $actor = app(AuthorizationEvidenceLockService::class)->lockForUserWithoutWaiting($request->user(), ['*']);
             abort_unless($actor->canDo('medications.audit.view') && ! $this->access->financeOnly($actor), 403);
-            \App\Services\CurrentAuthorizationReads::within(fn ($reads) => $this->access->siteIds($actor, (int) $data['site_id'], reads: $reads));
+            CurrentAuthorizationReads::within(fn ($reads) => $this->access->siteIds($actor, (int) $data['site_id'], reads: $reads));
             $result = app(MedicationEventChain::class)->verify((int) $data['site_id']);
             app(MedicationEventRecorder::class)->append(new MedicationEventData((int) $data['site_id'], 'chain.verified', 'site', (string) $data['site_id'], $actor->id, CarbonImmutable::now('UTC'), $result['intact'] ? 'Medication event chain verified' : 'Medication event chain check found a broken link', ['intact' => $result['intact'], 'broken_at' => $result['broken_at']]));
 
@@ -157,7 +160,7 @@ class MedicationReportsController extends Controller
 
     public function export(Request $request)
     {
-        $data = $request->validate(['type' => ['required', Rule::in(['mar', 'cd_register', 'round_sheet', 'doses', 'errors', 'stock', 'audit'])], 'site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'], 'medication_id' => ['nullable', 'integer', 'min:1'], 'kind' => ['nullable', 'string', 'max:100'], 'q' => ['nullable', 'string', 'max:80'], 'include_in_error' => ['nullable', 'boolean'], 'include_prn' => ['nullable', 'boolean']]);
+        $data = $request->validate(['type' => ['required', Rule::in(['mar', 'cd_register', 'round_sheet', 'doses', 'errors', 'stock', 'audit', 'syringe_drivers'])], 'site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'], 'medication_id' => ['nullable', 'integer', 'min:1'], 'kind' => ['nullable', 'string', 'max:100'], 'q' => ['nullable', 'string', 'max:80'], 'include_in_error' => ['nullable', 'boolean'], 'include_prn' => ['nullable', 'boolean']]);
         $actor = $request->user();
         $type = $data['type'];
         abort_unless($this->access->canExport($actor, $type), 403);

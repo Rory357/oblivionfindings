@@ -24,6 +24,7 @@ const reportFields: Record<string, [string, string][]> = {
     doses: [['site', 'House'], ['due', 'Due'], ['given', 'Given'], ['refused', 'Refused'], ['withheld', 'Withheld'], ['missed', 'Recorded missed'], ['not_recorded', 'Not recorded'], ['away', 'Away'], ['given_rate', 'Given rate']],
     rounds: [['site', 'House'], ['date', 'Day'], ['status', 'Result'], ['due', 'Due'], ['recorded', 'Recorded'], ['away', 'Away'], ['window_ends_at', 'Window ended']],
     prn: [['site', 'House'], ['given', 'Given'], ['effect_recorded', 'Effect recorded'], ['last_given_at', 'Last given']],
+    syringe_drivers: [['site', 'House'], ['commenced_at', 'Started'], ['completed_at', 'Completed'], ['status', 'Status'], ['rate', 'Rate'], ['rate_unit', 'Rate unit'], ['contents', 'Medicine contents']],
     controlled: [['date', 'Day'], ['medicine', 'Medicine'], ['movement', 'Movement'], ['quantity', 'Quantity'], ['balance', 'Balance'], ['witnessed', 'Witnessed']],
     errors: [['date', 'Day'], ['error_type', 'Type'], ['reached', 'Reached person'], ['harm', 'Harm'], ['status', 'Status'], ['confirmed_sac', 'Confirmed SAC']],
     reviews: [['date', 'Due'], ['status', 'Status'], ['completed_date', 'Completed'], ['next_review_date', 'Next review']],
@@ -34,6 +35,7 @@ const meters: Record<string, [string, string, string?][]> = {
     doses: [['due', 'Doses due'], ['given', 'Given'], ['not_recorded', 'Not recorded'], ['away', 'Away', 'Outside the due denominator'], ['given_rate', 'Given rate', 'No doses due in this period']],
     rounds: [['ended', 'Rounds ended'], ['on_time', 'On time'], ['not_completed', 'Not completed'], ['not_started', 'Not started'], ['on_time_pct', 'On time', 'No eligible rounds have ended']],
     prn: [['given', 'As-needed doses'], ['effect_recorded', 'Effect recorded'], ['effect_pct', 'Effect recorded', 'No as-needed doses were given']],
+    syringe_drivers: [['drivers', 'Drivers'], ['running', 'Running'], ['completed', 'Completed']],
     controlled: [['movements', 'Register entries'], ['witnessed', 'Witnessed'], ['receipts', 'Receipts'], ['disposals', 'Disposals']],
     errors: [['reached', 'Reached person'], ['near_misses', 'Near misses'], ['with_harm', 'With harm'], ['open', 'Open']],
     reviews: [['due', 'Reviews due'], ['done', 'Completed'], ['overdue', 'Overdue']],
@@ -82,7 +84,7 @@ export default function ReportsHub(props: Props) {
         catch (e) { setError(e instanceof Error ? e.message : 'The chain check could not be completed.'); }
         finally { setBusy(false); }
     }
-    const selectedExport = props.exports.find((e) => e.type === (filters.view === 'audit' ? 'audit' : ['errors', 'stock'].includes(filters.report) ? filters.report : 'doses'));
+    const selectedExport = props.exports.find((e) => e.type === (filters.view === 'audit' ? 'audit' : ['errors', 'stock', 'syringe_drivers'].includes(filters.report) ? filters.report : 'doses'));
     const meterItems = filters.view === 'standard' ? meters[filters.report] ?? [] : filters.view === 'audit' ? [['events', 'Events'], ['exports', 'Exports'], ['doses', 'Dose events'], ['errors', 'Error events']] as [string, string, string?][] : [];
     const heading = filters.view === 'audit' ? 'Audit trail' : filters.view === 'exports' ? 'Print & exports' : props.reports[filters.report];
     return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Medication', href: '/emar' }, { title: 'Reports & audit', href: '/emar/reports' }]}><Head title="Medication reports & audit" />

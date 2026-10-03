@@ -20,10 +20,12 @@ use App\Services\MedicationReportingService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\ReadsRetainedMedicationAuditEvidence;
 use Tests\TestCase;
 
 class MedicationReportCanonicalScopeTest extends TestCase
 {
+    use ReadsRetainedMedicationAuditEvidence;
     use RefreshDatabase;
 
     public function test_generic_medication_administration_report_uses_effective_clinical_evidence(): void
@@ -97,7 +99,7 @@ class MedicationReportCanonicalScopeTest extends TestCase
             'refused',
             'FOREIGN OUT-OF-SCOPE ADMINISTRATION',
         );
-        MedicationError::query()->create([
+        $localError = MedicationError::query()->create([
             'client_id' => $localClient->id,
             'client_medication_id' => null,
             'error_type' => 'documentation',
@@ -117,7 +119,7 @@ class MedicationReportCanonicalScopeTest extends TestCase
             'reported_at' => now(),
             'status' => 'reported',
         ]);
-        MedicationError::query()->create([
+        $controlledError = MedicationError::query()->create([
             'client_id' => $localClient->id,
             'client_medication_id' => $localControlledMedication->id,
             'error_type' => 'wrong_medication',
@@ -274,12 +276,11 @@ class MedicationReportCanonicalScopeTest extends TestCase
         $this->assertTrue($reader->canDo('reports.viewAny'));
         $this->assertFalse($reader->canDo('medications.view'));
 
-        $medicationsPage = $this->actingAs($reader)
-            ->get(route('reports.medications'))
+        $medicationsPage = $this->canonicalGet($reader, 'reports.medications')
             ->assertOk();
         $this->assertSame(
-            [$localAdministration->id],
-            collect($medicationsPage->inertiaProps('administrations'))->pluck('id')->all(),
+            [$localClient->id],
+            collect($medicationsPage->inertiaProps('people'))->pluck('id')->all(),
         );
         $this->assertNoForgedMedicationMarkers($medicationsPage->getContent());
 
@@ -289,24 +290,19 @@ class MedicationReportCanonicalScopeTest extends TestCase
         // The dose numbers are the scheduled doses due, from the dose-slot
         // projection (C6h), which no forged record reaches. These medicines
         // are PRN, so none is due; the PRN figures below still count records.
-        $this->assertSame(0, (int) $emarPage->inertiaProps('adminSummary.total'));
-        $this->assertSame(0, (int) $emarPage->inertiaProps('adminSummary.given'));
-        $this->assertSame(0, (int) $emarPage->inertiaProps('adminSummary.missed'));
-        $this->assertSame([], $emarPage->inertiaProps('dailyAdmin'));
-        $this->assertSame([], $emarPage->inertiaProps('clientBreakdown'));
-        $this->assertSame(
-            [$localMedication->name],
-            collect($emarPage->inertiaProps('topPrnMeds'))->pluck('medication')->all(),
-        );
-        $this->assertSame(1, (int) collect($emarPage->inertiaProps('topPrnMeds'))->sum('count'));
-        $this->assertSame(1, (int) collect($emarPage->inertiaProps('prnByClient'))->sum('count'));
-        $this->assertSame(1, (int) $emarPage->inertiaProps('errorSummary.total'));
-        $this->assertSame(1, (int) $emarPage->inertiaProps('errorSummary.open'));
+        $this->assertSame(0, (int) $emarPage->inertiaProps('data.totals.due'));
+        $this->assertSame(0, (int) $emarPage->inertiaProps('data.totals.given'));
+        $this->assertSame(0, (int) $emarPage->inertiaProps('data.totals.missed'));
+        $this->actingAs($reader)->get(route('emar.reports', ['report' => 'prn']))->assertOk()
+            ->assertInertia(fn ($page) => $page->where('data.totals.given', 1)->has('page.data', 1)->where('page.data.0.client_id', $localClient->id));
+        $this->actingAs($reader)->get(route('emar.reports', ['report' => 'errors']))->assertOk()
+            ->assertInertia(fn ($page) => $page->where('data.totals.open', 1)->has('page.data', 1)
+                ->where('page.data.0.reference', $localError->fresh()->reference_number));
         $this->assertStringNotContainsString('RESTRICTED CONTROLLED MEDICATION ERROR', $emarPage->getContent());
         $this->assertNoForgedMedicationMarkers($emarPage->getContent());
 
         $apiReport = $this->actingAs($reader)
-            ->getJson(route('api.medications.reports', ['type' => 'mar']))
+            ->getJson(route('api.medications.reports', ['type' => 'mar', 'purpose' => 'care']))
             ->assertOk()
             ->assertJsonCount(1, 'records')
             ->assertJsonPath('meta.total_records', 1)
@@ -339,21 +335,17 @@ class MedicationReportCanonicalScopeTest extends TestCase
 
         $ordinaryAdministrationExports = [
             $this->actingAs($reader)
-                ->get(route('api.medications.reports.export', ['type' => 'mar']))
+                ->get(route('api.medications.reports.export', ['type' => 'mar', 'purpose' => 'care']))
                 ->assertOk()
-                ->streamedContent(),
+                ->getContent(),
             $this->actingAs($reader)
-                ->get(route('reports.medications.export_mar'))
+                ->get(route('reports.medications.export_mar', ['purpose' => 'care']))
                 ->assertOk()
-                ->streamedContent(),
+                ->getContent(),
             $this->actingAs($reader)
-                ->get(route('emar.reports.export', ['report_type' => 'administration']))
+                ->post(route('emar.reports.export'), ['type' => 'doses', 'purpose' => 'care'])
                 ->assertOk()
-                ->streamedContent(),
-            $this->actingAs($reader)
-                ->get(route('emar.reports.export', ['report_type' => 'prn']))
-                ->assertOk()
-                ->streamedContent(),
+                ->getContent(),
         ];
         foreach ($ordinaryAdministrationExports as $csv) {
             $this->assertStringContainsString($localMedication->name, $csv);
@@ -361,17 +353,18 @@ class MedicationReportCanonicalScopeTest extends TestCase
         }
 
         $ordinaryErrorCsv = $this->actingAs($reader)
-            ->get(route('emar.reports.export', ['report_type' => 'errors']))
+            ->post(route('emar.reports.export'), ['type' => 'errors', 'purpose' => 'care'])
             ->assertOk()
-            ->streamedContent();
-        $this->assertStringContainsString('LOCAL NULLABLE MEDICATION ERROR', $ordinaryErrorCsv);
+            ->getContent();
+        $this->assertStringContainsString($localError->fresh()->reference_number, $ordinaryErrorCsv);
+        $this->assertStringNotContainsString('LOCAL NULLABLE MEDICATION ERROR', $ordinaryErrorCsv);
         $this->assertStringNotContainsString('RESTRICTED CONTROLLED MEDICATION ERROR', $ordinaryErrorCsv);
         $this->assertNoForgedMedicationMarkers($ordinaryErrorCsv);
 
         $ordinarySyringeCsv = $this->actingAs($reader)
-            ->get(route('emar.reports.export', ['report_type' => 'syringe_drivers']))
+            ->post(route('emar.reports.export'), ['type' => 'syringe_drivers', 'purpose' => 'care'])
             ->assertOk()
-            ->streamedContent();
+            ->getContent();
         $this->assertStringContainsString('ORDINARY SYRINGE CONTENT', $ordinarySyringeCsv);
         $this->assertStringNotContainsString('ORDINARY DRIVER NOTES', $ordinarySyringeCsv);
         $this->assertStringNotContainsString('RESTRICTED MIXED ORDINARY SYRINGE CONTENT', $ordinarySyringeCsv);
@@ -389,16 +382,13 @@ class MedicationReportCanonicalScopeTest extends TestCase
         ]);
         $reader->unsetRelation('permissionOverrides')->unsetRelation('roles');
         $this->actingAs($reader)
-            ->get(route('emar.reports'))
+            ->get(route('emar.reports', ['report' => 'errors']))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                // PRN medicines: no scheduled dose due (C6h).
-                ->where('adminSummary.total', 0)
-                ->where('adminSummary.given', 0)
-                ->where('errorSummary.total', 2)
-                ->where('errorSummary.open', 2));
+                ->has('page.data', 2)
+                ->where('data.totals.open', 2));
         $this->actingAs($reader)
-            ->getJson(route('api.medications.reports', ['type' => 'mar']))
+            ->getJson(route('api.medications.reports', ['type' => 'mar', 'purpose' => 'care']))
             ->assertOk()
             ->assertJsonPath('meta.total_records', 2)
             ->assertJsonFragment([
@@ -420,9 +410,9 @@ class MedicationReportCanonicalScopeTest extends TestCase
             ->assertJsonMissing(['title' => 'MISSING HISTORICAL MEDICATION INCIDENT LEAK']);
 
         $controlledSyringeCsv = $this->actingAs($reader)
-            ->get(route('emar.reports.export', ['report_type' => 'syringe_drivers']))
+            ->post(route('emar.reports.export'), ['type' => 'syringe_drivers', 'purpose' => 'care'])
             ->assertOk()
-            ->streamedContent();
+            ->getContent();
         $this->assertStringContainsString('ORDINARY SYRINGE CONTENT', $controlledSyringeCsv);
         $this->assertStringContainsString('RESTRICTED MIXED ORDINARY SYRINGE CONTENT', $controlledSyringeCsv);
         $this->assertStringContainsString('RESTRICTED CONTROLLED SYRINGE CONTENT', $controlledSyringeCsv);
@@ -433,35 +423,33 @@ class MedicationReportCanonicalScopeTest extends TestCase
 
         $csvPayloads = [
             $this->actingAs($reader)
-                ->get(route('api.medications.reports.export', ['type' => 'mar']))
+                ->get(route('api.medications.reports.export', ['type' => 'mar', 'purpose' => 'care']))
                 ->assertOk()
-                ->streamedContent(),
+                ->getContent(),
             $this->actingAs($reader)
-                ->get(route('reports.medications.export_mar'))
+                ->get(route('reports.medications.export_mar', ['purpose' => 'care']))
                 ->assertOk()
-                ->streamedContent(),
+                ->getContent(),
             $this->actingAs($reader)
-                ->get(route('emar.reports.export', ['report_type' => 'administration']))
+                ->post(route('emar.reports.export'), ['type' => 'doses', 'purpose' => 'care'])
                 ->assertOk()
-                ->streamedContent(),
+                ->getContent(),
             $this->actingAs($reader)
-                ->get(route('emar.reports.export', ['report_type' => 'prn']))
+                ->post(route('emar.reports.export'), ['type' => 'errors', 'purpose' => 'care'])
                 ->assertOk()
-                ->streamedContent(),
-            $this->actingAs($reader)
-                ->get(route('emar.reports.export', ['report_type' => 'errors']))
-                ->assertOk()
-                ->streamedContent(),
+                ->getContent(),
         ];
 
-        foreach (array_slice($csvPayloads, 0, 4) as $csv) {
+        foreach (array_slice($csvPayloads, 0, 3) as $csv) {
             $this->assertStringContainsString($localMedication->name, $csv);
             $this->assertStringContainsString($localControlledMedication->name, $csv);
             $this->assertNoForgedMedicationMarkers($csv);
         }
-        $this->assertStringContainsString('LOCAL NULLABLE MEDICATION ERROR', $csvPayloads[4]);
-        $this->assertStringContainsString('RESTRICTED CONTROLLED MEDICATION ERROR', $csvPayloads[4]);
-        $this->assertNoForgedMedicationMarkers($csvPayloads[4]);
+        $this->assertStringContainsString($localError->fresh()->reference_number, $csvPayloads[3]);
+        $this->assertStringContainsString($controlledError->fresh()->reference_number, $csvPayloads[3]);
+        $this->assertStringNotContainsString('LOCAL NULLABLE MEDICATION ERROR', $csvPayloads[3]);
+        $this->assertStringNotContainsString('RESTRICTED CONTROLLED MEDICATION ERROR', $csvPayloads[3]);
+        $this->assertNoForgedMedicationMarkers($csvPayloads[3]);
         $this->assertStringContainsString("'=HYPERLINK", $csvPayloads[0]);
     }
 
@@ -838,12 +826,16 @@ class MedicationReportCanonicalScopeTest extends TestCase
         ]);
 
         $permissionIds = Permission::query()
-            ->whereIn('key', ['reports.viewAny', 'medications.view'])
+            ->whereIn('key', ['reports.viewAny', 'medications.view', 'medications.reports.view', 'medications.reports.export', 'medications.audit.view', 'medications.controlled.view'])
             ->pluck('id', 'key');
-        $this->assertCount(2, $permissionIds, 'Missing seeded permission in test setup.');
+        $this->assertCount(6, $permissionIds, 'Missing seeded permission in test setup.');
         $reader->permissionOverrides()->sync([
             (int) $permissionIds['reports.viewAny'] => ['allowed' => true],
             (int) $permissionIds['medications.view'] => ['allowed' => false],
+            (int) $permissionIds['medications.reports.view'] => ['allowed' => true],
+            (int) $permissionIds['medications.reports.export'] => ['allowed' => true],
+            (int) $permissionIds['medications.audit.view'] => ['allowed' => true],
+            (int) $permissionIds['medications.controlled.view'] => ['allowed' => false],
         ]);
 
         return $reader->refresh();
@@ -866,6 +858,9 @@ class MedicationReportCanonicalScopeTest extends TestCase
         $reader->permissionOverrides()->sync([
             $permission->id => ['allowed' => true],
         ]);
+        $keys = ['medications.audit.view' => true, 'medications.controlled.view' => false];
+        $reader->permissionOverrides()->syncWithoutDetaching(Permission::query()->whereIn('key', array_keys($keys))->get()
+            ->mapWithKeys(fn ($grant) => [$grant->id => ['allowed' => $keys[$grant->key]]])->all());
 
         return $reader->refresh();
     }
