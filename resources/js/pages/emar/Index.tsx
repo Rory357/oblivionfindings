@@ -994,7 +994,7 @@ export default function EmarHome(props: Props) {
                         value={stats.competenciesExpiring}
                         label="Competencies expiring"
                         pill={{ label: '30 days', tone: 'neutral' }}
-                        sub="med-competent staff"
+                        sub="Medication-trained staff"
                     />
                     {can.manage_stock ? (
                         <KpiCard
@@ -1034,8 +1034,8 @@ export default function EmarHome(props: Props) {
                                             Action centre
                                         </CardTitle>
                                         <p className="text-xs text-muted-foreground">
-                                            Everything that needs a clinician
-                                            right now, most urgent first.
+                                            Work needing attention from your team
+                                            today, most urgent first.
                                         </p>
                                     </div>
                                 </div>
@@ -1332,7 +1332,7 @@ export default function EmarHome(props: Props) {
                         <Card className="rounded-[18px]">
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-sm">
-                                    Today&rsquo;s med-pass outcomes
+                                    Today&rsquo;s medication outcomes
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="flex items-center gap-4">
@@ -1435,10 +1435,10 @@ export default function EmarHome(props: Props) {
                             </span>
                             <div className="min-w-0">
                                 <CardTitle className="text-base">
-                                    Client board — today
+                                    People — today
                                 </CardTitle>
                                 <p className="text-xs text-muted-foreground">
-                                    Med-pass progress per client.
+                                    Medication progress for each person.
                                 </p>
                             </div>
                         </div>
@@ -1454,14 +1454,14 @@ export default function EmarHome(props: Props) {
                                 href="/emar/mar"
                                 className="text-xs font-medium whitespace-nowrap text-primary hover:underline"
                             >
-                                All clients →
+                                All people →
                             </Link>
                         </div>
                     </CardHeader>
                     <CardContent className="min-w-0">
                         {filteredBoard.length === 0 ? (
                             <p className="py-8 text-center text-sm text-muted-foreground">
-                                No clients match this view.
+                                No people match this view.
                             </p>
                         ) : (
                             <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
