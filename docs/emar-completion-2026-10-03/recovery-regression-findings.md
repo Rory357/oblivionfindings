@@ -23,4 +23,5 @@ Application files are unchanged.
 - Dependencies were physically copied into the managed worktree. Reflection resolved `EnhancedMarService` from this worktree, not the primary checkout.
 - PHP syntax validation passed. The owned file was formatted with Pint.
 - One focused suite was queued through `C:/Users/steph/.claude/heavy-lock.sh`, using absolute PHP `C:/Users/steph/.config/herd/bin/php84/php.exe` and the repository's per-process isolated test database.
-- Runtime result: pending. Log: `storage/logs/emar-recovery-regressions.log`.
+- Runtime result: not run. Main issued a temporary heavy-test hold after discovering the existing guard parsed labels containing spaces incorrectly. Only this suite's still-queued wrapper processes (`42708` and `35464`) were stopped, after checking their identities, descendants and log. No PHP test child had started; the shared lock was untouched. Resume requires Main's verified guard-repair announcement. Log: `storage/logs/emar-recovery-regressions.log`.
+- Final test file SHA-256: `3f1b4cb78fdd61c0e416b9fd07c8f78a376ac785371dc98540e766d357247dea`. The audit rollback fixture restores the real recorder and flushes the approval route's cached controller before retrying, supporting either dynamic or constructor-injected recorder dependencies.

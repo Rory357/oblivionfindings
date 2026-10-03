@@ -175,6 +175,7 @@ class MedicationRecoveryIntegrationRegressionTest extends TestCase
             $this->assertSame('Synthetic correction audit failure', $exception->getMessage());
         } finally {
             $this->app->instance(MedicationEventRecorder::class, $realRecorder);
+            $this->app['router']->getRoutes()->getByName('emar.corrections.approve')->flushController();
         }
         $this->assertSame(1, $attempts);
         $this->assertSame($doseFacts, ClientMedicationAdministration::query()->orderBy('id')->get()->map->getRawOriginal()->all());
