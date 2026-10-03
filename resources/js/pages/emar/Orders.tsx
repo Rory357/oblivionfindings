@@ -403,7 +403,7 @@ export default function Orders(props: Props) {
     return (
         <AppLayout breadcrumbs={useEmarBreadcrumbs()}>
             <Head title="Medication orders" />
-            <div className="flex flex-col gap-5 [&_button]:min-h-11 [&_button]:min-w-11 [&_input[type=search]]:min-h-11">
+            <div className="flex flex-col gap-5 [&_button]:min-h-[44px] [&_button]:min-w-[44px] [&_input[type=search]]:min-h-[44px]">
                 <PageHeader
                     icon={Pill}
                     title="Medication orders"
@@ -532,7 +532,7 @@ export default function Orders(props: Props) {
                         </>
                     }
                     filters={
-                        <div className="flex flex-wrap items-center gap-2 [&>div]:min-h-11">
+                        <div className="flex flex-wrap items-center gap-2 [&>div]:min-h-[44px]">
                             <PageHeaderFilterSelect
                                 label="All houses"
                                 value={props.filters.site_id ?? 'all'}
@@ -697,7 +697,7 @@ export default function Orders(props: Props) {
                         <p className="text-caption">
                             <Link
                                 href="/emar/prescriptions/legacy"
-                                className="inline-flex min-h-11 items-center underline"
+                                className="inline-flex min-h-[44px] items-center underline"
                             >
                                 Open supply and dispensing records
                             </Link>
