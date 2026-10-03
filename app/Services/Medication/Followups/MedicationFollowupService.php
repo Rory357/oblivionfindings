@@ -15,6 +15,7 @@ use App\Models\ShiftHandover;
 use App\Models\User;
 use App\Services\AuthorizationEvidenceLockService;
 use App\Services\Medication\Audit\MedicationEventData;
+use App\Services\Medication\Audit\MedicationEventFingerprint;
 use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationGovernanceScopeService;
@@ -126,6 +127,18 @@ final class MedicationFollowupService
             return;
         }
         $owner = $administration->administered_by ? (int) $administration->administered_by : null;
+        if (! ClientMedicationAdministration::query()->effectiveClinicalEvidence()->whereKey($administration->id)->exists()) {
+            // Historical evidence remains intact; only outstanding work is retired.
+            MedicationFollowup::query()->where('administration_id', $administration->id)
+                ->whereIn('type', ['effect', 'reoffer', 'partial', 'unconfirmed'])
+                ->whereNull('completed_at')->orderBy('id')->lockForUpdate()->get()
+                ->each(fn ($row) => $this->close($row, 0, 'source_retired', [
+                    'reason' => 'This administration no longer represents the effective clinical record.',
+                    'correction_status' => $administration->correction_status,
+                ]));
+
+            return;
+        }
         if ($medication->is_prn && $administration->status === 'given') {
             $row = $this->ensure('effect:'.$administration->id, 'effect', $client, $medication,
                 $administration, $owner, $this->instant($administration, 'effect_check_due_at'));
@@ -176,7 +189,10 @@ final class MedicationFollowupService
             ->where(fn (Builder $q) => $q->whereNull('administration_id')
                 ->orWhereHas('administration', fn (Builder $a) => $a
                     ->whereColumn('client_medication_administrations.client_id', 'medication_followups.client_id')
-                    ->whereColumn('client_medication_administrations.client_medication_id', 'medication_followups.client_medication_id')));
+                    ->whereColumn('client_medication_administrations.client_medication_id', 'medication_followups.client_medication_id')))
+            ->where(fn (Builder $q) => $q->whereNotNull('completed_at')
+                ->orWhereNotIn('type', ['effect', 'reoffer', 'partial', 'unconfirmed'])
+                ->orWhereHas('administration', fn (Builder $a) => $a->effectiveClinicalEvidence()));
         if (! $includeControlled && ! $actor->canDo('medications.controlled.view')) {
             $query->where(fn (Builder $q) => $q->whereNull('client_medication_id')
                 ->orWhereHas('medication', fn (Builder $m) => $m->where('controlled_drug', false)->orWhereNull('controlled_drug')));
@@ -210,6 +226,10 @@ final class MedicationFollowupService
             ? (int) $row->owner_id === (int) $actor->id && $actor->canDo('medications.administer.record')
             : ($lead ? $manage : ($shift !== null || (int) $row->owner_id === (int) $actor->id) && $actor->canDo('medications.administer.record'));
         if ($row->medication?->controlled_drug && ! $actor->canDo('medications.controlled.record')) {
+            $canComplete = false;
+        }
+        if ($row->completed_at && ($row->type !== 'effect'
+            || ! ClientMedicationAdministration::query()->effectiveClinicalEvidence()->whereKey($row->administration_id)->where('status', 'given')->exists())) {
             $canComplete = false;
         }
         $state = $row->completed_at ? 'done' : ($row->due_at?->isPast() ? 'overdue' : $row->state);
@@ -292,6 +312,10 @@ final class MedicationFollowupService
                 ->where('client_medication_id', $snapshot->client_medication_id)->where('administration_id', $snapshot->administration_id)
                 ->lockForUpdate()->firstOrFail();
             $action = $data['action'];
+            if (in_array($row->type, ['effect', 'reoffer', 'partial', 'unconfirmed'], true)) {
+                abort_unless($administration && ClientMedicationAdministration::query()
+                    ->effectiveClinicalEvidence()->whereKey($administration->id)->exists(), 404);
+            }
             $manage = $lockedActor->canDo(self::MANAGE);
             $actorShift = $shifts->first(fn (Shift $s) => (int) $s->user_id === (int) $lockedActor->id);
             if ($action === 'reassign') {
@@ -485,6 +509,13 @@ final class MedicationFollowupService
         if (DB::transactionLevel() < 1) {
             throw new \LogicException('Resolve source follow-ups in the source transaction.');
         }
+        if (array_key_exists('outcome', $facts)) {
+            throw ValidationException::withMessages(['outcome' => 'Outcome is reserved; supply evidence facts separately.']);
+        }
+        $fingerprint = MedicationEventFingerprint::of([
+            'source_key' => $sourceKey, 'actor_id' => $actor ? (int) $actor->id : null,
+            'outcome' => $outcome, 'facts' => $facts,
+        ]);
         $row = MedicationFollowup::query()->where('source_key', $sourceKey)->lockForUpdate()->firstOrFail();
         if ($row->type === 'confirm') {
             if (! in_array($outcome, ['yes', 'no', 'expired'], true)) {
@@ -496,8 +527,14 @@ final class MedicationFollowupService
         }
         if ($row->completed_at) {
             $event = $row->events()->where('action', 'source_completed')->latest('id')->first();
-            if ($event && ($event->data['outcome'] ?? null) !== $outcome) {
-                throw ValidationException::withMessages(['outcome' => 'This source follow-up was already completed with a different outcome.']);
+            $priorFacts = $event?->data ?? [];
+            unset($priorFacts['outcome']);
+            $priorFingerprint = $event?->request_fingerprint ?? ($event ? MedicationEventFingerprint::of([
+                'source_key' => $sourceKey, 'actor_id' => $event->actor_id ? (int) $event->actor_id : null,
+                'outcome' => $event->data['outcome'] ?? null, 'facts' => $priorFacts,
+            ]) : null);
+            if ($priorFingerprint !== $fingerprint) {
+                throw ValidationException::withMessages(['outcome' => 'This source follow-up was already completed with different evidence, actor or outcome.']);
             }
 
             return $row;
@@ -508,7 +545,7 @@ final class MedicationFollowupService
                 $row->administration, null, $row->administration ? $this->nextShiftEnd($row->client, $row->administration) : null,
                 ['confirmation_id' => $row->id, 'outcome' => $outcome]);
         }
-        $this->close($row, (int) $actor?->id, 'source_completed', ['outcome' => $outcome, ...$facts]);
+        $this->close($row, (int) $actor?->id, 'source_completed', ['outcome' => $outcome, ...$facts], fingerprint: $fingerprint);
         $audit = new MedicationEventData(
             siteId: (int) $row->client->site_id, kind: 'followup.source_completed',
             subjectType: 'medication_followup', subjectId: (string) $row->id,
@@ -686,11 +723,11 @@ final class MedicationFollowupService
         }, 3);
     }
 
-    private function close(MedicationFollowup $row, int $by, string $action, array $data, ?CarbonImmutable $at = null): void
+    private function close(MedicationFollowup $row, int $by, string $action, array $data, ?CarbonImmutable $at = null, ?string $fingerprint = null): void
     {
         $row->update(['completed_at' => $at ?? now('UTC'), 'completed_by' => $by > 0 ? $by : null,
             'state' => 'done', 'revision' => $row->revision + 1]);
-        $this->event($row, $by > 0 ? $by : null, $action, $data);
+        $this->event($row, $by > 0 ? $by : null, $action, $data, fingerprint: $fingerprint);
     }
 
     private function event(MedicationFollowup $row, ?int $actorId, string $action, array $data,

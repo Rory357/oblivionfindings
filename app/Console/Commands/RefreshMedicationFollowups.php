@@ -19,7 +19,7 @@ final class RefreshMedicationFollowups extends Command
     public function handle(MedicationFollowupService $work): int
     {
         if ($this->option('import')) {
-            ClientMedicationAdministration::query()->where(fn ($q) => $q
+            ClientMedicationAdministration::query()->effectiveClinicalEvidence()->where(fn ($q) => $q
                 ->whereNotNull('effect_check_due_at')->orWhere('review_required', true)
                 ->orWhereExists(fn ($r) => $r->selectRaw('1')->from('medication_refusal_followups')
                     ->whereColumn('medication_refusal_followups.client_medication_administration_id', 'client_medication_administrations.id'))

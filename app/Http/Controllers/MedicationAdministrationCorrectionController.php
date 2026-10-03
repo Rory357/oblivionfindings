@@ -9,6 +9,7 @@ use App\Models\MedicationRefusalFollowup;
 use App\Models\MedicationRound;
 use App\Models\User;
 use App\Notifications\AppEventNotification;
+use App\Services\Medication\Followups\MedicationFollowupService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\UserSiteAccessService;
@@ -104,6 +105,14 @@ class MedicationAdministrationCorrectionController extends Controller
                 $user->id
             );
 
+            // The source aggregate already owns the person, order and correction
+            // locks. Retire former clinical work and create the accepted replacement.
+            $followups = app(MedicationFollowupService::class);
+            $followups->syncAdministration($original);
+            foreach ($corrections->sortBy('id') as $source) {
+                $followups->syncAdministration($source);
+            }
+
             return back()->with('success', 'Correction approved.');
         });
     }
@@ -128,6 +137,7 @@ class MedicationAdministrationCorrectionController extends Controller
                 'Unsafe medication correction rejected.',
                 $user->id
             );
+            app(MedicationFollowupService::class)->syncAdministration($lockedCorrection);
 
             return back()->with('success', 'Correction rejected.');
         });
