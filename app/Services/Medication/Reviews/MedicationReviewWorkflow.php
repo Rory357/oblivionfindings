@@ -404,7 +404,7 @@ final class MedicationReviewWorkflow
             $callback($client, $locked, $actor);
             $locked->forceFill(['revision' => $locked->revision + 1])->save();
             $locked->refresh();
-            $lastEvent = $locked->events()->latest('id')->first();
+            $lastEvent = $locked->events()->reorder()->latest('id')->first();
             $this->recordChain($client, $actor, $lastEvent?->event ?? 'updated', $locked);
 
             return $locked;
