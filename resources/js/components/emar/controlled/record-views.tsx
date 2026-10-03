@@ -160,8 +160,8 @@ export function EntryList({
                     ),
                 },
             ]}
-            emptyTitle="No register entries yet"
-            emptyDescription="Confirmed counts and witnessed register changes appear here."
+            emptyTitle="No entries in this view"
+            emptyDescription="Try another date, person or search. Recorded counts and witnessed changes appear here."
         />
     );
 }
