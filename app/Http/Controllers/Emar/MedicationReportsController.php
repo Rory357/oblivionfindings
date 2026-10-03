@@ -12,6 +12,7 @@ use App\Services\Medication\Audit\MedicationEventData;
 use App\Services\Medication\Audit\MedicationEventReader;
 use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\Downtime\DowntimePackService;
 use App\Services\Medication\Reporting\MedicationExportAudit;
 use App\Services\Medication\Reporting\MedicationPdfDataset;
 use App\Services\Medication\Reporting\MedicationReportAccess;
@@ -89,6 +90,7 @@ class MedicationReportsController extends Controller
             'can' => ['audit' => $actor->canDo('medications.audit.view') && ! $finance, 'controlled' => $actor->canDo('medications.controlled.view'), 'verify' => $actor->canDo('medications.audit.view') && ! $finance],
             'exports' => collect(['mar' => ['MAR chart', 'PDF', 'One person, up to 31 NZ days; includes medicines ceased in the period.'], 'cd_register' => ['Controlled drug register', 'PDF', 'One medicine, up to 31 NZ days.'], 'round_sheet' => ['Round sheet', 'PDF', 'One house, one NZ day.'], 'doses' => ['Doses', 'CSV', 'Scheduled dose slots by NZ day, including Away.'], 'errors' => ['Medication errors', 'CSV', 'Factual account; in-error records are excluded unless requested.'], 'stock' => ['Stock', 'CSV', 'Current stock by house and medicine.'], 'audit' => ['Audit trail', 'CSV', 'The same filtered event list as the screen, over the whole period.']])->map(fn ($spec, $type) => ['type' => $type, 'label' => $spec[0], 'format' => $spec[1], 'description' => $spec[2], 'allowed' => $this->access->canExport($actor, $type)])->filter(fn ($e) => ! $finance || $e['type'] === 'stock')->values(),
             'purposes' => MedicationExportAudit::PURPOSES, 'as_at' => CarbonImmutable::now('UTC')->toIso8601String(),
+            'downtime_pack' => $finance ? null : ['allowed' => $actor->isApproved() && $this->access->canExport($actor, 'doses'), 'today' => CarbonImmutable::now('Pacific/Auckland')->toDateString(), 'tomorrow' => CarbonImmutable::now('Pacific/Auckland')->addDay()->toDateString(), 'purpose' => DowntimePackService::PURPOSE],
         ]);
     }
 

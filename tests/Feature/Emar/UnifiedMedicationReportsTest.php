@@ -111,6 +111,15 @@ it('requires a purpose and gives the auditor audit-only export rights', function
     expect(MedicationEvent::where('kind', 'export.created')->first()->facts['purpose'])->toBe('Audit or inspection');
 });
 
+it('offers the guarded downtime pack only within the existing clinical export boundary', function () {
+    $this->actingAs(p09Reader('coordinator', $this->site))->get('/emar/reports?view=exports')->assertOk()->assertInertia(fn ($page) => $page
+        ->where('downtime_pack.allowed', true)->where('downtime_pack.today', '2026-09-29')->where('downtime_pack.tomorrow', '2026-09-30')
+        ->where('downtime_pack.purpose', App\Services\Medication\Downtime\DowntimePackService::PURPOSE));
+    $this->actingAs(p09Reader('auditor', $this->site))->get('/emar/reports?view=exports')->assertOk()->assertInertia(fn ($page) => $page->where('downtime_pack.allowed', false));
+    $this->actingAs(p09Reader('finance', $this->site))->get('/emar/reports?view=exports')->assertOk()->assertInertia(fn ($page) => $page->where('downtime_pack', null));
+    expect(MedicationEvent::count())->toBe(0);
+});
+
 it('rejects a multi-person PDF when an included person moves during rendering', function () {
     p09Medicine($this->person);
     $other = Site::factory()->create(['is_active' => true]);

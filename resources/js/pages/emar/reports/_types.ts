@@ -7,6 +7,7 @@ export type Props = {
     data: { totals: Record<string, number | null>; notice: string | null; weeks?: Row[] }; page: { data: Row[]; total: number; last_page: number; links: { url: string | null; label: string; active: boolean }[] } | null;
     locked: string | null; finance: boolean; can: { audit: boolean; controlled: boolean; verify: boolean };
     exports: ExportOption[]; purposes: Record<string, string>; as_at: string;
+    downtime_pack: { allowed: boolean; today: string; tomorrow: string; purpose: string } | null;
 };
 export type ExportContext = Pick<Props, 'filters' | 'sites' | 'people' | 'finance' | 'purposes' | 'exports'>;
 
