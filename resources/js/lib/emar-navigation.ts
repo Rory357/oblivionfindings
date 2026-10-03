@@ -474,6 +474,33 @@ export function emarBreadcrumbs(url: string, can: Can): EmarBreadcrumb[] {
 }
 
 /**
+ * A person's medication record (P02): frontline staff reach it from Meds
+ * today (Home › Meds today › person); everyone else from the MAR hub
+ * (Home › Medication › MAR & medicines › person).
+ */
+export function emarRecordBreadcrumbs(
+    can: Can,
+    person: EmarBreadcrumb,
+): EmarBreadcrumb[] {
+    const home = { title: 'Home', href: '/dashboard' };
+    const sidebar = emarSidebar(can);
+    if (sidebar.mode === 'frontline') {
+        return [home, { title: 'Meds today', href: sidebar.href }, person];
+    }
+    const mar = EMAR_HUBS.find((hub) => hub.key === 'mar');
+    const marLanding = mar ? emarHubLanding(mar, can) : null;
+    return [
+        home,
+        {
+            title: EMAR_MODULE_LABEL,
+            href: emarModuleLanding(can) ?? person.href,
+        },
+        ...(mar && marLanding ? [{ title: mar.label, href: marLanding }] : []),
+        person,
+    ];
+}
+
+/**
  * Sidebar active state for a hub link: lit on every page of its hub.
  * Undefined leaves the generic matcher alone for every other link.
  */

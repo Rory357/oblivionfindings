@@ -1239,6 +1239,12 @@ class EmarController extends Controller
     // ─── MAR Charts ────────────────────────────────────────
     public function mar(Request $request)
     {
+        // The rebuilt person record (P02) serves a named person once the
+        // switch is on; until the Chart lands (P02-4) today's page stays.
+        if (config('medications.person_record') === 'p02' && $request->filled('client_id')) {
+            return app(PersonMedicationRecordController::class)->show($request, $request->integer('client_id'));
+        }
+
         $actor = $request->user();
         abort_unless($actor, 403);
         $requestedClientId = $request->integer('client_id') ?: null;

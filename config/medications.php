@@ -1,6 +1,12 @@
 <?php
 
 return [
+    // The person medication record at /emar/mar?client_id=… (eMAR P02):
+    // "legacy" keeps today's MAR chart page; "p02" serves the rebuilt record.
+    // It switches to p02 when the record reaches today's page (the Chart,
+    // P02-4) and the switch is then removed.
+    'person_record' => env('EMAR_PERSON_RECORD', 'legacy'),
+
     // Dose timing defaults. Medication › Settings › Rounds & timing saves the
     // organisation's own values; DoseTimingSettings reads them, falling back
     // to these until someone saves one.

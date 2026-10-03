@@ -7,6 +7,7 @@ use App\Http\Controllers\Emar\ClientMedicationDayController;
 use App\Http\Controllers\Emar\CompetencyExemptionController;
 use App\Http\Controllers\Emar\DoseRequirementsController;
 use App\Http\Controllers\Emar\EmarController;
+use App\Http\Controllers\Emar\PersonMedicationRecordController;
 use App\Http\Controllers\Emar\EmarPdfController;
 use App\Http\Controllers\Emar\EmarReportController;
 use App\Http\Controllers\Emar\GuidedRoundController;
@@ -172,6 +173,12 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->whereNumber('client')
         ->middleware('permission:medications.view')
         ->name('emar.clients.day');
+
+    Route::prefix('/clients/{client}/record')->whereNumber('client')->middleware('permission:medications.view')->group(function () {
+        Route::get('/medicines', [PersonMedicationRecordController::class, 'medicines'])->name('emar.record.medicines');
+        Route::get('/medicines/{medication}', [PersonMedicationRecordController::class, 'medicine'])->whereNumber('medication')->name('emar.record.medicine');
+        Route::get('/support', [PersonMedicationRecordController::class, 'support'])->name('emar.record.support');
+    });
 
     // Self-Administration Assessments
     Route::get('/self-admin', [EmarController::class, 'selfAdmin'])
