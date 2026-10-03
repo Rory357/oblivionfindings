@@ -1,230 +1,56 @@
-/* eslint-disable no-restricted-syntax -- the post-event review modal uses styled native outcome
-   toggles / checkbox inside a Dialog; all colours are semantic tokens. */
+import InputError from '@/components/input-error';
 import { SummaryRow } from '@/components/meds/wizard-shell';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { TilePicker } from '@/components/wizard/primitives';
+import { formatDateTime } from '@/lib/datetime';
 import { router } from '@inertiajs/react';
-import { Ban, Check, ClipboardCheck } from 'lucide-react';
 import { useState } from 'react';
-import { toast } from 'sonner';
+import type { Grant } from './_types';
+export type ReviewRecord = Grant;
 
-export type ReviewRecord = {
-    id: number;
-    client_id: number;
-    client_name: string;
-    site_name: string | null;
-    staff: string;
-    reason: string;
-    reason_category: string | null;
-    minutes: number | null;
-    created_at: string | null;
-    review_outcome: string | null;
-    incident_report_id: number | null;
-    events: { action: string; detail: string | null; at: string | null }[];
-};
-
-type IncidentOption = { id: number; label: string; date: string | null };
-
-const fmtDateTime = (iso: string | null) =>
-    iso
-        ? new Date(iso).toLocaleString('en-NZ', {
-              day: 'numeric',
-              month: 'short',
-              hour: '2-digit',
-              minute: '2-digit',
-          })
-        : '—';
-
-export function ReviewDialog({
-    record,
-    incidents,
-    onClose,
-}: {
-    record: ReviewRecord;
-    incidents: IncidentOption[];
-    onClose: () => void;
-}) {
-    const [outcome, setOutcome] = useState<'justified' | 'not_justified' | ''>(
-        record.review_outcome === 'justified' ||
-            record.review_outcome === 'not_justified'
-            ? record.review_outcome
-            : '',
-    );
+export function ReviewDialog({ record, onClose }: { record: Grant; incidents?: unknown[]; onClose: () => void }) {
+    const previous = record.reviews.at(-1);
+    const [outcome, setOutcome] = useState(previous?.outcome ?? '');
     const [notes, setNotes] = useState('');
-    const [incidentId, setIncidentId] = useState<number | null>(
-        record.incident_report_id,
-    );
+    const [why, setWhy] = useState('');
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [busy, setBusy] = useState(false);
-
-    const save = () => {
-        if (!outcome) return;
+    function save() {
         setBusy(true);
-        router.post(
-            `/emar/clients/${record.client_id}/break-glass/${record.id}/review`,
-            {
-                review_outcome: outcome,
-                review_notes: notes.trim() || null,
-                incident_report_id: incidentId,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    toast.success(
-                        `Review saved — marked ${outcome === 'justified' ? 'justified' : 'not justified'}`,
-                    );
-                    onClose();
-                },
-                onError: () => toast.error('Could not save review'),
-                onFinish: () => setBusy(false),
-            },
-        );
-    };
-
-    return (
-        <Dialog open onOpenChange={(next) => !next && onClose()}>
-            <DialogContent className="sm:max-w-[560px]">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2.5">
-                        <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-primary">
-                            <ClipboardCheck className="h-4 w-4" />
-                        </span>
-                        Review activation
-                    </DialogTitle>
-                    <DialogDescription>
-                        Post-event sign-off · {record.client_name}
-                    </DialogDescription>
-                </DialogHeader>
-
-                <div className="rounded-lg border px-4">
-                    <SummaryRow label="Staff" value={record.staff} />
-                    <SummaryRow
-                        label="Client"
-                        value={`${record.client_name}${record.site_name ? ` · ${record.site_name}` : ''}`}
-                    />
-                    <SummaryRow
-                        label="When · duration"
-                        value={`${fmtDateTime(record.created_at)}${record.minutes != null ? ` · ${record.minutes} min` : ''}`}
-                    />
-                    <SummaryRow
-                        label="Reason"
-                        value={record.reason_category ?? record.reason}
-                    />
-                </div>
-
-                <div>
-                    <div className="mb-1.5 text-sm font-medium">Outcome</div>
-                    <div className="flex gap-2">
-                        <button
-                            type="button"
-                            aria-pressed={outcome === 'justified'}
-                            onClick={() => setOutcome('justified')}
-                            className={`flex flex-1 items-center justify-center gap-2 rounded-lg border py-2.5 text-sm font-semibold ${outcome === 'justified' ? 'border-status-success bg-status-success-bg text-status-success' : 'border-border hover:bg-muted'}`}
-                        >
-                            <Check className="h-4 w-4" />
-                            Justified
-                        </button>
-                        <button
-                            type="button"
-                            aria-pressed={outcome === 'not_justified'}
-                            onClick={() => setOutcome('not_justified')}
-                            className={`flex flex-1 items-center justify-center gap-2 rounded-lg border py-2.5 text-sm font-semibold ${outcome === 'not_justified' ? 'border-status-critical bg-status-critical-bg text-status-critical' : 'border-border hover:bg-muted'}`}
-                        >
-                            <Ban className="h-4 w-4" />
-                            Not justified
-                        </button>
-                    </div>
-                </div>
-
-                <Textarea
-                    aria-label="Reviewer notes"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Reviewer notes (optional)…"
-                    className="min-h-16"
-                />
-
-                <div className="rounded-lg border">
-                    <div className="border-b bg-muted/40 px-3 py-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                        Accessed during this window
-                    </div>
-                    {record.events.length === 0 ? (
-                        <p className="px-3 py-2.5 text-sm text-muted-foreground">
-                            No medication activity was recorded under this
-                            grant.
-                        </p>
-                    ) : (
-                        <ul className="max-h-40 divide-y overflow-y-auto text-sm">
-                            {record.events.map((e, i) => (
-                                <li
-                                    key={i}
-                                    className="flex items-center justify-between gap-2 px-3 py-1.5"
-                                >
-                                    <span>
-                                        {e.action === 'viewed_mar'
-                                            ? 'Viewed MAR chart'
-                                            : e.action === 'recorded_dose'
-                                              ? 'Recorded dose'
-                                              : e.action}
-                                        {e.detail ? ` — ${e.detail}` : ''}
-                                    </span>
-                                    <span className="shrink-0 text-xs text-muted-foreground">
-                                        {fmtDateTime(e.at)}
-                                    </span>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </div>
-
-                <div>
-                    <div className="mb-1.5 text-sm font-medium">
-                        Link incident report
-                    </div>
-                    {incidents.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                            No incident reports recorded for this client.
-                        </p>
-                    ) : (
-                        <select
-                            aria-label="Link incident report"
-                            value={incidentId ?? ''}
-                            onChange={(e) =>
-                                setIncidentId(
-                                    e.target.value
-                                        ? Number(e.target.value)
-                                        : null,
-                                )
-                            }
-                            className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                            <option value="">— None —</option>
-                            {incidents.map((inc) => (
-                                <option key={inc.id} value={inc.id}>
-                                    {inc.label}
-                                    {inc.date ? ` · ${inc.date}` : ''}
-                                </option>
-                            ))}
-                        </select>
-                    )}
-                </div>
-
-                <div className="flex items-center justify-end gap-2">
-                    <Button variant="outline" onClick={onClose} disabled={busy}>
-                        Cancel
-                    </Button>
-                    <Button onClick={save} disabled={busy || !outcome}>
-                        <Check className="h-4 w-4" />
-                        Save review
-                    </Button>
-                </div>
-            </DialogContent>
-        </Dialog>
-    );
+        router.post(`/emar/clients/${record.client_id}/break-glass/${record.id}/review`, {
+            review_outcome: outcome, review_notes: notes.trim() || null,
+            correction_reason: previous ? why.trim() : null, corrects_review_id: previous?.id ?? null,
+        }, { preserveScroll: true, onSuccess: onClose, onError: setErrors, onFinish: () => setBusy(false) });
+    }
+    return <Dialog open onOpenChange={(v) => !v && onClose()}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader><DialogTitle>{previous ? 'Correct the review of' : 'Review'} EA-{record.id} — {record.client_name}</DialogTitle>
+            <DialogDescription>{record.staff} · ended {formatDateTime(record.ended_at)}</DialogDescription></DialogHeader>
+        <div className="space-y-5">
+            <SummaryRow label="Why they used it" value={record.reason} /><SummaryRow label="Second person" value={record.cosign_label ?? 'Not recorded'} />
+            <h3 className="text-section-title">What was done</h3>
+            {record.events.length ? record.events.map((event, i) => <SummaryRow key={i} label={formatDateTime(event.at)} value={event.detail ?? event.action} />) : <p className="text-caption">No activity is recorded for this grant.</p>}
+            {record.review_denial ? <Alert><AlertTitle>{record.review_denial}</AlertTitle><AlertDescription>An independent colleague reviews it.</AlertDescription></Alert> : null}
+            {record.reviews.map((r, i) => <Alert key={r.id}><AlertTitle>{r.outcome === 'justified' ? 'Justified' : 'Not justified'}{i < record.reviews.length - 1 ? ' — corrected later' : ''}</AlertTitle><AlertDescription>{r.by} · {formatDateTime(r.at)}{r.notes ? ` · ${r.notes}` : ''}{r.correction_reason ? ` · Correction: ${r.correction_reason}` : ''}</AlertDescription></Alert>)}
+            {record.can_review && <>
+                {previous && <><Label htmlFor="review-correction-reason">Why the review is being corrected</Label><Textarea id="review-correction-reason" value={why} onChange={(e) => setWhy(e.target.value)} /><InputError message={errors.correction_reason} /></>}
+                <Label id="emergency-review-outcome-label">Was it justified?</Label>
+                <TilePicker value={outcome} onChange={setOutcome} labelledBy="emergency-review-outcome-label" options={[
+                    { key: 'justified', label: 'Justified', description: 'It was needed, and only what was needed was done' },
+                    { key: 'not_justified', label: 'Not justified', description: 'It wasn’t needed, or more was done than needed' },
+                ]} />
+                <Label htmlFor="emergency-review-notes">{outcome === 'not_justified' ? 'What wasn’t needed (required)' : 'Notes (optional)'}</Label>
+                <Textarea id="emergency-review-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
+                {outcome === 'not_justified' && <Alert><AlertTitle>Talk it through with {record.staff}</AlertTitle><AlertDescription>If a dose went wrong, report a medication error separately.</AlertDescription></Alert>}
+                <p className="text-caption">Earlier reviews stay visible. Your name and the time are recorded with this {previous ? 'correction' : 'review'}.</p>
+                {Object.values(errors).map((error) => <InputError key={error} message={error} />)}
+            </>}
+        </div>
+        <DialogFooter><Button variant="outline" onClick={onClose}>Close</Button>
+            {record.can_review && <Button disabled={busy || !outcome || outcome === 'not_justified' && notes.trim().length < 10 || !!previous && why.trim().length < 10} onClick={save}>{busy ? 'Saving…' : previous ? 'Save the correction' : 'Save the review'}</Button>}
+        </DialogFooter>
+    </DialogContent></Dialog>;
 }

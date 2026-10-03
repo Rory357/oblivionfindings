@@ -63,6 +63,7 @@ final class MedicationAlertCatalogue
         self::CLINICAL_LEAD,
         self::PROVIDER_MANAGER,
         self::STOCK_STAFF,
+        self::EA_REVIEWERS,
         self::STAFF_MEMBER,
     ];
 
@@ -208,7 +209,7 @@ final class MedicationAlertCatalogue
             'controlled' => false,
             'follow_up' => false,
             'until' => 'Until reviewed',
-            'built' => false,
+            'built' => true,
         ],
         // The 29 Sep audit's five: alerts that existed only as Control Room
         // signals or dashboard tiles (P11 v2 AUDIT §1).

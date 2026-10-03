@@ -311,6 +311,7 @@ class RbacSeeder extends Seeder
             ['key' => 'medications.audit.view', 'description' => 'View medication-focused audit log', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.reports.export', 'description' => 'Export MAR/audit/medications reports', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.breakglass', 'description' => 'Use break-glass emergency access', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.breakglass.end', 'description' => 'End another person’s medication emergency access', 'group' => 'medications', 'module' => 'Clinical'],
 
             // Health & Clinical
             ['key' => 'clinical.observations.view', 'description' => 'View clinical observations', 'group' => 'clinical', 'module' => 'Clinical'],
@@ -1045,6 +1046,11 @@ class RbacSeeder extends Seeder
         // personas are excluded — they are not staff and never see the
         // internal helpdesk. Mirrors 2026_07_07_100001. Runs after the role
         // syncs above; syncWithoutDetaching augments rather than replaces.
+        // P10 approved ending authority; the auditor remains read-only.
+        $emergencyEndIds = Permission::where('key', 'medications.breakglass.end')->pluck('id')->all();
+        Role::whereIn('name', ['admin', 'provider_manager', 'coordinator', 'clinical_lead'])
+            ->each(fn (Role $role) => $role->permissions()->syncWithoutDetaching($emergencyEndIds));
+
         $itRequestId = Permission::where('key', 'it.request')->pluck('id')->all();
         foreach (Role::whereNotIn('name', ['client', 'next_of_kin'])->get() as $staffRole) {
             $staffRole->permissions()->syncWithoutDetaching($itRequestId);

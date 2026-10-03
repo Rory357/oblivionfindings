@@ -13,8 +13,10 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Models\UserWitnessPin;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -28,7 +30,7 @@ class EmergencyAccessTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function seedAccess(): array
+    private function seedAccess(bool $running = true): array
     {
         $this->seed(RbacSeeder::class);
         $user = $this->makeRoleUser('admin');
@@ -38,7 +40,7 @@ class EmergencyAccessTest extends TestCase
         $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
         $access = ClientBreakGlassAccess::query()->create([
             'client_id' => $client->id, 'user_id' => $user->id, 'reason' => 'Clinical urgency — resident unwell',
-            'expires_at' => now()->addHour(),
+            'expires_at' => $running ? now()->addHour() : now()->subMinute(),
         ]);
 
         return compact('user', 'site', 'client', 'access');
@@ -88,60 +90,39 @@ class EmergencyAccessTest extends TestCase
 
     public function test_grant_persists_structured_fields_and_cosign(): void
     {
-        ['user' => $user, 'site' => $site, 'client' => $client] = $this->seedAccess();
+        ['user' => $user, 'site' => $site, 'client' => $client] = $this->seedAccess(false);
         $cosigner = $this->makeRoleUser('provider_manager');
         $this->attachCurrentSiteAssignment($cosigner, $site, 'provider_manager');
-
-        $this->actingAs($user)
-            ->from('/emar/emergency-access')
-            ->post("/clients/{$client->id}/break-glass", [
-                'reason' => 'Covering sick leave; 16:00 meds due',
-                'reason_category' => 'Staff absence / cover',
-                'minutes' => 120,
-                'authorization_mode' => 'co_sign',
-                'co_signed_by' => $cosigner->id,
-                'acknowledged_min_necessary' => true,
-                'acknowledged_incident_report' => true,
-            ])
-            ->assertSessionHasNoErrors();
-
+        UserWitnessPin::updateOrCreate(['user_id' => $cosigner->id], [
+            'pin_hash' => Hash::make('384927'), 'set_at' => now(), 'must_change' => false,
+        ]);
+        $this->actingAs($user)->post("/clients/{$client->id}/break-glass", $this->grantPayload([
+            'authorization_mode' => 'co_sign', 'co_signed_by' => $cosigner->id, 'co_signer_pin' => '384927',
+        ]))->assertSessionHasNoErrors();
         $this->assertDatabaseHas('client_break_glass_accesses', [
-            'client_id' => $client->id,
-            'reason_category' => 'Staff absence / cover',
-            'authorization_mode' => 'co_sign',
-            'co_signed_by' => $cosigner->id,
-            'acknowledged_min_necessary' => true,
-            'acknowledged_incident_report' => true,
+            'client_id' => $client->id, 'reason_category' => 'Covering an absence',
+            'authorization_mode' => 'co_sign', 'co_signed_by' => $cosigner->id,
+            'acknowledged_min_necessary' => true, 'acknowledged_incident_report' => true,
         ]);
     }
 
     public function test_cosign_must_be_a_different_person(): void
     {
-        ['user' => $user, 'client' => $client] = $this->seedAccess();
-
-        $this->actingAs($user)
-            ->from('/emar/emergency-access')
-            ->post("/clients/{$client->id}/break-glass", [
-                'reason' => 'x', 'authorization_mode' => 'co_sign', 'co_signed_by' => $user->id,
-            ])
-            ->assertSessionHasErrors('co_signed_by');
+        ['user' => $user, 'client' => $client] = $this->seedAccess(false);
+        $this->actingAs($user)->post("/clients/{$client->id}/break-glass", $this->grantPayload([
+            'authorization_mode' => 'co_sign', 'co_signed_by' => $user->id, 'co_signer_pin' => '384927',
+        ]))->assertSessionHasErrors('co_signed_by');
     }
 
     public function test_cosign_requires_an_approved_user_with_access_to_the_client_site(): void
     {
-        ['user' => $user, 'client' => $client] = $this->seedAccess();
+        ['user' => $user, 'client' => $client] = $this->seedAccess(false);
         $otherSite = Site::factory()->create(['is_active' => true]);
-        $outsideApprover = $this->makeRoleUser('provider_manager');
-        $this->attachCurrentSiteAssignment($outsideApprover, $otherSite, 'provider_manager');
-
-        $this->actingAs($user)
-            ->from('/emar/emergency-access')
-            ->post("/clients/{$client->id}/break-glass", [
-                'reason' => 'Urgent medication support',
-                'authorization_mode' => 'co_sign',
-                'co_signed_by' => $outsideApprover->id,
-            ])
-            ->assertSessionHasErrors('co_signed_by');
+        $outside = $this->makeRoleUser('provider_manager');
+        $this->attachCurrentSiteAssignment($outside, $otherSite, 'provider_manager');
+        $this->actingAs($user)->post("/clients/{$client->id}/break-glass", $this->grantPayload([
+            'authorization_mode' => 'co_sign', 'co_signed_by' => $outside->id, 'co_signer_pin' => '384927',
+        ]))->assertSessionHasErrors('co_signed_by');
     }
 
     public function test_grant_duration_is_capped_at_policy_max(): void
@@ -157,47 +138,34 @@ class EmergencyAccessTest extends TestCase
     public function test_extend_adds_time_within_cap(): void
     {
         ['user' => $user, 'client' => $client, 'access' => $access] = $this->seedAccess();
+        $this->travel(51)->minutes();
         $original = $access->expires_at;
-
-        $this->actingAs($user)
-            ->from('/emar/emergency-access')
-            ->post("/emar/clients/{$client->id}/break-glass/{$access->id}/extend")
-            ->assertSessionHasNoErrors();
-
+        $this->actingAs($user)->post("/emar/clients/{$client->id}/break-glass/{$access->id}/extend",
+            ['reason' => 'Relief has not arrived'])->assertSessionHasNoErrors();
         $this->assertTrue($access->refresh()->expires_at->greaterThan($original));
     }
 
     public function test_extend_refuses_past_the_maximum_window(): void
     {
         ['user' => $user, 'client' => $client, 'access' => $access] = $this->seedAccess();
-        // Push the window out to the policy cap (created_at + max).
         $access->forceFill(['expires_at' => $access->created_at->copy()->addMinutes(ClientBreakGlassAccess::MAX_MINUTES)])->save();
         $capped = $access->refresh()->expires_at;
-
-        $this->actingAs($user)
-            ->from('/emar/emergency-access')
-            ->post("/emar/clients/{$client->id}/break-glass/{$access->id}/extend")
-            ->assertSessionHas('error');
-
+        $this->travel(231)->minutes();
+        $this->actingAs($user)->post("/emar/clients/{$client->id}/break-glass/{$access->id}/extend",
+            ['reason' => 'Relief has not arrived'])->assertSessionHasErrors('access');
         $this->assertSame($capped->timestamp, $access->refresh()->expires_at->timestamp);
     }
 
     public function test_review_records_outcome_and_reviewer(): void
     {
-        ['user' => $user, 'client' => $client, 'access' => $access] = $this->seedAccess();
-        $access->forceFill(['expires_at' => now()->subMinutes(5)])->save(); // completed activation
-
-        $this->actingAs($user)
-            ->from('/emar/emergency-access')
-            ->post("/emar/clients/{$client->id}/break-glass/{$access->id}/review", [
-                'review_outcome' => 'justified',
-                'review_notes' => 'Appropriate emergency use',
-            ])
-            ->assertSessionHasNoErrors();
-
-        $access->refresh();
-        $this->assertSame('justified', $access->review_outcome);
-        $this->assertSame($user->id, $access->reviewed_by);
+        ['user' => $owner, 'site' => $site, 'client' => $client, 'access' => $access] = $this->seedAccess(false);
+        $reviewer = $this->makeRoleUser('clinical_lead');
+        $this->attachCurrentSiteAssignment($reviewer, $site, 'clinical_lead');
+        $this->actingAs($reviewer)->post("/emar/clients/{$client->id}/break-glass/{$access->id}/review", [
+            'review_outcome' => 'justified', 'review_notes' => 'Appropriate emergency use',
+        ])->assertSessionHasNoErrors();
+        $this->assertSame('justified', $access->refresh()->review_outcome);
+        $this->assertSame($reviewer->id, $access->reviewed_by);
         $this->assertNotNull($access->reviewed_at);
     }
 
@@ -320,49 +288,18 @@ class EmergencyAccessTest extends TestCase
                 ->where('policy.max_minutes', ClientBreakGlassAccess::MAX_MINUTES)
                 ->where('policy.repeat_threshold_count', 4)
                 ->where('policy.repeat_window_days', 7)
-                ->where('can_edit_policy', true)
+                ->where('can_edit_policy', false)
             );
     }
 
-    public function test_admin_updates_the_application_policy_and_it_is_served_and_enforced(): void
+    public function test_legacy_policy_save_directs_admin_to_medication_settings_without_writing(): void
     {
-        ['user' => $user, 'client' => $client] = $this->seedAccess();
-
-        $this->actingAs($user)
-            ->from('/emar/emergency-access')
-            ->put('/emar/break-glass-policy', [
-                'default_minutes' => 45,
-                'max_minutes' => 90,
-                'extend_minutes' => 15,
-                'reason_required' => true,
-                'repeat_threshold_count' => 2,
-                'repeat_window_days' => 3,
-            ])
-            ->assertSessionHasNoErrors();
-
-        $this->assertDatabaseHas('break_glass_policies', [
-            'default_minutes' => 45,
-            'max_minutes' => 90,
-            'repeat_threshold_count' => 2,
-        ]);
-        $this->assertDatabaseCount('break_glass_policies', 1);
-
-        // Enforced: a grant beyond the new max is rejected by validation.
-        $this->actingAs($user)
-            ->from('/emar/emergency-access')
-            ->post("/clients/{$client->id}/break-glass", ['reason' => 'x', 'minutes' => 200])
-            ->assertSessionHasErrors('minutes');
-
-        // Served back to the page.
-        $this->actingAs($user)
-            ->get('/emar/emergency-access')
-            ->assertInertia(fn (Assert $page) => $page->where('policy.max_minutes', 90));
-
-        $otherAdmin = $this->makeRoleUser('admin');
-        $this->grantPermissions($otherAdmin, ['medications.breakglass', 'medications.audit.view']);
-        $this->actingAs($otherAdmin)
-            ->get('/emar/emergency-access')
-            ->assertInertia(fn (Assert $page) => $page->where('policy.max_minutes', 90));
+        ['user' => $user] = $this->seedAccess();
+        $this->actingAs($user)->putJson('/emar/break-glass-policy', [
+            'default_minutes' => 45, 'max_minutes' => 90, 'extend_minutes' => 15,
+            'reason_required' => true, 'repeat_threshold_count' => 2, 'repeat_window_days' => 3,
+        ])->assertStatus(409);
+        $this->assertDatabaseCount('break_glass_policies', 0);
     }
 
     public function test_policy_update_is_denied_for_non_admin(): void
@@ -404,30 +341,21 @@ class EmergencyAccessTest extends TestCase
 
     public function test_reviewer_can_acknowledge_repeat_signal_and_it_is_suppressed(): void
     {
-        ['user' => $user, 'client' => $client] = $this->seedAccess();
-        BreakGlassPolicy::query()->create(array_merge(BreakGlassPolicy::defaults(), [
-            'repeat_threshold_count' => 2,
-        ]));
-        ClientBreakGlassAccess::query()->create([
-            'client_id' => $client->id, 'user_id' => $user->id, 'reason' => 'second', 'expires_at' => now()->addHour(),
+        ['user' => $owner, 'site' => $site, 'client' => $client] = $this->seedAccess();
+        $reviewer = $this->makeRoleUser('clinical_lead');
+        $this->attachCurrentSiteAssignment($reviewer, $site, 'clinical_lead');
+        BreakGlassPolicy::create(array_merge(BreakGlassPolicy::defaults(), ['repeat_threshold_count' => 2]));
+        ClientBreakGlassAccess::create([
+            'client_id' => $client->id, 'user_id' => $owner->id, 'reason' => 'Second grant', 'expires_at' => now()->addHour(),
         ]);
-
-        // Repeat signal present.
-        $this->actingAs($user)->get('/emar/emergency-access')
-            ->assertInertia(fn (Assert $page) => $page->has('flaggedSignals', 1)->where('flaggedSignals.0.type', 'repeat'));
-
-        // Acknowledge it.
-        $this->actingAs($user)
-            ->from('/emar/emergency-access')
-            ->post('/emar/break-glass-flags/dismiss', ['type' => 'repeat', 'key' => (string) $user->id, 'reason' => 'Genuine cover'])
-            ->assertSessionHasNoErrors();
-        $this->assertDatabaseHas('break_glass_flag_dismissals', [
-            'signal_type' => 'repeat', 'signal_key' => (string) $user->id, 'dismissed_by' => $user->id,
-        ]);
-
-        // Now suppressed.
-        $this->actingAs($user)->get('/emar/emergency-access')
-            ->assertInertia(fn (Assert $page) => $page->has('flaggedSignals', 0));
+        $key = $site->id.':'.$owner->id;
+        $this->actingAs($reviewer)->get('/emar/emergency-access')->assertInertia(fn (Assert $page) => $page->has('flaggedSignals', 1));
+        $this->actingAs($reviewer)->post('/emar/break-glass-flags/dismiss', ['type' => 'repeat', 'key' => $key, 'reason' => 'Genuine cover'])->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('break_glass_flag_dismissals', ['signal_type' => 'repeat', 'signal_key' => $key, 'dismissed_by' => $reviewer->id]);
+        $this->actingAs($reviewer)->get('/emar/emergency-access')->assertInertia(fn (Assert $page) => $page->has('flaggedSignals', 0));
+        // A new grant in the very same second must resurface, using its stable id.
+        ClientBreakGlassAccess::create(['client_id' => $client->id, 'user_id' => $owner->id, 'reason' => 'New use', 'expires_at' => now()->addHour()]);
+        $this->actingAs($reviewer)->get('/emar/emergency-access')->assertInertia(fn (Assert $page) => $page->has('flaggedSignals', 1));
     }
 
     public function test_acknowledged_signal_resurfaces_when_newer_activity_exists(): void
@@ -466,35 +394,24 @@ class EmergencyAccessTest extends TestCase
 
     public function test_reviewer_cannot_acknowledge_a_signal_that_does_not_exist(): void
     {
-        ['user' => $user] = $this->seedAccess();
-
-        $this->actingAs($user)
-            ->post('/emar/break-glass-flags/dismiss', [
-                'type' => 'repeat',
-                'key' => (string) $user->id,
-                'reason' => 'Forged acknowledgement',
-            ])
-            ->assertNotFound();
-
+        ['user' => $user, 'site' => $site] = $this->seedAccess();
+        $other = $this->makeRoleUser('provider_manager');
+        $this->actingAs($user)->postJson('/emar/break-glass-flags/dismiss', [
+            'type' => 'repeat', 'key' => $site->id.':'.$other->id, 'reason' => 'Forged acknowledgement',
+        ])->assertNotFound();
         $this->assertDatabaseCount('break_glass_flag_dismissals', 0);
     }
 
     public function test_review_links_a_real_incident_report(): void
     {
-        ['user' => $user, 'client' => $client, 'access' => $access] = $this->seedAccess();
-        $access->forceFill(['expires_at' => now()->subMinutes(5)])->save();
+        ['site' => $site, 'client' => $client, 'access' => $access] = $this->seedAccess(false);
+        $reviewer = $this->makeRoleUser('clinical_lead');
+        $this->attachCurrentSiteAssignment($reviewer, $site, 'clinical_lead');
         $incident = ClientIncident::factory()->create(['client_id' => $client->id]);
-
-        $this->actingAs($user)
-            ->from('/emar/emergency-access')
-            ->post("/emar/clients/{$client->id}/break-glass/{$access->id}/review", [
-                'review_outcome' => 'justified',
-                'incident_report_id' => $incident->id,
-            ])
-            ->assertSessionHasNoErrors();
-
-        $access->refresh();
-        $this->assertSame($incident->id, $access->incident_report_id);
+        $this->actingAs($reviewer)->post("/emar/clients/{$client->id}/break-glass/{$access->id}/review", [
+            'review_outcome' => 'justified', 'incident_report_id' => $incident->id,
+        ])->assertSessionHasNoErrors();
+        $this->assertSame($incident->id, $access->refresh()->incident_report_id);
         $this->assertTrue((bool) $access->incident_report_linked);
     }
 
@@ -538,6 +455,13 @@ class EmergencyAccessTest extends TestCase
         BreakGlassAccessEvent::recordFor($user, $other, 'viewed_mar');
 
         $this->assertDatabaseCount('break_glass_access_events', 0);
+    }
+
+    private function grantPayload(array $extra = []): array
+    {
+        return $extra + ['reason' => 'Relief has not arrived and a dose is due',
+            'reason_category' => 'Covering an absence', 'minutes' => 60, 'authorization_mode' => 'self',
+            'acknowledged_min_necessary' => true, 'acknowledged_incident_report' => true];
     }
 
     protected function makeRoleUser(string $roleName): User

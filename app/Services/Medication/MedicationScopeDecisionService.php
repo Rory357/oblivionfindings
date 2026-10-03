@@ -3,7 +3,6 @@
 namespace App\Services\Medication;
 
 use App\Models\BreakGlassAccessEvent;
-use App\Models\BreakGlassPolicy;
 use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
 use App\Models\ClientMedication;
@@ -1079,8 +1078,8 @@ class MedicationScopeDecisionService
             return false;
         }
 
-        $policy = BreakGlassPolicy::current();
-        if ($policy->reason_required && blank($access->reason)) {
+        $policy = $access->effectivePolicy();
+        if ($policy['reason_required'] && blank($access->reason)) {
             return false;
         }
 
@@ -1098,7 +1097,7 @@ class MedicationScopeDecisionService
 
         $duration = $access->created_at->diffInMinutes($access->expires_at, false);
 
-        return $duration >= 5 && $duration <= (int) $policy->max_minutes;
+        return $duration >= 5 && $duration <= (int) $policy['max_minutes'];
     }
 
     private function clientSiteId(Client $client): int

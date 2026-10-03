@@ -985,3 +985,4 @@ app(Schedule::class)->command('emar:workflow-followups')->everyMinute()->without
 
 Illuminate\Support\Facades\Schedule::command('emar:support-reviews')->dailyAt('06:00')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
 Illuminate\Support\Facades\Schedule::command('emar:support-review-delivery')->everyMinute()->withoutOverlapping()->onOneServer();
+app(Schedule::class)->command('emar:expire-emergency-access')->everyMinute()->onOneServer()->withoutOverlapping()->name('medication.emergency-access.expiry');

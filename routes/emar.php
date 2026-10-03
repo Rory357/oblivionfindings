@@ -506,17 +506,17 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
 
     // Emergency access
     Route::get('/emergency-access', [EmergencyAccessController::class, 'index'])
-        ->middleware('permission:medications.breakglass')
+        ->middleware('permission:medications.breakglass|medications.audit.view')
         ->name('emar.emergency_access');
 
     // Canonical break-glass revoke
     Route::delete('/clients/{client}/break-glass/{access}', [BreakGlassController::class, 'destroy'])
-        ->middleware('permission:medications.breakglass|medications.audit.view')
+        ->middleware('permission:medications.breakglass|medications.breakglass.end')
         ->name('emar.clients.break_glass.destroy');
 
     // Extend a live grant (+30 min, capped at the policy max)
     Route::post('/clients/{client}/break-glass/{access}/extend', [BreakGlassController::class, 'extend'])
-        ->middleware('permission:medications.breakglass|medications.audit.view')
+        ->middleware('permission:medications.breakglass')
         ->name('emar.clients.break_glass.extend');
 
     // Post-event review (oversight sign-off): justified / not justified
@@ -628,3 +628,4 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
 });
 
 require __DIR__.'/emar-stock.php';
+require __DIR__.'/emar-downtime.php';
