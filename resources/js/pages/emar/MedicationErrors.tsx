@@ -92,7 +92,8 @@ type Props = {
         controlled: boolean;
     };
 };
-const views = [
+type ErrorView = 'triage' | 'investigating' | 'actions' | 'closed' | 'incidents' | 'trends' | 'mine';
+const views: ReadonlyArray<readonly [ErrorView, string]> = [
     ['triage', 'To triage'],
     ['investigating', 'Investigating'],
     ['actions', 'Open actions'],
@@ -100,7 +101,7 @@ const views = [
     ['incidents', 'Incidents'],
     ['trends', 'Trends'],
     ['mine', 'Your reports'],
-] as const;
+];
 export default function MedicationErrors({
     errors,
     detail,
@@ -141,7 +142,7 @@ export default function MedicationErrors({
     const filtersNode = (
         <div className="flex flex-wrap items-center gap-2.5">
             {(can.all ? views : views.filter(([key]) => key === 'mine')).map(
-                ([key, label]) => (
+                ([key, label]: readonly [ErrorView, string]) => (
                     <PageHeaderFilterButton
                         key={key}
                         active={filters.tab === key}
