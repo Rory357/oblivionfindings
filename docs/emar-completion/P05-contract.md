@@ -64,3 +64,11 @@ The repaired 31-case workflow run at PHP source b2d2409e8 ended with 205 asserti
 ## Bounded care-parameter seam regression
 
 MedicationCareParametersTest.php adds 8 synthetic cases for care-only preservation, omitted/null behavior, rejection of all direct cadence/date fields, foreign-house and same-house person denial, exact cadence permission, and canonical audited interval edits that leave booked dates intact. OneChartSettingsTest::test_medication_settings_update_care_level_without_changing_review_cadence replaces the obsolete direct interval/date persistence assertion. Main owns their consolidated runtime verification; no database tests were launched by this worker for this repair.
+
+## Production-compiler empty-dialog repair
+
+Main reproduced the blank Book a review first-open on the e52054efc UI build. The emitted _review-dialogs-DWMxHzc8.js cache dependencies evaluate owner.value and person.value during rendering, although those accesses appear inside the source save callback. Empty selections are legitimately null. The bounded frontend repair captures person/owner IDs and clinician/prescriber names with optional access before memoization and refuses an incomplete save. It covers booking, review recording, appointments and prescriber decisions; the picker, model and shared wizard already render null selections safely.
+
+The focused production-transform rendering suite is resources/js/pages/emar/reviews/dialogs.render.test.tsx, run with vitest.reviews-dialogs.config.ts to enable the same babel-plugin-react-compiler as the app build. The ordinary Vitest config does not enable that compiler and alone cannot reproduce the pre-repair crash. Main owns the targeted test command, final build and real-browser rerun; this worker launched no node or heavy verification command while consolidated PHP was active.
+
+Main's focused command from the integrated checkout is `node node_modules/vitest/vitest.mjs run --config vitest.reviews-dialogs.config.ts`. The five cases cover a completely empty booking, a preselected person with no owner, recording with no clinician, an appointment with no clinician, and a decision with no prescriber. They mount the real compiled dialogs and wizard, check required-field validation, and assert zero transport/navigation calls. The config fails if the booking module lacks the compiler runtime marker.

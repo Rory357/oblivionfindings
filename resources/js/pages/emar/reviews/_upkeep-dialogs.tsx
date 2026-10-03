@@ -368,6 +368,7 @@ export function AppointmentDialog({
         }
         return errors;
     };
+    const clinicianName = clinician?.label ?? '';
     return (
         <ReviewFormShell
             title={`Appointment — ${review.client_name}`}
@@ -388,6 +389,7 @@ export function AppointmentDialog({
             }
             validate={validate}
             onSave={() => {
+                if (!clinicianName) return;
                 const [date, time] = when.split('T');
                 command.submit(
                     `/emar/reviews/${review.id}/appointment`,
@@ -396,7 +398,7 @@ export function AppointmentDialog({
                         appointment_date: date,
                         appointment_time: time,
                         appointment_location: location,
-                        reviewer_name: clinician!.label,
+                        reviewer_name: clinicianName,
                         reviewer_role: role,
                         clinician_practice: practice.trim(),
                     },

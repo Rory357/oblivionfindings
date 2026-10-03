@@ -393,6 +393,7 @@ export function DecisionDialog({
     const command = useReviewCommand();
     const [state, setState] = useState<DecisionState | ''>('');
     const [prescriber, setPrescriber] = useState<PickerOption | null>(null);
+    const prescriberName = prescriber?.label ?? '';
     const [when, setWhen] = useState(toDatetimeLocal(asAt));
     const [method, setMethod] = useState<DecisionMethod | ''>('');
     const [note, setNote] = useState('');
@@ -457,13 +458,14 @@ export function DecisionDialog({
             command={command}
             dirty={!!(state || prescriber || method || note || source)}
             validate={validate}
-            onSave={() =>
+            onSave={() => {
+                if (!prescriberName) return;
                 command.submit(
                     `/emar/reviews/${review.id}/items/${item.id}/decision`,
                     {
                         revision: review.revision,
                         state,
-                        prescriber_name: prescriber!.label,
+                        prescriber_name: prescriberName,
                         decision_date: when,
                         method: state === 'waiting' ? null : method,
                         note: note.trim(),
@@ -472,8 +474,8 @@ export function DecisionDialog({
                                 ? source
                                 : null,
                     },
-                )
-            }
+                );
+            }}
             onClose={onClose}
             saveLabel="Record the decision"
             successTitle={

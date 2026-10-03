@@ -271,14 +271,17 @@ export function BookReviewDialog({
         }
         return next;
     };
+    const personId = person?.value ?? '';
+    const ownerId = owner?.value ?? '';
     const save = () => {
+        if (!personId || !ownerId) return;
         const [date, time] = appointment.split('T');
         command.submit('/emar/reviews', {
             request_uuid: requestUuid,
-            client_id: Number(person!.value),
+            client_id: Number(personId),
             review_type: kind,
             scheduled_date: due,
-            owner_id: Number(owner!.value),
+            owner_id: Number(ownerId),
             trigger_code: kind === 'triggered' ? trigger : null,
             trigger_reason: kind === 'triggered' ? reason.trim() : null,
             appointment_date: clinician ? date : null,
@@ -775,13 +778,15 @@ export function RecordReviewDialog({
         }
         return next;
     };
+    const clinicianName = clinician?.label ?? '';
     const save = () => {
+        if (!clinicianName) return;
         const [date, time] = when.split('T');
         command.submit(`/emar/reviews/${review.id}/complete`, {
             revision: review.revision,
             completed_date: date,
             completed_time: time,
-            reviewer_name: clinician!.label,
+            reviewer_name: clinicianName,
             reviewer_role: role,
             reviewer_registration_number: registration.trim(),
             clinician_practice: practice.trim(),
