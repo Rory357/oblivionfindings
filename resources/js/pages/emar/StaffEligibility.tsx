@@ -309,7 +309,7 @@ export default function StaffEligibility(props: Props) {
                     {houses.length} {houses.length === 1 ? 'house' : 'houses'}
                 </PageHeaderStatusChip>
             }
-            subline={`${houseNames.length > 3 ? `${houseNames.slice(0, 3).join(', ')} and ${houseNames.length - 3} more` : houseNames.join(' and ') || 'No houses'} · your approved houses · times in NZDT (Pacific/Auckland)`}
+            subline={`${houseNames.length > 3 ? `${houseNames.slice(0, 3).join(', ')} and ${houseNames.length - 3} more` : houseNames.join(' and ') || 'No houses'} · your approved houses · times in Pacific/Auckland`}
             actions={
                 <>
                     <PageHeaderSearch

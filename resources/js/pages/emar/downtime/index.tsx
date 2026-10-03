@@ -10,12 +10,15 @@ import {
 import {
     PageHeader,
     PageHeaderGlassButton,
+    PageHeaderMeterBig,
     PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
     PageHeaderPrimaryButton,
     PageHeaderRail,
     PageLayout,
 } from '@/components/page';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/datetime';
@@ -93,26 +96,46 @@ export default function DowntimeIndex({
                 <>
                     <PageHeaderMeterBlock
                         label="Downtimes in your scope"
-                        value={downtimes.total}
                         onClick={() => setView('all')}
-                    />
+                    >
+                        <PageHeaderMeterBig>
+                            {downtimes.total}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            All permitted houses
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="Open on this page"
-                        value={openHere}
                         tone="warning"
                         onClick={() => setView('open')}
-                    />
+                    >
+                        <PageHeaderMeterBig>{openHere}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Paper still being collected
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="Collected on this page"
-                        value={downtimes.data.length - openHere}
                         onClick={() => setView('collected')}
-                    />
+                    >
+                        <PageHeaderMeterBig>
+                            {downtimes.data.length - openHere}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Paper collection finished
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
                     {can_make_pack && (
                         <PageHeaderMeterBlock
                             label="Today's downtime pack"
-                            value="PDF"
                             onClick={() => setPack(true)}
-                        />
+                        >
+                            <PageHeaderMeterBig>PDF</PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                Prepare the current paper pack
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
                     )}
                 </>
             }
@@ -125,7 +148,6 @@ export default function DowntimeIndex({
                     ]}
                     value={view}
                     onSelect={setView}
-                    showFind={false}
                 />
             }
         />
@@ -150,8 +172,8 @@ export default function DowntimeIndex({
                         caption={`${rows.length} shown on this page · ${downtimes.total} in your scope`}
                     />
                     {!rows.length ? (
-                        <div className="bg-card rounded-xl border p-8 text-center">
-                            <FileText className="text-muted-foreground mx-auto mb-3 size-8" />
+                        <Card className="p-8 text-center">
+                            <FileText className="mx-auto mb-3 size-8 text-muted-foreground" />
                             <p className="text-section-title">
                                 No paper records in this view
                             </p>
@@ -166,7 +188,7 @@ export default function DowntimeIndex({
                                     Record a downtime
                                 </Button>
                             )}
-                        </div>
+                        </Card>
                     ) : (
                         <>
                             <div className="hidden md:block">

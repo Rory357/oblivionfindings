@@ -202,6 +202,7 @@ export interface ControlledOverride {
     doses: ControlledOverrideDose[];
 }
 export interface ControlledProductPayload {
+    site_brand_colour?: string | null;
     filters?: {
         site_id: number | null;
         client_medication_id: number | null;

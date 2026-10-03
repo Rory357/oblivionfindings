@@ -9,16 +9,19 @@ import {
     type MedRow,
 } from '@/components/emar/medications/types';
 import {
-    PageHero,
-    type PageHeroBadge,
-    type PageHeroMetaItem,
-    type PageHeroStat,
-} from '@/components/page';
-import { PageHeaderPrimaryButton } from '@/components/page/page-header';
+    EmarMeters,
+    EmarViewFilter,
+} from '@/components/emar/workspace-navigation';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
 import {
     EntityFilter,
     ShiftContextMenu,
-    TabStrip,
     type RosterTabItem,
     type ShiftCtxItem,
     type ShiftCtxState,
@@ -58,10 +61,8 @@ import {
     Pencil,
     Pill,
     Plus,
-    Search,
     Shield,
     User,
-    Users,
     X,
 } from 'lucide-react';
 import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
@@ -277,40 +278,6 @@ export default function Medications(props: Props) {
             medications.filter((m) => matchesTab(m, t.id)).length || undefined,
     }));
 
-    const heroMeta: PageHeroMetaItem[] = [
-        {
-            icon: Users,
-            label: `${counts.clients} client${counts.clients === 1 ? '' : 's'}`,
-        },
-        { icon: Package, label: `${medications.length} orders` },
-    ];
-
-    const heroBadges: PageHeroBadge[] = [
-        counts.awaiting > 0
-            ? {
-                  tone: 'warning' as const,
-                  label: `${counts.awaiting} to verify`,
-              }
-            : null,
-        counts.lowStock > 0
-            ? {
-                  tone: 'critical' as const,
-                  label: `${counts.lowStock} low on stock`,
-              }
-            : null,
-    ].filter(Boolean) as PageHeroBadge[];
-
-    const heroStats: PageHeroStat[] = [
-        { label: 'Active', value: counts.active },
-        { label: 'PRN', value: counts.prn },
-        { label: 'Controlled', value: counts.controlled },
-        {
-            label: 'To verify',
-            value: counts.awaiting,
-            tone: counts.awaiting > 0 ? 'warning' : 'neutral',
-        },
-    ];
-
     const verify = (med: MedRow) => {
         router.visit(`/emar/prescriptions?order_id=${med.id}&action=check`);
         setModal(null);
@@ -426,79 +393,87 @@ export default function Medications(props: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Medications Database" />
-            <div className="flex flex-col gap-6 p-6">
-                <PageHero
+            <div className="flex flex-col gap-5">
+                <PageHeader
+                    frontline
                     rail={<EmarHubRail />}
-                    variant="hero"
-                    category="ops"
                     brandColour={brandColour}
                     icon={Pill}
-                    title={
-                        <span>
-                            <span className="flex items-center gap-2 text-[10.5px] font-semibold tracking-wide text-primary-foreground/80 uppercase">
-                                <span
-                                    aria-hidden
-                                    className="relative inline-flex h-2 w-2"
-                                >
-                                    <span className="absolute inset-0 animate-ping rounded-full bg-status-success/70" />
-                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
-                                </span>
-                                Medication register
-                            </span>
-                            <span className="mt-1 block text-[26px] leading-tight font-bold">
-                                The medication register for{' '}
-                                <span className="border-b-2 border-primary-foreground/40">
-                                    {activeSite?.name ?? 'your services'}
-                                </span>
-                            </span>
-                        </span>
+                    title="Medicines"
+                    titleChip={
+                        <PageHeaderStatusChip variant="neutral">
+                            {activeSite?.name ?? 'All permitted houses'}
+                        </PageHeaderStatusChip>
                     }
-                    description={`${medications.length} medications across ${counts.clients} clients. ${counts.awaiting} awaiting prescriber verification and ${counts.lowStock} low on stock.`}
-                    meta={heroMeta}
-                    badges={heroBadges}
-                    stats={heroStats}
+                    subline={`${medications.length} orders · ${counts.clients} people · Medication register`}
+                    meters={
+                        <EmarMeters
+                            items={[
+                                {
+                                    label: 'Active',
+                                    value: counts.active,
+                                    caption: 'Active medication orders',
+                                    onClick: () => setActiveTab('active'),
+                                },
+                                {
+                                    label: 'As needed',
+                                    value: counts.prn,
+                                    caption: 'PRN medication orders',
+                                    onClick: () => setActiveTab('prn'),
+                                },
+                                {
+                                    label: 'Controlled',
+                                    value: counts.controlled,
+                                    caption: 'Controlled medication orders',
+                                    onClick: () => setActiveTab('controlled'),
+                                },
+                                {
+                                    label: 'To verify',
+                                    value: counts.awaiting,
+                                    caption: 'Awaiting prescriber verification',
+                                    tone: counts.awaiting ? 'warning' : 'brand',
+                                    onClick: () => setActiveTab('awaiting'),
+                                },
+                            ]}
+                        />
+                    }
                     actions={
                         <>
+                            <PageHeaderSearch
+                                value={search}
+                                onChange={setSearch}
+                                placeholder="Search medication, brand or person…"
+                                ariaLabel="Search medicines"
+                            />
                             <PageHeaderPrimaryButton
                                 icon={Plus}
                                 onClick={() => setModal({ type: 'add' })}
                             >
                                 Add medication
                             </PageHeaderPrimaryButton>
-                            <Button
-                                variant="outline"
-                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                            <PageHeaderGlassButton
+                                icon={FileUp}
                                 onClick={() => setModal({ type: 'import' })}
                             >
-                                <FileUp className="h-4 w-4" />
                                 Import
-                            </Button>
+                            </PageHeaderGlassButton>
                         </>
                     }
-                    footer={
-                        <div className="flex flex-wrap items-center justify-end gap-2 py-3">
-                            <div className="relative w-full max-w-xs md:w-[280px]">
-                                <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                {/* eslint-disable-next-line no-restricted-syntax -- white pill search on the dark hero (shared eMAR filter-row idiom, mirrors /emar/prn). */}
-                                <input
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    placeholder="Search medication, brand or client…"
-                                    aria-label="Search medications"
-                                    className="h-8 w-full rounded-full border-0 bg-primary-foreground pr-8 pl-9 text-[13px] text-foreground shadow-sm outline-none placeholder:text-muted-foreground/80 focus:ring-2 focus:ring-primary-foreground/50"
-                                />
-                                {search ? (
-                                    // eslint-disable-next-line no-restricted-syntax -- inline clear affordance inside the pill search input.
-                                    <button
-                                        type="button"
-                                        aria-label="Clear search"
-                                        onClick={() => setSearch('')}
-                                        className="absolute top-1/2 right-2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted"
-                                    >
-                                        <X className="h-3.5 w-3.5" />
-                                    </button>
-                                ) : null}
-                            </div>
+                    filters={
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                            <EmarViewFilter
+                                value={activeTab}
+                                onChange={setActiveTab}
+                                items={TABS}
+                                label="Medicines view"
+                            />
+                            {search && (
+                                <PageHeaderGlassButton
+                                    onClick={() => setSearch('')}
+                                >
+                                    Clear search
+                                </PageHeaderGlassButton>
+                            )}
                             {sites.length > 0 ? (
                                 <EntityFilter
                                     label="Site"
@@ -571,13 +546,6 @@ export default function Medications(props: Props) {
                         )}
                     </div>
                 ) : null}
-
-                <TabStrip
-                    value={activeTab}
-                    onChange={setActiveTab}
-                    items={TABS}
-                    ariaLabel="Medication register views"
-                />
 
                 <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                     <div className="flex flex-wrap items-center gap-2.5 border-b p-3.5">

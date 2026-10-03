@@ -212,6 +212,7 @@ export default function ControlledRegister({
     const header = (
         <PageHeader
             frontline
+            brandColour={payload?.site_brand_colour}
             icon={ShieldCheck}
             title="Controlled register"
             subline="Current stock, counts and follow-up · register history by NZ date"
@@ -327,7 +328,7 @@ export default function ControlledRegister({
                         ]}
                         onChange={(client) => change({ client })}
                     />
-                    <label className="text-band-foreground flex min-w-0 flex-wrap items-center gap-2 text-sm">
+                    <label className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-band-foreground">
                         Register history (NZ date)
                         <input
                             type="date"
@@ -336,7 +337,7 @@ export default function ControlledRegister({
                             onChange={(event) =>
                                 change({ date: event.target.value })
                             }
-                            className="frontline-tap frontline-focus border-band-foreground/20 bg-band-foreground/10 min-w-0 rounded-md border px-2 py-2 text-sm"
+                            className="frontline-tap frontline-focus min-w-0 rounded-md border border-band-foreground/20 bg-band-foreground/10 px-2 py-2 text-sm"
                         />
                     </label>
                     {filters.date && (

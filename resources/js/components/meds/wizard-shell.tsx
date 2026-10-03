@@ -1,24 +1,18 @@
-/* eslint-disable no-restricted-syntax -- Shared medication wizard chrome,
- * ported 1:1 from the Add Client dialog (components/clients/add-client-dialog.tsx),
- * the reference implementation for every multi-step popup workflow: 248px
- * stepper rail on bg-muted/30, header strip, 3px progress bar, scroll-contained
- * body, muted footer band. Every colour comes from semantic design tokens. */
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import {
-    WIZARD_FOOTER_CLASS,
-    WIZARD_PROGRESS_BAR_CLASS,
-    WIZARD_PROGRESS_TRACK_CLASS,
-    WIZARD_RAIL_CLASS,
-    type IconType,
-} from '@/components/wizard/primitives';
+import { DiscardDraftDialog } from '@/components/governance/DiscardDraftDialog';
+import { SettingsModal } from '@/components/settings/settings-modal';
+import type { IconType } from '@/components/wizard/primitives';
+import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import { cn } from '@/lib/utils';
-import { Check, X } from 'lucide-react';
-import type { ReactNode } from 'react';
+import {
+    Children,
+    Fragment,
+    cloneElement,
+    isValidElement,
+    useEffect,
+    useRef,
+    useState,
+    type ReactNode,
+} from 'react';
 
 export type MedsWizardStep = {
     key: string;
@@ -27,12 +21,14 @@ export type MedsWizardStep = {
     icon: IconType;
 };
 
+/** Medication workflows use the canonical responsive wizard; their own validation
+ * and clinical command handlers continue to own step transitions and saves. */
 export function MedsWizardDialog({
     open,
     onClose,
     title,
     description,
-    railIcon: RailIcon,
+    railIcon,
     railTitle,
     railSubtitle,
     railFooter,
@@ -41,10 +37,11 @@ export function MedsWizardDialog({
     onStepClick,
     footer,
     children,
+    formState,
+    sequential = true,
 }: {
     open: boolean;
     onClose: () => void;
-    /** Screen-reader dialog title/description (visually hidden). */
     title: string;
     description: string;
     railIcon: IconType;
@@ -53,141 +50,135 @@ export function MedsWizardDialog({
     railFooter?: ReactNode;
     steps: MedsWizardStep[];
     stepIndex: number;
-    /** Rail steps allow jumping back only; forward clicks are ignored. */
     onStepClick: (index: number) => void;
     footer: ReactNode;
     children: ReactNode;
+    sequential?: boolean;
+    /** The owning form supplies real dirtiness and request state. Successful saves close through the owner. */
+    formState?: {
+        isDirty: boolean;
+        processing: boolean;
+        errors?: Record<string, string | undefined>;
+    };
 }) {
-    const cur = steps[stepIndex];
-
+    const [discard, setDiscard] = useState(false);
+    const errorRef = useRef<HTMLDivElement>(null);
+    const errors = Object.values(formState?.errors ?? {}).filter(
+        (error): error is string => !!error,
+    );
+    const errorKey = errors.join('\n');
+    useEffect(() => {
+        if (errorKey) errorRef.current?.focus();
+    }, [errorKey]);
+    const errorSummary = errors.length ? (
+        <div
+            ref={errorRef}
+            tabIndex={-1}
+            role="alert"
+            className="mb-4 rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical"
+        >
+            <p className="font-semibold">Changes were not saved</p>
+            <ul className="mt-1 list-disc pl-5">
+                {errors.map((error, index) => (
+                    <li key={index}>{error}</li>
+                ))}
+            </ul>
+        </div>
+    ) : null;
+    const requestClose = () => {
+        if (formState?.processing) return;
+        if (formState?.isDirty) setDiscard(true);
+        else onClose();
+    };
+    const footerItems = Children.toArray(
+        isValidElement<{ children?: ReactNode }>(footer) &&
+            footer.type === Fragment
+            ? footer.props.children
+            : footer,
+    );
+    // The legacy footer contract passes the same close callback to Cancel. Keep
+    // that route consistent with Escape and the shell's close control, while
+    // preserving Back, submit and any recovery-owned callbacks unchanged.
+    const guardFooter = (item: ReactNode): ReactNode => {
+        if (
+            !isValidElement<{
+                onClick?: () => void;
+                onCancel?: () => void;
+                children?: ReactNode;
+            }>(item)
+        )
+            return item;
+        return cloneElement(item, {
+            ...(item.props.onClick === onClose
+                ? { onClick: requestClose }
+                : {}),
+            ...(item.props.onCancel === onClose
+                ? { onCancel: requestClose }
+                : {}),
+            ...(item.props.children !== undefined
+                ? { children: Children.map(item.props.children, guardFooter) }
+                : {}),
+        });
+    };
+    const guardedFooter = footerItems.map(guardFooter);
+    const guard = (
+        <DiscardDraftDialog
+            open={discard}
+            description="These medication changes have not been saved."
+            onKeepEditing={() => setDiscard(false)}
+            onDiscard={() => {
+                setDiscard(false);
+                onClose();
+            }}
+        />
+    );
+    if (steps.length === 1)
+        return open ? (
+            <>
+                <SettingsModal
+                    frontline
+                    title={title}
+                    description={description}
+                    width={720}
+                    onClose={requestClose}
+                    footer={<>{guardedFooter}</>}
+                >
+                    {errorSummary}
+                    {children}
+                    {railFooter}
+                </SettingsModal>
+                {guard}
+            </>
+        ) : null;
     return (
-        <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-            <DialogContent
-                className="overflow-hidden p-0 [&>button]:hidden"
-                style={{
-                    maxWidth: 'min(94vw, 1080px)',
-                    width: 'min(94vw, 1080px)',
-                }}
+        <>
+            <WizardShell
+                frontline
+                open={open}
+                onClose={requestClose}
+                title={title}
+                description={description}
+                railIcon={railIcon}
+                railTitle={railTitle}
+                railSub={railSubtitle}
+                railExtra={railFooter}
+                steps={steps}
+                stepIndex={stepIndex}
+                onStepClick={onStepClick}
+                sequential={sequential}
+                headerLabel={!sequential ? steps[stepIndex]?.label : undefined}
+                footerStart={guardedFooter[0]}
+                footerEnd={guardedFooter.slice(1)}
+                maxWidth="min(92vw, 1100px)"
+                maxHeight="min(88vh, 860px)"
             >
-                <DialogTitle className="sr-only">{title}</DialogTitle>
-                <DialogDescription className="sr-only">
-                    {description}
-                </DialogDescription>
-
-                <div className="flex h-[min(92vh,860px)] min-h-0 overflow-hidden">
-                    {/* ── Stepper rail ── */}
-                    <aside className={WIZARD_RAIL_CLASS}>
-                        <div className="mb-3 flex items-center gap-2.5">
-                            <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary-fill text-primary-fill-foreground">
-                                <RailIcon className="h-5 w-5" />
-                            </span>
-                            <div>
-                                <div className="text-sm leading-tight font-bold">
-                                    {railTitle}
-                                </div>
-                                <div className="text-[11px] text-muted-foreground">
-                                    {railSubtitle}
-                                </div>
-                            </div>
-                        </div>
-
-                        {steps.map((s, i) => {
-                            const active = i === stepIndex;
-                            const complete = i < stepIndex;
-                            const Icon = s.icon;
-                            return (
-                                <button
-                                    key={s.key}
-                                    type="button"
-                                    onClick={() => onStepClick(i)}
-                                    className={cn(
-                                        'flex items-center gap-2.5 rounded-md p-2 text-left transition-colors',
-                                        active
-                                            ? 'bg-primary-fill/10'
-                                            : 'hover:bg-muted',
-                                    )}
-                                >
-                                    <span
-                                        className={cn(
-                                            'grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors',
-                                            active
-                                                ? 'bg-primary-fill text-primary-fill-foreground'
-                                                : complete
-                                                  ? 'bg-status-success-bg text-status-success'
-                                                  : 'bg-muted text-muted-foreground',
-                                        )}
-                                    >
-                                        {complete ? (
-                                            <Check className="h-3.5 w-3.5" />
-                                        ) : (
-                                            <Icon className="h-3.5 w-3.5" />
-                                        )}
-                                    </span>
-                                    <span className="min-w-0">
-                                        <span
-                                            className={cn(
-                                                'block text-[13px]',
-                                                active
-                                                    ? 'font-bold text-foreground'
-                                                    : complete
-                                                      ? 'font-semibold text-foreground'
-                                                      : 'font-semibold text-muted-foreground',
-                                            )}
-                                        >
-                                            {s.label}
-                                        </span>
-                                        <span className="block truncate text-[11px] text-muted-foreground">
-                                            {s.blurb}
-                                        </span>
-                                    </span>
-                                </button>
-                            );
-                        })}
-
-                        {railFooter ? (
-                            <div className="mt-auto pt-4">{railFooter}</div>
-                        ) : null}
-                    </aside>
-
-                    {/* ── Main column ── */}
-                    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                        <header className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3.5">
-                            <div className="text-[13px] font-semibold text-muted-foreground">
-                                Step {stepIndex + 1} of {steps.length} ·{' '}
-                                <span className="text-foreground">
-                                    {cur?.label}
-                                </span>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                aria-label="Close"
-                                className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted"
-                            >
-                                <X className="h-5 w-5" />
-                            </button>
-                        </header>
-
-                        <div className={WIZARD_PROGRESS_TRACK_CLASS}>
-                            <div
-                                className={WIZARD_PROGRESS_BAR_CLASS}
-                                style={{
-                                    width: `${((stepIndex + 1) / steps.length) * 100}%`,
-                                }}
-                            />
-                        </div>
-
-                        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-6 py-6">
-                            {children}
-                        </div>
-
-                        <footer className={WIZARD_FOOTER_CLASS}>
-                            {footer}
-                        </footer>
-                    </div>
-                </div>
-            </DialogContent>
-        </Dialog>
+                <WizardStepPane key={stepIndex}>
+                    {errorSummary}
+                    {children}
+                </WizardStepPane>
+            </WizardShell>
+            {guard}
+        </>
     );
 }
 

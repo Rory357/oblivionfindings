@@ -1431,12 +1431,13 @@ export function MedicineSupportDialog({
         <>
             <Dialog open onOpenChange={(open) => !open && close()}>
                 <DialogContent
+                    className="flex max-h-[88vh] flex-col overflow-hidden p-0"
                     style={{
                         width: 'min(92vw, 720px)',
                         maxWidth: 'min(92vw, 720px)',
                     }}
                 >
-                    <DialogHeader>
+                    <DialogHeader className="shrink-0 border-b p-5 pr-12">
                         <DialogTitle>
                             {medicine.requested_mode
                                 ? 'Give more staff support'
@@ -1448,7 +1449,7 @@ export function MedicineSupportDialog({
                             independence allowed: {SUPPORT[plan.cap].label}
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4">
+                    <div className="min-h-0 space-y-4 overflow-y-auto px-5">
                         <Errors errors={form.errors} />
                         {MODES.map((m) => (
                             <Button
@@ -1480,7 +1481,7 @@ export function MedicineSupportDialog({
                         </p>
                         <p>{SUPPORT[mode].recorded}</p>
                     </div>
-                    <DialogFooter>
+                    <DialogFooter className="shrink-0 border-t bg-muted/30 p-4">
                         <Button
                             variant="outline"
                             onClick={close}
@@ -1628,19 +1629,25 @@ export function ConsentDialog({
     if (queued)
         return (
             <Dialog open onOpenChange={(open) => !open && onClose()}>
-                <DialogContent>
-                    <DialogHeader>
+                <DialogContent
+                    className="flex max-h-[88vh] flex-col overflow-hidden p-0"
+                    style={{
+                        width: 'min(92vw, 480px)',
+                        maxWidth: 'min(92vw, 480px)',
+                    }}
+                >
+                    <DialogHeader className="shrink-0 border-b p-5 pr-12">
                         <DialogTitle>Saved on this device</DialogTitle>
                         <DialogDescription>
                             This change is waiting to send when you reconnect.
                         </DialogDescription>
                     </DialogHeader>
-                    <p>
+                    <p className="min-h-0 overflow-y-auto px-5">
                         Tell the house lead about the change now. The server
                         support record will update only after the change is
                         accepted. You can check its progress in saved actions.
                     </p>
-                    <DialogFooter>
+                    <DialogFooter className="shrink-0 border-t bg-muted/30 p-4">
                         <Button onClick={onClose}>Done</Button>
                     </DialogFooter>
                 </DialogContent>
@@ -1654,9 +1661,9 @@ export function ConsentDialog({
                         width: 'min(92vw, 720px)',
                         maxWidth: 'min(92vw, 720px)',
                     }}
-                    className="max-h-[90vh] overflow-y-auto"
+                    className="flex max-h-[88vh] flex-col overflow-hidden p-0"
                 >
-                    <DialogHeader>
+                    <DialogHeader className="shrink-0 border-b p-5 pr-12">
                         <DialogTitle>
                             Record a change the person asked for
                         </DialogTitle>
@@ -1665,7 +1672,7 @@ export function ConsentDialog({
                             refusal.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4">
+                    <div className="min-h-0 space-y-4 overflow-y-auto px-5">
                         <Errors errors={form.errors} />
                         <Choice
                             id="client_medication_id"
@@ -1746,7 +1753,7 @@ export function ConsentDialog({
                             </AlertDescription>
                         </Alert>
                     </div>
-                    <DialogFooter>
+                    <DialogFooter className="shrink-0 border-t bg-muted/30 p-4">
                         <Button
                             variant="outline"
                             onClick={close}
@@ -1787,9 +1794,9 @@ export function AssessmentHistoryDialog({
                     width: 'min(92vw, 720px)',
                     maxWidth: 'min(92vw, 720px)',
                 }}
-                className="max-h-[90vh] overflow-y-auto"
+                className="flex max-h-[88vh] flex-col overflow-hidden p-0"
             >
-                <DialogHeader>
+                <DialogHeader className="shrink-0 border-b p-5 pr-12">
                     <DialogTitle>
                         Assessment ·{' '}
                         {formatDateOnly(
@@ -1801,7 +1808,7 @@ export function AssessmentHistoryDialog({
                         earlier assessments are kept
                     </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-4">
+                <div className="min-h-0 space-y-4 overflow-y-auto px-5">
                     <ReviewCard title="What they can do" icon={ClipboardList}>
                         {SCORES.map((s) => (
                             <ReviewRow
@@ -1833,7 +1840,7 @@ export function AssessmentHistoryDialog({
                         )}
                     </p>
                 </div>
-                <DialogFooter>
+                <DialogFooter className="shrink-0 border-t bg-muted/30 p-4">
                     <Button onClick={onClose}>Close</Button>
                 </DialogFooter>
             </DialogContent>

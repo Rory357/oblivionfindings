@@ -159,6 +159,7 @@ describe('Medication history server periods and frontline controls', () => {
 
     it('initializes from returned dates, renders both NZ records and requests explicit dates with current scope', () => {
         render(<AuditLog {...props} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Custom dates' }));
         expect(screen.getByLabelText('From (NZ date)')).toHaveValue(
             '2026-09-27',
         );
@@ -244,6 +245,7 @@ describe('Medication history server periods and frontline controls', () => {
 
     it('resets dates and category counts to the returned window on back/forward navigation', () => {
         const { rerender } = render(<AuditLog {...props} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Custom dates' }));
         fireEvent.change(screen.getByLabelText('From (NZ date)'), {
             target: { value: '2026-04-05' },
         });

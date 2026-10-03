@@ -1,6 +1,6 @@
-import { RecordDoseLaunch } from '@/components/emar/record/record-dose-launch';
 import { AdministrationFollowupDialog } from '@/components/emar/followups/administration-followup-dialog';
 import { MedicationExportButton } from '@/components/emar/medication-export-button';
+import { RecordDoseLaunch } from '@/components/emar/record/record-dose-launch';
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { EntityTable } from '@/components/lists/entity-table';
 import {
@@ -21,7 +21,13 @@ import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTime, formatTime } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
-import { CalendarDays, ClipboardList, History, Pill, Users } from 'lucide-react';
+import {
+    CalendarDays,
+    ClipboardList,
+    History,
+    Pill,
+    Users,
+} from 'lucide-react';
 import { useState } from 'react';
 
 type View = 'charts' | 'medicines' | 'asneeded';
@@ -116,6 +122,25 @@ export default function MedicationRecordHub(props: Props) {
                     title="MAR & medicines"
                     wrapTitle
                     subline="Open a person’s medication record from their chart, medicine or as-needed dose."
+                    actions={
+                        <form
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                visit({ q: search });
+                            }}
+                        >
+                            <PageHeaderSearch
+                                value={search}
+                                onChange={setSearch}
+                                placeholder={
+                                    props.view === 'charts'
+                                        ? 'Find a person…'
+                                        : 'Find a person or medicine…'
+                                }
+                                ariaLabel="Search MAR and medicines"
+                            />
+                        </form>
+                    }
                     meters={
                         <>
                             <PageHeaderMeterBlock
@@ -161,9 +186,7 @@ export default function MedicationRecordHub(props: Props) {
                             <PageHeaderMeterBlock
                                 label="Overdue"
                                 tone={
-                                    props.meters.overdue
-                                        ? 'critical'
-                                        : 'brand'
+                                    props.meters.overdue ? 'critical' : 'brand'
                                 }
                                 onClick={() =>
                                     visit({ date: props.today }, 'charts')
@@ -211,10 +234,11 @@ export default function MedicationRecordHub(props: Props) {
                                     <PageHeaderFilterButton
                                         id="medication-hub-day"
                                         icon={CalendarDays}
-                                        className="h-11 shrink-0 gap-2 whitespace-nowrap px-3"
+                                        className="h-11 shrink-0 gap-2 px-3 whitespace-nowrap"
                                         aria-label={`NZ calendar day: ${formatDateOnly(props.filters.date)}`}
                                     >
-                                        Day · {formatDateOnly(props.filters.date)}
+                                        Day ·{' '}
+                                        {formatDateOnly(props.filters.date)}
                                     </PageHeaderFilterButton>
                                 }
                             />
@@ -246,22 +270,6 @@ export default function MedicationRecordHub(props: Props) {
                                     ]}
                                 />
                             )}
-                            <form
-                                onSubmit={(event) => {
-                                    event.preventDefault();
-                                    visit({ q: search });
-                                }}
-                            >
-                                <PageHeaderSearch
-                                    value={search}
-                                    onChange={setSearch}
-                                    placeholder={
-                                        props.view === 'charts'
-                                            ? 'Find a person…'
-                                            : 'Find a person or medicine…'
-                                    }
-                                />
-                            </form>
                             <PageHeaderMeterCaption>
                                 As at {formatTime(props.as_at)} ·
                                 Pacific/Auckland
@@ -290,7 +298,12 @@ export default function MedicationRecordHub(props: Props) {
                     </p>
                 )}
                 <Card className="min-w-0 p-4">
-                    {props.view === 'charts' && !props.coverage.complete && <p className="mb-4 text-subtle" role="status">{props.coverage.notice ?? 'Scheduled-dose coverage is not available for this day. Open the person’s record for retained dose history.'}</p>}
+                    {props.view === 'charts' && !props.coverage.complete && (
+                        <p className="text-subtle mb-4" role="status">
+                            {props.coverage.notice ??
+                                'Scheduled-dose coverage is not available for this day. Open the person’s record for retained dose history.'}
+                        </p>
+                    )}
                     <div className="mb-4 flex items-center justify-between gap-3">
                         <h2 className="text-section-title">{title}</h2>
                         <p className="text-caption text-muted-foreground">
@@ -368,7 +381,24 @@ export default function MedicationRecordHub(props: Props) {
                                               key: 'report',
                                               label: 'Report',
                                               width: '180px',
-                                              cell: (row) => props.can_report ? <MedicationExportButton clientId={row.client_id} dateFrom={props.filters.date} dateTo={props.filters.date} /> : <span className="text-caption text-muted-foreground">Report access needed</span>,
+                                              cell: (row) =>
+                                                  props.can_report ? (
+                                                      <MedicationExportButton
+                                                          clientId={
+                                                              row.client_id
+                                                          }
+                                                          dateFrom={
+                                                              props.filters.date
+                                                          }
+                                                          dateTo={
+                                                              props.filters.date
+                                                          }
+                                                      />
+                                                  ) : (
+                                                      <span className="text-caption text-muted-foreground">
+                                                          Report access needed
+                                                      </span>
+                                                  ),
                                           },
                                           {
                                               key: 'record',
@@ -493,7 +523,16 @@ export default function MedicationRecordHub(props: Props) {
                                     icon: ClipboardList,
                                     onClick: () => router.visit(row.href),
                                 },
-                                ...(props.view === 'asneeded' && row.can_record ? [{ label: 'Record effect check', icon: History, onClick: () => setEffectDose(row.id) }] : []),
+                                ...(props.view === 'asneeded' && row.can_record
+                                    ? [
+                                          {
+                                              label: 'Record effect check',
+                                              icon: History,
+                                              onClick: () =>
+                                                  setEffectDose(row.id),
+                                          },
+                                      ]
+                                    : []),
                             ]}
                         />
                     ) : (
@@ -531,7 +570,13 @@ export default function MedicationRecordHub(props: Props) {
                     </div>
                 </Card>
             </div>
-            {effectDose !== null && <AdministrationFollowupDialog key={effectDose} administrationId={effectDose} onClose={() => setEffectDose(null)} />}
+            {effectDose !== null && (
+                <AdministrationFollowupDialog
+                    key={effectDose}
+                    administrationId={effectDose}
+                    onClose={() => setEffectDose(null)}
+                />
+            )}
         </AppLayout>
     );
 }

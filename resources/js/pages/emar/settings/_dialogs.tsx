@@ -412,7 +412,7 @@ export function HistDetail({ id }: { id: number }) {
     return (
         <SettingsModal
             title={historyWhat(h)}
-            description={`${whenText(h.at)} NZDT · ${h.who ?? 'Someone'}${h.note ? ` · ${h.note}` : ''}`}
+            description={`${whenText(h.at)} NZ time · ${h.who ?? 'Someone'}${h.note ? ` · ${h.note}` : ''}`}
             onClose={close}
             footer={
                 <>

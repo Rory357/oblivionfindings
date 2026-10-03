@@ -25,6 +25,7 @@ import {
     type ComponentProps,
     type ComponentType,
     type ReactNode,
+    type Ref,
 } from 'react';
 
 /** On the collapsed top stepper, scroll the current step into view. */
@@ -71,6 +72,8 @@ export function WizardShell({
     maxWidth = 'min(94vw, 980px)',
     maxHeight = 'min(88vh, 760px)',
     children,
+    bodyRef,
+    frontline = false,
 }: {
     open: boolean;
     onClose: () => void;
@@ -90,7 +93,7 @@ export function WizardShell({
     /** Replaces the "Step x of y · label" header line. Detail dialogs use this —
      *  their rail entries are SECTIONS, not sequential steps, so "Step 1 of 7"
      *  reads wrong; a pane title or section name goes here instead. */
-    headerLabel?: string;
+    headerLabel?: ReactNode;
     /** Detail viewers have sections rather than sequential completion steps. */
     sequential?: boolean;
     pct?: number | null;
@@ -106,6 +109,10 @@ export function WizardShell({
     /** Dialog body height — defaults to 760px; pass taller (e.g. Add-Client's 860px) for step-heavy modals. */
     maxHeight?: string;
     children?: ReactNode;
+    /** Read-only section viewers may attach their scroll spy to the shared body. */
+    bodyRef?: Ref<HTMLDivElement>;
+    /** Medication workflows opt in to real touch-sized form controls. */
+    frontline?: boolean;
 }) {
     // The rail is a column from Tailwind's `lg` (1024 CSS px). Below that —
     // 200 % zoom on a 1440 px screen is 720 CSS px — a 248px column would
@@ -125,7 +132,10 @@ export function WizardShell({
     return (
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
             <DialogContent
-                className="overflow-hidden p-0"
+                className={cn(
+                    'overflow-hidden p-0',
+                    frontline && 'frontline-dialog',
+                )}
                 showCloseButton={false}
                 style={{ maxWidth, width: maxWidth }}
                 onOpenAutoFocus={onOpenAutoFocus}
@@ -223,7 +233,7 @@ export function WizardShell({
                                         }
                                         onClick={() => onStepClick(i)}
                                         className={cn(
-                                            'flex items-center rounded-md text-left transition-colors disabled:pointer-events-none',
+                                            'frontline-tap frontline-focus flex items-center rounded-md text-left transition-colors disabled:pointer-events-none',
                                             wideRail
                                                 ? 'gap-2.5 p-2'
                                                 : 'frontline-tap relative shrink-0 justify-center gap-2 px-2',
@@ -361,13 +371,12 @@ export function WizardShell({
                                         </span>
                                     )}
                                 </div>
-                                {/* Drawn at 28 px; frontline-hit gives it a
-                                    44 px target inside the header padding. */}
+                                {/* Keep the close target at least 44 px. */}
                                 <button
                                     type="button"
                                     onClick={onClose}
                                     aria-label="Close"
-                                    className="frontline-hit grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted"
+                                    className="frontline-tap frontline-focus grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted"
                                 >
                                     <X className="h-5 w-5" />
                                 </button>
@@ -389,7 +398,8 @@ export function WizardShell({
 
                             <div
                                 data-wizard-region="body"
-                                className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-6 py-6"
+                                ref={bodyRef}
+                                className="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-6 py-6"
                             >
                                 {children}
                                 {/* The strip has no room for rail extras

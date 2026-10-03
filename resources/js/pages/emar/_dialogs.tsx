@@ -589,6 +589,7 @@ export function DiscontinueDialog({
             open
             onClose={onClose}
             title={`Discontinue ${medication.name}?`}
+            formState={form}
             description="The medication is ceased and archived; records are kept."
             railIcon={Ban}
             railTitle="Discontinue"
@@ -664,7 +665,6 @@ export function ImportCsvDialog({ onClose }: { onClose: () => void }) {
             preserveScroll: true,
             forceFormData: true,
             onSuccess: () => {
-                toast.success('Medications imported');
                 onClose();
             },
             onError: () => toast.error('Import failed — check the file format'),
@@ -675,6 +675,7 @@ export function ImportCsvDialog({ onClose }: { onClose: () => void }) {
             open
             onClose={onClose}
             title="Import medications"
+            formState={form}
             description="Bulk-import medication orders from a CSV file."
             railIcon={FileUp}
             railTitle="Import CSV"

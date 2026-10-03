@@ -57,7 +57,7 @@ export function RequestErrors({ errors }: { errors: Record<string, string> }) {
     return messages.length ? (
         <div
             role="alert"
-            className="border-status-critical bg-status-critical-bg text-status-critical-foreground rounded-lg border p-3"
+            className="rounded-lg border border-status-critical bg-status-critical-bg p-3 text-status-critical-foreground"
         >
             {messages.map((message) => (
                 <p key={message}>{message}</p>
@@ -154,8 +154,14 @@ export function DuplicateResolutionDialog({
                     if (!open) close();
                 }}
             >
-                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-                    <DialogHeader>
+                <DialogContent
+                    className="flex max-h-[88vh] flex-col overflow-hidden p-0"
+                    style={{
+                        width: 'min(92vw, 720px)',
+                        maxWidth: 'min(92vw, 720px)',
+                    }}
+                >
+                    <DialogHeader className="shrink-0 border-b p-5 pr-12">
                         <DialogTitle>
                             {dose.resolution
                                 ? 'Reviewed duplicate'
@@ -167,97 +173,103 @@ export function DuplicateResolutionDialog({
                             does not post or replace a dose.
                         </DialogDescription>
                     </DialogHeader>
-                    <p>
-                        {dose.snapshot.person} · {dose.snapshot.medicine} ·
-                        listed {formatDateTime(dose.scheduled_for)}
-                    </p>
-                    {dose.resolution ? (
-                        <>
-                            <p className="whitespace-pre-wrap">
-                                {dose.resolution.reason}
-                            </p>
-                            <p>Reviewed by {dose.resolution.resolved_by}.</p>
-                        </>
-                    ) : (
-                        <>
-                            <RequestErrors errors={form.errors} />
-                            <Choice
-                                id="duplicate-evidence"
-                                label="Existing evidence you checked"
-                                value={form.data.evidence}
-                                options={dose.resolution_choices.map(
-                                    (item) => ({
-                                        id: `${item.kind}:${item.id}`,
-                                        label: item.label,
-                                    }),
-                                )}
-                                onChange={(value) => {
-                                    form.setData('evidence', value);
-                                    form.setData(
-                                        'accountable_confirmation',
-                                        false,
-                                    );
-                                }}
-                            />
-                            {choice && (
-                                <div className="bg-muted space-y-2 rounded-lg border p-3">
-                                    <p>
-                                        {choice.label} · actual time{' '}
-                                        {choice.actual_at
-                                            ? formatDateTime(choice.actual_at)
-                                            : 'Not specified'}
-                                    </p>
-                                    {choice.href && (
-                                        <Button
-                                            variant="outline"
-                                            className="frontline-tap"
-                                            asChild
-                                        >
-                                            <a
-                                                href={choice.href}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                            >
-                                                Open existing evidence
-                                            </a>
-                                        </Button>
+                    <div className="min-h-0 space-y-4 overflow-y-auto px-5">
+                        <p>
+                            {dose.snapshot.person} · {dose.snapshot.medicine} ·
+                            listed {formatDateTime(dose.scheduled_for)}
+                        </p>
+                        {dose.resolution ? (
+                            <>
+                                <p className="whitespace-pre-wrap">
+                                    {dose.resolution.reason}
+                                </p>
+                                <p>
+                                    Reviewed by {dose.resolution.resolved_by}.
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <RequestErrors errors={form.errors} />
+                                <Choice
+                                    id="duplicate-evidence"
+                                    label="Existing evidence you checked"
+                                    value={form.data.evidence}
+                                    options={dose.resolution_choices.map(
+                                        (item) => ({
+                                            id: `${item.kind}:${item.id}`,
+                                            label: item.label,
+                                        }),
                                     )}
-                                </div>
-                            )}
-                            <div className="space-y-2">
-                                <Label htmlFor="duplicate-reason">
-                                    How you checked the paper against this
-                                    record
-                                </Label>
-                                <Textarea
-                                    id="duplicate-reason"
-                                    value={form.data.reason}
-                                    onChange={(event) => {
-                                        form.setData(
-                                            'reason',
-                                            event.target.value,
-                                        );
+                                    onChange={(value) => {
+                                        form.setData('evidence', value);
                                         form.setData(
                                             'accountable_confirmation',
                                             false,
                                         );
                                     }}
                                 />
-                            </div>
-                            <CheckPaper
-                                id="duplicate-accountability"
-                                checked={form.data.accountable_confirmation}
-                                onChange={(value) =>
-                                    form.setData(
-                                        'accountable_confirmation',
-                                        value,
-                                    )
-                                }
-                                label="I checked the signed paper and this existing evidence. This listed dose is accounted for by that record."
-                            />
-                        </>
-                    )}
-                    <DialogFooter>
+                                {choice && (
+                                    <div className="space-y-2 rounded-lg border bg-muted p-3">
+                                        <p>
+                                            {choice.label} · actual time{' '}
+                                            {choice.actual_at
+                                                ? formatDateTime(
+                                                      choice.actual_at,
+                                                  )
+                                                : 'Not specified'}
+                                        </p>
+                                        {choice.href && (
+                                            <Button
+                                                variant="outline"
+                                                className="frontline-tap"
+                                                asChild
+                                            >
+                                                <a
+                                                    href={choice.href}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                >
+                                                    Open existing evidence
+                                                </a>
+                                            </Button>
+                                        )}
+                                    </div>
+                                )}
+                                <div className="space-y-2">
+                                    <Label htmlFor="duplicate-reason">
+                                        How you checked the paper against this
+                                        record
+                                    </Label>
+                                    <Textarea
+                                        id="duplicate-reason"
+                                        value={form.data.reason}
+                                        onChange={(event) => {
+                                            form.setData(
+                                                'reason',
+                                                event.target.value,
+                                            );
+                                            form.setData(
+                                                'accountable_confirmation',
+                                                false,
+                                            );
+                                        }}
+                                    />
+                                </div>
+                                <CheckPaper
+                                    id="duplicate-accountability"
+                                    checked={form.data.accountable_confirmation}
+                                    onChange={(value) =>
+                                        form.setData(
+                                            'accountable_confirmation',
+                                            value,
+                                        )
+                                    }
+                                    label="I checked the signed paper and this existing evidence. This listed dose is accounted for by that record."
+                                />
+                            </>
+                        )}
+                    </div>
+                    <DialogFooter className="shrink-0 border-t bg-muted/30 p-4">
                         <Button
                             variant="outline"
                             className="frontline-tap"
@@ -1082,8 +1094,14 @@ export function ConfirmationDialog({
                 if (!open && !form.processing) onClose();
             }}
         >
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
-                <DialogHeader>
+            <DialogContent
+                className="flex max-h-[88vh] flex-col overflow-hidden p-0"
+                style={{
+                    width: 'min(92vw, 720px)',
+                    maxWidth: 'min(92vw, 720px)',
+                }}
+            >
+                <DialogHeader className="shrink-0 border-b p-5 pr-12">
                     <DialogTitle>
                         {kind === 'reconcile'
                             ? 'Apply the signed paper entry'
@@ -1095,7 +1113,7 @@ export function ConfirmationDialog({
                             : 'Your confirmation is appended to the evidence. It does not post the dose.'}
                     </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-4">
+                <div className="min-h-0 space-y-4 overflow-y-auto px-5">
                     <ReviewCard
                         title={`${entry.snapshot.person} · ${entry.snapshot.medicine}`}
                         icon={FileText}
@@ -1147,7 +1165,7 @@ export function ConfirmationDialog({
                     />
                     <RequestErrors errors={form.errors} />
                 </div>
-                <DialogFooter>
+                <DialogFooter className="shrink-0 border-t bg-muted/30 p-4">
                     <Button
                         variant="outline"
                         className="frontline-tap"
@@ -1274,15 +1292,21 @@ export function PackDialog({
                 if (!open && !busy) onClose();
             }}
         >
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-                <DialogHeader>
+            <DialogContent
+                className="flex max-h-[88vh] flex-col overflow-hidden p-0"
+                style={{
+                    width: 'min(92vw, 900px)',
+                    maxWidth: 'min(92vw, 900px)',
+                }}
+            >
+                <DialogHeader className="shrink-0 border-b p-5 pr-12">
                     <DialogTitle>Make the downtime pack</DialogTitle>
                     <DialogDescription>
                         One house, today or tomorrow. Check changes before each
                         round.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-5">
+                <div className="min-h-0 space-y-5 overflow-y-auto px-5">
                     <div className="grid gap-4 sm:grid-cols-2">
                         <Choice
                             id="pack-house"
@@ -1342,7 +1366,7 @@ export function PackDialog({
                         />
                     </ReviewCard>
                     {preview?.controlled_notice && (
-                        <p className="bg-muted rounded-lg border p-3">
+                        <p className="rounded-lg border bg-muted p-3">
                             {preview.controlled_notice}
                         </p>
                     )}
@@ -1383,7 +1407,7 @@ export function PackDialog({
                         printed copy or the PDF saved on this device.
                     </p>
                 </div>
-                <DialogFooter>
+                <DialogFooter className="shrink-0 border-t bg-muted/30 p-4">
                     <Button
                         variant="outline"
                         className="frontline-tap"

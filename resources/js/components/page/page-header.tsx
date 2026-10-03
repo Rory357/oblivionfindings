@@ -35,15 +35,16 @@ import {
 } from 'lucide-react';
 import {
     createContext,
-    type ButtonHTMLAttributes,
-    type ComponentType,
-    type ReactNode,
-    type Ref,
     useContext,
     useEffect,
     useLayoutEffect,
     useRef,
     useState,
+    type ButtonHTMLAttributes,
+    type ComponentType,
+    type CSSProperties,
+    type ReactNode,
+    type Ref,
 } from 'react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -78,6 +79,8 @@ const useFrontlineTap = () =>
 /* ------------------------------------------------------------------ */
 
 export interface PageHeaderProps {
+    /** Optional approved site's brand, scoped to the header's token-derived sky. */
+    brandColour?: string | null;
     variant?: 'index' | 'profile';
     /** Actual ≥44px controls, with reflow, for support-worker surfaces only. */
     frontline?: boolean;
@@ -117,6 +120,7 @@ export interface PageHeaderProps {
 }
 
 export function PageHeader({
+    brandColour,
     variant = 'index',
     frontline = false,
     icon: Icon,
@@ -136,6 +140,11 @@ export function PageHeader({
     return (
         <PageHeaderFrontlineContext.Provider value={frontline}>
             <header
+                style={
+                    brandColour
+                        ? ({ '--primary': brandColour } as CSSProperties)
+                        : undefined
+                }
                 className={cn(
                     'eh-header text-band-foreground',
                     frontline && 'eh-header-frontline',
@@ -203,7 +212,7 @@ export function PageHeader({
                                         'flex shrink-0 flex-wrap items-center gap-2 lg:justify-end',
                                         wrapTitle && 'max-w-full lg:ml-auto',
                                         frontline &&
-                                            'w-full min-w-0 max-w-full lg:ml-auto lg:w-auto',
+                                            'w-full max-w-full min-w-0 lg:ml-auto lg:w-auto',
                                     )}
                                 >
                                     {actions}
@@ -930,7 +939,7 @@ export function PageHeaderFilterSelect({
                         aria-label={`Clear ${label}`}
                         onClick={() => onChange(allValue)}
                         className={cn(
-                            'mr-1.5 inline-flex size-3.5 shrink-0 items-center justify-center rounded-[4px] hover:bg-primary/20 outline-none focus-visible:ring-2 focus-visible:ring-band-foreground/70',
+                            'mr-1.5 inline-flex size-3.5 shrink-0 items-center justify-center rounded-[4px] outline-none hover:bg-primary/20 focus-visible:ring-2 focus-visible:ring-band-foreground/70',
                             tap &&
                                 'frontline-tap mr-0 self-stretch rounded-[7px]',
                         )}

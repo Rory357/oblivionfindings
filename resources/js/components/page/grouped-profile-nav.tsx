@@ -334,7 +334,7 @@ export function TierTwoTabs({
                 const className = cn(
                     // frontline-hit: a 44 px target without growing the
                     // strip; gap-y-3 keeps wrapped rows' targets apart.
-                    'frontline-hit relative inline-flex min-h-10 shrink-0 items-center gap-2 rounded-[9px] px-3 text-[13px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:outline-none',
+                    'frontline-hit relative inline-flex min-h-[36px] shrink-0 items-center gap-2 rounded-[9px] px-3 text-[13px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:outline-none',
                     isActive
                         ? tone.active
                         : 'text-muted-foreground hover:bg-accent hover:text-foreground',
@@ -344,10 +344,8 @@ export function TierTwoTabs({
                     <>
                         <span
                             className={cn(
-                                'inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md',
-                                isActive
-                                    ? tone.chip
-                                    : 'bg-muted text-muted-foreground',
+                                'inline-flex size-[18px] shrink-0 items-center justify-center rounded-full',
+                                isActive ? tone.chip : 'text-muted-foreground',
                             )}
                         >
                             <Icon className="h-3.5 w-3.5" />
@@ -361,7 +359,7 @@ export function TierTwoTabs({
                         {isActive ? (
                             <span
                                 className={cn(
-                                    'absolute inset-x-3.5 bottom-0 h-0.5 rounded',
+                                    'absolute bottom-0 left-1/2 h-[3px] w-3/5 -translate-x-1/2 rounded-[2px]',
                                     tone.bar,
                                 )}
                                 aria-hidden="true"

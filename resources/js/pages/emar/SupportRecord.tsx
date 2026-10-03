@@ -10,6 +10,7 @@ import {
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
     PageHeaderRail,
 } from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
@@ -19,13 +20,7 @@ import { useEmarRecordBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTime, toDateInput } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
-import {
-    ClipboardList,
-    FileSignature,
-    History,
-    Pill,
-    User,
-} from 'lucide-react';
+import { ClipboardList, FileSignature, History, Pill } from 'lucide-react';
 import { useState } from 'react';
 import {
     AgreementDialog,
@@ -130,7 +125,15 @@ export default function SupportRecord({
             <div className="flex flex-col gap-5">
                 <PageHeader
                     variant="profile"
-                    icon={User}
+                    mark={
+                        <span className="eh-mark-ring text-sm font-semibold">
+                            {support.client_name
+                                .split(/\s+/)
+                                .slice(0, 2)
+                                .map((name) => name[0])
+                                .join('')}
+                        </span>
+                    }
                     backHref={recordUrl}
                     title={support.client_name}
                     wrapTitle
@@ -141,11 +144,13 @@ export default function SupportRecord({
                     }
                     actions={
                         support.can_assess ? (
-                            <Button onClick={() => setDialog('assess')}>
+                            <PageHeaderPrimaryButton
+                                onClick={() => setDialog('assess')}
+                            >
                                 {support.assessment
                                     ? 'Reassess'
                                     : 'Assess support'}
-                            </Button>
+                            </PageHeaderPrimaryButton>
                         ) : undefined
                     }
                     meters={

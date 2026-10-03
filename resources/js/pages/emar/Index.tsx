@@ -16,11 +16,12 @@ import {
     PageHeaderStatusChip,
 } from '@/components/page/page-header';
 import { EntityFilter } from '@/components/rostering/entity-filter';
-import { TabStrip, type RosterTabItem } from '@/components/rostering/tab-strip';
+import { type RosterTabItem } from '@/components/rostering/tab-strip';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateOnly } from '@/lib/datetime';
 import {
     canOpenEmarAudit,
     canOpenEmarReports,
@@ -28,7 +29,6 @@ import {
     type EmarNavigationPermissions,
 } from '@/lib/emar-navigation';
 import { cn } from '@/lib/utils';
-import { formatDateOnly } from '@/lib/datetime';
 import type { SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
@@ -1034,8 +1034,8 @@ export default function EmarHome(props: Props) {
                                             Action centre
                                         </CardTitle>
                                         <p className="text-xs text-muted-foreground">
-                                            Work needing attention from your team
-                                            today, most urgent first.
+                                            Work needing attention from your
+                                            team today, most urgent first.
                                         </p>
                                     </div>
                                 </div>
@@ -1054,14 +1054,35 @@ export default function EmarHome(props: Props) {
                                     </span>
                                 </div>
                             </div>
-                            <TabStrip
-                                ariaLabel="Action centre filter"
-                                value={acFilter}
-                                onChange={(id) =>
-                                    setAcFilter(id as 'all' | AcCategory)
-                                }
-                                items={acTabs}
-                            />
+                            <div
+                                className="flex flex-wrap gap-2"
+                                role="group"
+                                aria-label="Action centre filter"
+                            >
+                                {acTabs.map((tab) => (
+                                    <Button
+                                        key={tab.id}
+                                        size="sm"
+                                        variant={
+                                            acFilter === tab.id
+                                                ? 'default'
+                                                : 'outline'
+                                        }
+                                        aria-pressed={acFilter === tab.id}
+                                        onClick={() =>
+                                            setAcFilter(
+                                                tab.id as 'all' | AcCategory,
+                                            )
+                                        }
+                                    >
+                                        <tab.icon className="size-4" />
+                                        {tab.label}
+                                        {tab.badge != null && (
+                                            <span>{tab.badge}</span>
+                                        )}
+                                    </Button>
+                                ))}
+                            </div>
                         </CardHeader>
                         <CardContent className="flex flex-col gap-0">
                             {visibleActions.length === 0 ? (

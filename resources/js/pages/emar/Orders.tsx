@@ -7,6 +7,7 @@ import { EntityTable } from '@/components/lists/entity-table';
 import {
     PageHeader,
     PageHeaderFilterSelect,
+    PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
     PageHeaderRail,
@@ -210,7 +211,12 @@ export default function Orders(props: Props) {
     };
     useEffect(() => {
         if (props.open_order_id)
-            openOrder(props.open_order_id, props.open_order_action, undefined, props.open_check_mode);
+            openOrder(
+                props.open_order_id,
+                props.open_order_action,
+                undefined,
+                props.open_check_mode,
+            );
         else if (props.open_new_order)
             setModal({
                 type: 'new',
@@ -428,7 +434,9 @@ export default function Orders(props: Props) {
                                     onClick={() =>
                                         setModal(
                                             view === 'reconciliation'
-                                                ? { type: 'start_reconciliation' }
+                                                ? {
+                                                      type: 'start_reconciliation',
+                                                  }
                                                 : { type: 'new' },
                                         )
                                     }
@@ -522,9 +530,11 @@ export default function Orders(props: Props) {
                                 <PageHeaderMeterBlock
                                     key={meter.key}
                                     label={meter.label}
-                                    value={meter.value}
                                     onClick={() => filter(meter.change)}
                                 >
+                                    <PageHeaderMeterBig>
+                                        {meter.value}
+                                    </PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
                                         {meter.caption}
                                     </PageHeaderMeterCaption>

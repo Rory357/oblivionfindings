@@ -9,8 +9,10 @@ import {
     MedicationEventDrawer,
     type AuditEvent,
 } from '@/components/emar/medication-event-drawer';
+import { EmarMeters } from '@/components/emar/workspace-navigation';
 import {
     PageHeader,
+    PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
     PageHeaderPrimaryButton,
@@ -19,6 +21,11 @@ import {
 } from '@/components/page/page-header';
 import type { ShiftCtxItem, ShiftCtxState } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import {
@@ -32,6 +39,7 @@ import {
     Activity,
     AlertOctagon,
     AlertTriangle,
+    CalendarDays,
     ClipboardCheck,
     Copy,
     Download,
@@ -510,14 +518,66 @@ export default function AuditLog({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Medication clinical history" />
-            <div className="flex min-w-0 flex-col gap-4 p-3 sm:p-6">
+            <div className="flex min-w-0 flex-col gap-5">
                 <PageHeader
                     frontline
                     icon={History}
                     title="Medication history"
                     subline="Dose outcomes, medicine changes, stock and controlled-drug records."
+                    meters={
+                        <EmarMeters
+                            items={[
+                                {
+                                    label: 'Loaded records',
+                                    value: windowEvents.length,
+                                    caption:
+                                        'Matching the current search and scope',
+                                    onClick: () => {
+                                        setCat('all');
+                                        setView('table');
+                                    },
+                                },
+                                {
+                                    label: 'Needs review',
+                                    value: gaps.length,
+                                    caption:
+                                        'Audit flags in the selected category',
+                                    tone: gaps.length ? 'warning' : 'brand',
+                                    onClick: () => setView('gaps'),
+                                },
+                                {
+                                    label: 'Controlled records',
+                                    value: catCounts.controlled ?? 0,
+                                    caption: 'Visible controlled-drug events',
+                                    onClick: () => {
+                                        setCat('controlled');
+                                        setView('table');
+                                    },
+                                },
+                                {
+                                    label: 'Witness gaps',
+                                    value: windowMissingWitness,
+                                    caption:
+                                        'Missing a recorded second signature',
+                                    tone: windowMissingWitness
+                                        ? 'critical'
+                                        : 'brand',
+                                    onClick: () => {
+                                        setCat('controlled');
+                                        setView('gaps');
+                                    },
+                                },
+                            ]}
+                        />
+                    }
                     actions={
                         <>
+                            <PageHeaderSearch
+                                value={search}
+                                onChange={setSearch}
+                                placeholder="Search loaded records"
+                                ariaLabel="Search loaded history"
+                            />
                             <PageHeaderGlassButton asChild icon={History}>
                                 <a
                                     href={scopedHref(
@@ -536,12 +596,6 @@ export default function AuditLog({
                     }
                     filters={
                         <>
-                            <PageHeaderSearch
-                                value={search}
-                                onChange={setSearch}
-                                placeholder="Search loaded records"
-                                ariaLabel="Search loaded history"
-                            />
                             <PageHeaderFilterSelect
                                 label="All sites"
                                 value={siteFilter ? String(siteFilter) : 'all'}
@@ -583,6 +637,83 @@ export default function AuditLog({
                                 options={RANGES}
                                 onChange={onRange}
                             />
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <PageHeaderFilterButton icon={CalendarDays}>
+                                        Custom dates
+                                    </PageHeaderFilterButton>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                    align="end"
+                                    className="w-[min(92vw,440px)]"
+                                >
+                                    <form
+                                        className="flex min-w-0 flex-wrap items-end gap-3"
+                                        onSubmit={(event) => {
+                                            event.preventDefault();
+                                            if (
+                                                dateFrom &&
+                                                dateTo &&
+                                                dateFrom <= dateTo
+                                            )
+                                                visitHistory({
+                                                    date_from: dateFrom,
+                                                    date_to: dateTo,
+                                                });
+                                        }}
+                                    >
+                                        <label
+                                            className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-medium"
+                                            htmlFor="history-date-from"
+                                        >
+                                            From (NZ date)
+                                            <input
+                                                id="history-date-from"
+                                                type="date"
+                                                required
+                                                value={dateFrom}
+                                                max={dateTo || undefined}
+                                                onChange={(event) =>
+                                                    setDateFrom(
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                className="frontline-tap frontline-focus w-full min-w-0 rounded-md border bg-background px-3 py-2 text-sm"
+                                            />
+                                        </label>
+                                        <label
+                                            className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-medium"
+                                            htmlFor="history-date-to"
+                                        >
+                                            To (NZ date)
+                                            <input
+                                                id="history-date-to"
+                                                type="date"
+                                                required
+                                                value={dateTo}
+                                                min={dateFrom || undefined}
+                                                onChange={(event) =>
+                                                    setDateTo(
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                className="frontline-tap frontline-focus w-full min-w-0 rounded-md border bg-background px-3 py-2 text-sm"
+                                            />
+                                        </label>
+                                        <Button
+                                            type="submit"
+                                            className="frontline-tap frontline-focus"
+                                        >
+                                            Apply dates
+                                        </Button>
+                                    </form>
+                                </PopoverContent>
+                            </Popover>
+                            {hasFilters && (
+                                <PageHeaderFilterButton onClick={clearFilters}>
+                                    Clear filters
+                                </PageHeaderFilterButton>
+                            )}
                         </>
                     }
                     rail={
@@ -594,66 +725,6 @@ export default function AuditLog({
                         />
                     }
                 />
-                <form
-                    className="flex min-w-0 flex-wrap items-end gap-3 rounded-xl border bg-card p-4"
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        if (dateFrom && dateTo && dateFrom <= dateTo)
-                            visitHistory({
-                                date_from: dateFrom,
-                                date_to: dateTo,
-                            });
-                    }}
-                >
-                    <label
-                        className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-medium"
-                        htmlFor="history-date-from"
-                    >
-                        From (NZ date)
-                        <input
-                            id="history-date-from"
-                            type="date"
-                            required
-                            value={dateFrom}
-                            max={dateTo || undefined}
-                            onChange={(event) =>
-                                setDateFrom(event.target.value)
-                            }
-                            className="frontline-tap frontline-focus w-full min-w-0 rounded-md border bg-background px-3 py-2 text-sm"
-                        />
-                    </label>
-                    <label
-                        className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-medium"
-                        htmlFor="history-date-to"
-                    >
-                        To (NZ date)
-                        <input
-                            id="history-date-to"
-                            type="date"
-                            required
-                            value={dateTo}
-                            min={dateFrom || undefined}
-                            onChange={(event) => setDateTo(event.target.value)}
-                            className="frontline-tap frontline-focus w-full min-w-0 rounded-md border bg-background px-3 py-2 text-sm"
-                        />
-                    </label>
-                    <Button
-                        type="submit"
-                        className="frontline-tap frontline-focus"
-                    >
-                        Apply dates
-                    </Button>
-                    {hasFilters && (
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            className="frontline-tap frontline-focus"
-                            onClick={clearFilters}
-                        >
-                            Clear filters
-                        </Button>
-                    )}
-                </form>
                 <div className="flex flex-col gap-2 text-sm">
                     <p className="font-medium">
                         {periodLabel} · Pacific/Auckland

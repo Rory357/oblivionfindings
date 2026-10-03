@@ -93,9 +93,9 @@ const VIEWS = [
 ];
 const RAIL = [
     { key: 'orders', label: 'Orders', icon: ClipboardList },
-    { key: 'check', label: 'To check', icon: ClipboardCheck },
+    { key: 'to_check', label: 'To check', icon: ClipboardCheck },
     { key: 'covert', label: 'Covert', icon: EyeOff },
-    { key: 'reconcile', label: 'Reconciliation', icon: GitCompare },
+    { key: 'reconciliation', label: 'Reconciliation', icon: GitCompare },
     { key: 'reviews', label: 'Medication reviews', icon: Stethoscope },
 ];
 const VIEW_TITLES: Record<ReviewView, string> = {
@@ -456,7 +456,7 @@ export default function ReviewsPage(props: ReviewPageProps) {
                                         <Button
                                             type="button"
                                             variant="link"
-                                            className="h-auto min-w-0 justify-start gap-2 whitespace-normal p-0 text-left"
+                                            className="h-auto min-w-0 justify-start gap-2 p-0 text-left whitespace-normal"
                                             onClick={() =>
                                                 open({ type: 'detail', review })
                                             }
@@ -1048,7 +1048,7 @@ function ChangeList({
                                 return (
                                     <StatusBadge
                                         variant={status.variant}
-                                        className="whitespace-normal rounded-[8px]"
+                                        className="rounded-[8px] whitespace-normal"
                                     >
                                         {status.label}
                                     </StatusBadge>
@@ -1089,7 +1089,7 @@ function ChangeList({
                                     <Button
                                         type="button"
                                         variant="link"
-                                        className="h-auto min-w-0 whitespace-normal p-0 text-left"
+                                        className="h-auto min-w-0 p-0 text-left whitespace-normal"
                                         onClick={() => open(row)}
                                     >
                                         <span>
@@ -1105,7 +1105,7 @@ function ChangeList({
                                 </div>
                                 <StatusBadge
                                     variant={status.variant}
-                                    className="w-fit whitespace-normal rounded-[8px]"
+                                    className="w-fit rounded-[8px] whitespace-normal"
                                 >
                                     {status.label}
                                 </StatusBadge>

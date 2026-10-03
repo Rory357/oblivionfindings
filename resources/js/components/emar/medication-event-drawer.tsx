@@ -3,15 +3,12 @@
 import { SummaryRow } from '@/components/meds/wizard-shell';
 import { Button } from '@/components/ui/button';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import {
-    WIZARD_FOOTER_CLASS,
-    WIZARD_RAIL_CLASS,
-} from '@/components/wizard/primitives';
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { WizardShell } from '@/components/wizard/shell';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
@@ -28,6 +25,7 @@ import {
     Flag,
     Link2,
     Lock,
+    MoreHorizontal,
     Package,
     Pencil,
     Pill,
@@ -35,7 +33,6 @@ import {
     Trash2,
     User,
     Users,
-    X,
     XCircle,
     type LucideIcon,
 } from 'lucide-react';
@@ -437,399 +434,405 @@ export function MedicationEventDrawer({
     };
 
     return (
-        <Dialog open onOpenChange={(next) => !next && onClose()}>
-            <DialogContent
-                showCloseButton={false}
-                className="overflow-hidden p-0"
-                style={{
-                    maxWidth: 'min(94vw, 1040px)',
-                    width: 'min(94vw, 1040px)',
-                }}
-            >
-                <DialogTitle className="sr-only">
-                    {meta.label} — audit record
-                </DialogTitle>
-                <DialogDescription className="sr-only">
-                    {event.description}
-                </DialogDescription>
-
-                <div className="flex h-[min(90vh,820px)] min-h-0 overflow-hidden">
-                    {/* ── Section rail ── */}
-                    <aside className={WIZARD_RAIL_CLASS}>
-                        <div className="mb-3 flex items-center gap-2.5">
-                            <span
-                                className={cn(
-                                    'grid h-9 w-9 place-items-center rounded-lg',
-                                    meta.cls,
-                                )}
-                            >
-                                <Icon className="h-5 w-5" />
-                            </span>
-                            <div className="min-w-0">
-                                <div className="truncate text-sm leading-tight font-bold">
-                                    {meta.label}
-                                </div>
-                                <div className="truncate text-[11px] text-muted-foreground">
-                                    {event.source} · {event.id}
-                                </div>
-                            </div>
-                        </div>
-
-                        {sections.map((s) => {
-                            const SIcon = s.icon;
-                            const isActive = active === s.key;
-                            return (
-                                <button
-                                    key={s.key}
-                                    type="button"
-                                    onClick={() => goToSection(s.key)}
-                                    className={cn(
-                                        'frontline-tap frontline-focus flex items-center gap-2.5 rounded-md p-2 text-left text-[13px] font-semibold transition-colors',
-                                        isActive
-                                            ? 'bg-primary-fill/10 text-primary'
-                                            : 'text-muted-foreground hover:bg-muted',
-                                    )}
-                                >
-                                    <SIcon className="h-4 w-4 shrink-0" />
-                                    {s.label}
-                                </button>
-                            );
-                        })}
-
-                        <div className="mt-auto pt-4">
-                            <div className="flex items-center gap-2 rounded-lg bg-status-success-bg px-3 py-2 text-[11px] font-semibold text-status-success">
-                                <Shield className="h-3.5 w-3.5 shrink-0" />
-                                Append-only source record
-                            </div>
-                        </div>
-                    </aside>
-
-                    {/* ── Main column ── */}
-                    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-5 py-3.5">
-                            <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <span
-                                        className={cn(
-                                            'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold',
-                                            meta.cls,
-                                        )}
-                                    >
-                                        <Icon className="h-3.5 w-3.5" />
-                                        {meta.label}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground">
-                                        {formatDateTimeLong(event.timestamp)}
-                                    </span>
-                                    {event.flags.map((f) => (
-                                        <span
-                                            key={f}
-                                            className={cn(
-                                                'rounded-full px-2 py-0.5 text-[11px] font-semibold',
-                                                FLAG_META[f]?.cls ??
-                                                    'bg-muted text-muted-foreground',
-                                            )}
-                                        >
-                                            {FLAG_META[f]?.label ?? f}
-                                        </span>
-                                    ))}
-                                </div>
-                                <h2 className="mt-1.5 text-[19px] leading-snug font-bold">
-                                    {event.description}
-                                </h2>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                aria-label="Close"
-                                className="frontline-tap frontline-focus grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted"
-                            >
-                                <X className="h-5 w-5" />
-                            </button>
-                        </header>
-
-                        <div
-                            ref={bodyRef}
-                            className="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-6 py-5"
-                        >
-                            {/* What happened */}
-                            <Section
-                                refCb={(el) => (sectionEls.current.what = el)}
-                                flash={flash === 'what'}
-                                title="What happened"
-                            >
-                                {event.flags.includes('missing_witness') && (
-                                    <div className="mb-3 rounded-lg border border-status-critical/30 bg-status-critical-bg/60 px-3 py-2 text-xs text-status-critical">
-                                        Controlled-drug transaction without a
-                                        recorded second signature — investigate
-                                        and countersign in the CD register.
-                                    </div>
-                                )}
-                                {event.flags.includes('omission') && (
-                                    <div className="mb-3 rounded-lg border border-dashed border-status-critical/40 bg-status-critical-bg/50 px-3 py-2 text-xs text-status-critical">
-                                        A scheduled dose was not recorded — a
-                                        MAR omission must be reconciled with an
-                                        outcome and reason.
-                                    </div>
-                                )}
-                                <div className="rounded-lg border px-4">
-                                    <SummaryRow
-                                        label="Client"
-                                        value={event.client_name}
-                                    />
-                                    {event.site_name && (
-                                        <SummaryRow
-                                            label="Site"
-                                            value={event.site_name}
-                                        />
-                                    )}
-                                    {event.outcome && (
-                                        <SummaryRow
-                                            label="Outcome"
-                                            value={String(event.outcome)}
-                                        />
-                                    )}
-                                    {detailRows.map(([k, v]) => (
-                                        <SummaryRow
-                                            key={k}
-                                            label={k.replace(/_/g, ' ')}
-                                            value={String(v)}
-                                        />
-                                    ))}
-                                </div>
-                            </Section>
-
-                            {/* People & sign-off */}
-                            <Section
-                                refCb={(el) => (sectionEls.current.people = el)}
-                                flash={flash === 'people'}
-                                title="People & sign-off"
-                            >
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                    <div
-                                        className={cn(
-                                            'rounded-lg border px-3 py-2.5',
-                                            event.performed_by
-                                                ? ''
-                                                : 'border-status-warning/40 bg-status-warning-bg/40',
-                                        )}
-                                    >
-                                        <div className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-                                            Performed by
-                                        </div>
-                                        <div className="text-sm font-medium">
-                                            {event.performed_by ??
-                                                'Not attributed to a staff member'}
-                                        </div>
-                                    </div>
-                                    {event.witness_required && (
-                                        <div
-                                            className={cn(
-                                                'rounded-lg border px-3 py-2.5',
-                                                event.witness
-                                                    ? 'border-status-success/40 bg-status-success-bg/40'
-                                                    : 'border-status-critical/40 bg-status-critical-bg/40',
-                                            )}
-                                        >
-                                            <div className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-                                                Witness (2nd signature)
-                                            </div>
-                                            <div
-                                                className={cn(
-                                                    'text-sm font-medium',
-                                                    event.witness
-                                                        ? ''
-                                                        : 'text-status-critical',
-                                                )}
-                                            >
-                                                {event.witness ??
-                                                    'Required — missing'}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </Section>
-
-                            {/* Before → after */}
-                            {changes.length > 0 && (
-                                <Section
-                                    refCb={(el) =>
-                                        (sectionEls.current.changes = el)
-                                    }
-                                    flash={flash === 'changes'}
-                                    title="Before → after"
-                                >
-                                    <div className="flex flex-col gap-2">
-                                        {changes.map((c, i) => (
-                                            <div
-                                                key={i}
-                                                className="rounded-lg border px-3 py-2"
-                                            >
-                                                <div className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-                                                    {c.field}
-                                                </div>
-                                                <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
-                                                    <span className="rounded bg-muted px-2 py-0.5 text-muted-foreground line-through">
-                                                        {c.from || '—'}
-                                                    </span>
-                                                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-                                                    <span className="rounded bg-status-success-bg px-2 py-0.5 font-medium text-status-success">
-                                                        {c.to || '—'}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </Section>
-                            )}
-
-                            {/* Record integrity */}
-                            <Section
-                                refCb={(el) =>
-                                    (sectionEls.current.integrity = el)
-                                }
-                                flash={flash === 'integrity'}
-                                title="Record integrity"
-                            >
-                                {integrity === null ? (
-                                    <div className="rounded-lg border px-4 py-3 text-sm text-muted-foreground">
-                                        Loading integrity…
-                                    </div>
-                                ) : !integrity.backed ? (
-                                    <div className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
-                                        No canonical stored record is available.
-                                    </div>
-                                ) : (
-                                    <div className="rounded-lg border px-4">
-                                        <SummaryRow
-                                            label="Canonical record"
-                                            value="Stored record confirmed"
-                                            tone="success"
-                                        />
-                                    </div>
-                                )}
-                                <p className="mt-2 text-[11px] text-muted-foreground">
-                                    Confirms the event is backed by the
-                                    authorized canonical medication record.
-                                    Device, network and edit-history metadata
-                                    are not exposed.
-                                </p>
-                            </Section>
-
-                            {/* Linked records */}
-                            <Section
-                                refCb={(el) => (sectionEls.current.linked = el)}
-                                flash={flash === 'linked'}
-                                title="Linked records"
-                            >
-                                <div className="flex flex-wrap gap-2">
-                                    {link && (
-                                        <a
-                                            href={link.href}
-                                            className="frontline-tap frontline-focus inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium text-primary hover:bg-accent"
-                                        >
-                                            {link.label}
-                                        </a>
-                                    )}
-                                    {event.client_id && (
-                                        <a
-                                            href={`/clients/${event.client_id}`}
-                                            className="frontline-tap frontline-focus inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium text-primary hover:bg-accent"
-                                        >
-                                            Client profile
-                                        </a>
-                                    )}
-                                </div>
-                            </Section>
-                        </div>
-
-                        {/* Footer Options bar — read-only / navigational actions only
-                            (adapts the prn-detail-dialog pattern): Close · View client ·
-                            Open on … · Verify integrity · Export event · Flag · Review source record. */}
-                        <footer className={WIZARD_FOOTER_CLASS}>
+        <WizardShell
+            open
+            onClose={onClose}
+            title={`${meta.label} — audit record`}
+            description={event.description}
+            railIcon={Icon}
+            railTitle={meta.label}
+            railSub={`${event.source} · ${event.id}`}
+            steps={sections.map((section) => ({
+                ...section,
+                blurb: (
+                    {
+                        what: 'Event details',
+                        people: 'Recorded signatures',
+                        changes: 'Recorded changes',
+                        integrity: 'Check the source',
+                        linked: 'Related records',
+                    } as Record<string, string>
+                )[section.key],
+            }))}
+            stepIndex={Math.max(
+                0,
+                sections.findIndex((section) => section.key === active),
+            )}
+            onStepClick={(index) => goToSection(sections[index].key)}
+            sequential={false}
+            headerLabel={
+                <>
+                    <span className="block">{event.description}</span>
+                    <span className="text-xs font-normal text-muted-foreground">
+                        {formatDateTimeLong(event.timestamp)}
+                    </span>
+                </>
+            }
+            bodyRef={bodyRef}
+            maxWidth="min(92vw, 1100px)"
+            maxHeight="min(88vh, 820px)"
+            railExtra={
+                <p className="text-xs text-muted-foreground">
+                    Append-only source record
+                </p>
+            }
+            footerStart={
+                <Button
+                    className="frontline-tap frontline-focus"
+                    variant="outline"
+                    onClick={onClose}
+                >
+                    Close
+                </Button>
+            }
+            footerEnd={
+                <>
+                    <div className="hidden min-w-0 flex-wrap justify-end gap-1.5 sm:flex">
+                        {event.client_id ? (
                             <Button
-                                className="frontline-tap frontline-focus h-auto max-w-full shrink-0 whitespace-normal"
-                                variant="outline"
-                                onClick={onClose}
+                                className="frontline-tap frontline-focus h-auto whitespace-normal"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                    router.visit(
+                                        `/operations/clients/${event.client_id}?tab=mar`,
+                                    )
+                                }
                             >
-                                Close
+                                <User className="size-4" />
+                                View client
                             </Button>
-                            <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
+                        ) : null}
+                        <Button
+                            className="frontline-tap frontline-focus h-auto whitespace-normal"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => router.visit(primaryHref)}
+                        >
+                            <Eye className="size-4" />
+                            Open on {link.label}
+                        </Button>
+                        <Button
+                            className="frontline-tap frontline-focus h-auto whitespace-normal"
+                            variant="ghost"
+                            size="sm"
+                            onClick={verifyIntegrity}
+                            disabled={verifying}
+                        >
+                            <Fingerprint className="size-4" />
+                            Verify integrity
+                        </Button>
+                        {onExport && (
+                            <Button
+                                className="frontline-tap frontline-focus h-auto whitespace-normal"
+                                variant="ghost"
+                                size="sm"
+                                onClick={onExport}
+                            >
+                                <Download className="size-4" />
+                                Export event
+                            </Button>
+                        )}
+                        {integrity?.backed && (
+                            <Button
+                                className="frontline-tap frontline-focus h-auto whitespace-normal"
+                                variant="ghost"
+                                size="sm"
+                                onClick={onFlag}
+                                disabled={flagging}
+                            >
+                                <Flag className="size-4" />
+                                Flag for investigation
+                            </Button>
+                        )}
+                        {isGap && (
+                            <Button
+                                className="frontline-tap frontline-focus h-auto whitespace-normal"
+                                asChild
+                                size="sm"
+                            >
+                                <a href={resolveHref}>
+                                    <Check className="size-4" />
+                                    Review source record
+                                </a>
+                            </Button>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2 sm:hidden">
+                        <Button
+                            className="frontline-tap frontline-focus"
+                            variant="outline"
+                            onClick={() => router.visit(primaryHref)}
+                        >
+                            Open record
+                        </Button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    className="frontline-tap frontline-focus"
+                                    variant="ghost"
+                                    aria-label="More record actions"
+                                >
+                                    <MoreHorizontal className="size-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                                align="end"
+                                className="max-w-[85vw]"
+                            >
                                 {event.client_id ? (
-                                    <Button
-                                        className="frontline-tap frontline-focus h-auto max-w-full whitespace-normal"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() =>
+                                    <DropdownMenuItem
+                                        className="frontline-tap frontline-focus"
+                                        onSelect={() =>
                                             router.visit(
                                                 `/operations/clients/${event.client_id}?tab=mar`,
                                             )
                                         }
                                     >
-                                        <User className="h-4 w-4" />
                                         View client
-                                    </Button>
+                                    </DropdownMenuItem>
                                 ) : null}
-                                <Button
-                                    className="frontline-tap frontline-focus h-auto max-w-full whitespace-normal"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => router.visit(primaryHref)}
-                                >
-                                    <Eye className="h-4 w-4" />
-                                    Open on {link.label}
-                                </Button>
-                                <Button
-                                    className="frontline-tap frontline-focus h-auto max-w-full whitespace-normal"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={verifyIntegrity}
+                                <DropdownMenuItem
+                                    className="frontline-tap frontline-focus"
+                                    onSelect={verifyIntegrity}
                                     disabled={verifying}
                                 >
-                                    <Fingerprint className="h-4 w-4" />
                                     Verify integrity
-                                </Button>
+                                </DropdownMenuItem>
                                 {onExport && (
-                                    <Button
-                                        className="frontline-tap frontline-focus h-auto max-w-full whitespace-normal"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={onExport}
+                                    <DropdownMenuItem
+                                        className="frontline-tap frontline-focus"
+                                        onSelect={onExport}
                                     >
-                                        <Download className="h-4 w-4" />
                                         Export event
-                                    </Button>
+                                    </DropdownMenuItem>
                                 )}
-                                {integrity?.backed ? (
-                                    <Button
-                                        className="frontline-tap frontline-focus h-auto max-w-full whitespace-normal"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={onFlag}
+                                {integrity?.backed && (
+                                    <DropdownMenuItem
+                                        className="frontline-tap frontline-focus"
+                                        onSelect={onFlag}
                                         disabled={flagging}
                                     >
-                                        <Flag className="h-4 w-4" />
                                         Flag for investigation
-                                    </Button>
-                                ) : null}
-                                {isGap ? (
-                                    <Button
-                                        className="frontline-tap frontline-focus h-auto max-w-full whitespace-normal"
+                                    </DropdownMenuItem>
+                                )}
+                                {isGap && (
+                                    <DropdownMenuItem
+                                        className="frontline-tap frontline-focus"
                                         asChild
-                                        size="sm"
                                     >
                                         <a href={resolveHref}>
-                                            <Check className="h-4 w-4" />
                                             Review source record
                                         </a>
-                                    </Button>
-                                ) : null}
-                            </div>
-                        </footer>
+                                    </DropdownMenuItem>
+                                )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
+                </>
+            }
+        >
+            {event.flags.length > 0 && (
+                <div className="mb-4 flex flex-wrap gap-2">
+                    {event.flags.map((flag) => (
+                        <span
+                            key={flag}
+                            className={cn(
+                                'rounded-md px-2 py-1 text-xs',
+                                FLAG_META[flag]?.cls ??
+                                    'bg-muted text-muted-foreground',
+                            )}
+                        >
+                            {FLAG_META[flag]?.label ?? flag}
+                        </span>
+                    ))}
                 </div>
-            </DialogContent>
-        </Dialog>
+            )}
+            {/* What happened */}
+            <Section
+                refCb={(el) => (sectionEls.current.what = el)}
+                flash={flash === 'what'}
+                title="What happened"
+            >
+                {event.flags.includes('missing_witness') && (
+                    <div className="mb-3 rounded-lg border border-status-critical/30 bg-status-critical-bg/60 px-3 py-2 text-xs text-status-critical">
+                        Controlled-drug transaction without a recorded second
+                        signature — investigate and countersign in the CD
+                        register.
+                    </div>
+                )}
+                {event.flags.includes('omission') && (
+                    <div className="mb-3 rounded-lg border border-dashed border-status-critical/40 bg-status-critical-bg/50 px-3 py-2 text-xs text-status-critical">
+                        A scheduled dose was not recorded — a MAR omission must
+                        be reconciled with an outcome and reason.
+                    </div>
+                )}
+                <div className="rounded-lg border px-4">
+                    <SummaryRow label="Client" value={event.client_name} />
+                    {event.site_name && (
+                        <SummaryRow label="Site" value={event.site_name} />
+                    )}
+                    {event.outcome && (
+                        <SummaryRow
+                            label="Outcome"
+                            value={String(event.outcome)}
+                        />
+                    )}
+                    {detailRows.map(([k, v]) => (
+                        <SummaryRow
+                            key={k}
+                            label={k
+                                .replace(/_/g, ' ')
+                                .replace(/^./, (letter) =>
+                                    letter.toUpperCase(),
+                                )}
+                            value={
+                                typeof v === 'boolean'
+                                    ? v
+                                        ? 'Yes'
+                                        : 'No'
+                                    : String(v)
+                            }
+                        />
+                    ))}
+                </div>
+            </Section>
+
+            {/* People & sign-off */}
+            <Section
+                refCb={(el) => (sectionEls.current.people = el)}
+                flash={flash === 'people'}
+                title="People & sign-off"
+            >
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div
+                        className={cn(
+                            'rounded-lg border px-3 py-2.5',
+                            event.performed_by
+                                ? ''
+                                : 'border-status-warning/40 bg-status-warning-bg/40',
+                        )}
+                    >
+                        <div className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                            Performed by
+                        </div>
+                        <div className="text-sm font-medium">
+                            {event.performed_by ??
+                                'Not attributed to a staff member'}
+                        </div>
+                    </div>
+                    {event.witness_required && (
+                        <div
+                            className={cn(
+                                'rounded-lg border px-3 py-2.5',
+                                event.witness
+                                    ? 'border-status-success/40 bg-status-success-bg/40'
+                                    : 'border-status-critical/40 bg-status-critical-bg/40',
+                            )}
+                        >
+                            <div className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                Witness (2nd signature)
+                            </div>
+                            <div
+                                className={cn(
+                                    'text-sm font-medium',
+                                    event.witness ? '' : 'text-status-critical',
+                                )}
+                            >
+                                {event.witness ?? 'Required — missing'}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </Section>
+
+            {/* Before → after */}
+            {changes.length > 0 && (
+                <Section
+                    refCb={(el) => (sectionEls.current.changes = el)}
+                    flash={flash === 'changes'}
+                    title="Before → after"
+                >
+                    <div className="flex flex-col gap-2">
+                        {changes.map((c, i) => (
+                            <div
+                                key={i}
+                                className="rounded-lg border px-3 py-2"
+                            >
+                                <div className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                    {c.field}
+                                </div>
+                                <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
+                                    <span className="rounded bg-muted px-2 py-0.5 text-muted-foreground line-through">
+                                        {c.from || '—'}
+                                    </span>
+                                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                    <span className="rounded bg-status-success-bg px-2 py-0.5 font-medium text-status-success">
+                                        {c.to || '—'}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </Section>
+            )}
+
+            {/* Record integrity */}
+            <Section
+                refCb={(el) => (sectionEls.current.integrity = el)}
+                flash={flash === 'integrity'}
+                title="Record integrity"
+            >
+                {integrity === null ? (
+                    <div className="rounded-lg border px-4 py-3 text-sm text-muted-foreground">
+                        Loading integrity…
+                    </div>
+                ) : !integrity.backed ? (
+                    <div className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
+                        No canonical stored record is available.
+                    </div>
+                ) : (
+                    <div className="rounded-lg border px-4">
+                        <SummaryRow
+                            label="Canonical record"
+                            value="Stored record confirmed"
+                            tone="success"
+                        />
+                    </div>
+                )}
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                    Confirms the event is backed by the authorized canonical
+                    medication record. Device, network and edit-history metadata
+                    are not exposed.
+                </p>
+            </Section>
+
+            {/* Linked records */}
+            <Section
+                refCb={(el) => (sectionEls.current.linked = el)}
+                flash={flash === 'linked'}
+                title="Linked records"
+            >
+                <div className="flex flex-wrap gap-2">
+                    {link && (
+                        <a
+                            href={link.href}
+                            className="frontline-tap frontline-focus inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium text-primary hover:bg-accent"
+                        >
+                            {link.label}
+                        </a>
+                    )}
+                    {event.client_id && (
+                        <a
+                            href={`/clients/${event.client_id}`}
+                            className="frontline-tap frontline-focus inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium text-primary hover:bg-accent"
+                        >
+                            Client profile
+                        </a>
+                    )}
+                </div>
+            </Section>
+        </WizardShell>
     );
 }
 

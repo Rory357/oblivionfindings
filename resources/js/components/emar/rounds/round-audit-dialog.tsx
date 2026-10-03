@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
@@ -53,8 +54,17 @@ export default function RoundAuditDialog({
 
     return (
         <Dialog open onOpenChange={(o) => !o && onClose()}>
-            <DialogContent className="max-w-[640px] gap-0 p-0">
-                <DialogHeader className="space-y-0 border-b p-5 pr-12">
+            <DialogContent
+                className="flex max-h-[88vh] flex-col gap-0 overflow-hidden p-0"
+                style={{
+                    width: 'min(92vw, 720px)',
+                    maxWidth: 'min(92vw, 720px)',
+                }}
+            >
+                <DialogHeader className="shrink-0 space-y-0 border-b p-5 pr-12">
+                    <DialogDescription className="sr-only">
+                        Medication round outcomes and its recorded audit trail.
+                    </DialogDescription>
                     <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3">
                             <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent text-primary">
@@ -78,7 +88,7 @@ export default function RoundAuditDialog({
                     </div>
                 </DialogHeader>
 
-                <div className="grid grid-cols-4 gap-2 px-5 pt-4">
+                <div className="grid shrink-0 grid-cols-2 gap-2 px-5 pt-4 sm:grid-cols-4">
                     <CountTile
                         label="Given"
                         value={counts.given}
@@ -101,7 +111,7 @@ export default function RoundAuditDialog({
                     />
                 </div>
 
-                <div className="max-h-[46vh] overflow-y-auto px-5 py-5">
+                <div className="min-h-0 overflow-y-auto px-5 py-5">
                     <div className="mb-3 text-[11.5px] font-bold tracking-wide text-muted-foreground uppercase">
                         Audit trail
                     </div>
@@ -111,7 +121,10 @@ export default function RoundAuditDialog({
                     />
                 </div>
 
-                <DialogFooter className="border-t bg-muted/40 p-4">
+                <DialogFooter className="shrink-0 border-t bg-muted/40 p-4">
+                    <Button variant="outline" onClick={onClose}>
+                        Close
+                    </Button>
                     {canExport ? (
                         <Button variant="outline" onClick={onPrint}>
                             <Printer className="h-4 w-4" />

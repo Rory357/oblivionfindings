@@ -10,12 +10,15 @@ import {
 } from '@/components/lists';
 import {
     PageHeader,
+    PageHeaderMeterBig,
     PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
     PageHeaderPrimaryButton,
     PageHeaderRail,
     PageLayout,
 } from '@/components/page';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -202,28 +205,48 @@ export default function DowntimeShow({
                 <>
                     <PageHeaderMeterBlock
                         label="Listed doses to enter"
-                        value={missing.length}
                         tone="warning"
                         onClick={() => setView('paper')}
-                    />
+                    >
+                        <PageHeaderMeterBig>
+                            {missing.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Scheduled doses without paper facts
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="Confirmations still due"
-                        value={
-                            entries.length - confirmed.length - posted.length
-                        }
                         tone="warning"
                         onClick={() => setView('paper')}
-                    />
+                    >
+                        <PageHeaderMeterBig>
+                            {entries.length - confirmed.length - posted.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Giver or witness confirmation needed
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="Signed paper to reconcile"
-                        value={confirmed.length}
                         onClick={() => setView('paper')}
-                    />
+                    >
+                        <PageHeaderMeterBig>
+                            {confirmed.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Confirmed facts awaiting reconciliation
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="Entered from paper"
-                        value={posted.length}
                         onClick={() => setView('paper')}
-                    />
+                    >
+                        <PageHeaderMeterBig>{posted.length}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Reconciled paper entries
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
                 </>
             }
             rail={
@@ -234,7 +257,6 @@ export default function DowntimeShow({
                     ]}
                     value={view}
                     onSelect={setView}
-                    showFind={false}
                 />
             }
         />
@@ -256,12 +278,12 @@ export default function DowntimeShow({
                 <div className="space-y-5">
                     <RequestErrors errors={page.props.errors} />
                     {controlled_notice && (
-                        <p className="bg-muted rounded-lg border p-4">
+                        <p className="rounded-lg border bg-muted p-4">
                             {controlled_notice}
                         </p>
                     )}
                     {view === 'facts' ? (
-                        <section className="bg-card space-y-4 rounded-xl border p-5">
+                        <section className="space-y-4 rounded-xl border bg-card p-5">
                             <h2 className="text-section-title">
                                 What went down
                             </h2>
@@ -444,7 +466,7 @@ export default function DowntimeShow({
                                     caption={`${entries.length} visible paper entries`}
                                 />
                                 {!entries.length ? (
-                                    <div className="bg-card rounded-xl border p-6">
+                                    <Card className="p-6">
                                         <p className="text-section-title">
                                             No paper facts collected yet
                                         </p>
@@ -454,7 +476,7 @@ export default function DowntimeShow({
                                             accountable confirmations and
                                             clinical reconciliation.
                                         </p>
-                                    </div>
+                                    </Card>
                                 ) : (
                                     <>
                                         <div className="hidden md:block">
@@ -566,7 +588,7 @@ export default function DowntimeShow({
                                 )}
                             </section>
                             {can_manage && !downtime.finished_at && (
-                                <div className="bg-card flex flex-wrap items-center gap-4 rounded-xl border p-4">
+                                <Card className="flex flex-wrap items-center gap-4 p-4">
                                     <Button
                                         className="frontline-tap"
                                         variant="outline"
@@ -580,7 +602,7 @@ export default function DowntimeShow({
                                             ? 'Confirmations and clinical reconciliation remain due afterwards.'
                                             : 'Every listed paper dose needs its actual facts first, including concealed entries for the authorised lead.'}
                                     </p>
-                                </div>
+                                </Card>
                             )}
                         </>
                     )}
@@ -630,8 +652,14 @@ export default function DowntimeShow({
                     if (!open) setSelected(null);
                 }}
             >
-                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-                    <DialogHeader>
+                <DialogContent
+                    className="flex max-h-[88vh] flex-col overflow-hidden p-0"
+                    style={{
+                        width: 'min(92vw, 720px)',
+                        maxWidth: 'min(92vw, 720px)',
+                    }}
+                >
+                    <DialogHeader className="shrink-0 border-b p-5 pr-12">
                         <DialogTitle>
                             Paper evidence — {selected?.snapshot.medicine}
                         </DialogTitle>
@@ -641,7 +669,7 @@ export default function DowntimeShow({
                         </DialogDescription>
                     </DialogHeader>
                     {selected && (
-                        <div className="space-y-4">
+                        <div className="min-h-0 space-y-4 overflow-y-auto px-5 pb-5">
                             {status(selected)}
                             <p>
                                 {selected.snapshot.person} · {selected.outcome}{' '}
@@ -667,7 +695,7 @@ export default function DowntimeShow({
                                 </p>
                             )}
                             {selected.reconciliation.unavailable && (
-                                <p className="border-status-warning bg-status-warning-bg text-status-warning-foreground rounded-lg border p-3">
+                                <p className="rounded-lg border border-status-warning bg-status-warning-bg p-3 text-status-warning-foreground">
                                     {selected.reconciliation.unavailable}
                                 </p>
                             )}

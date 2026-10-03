@@ -703,6 +703,7 @@ export function CountersignDialog({
             open
             onClose={onClose}
             title="Countersign order"
+            formState={form}
             description="Prescriber countersignature for a verbal/telephone order."
             railIcon={PenTool}
             railTitle="Countersign"
@@ -804,6 +805,7 @@ export function DispenseDialog({
             open
             onClose={onClose}
             title="Record dispensing"
+            formState={form}
             description="Record the pharmacy dispense for this order."
             railIcon={Package}
             railTitle="Dispensing"
@@ -930,6 +932,7 @@ export function CancelOrderDialog({
             open
             onClose={onClose}
             title="Cancel order"
+            formState={form}
             description="Record why this prescriber order is being cancelled."
             railIcon={Ban}
             railTitle="Cancellation"
@@ -1130,6 +1133,7 @@ export function LinkMarDialog({
             open
             onClose={onClose}
             title="Link order to MAR"
+            formState={form}
             description="Link this order to a charted medication."
             railIcon={Link2}
             railTitle="Link → MAR"

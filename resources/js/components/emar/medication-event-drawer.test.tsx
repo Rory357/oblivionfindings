@@ -249,6 +249,43 @@ describe('history drawer New Zealand timestamp', () => {
 });
 
 describe('history drawer touch controls', () => {
+    it('keeps secondary phone actions available in the compact menu', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi
+                .fn()
+                .mockResolvedValue({
+                    ok: true,
+                    json: async () => ({ backed: true }),
+                }),
+        );
+        const onExport = vi.fn();
+        render(
+            <MedicationEventDrawer
+                event={event()}
+                onClose={vi.fn()}
+                onExport={onExport}
+            />,
+        );
+        await screen.findByRole('button', { name: 'Flag for investigation' });
+        fireEvent.keyDown(
+            screen.getByRole('button', { name: 'More record actions' }),
+            { key: 'ArrowDown' },
+        );
+        const exportAction = await screen.findByRole('menuitem', {
+            name: 'Export event',
+        });
+        expect(
+            screen.getByRole('menuitem', { name: 'Verify integrity' }),
+        ).toBeEnabled();
+        expect(
+            screen.getByRole('menuitem', { name: 'Flag for investigation' }),
+        ).toBeEnabled();
+        expect(exportAction).toHaveClass('frontline-tap');
+        fireEvent.click(exportAction);
+        expect(onExport).toHaveBeenCalledOnce();
+        expect(post).not.toHaveBeenCalled();
+    });
     it('gives the real close controls, section rail, footer actions and chips the shared tap/focus styles', async () => {
         vi.stubGlobal(
             'fetch',
@@ -285,7 +322,7 @@ describe('history drawer touch controls', () => {
         expect(
             within(dialog).getByRole('button', { name: 'Export event' }),
         ).toBeEnabled();
-        expect(dialog.querySelector('header')?.nextElementSibling).toHaveClass(
+        expect(dialog.querySelector('[data-wizard-region="body"]')).toHaveClass(
             'min-h-0',
             'overflow-y-auto',
         );

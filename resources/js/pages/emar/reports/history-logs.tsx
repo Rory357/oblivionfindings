@@ -10,6 +10,7 @@ import {
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
     PageHeaderPrimaryButton,
+    PageHeaderSearch,
 } from '@/components/page/page-header';
 import { RecordPicker } from '@/components/people-locations/record-picker';
 import { Button } from '@/components/ui/button';
@@ -101,6 +102,20 @@ function changedFields(row: Log): string {
     return fields.length ? fields.join(', ') : 'Fields not recorded';
 }
 export default function HistoricalChangeLogs(props: Props) {
+    const [search, setSearch] = useState('');
+    const visibleLogs = props.logs.filter((row) =>
+        [
+            row.action,
+            row.client?.name,
+            row.user?.name,
+            recordLabel(row),
+            changedFields(row),
+        ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+            .includes(search.trim().toLowerCase()),
+    );
     const [exportOpen, setExportOpen] = useState(false);
     const [rangeOpen, setRangeOpen] = useState(false);
     const [from, setFrom] = useState<string | null>(props.filters.date_from);
@@ -139,6 +154,12 @@ export default function HistoricalChangeLogs(props: Props) {
                     subline={`${formatDateOnly(props.filters.date_from)} – ${formatDateOnly(props.filters.date_to)} · Pacific/Auckland · Retained changes to medication records.`}
                     actions={
                         <>
+                            <PageHeaderSearch
+                                value={search}
+                                onChange={setSearch}
+                                placeholder="Search loaded changes…"
+                                ariaLabel="Search loaded medication changes"
+                            />
                             <PageHeaderGlassButton
                                 className="min-h-11"
                                 onClick={() =>
@@ -275,15 +296,23 @@ export default function HistoricalChangeLogs(props: Props) {
                     }
                 />
                 <p className="text-subtle">
-                    Showing the latest {props.logs.length} changes, up to 200.
-                    The CSV includes every change in the selected period, house
-                    and person, up to 100,000 rows. Larger results ask you to
-                    narrow the selection before a file is made. Clinical history
-                    and the event ledger remain available from Reports & audit.
+                    Showing {visibleLogs.length} of the latest{' '}
+                    {props.logs.length} loaded changes, up to 200. The CSV
+                    includes every change in the selected period, house and
+                    person, up to 100,000 rows. Larger results ask you to narrow
+                    the selection before a file is made. Clinical history and
+                    the event ledger remain available from Reports & audit.
                 </p>
+                {visibleLogs.length === 0 && (
+                    <p role="status" className="text-subtle py-6">
+                        {search
+                            ? 'No loaded changes match this search.'
+                            : 'No changes recorded in this scope.'}
+                    </p>
+                )}
                 <div className="hidden md:block">
                     <EntityTable
-                        rows={props.logs}
+                        rows={visibleLogs}
                         rowKey={(row) => String(row.id)}
                         identity={(row) => ({
                             name: words(row.action),
@@ -297,10 +326,10 @@ export default function HistoricalChangeLogs(props: Props) {
                     />
                 </div>
                 <div className="space-y-3 md:hidden">
-                    {props.logs.map((row) => (
+                    {visibleLogs.map((row) => (
                         <article
                             key={row.id}
-                            className="border-border bg-card space-y-3 rounded-xl border p-4"
+                            className="space-y-3 rounded-xl border border-border bg-card p-4"
                             aria-label={`${words(row.action)} for ${row.client?.name ?? 'person not recorded'}`}
                         >
                             <div>

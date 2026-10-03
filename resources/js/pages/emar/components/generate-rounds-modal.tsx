@@ -68,7 +68,6 @@ export function GenerateRoundsModal({
             {
                 preserveScroll: true,
                 onSuccess: () => {
-                    toast.success('Rounds generated for ' + dateLabel);
                     close();
                 },
                 onError: () => toast.error('Could not generate rounds'),

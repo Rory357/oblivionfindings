@@ -18,22 +18,21 @@ import {
     type RoundStatus,
     type RoundSummary,
 } from '@/components/emar/rounds/types';
+import { EmarMeters } from '@/components/emar/workspace-navigation';
 import {
     addDays,
     DayPickerChip,
     toYmd,
 } from '@/components/meds/day-picker-chip';
 import {
-    PageHero,
-    type PageHeroBadge,
-    type PageHeroStat,
-} from '@/components/page';
-import { PageHeaderPrimaryButton } from '@/components/page/page-header';
-import {
-    EntityFilter,
-    TabStrip,
-    type RosterTabItem,
-} from '@/components/rostering';
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
+import { EntityFilter, type RosterTabItem } from '@/components/rostering';
 import {
     ShiftContextMenu,
     type ShiftCtxItem,
@@ -58,7 +57,6 @@ import {
     Activity,
     ArrowUpRight,
     CalendarCheck,
-    CalendarDays,
     CheckCircle2,
     ChevronLeft,
     ChevronRight,
@@ -122,6 +120,7 @@ export default function Rounds(props: Props) {
     } = props;
 
     const [activeTab, setActiveTab] = useState('board');
+    const [search, setSearch] = useState('');
     const [boardView, setBoardView] = useState<'cards' | 'list'>('cards');
     const [siteFilter, setSiteFilter] = useState<number | null>(null);
     const [residentFilter, setResidentFilter] = useState<number | null>(null);
@@ -187,6 +186,15 @@ export default function Rounds(props: Props) {
                 hasFilter ? { ...r, cells: r.cells.filter(cellVisible) } : r,
             )
             .filter((r) => {
+                if (
+                    search.trim() &&
+                    ![r.name, r.site_name, r.assignee]
+                        .filter(Boolean)
+                        .join(' ')
+                        .toLowerCase()
+                        .includes(search.trim().toLowerCase())
+                )
+                    return false;
                 if (hasFilter && r.cells.length === 0) return false;
                 const counts = roundCounts(r.cells);
                 if (statusChip === 'due') return counts.due > 0;
@@ -195,7 +203,7 @@ export default function Rounds(props: Props) {
                 return true;
             });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [rounds, siteFilter, residentFilter, statusChip]);
+    }, [rounds, siteFilter, residentFilter, statusChip, search]);
 
     const filteredResidents = useMemo(
         () =>
@@ -366,46 +374,6 @@ export default function Rounds(props: Props) {
         },
     ];
 
-    const heroBadges: PageHeroBadge[] = [
-        {
-            label: `${sites.length} site${sites.length === 1 ? '' : 's'} · ${residents.length} resident${residents.length === 1 ? '' : 's'}`,
-        },
-        signer.med_competent
-            ? {
-                  tone: 'success' as const,
-                  label: signer.cd_witness
-                      ? 'Med-competent · CD witness authorised'
-                      : 'Med-competent',
-              }
-            : null,
-        signer.witness_pin && signer.witness_pin !== 'set'
-            ? {
-                  tone: 'warning' as const,
-                  icon: KeyRound,
-                  label: OWN_WITNESS_PIN_PROMPT[signer.witness_pin],
-                  href: OWN_WITNESS_PIN_SETTINGS_URL,
-              }
-            : null,
-    ].filter(Boolean) as PageHeroBadge[];
-
-    const heroStats: PageHeroStat[] = [
-        {
-            label: 'Rounds',
-            value: `${counts.doneRounds}/${counts.totalRounds}`,
-        },
-        { label: 'Given', value: `${counts.given}/${counts.totalDoses}` },
-        {
-            label: 'Due',
-            value: counts.due,
-            tone: counts.due > 0 ? 'warning' : 'neutral',
-        },
-        {
-            label: 'Flags',
-            value: counts.flags,
-            tone: counts.flags > 0 ? 'critical' : 'neutral',
-        },
-    ];
-
     const dayTitle = useMemo(() => {
         const d = new Date(`${date}T00:00:00`);
         return Number.isNaN(d.getTime())
@@ -430,15 +398,11 @@ export default function Rounds(props: Props) {
               });
     };
 
-    const description = `${counts.totalDoses} scheduled dose${counts.totalDoses === 1 ? '' : 's'} across ${sites.length} site${
-        sites.length === 1 ? '' : 's'
-    } today. ${counts.given} given, ${counts.due} still to give${activeRound ? `, and the ${activeRound.name} is in progress.` : '.'}`;
-
     const onDarkChip =
         'border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20';
 
     const heroFooter = (
-        <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex w-full flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-1.5">
                 <Button
                     variant="outline"
@@ -502,48 +466,103 @@ export default function Rounds(props: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Medication Rounds" />
-            <div className="flex flex-col gap-6 p-6">
-                <PageHero
-                    variant="hero"
-                    category="ops"
+            <div className="flex flex-col gap-5">
+                <PageHeader
+                    frontline
                     brandColour={brandColour}
                     icon={Pill}
-                    title={
-                        <span>
-                            <span className="flex items-center gap-2 text-[10.5px] font-semibold tracking-wider text-primary-foreground/80 uppercase">
-                                {isToday ? (
-                                    <span
-                                        aria-hidden
-                                        className="relative inline-flex h-2 w-2"
-                                    >
-                                        <span className="absolute inset-0 animate-ping rounded-full bg-status-success/70" />
-                                        <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
-                                    </span>
-                                ) : (
-                                    <CalendarDays className="h-3 w-3" />
-                                )}
-                                {isToday
-                                    ? `Live medication board · refreshed ${nowLabel}`
-                                    : 'Medication board · day view'}
-                            </span>
-                            <span className="mt-1 block text-[26px] leading-tight font-bold">
-                                <span className="font-normal text-primary-foreground/80">
-                                    Kia ora {signer.first_name},{' '}
-                                    {isToday
-                                        ? "today's rounds —"
-                                        : 'the rounds for —'}
-                                </span>{' '}
-                                <span className="border-b-2 border-primary-foreground/40 pb-0.5 whitespace-nowrap">
-                                    {dayTitle}
-                                </span>
-                            </span>
-                        </span>
+                    title="Medication rounds"
+                    titleChip={
+                        <PageHeaderStatusChip
+                            variant={
+                                signer.med_competent ? 'success' : 'warning'
+                            }
+                        >
+                            {signer.med_competent
+                                ? signer.cd_witness
+                                    ? 'Medication & witness eligible'
+                                    : 'Medication eligible'
+                                : 'Check staff eligibility'}
+                        </PageHeaderStatusChip>
                     }
-                    description={description}
-                    badges={heroBadges}
-                    stats={heroStats}
+                    subline={`${dayTitle} · ${sites.length} houses · ${residents.length} people · Updated ${nowLabel}${activeRound ? ` · ${activeRound.name} in progress` : ''}`}
+                    meters={
+                        <EmarMeters
+                            items={[
+                                {
+                                    label: 'Rounds',
+                                    value: `${counts.doneRounds}/${counts.totalRounds}`,
+                                    caption: 'Completed in the selected day',
+                                    onClick: () => {
+                                        setSearch('');
+                                        setStatusChip('all');
+                                        setActiveTab('board');
+                                    },
+                                },
+                                {
+                                    label: 'Given',
+                                    value: `${counts.given}/${counts.totalDoses}`,
+                                    caption:
+                                        'Scheduled doses recorded as given',
+                                    onClick: () => {
+                                        setSearch('');
+                                        setStatusChip('all');
+                                        setActiveTab('chart');
+                                    },
+                                },
+                                {
+                                    label: 'Due',
+                                    value: counts.due,
+                                    caption: 'Doses still due',
+                                    tone: counts.due ? 'warning' : 'brand',
+                                    onClick: () => {
+                                        setSearch('');
+                                        setStatusChip('due');
+                                        setActiveTab('chart');
+                                    },
+                                },
+                                {
+                                    label: 'Flags',
+                                    value: counts.flags,
+                                    caption: 'Refused, held or missed',
+                                    tone: counts.flags ? 'critical' : 'brand',
+                                    onClick: () => {
+                                        setSearch('');
+                                        setStatusChip('flagged');
+                                        setActiveTab('chart');
+                                    },
+                                },
+                            ]}
+                        />
+                    }
                     actions={
                         <>
+                            {(activeTab === 'board' ||
+                                activeTab === 'chart') && (
+                                <PageHeaderSearch
+                                    value={search}
+                                    onChange={setSearch}
+                                    placeholder="Search round, house or staff…"
+                                    ariaLabel="Search rounds"
+                                />
+                            )}
+                            {signer.witness_pin &&
+                                signer.witness_pin !== 'set' && (
+                                    <PageHeaderGlassButton
+                                        icon={KeyRound}
+                                        asChild
+                                    >
+                                        <Link
+                                            href={OWN_WITNESS_PIN_SETTINGS_URL}
+                                        >
+                                            {
+                                                OWN_WITNESS_PIN_PROMPT[
+                                                    signer.witness_pin
+                                                ]
+                                            }
+                                        </Link>
+                                    </PageHeaderGlassButton>
+                                )}
                             {canManage && (
                                 <PageHeaderPrimaryButton
                                     icon={Zap}
@@ -554,7 +573,23 @@ export default function Rounds(props: Props) {
                             )}
                         </>
                     }
-                    footer={heroFooter}
+                    filters={heroFooter}
+                    rail={
+                        <PageHeaderRail
+                            value={activeTab}
+                            onSelect={setActiveTab}
+                            ariaLabel="Medication rounds views"
+                            items={TABS.map((tab) => ({
+                                key: tab.id,
+                                label: tab.label,
+                                icon: tab.icon,
+                                count:
+                                    typeof tab.badge === 'number'
+                                        ? tab.badge
+                                        : undefined,
+                            }))}
+                        />
+                    }
                 />
 
                 <RoundTimeline
@@ -563,13 +598,6 @@ export default function Rounds(props: Props) {
                     canRecord={signer.med_competent}
                     onOpen={openGuided}
                     onContext={openContext}
-                />
-
-                <TabStrip
-                    value={activeTab}
-                    onChange={setActiveTab}
-                    items={TABS}
-                    ariaLabel="Medication rounds views"
                 />
 
                 {activeTab === 'board' && (

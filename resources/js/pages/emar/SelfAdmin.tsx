@@ -10,14 +10,15 @@ import { ListCaption } from '@/components/lists/list-caption';
 import {
     PageHeader,
     PageHeaderFilterSelect,
+    PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    PageHeaderSearch,
 } from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTime, toDateInput } from '@/lib/datetime';
@@ -98,19 +99,18 @@ export default function SelfAdmin({
                                 visit({ search });
                             }}
                         >
-                            <Input
-                                aria-label="Find a person"
+                            <PageHeaderSearch
+                                ariaLabel="Find a person"
                                 value={search}
-                                onChange={(e) => setSearch(e.target.value)}
+                                onChange={setSearch}
                                 placeholder="Find a person"
                             />
-                            <Button
+                            <PageHeaderGlassButton
                                 type="submit"
-                                variant="outline"
                                 aria-label="Search"
                             >
                                 <Search className="size-4" />
-                            </Button>
+                            </PageHeaderGlassButton>
                         </form>
                     }
                     meters={

@@ -137,6 +137,24 @@ function replacedQuery() {
 }
 
 describe('controlled register reader filters', () => {
+    it('uses the current reader house brand and clears it for an unbranded scope', () => {
+        const { rerender } = render(
+            <ControlledRegister
+                product={{ ...product, site_brand_colour: '#16706f' }}
+            />,
+        );
+        const header = screen
+            .getByRole('heading', { name: 'Controlled register' })
+            .closest('header');
+        expect(header?.style.getPropertyValue('--primary')).toBe('#16706f');
+        rerender(
+            <ControlledRegister
+                product={{ ...product, site_brand_colour: null }}
+            />,
+        );
+        expect(header?.style.getPropertyValue('--primary')).toBe('');
+    });
+
     it('gives phone record links and all action menu items real frontline targets', () => {
         render(<ControlledRegister product={product} />);
         expect(

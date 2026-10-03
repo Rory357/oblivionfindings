@@ -1220,6 +1220,22 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
     min-width: max(44px, 2.75rem);
 }
 
+/* Medication dialogs opt in locally; unrelated settings and wizard forms
+   retain their existing geometry. Checkboxes/radios keep their native marks. */
+.frontline-dialog :is(button, [role='combobox']),
+.eh-header-frontline :is(button, [role='combobox']) {
+    min-height: max(44px, 2.75rem);
+    min-width: max(44px, 2.75rem);
+}
+.frontline-dialog
+    :is(
+        input:not([type='checkbox']):not([type='radio']):not([type='hidden']),
+        select
+    ),
+.eh-header-frontline input:not([type='hidden']) {
+    min-height: max(44px, 2.75rem);
+}
+
 /* The active rail meets the page edge; its existing 6px optical offset
  * sits above the same real target as the inactive tabs and utility pills. */
 .eh-meter.frontline-tap {
