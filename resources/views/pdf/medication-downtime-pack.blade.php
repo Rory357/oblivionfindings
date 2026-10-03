@@ -60,7 +60,7 @@ Nothing recorded — check the health profile and ask the lead. This does not me
 <tr><td>{{ $medicine['medicine'] }}<br>{{ $medicine['dosage'] }} · {{ $medicine['route'] ?? 'Route not recorded' }}@if (! $medicine['verified'])<br><strong>Waiting for the order check</strong>@endif</td><td>{{ $medicine['indication'] }}<br>{{ $medicine['instructions'] }}</td><td>{{ $medicine['max_per_day'] ?? 'Not configured — check the order' }}</td><td>{{ $medicine['min_hours_between_doses'] !== null ? $medicine['min_hours_between_doses'].' hours' : 'Not configured — check the order' }}</td><td>{{ $medicine['second_person_required'] ? 'Second person required' : '—' }}<br>{{ implode('; ', $medicine['readings']) }}</td></tr>
 @empty<tr><td colspan="5">No as-needed medicines shown.</td></tr>@endforelse
 </tbody></table>
-<table><thead><tr><th colspan="6" class="paper-identity">As-needed recording - {{ $person['name'] }}</th></tr><tr><th>As-needed medicine / actual amount</th><th>Reason / reading</th><th>Given at (NZ date and time)</th><th>Actual giver / signature</th><th>Second person / signature</th><th>Follow-up on paper</th></tr></thead><tbody>
+<table style="page-break-inside: avoid"><thead><tr><th colspan="6" class="paper-identity">As-needed recording - {{ $person['name'] }}</th></tr><tr><th>As-needed medicine / actual amount</th><th>Reason / reading</th><th>Given at (NZ date and time)</th><th>Actual giver / signature</th><th>Second person / signature</th><th>Follow-up on paper</th></tr></thead><tbody>
 @for ($i = 0; $i < 4; $i++)<tr class="writing"><td></td><td></td><td></td><td></td><td></td><td></td></tr>@endfor
 </tbody></table>
 </section>
