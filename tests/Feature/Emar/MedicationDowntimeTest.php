@@ -9,6 +9,7 @@ use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationAdminRule;
 use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationDowntime;
+use App\Models\MedicationEvent;
 use App\Models\MedicationPaperEntry;
 use App\Models\Permission;
 use App\Models\Role;
@@ -16,8 +17,10 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\Downtime\DowntimeEvents;
+use App\Services\Medication\Downtime\DowntimePackPdf;
 use App\Services\Medication\Downtime\DowntimePackService;
 use App\Services\Medication\Downtime\DowntimeService;
+use App\Services\Medication\Downtime\PaperAdministrationWriter;
 use App\Services\Medication\Downtime\PaperEntryService;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
@@ -48,12 +51,15 @@ class MedicationDowntimeTest extends TestCase
         parent::setUp();
         Carbon::setTestNow(Carbon::parse('2026-10-03 00:00', 'Pacific/Auckland')->utc());
         $this->seed(RbacSeeder::class);
+        // P09 owns the production grant foundation; this older P10 base
+        // supplies the key only in isolated synthetic test fixtures.
+        Permission::query()->firstOrCreate(['key' => 'medications.reports.view'], ['description' => 'View medication reports', 'group' => 'medications', 'module' => 'Clinical']);
         if (! Route::has('emar.downtime.index')) {
             Route::middleware('web')->group(base_path('routes/emar-downtime.php'));
         }
         $this->site = Site::factory()->create(['is_active' => true]);
         $this->client = Client::factory()->create(['site_id' => $this->site->id, 'status' => 'active']);
-        $this->lead = $this->staff($this->site, 'team_lead', ['medications.view', 'medications.administer.record', 'clients.viewAny', 'medications.reports.export', 'medications.controlled.view']);
+        $this->lead = $this->staff($this->site, 'team_lead', ['medications.view', 'medications.administer.record', 'clients.viewAny', 'medications.reports.view', 'medications.reports.export', 'medications.controlled.view']);
         $this->order = ClientMedication::factory()->create([
             'client_id' => $this->client->id, 'name' => 'Synthetic medicine', 'dosage' => '10 mg', 'dose_amount' => 10, 'dose_unit' => 'mg',
             'active' => true, 'state' => 'active', 'approval_status' => 'verified', 'verified_at' => now(),
@@ -213,7 +219,7 @@ class MedicationDowntimeTest extends TestCase
         ClientMedication::factory()->create(['client_id' => $this->client->id, 'name' => 'Concealed synthetic medicine', 'start_date' => '2026-10-01', 'end_date' => null, 'approval_status' => 'verified', 'verified_at' => now(), 'controlled_drug' => true, 'dose_times' => ['09:00'], 'is_prn' => false, 'active' => true]);
         Carbon::setTestNow($clock);
         MedicationAdminRule::query()->create(['match_type' => 'medicine_name', 'match_value' => 'Synthetic medicine', 'requires_countersign' => true, 'required_observations' => ['blood_glucose'], 'active' => true]);
-        $reader = $this->staff($this->site, 'clinical_lead', ['medications.view', 'clients.viewAny', 'medications.reports.export']);
+        $reader = $this->staff($this->site, 'clinical_lead', ['medications.view', 'clients.viewAny', 'medications.reports.view', 'medications.reports.export']);
         $deny = Permission::query()->where('key', 'medications.controlled.view')->firstOrFail();
         $reader->permissionOverrides()->syncWithoutDetaching([$deny->id => ['allowed' => false]]);
         $reader = $reader->fresh();
@@ -266,51 +272,104 @@ class MedicationDowntimeTest extends TestCase
         $this->assertDatabaseCount('medication_paper_postings', 0);
     }
 
-    public function test_ordinary_paper_posts_through_canonical_authority_with_actual_time_and_shift(): void
-    {
-        $shift = $this->coveringAuthority();
-        $this->actingAs($this->lead);
-        $downtime = $this->declare();
-        $entry = $this->capture($downtime);
-        $preview = app(PaperEntryService::class)->reconciliationPreview($this->lead, $downtime, $entry);
-        $this->assertTrue($preview['can_reconcile'], json_encode($preview));
-        $result = app(PaperEntryService::class)->reconcile($this->lead, $downtime, $entry, $preview['preview_token']);
-        $this->assertTrue($result['success'], json_encode($result));
-        $admin = ClientMedicationAdministration::query()->sole();
-        $this->assertSame($this->lead->id, $admin->administered_by);
-        $this->assertSame($shift->id, $admin->shift_id);
-        $this->assertTrue($entry->given_at->equalTo($admin->administered_at));
-        $this->assertTrue($entry->scheduled_for->equalTo($admin->scheduled_for));
-        $this->assertDatabaseHas('medication_paper_postings', ['paper_entry_id' => $entry->id, 'administration_id' => $admin->id]);
-        $this->assertDatabaseHas('medication_dose_slots', ['client_medication_id' => $this->order->id, 'outcome' => 'given', 'outcome_administration_id' => $admin->id]);
-        $this->assertSame('entered_from_paper', app(PaperEntryService::class)->reconciliationPreview($this->lead, $downtime, $entry)['state']);
-        $again = app(PaperEntryService::class)->reconcile($this->lead, $downtime, $entry, $preview['preview_token']);
-        $this->assertTrue($again['duplicate']);
-        $this->assertDatabaseCount('client_medication_administrations', 1);
-    }
-
-    public function test_final_event_failure_rolls_back_canonical_dose_projection_posting_and_receipt(): void
+    public function test_completed_assignment_cannot_post_given_paper_without_historical_stock_disposition(): void
     {
         $this->coveringAuthority();
         $this->actingAs($this->lead);
         $downtime = $this->declare();
         $entry = $this->capture($downtime);
         $preview = app(PaperEntryService::class)->reconciliationPreview($this->lead, $downtime, $entry);
+        $this->assertFalse($preview['can_reconcile']);
+        $this->assertStringContainsString('physical stock disposition and count coverage', $preview['unavailable']);
+        $result = app(PaperEntryService::class)->reconcile($this->lead, $downtime, $entry, $preview['preview_token']);
+        $this->assertFalse($result['success']);
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertDatabaseCount('medication_paper_postings', 0);
+        $this->assertDatabaseCount('medication_idempotency_results', 0);
+        $this->assertSame(0, DB::table('medication_dose_slots')->whereNotNull('outcome_administration_id')->count());
+        $this->assertSame('ready_to_reconcile', app(PaperEntryService::class)->reconciliationPreview($this->lead, $downtime, $entry)['state']);
+    }
+
+    public function test_final_export_event_failure_keeps_rendered_pdf_private(): void
+    {
+        $this->fakePackRender(fn () => null);
         $events = Mockery::mock(DowntimeEvents::class);
-        $events->shouldReceive('record')->once()->andThrow(new \RuntimeException('Synthetic final event failure'));
+        $events->shouldReceive('packMade')->once()->andThrow(new \RuntimeException('Synthetic final event failure'));
         $this->app->instance(DowntimeEvents::class, $events);
+        $this->withoutExceptionHandling();
         try {
-            app(PaperEntryService::class)->reconcile($this->lead, $downtime, $entry, $preview['preview_token']);
-            $this->fail('Final event failure must abort the complete reconciliation.');
+            $this->actingAs($this->lead)->postJson('/emar/downtime/pack', ['site_id' => $this->site->id, 'nz_date' => '2026-10-03']);
+            $this->fail('Final event failure must prevent release of the rendered PDF.');
         } catch (\RuntimeException $e) {
             $this->assertSame('Synthetic final event failure', $e->getMessage());
         }
+        $this->assertSame(0, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
+    }
+
+    public function test_non_given_mapping_retains_paper_reason_without_given_only_fields_or_clinical_posting(): void
+    {
+        foreach (['refused', 'withheld'] as $outcome) {
+            if ($outcome === 'withheld') {
+                $copy = $this->order->replicate();
+                $copy->name = 'Synthetic withheld medicine';
+                $copy->save();
+                $this->order = $copy->fresh();
+            }
+            $downtime = $this->declare();
+            $target = $downtime->doses()->where('client_medication_id', $this->order->id)->firstOrFail();
+            $entry = $this->capture($downtime, ['downtime_dose_id' => $target->id, 'outcome' => $outcome, 'dose_on_paper' => null,
+                'notes' => 'Exact synthetic paper explanation', 'observations' => ['blood_glucose' => 4.2]]);
+            $facts = app(PaperAdministrationWriter::class)->canonicalData($entry);
+            $this->assertSame($outcome, $facts['reason_code']);
+            $this->assertSame('Exact synthetic paper explanation', $facts['reason']);
+            $this->assertSame($outcome, $entry->snapshot['reason_code']);
+            foreach (['dose_given', 'amount_mode', 'blood_glucose', 'reason_category', 'witness_id', 'witness_pin'] as $key) {
+                $this->assertArrayNotHasKey($key, $facts);
+            }
+            $preview = app(PaperEntryService::class)->reconciliationPreview($this->lead, $downtime, $entry);
+            $this->assertFalse($preview['can_reconcile']);
+            $this->assertStringContainsString('canonical historical non-given adapter', $preview['unavailable']);
+        }
         $this->assertDatabaseCount('client_medication_administrations', 0);
         $this->assertDatabaseCount('medication_paper_postings', 0);
-        $this->assertSame(0, DB::table('medication_dose_slots')->whereNotNull('outcome_administration_id')->count());
-        $this->assertDatabaseCount('medication_idempotency_results', 0);
-        $this->assertDatabaseCount('medication_paper_entries', 1);
-        $this->assertDatabaseCount('medication_paper_confirmations', 1);
+    }
+
+    public function test_non_given_paper_requires_the_explanation_on_paper(): void
+    {
+        $downtime = $this->declare();
+        $preview = app(PaperEntryService::class)->preview($this->lead, $downtime, $this->facts($downtime, ['outcome' => 'refused', 'dose_on_paper' => null, 'notes' => '']));
+        $this->assertFalse($preview['can_submit']);
+        $this->assertStringContainsString('explanation written on the paper', implode(' ', $preview['errors']));
+    }
+
+    public function test_reconciliation_preview_binds_schedule_dates_and_prn_limits_even_while_held(): void
+    {
+        $downtime = $this->declare();
+        $entry = $this->capture($downtime);
+        foreach (['dose_times' => ['10:00'], 'start_date' => '2026-10-02', 'end_date' => '2026-10-04', 'max_per_day' => 4, 'min_hours_between_doses' => 6] as $field => $value) {
+            $preview = app(PaperEntryService::class)->reconciliationPreview($this->lead, $downtime, $entry, $this->order->fresh());
+            ClientMedication::withoutEvents(fn () => $this->order->update([$field => $value]));
+            try {
+                app(PaperEntryService::class)->reconcile($this->lead, $downtime, $entry, $preview['preview_token']);
+                $this->fail('Changed '.$field.' must invalidate the execution preview.');
+            } catch (ValidationException $e) {
+                $this->assertArrayHasKey('preview_token', $e->errors());
+            }
+        }
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertDatabaseCount('medication_paper_postings', 0);
+    }
+
+    public function test_reconciliation_preview_binds_matching_rule_revision_even_when_requirements_are_unchanged(): void
+    {
+        $rule = MedicationAdminRule::query()->create(['site_id' => $this->site->id, 'match_type' => 'route', 'match_value' => 'oral',
+            'requires_countersign' => false, 'required_observations' => [], 'active' => true]);
+        $downtime = $this->declare();
+        $entry = $this->capture($downtime);
+        $preview = app(PaperEntryService::class)->reconciliationPreview($this->lead, $downtime, $entry);
+        $rule->update(['updated_at' => now()->addMinute()]);
+        $this->expectException(ValidationException::class);
+        app(PaperEntryService::class)->reconcile($this->lead, $downtime, $entry, $preview['preview_token']);
     }
 
     public function test_direct_collection_service_requires_accountable_approval(): void
@@ -374,7 +433,7 @@ class MedicationDowntimeTest extends TestCase
         $downtime = $this->declare();
         $witness = $this->staff($this->site, 'support_worker', ['medications.view', 'medications.controlled.view', 'medications.controlled.witness']);
         $entry = $this->capture($downtime, ['witness_id' => $witness->id]);
-        $reader = $this->staff($this->site, 'clinical_lead', ['medications.view', 'clients.viewAny', 'medications.reports.export']);
+        $reader = $this->staff($this->site, 'clinical_lead', ['medications.view', 'clients.viewAny', 'medications.reports.view', 'medications.reports.export']);
         $reader->permissionOverrides()->syncWithoutDetaching([Permission::query()->where('key', 'medications.controlled.view')->firstOrFail()->id => ['allowed' => false]]);
         $second = app(DowntimeService::class)->declare($reader->fresh(), $this->declaration());
         $this->assertCount(1, $second->doses);
@@ -386,10 +445,134 @@ class MedicationDowntimeTest extends TestCase
     public function test_pack_omits_reclassified_controlled_order_even_if_slot_remains_ordinary(): void
     {
         ClientMedication::withoutEvents(fn () => $this->order->update(['controlled_drug' => true]));
-        $reader = $this->staff($this->site, 'clinical_lead', ['medications.view', 'clients.viewAny', 'medications.reports.export']);
+        $reader = $this->staff($this->site, 'clinical_lead', ['medications.view', 'clients.viewAny', 'medications.reports.view', 'medications.reports.export']);
         $reader->permissionOverrides()->syncWithoutDetaching([Permission::query()->where('key', 'medications.controlled.view')->firstOrFail()->id => ['allowed' => false]]);
         $pack = app(DowntimePackService::class)->build($reader->fresh(), $this->site->id, '2026-10-03');
         $this->assertStringNotContainsString('Synthetic medicine', json_encode($pack));
+    }
+
+    public function test_actual_pdf_download_renders_generic_concealment_notice_and_logs_release(): void
+    {
+        $this->lead->permissionOverrides()->syncWithoutDetaching([Permission::query()->where('key', 'medications.controlled.view')->firstOrFail()->id => ['allowed' => false]]);
+        $response = $this->actingAs($this->lead->fresh())->post('/emar/downtime/pack', ['site_id' => $this->site->id, 'nz_date' => '2026-10-03']);
+        $response->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF-', $response->getContent());
+        $this->assertGreaterThan(1000, strlen($response->getContent()));
+        $event = MedicationEvent::query()->where('kind', 'export.downtime_pack')->sole();
+        $this->assertSame(DowntimePackService::PURPOSE, $event->facts['purpose']);
+        $this->assertFalse($event->facts['controlled_pages_included']);
+    }
+
+    public function test_pack_requires_p09_report_and_export_capabilities(): void
+    {
+        $this->lead->permissionOverrides()->syncWithoutDetaching([Permission::query()->where('key', 'medications.reports.view')->firstOrFail()->id => ['allowed' => false]]);
+        $this->actingAs($this->lead->fresh())->postJson('/emar/downtime/pack', ['site_id' => $this->site->id, 'nz_date' => '2026-10-03'])->assertForbidden();
+        $this->assertSame(0, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
+    }
+
+    public function test_finance_only_report_overrides_cannot_release_person_pack_details(): void
+    {
+        $finance = $this->staff($this->site, 'finance', ['medications.reports.view', 'medications.reports.export']);
+        $this->actingAs($finance)->postJson('/emar/downtime/pack/preview', ['site_id' => $this->site->id, 'nz_date' => '2026-10-03'])->assertForbidden();
+        $this->actingAs($finance)->postJson('/emar/downtime/pack', ['site_id' => $this->site->id, 'nz_date' => '2026-10-03'])->assertForbidden();
+        $this->assertSame(0, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
+    }
+
+    public function test_revoked_export_authority_during_render_releases_no_bytes_or_export_event(): void
+    {
+        $this->fakePackRender(function (): void {
+            $this->lead->permissionOverrides()->syncWithoutDetaching([Permission::query()->where('key', 'medications.reports.export')->firstOrFail()->id => ['allowed' => false]]);
+        });
+        $response = $this->actingAs($this->lead)->postJson('/emar/downtime/pack', ['site_id' => $this->site->id, 'nz_date' => '2026-10-03']);
+        $response->assertForbidden();
+        $this->assertStringNotContainsString('%PDF-sensitive', $response->getContent());
+        $this->assertSame(0, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
+    }
+
+    public function test_revoked_account_approval_during_render_releases_no_bytes_or_export_event(): void
+    {
+        $this->fakePackRender(fn () => User::withoutEvents(fn () => $this->lead->forceFill(['approved_at' => null])->save()));
+        $response = $this->actingAs($this->lead)->postJson('/emar/downtime/pack', ['site_id' => $this->site->id, 'nz_date' => '2026-10-03']);
+        $response->assertForbidden();
+        $this->assertStringNotContainsString('%PDF-sensitive', $response->getContent());
+        $this->assertSame(0, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
+    }
+
+    public function test_revoked_approved_site_during_render_releases_no_bytes_or_export_event(): void
+    {
+        $this->fakePackRender(fn () => $this->lead->hrEmployeeProfile->update(['primary_site_id' => null, 'secondary_site_ids' => []]));
+        $response = $this->actingAs($this->lead)->postJson('/emar/downtime/pack', ['site_id' => $this->site->id, 'nz_date' => '2026-10-03']);
+        $response->assertNotFound();
+        $this->assertStringNotContainsString('%PDF-sensitive', $response->getContent());
+        $this->assertSame(0, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
+    }
+
+    public function test_controlled_view_revocation_during_render_releases_no_bytes_or_export_event(): void
+    {
+        $this->fakePackRender(function (): void {
+            $this->lead->permissionOverrides()->syncWithoutDetaching([Permission::query()->where('key', 'medications.controlled.view')->firstOrFail()->id => ['allowed' => false]]);
+        });
+        $response = $this->actingAs($this->lead)->postJson('/emar/downtime/pack', ['site_id' => $this->site->id, 'nz_date' => '2026-10-03']);
+        $response->assertConflict();
+        $this->assertStringNotContainsString('%PDF-sensitive', $response->getContent());
+        $this->assertSame(0, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
+    }
+
+    public function test_controlled_reclassification_during_render_releases_no_bytes_or_export_event(): void
+    {
+        $this->fakePackRender(function (): void {
+            ClientMedication::withoutEvents(fn () => $this->order->update(['controlled_drug' => true]));
+        });
+        $response = $this->actingAs($this->lead)->postJson('/emar/downtime/pack', ['site_id' => $this->site->id, 'nz_date' => '2026-10-03']);
+        $response->assertConflict();
+        $this->assertStringNotContainsString('%PDF-sensitive', $response->getContent());
+        $this->assertSame(0, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
+    }
+
+    public function test_person_move_during_render_releases_no_bytes_or_export_event(): void
+    {
+        $other = Site::factory()->create(['is_active' => true]);
+        $this->fakePackRender(fn () => $this->client->update(['site_id' => $other->id]));
+        $response = $this->actingAs($this->lead)->postJson('/emar/downtime/pack', ['site_id' => $this->site->id, 'nz_date' => '2026-10-03']);
+        $response->assertConflict();
+        $this->assertStringNotContainsString('%PDF-sensitive', $response->getContent());
+        $this->assertSame(0, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
+    }
+
+    public function test_changed_instructions_during_render_releases_no_bytes_or_export_event(): void
+    {
+        $this->fakePackRender(fn () => ClientMedication::withoutEvents(fn () => $this->order->update(['instructions' => 'Synthetic changed instructions'])));
+        $response = $this->actingAs($this->lead)->postJson('/emar/downtime/pack', ['site_id' => $this->site->id, 'nz_date' => '2026-10-03']);
+        $response->assertConflict();
+        $this->assertStringNotContainsString('%PDF-sensitive', $response->getContent());
+        $this->assertSame(0, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
+    }
+
+    public function test_changed_rule_or_projection_evidence_during_render_releases_no_bytes_or_export_event(): void
+    {
+        $mutations = [
+            fn () => MedicationAdminRule::query()->create(['site_id' => $this->site->id, 'match_type' => 'route', 'match_value' => 'oral',
+                'requires_countersign' => true, 'required_observations' => [], 'active' => true]),
+            fn () => DB::table('medication_dose_slots')->where('client_medication_id', $this->order->id)->where('nz_date', '2026-10-03')->update(['outcome' => 'refused']),
+        ];
+        foreach ($mutations as $mutation) {
+            $this->fakePackRender($mutation);
+            $response = $this->actingAs($this->lead)->postJson('/emar/downtime/pack', ['site_id' => $this->site->id, 'nz_date' => '2026-10-03']);
+            $response->assertConflict();
+            $this->assertStringNotContainsString('%PDF-sensitive', $response->getContent());
+        }
+        $this->assertSame(0, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
+    }
+
+    private function fakePackRender(callable $duringRender): void
+    {
+        $pdf = Mockery::mock(DowntimePackPdf::class);
+        $pdf->shouldReceive('render')->once()->andReturnUsing(function (array $pack) use ($duringRender): string {
+            $duringRender();
+
+            return '%PDF-sensitive-synthetic-person';
+        });
+        $this->app->instance(DowntimePackPdf::class, $pdf);
     }
 
     private function coveringAuthority(): Shift

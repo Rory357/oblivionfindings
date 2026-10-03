@@ -2,15 +2,16 @@
 
 namespace App\Services\Medication\Downtime;
 
+use App\Enums\Medication\NotGivenReason;
 use App\Models\ClientMedication;
 use App\Models\MedicationPaperEntry;
 use App\Models\User;
-use App\Services\EnhancedMarService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\MedicationRuleService;
 use Carbon\Carbon;
 use Closure;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
@@ -21,7 +22,7 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
  */
 class PaperAdministrationWriter
 {
-    public function __construct(private readonly EnhancedMarService $mar, private readonly MedicationRuleService $rules, private readonly MedicationScopeDecisionService $scope) {}
+    public function __construct(private readonly MedicationRuleService $rules, private readonly MedicationScopeDecisionService $scope) {}
 
     public function availability(MedicationPaperEntry $entry, ClientMedication $order, User $actor): ?string
     {
@@ -38,7 +39,7 @@ class PaperAdministrationWriter
             || PaperEntryService::orderFingerprint($order) !== ($entry->snapshot['order_fingerprint'] ?? null)) {
             return 'The order changed or is no longer recordable. Historical order reconciliation is not configured; ask the clinical lead to review the signed paper.';
         }
-        $currentRules = $this->rules->requirementsFor($order);
+        $currentRules = $this->rules->requirementsFor($order, lockForUpdate: DB::transactionLevel() > 0);
         if ($entry->outcome === 'given' && ($order->requiresWitness() || $currentRules['requires_countersign'])) {
             return 'This dose now needs a second person. Historical second-person reconciliation is not configured; no eMAR dose has been posted.';
         }
@@ -46,16 +47,48 @@ class PaperAdministrationWriter
             return 'The dose on paper differs from the order text. Use the approved exception-recording workflow with the clinical lead; no amount is assumed.';
         }
         if ($entry->outcome !== 'given') {
-            return 'Historical refused or withheld reconciliation needs the approved structured reason from paper. That adapter is not configured; the paper outcome and notes are kept and no clinical outcome is assumed.';
+            return 'The paper outcome maps explicitly to '.$this->reasonCode($entry->outcome).'. The canonical historical non-given adapter is not configured; the original paper outcome and notes are kept, and no refusal cause or clinical record is inferred.';
         }
         if ($order->is_prn) {
-            return 'Historical as-needed reconciliation is not configured. The shared interval and daily-limit checks use the current time; the signed paper evidence is kept and no eMAR dose has been posted.';
+            return 'Historical as-needed reconciliation is not configured. Temporal safety checks alone do not establish historical recording authority or physical stock disposition; the signed paper evidence is kept and no eMAR dose has been posted.';
         }
         if (! in_array((int) $order->client_id, $this->scope->clientIdsWithCurrentAuthority($actor, [(int) $order->client_id], Carbon::instance($entry->given_at)), true)) {
             return 'A covering assignment or usable emergency grant at the actual paper time could not be established. The signed paper evidence is kept; no eMAR dose has been posted.';
         }
 
-        return null;
+        return 'Historical physical stock disposition and count coverage have not been established by the shared recording adapter. The signed paper evidence is kept; no eMAR dose, current stock deduction or register movement has been made.';
+    }
+
+    /** Server-owned mapping of the selected paper outcome; never infer a refusal cause. */
+    public static function reasonCode(string $outcome): ?string
+    {
+        return match ($outcome) {
+            'refused' => NotGivenReason::Refused->value,
+            'withheld' => NotGivenReason::Withheld->value,
+            default => null,
+        };
+    }
+
+    /** Integration facts only. Posting remains held until the shared historical adapter exists. */
+    public function canonicalData(MedicationPaperEntry $entry): array
+    {
+        $facts = [
+            'scope_authorized' => true,
+            'client_request_uuid' => $entry->request_uuid,
+            'status' => $entry->outcome,
+            'scheduled_for' => $entry->scheduled_for?->toIso8601String(),
+            'administered_at' => $entry->given_at->toIso8601String(),
+            'reason_code' => self::reasonCode($entry->outcome),
+            'reason' => $entry->notes,
+            'notes' => trim((string) $entry->notes)."\nEntered from paper DT-".$entry->downtime_id
+                .'; paper entry '.$entry->id.'; actual giver '.$entry->given_by.'; entered by '.$entry->entered_by
+                .'; entered at '.$entry->created_at->toIso8601String(),
+        ];
+        if ($entry->outcome === 'given') {
+            $facts += ['dose_given' => $entry->dose_on_paper, 'amount_mode' => 'as_ordered', ...$entry->observations];
+        }
+
+        return $facts;
     }
 
     /** Canonical authority locks precede the caller's paper-entry lock and final P09 append. */
@@ -97,27 +130,9 @@ class PaperAdministrationWriter
             return ['success' => false, 'error' => $reason];
         }
 
-        $result = $this->mar->recordAdministration($decision->client, $order, [
-            'scope_authorized' => true,
-            'client_request_uuid' => $entry->request_uuid,
-            'status' => $entry->outcome,
-            'scheduled_for' => $entry->scheduled_for?->toIso8601String(),
-            'administered_at' => $entry->given_at->toIso8601String(),
-            'dose_given' => $entry->dose_on_paper,
-            // Explicit amount on the paper was compared to the unchanged order above.
-            'amount_mode' => $entry->outcome === 'given' ? 'as_ordered' : null,
-            'reason' => $entry->notes,
-            'notes' => trim((string) $entry->notes)."\nEntered from paper DT-".$entry->downtime_id
-                .'; paper entry '.$entry->id.'; actual giver '.$entry->given_by.'; entered by '.$entry->entered_by
-                .'; entered at '.$entry->created_at->toIso8601String(),
-            ...$entry->observations,
-        ], (int) $decision->performer->id, $decision->shiftId(), $decision->performer->canDo('medications.controlled.view'),
-            prelockedPresenceShifts: $decision->lockedPresenceShifts,
-            prelockedPresenceEffectiveAt: $decision->lockedPresenceEffectiveAt);
-        if ($result['success'] ?? false) {
-            $this->scope->recordBreakGlassUse($decision, 'medication.paper_reconciled', 'Paper entry '.$entry->id);
-        }
-
-        return $result;
+        // P01/P06 must wire their canonical historical recorder here after
+        // proving physical disposition/count coverage (or evidenced non-given
+        // reasons). Today's ordinary FEFO writer is not a historical adapter.
+        return ['success' => false, 'error' => 'The canonical historical paper recording adapter is not configured. Signed paper evidence is kept; no clinical or stock record has changed.'];
     }
 }

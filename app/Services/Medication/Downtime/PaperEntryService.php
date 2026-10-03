@@ -5,6 +5,7 @@ namespace App\Services\Medication\Downtime;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationAdminRule;
 use App\Models\MedicationDowntime;
 use App\Models\MedicationDowntimeDose;
 use App\Models\MedicationDowntimeResolution;
@@ -40,12 +41,28 @@ final class PaperEntryService
         return PaperReconciliationRules::fingerprint($order->only([
             'id', 'client_id', 'name', 'dosage', 'dose_amount', 'dose_unit', 'route', 'version',
             'controlled_drug', 'is_prn', 'approval_status', 'verified_at', 'superseded_by',
+            'dose_times', 'frequency', 'frequency_code', 'start_date', 'end_date',
+            'max_per_day', 'min_hours_between_doses', 'prn_reason', 'instructions',
+            'witness_required', 'high_risk', 'nzulm_code', 'active', 'state',
+            'paused_at', 'ceased_at', 'superseded_at', 'self_managed',
         ]));
+    }
+
+    /** Bind matching rule revisions as well as their effective requirements. */
+    public function requirementsFingerprint(ClientMedication $order): string
+    {
+        $locking = DB::transactionLevel() > 0;
+        $requirements = $this->rules->requirementsFor($order, lockForUpdate: $locking);
+        $revisions = MedicationAdminRule::query()->whereIn('id', array_column($requirements['matched_rules'], 'id'))->orderBy('id')
+            ->when($locking, fn ($query) => $query->lockForUpdate())
+            ->get(['id', 'site_id', 'match_type', 'match_value', 'requires_countersign', 'required_observations', 'active', 'created_at', 'updated_at'])->toArray();
+
+        return PaperReconciliationRules::fingerprint([$requirements, $revisions]);
     }
 
     public function snapshot(ClientMedication $order, string $outcome = 'given'): array
     {
-        $rule = $this->rules->requirementsFor($order);
+        $rule = $this->rules->requirementsFor($order, lockForUpdate: DB::transactionLevel() > 0);
 
         return [
             'person' => $order->client->full_name, 'medicine' => $order->name,
@@ -54,6 +71,8 @@ final class PaperEntryService
             'second_person_required' => $outcome === 'given' && ($order->requiresWitness() || $rule['requires_countersign']),
             'observation_keys' => $outcome === 'given' ? $rule['required_observations'] : [],
             'order_fingerprint' => self::orderFingerprint($order),
+            'requirements_fingerprint' => $this->requirementsFingerprint($order),
+            'reason_code' => PaperAdministrationWriter::reasonCode($outcome),
             'order_version' => $order->version,
         ];
     }
@@ -66,6 +85,9 @@ final class PaperEntryService
         $errors = [];
         if (! PaperReconciliationRules::inside($at, $downtime->started_at->utc(), $downtime->ended_at->utc())) {
             $errors[] = 'The time on paper must be inside this downtime.';
+        }
+        if ($data['outcome'] !== 'given' && blank($data['notes'] ?? null)) {
+            $errors[] = 'Enter the reason or explanation written on the paper for this outcome.';
         }
         abort_unless($this->access->manages($actor) || (int) $data['given_by'] === (int) $actor->id, 403);
         $giver = User::query()->findOrFail((int) $data['given_by']);
@@ -253,7 +275,7 @@ final class PaperEntryService
         $state = PaperReconciliationRules::state($entry->posting()->exists(), $confirmations->has('giver'), (bool) ($entry->snapshot['second_person_required'] ?? false), $confirmations->has('witness'));
         $conflicts = $this->conflicts($order, $entry->scheduled_for, $entry->given_at, $entry->dose_identity, (int) $entry->id);
         $unavailable = $this->writer->availability($entry, $order, $actor);
-        $facts = [$entry->request_fingerprint, $state, $conflicts, $unavailable, self::orderFingerprint($order)];
+        $facts = [$entry->request_fingerprint, $state, $conflicts, $unavailable, self::orderFingerprint($order), $this->requirementsFingerprint($order)];
 
         return [
             'state' => $state, 'conflicts' => $conflicts, 'unavailable' => $unavailable,

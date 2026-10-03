@@ -1,6 +1,7 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { EmergencyAccessStrip } from '@/components/emar/emergency-access-strip';
 import InputError from '@/components/input-error';
+import { EntityContextMenu, useEntityContextMenu } from '@/components/lists';
 import {
     PageHeader,
     PageHeaderFilterButton,
@@ -15,12 +16,6 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-    ContextMenu,
-    ContextMenuContent,
-    ContextMenuItem,
-    ContextMenuTrigger,
-} from '@/components/ui/context-menu';
 import {
     Dialog,
     DialogContent,
@@ -128,6 +123,7 @@ export default function AccessPage(props: Props) {
         props.open_grant ?? null,
     );
     const [command, setCommand] = useState<Command | null>(null);
+    const context = useEntityContextMenu<Grant>();
     const [now, setNow] = useState(Date.now());
     useEffect(() => {
         const id = window.setInterval(() => setNow(Date.now()), 1000);
@@ -426,118 +422,108 @@ export default function AccessPage(props: Props) {
                                 </TableHeader>
                                 <TableBody>
                                     {rows.map((grant) => (
-                                        <ContextMenu key={grant.id}>
-                                            <ContextMenuTrigger asChild>
-                                                <TableRow
-                                                    tabIndex={0}
-                                                    onClick={() => open(grant)}
-                                                    onKeyDown={(e) => {
-                                                        if (
-                                                            e.key === 'Enter' &&
-                                                            e.target ===
-                                                                e.currentTarget
-                                                        )
-                                                            open(grant);
-                                                    }}
-                                                    className="focus-visible:ring-ring cursor-pointer focus-visible:ring-2"
-                                                >
-                                                    <TableCell>
-                                                        <span className="font-medium">
-                                                            EA-{grant.id} ·{' '}
-                                                            {grant.client_name}
-                                                        </span>
-                                                        <div className="text-caption">
-                                                            {grant.site_name}
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {grant.staff}
-                                                        <div className="text-caption">
-                                                            {
-                                                                grant.reason_category
-                                                            }
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {formatDateTime(
-                                                            grant.created_at,
-                                                        )}
-                                                        <div className="text-caption">
-                                                            {grant.status ===
-                                                            'active'
-                                                                ? `Ends ${formatDateTime(grant.expires_at)}`
-                                                                : `Review due ${formatDateTime(grant.review_due_at)}`}
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {status(grant)}
-                                                        {grant.review_denial && (
-                                                            <div className="text-caption">
-                                                                {
-                                                                    grant.review_denial
-                                                                }
-                                                            </div>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell
-                                                        onClick={(e) =>
-                                                            e.stopPropagation()
-                                                        }
-                                                    >
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger
-                                                                asChild
-                                                            >
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="frontline-tap"
-                                                                    aria-label={`Actions for EA-${grant.id}`}
-                                                                >
-                                                                    <MoreHorizontal className="size-4" />
-                                                                </Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent>
-                                                                {actions(
-                                                                    grant,
-                                                                ).map(
-                                                                    (
-                                                                        action,
-                                                                    ) => (
-                                                                        <DropdownMenuItem
-                                                                            key={
-                                                                                action.label
-                                                                            }
-                                                                            onSelect={
-                                                                                action.run
-                                                                            }
-                                                                        >
-                                                                            {
-                                                                                action.label
-                                                                            }
-                                                                        </DropdownMenuItem>
-                                                                    ),
-                                                                )}
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
-                                                    </TableCell>
-                                                </TableRow>
-                                            </ContextMenuTrigger>
-                                            <ContextMenuContent>
-                                                {actions(grant).map(
-                                                    (action) => (
-                                                        <ContextMenuItem
-                                                            key={action.label}
-                                                            onSelect={
-                                                                action.run
-                                                            }
-                                                        >
-                                                            {action.label}
-                                                        </ContextMenuItem>
-                                                    ),
+                                        <TableRow
+                                            key={grant.id}
+                                            tabIndex={0}
+                                            onContextMenu={(event) =>
+                                                context.open(event, grant)
+                                            }
+                                            onClick={() => open(grant)}
+                                            onKeyDown={(e) => {
+                                                if (
+                                                    e.key === 'ContextMenu' ||
+                                                    (e.shiftKey &&
+                                                        e.key === 'F10')
+                                                ) {
+                                                    e.preventDefault();
+                                                    e.currentTarget.dispatchEvent(
+                                                        new MouseEvent(
+                                                            'contextmenu',
+                                                            { bubbles: true },
+                                                        ),
+                                                    );
+                                                    return;
+                                                }
+                                                if (
+                                                    e.key === 'Enter' &&
+                                                    e.target === e.currentTarget
+                                                )
+                                                    open(grant);
+                                            }}
+                                            className="focus-visible:ring-ring cursor-pointer focus-visible:ring-2"
+                                        >
+                                            <TableCell>
+                                                <span className="font-medium">
+                                                    EA-{grant.id} ·{' '}
+                                                    {grant.client_name}
+                                                </span>
+                                                <div className="text-caption">
+                                                    {grant.site_name}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                {grant.staff}
+                                                <div className="text-caption">
+                                                    {grant.reason_category}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                {formatDateTime(
+                                                    grant.created_at,
                                                 )}
-                                            </ContextMenuContent>
-                                        </ContextMenu>
+                                                <div className="text-caption">
+                                                    {grant.status === 'active'
+                                                        ? `Ends ${formatDateTime(grant.expires_at)}`
+                                                        : `Review due ${formatDateTime(grant.review_due_at)}`}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                {status(grant)}
+                                                {grant.review_denial && (
+                                                    <div className="text-caption">
+                                                        {grant.review_denial}
+                                                    </div>
+                                                )}
+                                            </TableCell>
+                                            <TableCell
+                                                onClick={(e) =>
+                                                    e.stopPropagation()
+                                                }
+                                            >
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger
+                                                        asChild
+                                                    >
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="frontline-tap"
+                                                            aria-label={`Actions for EA-${grant.id}`}
+                                                        >
+                                                            <MoreHorizontal className="size-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent>
+                                                        {actions(grant).map(
+                                                            (action) => (
+                                                                <DropdownMenuItem
+                                                                    key={
+                                                                        action.label
+                                                                    }
+                                                                    onSelect={
+                                                                        action.run
+                                                                    }
+                                                                >
+                                                                    {
+                                                                        action.label
+                                                                    }
+                                                                </DropdownMenuItem>
+                                                            ),
+                                                        )}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </TableCell>
+                                        </TableRow>
                                     ))}
                                 </TableBody>
                             </Table>
@@ -614,6 +600,19 @@ export default function AccessPage(props: Props) {
                     </div>
                 )}
             </div>
+            {context.ctx && (
+                <EntityContextMenu
+                    x={context.ctx.x}
+                    y={context.ctx.y}
+                    title={`EA-${context.ctx.record.id} · ${context.ctx.record.client_name}`}
+                    icon={ShieldAlert}
+                    items={actions(context.ctx.record).map((action) => ({
+                        label: action.label,
+                        onClick: action.run,
+                    }))}
+                    onClose={context.close}
+                />
+            )}
             {requesting && (
                 <RequestAccessDialog
                     results={props.results}

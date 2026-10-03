@@ -65,7 +65,7 @@ Nothing recorded — check the health profile and ask the lead. This does not me
 <section class="{{ count($pack['people']) ? 'page' : '' }}">
 <h1>Round sheet — {{ $pack['site']['name'] }}</h1>
 <p>Built from scheduled doses on {{ $day->format('D j M Y') }}. Check any recorded outcome and changes before the round.</p>
-@if ($pack['hidden_controlled_doses'])<p class="notice">Some controlled doses are omitted. Ask the house lead with controlled-medicine access for the complete round sheet.</p>@endif
+@if ($pack['controlled_notice'])<p class="notice">{{ $pack['controlled_notice'] }}</p>@endif
 <table><thead><tr><th>Due (NZ)</th><th>Person</th><th>Medicine / dose / route</th><th>At printing</th><th>Actual outcome / time</th><th>Giver</th><th>Second person / required readings</th></tr></thead><tbody>
 @forelse ($pack['rounds'] as $dose)
 <tr class="writing"><td>{{ $dose['ordered_time'] }}</td><td>{{ $dose['person'] }}</td><td>{{ $dose['medicine'] }}<br>{{ $dose['dosage'] }} · {{ $dose['route'] }}</td><td>{{ ucfirst(str_replace('_', ' ', $dose['state'])) }}</td><td></td><td></td><td>{{ $dose['second_person_required'] ? 'Name / signature:' : '—' }}<br>{{ implode('; ', $dose['readings']) }}</td></tr>

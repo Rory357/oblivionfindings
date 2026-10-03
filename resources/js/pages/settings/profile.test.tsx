@@ -68,6 +68,7 @@ function renderProfile(phone: string | null) {
         <Profile
             mustVerifyEmail={false}
             profile={{
+                ...{ onCallCellphoneConsentedAt: null },
                 phone,
                 jobTitle: 'Support Worker',
                 timezone: 'Pacific/Auckland',

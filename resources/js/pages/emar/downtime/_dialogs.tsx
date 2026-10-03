@@ -283,7 +283,8 @@ export function DuplicateResolutionDialog({
                                         reason: data.reason,
                                         accountable_confirmation:
                                             data.accountable_confirmation,
-                                    })).post(
+                                    }));
+                                    form.post(
                                         `/emar/downtime/${downtimeId}/doses/${dose.id}/resolve`,
                                         {
                                             preserveScroll: true,
@@ -716,23 +717,21 @@ export function PaperEntryDialog({
                                 (!preview?.can_submit ||
                                     !form.data.accountable_confirmation))
                         }
-                        onClick={() =>
-                            step === 0
-                                ? void check()
-                                : form
-                                      .transform((data) => ({
-                                          ...data,
-                                          given_at: data.given_at + clockOffset,
-                                          witness_id: data.witness_id || null,
-                                      }))
-                                      .post(
-                                          `/emar/downtime/${downtimeId}/paper`,
-                                          {
-                                              onSuccess: onClose,
-                                              preserveScroll: true,
-                                          },
-                                      )
-                        }
+                        onClick={() => {
+                            if (step === 0) {
+                                void check();
+                                return;
+                            }
+                            form.transform((data) => ({
+                                ...data,
+                                given_at: data.given_at + clockOffset,
+                                witness_id: data.witness_id || null,
+                            }));
+                            form.post(`/emar/downtime/${downtimeId}/paper`, {
+                                onSuccess: onClose,
+                                preserveScroll: true,
+                            });
+                        }}
                     >
                         {(checking || form.processing) && (
                             <Loader2 className="size-4 animate-spin" />

@@ -9,6 +9,6 @@ class DowntimePackPdf
 {
     public function render(array $pack): string
     {
-        return Pdf::loadView('pdf.medication-downtime-pack', ['pack' => $pack])->setPaper('A4', 'landscape')->output();
+        return Pdf::setOption(['defaultFont' => 'DejaVu Sans', 'isRemoteEnabled' => false])->loadView('pdf.medication-downtime-pack', ['pack' => $pack])->setPaper('A4', 'landscape')->output();
     }
 }
