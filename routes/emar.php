@@ -14,6 +14,7 @@ use App\Http\Controllers\Emar\GuidedRoundController;
 use App\Http\Controllers\Emar\MedicationAuditEventController;
 use App\Http\Controllers\Emar\MedicationErrorController;
 use App\Http\Controllers\Emar\MedicationSettingsController;
+use App\Http\Controllers\Emar\MedicationSupportController;
 use App\Http\Controllers\Emar\RefusalFollowUpController;
 use App\Http\Controllers\Emar\StaffEligibilityController;
 use App\Http\Controllers\Emar\WorkerMedsController;
@@ -181,9 +182,13 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     });
 
     // Self-Administration Assessments
-    Route::get('/self-admin', [EmarController::class, 'selfAdmin'])
+    Route::get('/self-admin', [MedicationSupportController::class, 'index'])
         ->middleware('permission:medications.view')
         ->name('emar.self_admin');
+    Route::get('/self-admin/clients/{client}', [MedicationSupportController::class, 'show'])->middleware('permission:medications.view')->name('emar.support.show');
+    Route::post('/self-admin/{assessment}/consent', [MedicationSupportController::class, 'consent'])->middleware('permission:medications.orders.manage|medications.administer.record')->name('emar.support.consent');
+    Route::post('/self-admin/{assessment}/agreement', [MedicationSupportController::class, 'agreement'])->middleware('permission:medications.orders.manage')->name('emar.support.agreement');
+    Route::get('/self-admin/agreements/{agreement}/file', [MedicationSupportController::class, 'agreementFile'])->middleware('permission:medications.view')->name('emar.support.agreement.file');
 
     Route::post('/competency/{assessment}/acknowledge', [EmarController::class, 'acknowledgeCompetency'])
         ->name('emar.competency.acknowledge');
@@ -269,8 +274,8 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         Route::put('/rounds/{round}/assign', [EmarController::class, 'assignRound'])->name('emar.rounds.assign');
 
         // Self-Admin Assessments
-        Route::post('/self-admin', [EmarController::class, 'storeSelfAdmin'])->name('emar.self_admin.store');
-        Route::put('/self-admin/{assessment}', [EmarController::class, 'updateSelfAdmin'])->name('emar.self_admin.update');
+        Route::post('/self-admin', [MedicationSupportController::class, 'store'])->name('emar.self_admin.store');
+        Route::put('/self-admin/{assessment}', [MedicationSupportController::class, 'update'])->name('emar.self_admin.update');
         Route::delete('/self-admin/{assessment}', [EmarController::class, 'destroySelfAdmin'])->name('emar.self_admin.destroy');
 
         // Medications CRUD

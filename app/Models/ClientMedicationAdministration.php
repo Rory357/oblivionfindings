@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\AuditableChanges;
 use App\Services\Medication\DoseSlots\DoseSlotOutcomeWriter;
 use App\Services\Medication\OverdueDoseAlerts;
+use App\Services\Medication\Support\SupportRecordingGuard;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -28,6 +29,7 @@ class ClientMedicationAdministration extends Model
         $lockOrder = static fn (self $administration) => app(DoseSlotOutcomeWriter::class)->lockOrderOf($administration);
 
         static::saving($lockOrder);
+        static::saving(static fn (self $record) => app(SupportRecordingGuard::class)->saving($record));
         static::deleting($lockOrder);
         static::restoring($lockOrder);
         static::forceDeleting($lockOrder);

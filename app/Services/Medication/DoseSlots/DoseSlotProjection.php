@@ -128,6 +128,7 @@ final class DoseSlotProjection
                     'controlled' => (bool) $row->controlled,
                     'concealed' => $concealed,
                     'order_change_pending' => (bool) $row->order_change_pending,
+                    'support_mode' => $concealed ? null : (string) $row->support_mode,
                     'dst_adjustment' => $row->dst_adjustment,
                     'last_day' => (bool) $row->last_day,
                     // Rebuilt from history by the backfill, not generated live.
@@ -249,9 +250,17 @@ final class DoseSlotProjection
         // (C7), read live; the window and state are worked out over them.
         $slots = $scoped->select([
             's.id', 's.client_id', 's.client_medication_id', 's.schedule_version_id', 's.nz_date', 's.ordered_time',
-            's.due_at', 's.controlled', 's.order_change_pending', 's.dst_adjustment', 's.self_managed', 's.last_day', 's.reconstructed',
+            's.due_at', 's.controlled', 's.order_change_pending', 's.dst_adjustment', 's.last_day', 's.reconstructed',
             's.outcome', 's.outcome_administration_id', 's.outcome_at',
         ]);
+        // P03: support is versioned independently of the prescription. Today's
+        // unrecorded doses follow support now (withdrawal takes effect at once);
+        // historical doses retain the support in effect when they were due.
+        $supportAt = "CASE WHEN s.outcome IS NOT NULL THEN COALESCE(s.outcome_at, s.due_at) WHEN s.nz_date = ? AND s.due_at < ? THEN ? ELSE s.due_at END";
+        $supportSql = "(SELECT c.mode FROM medication_support_changes c WHERE c.client_medication_id = s.client_medication_id AND c.client_id = s.client_id AND c.effective_at <= ({$supportAt}) ORDER BY c.effective_at DESC, c.id DESC LIMIT 1)";
+        $supportBindings = [$today, $nowUtc, $nowUtc];
+        $slots->selectRaw("COALESCE({$supportSql}, CASE WHEN s.self_managed = 1 THEN 'self_managed' ELSE 'staff_given' END) as support_mode", $supportBindings);
+        $slots->selectRaw("CASE WHEN COALESCE({$supportSql}, CASE WHEN s.self_managed = 1 THEN 'self_managed' ELSE 'staff_given' END) = 'self_managed' THEN 1 ELSE 0 END as self_managed", $supportBindings);
         foreach (DoseAwaySources::sql() as $column => $sql) {
             $slots->selectRaw("({$sql}) as {$column}");
         }

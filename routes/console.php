@@ -982,3 +982,5 @@ Illuminate\Support\Facades\Schedule::command('reports:run-schedules')->everyFive
 // Medication work is visible independently of Delivery. This creates one
 // lead heads-up for a handover still unread an hour into the incoming shift.
 app(Schedule::class)->command('emar:workflow-followups')->everyMinute()->withoutOverlapping()->onOneServer();
+
+Illuminate\Support\Facades\Schedule::command('emar:support-reviews')->dailyAt('06:00')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
