@@ -4,11 +4,13 @@ namespace App\Services\Fleet;
 
 use App\Models\Client;
 use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
 use App\Models\ClientTransportBooking;
 use App\Models\FleetMedicationTransitLog;
 use App\Models\FleetResidentTransport;
 use App\Models\FleetResidentTransportEvent;
 use App\Models\FleetVehicleBooking;
+use App\Models\MedicationDoseSlot;
 use App\Models\MedicationOrderVersion;
 use App\Models\Shift;
 use App\Models\Site;
@@ -17,14 +19,20 @@ use App\Services\AuditLogger;
 use App\Services\CoverageRoleService;
 use App\Services\EnhancedMarService;
 use App\Services\Medication\ControlledMedicationTransportWitnessService;
+use App\Services\Medication\DoseSlots\DoseSlotGenerator;
+use App\Services\Medication\DoseSlots\DoseSlotProjection;
+use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\WitnessPinService;
+use App\Services\MarScheduleService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\MedicationRuleService;
+use App\Services\MedicationSafetyService;
 use App\Services\MedicationScanVerificationService;
 use App\Services\ShiftOperationalSnapshotService;
 use App\Support\Medication\MedicationStockQuantity;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -35,11 +43,20 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
+use LogicException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class ResidentTransportJourneyService
 {
     private const OFFLINE_CAPTURE_FUTURE_SKEW_MINUTES = 5;
+
+    /** Stored as the reason when a transport dose fills a slot whose window has ended. */
+    public const TRANSPORT_LATE_REASON = 'Given during transport';
+
+    public const TRANSPORT_NOT_DUE = 'Record this dose from Meds today. No dose of this medicine is due now and none is overdue without an outcome.';
+
+    public const TRANSPORT_ALREADY_RECORDED = 'This dose is already recorded — nothing new was saved. Return the medicine to the house.';
 
     public function __construct(
         private readonly ResidentTransportJourneyScope $scope,
@@ -1077,12 +1094,23 @@ class ResidentTransportJourneyService
                     $witness = $witnessAttestation['witness'];
                 }
 
+                // A scheduled order's dose is recorded against its owed slot, so
+                // it is one record whichever screen makes it and the house never
+                // sees the same dose as still due (P0: transport double dose).
+                $doseSlot = $medication->is_prn
+                    ? null
+                    : $this->transportDoseSlot($medication, Carbon::instance($actionAt), $requestUuid);
+
                 $emarResult = $this->emar->recordAdministration(
                     $resident,
                     $medication,
                     [
                         'status' => 'given',
                         'administered_at' => $actionAt->toIso8601String(),
+                        ...($doseSlot !== null ? [
+                            'scheduled_for' => $doseSlot['due_at']->toIso8601String(),
+                            ...($doseSlot['late'] ? ['reason' => self::TRANSPORT_LATE_REASON] : []),
+                        ] : []),
                         'dose_given' => $medication->dosage ?: $medication->name,
                         'notes' => $data['notes'] ?? null,
                         'client_request_uuid' => $requestUuid,
@@ -1110,6 +1138,14 @@ class ResidentTransportJourneyService
                 }
 
                 $administration = $emarResult['administration'];
+                // Someone else recorded this dose first (a race the slot choice
+                // can't see): nothing new is saved and the medicine goes back.
+                if (($emarResult['duplicate'] ?? false)
+                    && (string) $administration->client_request_uuid !== (string) $requestUuid) {
+                    throw ValidationException::withMessages([
+                        'medication' => self::TRANSPORT_ALREADY_RECORDED,
+                    ]);
+                }
                 abort_unless(
                     (int) $administration->client_id === $resident->id
                         && (int) $administration->client_medication_id === $medication->id
@@ -1941,6 +1977,92 @@ class ResidentTransportJourneyService
                 : null,
             'queued_offline' => true,
         ];
+    }
+
+    /**
+     * The owed slot a scheduled order's transport dose fills, on the NZ day
+     * of the given time, with no outcome yet: the slot whose dose window
+     * contains the given time; otherwise the most recent slot whose window
+     * has ended (recorded with the transport late reason). A slot whose
+     * window hasn't opened is never used. Runs under the order's lock: the
+     * day's slots are made sure of, then the chosen slot row is locked before
+     * the record path locks the slot's administrations.
+     *
+     * @return array{due_at: Carbon, late: bool}
+     */
+    private function transportDoseSlot(ClientMedication $medication, Carbon $givenAt, string $requestUuid): array
+    {
+        $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        $nzDate = $givenAt->copy()->timezone($timezone)->toDateString();
+        $states = app(ScheduledDoseStates::class);
+        if ($states->holdsDay($nzDate, CarbonImmutable::now()->utc())) {
+            try {
+                app(DoseSlotGenerator::class)->ensureDay($medication, $nzDate, CarbonImmutable::now()->utc());
+            } catch (InvalidArgumentException|LogicException $unreadable) {
+                report($unreadable);
+            }
+        }
+
+        $at = $givenAt->copy()->utc();
+        $doses = collect($states->dosesOn([$medication], $givenAt->copy(), now())[(int) $medication->id] ?? [])
+            ->reject(fn (array $dose): bool => ($dose['state'] ?? null) === DoseSlotProjection::STATE_AWAY);
+        $schedule = app(MarScheduleService::class);
+        // Owed and open: no outcome on the slot and no effective record in
+        // its minute. A record this same request already made (a replay)
+        // still counts as its own slot, so a retry lands where it landed.
+        $isOpen = function (array $dose) use ($medication, $schedule, $requestUuid): bool {
+            $recorded = ClientMedicationAdministration::query()
+                ->effectiveClinicalEvidence()
+                ->where('client_medication_id', $medication->id)
+                ->whereBetween('scheduled_for', $schedule->utcSlotWindow(Carbon::instance($dose['due_at'])))
+                ->pluck('client_request_uuid');
+            if ($recorded->contains(fn ($uuid): bool => (string) $uuid === $requestUuid)) {
+                return true;
+            }
+
+            return $dose['outcome'] === null && $recorded->isEmpty();
+        };
+
+        $containing = $doses
+            ->filter(fn (array $dose): bool => $dose['window_opens_at']->copy()->utc()->lte($at)
+                && $dose['window_ends_at']->copy()->utc()->gte($at))
+            ->sortBy(fn (array $dose): int => abs($dose['due_at']->copy()->utc()->getTimestamp() - $at->getTimestamp()))
+            ->values();
+        $openContaining = $containing->first($isOpen);
+        $overdue = $openContaining !== null
+            ? null
+            : $doses
+                ->filter(fn (array $dose): bool => $dose['window_ends_at']->copy()->utc()->lt($at))
+                ->sortByDesc(fn (array $dose): int => $dose['due_at']->copy()->utc()->getTimestamp())
+                ->first($isOpen);
+
+        $chosen = $openContaining !== null
+            ? ['due_at' => Carbon::instance($openContaining['due_at']), 'late' => false]
+            : ($overdue !== null ? ['due_at' => Carbon::instance($overdue['due_at']), 'late' => true] : null);
+        if ($chosen === null) {
+            throw ValidationException::withMessages([
+                'medication' => $containing->isNotEmpty() ? self::TRANSPORT_ALREADY_RECORDED : self::TRANSPORT_NOT_DUE,
+            ]);
+        }
+        // The record path still asks a reason for a time outside the house
+        // timing (a medicine whose own window is wider): give it the same one.
+        if (! $chosen['late'] && ! app(MedicationSafetyService::class)->validateTimeWindow(
+            $chosen['due_at']->copy(),
+            $givenAt->copy(),
+            $schedule->windowBeforeMinutes(),
+            $schedule->windowAfterMinutes(),
+        )['valid']) {
+            $chosen['late'] = true;
+        }
+
+        MedicationDoseSlot::query()
+            ->where('client_medication_id', $medication->id)
+            ->where('due_at', $chosen['due_at']->copy()->utc()->format('Y-m-d H:i:s'))
+            ->whereNull('superseded_at')
+            ->lockForUpdate()
+            ->get(['id']);
+
+        return $chosen;
     }
 
     private function requiredAdministrationQuantity(array $payload): string
