@@ -66,7 +66,9 @@ class MedicationAuditEventExportReleaseTest extends TestCase
         Site::factory()->create(['is_active' => true]);
         $this->actingAs($this->actor)->getJson(route('emar.audit.event.export', ['id' => 'med_start_'.$this->medicine->id]))
             ->assertUnprocessable()->assertJsonValidationErrors('purpose');
-        $response = $this->get($this->url())->assertOk()->assertHeader('Cache-Control', 'no-store');
+        $response = $this->get($this->url())->assertOk();
+        $this->assertTrue($response->headers->hasCacheControlDirective('no-store'));
+        $this->assertTrue($response->headers->hasCacheControlDirective('private'));
         $this->assertStringContainsString('Synthetic export medicine', $response->getContent());
         $events = MedicationEvent::query()->where('kind', 'export.created')->get();
         $this->assertCount(1, $events);
@@ -108,7 +110,7 @@ class MedicationAuditEventExportReleaseTest extends TestCase
 
     private function duringRelease(callable $mutation): void
     {
-        $audit = Mockery::mock(MedicationExportAudit::class)->makePartial();
+        $audit = Mockery::mock(new MedicationExportAudit);
         $audit->shouldReceive('record')->once()->andReturnUsing(function (...$arguments) use ($mutation): void {
             $mutation();
             (new MedicationExportAudit)->record(...$arguments);

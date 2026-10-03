@@ -376,7 +376,7 @@ class ClientMedicationDayTest extends TestCase
         $prn = $this->historicalOrder('Current unproven PRN', [], ['is_prn' => true, 'dosage' => '99 mg', 'route' => 'nasal', 'instructions' => 'Unproven instructions']);
         $this->heldSlot($order, '2026-06-14 08:00');
         $other = Client::factory()->create(['site_id' => $this->site->id]);
-        $foreign = MedicationOrderVersion::query()->create(['client_id' => $other->id, 'client_medication_id' => $order->id, 'version_number' => 8, 'name' => 'Foreign wording', 'dosage' => '88 mg', 'route' => 'topical', 'changed_at' => Carbon::parse('2026-06-12 00:00', 'Pacific/Auckland')->utc()]);
+        $foreign = MedicationOrderVersion::query()->create(['client_id' => $other->id, 'client_medication_id' => $order->id, 'version_number' => 8, 'changed_by' => $this->reader->id, 'name' => 'Foreign wording', 'dosage' => '88 mg', 'route' => 'topical', 'changed_at' => Carbon::parse('2026-06-12 00:00', 'Pacific/Auckland')->utc()]);
         MedicationOrderRevision::query()->create(['client_id' => $this->aroha->id, 'client_medication_id' => $order->id, 'medication_order_version_id' => $foreign->id, 'base_version' => 1, 'status' => 'checked', 'checked_at' => Carbon::parse('2026-06-12 00:00', 'Pacific/Auckland')->utc(), 'entered_by' => $this->reader->id]);
         $this->historicalVersion($order, 2, [], '2026-06-15 07:00');
         $this->historicalVersion($prn, 2, [], '2026-06-15 07:00');

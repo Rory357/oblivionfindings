@@ -35,6 +35,7 @@ use Illuminate\Validation\ValidationException;
 use LogicException;
 use Mockery;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class MedicationDowntimeTest extends TestCase
@@ -312,30 +313,28 @@ class MedicationDowntimeTest extends TestCase
         $this->assertSame(0, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
     }
 
-    public function test_non_given_mapping_retains_paper_reason_without_given_only_fields_or_clinical_posting(): void
+    public static function nonGivenPaperOutcomes(): array
     {
-        foreach (['refused', 'withheld'] as $outcome) {
-            if ($outcome === 'withheld') {
-                $copy = $this->order->replicate();
-                $copy->name = 'Synthetic withheld medicine';
-                $copy->save();
-                $this->order = $copy->fresh();
-            }
-            $downtime = $this->declare();
-            $target = $downtime->doses()->where('client_medication_id', $this->order->id)->firstOrFail();
-            $entry = $this->capture($downtime, ['downtime_dose_id' => $target->id, 'outcome' => $outcome, 'dose_on_paper' => null,
-                'notes' => 'Exact synthetic paper explanation', 'observations' => ['blood_glucose' => 4.2]]);
-            $facts = app(PaperAdministrationWriter::class)->canonicalData($entry);
-            $this->assertSame($outcome, $facts['reason_code']);
-            $this->assertSame('Exact synthetic paper explanation', $facts['reason']);
-            $this->assertSame($outcome, $entry->snapshot['reason_code']);
-            foreach (['dose_given', 'amount_mode', 'blood_glucose', 'reason_category', 'witness_id', 'witness_pin'] as $key) {
-                $this->assertArrayNotHasKey($key, $facts);
-            }
-            $preview = app(PaperEntryService::class)->reconciliationPreview($this->lead, $downtime, $entry);
-            $this->assertFalse($preview['can_reconcile']);
-            $this->assertStringContainsString('canonical historical non-given adapter', $preview['unavailable']);
+        return ['refused' => ['refused'], 'withheld' => ['withheld']];
+    }
+
+    #[DataProvider('nonGivenPaperOutcomes')]
+    public function test_non_given_mapping_retains_paper_reason_without_given_only_fields_or_clinical_posting(string $outcome): void
+    {
+        $downtime = $this->declare();
+        $target = $downtime->doses()->where('client_medication_id', $this->order->id)->firstOrFail();
+        $entry = $this->capture($downtime, ['downtime_dose_id' => $target->id, 'outcome' => $outcome, 'dose_on_paper' => null,
+            'notes' => 'Exact synthetic paper explanation', 'observations' => ['blood_glucose' => 4.2]]);
+        $facts = app(PaperAdministrationWriter::class)->canonicalData($entry);
+        $this->assertSame($outcome, $facts['reason_code']);
+        $this->assertSame('Exact synthetic paper explanation', $facts['reason']);
+        $this->assertSame($outcome, $entry->snapshot['reason_code']);
+        foreach (['dose_given', 'amount_mode', 'blood_glucose', 'reason_category', 'witness_id', 'witness_pin'] as $key) {
+            $this->assertArrayNotHasKey($key, $facts);
         }
+        $preview = app(PaperEntryService::class)->reconciliationPreview($this->lead, $downtime, $entry);
+        $this->assertFalse($preview['can_reconcile']);
+        $this->assertStringContainsString('canonical historical non-given adapter', $preview['unavailable']);
         $this->assertDatabaseCount('client_medication_administrations', 0);
         $this->assertDatabaseCount('medication_paper_postings', 0);
     }
@@ -373,7 +372,8 @@ class MedicationDowntimeTest extends TestCase
         $downtime = $this->declare();
         $entry = $this->capture($downtime);
         $preview = app(PaperEntryService::class)->reconciliationPreview($this->lead, $downtime, $entry);
-        $rule->update(['updated_at' => now()->addMinute()]);
+        $rule->forceFill(['updated_at' => now()->addMinute()])->save();
+        $this->assertTrue($rule->fresh()->updated_at->greaterThan(now()));
         $this->expectException(ValidationException::class);
         app(PaperEntryService::class)->reconcile($this->lead, $downtime, $entry, $preview['preview_token']);
     }
@@ -556,19 +556,28 @@ class MedicationDowntimeTest extends TestCase
         $this->assertSame(0, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
     }
 
-    public function test_changed_rule_or_projection_evidence_during_render_releases_no_bytes_or_export_event(): void
+    public static function changedPackSources(): array
     {
-        $mutations = [
-            fn () => MedicationAdminRule::query()->create(['site_id' => $this->site->id, 'match_type' => 'route', 'match_value' => 'oral',
-                'requires_countersign' => true, 'required_observations' => [], 'active' => true]),
-            fn () => DB::table('medication_dose_slots')->where('client_medication_id', $this->order->id)->where('nz_date', '2026-10-03')->update(['outcome' => 'refused']),
-        ];
-        foreach ($mutations as $mutation) {
-            $this->fakePackRender($mutation);
-            $response = $this->actingAs($this->lead)->postJson('/emar/downtime/pack', ['site_id' => $this->site->id, 'nz_date' => '2026-10-03']);
-            $response->assertConflict();
-            $this->assertStringNotContainsString('%PDF-sensitive', $response->getContent());
-        }
+        return ['matching rule' => ['rule'], 'dose projection' => ['projection']];
+    }
+
+    #[DataProvider('changedPackSources')]
+    public function test_changed_rule_or_projection_evidence_during_render_releases_no_bytes_or_export_event(string $source): void
+    {
+        // Separate requests have separate controller/PDF instances, so each
+        // case must execute its own intended mutation exactly once.
+        $this->fakePackRender(function () use ($source): void {
+            if ($source === 'rule') {
+                MedicationAdminRule::query()->create(['site_id' => $this->site->id, 'match_type' => 'route', 'match_value' => 'oral',
+                    'requires_countersign' => true, 'required_observations' => [], 'active' => true]);
+            } else {
+                $changed = DB::table('medication_dose_slots')->where('client_medication_id', $this->order->id)->where('nz_date', '2026-10-03')->update(['outcome' => 'refused']);
+                $this->assertGreaterThan(0, $changed);
+            }
+        });
+        $response = $this->actingAs($this->lead)->postJson('/emar/downtime/pack', ['site_id' => $this->site->id, 'nz_date' => '2026-10-03']);
+        $response->assertConflict();
+        $this->assertStringNotContainsString('%PDF-sensitive', $response->getContent());
         $this->assertSame(0, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
     }
 

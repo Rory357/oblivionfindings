@@ -55,7 +55,7 @@ class PersonMedicationCommandsTest extends TestCase
         $source = MedicationAllergy::create(['client_id' => $this->person->id, 'allergen' => 'Penicillin', 'severity' => 'severe', 'reaction' => 'Swelling', 'notes' => 'Original evidence', 'recorded_by' => $this->lead->id]);
         $duplicate = MedicationAllergy::create(['client_id' => $this->person->id, 'allergen' => ' penicillin ', 'severity' => 'severe', 'reaction' => 'swelling', 'notes' => 'Original evidence', 'recorded_by' => $this->lead->id]);
         $different = MedicationAllergy::create(['client_id' => $this->person->id, 'allergen' => 'Penicillin', 'severity' => 'mild', 'reaction' => 'Rash', 'recorded_by' => $this->lead->id]);
-        $before = $source->getAttributes();
+        $before = $source->fresh()->getAttributes();
         $service = app(ClientAllergyRecordService::class);
         $profile = DB::transaction(fn () => $service->copyLegacy(Client::whereKey($this->person->id)->lockForUpdate()->firstOrFail()));
         $this->assertCount(2, $profile->allergy_records);
@@ -254,7 +254,7 @@ class PersonMedicationCommandsTest extends TestCase
     public function test_allergy_copy_command_defaults_to_no_writes_and_repeats_without_duplicate_events(): void
     {
         $source = MedicationAllergy::create(['client_id' => $this->person->id, 'allergen' => 'Peanut', 'reaction' => 'Swelling', 'severity' => 'severe', 'recorded_by' => $this->lead->id]);
-        $before = $source->getAttributes();
+        $before = $source->fresh()->getAttributes();
         $this->artisan('emar:copy-allergies', ['--client' => [$this->person->id]])->assertSuccessful();
         $this->assertDatabaseMissing('client_medical_profiles', ['client_id' => $this->person->id]);
         $this->assertDatabaseCount('medication_events', 0);
