@@ -48,10 +48,19 @@ class MedicationSettingsStore
     public function organisationValues(): array
     {
         $definitions = $this->organisationDefinitions();
-        $stored = AppSetting::query()
+
+        return $this->organisationValuesFrom($definitions, $this->organisationRows($definitions));
+    }
+
+    private function organisationRows(Collection $definitions): Collection
+    {
+        return AppSetting::query()
             ->whereIn('key', $definitions->pluck('storageKey')->all())
             ->pluck('value', 'key');
+    }
 
+    private function organisationValuesFrom(Collection $definitions, Collection $stored): array
+    {
         $values = $this->nest($definitions->map(fn (MedicationSettingDefinition $d): array => [
             $d, $d->normalise($stored[$d->storageKey] ?? null),
         ]));
@@ -71,7 +80,12 @@ class MedicationSettingsStore
      */
     public function siteValues(array $siteIds): array
     {
-        return $this->siteRows($siteIds)
+        return $this->siteValuesFrom($this->siteRows($siteIds));
+    }
+
+    private function siteValuesFrom(Collection $sites): array
+    {
+        return $sites
             ->map(fn (Collection $rows): array => $this->nest($rows->map(fn (array $row): array => [
                 $row['definition'], $row['value'],
             ])))
@@ -89,10 +103,12 @@ class MedicationSettingsStore
     public function reviewed(): array
     {
         $definitions = $this->organisationDefinitions();
-        $stored = AppSetting::query()
-            ->whereIn('key', $definitions->pluck('storageKey')->all())
-            ->pluck('key')
-            ->flip();
+
+        return $this->reviewedFrom($definitions, $this->organisationRows($definitions));
+    }
+
+    private function reviewedFrom(Collection $definitions, Collection $stored): array
+    {
         $latest = $this->latestChanges(null);
 
         return $this->nest($definitions->map(fn (MedicationSettingDefinition $d): array => [
@@ -108,13 +124,39 @@ class MedicationSettingsStore
      */
     public function siteReviewed(array $siteIds): array
     {
+        return $this->siteReviewedFrom($siteIds, $this->siteRows($siteIds));
+    }
+
+    private function siteReviewedFrom(array $siteIds, Collection $sites): array
+    {
         $latest = $this->latestChanges($siteIds);
 
-        return $this->siteRows($siteIds)
+        return $sites
             ->map(fn (Collection $rows, int $siteId): array => $this->nest($rows->map(fn (array $row): array => [
                 $row['definition'], $this->reviewer($latest->get($this->slot($row['definition'], $siteId))),
             ])))
             ->all();
+    }
+
+    /**
+     * Read values and their review markers from the same saved rows for one
+     * response. No cross-request cache: the next read sees subsequent saves.
+     *
+     * @param  list<int>  $siteIds
+     * @return array{values: array, reviewed: array, site_values: array, site_reviewed: array}
+     */
+    public function valuesAndReviews(array $siteIds): array
+    {
+        $definitions = $this->organisationDefinitions();
+        $stored = $this->organisationRows($definitions);
+        $sites = $this->siteRows($siteIds);
+
+        return [
+            'values' => $this->organisationValuesFrom($definitions, $stored),
+            'reviewed' => $this->reviewedFrom($definitions, $stored),
+            'site_values' => $this->siteValuesFrom($sites),
+            'site_reviewed' => $this->siteReviewedFrom($siteIds, $sites),
+        ];
     }
 
     /**

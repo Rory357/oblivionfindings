@@ -128,7 +128,7 @@ type Props = {
     ruleOptions: RuleOptions;
     /** Houses this person can see; the house choices for medicine rules. */
     sites: { id: number; name: string }[];
-    can: { manage: boolean; manage_global: boolean };
+    settingsCan: { manage: boolean; manage_global: boolean };
     settings: SettingsPayload;
     witnessPin: WitnessPinProps;
     /** false = a house lead who can only reset PINs sees Staff & PINs, read-only. */
@@ -480,7 +480,7 @@ export default function EmarSettings(props: Props) {
         rules: props.rules,
         options: props.ruleOptions,
         sites: props.sites,
-        can: props.can,
+        can: props.settingsCan,
         readOnlyAudit,
     };
     const onCallData: OnCallData = props.onCall ?? { houses: [], staff: {} };

@@ -29,6 +29,7 @@ it('exposes the existing house-alert capability and admits its own-house Setting
     $this->actingAs($actor)->get('/emar/settings')->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('emar/Settings')->where('can.medications.alertsManageHouse', true)->where('can.medications.witnessPinReset', false)
         ->where('can.medications.view', false)->where('can.medications.settingsManage', false)
+        ->where('settingsCan.manage', false)->where('settingsCan.manage_global', false)
         ->where('settingsAccess', false)->where('alertAccess.view', true)->where('alertAccess.manage_org', false)
         ->where('alertAccess.house_ids', [$site->id])->where('sites.0.id', $site->id)->has('sites', 1)->where('witnessPin.can_reset', false));
     $this->put('/emar/settings/changes', ['view' => 'alerts', 'changes' => [['group' => 'delivery', 'key' => 'pin_unattended', 'from' => 'no', 'value' => 'yes']]])->assertForbidden();
@@ -41,10 +42,21 @@ it('keeps the existing PIN-only Settings entry read-only for policy and house al
     $actor = p11NavigationActor($site, ['medications.witness_pin.reset']);
     $this->actingAs($actor)->get('/emar/settings')->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('emar/Settings')->where('can.medications.witnessPinReset', true)->where('can.medications.alertsManageHouse', false)
+        ->where('settingsCan.manage', false)->where('settingsCan.manage_global', false)
         ->where('settingsAccess', false)->where('witnessPin.can_reset', true)->where('alertAccess.view', false));
 });
 
 it('denies Settings when neither reading nor management capability exists', function () {
     $actor = p11NavigationActor(Site::factory()->create(), []);
     $this->actingAs($actor)->get('/emar/settings')->assertForbidden();
+});
+
+it('preserves shared medication navigation alongside organisation Settings management', function () {
+    $site = Site::factory()->create(['is_active' => true]);
+    $actor = p11NavigationActor($site, ['medications.view', 'medications.settings.manage', 'sites.viewAll']);
+    $this->actingAs($actor)->get('/emar/settings')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('emar/Settings')->where('can.medications.view', true)->where('can.medications.settingsManage', true)
+        ->where('settingsCan.manage', true)->where('settingsCan.manage_global', true)
+        ->where('settingsAccess', true)->where('settings.can_manage_organisation', true));
+    expect($actor->roles()->count())->toBe(0);
 });

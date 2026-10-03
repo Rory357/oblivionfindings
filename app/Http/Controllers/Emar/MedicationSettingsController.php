@@ -740,7 +740,8 @@ class MedicationSettingsController extends Controller
         $canManageGlobal = $this->canManageGlobalRules($actor);
         $houseSiteIds = $canManage || $canHouseAlerts ? $this->ownHouseSiteIds($actor) : [];
         $siteIds = $canView ? $this->accessibleSiteIds($actor) : $houseSiteIds;
-        $alertPayload = $this->alertPayload($actor, $canView, $canManage, $canManageGlobal, $canHouseAlerts, $siteIds, $houseSiteIds);
+        $savedSettings = $this->settingsStore->valuesAndReviews($siteIds);
+        $alertPayload = $this->alertPayload($actor, $canView, $canManage, $canManageGlobal, $canHouseAlerts, $siteIds, $houseSiteIds, $savedSettings);
         // Rules that name a controlled medicine are concealed from anyone
         // without controlled-medicine access, here and in the history (EM-12).
         $canSeeControlled = $this->ruleScope->canSeeControlled($actor);
@@ -749,11 +750,8 @@ class MedicationSettingsController extends Controller
             : [];
         $settings = [
             ...$this->settingsRegistry->toClient(),
-            'values' => $this->settingsStore->organisationValues(),
-            // null = still the default; nobody has deliberately saved or kept it.
-            'reviewed' => $this->settingsStore->reviewed(),
-            'site_values' => $this->settingsStore->siteValues($siteIds),
-            'site_reviewed' => $this->settingsStore->siteReviewed($siteIds),
+            // Values and review markers share the same stored rows.
+            ...$savedSettings,
             // Organisation-wide changes, plus changes at the houses this person can see.
             'history' => $canView
                 ? $this->settingsStore->history($canManageGlobal ? null : $siteIds, 500, $canSeeControlled, $controlledRuleIds)
@@ -787,7 +785,7 @@ class MedicationSettingsController extends Controller
                 'sites' => $canHouseAlerts ? $this->siteChoices($houseSiteIds) : [],
                 'observationOptions' => self::OBSERVATION_OPTIONS,
                 'matchTypes' => self::MATCH_TYPES,
-                'can' => ['manage' => false, 'manage_global' => false],
+                'settingsCan' => ['manage' => false, 'manage_global' => false],
             ]);
         }
 
@@ -877,7 +875,7 @@ class MedicationSettingsController extends Controller
                 ->get(['id', 'name']),
             'observationOptions' => self::OBSERVATION_OPTIONS,
             'matchTypes' => self::MATCH_TYPES,
-            'can' => [
+            'settingsCan' => [
                 'manage' => $canManage && ($canManageGlobal || $siteIds !== []),
                 'manage_global' => $canManage && $canManageGlobal,
             ],
@@ -1171,9 +1169,10 @@ class MedicationSettingsController extends Controller
      *
      * @param  list<int>  $siteIds  Houses whose settings this person reads.
      * @param  list<int>  $houseSiteIds  Their own houses (HR profile).
+     * @param  array{values: array, reviewed: array, site_values: array, site_reviewed: array}  $savedSettings
      * @return array{alertAccess: array<string, mixed>, alertPeople: list<array<string, mixed>>, alertNames: array<int, string>, alertReach: array<string, mixed>, alertNobodyOpen: int, alertPreviews: array<string, mixed>, alertDelivery: array{push_ready: int, people: int}, onCall: array<string, mixed>, alertHouses: list<array{id: int, name: string}>, alertReachGaps: list<array<string, mixed>>, alertLogSummary: array{recent: int, open: int}, alertLog: mixed}
      */
-    private function alertPayload(User $actor, bool $canView, bool $canManage, bool $canManageGlobal, bool $canHouseAlerts, array $siteIds, array $houseSiteIds): array
+    private function alertPayload(User $actor, bool $canView, bool $canManage, bool $canManageGlobal, bool $canHouseAlerts, array $siteIds, array $houseSiteIds, array $savedSettings): array
     {
         $view = $canView || $canHouseAlerts;
         $manageOrg = $canManage && $canManageGlobal;
@@ -1198,10 +1197,10 @@ class MedicationSettingsController extends Controller
         }
 
         $named = [];
-        foreach ($this->settingsStore->organisationValues()['alerts'] ?? [] as $value) {
+        foreach ($savedSettings['values']['alerts'] ?? [] as $value) {
             array_push($named, ...(json_decode($value, true)['people'] ?? []));
         }
-        foreach ($this->settingsStore->siteValues($siteIds) as $groups) {
+        foreach ($savedSettings['site_values'] as $groups) {
             foreach ($groups['alertExtra'] ?? [] as $value) {
                 array_push($named, ...(json_decode($value, true) ?? []));
             }
