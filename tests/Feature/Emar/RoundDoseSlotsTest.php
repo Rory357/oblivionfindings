@@ -2,12 +2,14 @@
 
 namespace Tests\Feature\Emar;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationRound;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\GuidedRoundService;
@@ -186,6 +188,29 @@ class RoundDoseSlotsTest extends TestCase
 
     public function test_my_calendar_shows_a_round_at_its_nz_time(): void
     {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->worker->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+        $this->aroha->supportWorkers()->attach($this->worker->id);
+        $this->ben->supportWorkers()->attach($this->worker->id);
+        foreach (['medications.view', 'clients.viewAssigned'] as $key) {
+            $permission = Permission::query()->firstOrCreate(['key' => $key], ['description' => $key, 'group' => 'medications']);
+            $this->worker->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
+        }
+        $this->worker->unsetRelation('permissionOverrides')->unsetRelation('roles');
+        Shift::factory()->published()->create([
+            'user_id' => $this->worker->id,
+            'client_id' => $this->aroha->id,
+            'site_id' => $this->site->id,
+            'starts_at' => Carbon::parse('2026-06-15 07:00', 'Pacific/Auckland')->utc(),
+            'ends_at' => Carbon::parse('2026-06-15 10:00', 'Pacific/Auckland')->utc(),
+            'status' => 'scheduled',
+        ]);
         $round = $this->round('08:00', 60, ['assigned_to' => $this->worker->id]);
 
         $events = $this->actingAs($this->worker)
@@ -193,7 +218,7 @@ class RoundDoseSlotsTest extends TestCase
             ->assertOk()
             ->json();
 
-        $event = collect($events)->firstWhere('id', 'med-round-'.$round->id);
+        $event = collect($events)->firstWhere('id', 'medication-round-'.$round->id);
         $this->assertNotNull($event);
         $this->assertSame('2026-06-14T20:00:00+00:00', Carbon::parse($event['start'])->utc()->toIso8601String());
     }
