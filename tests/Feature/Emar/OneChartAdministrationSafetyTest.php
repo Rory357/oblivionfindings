@@ -166,7 +166,7 @@ class OneChartAdministrationSafetyTest extends TestCase
             'controlled_drug' => true,
             'witness_required' => true,
         ]);
-        ClientMedicationStock::query()->create([
+        $stock = ClientMedicationStock::query()->create([
             'client_medication_id' => $medication->id,
             'on_hand' => 10,
             'unit' => 'tablets',
@@ -177,6 +177,7 @@ class OneChartAdministrationSafetyTest extends TestCase
             ->postJson($this->administrationUrl($medication), [
                 'status' => 'given',
                 'dose_given' => '5mg',
+                'quantity_administered' => 1,
                 'witnessed_by' => $witness->id,
                 'scheduled_for' => now()->toIso8601String(),
                 'administered_at' => now()->toIso8601String(),
@@ -188,6 +189,7 @@ class OneChartAdministrationSafetyTest extends TestCase
             ->postJson($this->administrationUrl($medication), [
                 'status' => 'given',
                 'dose_given' => '5mg',
+                'quantity_administered' => 1,
                 'witnessed_by' => $witness->id,
                 'witness_credential' => 'wrong-secret',
                 'scheduled_for' => now()->toIso8601String(),
@@ -200,11 +202,14 @@ class OneChartAdministrationSafetyTest extends TestCase
             'client_medication_id' => $medication->id,
             'status' => 'given',
         ]);
+        $this->assertSame('10.00', $stock->fresh()->on_hand);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
 
         $this->actingAs($this->admin, 'sanctum')
             ->postJson($this->administrationUrl($medication), [
                 'status' => 'given',
                 'dose_given' => '5mg',
+                'quantity_administered' => 1,
                 'witnessed_by' => $witness->id,
                 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'scheduled_for' => now()->toIso8601String(),
@@ -220,6 +225,8 @@ class OneChartAdministrationSafetyTest extends TestCase
         $this->assertSame($witness->id, $admin->witnessed_by);
         $this->assertSame('witness_pin', $admin->witness_method);
         $this->assertNotNull($admin->witnessed_at);
+        $this->assertSame('9.00', $stock->fresh()->on_hand);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 1);
     }
 
     public function test_facility_rule_requires_pulse_and_keeps_the_reading_on_the_dose_only(): void

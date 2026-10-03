@@ -303,6 +303,19 @@ class MedicationControllerTest extends TestCase
         ]);
     }
 
+    /** Positive P07 witnesses have the existing controlled competency endorsement. */
+    private function p07ControlledWitness(): User
+    {
+        $witness = $this->createWitness();
+        MedicationCompetencyAssessment::query()->where('user_id', $witness->id)->sole()->update([
+            'controlled_drugs' => true,
+            'restricted' => false,
+            'not_seen_areas' => [],
+        ]);
+
+        return $witness;
+    }
+
     /** Capture the actual register head and stock position sent by the current dialog. */
     private function p07ControlledCommand(ClientMedication $medication, array $fields = []): array
     {
@@ -320,7 +333,7 @@ class MedicationControllerTest extends TestCase
     private function p07ResolutionFixture(): array
     {
         $medication = $this->p07ControlledMedicine();
-        $witness = $this->createWitness();
+        $witness = $this->p07ControlledWitness();
         ClientMedicationStock::create([
             'client_medication_id' => $medication->id, 'on_hand' => 8, 'unit' => 'tablets',
         ]);
@@ -1394,7 +1407,7 @@ class MedicationControllerTest extends TestCase
     {
         $this->mockNotificationService();
         $med = $this->p07ControlledMedicine();
-        $witness = $this->createWitness();
+        $witness = $this->p07ControlledWitness();
         ClientMedicationStock::create([
             'client_medication_id' => $med->id,
             'on_hand' => 10,
@@ -1424,7 +1437,7 @@ class MedicationControllerTest extends TestCase
     {
         $this->mockNotificationService();
         $med = $this->p07ControlledMedicine();
-        $witness = $this->createWitness();
+        $witness = $this->p07ControlledWitness();
         $stock = ClientMedicationStock::create([
             'client_medication_id' => $med->id,
             'on_hand' => 10,
@@ -1589,7 +1602,7 @@ class MedicationControllerTest extends TestCase
     public function test_guided_controlled_balance_check_requires_immediate_action_for_discrepancy(): void
     {
         $med = $this->p07ControlledMedicine();
-        $witness = $this->createWitness();
+        $witness = $this->p07ControlledWitness();
         ClientMedicationStock::create([
             'client_medication_id' => $med->id,
             'on_hand' => 10,
@@ -1642,7 +1655,7 @@ class MedicationControllerTest extends TestCase
     {
         $this->mockNotificationService();
         $med = $this->p07ControlledMedicine();
-        $witness = $this->createWitness();
+        $witness = $this->p07ControlledWitness();
 
         ClientMedicationStock::create([
             'client_medication_id' => $med->id,
@@ -1676,7 +1689,7 @@ class MedicationControllerTest extends TestCase
     {
         $this->mockNotificationService();
         $med = $this->p07ControlledMedicine();
-        $witness = $this->createWitness();
+        $witness = $this->p07ControlledWitness();
 
         ClientMedicationStock::create([
             'client_medication_id' => $med->id,
@@ -1715,7 +1728,7 @@ class MedicationControllerTest extends TestCase
     {
         $this->mockNotificationService();
         $med = $this->p07ControlledMedicine();
-        $witness = $this->createWitness();
+        $witness = $this->p07ControlledWitness();
         $stock = ClientMedicationStock::create([
             'client_medication_id' => $med->id,
             'on_hand' => 9.5,
@@ -1780,7 +1793,7 @@ class MedicationControllerTest extends TestCase
     {
         $this->mockNotificationService();
         $med = $this->p07ControlledMedicine();
-        $witness = $this->createWitness();
+        $witness = $this->p07ControlledWitness();
 
         ClientMedicationStock::create([
             'client_medication_id' => $med->id,
@@ -2930,7 +2943,7 @@ class MedicationControllerTest extends TestCase
     public function test_guided_controlled_balance_check_remains_available_while_discrepancy_is_open(): void
     {
         $med = $this->p07ControlledMedicine();
-        $witness = $this->createWitness();
+        $witness = $this->p07ControlledWitness();
 
         ClientMedicationStock::create([
             'client_medication_id' => $med->id,
