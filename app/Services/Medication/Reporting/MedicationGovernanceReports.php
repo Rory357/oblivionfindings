@@ -45,6 +45,6 @@ final class MedicationGovernanceReports
     /** Organisation snapshot writer; reader-facing values are recomputed above. */
     public function count(CarbonImmutable $start, CarbonImmutable $end, string $reached): int
     {
-        return app(MedicationGovernanceScopeService::class)->scopeCanonicalClientMedicationRows(MedicationError::query(), null, true)->where('status', '!=', 'in_error')->where('reached_client', $reached)->whereBetween('reported_at', [$start->startOfDay()->utc(), $end->endOfDay()->utc()])->count();
+        return app(MedicationGovernanceScopeService::class)->scopeCanonicalClientMedicationRows(MedicationError::query(), null, true)->where('status', '!=', 'in_error')->where('reached_client', $reached)->whereRaw('COALESCE(occurred_at, reported_at) BETWEEN ? AND ?', [$start->startOfDay()->utc(), $end->endOfDay()->utc()])->count();
     }
 }

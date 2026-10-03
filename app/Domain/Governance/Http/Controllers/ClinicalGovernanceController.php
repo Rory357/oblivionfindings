@@ -227,9 +227,14 @@ class ClinicalGovernanceController extends Controller
         abort_unless($request->user()->canDo('governance.clinical.manage'), 403);
         $data = $request->validate(['target' => ['nullable', 'integer', 'min:0', 'max:2147483647']]);
         \Illuminate\Support\Facades\DB::transaction(function () use ($request, $data) {
-            $value = ['target' => isset($data['target']) ? (int) $data['target'] : null, 'reviewed_by' => $request->user()->id, 'reviewed_at' => now()->toIso8601String()];
+            $actor = app(\App\Services\AuthorizationEvidenceLockService::class)->lockForUserWithoutWaiting($request->user(), ['*']);
+            abort_unless($actor->canDo('governance.clinical.manage'), 403);
+            $sites = \App\Services\CurrentAuthorizationReads::within(fn ($reads) => app(\App\Services\UserSiteAccessService::class)->accessibleSiteIds($actor, MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS, $reads));
+            abort_if($sites === [], 422, 'An approved house is required to record this medication setting change.');
+            $value = ['target' => isset($data['target']) ? (int) $data['target'] : null, 'reviewed_by' => $actor->id, 'reviewed_at' => now()->toIso8601String()];
             AppSetting::updateOrCreate(['key' => MedicationGovernanceReports::TARGET_KEY], ['value' => $value]);
-            \App\Services\AuditLogger::logOrFail('medications.governance.target.updated', $request->user(), ['target' => $value['target']]);
+            \App\Services\AuditLogger::logOrFail('medications.governance.target.updated', $actor, ['target' => $value['target']]);
+            app(\App\Services\Medication\Audit\MedicationEventRecorder::class)->appendMany(array_map(fn ($siteId) => new \App\Services\Medication\Audit\MedicationEventData((int) $siteId, 'settings.governance_target.changed', 'organisation_setting', MedicationGovernanceReports::TARGET_KEY, $actor->id, CarbonImmutable::now('UTC'), 'Medication error governance target changed.', ['target' => $value['target']]), $sites));
         }, 5);
 
         return back()->with('success', 'Medication error target saved.');

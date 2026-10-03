@@ -123,7 +123,6 @@ class MedicationReportsController extends Controller
         $data = $request->validate(['type' => ['required', Rule::in(['mar', 'cd_register', 'round_sheet', 'doses', 'errors', 'stock', 'audit'])], 'site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1']]);
         $actor = $request->user();
         $type = $data['type'];
-        $data['reached'] = $request->validate(['reached' => ['nullable', Rule::in(['yes', 'no', 'unknown'])]])['reached'] ?? null;
         abort_unless($this->access->canExport($actor, $type), 403);
         $period = MedicationReportPeriod::fromRequest($request);
         $sites = $this->access->siteIds($actor, $request->integer('site_id') ?: null, $request->integer('client_id') ?: null, $type === 'stock' ? 'stock' : ($type === 'cd_register' ? 'controlled' : 'doses'));
@@ -139,8 +138,11 @@ class MedicationReportsController extends Controller
         $data = $request->validate(['site_id' => ['required', 'integer', 'min:1']]);
         $this->access->siteIds($request->user(), (int) $data['site_id']);
         $result = DB::transaction(function () use ($request, $data) {
+            $actor = app(\App\Services\AuthorizationEvidenceLockService::class)->lockForUserWithoutWaiting($request->user(), ['*']);
+            abort_unless($actor->canDo('medications.audit.view') && ! $this->access->financeOnly($actor), 403);
+            \App\Services\CurrentAuthorizationReads::within(fn ($reads) => $this->access->siteIds($actor, (int) $data['site_id'], reads: $reads));
             $result = app(MedicationEventChain::class)->verify((int) $data['site_id']);
-            app(MedicationEventRecorder::class)->append(new MedicationEventData((int) $data['site_id'], 'chain.verified', 'site', (string) $data['site_id'], $request->user()->id, CarbonImmutable::now('UTC'), $result['intact'] ? 'Medication event chain verified' : 'Medication event chain check found a broken link', ['intact' => $result['intact'], 'broken_at' => $result['broken_at']]));
+            app(MedicationEventRecorder::class)->append(new MedicationEventData((int) $data['site_id'], 'chain.verified', 'site', (string) $data['site_id'], $actor->id, CarbonImmutable::now('UTC'), $result['intact'] ? 'Medication event chain verified' : 'Medication event chain check found a broken link', ['intact' => $result['intact'], 'broken_at' => $result['broken_at']]));
 
             return $result;
         }, 5);

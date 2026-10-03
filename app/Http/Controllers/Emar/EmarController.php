@@ -159,9 +159,11 @@ class EmarController extends Controller
             'manage_stock' => (bool) $user && $user->canDo('medications.stock.update'),
             'view_controlled' => (bool) $user && $user->canDo('medications.controlled.view'),
             'revoke_break_glass' => (bool) $user && ($user->canDo('medications.breakglass') || $user->canDo('medications.audit.view')),
+            'view_reports' => (bool) $user && $user->canDo('medications.reports.view'),
+            'view_audit' => (bool) $user && $user->canDo('medications.reports.view') && $user->canDo('medications.audit.view'),
             'export_reports' => (bool) $user && (
-                $user->canDo('medications.reports.export')
-                || $user->canDo('reports.viewAny')
+                $user->canDo('medications.reports.view')
+                && $user->canDo('medications.reports.export')
             ),
         ];
     }
@@ -3440,7 +3442,7 @@ class EmarController extends Controller
             'can_manage' => $canManageRounds,
             // Round templates are read and changed in Settings › Rounds & timing (P11).
             'can_read_templates' => $canReadRounds,
-            'can_export' => (bool) ($user?->canDo('medications.reports.export') || $user?->canDo('reports.viewAny')),
+            'can_export' => (bool) ($user?->canDo('medications.reports.view') && $user?->canDo('medications.reports.export')),
         ]);
     }
 

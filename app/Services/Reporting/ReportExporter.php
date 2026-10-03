@@ -66,11 +66,16 @@ final class ReportExporter
         app(ReportRuns::class)->result($actor, $run->fresh());
         if ($domain === 'medication') {
             $scope = app(ReportAccess::class)->context($actor->fresh(), $definition);
-            app(\App\Services\Medication\Reporting\MedicationExportAudit::class)->record($actor, $medicationType, $scope['site_ids'], new \App\Services\Medication\Reporting\MedicationReportPeriod($definition['date_from'], $definition['date_to']), $reason, $definition['subject_id'] ?? null, ['run_id' => $run->id, 'source' => $definition['source'], 'format' => $format], fn (User $current) => app(ReportRuns::class)->result($current, $run->fresh()));
+            app(\App\Services\Medication\Reporting\MedicationExportAudit::class)->record($actor, $medicationType, $scope['site_ids'], new \App\Services\Medication\Reporting\MedicationReportPeriod($definition['date_from'], $definition['date_to']), $reason, $definition['subject_id'] ?? null, ['run_id' => $run->id, 'source' => $definition['source'], 'format' => $format], function (User $current) use ($run, $reason, $format, $payload) {
+                app(ReportRuns::class)->result($current, $run->fresh());
+                AuditLogger::logOrFail('reports.export.downloaded', $current, ['run_id' => $run->id, 'actor_id' => $current->id, 'reason' => $reason, 'format' => $format, 'rows' => $payload['result']['row_count']]);
+            });
         } elseif ($domain !== 'fleet') {
             abort_unless($actor->fresh()?->canDo('assets.telemetry.export'), 403);
         }
-        AuditLogger::logOrFail('reports.export.downloaded', $actor, ['run_id' => $run->id, 'actor_id' => $actor->id, 'reason' => $reason, 'format' => $format, 'rows' => $payload['result']['row_count']]);
+        if ($domain !== 'medication') {
+            AuditLogger::logOrFail('reports.export.downloaded', $actor, ['run_id' => $run->id, 'actor_id' => $actor->id, 'reason' => $reason, 'format' => $format, 'rows' => $payload['result']['row_count']]);
+        }
 
         return response($bytes, 200, [...ClientLocationAccessService::headers(), 'Content-Type' => $mime,
             'Content-Disposition' => 'attachment; filename="report-'.$run->id.'.'.$format.'"', 'X-Report-Row-Count' => (string) $payload['result']['row_count']]);

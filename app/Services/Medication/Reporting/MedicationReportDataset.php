@@ -11,10 +11,13 @@ use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationError;
 use App\Models\MedicationReview;
 use App\Models\MedicationRound;
+use App\Models\MedicationOrderRevision;
 use App\Models\User;
 use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Support\Medication\StockLotRules;
+use App\Support\Medication\MedicationStockQuantity as Quantity;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -99,30 +102,43 @@ final class MedicationReportDataset
             abort_unless($actor->canDo('medications.controlled.view'), 403);
             $entries = $this->canonical(ClientControlledDrugEntry::query(), $siteIds, $clientIds)->whereBetween('recorded_at', $period->bounds())->with('medication')->orderBy('recorded_at')->get();
             $rows = $entries->map(fn ($e) => $this->person($clients->get($e->client_id), $period) + ['reference' => 'register:'.$e->id, 'date' => $e->recorded_at->timezone('Pacific/Auckland')->toDateString(), 'medicine' => $e->medication?->historicalDisplayName(), 'movement' => $e->entry_type, 'quantity' => (float) $e->quantity, 'balance' => $e->on_hand_after === null ? null : (float) $e->on_hand_after, 'witnessed' => $e->witnessed_by !== null ? 1 : 0])->values();
-            $counts = $this->canonical(\App\Models\MedicationScheduledStockCount::query(), $siteIds, $clientIds)->whereHas('medication', fn ($q) => $q->where('controlled_drug', true))->whereBetween('scheduled_date', [$period->from, $period->to])->where('status', 'completed')->count();
+            // P07's real witnessed ledger entry is the count evidence. A task
+            // marked complete is not a substitute for a recorded count.
+            $counts = $entries->where('entry_type', 'balance_check')->count();
             $discrepancies = $this->canonical(\App\Models\ClientControlledDrugDiscrepancy::query(), $siteIds, $clientIds)->whereBetween('reported_at', $period->bounds())->count();
             $losses = $this->canonical(\App\Models\ControlledDrugLossReport::query(), $siteIds, $clientIds)->whereBetween('discovered_at', $period->bounds())->count();
             $given = $this->canonical(ClientMedicationAdministration::query()->effectiveClinicalEvidence(), $siteIds, $clientIds)->whereHas('medication', fn ($q) => $q->where('controlled_drug', true))->where('status', 'given')->whereBetween('administered_at', $period->bounds())->count();
             $totals = ['movements' => $rows->count(), 'witnessed' => $rows->sum('witnessed'), 'receipts' => $rows->where('movement', 'receipt')->count(), 'disposals' => $rows->whereIn('movement', ['disposal', 'destruction'])->count(), 'counts' => $counts, 'discrepancies' => $discrepancies, 'losses' => $losses, 'given' => $given];
         } elseif ($report === 'errors') {
-            $records = $this->canonical(MedicationError::query(), $siteIds, $clientIds, true)->whereBetween('reported_at', $period->bounds())->orderBy('reported_at')->get();
+            $bounds = $period->bounds();
+            $records = $this->canonical(MedicationError::query(), $siteIds, $clientIds, true)->whereRaw('COALESCE(occurred_at, reported_at) BETWEEN ? AND ?', $bounds)->orderByRaw('COALESCE(occurred_at, reported_at)')->orderBy('id')->get();
             // Only recorded facts. Free-text accounts may name a controlled
             // medicine, so they never enter this report or the builder domain.
-            $rows = $records->map(fn ($e) => $this->person($clients->get($e->client_id), $period) + ['reference' => $e->reference_number, 'date' => $e->reported_at?->timezone('Pacific/Auckland')->toDateString(), 'error_type' => $e->error_type, 'reached' => $e->reached_client ?? 'unknown', 'harm' => $e->harm_level ?? 'unknown', 'status' => $e->status, 'confirmed_sac' => $e->confirmed_sac, 'href' => '/emar/errors?error_id='.$e->id, 'in_error' => $e->status === 'in_error' ? 1 : 0])->values();
+            $rows = $records->map(fn ($e) => $this->person($clients->get($e->client_id), $period) + ['reference' => $e->reference_number, 'date' => ($e->occurred_at ?? $e->reported_at)?->timezone('Pacific/Auckland')->toDateString(), 'occurred_at' => ($e->occurred_at ?? $e->reported_at)?->toIso8601String(), 'reported_at' => $e->reported_at?->toIso8601String(), 'error_type' => $e->error_type, 'reached' => $e->reached_client ?? 'unknown', 'harm' => $e->harm_level ?? 'unknown', 'status' => $e->stage(), 'confirmed_sac' => $e->confirmed_sac, 'href' => '/emar/errors?error_id='.$e->id, 'in_error' => $e->status === 'in_error' ? 1 : 0])->values();
             $effective = $rows->where('in_error', 0);
             $totals = ['reached' => $effective->where('reached', 'yes')->count(), 'near_misses' => $effective->where('reached', 'no')->count(), 'with_harm' => $effective->whereIn('harm', ['minor', 'moderate', 'severe', 'severe_permanent', 'death'])->count(), 'open' => $effective->whereNotIn('status', ['closed', 'resolved'])->count(), 'reach_unknown' => $effective->whereNotIn('reached', ['yes', 'no'])->count()];
         } elseif ($report === 'reviews') {
-            $rows = MedicationReview::query()->whereIn('client_id', $clientIds)->where(fn ($q) => $q->whereBetween('scheduled_date', [$period->from, $period->to])->orWhereBetween('completed_date', [$period->from, $period->to]))->get()->map(fn ($r) => $this->person($clients->get($r->client_id), $period) + ['reference' => 'review:'.$r->id, 'date' => $r->scheduled_date?->toDateString(), 'status' => $r->status, 'completed_date' => $r->completed_date?->toDateString(), 'next_review_date' => $r->next_review_date?->toDateString(), 'href' => '/emar/reviews?client_id='.$r->client_id])->values();
-            $totals = ['due' => $rows->whereBetween('date', [$period->from, $period->to])->count(), 'done' => $rows->whereBetween('completed_date', [$period->from, $period->to])->count(), 'overdue' => MedicationReview::query()->whereIn('client_id', $clientIds)->overdue()->count()];
+            $rows = MedicationReview::query()->whereIn('client_id', $clientIds)->where(fn ($q) => $q->whereBetween('scheduled_date', [$period->from, $period->to])->orWhereBetween('happened_at', $period->bounds())->orWhere(fn ($q) => $q->whereNull('happened_at')->whereBetween('completed_date', [$period->from, $period->to])))->orderBy('scheduled_date')->orderBy('id')->get()->map(fn ($r) => $this->person($clients->get($r->client_id), $period) + ['reference' => 'review:'.$r->id, 'date' => $r->scheduled_date?->toDateString(), 'status' => $r->status, 'happened_at' => $r->happened_at?->toIso8601String(), 'completed_date' => $r->happened_at?->timezone('Pacific/Auckland')->toDateString() ?? $r->completed_date?->toDateString(), 'next_review_date' => $r->next_review_date?->toDateString(), 'href' => '/emar/reviews?review='.$r->id])->values();
+            $totals = ['due' => $rows->whereBetween('date', [$period->from, $period->to])->count(), 'done' => $rows->where('status', 'completed')->whereBetween('completed_date', [$period->from, $period->to])->count(), 'overdue' => MedicationReview::query()->whereIn('client_id', $clientIds)->whereIn('status', ['scheduled', 'overdue', 'in_progress'])->whereDate('scheduled_date', '<', $now->timezone('Pacific/Auckland')->toDateString())->count()];
         } elseif ($report === 'stock') {
-            $query = ClientMedicationStock::query()->whereHas('medication.client', fn ($q) => $q->whereIn('site_id', $siteIds))->with('medication.client.site:id,name');
+            $query = ClientMedicationStock::query()->whereHas('medication.client', fn ($q) => $q->whereIn('site_id', $siteIds))->with(['medication.client.site:id,name', 'lots']);
             if (! $finance) {
                 $query->whereHas('medication', fn ($q) => $q->whereIn('client_id', $clientIds));
             }
             if (! $actor->canDo('medications.controlled.view')) {
                 $query->whereHas('medication', fn ($q) => $q->where('controlled_drug', false));
             }
-            $rows = $query->get()->map(fn ($s) => ['reference' => 'stock:'.$s->id, 'medicine' => $s->medication?->historicalDisplayName(), 'site' => $s->medication?->client?->site?->name, 'unit' => $s->unit, 'on_hand' => $s->on_hand === null ? null : (float) $s->on_hand, 'reorder_level' => $s->reorder_level === null ? null : (float) $s->reorder_level, 'expiry_date' => $s->expiry_date?->toDateString(), 'value_on_hand' => null, 'low' => $s->on_hand !== null && $s->reorder_level !== null && (float) $s->on_hand <= (float) $s->reorder_level ? 1 : 0])->values();
+            $today = $now->timezone('Pacific/Auckland')->toDateString();
+            $this->limit((clone $query)->count());
+            $rows = $query->get()->map(function ($s) use ($today) {
+                $usable = $s->lots->map(fn ($lot) => ['id' => $lot->id, 'state' => $lot->state, 'quantity_remaining' => $lot->quantity_remaining, 'expiry_date' => $lot->expiry_date?->toDateString()])->filter(fn ($lot) => StockLotRules::usable($lot, $today))->values();
+                // P06: legacy unknown remains unknown; controlled physical stock
+                // follows its real register balance rather than pack allocation.
+                $onHand = $s->lots_started_at !== null && ! $s->medication?->controlled_drug ? Quantity::toFloat(StockLotRules::onHand($usable->all(), $today)) : ($s->on_hand === null ? null : (float) $s->on_hand);
+                $expiry = $s->lots_started_at !== null ? $usable->pluck('expiry_date')->filter()->sort()->first() : $s->expiry_date?->toDateString();
+
+                return ['reference' => 'stock:'.$s->id, 'medicine' => $s->medication?->historicalDisplayName(), 'site' => $s->medication?->client?->site?->name, 'unit' => $s->unit, 'on_hand' => $onHand, 'reorder_level' => $s->reorder_level === null ? null : (float) $s->reorder_level, 'expiry_date' => $expiry, 'value_on_hand' => null, 'low' => $onHand !== null && $s->reorder_level !== null && $onHand <= (float) $s->reorder_level ? 1 : 0];
+            })->values();
             if ($finance) {
                 // Collapse person-owned stock into medicine/house/unit lines.
                 // No person names, person IDs, links or individual balances.
@@ -172,8 +188,16 @@ final class MedicationReportDataset
         $this->limit($rows->count());
         $clients = Client::query()->whereIn('id', $ids)->with('site:id,name')->get()->keyBy('id');
         $medicines = ClientMedication::withTrashed()->whereIn('id', $rows->pluck('client_medication_id')->filter()->unique())->get()->keyBy('id');
+        $checked = MedicationOrderRevision::query()->whereIn('client_medication_id', $medicines->keys())->whereIn('client_id', $ids)->whereNotNull('checked_at')->whereIn('status', ['checked', 'checked_alone'])->with('version')->orderByDesc('checked_at')->orderByDesc('id')->get()->groupBy('client_medication_id');
 
-        return $rows->map(fn ($slot) => $this->person($clients->get($slot['client_id']), $period) + ['reference' => 'slot:'.$slot['id'], 'date' => $slot['nz_date'], 'medicine' => $slot['concealed'] ? 'Controlled medicine' : $medicines->get($slot['client_medication_id'])?->historicalDisplayName(), 'dose' => $slot['concealed'] ? 'Concealed' : $medicines->get($slot['client_medication_id'])?->dosage, 'route' => $slot['concealed'] ? 'Concealed' : $medicines->get($slot['client_medication_id'])?->route, 'status' => $slot['state'], 'due_at' => $slot['due_at'], 'window_ends_at' => $slot['window_ends_at'], 'recorded_at' => $slot['outcome_at'], 'late' => $slot['recorded_late'] ? 1 : 0, 'away' => $slot['state'] === 'away' ? 1 : 0])->all();
+        return $rows->map(function ($slot) use ($actor, $clients, $period, $medicines, $checked) {
+            $medicine = $medicines->get($slot['client_medication_id']);
+            $revision = ($checked[$slot['client_medication_id']] ?? collect())->first(fn ($r) => (int) $r->client_id === (int) $slot['client_id'] && $r->checked_at->lte(CarbonImmutable::parse($slot['due_at'])) && (int) $r->version?->client_medication_id === (int) $slot['client_medication_id'] && (int) $r->version?->client_id === (int) $slot['client_id']);
+            $version = $revision?->version;
+            $concealed = $slot['concealed'] || ($version?->controlled_drug && ! $actor->canDo('medications.controlled.view'));
+
+            return $this->person($clients->get($slot['client_id']), $period) + ['reference' => 'slot:'.$slot['id'], 'order_reference' => $concealed ? null : 'order:'.$slot['client_medication_id'], 'version_reference' => $concealed || ! $version ? null : 'order-version:'.$version->id, 'date' => $slot['nz_date'], 'medicine' => $concealed ? 'Controlled medicine' : ($version?->name ?? $medicine?->historicalDisplayName()), 'dose' => $concealed ? 'Concealed' : ($version?->formatted_dose ?? 'Not recorded'), 'route' => $concealed ? 'Concealed' : ($version?->route ?? 'Not recorded'), 'status' => $slot['state'], 'due_at' => $slot['due_at'], 'window_ends_at' => $slot['window_ends_at'], 'recorded_at' => $slot['outcome_at'], 'late' => $slot['recorded_late'] ? 1 : 0, 'away' => $slot['state'] === 'away' ? 1 : 0];
+        })->all();
     }
 
     private function canonical(Builder $query, array $sites, array $clients, bool $nullMedicine = false): Builder
