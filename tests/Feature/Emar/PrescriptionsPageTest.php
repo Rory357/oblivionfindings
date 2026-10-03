@@ -20,9 +20,11 @@ use App\Services\Medication\MedicationScopeDecisionService;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use RuntimeException;
 use Tests\TestCase;
@@ -30,9 +32,8 @@ use Database\Factories\UserFactory;
 use App\Services\Medication\WitnessPinService;
 
 /**
- * The redesigned Prescriptions & Orders page serves a flat order/covert payload
- * (+ medications for the covert/link selects, + active-site brand colour), and
- * verbal orders now capture read-back metadata + a countersignature method.
+ * The retained supply and dispensing reader serves the prescriber-order payload.
+ * Governed chart entry and covert changes use the canonical Orders workflow.
  */
 class PrescriptionsPageTest extends TestCase
 {
@@ -56,7 +57,8 @@ class PrescriptionsPageTest extends TestCase
         $this->assignUserToClient($user, $client);
         $recorder = $this->makeRoleUser('support_worker');
         $this->assignUserToClient($recorder, $client);
-        $med = ClientMedication::query()->create(['client_id' => $client->id, 'name' => 'Warfarin', 'dosage' => '3mg', 'frequency' => 'Once daily', 'active' => true, 'state' => 'active', 'approval_status' => 'verified']);
+        $med = ClientMedication::query()->create(['client_id' => $client->id, 'name' => 'Warfarin', 'dosage' => '3mg', 'frequency' => 'Once daily', 'controlled_drug' => false, 'active' => true, 'state' => 'active']);
+        $this->markChecked($med, $user);
         MedicationPrescriberOrder::create([
             'client_id' => $client->id, 'client_medication_id' => $med->id, 'order_type' => 'new', 'status' => 'pending',
             'prescriber_name' => 'Dr Singh', 'medication_name' => 'Warfarin', 'dose' => '3mg', 'route' => 'Oral', 'frequency' => 'Once daily', 'order_date' => '2026-06-10',
@@ -75,7 +77,7 @@ class PrescriptionsPageTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->get('/emar/prescriptions?site_id='.$site->id)
+            ->get('/emar/prescriptions/legacy?site_id='.$site->id)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('emar/Prescriptions')
@@ -128,6 +130,7 @@ class PrescriptionsPageTest extends TestCase
             'state' => 'active',
             'approval_status' => 'verified',
         ]);
+        $this->markChecked($medication, $viewer);
         MedicationPrescriberOrder::query()->create([
             'client_id' => $client->id,
             'client_medication_id' => $medication->id,
@@ -153,7 +156,7 @@ class PrescriptionsPageTest extends TestCase
         ]);
 
         $this->actingAs($viewer)
-            ->get(route('emar.prescriptions'))
+            ->get(route('emar.prescriptions.legacy'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('can.manage_orders', false)
@@ -328,7 +331,7 @@ class PrescriptionsPageTest extends TestCase
         ]);
         $user->unsetRelation('permissionOverrides')->unsetRelation('roles');
         $this->actingAs($user)
-            ->get(route('emar.prescriptions'))
+            ->get(route('emar.prescriptions.legacy'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('can_create_manual_order', true)
@@ -768,7 +771,7 @@ class PrescriptionsPageTest extends TestCase
         ]);
 
         $this->actingAs($verifier)
-            ->get(route('emar.prescriptions'))
+            ->get(route('emar.prescriptions.legacy'))
             ->assertInertia(fn (Assert $page) => $page
                 ->where('orders', function ($orders) use ($legacyOrder): bool {
                     $row = collect($orders)->firstWhere('id', $legacyOrder->id);
@@ -936,7 +939,7 @@ class PrescriptionsPageTest extends TestCase
             'received_by' => $manager->id,
         ]);
         $this->actingAs($verifier)
-            ->get(route('emar.prescriptions'))
+            ->get(route('emar.prescriptions.legacy'))
             ->assertInertia(fn (Assert $page) => $page
                 ->where('orders', function ($orders) use ($unlinkedCease): bool {
                     $row = collect($orders)->firstWhere('id', $unlinkedCease->id);
@@ -1047,7 +1050,7 @@ class PrescriptionsPageTest extends TestCase
         ]);
     }
 
-    public function test_covert_authorisations_reject_future_dates_and_parallel_active_records(): void
+    public function test_covert_authorisations_reject_future_dates_and_replace_active_records_without_parallel_authority(): void
     {
         $this->seed(RbacSeeder::class);
         $user = $this->makeRoleUser('admin');
@@ -1060,15 +1063,10 @@ class PrescriptionsPageTest extends TestCase
             'state' => 'active',
             'approval_status' => 'verified',
         ]);
+        $this->markChecked($medication, $user);
+        Storage::fake('local');
         $workerToday = now(config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
-        $payload = [
-            'client_id' => $client->id,
-            'client_medication_id' => $medication->id,
-            'authorised_by_name' => 'Dr Covert',
-            'clinical_justification' => 'Clinically justified',
-            'authorised_date' => $workerToday->toDateString(),
-            'review_date' => $workerToday->copy()->addMonth()->toDateString(),
-        ];
+        $payload = $this->covertInput($client, $medication);
 
         $this->actingAs($user)
             ->post(route('emar.covert.store'), [
@@ -1079,27 +1077,29 @@ class PrescriptionsPageTest extends TestCase
             ->assertSessionHasErrors('authorised_date');
         $this->actingAs($user)
             ->post(route('emar.covert.store'), $payload)
-            ->assertSessionHasNoErrors();
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $authorisation = MedicationCovertAuthorisation::where('client_medication_id', $medication->id)->sole();
+        $originalEvidence = $authorisation->structured_evidence;
         $this->actingAs($user)
             ->post(route('emar.covert.store'), [
                 ...$payload,
-                'clinical_justification' => 'Overlapping authorisation',
+                'request_key' => 'covert-replacement',
+                'capacity_record' => 'Updated documented capacity assessment.',
             ])
-            ->assertSessionHasErrors('clinical_justification');
+            ->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame(1, MedicationCovertAuthorisation::query()
             ->where('client_medication_id', $medication->id)
             ->where('status', 'active')
             ->count());
-        $authorisation = MedicationCovertAuthorisation::query()
-            ->where('client_medication_id', $medication->id)
-            ->sole();
-        $audit = AuditLog::query()
-            ->where('action', 'medications.covert_authorisation.created')
-            ->where('auditable_id', $authorisation->id)
-            ->sole();
-        $this->assertSame($user->id, (int) $audit->user_id);
-        $this->assertSame($medication->id, (int) $audit->meta['client_medication_id']);
-        $this->assertSame('active', $audit->meta['status_after']);
+        $this->assertSame(2, MedicationCovertAuthorisation::where('client_medication_id', $medication->id)->count());
+        $this->assertSame('revoked', $authorisation->refresh()->status);
+        $this->assertSame($originalEvidence, $authorisation->structured_evidence);
+        $this->assertCount(2, Storage::disk('local')->allFiles());
+        $audits = AuditLog::where('action', 'medication_order.covert_authorised')->where('auditable_id', $medication->id)->orderBy('id')->get();
+        $this->assertCount(2, $audits);
+        $this->assertSame($user->id, (int) $audits->first()->user_id);
+        $this->assertSame($authorisation->id, (int) $audits->first()->meta['authorisation_id']);
+        $this->assertSame($client->id, (int) $audits->first()->meta['client_id']);
     }
 
     public function test_order_creation_defaults_prescriber_type_when_posted_blank(): void
@@ -1271,25 +1271,19 @@ class PrescriptionsPageTest extends TestCase
             'state' => 'active',
             'approval_status' => 'verified',
         ]);
-        $workerToday = now(config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
-
+        $this->markChecked($medication, $actor);
+        Storage::fake('local');
         $this->assertStrictAuditFailureRollsBack(
-            'medications.covert_authorisation.created',
+            'medication_order.covert_authorised',
             fn () => $this->actingAs($actor)
-                ->post(route('emar.covert.store'), [
-                    'client_id' => $client->id,
-                    'client_medication_id' => $medication->id,
-                    'authorised_by_name' => 'Dr Audit Failure',
-                    'clinical_justification' => 'Must roll back with strict audit.',
-                    'authorised_date' => $workerToday->toDateString(),
-                    'review_date' => $workerToday->copy()->addMonth()->toDateString(),
-                ]),
+                ->post(route('emar.covert.store'), $this->covertInput($client, $medication, 'Must roll back with strict audit.')),
         );
 
         $this->assertDatabaseMissing('medication_covert_authorisations', [
             'client_medication_id' => $medication->id,
             'clinical_justification' => 'Must roll back with strict audit.',
         ]);
+        $this->assertCount(0, Storage::disk('local')->allFiles());
     }
 
     public function test_covert_revoke_rolls_back_when_strict_audit_fails(): void
@@ -1320,7 +1314,7 @@ class PrescriptionsPageTest extends TestCase
         ]);
 
         $this->assertStrictAuditFailureRollsBack(
-            'medications.covert_authorisation.revoked',
+            'medication_order.covert_revoked',
             fn () => $this->actingAs($actor)
                 ->post(route('emar.covert.revoke', $authorisation), [
                     'reason' => 'Governance decision superseded.',
@@ -1774,7 +1768,7 @@ class PrescriptionsPageTest extends TestCase
                 $confirmedCeaseTerminalOrder->id => 'confirmed',
             ]);
             $this->actingAs($actor)
-                ->get(route('emar.prescriptions'))
+                ->get(route('emar.prescriptions.legacy'))
                 ->assertOk()
                 ->assertInertia(fn (Assert $page) => $page
                     ->where('orders', function ($orders) use ($expiredIds, $inclusiveOrder, $terminalStatusById): bool {
@@ -1985,7 +1979,7 @@ class PrescriptionsPageTest extends TestCase
             );
 
             $this->actingAs($actor)
-                ->get(route('emar.prescriptions'))
+                ->get(route('emar.prescriptions.legacy'))
                 ->assertOk()
                 ->assertInertia(fn (Assert $page) => $page
                     ->where('can_create_manual_order', false)
@@ -2077,7 +2071,7 @@ class PrescriptionsPageTest extends TestCase
             );
 
             $this->actingAs($actor)
-                ->get(route('emar.prescriptions'))
+                ->get(route('emar.prescriptions.legacy'))
                 ->assertOk()
                 ->assertInertia(fn (Assert $page) => $page
                     ->where('can_create_manual_order', true)
@@ -2170,7 +2164,7 @@ class PrescriptionsPageTest extends TestCase
         $this->grantPermissions($actor, [MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY]);
         $actor->unsetRelation('permissionOverrides')->unsetRelation('roles');
         $this->actingAs($actor)
-            ->get(route('emar.prescriptions'))
+            ->get(route('emar.prescriptions.legacy'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('covert', function ($rows) use ($supersededAuthorisation, $deletedAuthorisation): bool {
@@ -2339,7 +2333,7 @@ class PrescriptionsPageTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->get(route('emar.prescriptions'))
+            ->get(route('emar.prescriptions.legacy'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('orders', function ($orders): bool {
@@ -2361,7 +2355,7 @@ class PrescriptionsPageTest extends TestCase
                 }));
 
         $this->actingAs($user)
-            ->get(route('emar.prescriptions'))
+            ->get(route('emar.prescriptions.legacy'))
             ->assertInertia(fn (Assert $page) => $page
                 ->where('covert', function ($authorisations) use ($ordinaryCovert): bool {
                     $ids = collect($authorisations)->pluck('id');
@@ -2485,7 +2479,7 @@ class PrescriptionsPageTest extends TestCase
         $this->grantPermissions($user, [MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY]);
         $user->unsetRelation('permissionOverrides')->unsetRelation('roles');
         $this->actingAs($user)
-            ->get(route('emar.prescriptions'))
+            ->get(route('emar.prescriptions.legacy'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('orders', function ($orders): bool {
@@ -2545,7 +2539,7 @@ class PrescriptionsPageTest extends TestCase
         $this->grantPermissions($user, [MedicationGovernanceScopeService::CONTROLLED_CAPABILITY]);
         $user->unsetRelation('permissionOverrides')->unsetRelation('roles');
         $this->actingAs($user)
-            ->get(route('emar.prescriptions'))
+            ->get(route('emar.prescriptions.legacy'))
             ->assertInertia(fn (Assert $page) => $page
                 ->where('medications', function ($medications) use ($controlledMedication): bool {
                     $row = collect($medications)->firstWhere('id', $controlledMedication->id);
@@ -2571,8 +2565,8 @@ class PrescriptionsPageTest extends TestCase
             ->assertSessionHasErrors('reason');
         $this->assertSame('active', $controlledCovert->fresh()->status);
         $this->assertDatabaseMissing('audit_logs', [
-            'action' => 'medications.covert_authorisation.revoked',
-            'auditable_id' => $controlledCovert->id,
+            'action' => 'medication_order.covert_revoked',
+            'auditable_id' => $controlledMedication->id,
         ]);
         $this->actingAs($user)
             ->post(route('emar.covert.revoke', $controlledCovert), [
@@ -2582,29 +2576,28 @@ class PrescriptionsPageTest extends TestCase
             ->assertSessionHasNoErrors();
         $this->assertSame('revoked', $controlledCovert->fresh()->status);
         $revokeAudit = AuditLog::query()
-            ->where('action', 'medications.covert_authorisation.revoked')
-            ->where('auditable_id', $controlledCovert->id)
+            ->where('action', 'medication_order.covert_revoked')
+            ->where('auditable_id', $controlledMedication->id)
             ->sole();
         $this->assertSame($user->id, (int) $revokeAudit->user_id);
-        $this->assertSame('active', $revokeAudit->meta['status_before']);
-        $this->assertSame('revoked', $revokeAudit->meta['status_after']);
+        $this->assertSame($controlledCovert->id, (int) $revokeAudit->meta['authorisation_id']);
+        $this->assertSame($client->id, (int) $revokeAudit->meta['client_id']);
         $this->assertSame('Best-interest decision superseded.', $revokeAudit->meta['reason']);
         $this->actingAs($user)
             ->post(route('emar.covert.revoke', $controlledCovert), [
                 'reason' => 'Attempted duplicate revocation.',
             ])
-            ->assertSessionHasErrors('authorisation');
+            ->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame('revoked', $controlledCovert->fresh()->status);
+        $this->assertSame('Best-interest decision superseded.', $controlledCovert->fresh()->revoke_reason);
         $this->assertSame(1, AuditLog::query()
-            ->where('action', 'medications.covert_authorisation.revoked')
-            ->where('auditable_id', $controlledCovert->id)
+            ->where('action', 'medication_order.covert_revoked')
+            ->where('auditable_id', $controlledMedication->id)
             ->count());
+        $this->markChecked($controlledMedication, $user);
+        Storage::fake('local');
         $this->actingAs($user)
-            ->post(route('emar.covert.store'), [
-                ...$covertPayload,
-                'client_medication_id' => $controlledMedication->id,
-                'clinical_justification' => 'Permitted controlled covert authorisation',
-            ])
+            ->post(route('emar.covert.store'), $this->covertInput($client, $controlledMedication, 'Permitted controlled covert authorisation'))
             ->assertRedirect()
             ->assertSessionHasNoErrors();
 
@@ -2668,7 +2661,7 @@ class PrescriptionsPageTest extends TestCase
             'user_id' => $user->id,
         ]);
         $this->actingAs($user)
-            ->get(route('emar.prescriptions'))
+            ->get(route('emar.prescriptions.legacy'))
             ->assertInertia(fn (Assert $page) => $page
                 ->where('orders', function ($orders) use ($controlledOrder): bool {
                     $row = collect($orders)->firstWhere('id', $controlledOrder->id);
@@ -2718,6 +2711,26 @@ class PrescriptionsPageTest extends TestCase
         }
 
         $this->assertDatabaseMissing('audit_logs', ['action' => $action]);
+    }
+
+    private function markChecked(ClientMedication $medication, User $actor): void
+    {
+        $medication->forceFill(['approval_status' => 'verified', 'verified_by' => $actor->id, 'verified_at' => now(), 'start_date' => now('Pacific/Auckland')->toDateString(), 'end_date' => null])->saveQuietly();
+    }
+
+    private function covertInput(Client $client, ClientMedication $medication, string $capacityRecord = 'Clinically justified'): array
+    {
+        $today = now('Pacific/Auckland');
+
+        return [
+            'client_id' => $client->id, 'client_medication_id' => $medication->id,
+            'capacity_lacking' => true, 'capacity_assessor' => 'Recorded assessor', 'capacity_date' => $today->toDateString(), 'capacity_record' => $capacityRecord,
+            'consulted_name' => 'Recorded guardian', 'consulted_role' => 'Welfare guardian', 'consulted_record' => 'Documented consultation.',
+            'pharmacist_name' => 'Recorded pharmacist', 'pharmacist_advice' => 'Documented medicine-specific advice.',
+            'authorised_by_name' => 'Dr Covert', 'authorised_date' => $today->toDateString(), 'legal_basis' => 'Recorded legal source',
+            'administration_method' => 'Method in signed authorisation', 'review_date' => $today->copy()->addMonth()->toDateString(),
+            'request_key' => 'covert-'.bin2hex(random_bytes(8)), 'gp_file' => UploadedFile::fake()->create('authorisation.pdf', 1, 'application/pdf'),
+        ];
     }
 
     protected function makeRoleUser(string $roleName): User
