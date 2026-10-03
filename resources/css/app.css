@@ -1220,6 +1220,12 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
     min-width: max(44px, 2.75rem);
 }
 
+/* The active rail meets the page edge; its existing 6px optical offset
+ * sits above the same real target as the inactive tabs and utility pills. */
+.eh-header-frontline .eh-frontline-rail-active {
+    min-height: calc(max(44px, 2.75rem) + 6px);
+}
+
 /* In the components layer so an `absolute`/`fixed` utility on the host wins. */
 @layer components {
     .frontline-hit {
