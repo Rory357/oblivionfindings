@@ -413,7 +413,7 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     // manage orders at a house reach its round templates only (P11 F1), and
     // medications.view holders read them, read-only (P11 Q2).
     Route::get('/settings', [MedicationSettingsController::class, 'index'])
-        ->middleware('permission:medications.settings.manage|medications.witness_pin.reset|medications.audit.view|medications.orders.manage|medications.view')
+        ->middleware('permission:medications.settings.manage|medications.witness_pin.reset|medications.audit.view|medications.orders.manage|medications.alerts.manage_house|medications.view')
         ->name('emar.settings');
     // P11: who a medicine rule would apply to now, in the reader's own person scope.
     Route::get('/settings/rules/preview', [MedicationSettingsController::class, 'previewRule'])

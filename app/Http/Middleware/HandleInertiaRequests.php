@@ -608,6 +608,7 @@ class HandleInertiaRequests extends Middleware
                 // and action re-checks its own permission on the server.
                 'ordersVerify' => $user->canDo('medications.orders.verify'),
                 'settingsManage' => $user->canDo('medications.settings.manage'),
+                'alertsManageHouse' => $user->canDo('medications.alerts.manage_house'),
                 'administerRecord' => $user->canDo('medications.administer.record'),
                 'administerCorrect' => $user->canDo('medications.administer.correct'),
                 'auditView' => $user->canDo('medications.audit.view'),
