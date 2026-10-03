@@ -1,0 +1,149 @@
+[heavy-lock] P11-completion-php running: /c/Users/steph/.config/herd/bin/php84/php.exe vendor/bin/pest tests/Feature/Emar/P11CompletionTest.php
+
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\Emar\P11CompletionTest[39m
+  [33;1m![39;22m[90m [39m[90mit pages all retained alert history and restricts forged house filters[39m[90m [39m[33m→ file_get_contents(C:\Users\steph[39m[90m…[39m [90m290.84s[39m  
+  [33;1m![39;22m[90m [39m[90mit conceals controlled details from payload and search while retaining the approved shell[39m[90m [39m[33m→ file_get_conten[39m[90m…[39m [90m0.26s[39m  
+  [33;1m![39;22m[90m [39m[90mit removes historical client alerts after a move and denies nonassigned people before counting[39m[90m [39m[33m→ file_get_c[39m[90m…[39m [90m0.30s[39m  
+  [33;1m![39;22m[90m [39m[90mit shows canonical event IDs and delivered recipients without calling held recipients told[39m[90m [39m[33m→ file_get_conte[39m[90m…[39m [90m0.12s[39m  
+  [33;1m![39;22m[90m [39m[90mit retains recently closed and unattended alerts beyond the audit cutoff and dry-run changes nothing[39m[90m [39m[33m→ file[39m[90m…[39m [90m0.43s[39m  
+  [31;1m⨯[39;22m[90m [39m[90mit saves emergency policy into the existing runtime row with structured history and a loosening confirmatio[39m[90m…[39m [90m7.96s[39m  
+  [33;1m![39;22m[90m [39m[90mit requires the dedicated emergency-policy grant and validates duration relationships under the write lock[39m[90m… [39m [90m0.34s[39m  
+  [33;1m![39;22m[90m [39m[90mit lets the account owner consent and withdraw without changing HR contacts or exposing the consent in user[39m[90m…[39m [90m0.46s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\Emar\P11CompletionTest[22m [90m>[39m it saves emergency policy into the existing runtime row with struc…   
+[39;1m  Session is missing expected key [errors].
+Failed asserting that false is true.
+
+The following exception occurred during the last request:
+
+ErrorException: Undefined array key "off" in C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\app\Services\Medication\Settings\MedicationSettingDefinition.php:177
+Stack trace:
+#0 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Bootstrap\HandleExceptions.php(258): Illuminate\Foundation\Bootstrap\HandleExceptions->handleError(2, 'Undefined array...', 'C:\\Users\\steph\\...', 177)
+#1 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\app\Services\Medication\Settings\MedicationSettingDefinition.php(177): Illuminate\Foundation\Bootstrap\HandleExceptions->{closure:Illuminate\Foundation\Bootstrap\HandleExceptions::forwardsTo():257}(2, 'Undefined array...', 'C:\\Users\\steph\\...', 177)
+#2 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\app\Services\Medication\Settings\MedicationSettingsStore.php(146): App\Services\Medication\Settings\MedicationSettingDefinition->loosens('240', '600')
+#3 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Concerns\ManagesTransactions.php(35): App\Services\Medication\Settings\MedicationSettingsStore->{closure:App\Services\Medication\Settings\MedicationSettingsStore::apply():129}(Object(Illuminate\Database\MySqlConnection))
+#4 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\DatabaseManager.php(496): Illuminate\Database\Connection->transaction(Object(Closure))
+#5 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Support\Facades\Facade.php(363): Illuminate\Database\DatabaseManager->__call('transaction', Array)
+#6 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\app\Services\Medication\Settings\MedicationSettingsStore.php(129): Illuminate\Support\Facades\Facade::__callStatic('transaction', Array)
+#7 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\app\Http\Controllers\Emar\MedicationSettingsController.php(133): App\Services\Medication\Settings\MedicationSettingsStore->apply(Object(App\Models\User), Array, false)
+#8 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Concerns\ManagesTransactions.php(35): App\Http\Controllers\Emar\MedicationSettingsController->{closure:App\Http\Controllers\Emar\MedicationSettingsController::saveChanges():124}(Object(Illuminate\Database\MySqlConnection))
+#9 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\DatabaseManager.php(496): Illuminate\Database\Connection->transaction(Object(Closure), 3)
+#10 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Support\Facades\Facade.php(363): Illuminate\Database\DatabaseManager->__call('transaction', Array)
+#11 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\app\Http\Controllers\Emar\MedicationSettingsController.php(124): Illuminate\Support\Facades\Facade::__callStatic('transaction', Array)
+#12 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Controller.php(54): App\Http\Controllers\Emar\MedicationSettingsController->saveChanges(Object(Illuminate\Http\Request))
+#13 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\ControllerDispatcher.php(43): Illuminate\Routing\Controller->callAction('saveChanges', Array)
+#14 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Route.php(269): Illuminate\Routing\ControllerDispatcher->dispatch(Object(Illuminate\Routing\Route), Object(App\Http\Controllers\Emar\MedicationSettingsController), 'saveChanges')
+#15 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Route.php(215): Illuminate\Routing\Route->runController()
+#16 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(822): Illuminate\Routing\Route->run()
+#17 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Routing\Router->{closure:Illuminate\Routing\Router::runRouteWithinStack():821}(Object(Illuminate\Http\Request))
+#18 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\app\Http\Middleware\EnsurePermission.php(27): Illuminate\Pipeline\Pipeline->{closure:Illuminate\Pipeline\Pipeline::prepareDestination():178}(Object(Illuminate\Http\Request))
+#19 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsurePermission->handle(Object(Illuminate\Http\Request), Object(Closure), 'medications.set...')
+#20 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\app\Http\Middleware\AddContentSecurityPolicy.php(49): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#21 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\AddContentSecurityPolicy->handle(Object(Illuminate\Http\Request), Object(Closure))
+#22 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\app\Http\Middleware\PreventSearchIndexing.php(14): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#23 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\PreventSearchIndexing->handle(Object(Illuminate\Http\Request), Object(Closure))
+#24 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets.php(32): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#25 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets->handle(Object(Illuminate\Http\Request), Object(Closure))
+#26 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\inertiajs\inertia-laravel\src\Middleware.php(122): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#27 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\app\Http\Middleware\HandleInertiaRequests.php(63): Inertia\Middleware->handle(Object(Illuminate\Http\Request), Object(Closure))
+#28 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\HandleInertiaRequests->handle(Object(Illuminate\Http\Request), Object(Closure))
+#29 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\app\Http\Middleware\EnforceTwoFactorPolicy.php(16): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#30 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnforceTwoFactorPolicy->handle(Object(Illuminate\Http\Request), Object(Closure))
+#31 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\app\Http\Middleware\EnsureAccountStillApproved.php(41): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#32 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsureAccountStillApproved->handle(Object(Illuminate\Http\Request), Object(Closure))
+#33 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\app\Http\Middleware\EnforceSessionTimeout.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#34 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnforceSessionTimeout->handle(Object(Illuminate\Http\Request), Object(Closure))
+#35 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\app\Http\Middleware\HandleAppearance.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#36 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\HandleAppearance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#37 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Middleware\SubstituteBindings.php(52): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#38 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Routing\Middleware\SubstituteBindings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#39 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Auth\Middleware\Authenticate.php(63): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#40 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Auth\Middleware\Authenticate->handle(Object(Illuminate\Http\Request), Object(Closure))
+#41 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestForgery.php(104): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#42 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestForgery->handle(Object(Illuminate\Http\Request), Object(Closure))
+#43 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\View\Middleware\ShareErrorsFromSession.php(48): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#44 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\View\Middleware\ShareErrorsFromSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#45 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(120): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#46 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(63): Illuminate\Session\Middleware\StartSession->handleStatefulRequest(Object(Illuminate\Http\Request), Object(Illuminate\Session\Store), Object(Closure))
+#47 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Session\Middleware\StartSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#48 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse.php(36): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#49 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse->handle(Object(Illuminate\Http\Request), Object(Closure))
+#50 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\EncryptCookies.php(74): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#51 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\EncryptCookies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#52 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#53 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(821): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#54 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(800): Illuminate\Routing\Router->runRouteWithinStack(Object(Illuminate\Routing\Route), Object(Illuminate\Http\Request))
+#55 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(764): Illuminate\Routing\Router->runRoute(Object(Illuminate\Http\Request), Object(Illuminate\Routing\Route))
+#56 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Routing\Router.php(753): Illuminate\Routing\Router->dispatchToRoute(Object(Illuminate\Http\Request))
+#57 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(200): Illuminate\Routing\Router->dispatch(Object(Illuminate\Http\Request))
+#58 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Foundation\Http\Kernel->{closure:Illuminate\Foundation\Http\Kernel::dispatchToRouter():197}(Object(Illuminate\Http\Request))
+#59 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->{closure:Illuminate\Pipeline\Pipeline::prepareDestination():178}(Object(Illuminate\Http\Request))
+#60 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull.php(31): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#61 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull->handle(Object(Illuminate\Http\Request), Object(Closure))
+#62 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#63 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TrimStrings.php(51): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#64 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\TrimStrings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#65 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePostSize.php(27): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#66 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePostSize->handle(Object(Illuminate\Http\Request), Object(Closure))
+#67 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance.php(109): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#68 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#69 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\HandleCors.php(61): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#70 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\HandleCors->handle(Object(Illuminate\Http\Request), Object(Closure))
+#71 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\TrustProxies.php(58): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#72 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\TrustProxies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#73 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks.php(22): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#74 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks->handle(Object(Illuminate\Http\Request), Object(Closure))
+#75 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePathEncoding.php(28): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#76 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePathEncoding->handle(Object(Illuminate\Http\Request), Object(Closure))
+#77 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\app\Http\Middleware\TraceItTicketCreation.php(20): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#78 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\TraceItTicketCreation->handle(Object(Illuminate\Http\Request), Object(Closure))
+#79 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\app\Http\Middleware\ProtectItDraftResponses.php(57): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#80 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\ProtectItDraftResponses->handle(Object(Illuminate\Http\Request), Object(Closure))
+#81 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\app\Http\Middleware\ProtectVendorVaultResponses.php(29): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#82 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\ProtectVendorVaultResponses->handle(Object(Illuminate\Http\Request), Object(Closure))
+#83 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->{closure:{closure:Illuminate\Pipeline\Pipeline::carry():194}:195}(Object(Illuminate\Http\Request))
+#84 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(175): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#85 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(144): Illuminate\Foundation\Http\Kernel->sendRequestThroughRouter(Object(Illuminate\Http\Request))
+#86 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(607): Illuminate\Foundation\Http\Kernel->handle(Object(Illuminate\Http\Request))
+#87 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(427): Illuminate\Foundation\Testing\TestCase->call('PUT', '/emar/settings/...', Array, Array, Array, Array)
+#88 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\tests\Feature\Emar\P11CompletionTest.php(109): Illuminate\Foundation\Testing\TestCase->put('/emar/settings/...', Array)
+#89 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\pestphp\pest\src\Factories\TestCaseMethodFactory.php(177): P\Tests\Feature\Emar\P11CompletionTest->{closure:C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\tests\Feature\Emar\P11CompletionTest.php:104}()
+#90 [internal function]: P\Tests\Feature\Emar\P11CompletionTest->{closure:Pest\Factories\TestCaseMethodFactory::getClosure():167}()
+#91 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(509): call_user_func_array(Object(Closure), Array)
+#92 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\pestphp\pest\src\Support\ExceptionTrace.php(26): P\Tests\Feature\Emar\P11CompletionTest->{closure:Pest\Concerns\Testable::__callClosure():509}()
+#93 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(509): Pest\Support\ExceptionTrace::ensure(Object(Closure))
+#94 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\pestphp\pest\src\Concerns\Testable.php(336): P\Tests\Feature\Emar\P11CompletionTest->__callClosure(Object(Closure), Array)
+#95 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\pestphp\pest\src\Factories\TestCaseFactory.php(175) : eval()'d code(62): P\Tests\Feature\Emar\P11CompletionTest->__runTest(Object(Closure))
+#96 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(1335): P\Tests\Feature\Emar\P11CompletionTest->__pest_evaluable_it_saves_emergency_policy_into_the_existing_runtime_row_with_structured_history_and_a_loosening_confirmation()
+#97 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(519): PHPUnit\Framework\TestCase->runTest()
+#98 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestRunner\TestRunner.php(99): PHPUnit\Framework\TestCase->runBare()
+#99 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestCase.php(359): PHPUnit\Framework\TestRunner->run(Object(P\Tests\Feature\Emar\P11CompletionTest))
+#100 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\phpunit\phpunit\src\Framework\TestSuite.php(374): PHPUnit\Framework\TestCase->run()
+#101 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\phpunit\phpunit\src\TextUI\TestRunner.php(64): PHPUnit\Framework\TestSuite->run()
+#102 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\phpunit\phpunit\src\TextUI\Application.php(229): PHPUnit\TextUI\TestRunner->run(Object(PHPUnit\TextUI\Configuration\Configuration), Object(PHPUnit\Runner\ResultCache\DefaultResultCache), Object(PHPUnit\Framework\TestSuite))
+#103 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\pestphp\pest\src\Kernel.php(103): PHPUnit\TextUI\Application->run(Array)
+#104 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\pestphp\pest\bin\pest(195): Pest\Kernel->handle(Array, Array)
+#105 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\pestphp\pest\bin\pest(203): {closure:C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\pestphp\pest\bin\pest:19}()
+#106 C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\vendor\bin\pest(119): include('C:\\Users\\steph\\...')
+#107 {main}
+
+----------------------------------------------------------------------------------
+
+Undefined array key "off"[39;22m
+
+  at [32mtests\Feature\Emar\P11CompletionTest.php[39m:[32m109[39m
+    105▕     $site = Site::factory()->create();
+    106▕     $manager = p11FinishActor($site, ['medications.view', 'medications.settings.manage', 'sites.viewAll', EmergencyAccessPolicySettings::PERMISSION]);
+    107▕     $from = (string) BreakGlassPolicy::current()->max_minutes;
+    108▕     $payload = ['view' => 'alerts', 'changes' => [['group' => 'ea', 'key' => 'max_minutes', 'from' => $from, 'value' => '600']]];
+  ➜ 109▕     $this->actingAs($manager)->put('/emar/settings/changes', $payload)->assertSessionHasErrors('confirm_loosening');
+    110▕     $this->put('/emar/settings/changes', $payload + ['confirm_loosening' => true])->assertSessionHasNoErrors();
+    111▕     expect(BreakGlassPolicy::current()->max_minutes)->toBe(600)
+    112▕         ->and(MedicationSettingChange::where('setting_group', 'ea')->sole()->before_value)->toBe($from)
+    113▕         ->and(MedicationSettingChange::where('setting_group', 'ea')->sole()->loosens)->toBeTrue();
+
+
+  [90mTests:[39m    [31;1m1 failed[39;22m[90m,[39m[39m [39m[33;1m7 warnings[39;22m[90m (50 assertions)[39m
+  [90mDuration:[39m [39m304.47s[39m
+
+[heavy-lock] P11-completion-php done (exit 1)

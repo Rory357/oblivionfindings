@@ -2,6 +2,7 @@
 
 namespace App\Services\Medication\Settings;
 
+use App\Models\BreakGlassPolicy;
 use App\Services\Medication\Alerts\MedicationAlertCatalogue;
 use App\Services\Medication\CompetencyPolicySettings;
 use App\Services\Medication\Controlled\ControlledSettingsFragment;
@@ -38,6 +39,8 @@ class MedicationSettingsRegistry
 
     /** Email and push leave out client names and medicines (P11 v5 Delivery › Email). */
     public const DELIVERY_PRIVATE = 'medications.alert_delivery.private';
+
+    public const DELIVERY_PIN_UNATTENDED = 'medications.alert_delivery.pin_unattended';
 
     /** Follow-up (P11 v5 Delivery, B2 chunk 3): re-alerting, attended, escalation. */
     public const DELIVERY_REALERT_EVERY = 'medications.alert_delivery.realert_every';
@@ -142,6 +145,7 @@ class MedicationSettingsRegistry
             MedicationReviewCadence::settingsGroup(),
             ...ControlledSettingsFragment::groups(),
             \App\Services\Medication\Reporting\RecordsReportingSettings::group(),
+            $this->emergencyPolicy(),
         ];
     }
 
@@ -256,6 +260,11 @@ class MedicationSettingsRegistry
                     default: 'yes',
                     rank: ['no', 'yes'],
                 ),
+                new MedicationSettingDefinition(
+                    group: 'delivery', key: 'pin_unattended', storageKey: self::DELIVERY_PIN_UNATTENDED,
+                    scope: MedicationSettingDefinition::SCOPE_ORGANISATION, section: 'delivery',
+                    label: 'Keep unattended alerts at the top of the bell', options: ['no' => 'Off', 'yes' => 'On — medication follow-up alerts only'], default: 'no',
+                ),
                 // Checked every 15 minutes, so 15 is the shortest interval.
                 $number('realert_every', self::DELIVERY_REALERT_EVERY, 'Re-alert until someone attends', 'minutes between re-alerts', [15, 1440], MedicationSettingDefinition::HIGHER_IS_LOOSER, 'Off — each alert is sent once', 'realert_max'),
                 $number('realert_max', self::DELIVERY_REALERT_MAX, 'Most re-alerts', 'times', [1, 10], MedicationSettingDefinition::HIGHER_IS_STRICTER, 'Off', 'realert_every'),
@@ -338,6 +347,35 @@ class MedicationSettingsRegistry
                     codec: new QuietHoursCodec,
                     houseManaged: true,
                 ),
+            ],
+        );
+    }
+
+    private function emergencyPolicy(): MedicationSettingGroup
+    {
+        $defaults = BreakGlassPolicy::defaults();
+        $number = fn (string $key, string $label, string $unit, array $range, string $direction, ?string $pair = null): MedicationSettingDefinition => new MedicationSettingDefinition(
+            group: 'ea', key: $key, storageKey: 'medications.emergency_policy.'.$key,
+            scope: MedicationSettingDefinition::SCOPE_ORGANISATION, section: 'emergency', label: $label,
+            options: [], default: (string) $defaults[$key], numeric: ['direction' => $direction, 'off' => null, 'off_is_loosest' => false], range: $range, unit: $unit, pairedWith: $pair,
+        );
+
+        return new MedicationSettingGroup(
+            key: 'ea', view: self::VIEW_ALERTS, effect: 'From the next emergency-access grant or extension', auditEvent: 'medications.emergency_policy.updated',
+            definitions: [
+                $number('default_minutes', 'A grant lasts', 'minutes', [5, 1440], MedicationSettingDefinition::HIGHER_IS_LOOSER),
+                $number('extend_minutes', 'Each extension adds', 'minutes', [5, 1440], MedicationSettingDefinition::HIGHER_IS_LOOSER),
+                $number('max_minutes', 'Longest time in all', 'minutes', [5, 1440], MedicationSettingDefinition::HIGHER_IS_LOOSER),
+                new MedicationSettingDefinition(group: 'ea', key: 'reason_required', storageKey: 'medications.emergency_policy.reason_required', scope: MedicationSettingDefinition::SCOPE_ORGANISATION, section: 'emergency', label: 'Ask for a reason', options: ['no' => 'Off — no reason is asked for', 'yes' => 'On'], default: 'yes', rank: ['no', 'yes']),
+                $number('repeat_threshold_count', 'Flag repeat use', 'grants within', [1, 100], MedicationSettingDefinition::HIGHER_IS_LOOSER, 'repeat_window_days'),
+                $number('repeat_window_days', 'Repeat-use window', 'days', [1, 90], MedicationSettingDefinition::HIGHER_IS_STRICTER, 'repeat_threshold_count'),
+                // P10 owns the canonical fields/migration and per-grant snapshots.
+                ...array_key_exists('second_person', $defaults) ? [
+                    new MedicationSettingDefinition(group: 'ea', key: 'second_person', storageKey: 'medications.emergency_policy.second_person', scope: MedicationSettingDefinition::SCOPE_ORGANISATION, section: 'emergency', label: 'A second person confirms a grant', options: ['off' => 'Not asked', 'optional' => 'Optional — the person starting it chooses', 'required' => 'Required — it cannot start without one'], default: (string) $defaults['second_person'], rank: ['off', 'optional', 'required']),
+                ] : [],
+                ...array_key_exists('review_days', $defaults) ? [
+                    new MedicationSettingDefinition(group: 'ea', key: 'review_days', storageKey: 'medications.emergency_policy.review_days', scope: MedicationSettingDefinition::SCOPE_ORGANISATION, section: 'emergency', label: 'A review is due within', options: ['1' => '1 day', '2' => '2 days', '3' => '3 days'], default: (string) $defaults['review_days'], rank: ['3', '2', '1']),
+                ] : [],
             ],
         );
     }

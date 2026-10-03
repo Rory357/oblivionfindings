@@ -52,9 +52,14 @@ class MedicationSettingsStore
             ->whereIn('key', $definitions->pluck('storageKey')->all())
             ->pluck('value', 'key');
 
-        return $this->nest($definitions->map(fn (MedicationSettingDefinition $d): array => [
+        $values = $this->nest($definitions->map(fn (MedicationSettingDefinition $d): array => [
             $d, $d->normalise($stored[$d->storageKey] ?? null),
         ]));
+        if ($definitions->contains('group', 'ea')) {
+            $values['ea'] = app(EmergencyAccessPolicySettings::class)->values();
+        }
+
+        return $values;
     }
 
     /**
@@ -126,6 +131,7 @@ class MedicationSettingsStore
         return DB::transaction(function () use ($actor, $changes, $confirmLoosening): array {
             $revision = $this->lockForWrite();
             $current = $this->lockedCurrent($changes);
+            $this->assertEmergencyPolicyConsistent($changes);
 
             $planned = [];
             foreach ($changes as $change) {
@@ -467,6 +473,25 @@ class MedicationSettingsStore
         }
 
         AppSetting::query()->updateOrCreate(['key' => $definition->storageKey], ['value' => $value]);
+        if ($definition->group === 'ea') {
+            app(EmergencyAccessPolicySettings::class)->write($definition->key, $value);
+        }
+    }
+
+    private function assertEmergencyPolicyConsistent(array $changes): void
+    {
+        if (! collect($changes)->contains(fn (array $c): bool => $c['definition']->group === 'ea')) {
+            return;
+        }
+        $policy = app(EmergencyAccessPolicySettings::class)->values(true);
+        foreach ($changes as $change) {
+            if ($change['definition']->group === 'ea') {
+                $policy[$change['definition']->key] = $change['value'];
+            }
+        }
+        if ((int) $policy['default_minutes'] > (int) $policy['max_minutes']) {
+            throw ValidationException::withMessages(['ea.default_minutes' => 'A grant cannot last longer than the longest time in all.']);
+        }
     }
 
     /** Serialise every Medication Settings write behind one row. */
@@ -514,7 +539,9 @@ class MedicationSettingsStore
             ->get()
             ->keyBy(fn (MedicationSiteSetting $row): string => $row->site_id.'|'.$row->key);
 
-        return $items->mapWithKeys(function (array $item) use ($orgRows, $siteRows): array {
+        $policy = $items->contains(fn (array $item): bool => $item['definition']->group === 'ea') ? app(EmergencyAccessPolicySettings::class)->values(true) : [];
+
+        return $items->mapWithKeys(function (array $item) use ($orgRows, $siteRows, $policy): array {
             $definition = $item['definition'];
             $row = $definition->isSiteScoped()
                 ? $siteRows->get($item['site_id'].'|'.$definition->storageKey)
@@ -522,7 +549,7 @@ class MedicationSettingsStore
 
             return [$this->slot($definition, $item['site_id']) => [
                 'exists' => $row !== null,
-                'value' => $definition->normalise($row?->value),
+                'value' => $definition->group === 'ea' ? $policy[$definition->key] : $definition->normalise($row?->value),
             ]];
         })->all();
     }
@@ -534,6 +561,9 @@ class MedicationSettingsStore
      */
     private function groupSnapshot(string $groupKey, ?int $siteId): array
     {
+        if ($groupKey === 'ea') {
+            return app(EmergencyAccessPolicySettings::class)->values(true);
+        }
         $definitions = collect($this->registry->group($groupKey)?->definitions ?? [])
             ->filter(fn (MedicationSettingDefinition $d): bool => $d->isSiteScoped() === ($siteId !== null))
             ->keyBy('storageKey');

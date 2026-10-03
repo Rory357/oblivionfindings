@@ -855,6 +855,15 @@ export function validateView(
                     `“${def.alert.label}”: turn on ${channelWords(def.alert.channels)} — otherwise nobody is told.`;
         });
     });
+    if (
+        s.groups.ea?.view === view &&
+        draft.ea &&
+        Number(draftValue(s, draft, 'ea', 'default_minutes')) >
+            Number(draftValue(s, draft, 'ea', 'max_minutes'))
+    ) {
+        errors['ea.default_minutes'] =
+            'A grant cannot last longer than the longest time in all.';
+    }
     // Follow-up settings that only work together (B2 C3; the server checks the same).
     if (s.groups.delivery?.view === view && draft.delivery) {
         const v = (key: string) => draftValue(s, draft, 'delivery', key);

@@ -88,6 +88,7 @@ const GROUP_ICON: Record<string, typeof Layers> = {
     cdw: Shield,
     alerts: Bell,
     alertExtra: Bell,
+    ea: Shield,
 };
 
 /** Review → save (Fleet "Review … changes"), with failure and conflict states. */

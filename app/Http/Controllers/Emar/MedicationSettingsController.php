@@ -17,12 +17,14 @@ use App\Models\UserPushSubscription;
 use App\Models\WitnessPinReminder;
 use App\Notifications\WitnessPinReminderNotification;
 use App\Services\AuditLogger;
+use App\Services\Medication\Alerts\MedicationAlertLog;
 use App\Services\Medication\Alerts\MedicationAlertPreviews;
 use App\Services\Medication\Alerts\MedicationAlertReachGaps;
 use App\Services\Medication\Alerts\MedicationAlertRecipients;
 use App\Services\Medication\Alerts\OnCallResolver;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\RoundTemplateCatalogue;
+use App\Services\Medication\Settings\EmergencyAccessPolicySettings;
 use App\Services\Medication\Settings\MedicationSettingDefinition;
 use App\Services\Medication\Settings\MedicationSettingsRegistry;
 use App\Services\Medication\Settings\MedicationSettingsStore;
@@ -93,7 +95,7 @@ class MedicationSettingsController extends Controller
     public function saveChanges(Request $request)
     {
         $actor = $request->user();
-        abort_unless($this->canManageSettings($actor) || $this->canManageHouseAlerts($actor), 403);
+        abort_unless($this->canManageSettings($actor) || $this->canManageHouseAlerts($actor) || $this->canManageEmergencyPolicy($actor), 403);
 
         $validated = $request->validate([
             'view' => ['required', 'string', Rule::in($this->settingsRegistry->views())],
@@ -146,7 +148,7 @@ class MedicationSettingsController extends Controller
     public function keepDefaults(Request $request)
     {
         $actor = $request->user();
-        abort_unless($this->canManageSettings($actor), 403);
+        abort_unless($this->canManageSettings($actor) || $this->canManageEmergencyPolicy($actor), 403);
 
         $validated = $request->validate([
             'items' => ['required', 'array', 'min:1', 'max:200'],
@@ -235,7 +237,11 @@ class MedicationSettingsController extends Controller
         if (collect($items)->contains(fn ($item) => str_starts_with($item['definition']->group, 'controlled_'))) {
             abort_unless($actor->canDo('medications.controlled.view'), 403);
         }
-        if (! $this->canManageSettings($actor)) {
+        if (collect($items)->contains(fn (array $item): bool => $item['definition']->group === 'ea')) {
+            abort_unless($this->canManageEmergencyPolicy($actor), 403);
+        }
+        $policyOnly = $items !== [] && collect($items)->every(fn (array $item): bool => $item['definition']->group === 'ea');
+        if (! $this->canManageSettings($actor) && ! ($policyOnly && $this->canManageEmergencyPolicy($actor))) {
             abort_unless($this->canManageHouseAlerts($actor) && $this->onlyHouseManaged($items), 403);
         }
         if (collect($items)->contains(fn (array $item): bool => ! $item['definition']->isSiteScoped())) {
@@ -243,7 +249,12 @@ class MedicationSettingsController extends Controller
         }
     }
 
-    /** @param  list<array{definition: MedicationSettingDefinition, site_id: int|null}>  $items */
+    /** A separate policy grant plus the existing all-sites authority. */
+    private function canManageEmergencyPolicy(?User $actor): bool
+    {
+        return $actor !== null && $actor->canDo(EmergencyAccessPolicySettings::PERMISSION) && $this->canManageGlobalRules($actor);
+    }
+
     private function onlyHouseManaged(array $items): bool
     {
         return $items !== [] && collect($items)->every(
@@ -765,6 +776,7 @@ class MedicationSettingsController extends Controller
                 'witnessPin' => $witnessPin,
                 ...$roundTemplates,
                 ...$alertPayload,
+                'emergencyPolicyAccess' => $this->canManageEmergencyPolicy($actor),
                 'settingsAccess' => false,
                 'controlledSettingsAccess' => ['view' => false, 'manageable_site_ids' => []],
                 'readOnlyAudit' => false,
@@ -845,6 +857,7 @@ class MedicationSettingsController extends Controller
             'witnessPin' => $witnessPin,
             ...$roundTemplates,
             ...$alertPayload,
+            'emergencyPolicyAccess' => $this->canManageEmergencyPolicy($actor),
             'settingsAccess' => true,
             'controlledSettingsAccess' => ['view' => $canSeeControlled, 'manageable_site_ids' => $canManage && $canSeeControlled
                 ? array_values(array_filter($siteIds, fn ($id) => $this->canUseRuleSiteNow($actor, (int) $id))) : []],
@@ -1133,6 +1146,20 @@ class MedicationSettingsController extends Controller
             ->all();
     }
 
+    /** Validated filters narrow the current house and person access; they never grant it. */
+    private function alertLogFilters(): array
+    {
+        $data = request()->validate([
+            'log_house' => ['nullable', 'integer', 'min:1'],
+            'log_show' => ['nullable', Rule::in(['all', 'open', 'attended', 'afterhours'])],
+            'log_range' => ['nullable', Rule::in(['recent', 'all'])],
+            'log_q' => ['nullable', 'string', 'max:150'],
+            'alert_page' => ['nullable', 'integer', 'min:1', 'max:1000000'],
+        ]);
+
+        return ['house' => $data['log_house'] ?? null, 'show' => $data['log_show'] ?? 'all', 'range' => $data['log_range'] ?? 'recent', 'q' => $data['log_q'] ?? ''];
+    }
+
     /**
      * Alerts & access (P11 B2): whether this person sees it, whether they set
      * who gets each alert organisation-wide, the houses whose extras they
@@ -1141,7 +1168,7 @@ class MedicationSettingsController extends Controller
      *
      * @param  list<int>  $siteIds  Houses whose settings this person reads.
      * @param  list<int>  $houseSiteIds  Their own houses (HR profile).
-     * @return array{alertAccess: array<string, mixed>, alertPeople: list<array<string, mixed>>, alertNames: array<int, string>, alertReach: array<string, mixed>, alertNobodyOpen: int, alertPreviews: array<string, mixed>, alertDelivery: array{push_ready: int, people: int}, onCall: array<string, mixed>, alertHouses: list<array{id: int, name: string}>, alertReachGaps: list<array<string, mixed>>}
+     * @return array{alertAccess: array<string, mixed>, alertPeople: list<array<string, mixed>>, alertNames: array<int, string>, alertReach: array<string, mixed>, alertNobodyOpen: int, alertPreviews: array<string, mixed>, alertDelivery: array{push_ready: int, people: int}, onCall: array<string, mixed>, alertHouses: list<array{id: int, name: string}>, alertReachGaps: list<array<string, mixed>>, alertLogSummary: array{recent: int, open: int}, alertLog: mixed}
      */
     private function alertPayload(User $actor, bool $canView, bool $canManage, bool $canManageGlobal, bool $canHouseAlerts, array $siteIds, array $houseSiteIds): array
     {
@@ -1162,6 +1189,8 @@ class MedicationSettingsController extends Controller
                 'onCall' => ['houses' => [], 'staff' => []],
                 'alertHouses' => [],
                 'alertReachGaps' => [],
+                'alertLogSummary' => ['recent' => 0, 'open' => 0],
+                'alertLog' => null,
             ];
         }
 
@@ -1222,6 +1251,12 @@ class MedicationSettingsController extends Controller
             // Who can't be reached (B2 chunk 5): people with a contact gap;
             // the page works out from its draft which gaps matter.
             'alertReachGaps' => app(MedicationAlertReachGaps::class)->rows($visiblePeople, $onCall['houses'], now(), $this->alertUsers),
+            // The alert log (B2 chunk 6), at the houses this person sees: a
+            // count for the Overview now; the rows only when the tab asks.
+            'alertLogSummary' => app(MedicationAlertLog::class)->summary($actor, $siteIds, $canManageGlobal, now()),
+            'alertLog' => fn (): ?array => request()->boolean('log') ? app(MedicationAlertLog::class)->page(
+                $actor, $siteIds, $canManageGlobal, now(), $this->alertLogFilters(),
+            ) : null,
             // Message preview (B2 chunk 2): synthetic samples through the real
             // notification, with the privacy switch on and off.
             'alertPreviews' => app(MedicationAlertPreviews::class)->all(),
@@ -1712,6 +1747,7 @@ class MedicationSettingsController extends Controller
             $lockedActor instanceof User
                 && $lockedActor->approved_at !== null
                 && ($lockedActor->canDo('medications.settings.manage')
+                    || $this->canManageEmergencyPolicy($lockedActor)
                     || ($houseManagedOnly && $lockedActor->canDo('medications.alerts.manage_house'))),
             403,
         );

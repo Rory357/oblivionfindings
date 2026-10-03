@@ -44,6 +44,13 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+    AlertLog,
+    AlertLogView,
+    LOG_RANGE,
+    LOG_SHOW,
+    type AlertLogPage,
+} from './settings/_alert-log';
+import {
     AlertDialogHost,
     AlertsDelivery,
     AlertsOverview,
@@ -60,6 +67,7 @@ import {
 } from './settings/_context';
 import { DialogHost } from './settings/_dialogs';
 import { ControlledProductSettings } from './settings/_controlled-product';
+import { EmergencyAccess } from './settings/_emergency';
 import {
     AllChanges,
     HISTORY_FILTERS,
@@ -162,6 +170,9 @@ type Props = {
     alertHouses: { id: number; name: string }[];
     /** People with a contact gap: Who can't be reached (B2 C5). */
     alertReachGaps: ReachGap[];
+    emergencyPolicyAccess: boolean;
+    alertLog: AlertLogPage | null;
+    alertLogSummary: { recent: number; open: number };
 };
 
 const VIEW_ICON: Record<ViewKey, LucideIcon> = {
@@ -188,6 +199,8 @@ const SEC_ICON: Record<string, LucideIcon> = {
     alerts: Bell,
     delivery: BellRing,
     oncall: Bell,
+    log: History,
+    emergency: LockKeyhole,
 };
 /** Tabs whose settings are saved through the save bar. */
 const SAVED_SECTIONS = [
@@ -198,6 +211,7 @@ const SAVED_SECTIONS = [
     'pins',
     'alerts',
     'delivery',
+    'emergency',
 ];
 const SHOW_OPTIONS = [
     { value: 'all', label: 'All settings' },
@@ -214,6 +228,9 @@ const ALERT_SHOW_OPTIONS = [
 
 export type Filters = {
     show: string;
+    logHouse: string;
+    logShow: string;
+    logRange: string;
     rulesWhere: string;
     rulesState: string;
     pinState: string;
@@ -224,6 +241,9 @@ export type Filters = {
 };
 const F0: Filters = {
     show: 'all',
+    logHouse: 'all',
+    logShow: 'all',
+    logRange: 'recent',
     rulesWhere: 'all',
     rulesState: 'all',
     pinState: 'all',
@@ -309,7 +329,15 @@ export default function EmarSettings(props: Props) {
                   : [],
             // P11 B2: settings readers, and house managers for their houses' extras.
             alerts: alertAccess.view
-                ? ['overview', 'alerts', 'delivery', 'triage', 'oncall']
+                ? [
+                      'overview',
+                      'alerts',
+                      'delivery',
+                      'triage',
+                      'oncall',
+                      'emergency',
+                      'log',
+                  ]
                 : [],
             history: settingsAccess ? ['decide', 'changes'] : [],
         }),
@@ -324,8 +352,20 @@ export default function EmarSettings(props: Props) {
     const [lensOpen, setLensOpen] = useState(false);
     const status = useStatusMessage();
     const setMessage = status.show;
-    const [query, setQuery] = useState('');
-    const [f, setF] = useState<Filters>(F0);
+    const [query, setQuery] = useState(() =>
+        route.view === 'alerts' && route.sec === 'log'
+            ? (new URLSearchParams(window.location.search).get('log_q') ?? '')
+            : '',
+    );
+    const [f, setF] = useState<Filters>(() => {
+        const params = new URLSearchParams(window.location.search);
+        return {
+            ...F0,
+            logHouse: params.get('log_house') || 'all',
+            logShow: params.get('log_show') || 'all',
+            logRange: params.get('log_range') || 'recent',
+        };
+    });
     const [page, setPage] = useState(1);
     const [loadedAt, setLoadedAt] = useState(() => new Date());
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -468,14 +508,17 @@ export default function EmarSettings(props: Props) {
         onCall: onCallData,
         houses: props.alertHouses ?? [],
         reachGaps: props.alertReachGaps ?? [],
+        logSummary: props.alertLogSummary ?? { recent: 0, open: 0 },
     };
     // House extras and quiet hours: their own houses' managers (B2 Q3,
     // Q12); everything else needs all-sites authority.
     const canEdit = (group: string) =>
         !!s.groups[group] &&
-        (group === 'alertExtra' || group === 'quietHouse'
-            ? !readOnlyAudit && alertAccess.house_ids.length > 0
-            : s.can_manage_organisation);
+        (group === 'ea'
+            ? !readOnlyAudit && props.emergencyPolicyAccess
+            : group === 'alertExtra' || group === 'quietHouse'
+              ? !readOnlyAudit && alertAccess.house_ids.length > 0
+              : s.can_manage_organisation);
     const ctx: SettingsContext = {
         s,
         draft,
@@ -677,6 +720,33 @@ export default function EmarSettings(props: Props) {
                     (v) => setF({ ...f, tplStatus: v }),
                     undefined,
                     'current',
+                )}
+            </>
+        ) : view === 'alerts' && sec === 'log' ? (
+            <>
+                {select(
+                    'House',
+                    f.logHouse,
+                    [
+                        { value: 'all', label: 'All houses' },
+                        ...props.sites.map((x) => ({
+                            value: String(x.id),
+                            label: x.name,
+                        })),
+                    ],
+                    (v) => setF({ ...f, logHouse: v }),
+                    Home,
+                )}
+                {select('Status', f.logShow, LOG_SHOW, (v) =>
+                    setF({ ...f, logShow: v }),
+                )}
+                {select(
+                    'History',
+                    f.logRange,
+                    LOG_RANGE,
+                    (v) => setF({ ...f, logRange: v }),
+                    History,
+                    'recent',
                 )}
             </>
         ) : view === 'alerts' && sec === 'alerts' ? (
@@ -899,6 +969,32 @@ export default function EmarSettings(props: Props) {
                     setF({ ...f, show: 'all' });
                 }}
             />
+        ) : view === 'alerts' && sec === 'emergency' ? (
+            <EmergencyAccess
+                q={query}
+                show={f.show}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+            />
+        ) : view === 'alerts' && sec === 'log' ? (
+            <AlertLog
+                page={props.alertLog ?? null}
+                q={query}
+                house={f.logHouse}
+                show={f.logShow}
+                range={f.logRange}
+                clear={() => {
+                    clearQ();
+                    setF({
+                        ...f,
+                        logHouse: 'all',
+                        logShow: 'all',
+                        logRange: 'recent',
+                    });
+                }}
+            />
         ) : view === 'alerts' && sec === 'delivery' ? (
             <AlertsDelivery
                 q={query}
@@ -961,6 +1057,9 @@ export default function EmarSettings(props: Props) {
                         />
                     ) : null}
                 </div>
+                {dialog?.kind === 'alertlog' && (
+                    <AlertLogView row={dialog.row} />
+                )}
                 <DialogHost dialog={dialog} />
                 {lensOpen ? (
                     <HouseLens

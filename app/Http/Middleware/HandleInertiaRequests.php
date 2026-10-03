@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Services\Assurance\NzsAssuranceResolver;
 use App\Services\Fleet\FleetMapSettings;
 use App\Services\MarScheduleService;
+use App\Services\Medication\Alerts\MedicationBellOrder;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Operations\OpsMessageVisibilityService;
@@ -371,7 +372,7 @@ class HandleInertiaRequests extends Middleware
                         ? $this->boardPackAccess->visibleNotificationQuery($user, unreadOnly: true)->count()
                         : 0,
                     'items' => $hasNotificationsTable
-                        ? $this->boardPackAccess->visibleNotificationQuery($user)
+                        ? app(MedicationBellOrder::class)->apply($this->boardPackAccess->visibleNotificationQuery($user))
                             ->latest()
                             ->limit(8)
                             ->get(['id', 'type', 'data', 'read_at', 'acknowledged_at', 'escalation_count', 'created_at'])

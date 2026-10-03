@@ -25,6 +25,8 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { formatDateTime } from '@/lib/datetime';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
@@ -56,7 +58,7 @@ import {
     Upload,
     User,
 } from 'lucide-react';
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 const NZ_AU_TIMEZONES = [
     { value: 'Pacific/Auckland', label: 'Auckland (NZST/NZDT)' },
@@ -83,6 +85,7 @@ type LandingOption = { key: string; label: string; role_label: string };
 
 type ProfileData = {
     phone: string | null;
+    onCallCellphoneConsentedAt: string | null;
     jobTitle: string | null;
     timezone: string;
     locale: string;
@@ -141,6 +144,9 @@ export default function Profile({
     const { auth } = usePage<SharedData>().props;
     const { availableLocales, t } = useI18n();
     const getInitials = useInitials();
+    const [onCallConsent, setOnCallConsent] = useState(
+        !!profileData.onCallCellphoneConsentedAt,
+    );
     const photoForm = useForm<{ photo: File | null }>({ photo: null });
     const removePhotoForm = useForm({});
     const preferencesForm = useForm({
@@ -522,6 +528,63 @@ export default function Profile({
                                                                 .phone
                                                         }
                                                     />
+                                                    <div className="mt-2 space-y-2 rounded-lg border border-border p-3">
+                                                        <input
+                                                            type="hidden"
+                                                            name="on_call_cellphone_consent"
+                                                            value={
+                                                                onCallConsent
+                                                                    ? '1'
+                                                                    : '0'
+                                                            }
+                                                        />
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <Label
+                                                                htmlFor="on-call-consent"
+                                                                className="leading-normal"
+                                                            >
+                                                                Show my personal
+                                                                cellphone when I
+                                                                am on call
+                                                            </Label>
+                                                            <Switch
+                                                                id="on-call-consent"
+                                                                checked={
+                                                                    onCallConsent
+                                                                }
+                                                                onCheckedChange={
+                                                                    setOnCallConsent
+                                                                }
+                                                                aria-describedby="on-call-consent-help"
+                                                            />
+                                                        </div>
+                                                        <p
+                                                            id="on-call-consent-help"
+                                                            className="text-caption"
+                                                        >
+                                                            Used by staff who
+                                                            can see your house's
+                                                            on-call contact,
+                                                            only when no work
+                                                            phone is available.
+                                                            You can withdraw
+                                                            consent here.
+                                                        </p>
+                                                        {profileData.onCallCellphoneConsentedAt && (
+                                                            <p className="text-caption">
+                                                                Consent saved{' '}
+                                                                {formatDateTime(
+                                                                    profileData.onCallCellphoneConsentedAt,
+                                                                )}
+                                                                .
+                                                            </p>
+                                                        )}
+                                                        <InputError
+                                                            message={
+                                                                errors.on_call_cellphone_consent
+                                                            }
+                                                        />
+                                                    </div>
                                                 </div>
 
                                                 <div className="grid gap-2">

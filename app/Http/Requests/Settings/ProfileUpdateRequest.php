@@ -56,6 +56,7 @@ class ProfileUpdateRequest extends FormRequest
                 Rule::unique(User::class)->ignore($this->user()->id),
             ],
             'phone' => ['nullable', 'string', 'max:50'],
+            'on_call_cellphone_consent' => ['sometimes', 'boolean'],
             'job_title' => ['nullable', 'string', 'max:255'],
             'timezone' => ['required', 'timezone'],
             'locale' => ['required', Rule::in(array_keys((array) config('locales.available', ['en' => []])))],
