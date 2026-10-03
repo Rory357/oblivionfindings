@@ -131,7 +131,7 @@ class EmarListPersonScopeTest extends TestCase
         ]);
 
         $page = $this->actingAs($this->worker)->get(route('emar.reviews'))->assertOk();
-        $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('reviews.data'), 'client.id'));
+        $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('reviews.data'), 'client_id'));
         $this->assertSame(2, $page->inertiaProps('meters.due_30'));
         foreach ([$this->unassigned, $foreign] as $hidden) {
             $this->actingAs($this->worker)
@@ -141,7 +141,7 @@ class EmarListPersonScopeTest extends TestCase
 
         $lead = $this->lead();
         $page = $this->actingAs($lead)->get(route('emar.reviews'))->assertOk();
-        $this->assertSame($this->allIds(), $this->sortedIds($page->inertiaProps('reviews.data'), 'client.id'));
+        $this->assertSame($this->allIds(), $this->sortedIds($page->inertiaProps('reviews.data'), 'client_id'));
         $this->assertSame(3, $page->inertiaProps('meters.due_30'));
         $this->actingAs($lead)->get(route('emar.reviews', ['review' => $reviewIds[$foreign->id]]))->assertNotFound();
     }

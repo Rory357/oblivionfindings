@@ -115,7 +115,7 @@ class MedicationRecoveryIntegrationRegressionTest extends TestCase
         $this->assertSame($originalFacts, $original->fresh()->getRawOriginal());
         foreach ($old as $row) {
             $fresh = $row->fresh();
-            $this->assertSame('done', $fresh->state);
+            $this->assertSame('retired', $fresh->state);
             $this->assertNotNull($fresh->completed_at);
             $this->assertSame($row->revision + 1, $fresh->revision);
             $this->assertSame(1, $fresh->events()->where('action', 'source_retired')->count());
@@ -141,7 +141,7 @@ class MedicationRecoveryIntegrationRegressionTest extends TestCase
 
         $this->assertSame([$correction->id], $this->effectiveIds($original));
         $this->assertSame('given', $original->fresh()->status);
-        $this->assertSame('done', $old->sole()->fresh()->state);
+        $this->assertSame('retired', $old->sole()->fresh()->state);
         $this->assertSame(1, $old->sole()->events()->where('action', 'source_retired')->count());
         $this->assertDatabaseCount('medication_followups', 1);
         $this->assertDatabaseMissing('medication_followups', ['administration_id' => $correction->id]);

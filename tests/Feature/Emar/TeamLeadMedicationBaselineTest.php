@@ -76,7 +76,7 @@ class TeamLeadMedicationBaselineTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_the_seeder_gives_team_lead_every_frontline_medication_key_a_support_worker_holds_and_nothing_more(): void
+    public function test_the_seeder_gives_team_lead_the_exact_frontline_and_approved_house_lead_medication_keys(): void
     {
         $teamLead = $this->medicationKeys('team_lead');
         $supportWorker = $this->medicationKeys('support_worker');
@@ -88,6 +88,12 @@ class TeamLeadMedicationBaselineTest extends TestCase
             'medications.witness_pin.reset',
             // P11 B2 Q3: their own houses' alert extras, quiet hours and on-call contact.
             'medications.alerts.manage_house',
+            // Approved house-level workflows have their own exact capabilities.
+            'medications.controlled.manage',
+            'medications.errors.manage',
+            'medications.followups.manage',
+            'medications.reports.view',
+            'medications.reviews.manage',
             ...self::FRONTLINE_KEYS,
         ], $teamLead);
     }
