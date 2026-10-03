@@ -562,12 +562,18 @@ class ResidentTransportMedicationTransitTest extends TestCase
             'frequency' => 'PRN',
             'is_prn' => true,
             'controlled_drug' => true,
+            'high_risk' => false,
+            'witness_required' => true,
             'active' => true,
             'state' => 'active',
             'approval_status' => 'verified',
             'version' => 1,
         ]);
         $scanCode = app(MedicationScanVerificationService::class)->internalCode($client, $medication);
+        $stock = \App\Models\ClientMedicationStock::query()->create([
+            'client_medication_id' => $medication->id, 'on_hand' => '5.00', 'unit' => 'tablet',
+        ]);
+        $stockFacts = $stock->fresh()->getRawOriginal();
 
         $log = FleetMedicationTransitLog::query()->create([
             'transport_id' => $transport->id,
@@ -577,10 +583,12 @@ class ResidentTransportMedicationTransitTest extends TestCase
             'medication_order_version' => 1,
             'medication_name' => 'Controlled transit medication',
             'is_controlled_drug' => true,
+            'witness_required' => true,
             'packed_witness_name' => 'Packing Witness',
             'packed_by_user_id' => $this->admin->id,
             'packed_at' => now(),
         ]);
+        $logFacts = $log->fresh()->getRawOriginal();
 
         $this->actingAs($this->admin)
             ->from("/fleet-assets/transports/{$transport->id}")
@@ -600,6 +608,9 @@ class ResidentTransportMedicationTransitTest extends TestCase
 
         $this->assertNull($log->fresh()->administered_at);
         $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $this->assertSame($stockFacts, $stock->fresh()->getRawOriginal());
+        $this->assertSame($logFacts, $log->fresh()->getRawOriginal());
     }
 
     public function test_pack_and_return_preserve_terminal_transit_consequences(): void
