@@ -21,16 +21,12 @@ final class ControlledProductController extends Controller
 {
     public function destructions(Request $request)
     {
-        $this->read($request);
-
-        return redirect('/emar/controlled?view=destructions');
+        return $this->redirectRead($request, 'destructions');
     }
 
     public function losses(Request $request)
     {
-        $this->read($request);
-
-        return redirect('/emar/controlled?view=losses');
+        return $this->redirectRead($request, 'losses');
     }
 
     /** Old URLs use the same validated command; old unwitnessed forms cannot bypass it. */
@@ -94,9 +90,16 @@ final class ControlledProductController extends Controller
 
     private function read(Request $request): array
     {
-        $filters = $request->validate(['site_id' => ['nullable', 'integer', 'min:1'], 'client_medication_id' => ['nullable', 'integer', 'min:1']]);
+        $filters = $request->validate(['site_id' => ['nullable', 'integer', 'min:1'], 'client_medication_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'], 'date' => ['nullable', 'date_format:Y-m-d']]);
 
-        return $this->payload->forActor($request->user(), isset($filters['site_id']) ? (int) $filters['site_id'] : null, isset($filters['client_medication_id']) ? (int) $filters['client_medication_id'] : null);
+        return $this->payload->forActor($request->user(), isset($filters['site_id']) ? (int) $filters['site_id'] : null, isset($filters['client_medication_id']) ? (int) $filters['client_medication_id'] : null, isset($filters['client_id']) ? (int) $filters['client_id'] : null, $filters['date'] ?? null);
+    }
+
+    private function redirectRead(Request $request, string $view)
+    {
+        $product = $this->read($request);
+
+        return redirect('/emar/controlled?'.http_build_query(array_filter(['view' => $view, ...$product['filters']], fn ($value) => $value !== null)));
     }
 
     public function action(Request $request, string $action)

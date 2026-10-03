@@ -7,6 +7,21 @@ import type {
 } from './product-types';
 
 const ENDPOINT = '/emar/controlled/product';
+/** Keep reader scope on refresh; view/search controls do not alter the API read. */
+export function controlledProductReadUrl(url: string): string {
+    const current = new URLSearchParams(url.split('?')[1] ?? '');
+    const query = new URLSearchParams();
+    for (const key of [
+        'site_id',
+        'client_id',
+        'client_medication_id',
+        'date',
+    ]) {
+        const value = current.get(key);
+        if (value) query.set(key, value);
+    }
+    return ENDPOINT + (query.size ? `?${query}` : '');
+}
 export class ControlledApiError extends Error {
     constructor(
         message: string,
@@ -127,10 +142,19 @@ export async function recordControlledAction(
         );
     }
 }
-export function useControlledProduct(initial?: ControlledProductPayload) {
-    const [payload, setPayload] = useState<ControlledProductPayload | null>(
-        initial ?? null,
+export function useControlledProduct(
+    initial?: ControlledProductPayload,
+    pageUrl?: string,
+) {
+    const [browserSearch, setBrowserSearch] = useState(() =>
+        typeof window === 'undefined' ? '' : window.location.search,
     );
+    const readUrl = controlledProductReadUrl(pageUrl ?? browserSearch);
+    const [snapshot, setSnapshot] = useState({
+        url: readUrl,
+        payload: initial ?? (null as ControlledProductPayload | null),
+    });
+    const payload = snapshot.url === readUrl ? snapshot.payload : null;
     const [loading, setLoading] = useState(!initial);
     const [error, setError] = useState<ControlledApiError | null>(null);
     const [offline, setOffline] = useState(
@@ -138,6 +162,14 @@ export function useControlledProduct(initial?: ControlledProductPayload) {
     );
     const generation = useRef(0);
     const controller = useRef<AbortController | null>(null);
+    const currentScope = useRef(readUrl);
+    useEffect(() => {
+        currentScope.current = readUrl;
+    }, [readUrl]);
+    const cancelRead = useCallback(() => {
+        controller.current?.abort();
+        generation.current++;
+    }, []);
     const refresh = useCallback(async () => {
         controller.current?.abort();
         const active = new AbortController();
@@ -146,14 +178,14 @@ export function useControlledProduct(initial?: ControlledProductPayload) {
         setLoading(true);
         try {
             const data = await readResponse<ControlledProductPayload>(
-                await fetch(ENDPOINT, {
+                await fetch(readUrl, {
                     credentials: 'same-origin',
                     headers: { Accept: 'application/json' },
                     signal: active.signal,
                 }),
             );
             if (generation.current === request) {
-                setPayload(data);
+                setSnapshot({ url: readUrl, payload: data });
                 setError(null);
             }
         } catch (cause) {
@@ -162,7 +194,7 @@ export function useControlledProduct(initial?: ControlledProductPayload) {
                     cause instanceof ControlledApiError &&
                     [401, 403, 404, 419].includes(cause.status)
                 )
-                    setPayload(null);
+                    setSnapshot({ url: readUrl, payload: null });
                 setError(
                     cause instanceof ControlledApiError
                         ? cause
@@ -174,6 +206,11 @@ export function useControlledProduct(initial?: ControlledProductPayload) {
         } finally {
             if (generation.current === request) setLoading(false);
         }
+    }, [readUrl]);
+    useEffect(() => {
+        const navigate = () => setBrowserSearch(window.location.search);
+        window.addEventListener('popstate', navigate);
+        return () => window.removeEventListener('popstate', navigate);
     }, []);
     useEffect(() => {
         void refresh();
@@ -181,14 +218,11 @@ export function useControlledProduct(initial?: ControlledProductPayload) {
         window.addEventListener('online', update);
         window.addEventListener('offline', update);
         return () => {
-            controller.current?.abort();
-            generation.current++;
+            cancelRead();
             window.removeEventListener('online', update);
             window.removeEventListener('offline', update);
         };
-        // The initial snapshot belongs to this mounted workspace.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [refresh]);
+    }, [refresh, cancelRead]);
     const act = useCallback(
         async (
             action: ControlledAction,
@@ -196,17 +230,26 @@ export function useControlledProduct(initial?: ControlledProductPayload) {
             uuid: string,
         ) => {
             const result = await recordControlledAction(action, values, uuid);
-            if (result.payload) {
+            // A completed action must not replace or abort a newly selected read.
+            if (currentScope.current !== readUrl) return result;
+            if (result.payload && readUrl === ENDPOINT) {
                 generation.current++;
                 controller.current?.abort();
-                setPayload(result.payload);
+                setSnapshot({ url: readUrl, payload: result.payload });
                 setLoading(false);
                 setError(null);
             } else await refresh();
             return result;
         },
-        [refresh],
+        [refresh, readUrl],
     );
-    return { payload, loading, error, offline, refresh, act };
+    return {
+        payload,
+        loading: loading || snapshot.url !== readUrl,
+        error,
+        offline,
+        refresh,
+        act,
+    };
 }
 export type ControlledWorkspace = ReturnType<typeof useControlledProduct>;

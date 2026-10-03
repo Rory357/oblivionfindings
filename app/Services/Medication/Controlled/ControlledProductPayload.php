@@ -21,6 +21,7 @@ use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\WitnessPinService;
 use App\Support\Medication\MedicationStockQuantity as Quantity;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -36,20 +37,35 @@ final class ControlledProductPayload
         private readonly WitnessPinService $pins,
     ) {}
 
-    public function forActor(User $actor, ?int $siteId = null, ?int $medicationId = null): array
+    public function forActor(User $actor, ?int $siteId = null, ?int $medicationId = null, ?int $clientId = null, ?string $date = null): array
     {
         $siteIds = $this->scope->readerSiteIds($actor, 'medications.controlled.view', $siteId);
         if ($siteId !== null) {
             $siteIds = [$siteId];
         }
         $clientIds = $this->access->readableClientIds($actor, Client::query()->whereIn('site_id', $siteIds)->pluck('id'));
+        // Narrow within the existing person boundary; conceal unreadable IDs.
+        abort_if($clientId !== null && ! in_array($clientId, $clientIds, true), 404);
+        $people = Client::query()->whereIn('id', $clientIds)->orderBy('first_name')->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name'])->map(fn ($person) => ['id' => $person->id, 'name' => $person->full_name])->values();
+        if ($clientId !== null) {
+            $clientIds = [$clientId];
+        }
         $meds = ClientMedication::withTrashed()->where('controlled_drug', true)->whereIn('client_id', $clientIds)
             ->when($medicationId !== null, fn ($q) => $q->whereKey($medicationId))
             ->with(['client.site', 'stock'])->orderBy('name')->get();
         abort_if($medicationId !== null && $meds->isEmpty(), 404);
         $ids = $meds->pluck('id');
         $entriesQuery = $this->scope->scopeCanonicalClientMedicationRows(ClientControlledDrugEntry::query(), $siteIds, false)->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds);
-        $entries = (clone $entriesQuery)->with(['recordedBy:id,name', 'witnessedBy:id,name'])->latest('id')->limit(self::HISTORY_LIMIT)->get();
+        // History dates never change current stock, count evidence or the
+        // optimistic entry version used by witnessed commands.
+        $historyQuery = clone $entriesQuery;
+        if ($date !== null) {
+            $start = CarbonImmutable::parse($date, 'Pacific/Auckland')->startOfDay();
+            $historyQuery->where('recorded_at', '>=', $start->utc())
+                ->where('recorded_at', '<', $start->addDay()->utc());
+        }
+        $entries = (clone $historyQuery)->with(['recordedBy:id,name', 'witnessedBy:id,name'])->latest('id')->limit(self::HISTORY_LIMIT)->get();
         $latest = (clone $entriesQuery)->selectRaw('client_medication_id, MAX(id) AS latest_id')->groupBy('client_medication_id')->pluck('latest_id', 'client_medication_id');
         $lastCounts = (clone $entriesQuery)->where('entry_type', 'balance_check')->whereNotNull('witnessed_by')->selectRaw('client_medication_id, MAX(id) AS latest_id')->groupBy('client_medication_id')->pluck('latest_id', 'client_medication_id');
         $counts = ClientControlledDrugEntry::query()->whereIn('id', $lastCounts)->get()->keyBy('client_medication_id');
@@ -104,6 +120,7 @@ final class ControlledProductPayload
         }
 
         return [
+            'filters' => ['site_id' => $siteId, 'client_medication_id' => $medicationId, 'client_id' => $clientId, 'date' => $date], 'people' => $people,
             'current_user_id' => $actor->id, 'current_user_name' => $actor->name, 'sites' => $siteRows,
             'as_at' => now()->toIso8601String(), 'witnesses_by_site' => $witnessRows,
             'on_site_destruction_allowed' => $this->policy->onsiteAllowed($siteId),
@@ -112,7 +129,7 @@ final class ControlledProductPayload
                 'shift' => 'Every shift change', 'day' => 'Once a day at the morning shift change', 'week' => 'Once a week — anchor not configured', default => 'Not configured'
             }, 'overdue_after_minutes' => $this->policy->overdueMinutes()],
             'history_limit' => self::HISTORY_LIMIT,
-            'history_has_more' => ['entries' => (clone $entriesQuery)->count() > self::HISTORY_LIMIT, 'discrepancies' => (clone $discrepancyQuery)->count() > self::HISTORY_LIMIT, 'losses' => (clone $lossQuery)->count() > self::HISTORY_LIMIT, 'destructions' => (clone $destructionQuery)->count() > self::HISTORY_LIMIT, 'overrides' => (clone $overrideQuery)->count() > self::HISTORY_LIMIT],
+            'history_has_more' => ['entries' => (clone $historyQuery)->count() > self::HISTORY_LIMIT, 'discrepancies' => (clone $discrepancyQuery)->count() > self::HISTORY_LIMIT, 'losses' => (clone $lossQuery)->count() > self::HISTORY_LIMIT, 'destructions' => (clone $destructionQuery)->count() > self::HISTORY_LIMIT, 'overrides' => (clone $overrideQuery)->count() > self::HISTORY_LIMIT],
             'totals' => ['open_discrepancies' => (clone $discrepancyQuery)->whereIn('status', ['open', 'under_review'])->count(), 'open_losses' => (clone $lossQuery)->whereIn('investigation_status', ['reported', 'investigating'])->count(), 'awaiting_receipt' => (clone $destructionQuery)->whereNull('voided_at')->where('disposal_method', 'pharmacy_return')->whereNull('pharmacy_received_at')->count()],
             'medicines' => $medicineRows = $meds->map(function (ClientMedication $m) use ($record, $presentSites, $counts, $latest): array {
                 $count = $counts->get($m->id);

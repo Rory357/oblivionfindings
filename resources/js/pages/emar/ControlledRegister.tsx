@@ -17,6 +17,7 @@ import { compactMenu, type MenuItem } from '@/components/lists/entity-menu';
 import { ListCaption } from '@/components/lists/list-caption';
 import {
     PageHeader,
+    PageHeaderFilterButton,
     PageHeaderFilterCheck,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
@@ -34,7 +35,8 @@ import { ErrorState } from '@/components/ui/error-state';
 import { SkeletonTable } from '@/components/ui/skeleton-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
+import { formatDateOnly } from '@/lib/datetime';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     BookOpen,
     ClipboardCheck,
@@ -46,7 +48,7 @@ import {
     ShieldCheck,
     Undo2,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type View = 'register' | 'discrepancies' | 'losses' | 'destructions';
 const VIEWS = [
@@ -55,21 +57,16 @@ const VIEWS = [
     { key: 'losses' as const, label: 'Losses', icon: FileWarning },
     { key: 'destructions' as const, label: 'Destructions', icon: PackageX },
 ];
-function initialFilters() {
-    if (typeof window === 'undefined')
-        return {
-            view: 'register' as View,
-            site: 'all',
-            search: '',
-            classReview: false,
-        };
-    const params = new URLSearchParams(window.location.search);
+function initialFilters(url: string) {
+    const params = new URLSearchParams(url.split('?')[1] ?? '');
     const selected = params.get('view');
     return {
         view: VIEWS.some((item) => item.key === selected)
             ? (selected as View)
             : ('register' as View),
         site: params.get('site_id') ?? 'all',
+        client: params.get('client_id') ?? 'all',
+        date: params.get('date') ?? '',
         search: params.get('q') ?? '',
         classReview: params.get('class_review') === '1',
     };
@@ -81,17 +78,28 @@ export default function ControlledRegister({
     product?: ControlledProductPayload;
     initialPayload?: ControlledProductPayload;
 }) {
-    const workspace = useControlledProduct(product ?? initialPayload);
+    const { url: pageUrl } = usePage();
+    const workspace = useControlledProduct(product ?? initialPayload, pageUrl);
     const dialogs = useControlledDialogs(workspace);
-    const [filters, setFilters] = useState(initialFilters);
+    const [filters, setFilters] = useState(() => initialFilters(pageUrl));
+    useEffect(() => setFilters(initialFilters(pageUrl)), [pageUrl]);
     const payload = workspace.payload;
     const change = (patch: Partial<typeof filters>) => {
         const next = { ...filters, ...patch };
+        const siteChanged =
+            patch.site !== undefined && patch.site !== filters.site;
+        const personChanged =
+            patch.client !== undefined && patch.client !== filters.client;
+        if (siteChanged) next.client = 'all';
         setFilters(next);
-        const url = new URL(window.location.href);
+        const url = new URL(pageUrl, window.location.origin);
+        if (siteChanged || personChanged)
+            url.searchParams.delete('client_medication_id');
         url.searchParams.set('view', next.view);
         for (const [key, value] of [
             ['site_id', next.site === 'all' ? '' : next.site],
+            ['client_id', next.client === 'all' ? '' : next.client],
+            ['date', next.date],
             ['q', next.search],
             ['class_review', next.classReview ? '1' : ''],
         ])
@@ -203,9 +211,10 @@ export default function ControlledRegister({
     );
     const header = (
         <PageHeader
+            frontline
             icon={ShieldCheck}
             title="Controlled register"
-            subline="Controlled medicines across your approved houses · Pacific/Auckland"
+            subline="Current stock, counts and follow-up · register history by NZ date"
             actions={
                 <>
                     <PageHeaderSearch
@@ -306,6 +315,37 @@ export default function ControlledRegister({
                         checked={filters.classReview}
                         onChange={(classReview) => change({ classReview })}
                     />
+                    <PageHeaderFilterSelect
+                        label="Person"
+                        value={filters.client}
+                        options={[
+                            { value: 'all', label: 'All permitted people' },
+                            ...(payload?.people ?? []).map((person) => ({
+                                value: String(person.id),
+                                label: person.name,
+                            })),
+                        ]}
+                        onChange={(client) => change({ client })}
+                    />
+                    <label className="text-band-foreground flex min-w-0 flex-wrap items-center gap-2 text-sm">
+                        Register history (NZ date)
+                        <input
+                            type="date"
+                            aria-label="Register history NZ date"
+                            value={filters.date}
+                            onChange={(event) =>
+                                change({ date: event.target.value })
+                            }
+                            className="frontline-tap frontline-focus border-band-foreground/20 bg-band-foreground/10 min-w-0 rounded-md border px-2 py-2 text-sm"
+                        />
+                    </label>
+                    {filters.date && (
+                        <PageHeaderFilterButton
+                            onClick={() => change({ date: '' })}
+                        >
+                            All entry dates
+                        </PageHeaderFilterButton>
+                    )}
                     <PageHeaderMeterCaption>
                         As at {dateTime(payload?.as_at)}
                     </PageHeaderMeterCaption>
@@ -414,7 +454,11 @@ export default function ControlledRegister({
                     emptyDescription="Try another house or clear the filters."
                 />
                 <ListCaption
-                    title="Recent entries"
+                    title={
+                        filters.date
+                            ? `Entries for ${formatDateOnly(filters.date)}`
+                            : 'Recent entries'
+                    }
                     caption={
                         payload.history_has_more?.entries
                             ? `Latest ${payload.history_limit ?? 500} records · more records exist`
@@ -428,6 +472,9 @@ export default function ControlledRegister({
                     onAction={dialogs.action}
                 />
                 <p className="text-caption">
+                    {filters.date
+                        ? 'Only register entries use the selected NZ date. Stock, count status and outstanding follow-up are current. '
+                        : ''}
                     Entries are never edited or deleted. Wrong entries are
                     voided with a reason and witness, and stay visible in the
                     history.

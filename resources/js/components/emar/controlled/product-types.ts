@@ -202,6 +202,13 @@ export interface ControlledOverride {
     doses: ControlledOverrideDose[];
 }
 export interface ControlledProductPayload {
+    filters?: {
+        site_id: number | null;
+        client_medication_id: number | null;
+        client_id: number | null;
+        date: string | null;
+    };
+    people?: { id: number; name: string }[];
     medicines: ControlledMedicine[];
     sites: { id: number; name: string }[];
     witnesses_by_site: Record<string, ControlledWitness[]>;
