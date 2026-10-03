@@ -234,7 +234,7 @@ export function CancelReviewDialog({
             steps={steps}
             command={command}
             dirty={!!reason}
-            validate={(step) =>
+            validate={(step): Record<string, string> =>
                 step === 0 && !reason.trim()
                     ? {
                           'cancel-reason':
