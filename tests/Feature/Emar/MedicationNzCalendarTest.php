@@ -17,6 +17,7 @@ use App\Services\MedicationSafetyService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 /*
  * eMAR dates are New Zealand calendar dates: days remaining on an order,
@@ -286,14 +287,15 @@ it('starts a new medication order on today\'s New Zealand date', function (strin
         'service_context_id' => ServiceContext::factory()->create(['type' => 'residential', 'is_active' => true])->id,
     ]);
     $manager = nzCalendarOrderManager($client);
+    Storage::fake('local');
 
     $this->actingAs($manager)
-        ->post(route('emar.medications.store'), [
+        ->post(route('emar.orders.enter'), [
             'client_id' => $client->id,
-            'medication_name' => 'Added medicine',
-            'dose' => '10 mg',
-            'frequency' => 'Once daily',
-            'controlled_drug' => false,
+            'request_key' => 'nz-calendar-source-order',
+            'source' => ['type' => 'written', 'prescriber' => 'Dr Calendar', 'received_at' => now()->subMinute()->toIso8601String(), 'description' => 'Signed prescription source.'],
+            'source_file' => UploadedFile::fake()->create('prescription.pdf', 1, 'application/pdf'),
+            'prescription' => ['name' => 'Added medicine', 'dosage' => '10 mg', 'frequency' => 'Once daily', 'dose_times' => ['10:00'], 'route' => 'oral', 'is_prn' => false, 'indication' => 'Indication from the signed prescription.', 'start_date' => now('Pacific/Auckland')->toDateString(), 'controlled_drug' => false, 'high_risk' => false, 'witness_required' => false],
         ])
         ->assertSessionHasNoErrors()
         ->assertRedirect();
@@ -311,5 +313,6 @@ it('starts a new medication order on today\'s New Zealand date', function (strin
     $orders = ClientMedication::query()->where('client_id', $client->id)->orderBy('name')->get();
 
     expect($orders->map(fn (ClientMedication $order) => [$order->name, $order->start_date?->toDateString()])->all())
-        ->toBe([['Added medicine', '2026-06-08'], ['Imported medicine', '2026-06-08']]);
+        ->toBe([['Added medicine', '2026-06-08'], ['Imported medicine', '2026-06-08']])
+        ->and($orders->pluck('approval_status')->unique()->all())->toBe(['pending_verification']);
 })->with('new zealand clock on 8 june');

@@ -881,7 +881,11 @@ class MedicationOrderLifecycleTest extends TestCase
             ->put("/emar/medications/{$medication->id}", [
                 'medication_name' => 'Tampered ceased medication',
             ])
-            ->assertNotFound();
+            ->assertStatus(303)
+            ->assertRedirect('/emar/prescriptions?client_id='.$this->client->id.'&order_id='.$medication->id.'&action=entry');
+        $this->actingAs($this->manager)->postJson('/emar/orders', ['client_id' => $this->client->id, 'medication_id' => $medication->id])->assertUnprocessable()->assertJsonValidationErrors('order');
+        $this->assertSame(1, $medication->fresh()->versions()->count());
+        $this->assertSame(1, AuditLog::where('action', 'medication_order.discontinued')->where('auditable_id', $medication->id)->count());
 
         try {
             $medication->fresh()->delete();
