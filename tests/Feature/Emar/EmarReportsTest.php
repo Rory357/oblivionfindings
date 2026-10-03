@@ -16,6 +16,7 @@ use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\ReadsRetainedMedicationAuditEvidence;
 use Tests\TestCase;
 
 /**
@@ -24,6 +25,7 @@ use Tests\TestCase;
  */
 class EmarReportsTest extends TestCase
 {
+    use ReadsRetainedMedicationAuditEvidence;
     use RefreshDatabase;
 
     protected function tearDown(): void
@@ -165,14 +167,13 @@ class EmarReportsTest extends TestCase
             ->get('/emar/reports/export-controlled-discrepancies?purpose=care&site_id='.$siteB->id)
             ->assertNotFound();
 
-        $legacyPage = $this->actingAs($user)
-            ->get('/reports/medications')
+        $legacyPage = $this->canonicalGet($user, 'reports.medications', ['period' => 'today'])
             ->assertOk();
         $legacyPage->assertInertia(fn (Assert $page) => $page
-            ->component('reports/medications')
-            ->has('clients', 1)
-            ->where('clients.0.id', $clientA->id)
-            ->has('administrations', 1));
+            ->component('emar/reports/hub')
+            ->has('people', 1)
+            ->where('people.0.id', $clientA->id)
+            ->where('data.totals.given', 1));
 
         $legacyMarCsv = $this->actingAs($user)
             ->get('/reports/medications/export-mar?purpose=care')
@@ -218,10 +219,9 @@ class EmarReportsTest extends TestCase
             ->get('/emar/reports')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->has('sites', 2));
-        $this->actingAs($user)
-            ->get('/reports/medications')
+        $this->canonicalGet($user, 'reports.medications')
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->has('clients', 2));
+            ->assertInertia(fn (Assert $page) => $page->has('people', 2));
     }
 
     public function test_report_capability_is_independent_from_medication_workflow_view_across_page_csv_and_api_routes(): void
@@ -240,13 +240,11 @@ class EmarReportsTest extends TestCase
                 ->where('data.totals.due', 0)
                 ->has('people', 0)
                 ->has('sites', 0));
-        $this->actingAs($user)
-            ->get('/reports/medications')
+        $this->canonicalGet($user, 'reports.medications')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->has('administrations', 0)
-                ->has('discrepancies', 0)
-                ->has('clients', 0));
+                ->where('data.totals.due', 0)
+                ->has('people', 0));
         $this->actingAs($user)
             ->getJson('/emar/reports/export-mar?purpose=care')
             ->assertUnprocessable();
@@ -290,13 +288,11 @@ class EmarReportsTest extends TestCase
                 ->where('data.totals.due', 0)
                 ->has('people', 0)
                 ->has('sites', 0));
-        $this->actingAs($actor)
-            ->get('/reports/medications')
+        $this->canonicalGet($actor, 'reports.medications')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->has('administrations', 0)
-                ->has('discrepancies', 0)
-                ->has('clients', 0));
+                ->where('data.totals.due', 0)
+                ->has('people', 0));
         $this->actingAs($actor)
             ->getJson('/reports/medications/export-mar?purpose=care')
             ->assertUnprocessable();

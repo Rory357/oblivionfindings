@@ -15,19 +15,29 @@ use App\Services\Medication\MedicationGovernanceScopeService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Mockery;
+use Tests\Support\ReadsRetainedMedicationAuditEvidence;
 use Tests\TestCase;
 
 class MedicationGovernanceReaderSurfaceTest extends TestCase
 {
+    use ReadsRetainedMedicationAuditEvidence;
     use RefreshDatabase;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(RbacSeeder::class);
+        Carbon::setTestNow(Carbon::parse('2026-06-15 00:00', 'Pacific/Auckland')->utc());
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
     }
 
     public function test_reader_routes_require_module_plus_exact_action_capabilities(): void
@@ -39,10 +49,12 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
         foreach (['emar.pdf.mar', 'emar.pdf.round_sheet', 'emar.pdf.cd_register'] as $routeName) {
             $middleware = Route::getRoutes()->getByName($routeName)?->gatherMiddleware() ?? [];
             $this->assertContains(
-                'permission:medications.reports.export|reports.viewAny',
+                'permission:medications.reports.view',
                 $middleware,
                 $routeName,
             );
+            $this->assertContains('permission:medications.reports.export', $middleware, $routeName);
+            $this->assertNotContains('permission:medications.reports.export|reports.viewAny', $middleware, $routeName);
             $this->assertNotContains('permission:medications.view', $middleware, $routeName);
         }
         $this->assertContains(
@@ -73,16 +85,18 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
         $localReader = $this->userWithPermissions([
             MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
             'medications.audit.view',
+            'medications.reports.view',
             'medications.reports.export',
         ], $context['local_site']);
         $noSiteReader = $this->userWithPermissions([
             MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
             'medications.audit.view',
+            'medications.reports.view',
             'medications.reports.export',
             MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
         ]);
 
-        $audit = $this->actingAs($localReader)->get(route('emar.audit'))->assertOk();
+        $audit = $this->retainedAuditFeed($localReader)->assertOk();
         $this->assertSame(
             [$context['local_site']->id],
             collect($audit->inertiaProps('sites'))->pluck('id')->all(),
@@ -120,18 +134,16 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
         $pdfPayloads = [];
         $this->fakePdf($pdfPayloads);
         $this->actingAs($localReader)
-            ->get(route('emar.pdf.round_sheet'))
+            ->get(route('emar.pdf.round_sheet', ['purpose' => 'care']))
             ->assertOk();
-        $this->assertSame(
-            [$context['local_round']->id],
-            $pdfPayloads['pdf.round-sheet'][0]['rounds']->pluck('id')->all(),
-        );
-        $this->assertSame(
-            [],
-            $pdfPayloads['pdf.round-sheet'][0]['rounds']->first()->administrations->pluck('id')->all(),
-        );
+        $rows = collect($pdfPayloads['pdf.medication-report'][0]['evidence']['rows']);
+        $this->assertCount(2, $rows);
+        $this->assertSame([$context['local_client']->full_name], $rows->pluck(0)->unique()->all());
+        $this->assertContains('Local ordinary medicine', $rows->pluck(2)->all());
+        $this->assertNotContains('Foreign ordinary medicine', $rows->pluck(2)->all());
+        $this->assertSame('not_recorded', $rows->first(fn ($row) => $row[2] === 'Local ordinary medicine')[4]);
 
-        $emptyAudit = $this->actingAs($noSiteReader)->get(route('emar.audit'))->assertOk();
+        $emptyAudit = $this->retainedAuditFeed($noSiteReader)->assertOk();
         $this->assertSame([], collect($emptyAudit->inertiaProps('events'))->all());
         $this->assertSame([], collect($emptyAudit->inertiaProps('clients'))->all());
         $this->assertSame([], collect($emptyAudit->inertiaProps('sites'))->all());
@@ -145,17 +157,16 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
         $this->assertSame([], $emptyWidgets->json('overdue_meds.items'));
 
         $this->actingAs($noSiteReader)
-            ->get(route('emar.pdf.round_sheet'))
-            ->assertOk();
-        $this->assertSame([], $pdfPayloads['pdf.round-sheet'][1]['rounds']->all());
-        $this->actingAs($noSiteReader)
-            ->get(route('emar.audit', ['client_id' => $context['local_client']->id]))
+            ->getJson(route('emar.pdf.round_sheet', ['purpose' => 'care']))
+            ->assertUnprocessable();
+        $this->assertCount(1, $pdfPayloads['pdf.medication-report']);
+        $this->canonicalGet($noSiteReader, 'emar.audit', ['client_id' => $context['local_client']->id])
             ->assertNotFound();
         $this->actingAs($noSiteReader)
-            ->get(route('emar.pdf.mar', ['client_id' => $context['local_client']->id]))
+            ->get(route('emar.pdf.mar', ['client_id' => $context['local_client']->id, 'purpose' => 'care']))
             ->assertNotFound();
         $this->actingAs($noSiteReader)
-            ->get(route('emar.pdf.cd_register', ['client_id' => $context['local_client']->id]))
+            ->get(route('emar.pdf.cd_register', ['client_id' => $context['local_client']->id, 'purpose' => 'care']))
             ->assertNotFound();
     }
 
@@ -164,10 +175,12 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
         $context = $this->context();
         $ordinaryReader = $this->userWithPermissions([
             MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
+            'medications.reports.view',
             'medications.reports.export',
         ], $context['local_site']);
         $controlledReader = $this->userWithPermissions([
             MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
+            'medications.reports.view',
             'medications.reports.export',
             MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
         ], $context['local_site']);
@@ -176,33 +189,27 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
 
         foreach ([$ordinaryReader, $controlledReader] as $reader) {
             $this->actingAs($reader)
-                ->get(route('emar.pdf.mar', ['client_id' => $context['local_client']->id]))
+                ->get(route('emar.pdf.mar', ['client_id' => $context['local_client']->id, 'purpose' => 'care']))
                 ->assertOk();
             $this->actingAs($reader)
-                ->get(route('emar.pdf.round_sheet'))
+                ->get(route('emar.pdf.round_sheet', ['purpose' => 'care']))
                 ->assertOk();
         }
 
         $ordinaryMar = $pdfPayloads['pdf.mar-chart'][0];
         $this->assertContains($context['local_medication']->id, $ordinaryMar['scheduledMedications']->pluck('id')->all());
         $this->assertNotContains($context['controlled_medication']->id, $ordinaryMar['scheduledMedications']->pluck('id')->all());
-        $this->assertNotContains(
-            $context['controlled_administration']->id,
-            $pdfPayloads['pdf.round-sheet'][0]['rounds']
-                ->flatMap(fn (MedicationRound $round) => $round->administrations)
-                ->pluck('id')
-                ->all(),
-        );
+        $ordinaryRows = collect($pdfPayloads['pdf.medication-report'][0]['evidence']['rows']);
+        $this->assertContains('Controlled medicine', $ordinaryRows->pluck(2)->all());
+        $this->assertNotContains('Named controlled medicine', $ordinaryRows->pluck(2)->all());
+        $this->assertSame('given', $ordinaryRows->first(fn ($row) => $row[2] === 'Controlled medicine')[4]);
 
         $controlledMar = $pdfPayloads['pdf.mar-chart'][1];
         $this->assertContains($context['controlled_medication']->id, $controlledMar['scheduledMedications']->pluck('id')->all());
-        $this->assertContains(
-            $context['controlled_administration']->id,
-            $pdfPayloads['pdf.round-sheet'][1]['rounds']
-                ->flatMap(fn (MedicationRound $round) => $round->administrations)
-                ->pluck('id')
-                ->all(),
-        );
+        $controlledRows = collect($pdfPayloads['pdf.medication-report'][1]['evidence']['rows']);
+        $this->assertContains('Named controlled medicine', $controlledRows->pluck(2)->all());
+        $this->assertSame('given', $controlledRows->first(fn ($row) => $row[2] === 'Named controlled medicine')[4]);
+        $this->assertCount($ordinaryRows->count(), $controlledRows);
     }
 
     public function test_foreign_and_missing_reader_ids_are_concealed_and_capabilities_do_not_substitute(): void
@@ -211,6 +218,7 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
         $reader = $this->userWithPermissions([
             MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
             'medications.audit.view',
+            'medications.reports.view',
             'medications.reports.export',
             'medications.administer.correct',
             MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
@@ -226,7 +234,7 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
             ['emar.pdf.cd_register', ['client_id' => $context['foreign_client']->id]],
             ['emar.pdf.cd_register', ['client_id' => 999999]],
         ] as [$routeName, $parameters]) {
-            $this->actingAs($reader)->get(route($routeName, $parameters))->assertNotFound();
+            $this->canonicalGet($reader, $routeName, $parameters + ['purpose' => 'care'])->assertNotFound();
         }
         $this->actingAs($reader)
             ->getJson(route('api.medications.alerts.client', $context['foreign_client']))
@@ -298,11 +306,12 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
 
         $actionOnly = $this->userWithPermissions([
             'medications.audit.view',
+            'medications.reports.view',
             'medications.reports.export',
         ], $context['local_site']);
         $this->actingAs($actionOnly)->get(route('emar.audit'))->assertForbidden();
         $this->actingAs($actionOnly)
-            ->get(route('emar.pdf.mar', ['client_id' => $context['local_client']->id]))
+            ->get(route('emar.pdf.mar', ['client_id' => $context['local_client']->id, 'purpose' => 'care']))
             ->assertOk();
 
         $moduleOnly = $this->userWithPermissions([
@@ -310,7 +319,7 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
         ], $context['local_site']);
         $this->actingAs($moduleOnly)->get(route('emar.audit'))->assertForbidden();
         $this->actingAs($moduleOnly)
-            ->get(route('emar.pdf.mar', ['client_id' => $context['local_client']->id]))
+            ->get(route('emar.pdf.mar', ['client_id' => $context['local_client']->id, 'purpose' => 'care']))
             ->assertForbidden();
         $this->actingAs($moduleOnly)
             ->postJson(route('api.medications.alerts.acknowledge', $context['foreign_alert']))
@@ -325,10 +334,11 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
 
         $exportWithoutControlled = $this->userWithPermissions([
             MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
+            'medications.reports.view',
             'medications.reports.export',
         ], $context['local_site']);
         $this->actingAs($exportWithoutControlled)
-            ->get(route('emar.pdf.cd_register', ['client_id' => $context['local_client']->id]))
+            ->get(route('emar.pdf.cd_register', ['client_id' => $context['local_client']->id, 'purpose' => 'care']))
             ->assertForbidden();
 
         $generalReportsOnly = $this->userWithPermissions([
@@ -340,7 +350,7 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
             $parameters = $routeName === 'emar.pdf.round_sheet'
                 ? []
                 : ['client_id' => $context['local_client']->id];
-            $this->actingAs($generalReportsOnly)->get(route($routeName, $parameters))->assertOk();
+            $this->actingAs($generalReportsOnly)->get(route($routeName, $parameters))->assertForbidden();
         }
 
         foreach (MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS as $bypassPermission) {
@@ -352,11 +362,11 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
             ]);
             $this->actingAs($globalWithoutActions)->get(route('emar.audit'))->assertForbidden();
             $this->actingAs($globalWithoutActions)
-                ->get(route('emar.pdf.mar', ['client_id' => $context['foreign_client']->id]))
-                ->assertOk();
+                ->get(route('emar.pdf.mar', ['client_id' => $context['foreign_client']->id, 'purpose' => 'care']))
+                ->assertForbidden();
             $this->actingAs($globalWithoutActions)
-                ->get(route('emar.pdf.cd_register', ['client_id' => $context['foreign_client']->id]))
-                ->assertOk();
+                ->get(route('emar.pdf.cd_register', ['client_id' => $context['foreign_client']->id, 'purpose' => 'care']))
+                ->assertForbidden();
         }
     }
 
@@ -376,13 +386,14 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
             $global = $this->userWithPermissions([
                 MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
                 'medications.audit.view',
+                'medications.reports.view',
                 'medications.reports.export',
                 'medications.administer.correct',
                 MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
                 $bypassPermission,
             ], $context['local_site']);
 
-            $audit = $this->actingAs($global)->get(route('emar.audit'))->assertOk();
+            $audit = $this->retainedAuditFeed($global)->assertOk();
             $this->assertEqualsCanonicalizing(
                 [$context['local_site']->id, $context['foreign_site']->id],
                 collect($audit->inertiaProps('sites'))->pluck('id')->all(),
@@ -410,23 +421,24 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
                 ->assertOk()
                 ->assertJson(['success' => true]);
 
-            $this->actingAs($global)->get(route('emar.pdf.round_sheet'))->assertOk();
-            $this->assertEqualsCanonicalizing(
-                [$context['local_round']->id, $context['foreign_round']->id],
-                $pdfPayloads['pdf.round-sheet'][$index]['rounds']->pluck('id')->all(),
-            );
-            $this->assertNotContains(
-                $context['forged_administration']->id,
-                $pdfPayloads['pdf.round-sheet'][$index]['rounds']
-                    ->flatMap(fn (MedicationRound $round) => $round->administrations)
-                    ->pluck('id')
-                    ->all(),
-            );
+            // The global grant exposes both houses; each round sheet still
+            // requires one explicitly selected house and one NZ day.
+            foreach (['local', 'foreign'] as $scope) {
+                $this->actingAs($global)->get(route('emar.pdf.round_sheet', [
+                    'site_id' => $context[$scope.'_site']->id, 'purpose' => 'care',
+                ]))->assertOk();
+                $evidence = collect($pdfPayloads['pdf.medication-report'])->last()['evidence'];
+                $rows = collect($evidence['rows']);
+                $this->assertSame([$context[$scope.'_client']->full_name], $rows->pluck(0)->unique()->all());
+                // The forged cross-person dose cannot turn either ordinary
+                // medicine's scheduled slot into a given dose.
+                $this->assertSame('not_recorded', $rows->first(fn ($row) => $row[2] === ucfirst($scope).' ordinary medicine')[4]);
+            }
             $this->actingAs($global)
-                ->get(route('emar.pdf.mar', ['client_id' => $context['foreign_client']->id]))
+                ->get(route('emar.pdf.mar', ['client_id' => $context['foreign_client']->id, 'purpose' => 'care']))
                 ->assertOk();
             $this->actingAs($global)
-                ->get(route('emar.pdf.cd_register', ['client_id' => $context['foreign_client']->id]))
+                ->get(route('emar.pdf.cd_register', ['client_id' => $context['foreign_client']->id, 'purpose' => 'care']))
                 ->assertOk();
         }
     }
@@ -685,6 +697,8 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
         $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id, 'status' => 'active']);
         $localMedication = ClientMedication::factory()->create([
             'client_id' => $localClient->id,
+            'name' => 'Local ordinary medicine', 'controlled_drug' => false,
+            'dose_times' => ['09:00'], 'start_date' => '2026-06-01', 'end_date' => null,
             'active' => true,
             'state' => 'active',
             'approval_status' => 'verified',
@@ -692,12 +706,15 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
         ]);
         $foreignMedication = ClientMedication::factory()->create([
             'client_id' => $foreignClient->id,
+            'name' => 'Foreign ordinary medicine', 'controlled_drug' => false,
+            'is_prn' => false, 'dose_times' => ['09:00'], 'start_date' => '2026-06-01', 'end_date' => null,
             'active' => true,
             'state' => 'active',
             'approval_status' => 'verified',
         ]);
         $controlledMedication = ClientMedication::factory()->create([
             'client_id' => $localClient->id,
+            'name' => 'Named controlled medicine', 'dose_times' => ['09:00'], 'start_date' => '2026-06-01', 'end_date' => null,
             'active' => true,
             'state' => 'active',
             'approval_status' => 'verified',
@@ -737,8 +754,8 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
             'medication_round_id' => $localRound->id,
             'service_context_id' => $localClient->service_context_id,
             'administered_by' => $recorder->id,
-            'scheduled_for' => now(),
-            'administered_at' => now(),
+            'scheduled_for' => Carbon::parse('2026-06-15 09:00', 'Pacific/Auckland')->utc(),
+            'administered_at' => Carbon::parse('2026-06-15 09:05', 'Pacific/Auckland')->utc(),
             'status' => 'given',
             'dose_given' => '1 tablet',
         ]);
@@ -748,11 +765,13 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
             'medication_round_id' => $localRound->id,
             'service_context_id' => $localClient->service_context_id,
             'administered_by' => $recorder->id,
-            'scheduled_for' => now(),
-            'administered_at' => now(),
+            'scheduled_for' => Carbon::parse('2026-06-15 09:00', 'Pacific/Auckland')->utc(),
+            'administered_at' => Carbon::parse('2026-06-15 09:05', 'Pacific/Auckland')->utc(),
             'status' => 'given',
             'dose_given' => '1 tablet',
         ]);
+
+        Carbon::setTestNow(Carbon::parse('2026-06-15 10:30', 'Pacific/Auckland')->utc());
 
         return [
             'local_site' => $localSite,
@@ -781,7 +800,7 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
             'round_type' => 'morning',
             'scheduled_time' => '09:00',
             'window_minutes' => 60,
-            'round_date' => today(),
+            'round_date' => Carbon::now('Pacific/Auckland')->toDateString(),
             'status' => 'pending',
         ]);
     }
@@ -792,6 +811,14 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
         $document = Mockery::mock(\Barryvdh\DomPDF\PDF::class);
         $document->shouldReceive('setPaper')->andReturnSelf();
         $document->shouldReceive('download')->andReturn(response('pdf'));
+        $document->shouldReceive('output')->andReturn('pdf');
+        Pdf::shouldReceive('setOption')->andReturn($document);
+        $document->shouldReceive('loadView')
+            ->andReturnUsing(function (string $view, array $data) use (&$payloads, $document) {
+                $payloads[$view][] = $data;
+
+                return $document;
+            });
         Pdf::shouldReceive('loadView')
             ->andReturnUsing(function (string $view, array $data) use (&$payloads, $document) {
                 $payloads[$view][] = $data;
@@ -820,6 +847,13 @@ class MedicationGovernanceReaderSurfaceTest extends TestCase
         $user->permissionOverrides()->sync(
             $permissionIds->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])->all(),
         );
+        $denied = array_diff([
+            'medications.view', 'medications.audit.view', 'medications.controlled.view',
+            'medications.reports.view', 'medications.reports.export', 'medications.administer.correct',
+            ...MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS,
+        ], $permissions);
+        $user->permissionOverrides()->syncWithoutDetaching(Permission::query()->whereIn('key', $denied)->pluck('id')
+            ->mapWithKeys(fn ($id) => [$id => ['allowed' => false]])->all());
 
         return $user->refresh();
     }

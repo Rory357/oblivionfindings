@@ -15,10 +15,12 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\ReadsRetainedMedicationAuditEvidence;
 use Tests\TestCase;
 
 class ControlledMedicationReportAuthorizationTest extends TestCase
 {
+    use ReadsRetainedMedicationAuditEvidence;
     use RefreshDatabase;
 
     protected function tearDown(): void
@@ -185,16 +187,13 @@ class ControlledMedicationReportAuthorizationTest extends TestCase
         ]);
 
         Carbon::setTestNow(Carbon::parse('2026-06-15 10:00', 'Pacific/Auckland')->utc());
-        $this->actingAs($actor)
-            ->get(route('reports.medications'))
+        $this->canonicalGet($actor, 'reports.medications', ['period' => 'today'])
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('reports/medications')
-                ->where('can_view_controlled', false)
-                ->has('discrepancies', 0)
-                ->has('administrations', 1)
-                ->where('administrations.0.medication.name', 'Ordinary MAR fixture')
-                ->where('administrations.0.medication.controlled_drug', false));
+                ->component('emar/reports/hub')
+                ->where('can.controlled', false)
+                ->where('data.totals.due', 2)
+                ->where('data.totals.given', 2));
 
         $this->actingAs($actor)
             ->get(route('emar.reports', ['report' => 'doses', 'period' => 'today']))
