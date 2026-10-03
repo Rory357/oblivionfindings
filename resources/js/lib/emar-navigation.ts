@@ -635,13 +635,23 @@ export function emarBreadcrumbs(url: string, can: Can): EmarBreadcrumb[] {
         { title: EMAR_MODULE_LABEL, href: emarModuleLanding(can) ?? here },
     ];
     if (!match) return trail;
+    const path = emarNavigationPath(url);
+    const historyLabel =
+        path === '/emar/reports/history/logs'
+            ? 'Change log'
+            : path === '/emar/reports/history'
+              ? 'Medication history'
+              : null;
     return [
         ...trail,
         {
             title: match.hub.label,
             href: emarHubLanding(match.hub, can) ?? match.view.href,
         },
-        { title: match.view.label, href: match.view.href },
+        {
+            title: historyLabel ?? match.view.label,
+            href: historyLabel ? path : match.view.href,
+        },
     ];
 }
 

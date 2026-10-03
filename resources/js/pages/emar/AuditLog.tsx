@@ -595,7 +595,7 @@ export default function AuditLog({
                     }
                 />
                 <form
-                    className="bg-card flex min-w-0 flex-wrap items-end gap-3 rounded-xl border p-4"
+                    className="flex min-w-0 flex-wrap items-end gap-3 rounded-xl border bg-card p-4"
                     onSubmit={(event) => {
                         event.preventDefault();
                         if (dateFrom && dateTo && dateFrom <= dateTo)
@@ -619,7 +619,7 @@ export default function AuditLog({
                             onChange={(event) =>
                                 setDateFrom(event.target.value)
                             }
-                            className="frontline-tap frontline-focus bg-background w-full min-w-0 rounded-md border px-3 py-2 text-sm"
+                            className="frontline-tap frontline-focus w-full min-w-0 rounded-md border bg-background px-3 py-2 text-sm"
                         />
                     </label>
                     <label
@@ -634,7 +634,7 @@ export default function AuditLog({
                             value={dateTo}
                             min={dateFrom || undefined}
                             onChange={(event) => setDateTo(event.target.value)}
-                            className="frontline-tap frontline-focus bg-background w-full min-w-0 rounded-md border px-3 py-2 text-sm"
+                            className="frontline-tap frontline-focus w-full min-w-0 rounded-md border bg-background px-3 py-2 text-sm"
                         />
                     </label>
                     <Button
@@ -700,13 +700,13 @@ export default function AuditLog({
                     </div>
                 )}
 
-                <p className="text-muted-foreground text-sm" role="status">
+                <p className="text-sm text-muted-foreground" role="status">
                     {view === 'gaps'
                         ? `${rows.length} loaded record${rows.length === 1 ? '' : 's'} need review`
                         : `Showing ${rows.length} of ${events.length} loaded records`}
                 </p>
 
-                <div className="bg-card overflow-hidden rounded-2xl border shadow-sm">
+                <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                     <div className="flex min-w-0 flex-col gap-3 border-b p-4">
                         <div
                             role="tablist"
@@ -770,7 +770,7 @@ export default function AuditLog({
                                     onChange={(event) =>
                                         setStaffName(event.target.value)
                                     }
-                                    className="frontline-tap frontline-focus bg-background w-full min-w-0 rounded-md border px-3 py-2"
+                                    className="frontline-tap frontline-focus w-full min-w-0 rounded-md border bg-background px-3 py-2"
                                 >
                                     <option value="">All staff</option>
                                     {staff.map((person) => (
@@ -790,7 +790,7 @@ export default function AuditLog({
                                     onChange={(event) =>
                                         setSource(event.target.value)
                                     }
-                                    className="frontline-tap frontline-focus bg-background w-full min-w-0 rounded-md border px-3 py-2"
+                                    className="frontline-tap frontline-focus w-full min-w-0 rounded-md border bg-background px-3 py-2"
                                 >
                                     <option value="">All sources</option>
                                     {sources.map((name) => (
@@ -804,7 +804,7 @@ export default function AuditLog({
                     </div>
 
                     {rows.length === 0 ? (
-                        <div className="text-muted-foreground px-5 py-16 text-center text-sm">
+                        <div className="px-5 py-16 text-center text-sm text-muted-foreground">
                             {view === 'gaps'
                                 ? 'No flagged records in the loaded results. This does not confirm that every dose is recorded.'
                                 : 'No loaded records match these filters. Change the period or clear a filter.'}
@@ -817,8 +817,8 @@ export default function AuditLog({
                                         <span className="text-xs font-bold">
                                             {day}
                                         </span>
-                                        <span className="bg-border h-px flex-1" />
-                                        <span className="text-muted-foreground text-xs">
+                                        <span className="h-px flex-1 bg-border" />
+                                        <span className="text-xs text-muted-foreground">
                                             {items.length} records
                                         </span>
                                     </div>
@@ -853,7 +853,7 @@ export default function AuditLog({
                             <div className="hidden overflow-x-auto md:block">
                                 <table className="w-full min-w-[920px] text-sm">
                                     <thead>
-                                        <tr className="bg-muted/50 text-muted-foreground text-left text-xs uppercase tracking-wide">
+                                        <tr className="bg-muted/50 text-left text-xs tracking-wide text-muted-foreground uppercase">
                                             <th className="px-4 py-2.5">
                                                 NZ date / time
                                             </th>
@@ -889,7 +889,7 @@ export default function AuditLog({
                                             return (
                                                 <tr
                                                     key={e.id}
-                                                    className="hover:bg-muted/30 cursor-pointer border-b last:border-b-0"
+                                                    className="cursor-pointer border-b last:border-b-0 hover:bg-muted/30"
                                                     onContextMenu={(ev) =>
                                                         openRowCtx(ev, e)
                                                     }
@@ -930,12 +930,12 @@ export default function AuditLog({
                                                     <td className="px-4 py-3">
                                                         {e.client_name}
                                                     </td>
-                                                    <td className="text-muted-foreground px-4 py-3">
+                                                    <td className="px-4 py-3 text-muted-foreground">
                                                         {e.outcome ?? '—'}
                                                     </td>
                                                     <td className="px-4 py-3">
                                                         {e.performed_by ?? (
-                                                            <span className="bg-status-warning-bg text-status-warning rounded-full px-1.5 py-0.5 text-xs font-semibold">
+                                                            <span className="rounded-full bg-status-warning-bg px-1.5 py-0.5 text-xs font-semibold text-status-warning">
                                                                 Not captured
                                                             </span>
                                                         )}
@@ -947,7 +947,7 @@ export default function AuditLog({
                                                                     {e.witness}
                                                                 </span>
                                                             ) : (
-                                                                <span className="bg-status-critical-bg text-status-critical rounded-full px-1.5 py-0.5 text-xs font-semibold">
+                                                                <span className="rounded-full bg-status-critical-bg px-1.5 py-0.5 text-xs font-semibold text-status-critical">
                                                                     Required —
                                                                     missing
                                                                 </span>
@@ -957,7 +957,7 @@ export default function AuditLog({
                                                         )}
                                                     </td>
                                                     <td className="px-4 py-3">
-                                                        <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
+                                                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                                                             {e.source}
                                                         </span>
                                                     </td>
@@ -985,7 +985,7 @@ export default function AuditLog({
                         </div>
                     ) : (
                         <div className="flex flex-col gap-4 p-4">
-                            <div className="border-status-critical/30 bg-status-critical-bg/50 text-status-critical rounded-xl border px-4 py-3 text-sm">
+                            <div className="rounded-xl border border-status-critical/30 bg-status-critical-bg/50 px-4 py-3 text-sm text-status-critical">
                                 Open each flagged record to review what happened
                                 and decide whether follow-up is needed. Flags
                                 may describe an earlier issue.
@@ -997,7 +997,7 @@ export default function AuditLog({
                                     return (
                                         <div
                                             key={e.id}
-                                            className="border-status-critical/30 bg-card rounded-2xl border p-4 shadow-sm"
+                                            className="rounded-2xl border border-status-critical/30 bg-card p-4 shadow-sm"
                                             onContextMenu={(ev) =>
                                                 openRowCtx(ev, e)
                                             }
@@ -1022,7 +1022,7 @@ export default function AuditLog({
                                             <div className="mt-2 text-sm">
                                                 {e.description}
                                             </div>
-                                            <div className="text-muted-foreground mt-1 text-xs">
+                                            <div className="mt-1 text-xs text-muted-foreground">
                                                 {e.performed_by ??
                                                     'Staff not captured'}{' '}
                                                 · {formatDateLong(e.timestamp)}{' '}
@@ -1122,7 +1122,7 @@ function AuditAlertRow({
                     type="button"
                     aria-label="Dismiss alert"
                     onClick={onDismiss}
-                    className="frontline-tap frontline-focus hover:bg-foreground/10 grid size-11 place-items-center rounded-md"
+                    className="frontline-tap frontline-focus grid size-11 place-items-center rounded-md hover:bg-foreground/10"
                 >
                     <X className="h-4 w-4" />
                 </button>
@@ -1147,13 +1147,13 @@ function TimelineRow({
     const isGap = e.flags.length > 0;
     return (
         <div
-            className={`bg-card flex min-w-0 items-center gap-1 rounded-xl border ${isGap ? 'border-status-critical/50 border-dashed' : ''}`}
+            className={`flex min-w-0 items-center gap-1 rounded-xl border bg-card ${isGap ? 'border-dashed border-status-critical/50' : ''}`}
             onContextMenu={onCtx}
         >
             <button
                 type="button"
                 onClick={onOpen}
-                className="frontline-tap frontline-focus hover:bg-muted/30 flex min-w-0 flex-1 items-start gap-3 rounded-xl px-3 py-3 text-left"
+                className="frontline-tap frontline-focus flex min-w-0 flex-1 items-start gap-3 rounded-xl px-3 py-3 text-left hover:bg-muted/30"
             >
                 <span
                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${m.cls}`}
@@ -1163,10 +1163,10 @@ function TimelineRow({
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
                         <span className="text-xs font-semibold">{m.label}</span>
-                        <span className="text-muted-foreground font-mono text-xs">
+                        <span className="font-mono text-xs text-muted-foreground">
                             {fmtTime(e.timestamp)}
                         </span>
-                        <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-xs">
+                        <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                             {e.source}
                         </span>
                         {e.flags.map((f) => (
@@ -1178,10 +1178,10 @@ function TimelineRow({
                             </span>
                         ))}
                     </div>
-                    <div className="break-words text-sm font-medium">
+                    <div className="text-sm font-medium break-words">
                         {e.description}
                     </div>
-                    <div className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                         <span className="font-medium">{e.client_name}</span> ·
                         {e.performed_by ?? (
                             <span className="text-status-warning">
@@ -1190,14 +1190,18 @@ function TimelineRow({
                         )}
                         {e.site_name ? ` · ${e.site_name}` : ''}
                     </div>
-                    {showOutcome && (
-                        <div className="text-muted-foreground mt-1 text-sm">
-                            Outcome: {e.outcome ?? 'Not captured'} ·{' '}
-                            {e.witness_required
-                                ? `Witness: ${e.witness ?? 'Required — missing'}`
-                                : 'No witness required'}
-                        </div>
-                    )}
+                    {showOutcome &&
+                        (e.outcome || e.witness_required || e.witness) && (
+                            <div className="mt-1 text-sm text-muted-foreground">
+                                {e.outcome && <span>Outcome: {e.outcome}</span>}
+                                {e.outcome && (e.witness_required || e.witness)
+                                    ? ' · '
+                                    : null}
+                                {e.witness_required || e.witness
+                                    ? `Witness: ${e.witness ?? 'Required — missing'}`
+                                    : null}
+                            </div>
+                        )}
                 </div>
             </button>
             <Button
