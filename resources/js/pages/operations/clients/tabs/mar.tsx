@@ -65,6 +65,7 @@ export type MarTabProps = {
     personName: string;
     /** The reader sees controlled medicines; otherwise exports leave them out. */
     canViewControlled: boolean;
+    /** The record provides the heading and dose launcher; Report stays on the chart. */
     embedded?: boolean;
     view?: 'scheduled' | 'asneeded';
     initialDate?: string | null;
@@ -281,131 +282,137 @@ export function MarTab({
 
     return (
         <div className="space-y-5">
-            {/* Summary and launch point */}
-            <Card>
-                <CardContent className="space-y-3 p-5">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                            <span className="flex size-10 items-center justify-center rounded-xl bg-muted text-primary">
-                                <Pill className="size-5" />
-                            </span>
-                            <div>
-                                <h2 className="text-section-title">
-                                    Medication
-                                </h2>
-                                <p className="text-caption text-muted-foreground">
-                                    The full chart, history, INR and alerts are
-                                    in the medication record
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                            {day?.can.report ? (
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setReportOpen(true)}
-                                >
-                                    <FileText className="size-4" />
-                                    Report
-                                </Button>
-                            ) : null}
-                            {!embedded && (
-                                <Button variant="outline" asChild>
-                                    <Link
-                                        href={`/emar/mar?client_id=${clientId}`}
-                                    >
-                                        Open medication record
-                                    </Link>
-                                </Button>
-                            )}
-                            {day &&
-                            day.can.record_reason !== 'no_permission' ? (
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
+            {/* Profile launch point and allergy warnings */}
+            {!embedded || day ? (
+                <Card>
+                    <CardContent className="space-y-3 p-5">
+                        {!embedded ? (
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                    <span className="flex size-10 items-center justify-center rounded-xl bg-muted text-primary">
+                                        <Pill className="size-5" />
+                                    </span>
+                                    <div>
+                                        <h2 className="text-section-title">
+                                            Medication
+                                        </h2>
+                                        <p className="text-caption text-muted-foreground">
+                                            The full chart, history, INR and alerts are
+                                            in the medication record
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {day?.can.report ? (
                                         <Button
-                                            disabled={
-                                                !day.can.record ||
-                                                recordable.length === 0
-                                            }
-                                            title={
-                                                recordReason ??
-                                                (recordable.length === 0
-                                                    ? 'Nothing due right now'
-                                                    : undefined)
-                                            }
+                                            variant="outline"
+                                            onClick={() => setReportOpen(true)}
                                         >
-                                            <Plus className="size-4" />
-                                            Record dose
+                                            <FileText className="size-4" />
+                                            Report
                                         </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent
-                                        align="end"
-                                        className="w-72"
-                                    >
-                                        <DropdownMenuLabel>
-                                            Due and overdue now
-                                        </DropdownMenuLabel>
-                                        {recordable.map(
-                                            ({ dose, medicine }) => {
-                                                const kind = cellKind(
-                                                    dose,
-                                                    true,
-                                                );
-                                                return (
-                                                    <DropdownMenuItem
-                                                        key={dose.key}
-                                                        onSelect={() =>
-                                                            recorder.recordScheduled(
-                                                                dose,
-                                                            )
-                                                        }
-                                                        className="flex items-start gap-2"
-                                                    >
-                                                        <span className="min-w-0 flex-1">
-                                                            <span className="block truncate font-medium">
-                                                                {medicine.name}
-                                                            </span>
-                                                            <span className="text-caption text-muted-foreground">
-                                                                {clockLabel(
-                                                                    dose.time,
-                                                                )}{' '}
-                                                                ·{' '}
-                                                                {
-                                                                    CELL_META[
-                                                                        kind
-                                                                    ].label
+                                    ) : null}
+                                    {!embedded && (
+                                        <Button variant="outline" asChild>
+                                            <Link
+                                                href={`/emar/mar?client_id=${clientId}`}
+                                            >
+                                                Open medication record
+                                            </Link>
+                                        </Button>
+                                    )}
+                                    {day &&
+                                    day.can.record_reason !== 'no_permission' ? (
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    disabled={
+                                                        !day.can.record ||
+                                                        recordable.length === 0
+                                                    }
+                                                    title={
+                                                        recordReason ??
+                                                        (recordable.length === 0
+                                                            ? 'Nothing due right now'
+                                                            : undefined)
+                                                    }
+                                                >
+                                                    <Plus className="size-4" />
+                                                    Record dose
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent
+                                                align="end"
+                                                className="w-72"
+                                            >
+                                                <DropdownMenuLabel>
+                                                    Due and overdue now
+                                                </DropdownMenuLabel>
+                                                {recordable.map(
+                                                    ({ dose, medicine }) => {
+                                                        const kind = cellKind(
+                                                            dose,
+                                                            true,
+                                                        );
+                                                        return (
+                                                            <DropdownMenuItem
+                                                                key={dose.key}
+                                                                onSelect={() =>
+                                                                    recorder.recordScheduled(
+                                                                        dose,
+                                                                    )
                                                                 }
-                                                            </span>
-                                                        </span>
-                                                    </DropdownMenuItem>
-                                                );
-                                            },
-                                        )}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            ) : null}
-                        </div>
-                    </div>
+                                                                className="flex items-start gap-2"
+                                                            >
+                                                                <span className="min-w-0 flex-1">
+                                                                    <span className="block truncate font-medium">
+                                                                        {medicine.name}
+                                                                    </span>
+                                                                    <span className="text-caption text-muted-foreground">
+                                                                        {clockLabel(
+                                                                            dose.time,
+                                                                        )}{' '}
+                                                                        ·{' '}
+                                                                        {
+                                                                            CELL_META[
+                                                                                kind
+                                                                            ].label
+                                                                        }
+                                                                    </span>
+                                                                </span>
+                                                            </DropdownMenuItem>
+                                                        );
+                                                    },
+                                                )}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    ) : null}
+                                </div>
+                            </div>
+                        ) : null}
 
-                    {day ? (
-                        <AllergyLine
-                            allergies={day.allergies}
-                            personName={personName}
-                        />
-                    ) : null}
-                    {day && day.chart_alerts.length > 0 ? (
-                        <SafetyLine
-                            tone="warning"
-                            icon={BellRing}
-                            title={`Chart alerts: ${day.chart_alerts
-                                .map((alert) => alert.title)
-                                .join(' · ')}`}
-                        >
-                            Read them on the medication record before recording.
-                        </SafetyLine>
-                    ) : null}
-                </CardContent>
-            </Card>
+                        {day ? (
+                            <AllergyLine
+                                allergies={day.allergies}
+                                personName={personName}
+                            />
+                        ) : null}
+                        {day && day.chart_alerts.length > 0 ? (
+                            <SafetyLine
+                                tone="warning"
+                                icon={BellRing}
+                                title={`Chart alerts: ${day.chart_alerts
+                                    .map((alert) => alert.title)
+                                    .join(' · ')}`}
+                            >
+                                {embedded
+                                    ? 'Read them in Allergies & alerts before recording.'
+                                    : 'Read them on the medication record before recording.'}
+                            </SafetyLine>
+                        ) : null}
+                    </CardContent>
+                </Card>
+            ) : null}
 
             {/* The day */}
             <Card>
@@ -449,11 +456,22 @@ export function MarTab({
                                 </Button>
                             ) : null}
                         </div>
-                        {view !== 'asneeded' &&
-                        day &&
-                        day.medicines.length > 0 ? (
-                            <MarDayLegend kinds={legendKinds} />
-                        ) : null}
+                        <div className="flex flex-wrap items-center justify-end gap-3">
+                            {view !== 'asneeded' &&
+                            day &&
+                            day.medicines.length > 0 ? (
+                                <MarDayLegend kinds={legendKinds} />
+                            ) : null}
+                            {embedded && day?.can.report ? (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setReportOpen(true)}
+                                >
+                                    <FileText className="size-4" />
+                                    Report
+                                </Button>
+                            ) : null}
+                        </div>
                     </div>
 
                     {view === 'asneeded' && day ? null : load.status ===

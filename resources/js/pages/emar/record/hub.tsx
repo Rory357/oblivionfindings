@@ -5,6 +5,7 @@ import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { EntityTable } from '@/components/lists/entity-table';
 import {
     PageHeader,
+    PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
@@ -18,9 +19,9 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTime, formatTime } from '@/lib/datetime';
+import { formatDateOnly, formatDateTime, formatTime } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
-import { ClipboardList, History, Pill, Users } from 'lucide-react';
+import { CalendarDays, ClipboardList, History, Pill, Users } from 'lucide-react';
 import { useState } from 'react';
 
 type View = 'charts' | 'medicines' | 'asneeded';
@@ -206,6 +207,16 @@ export default function MedicationRecordHub(props: Props) {
                                 onChange={(date) => {
                                     if (date) visit({ date });
                                 }}
+                                trigger={
+                                    <PageHeaderFilterButton
+                                        id="medication-hub-day"
+                                        icon={CalendarDays}
+                                        className="h-11 shrink-0 gap-2 whitespace-nowrap px-3"
+                                        aria-label={`NZ calendar day: ${formatDateOnly(props.filters.date)}`}
+                                    >
+                                        Day · {formatDateOnly(props.filters.date)}
+                                    </PageHeaderFilterButton>
+                                }
                             />
                             {props.view === 'medicines' && (
                                 <PageHeaderFilterSelect
@@ -251,10 +262,10 @@ export default function MedicationRecordHub(props: Props) {
                                     }
                                 />
                             </form>
-                            <span className="text-caption">
+                            <PageHeaderMeterCaption>
                                 As at {formatTime(props.as_at)} ·
                                 Pacific/Auckland
-                            </span>
+                            </PageHeaderMeterCaption>
                         </>
                     }
                     rail={

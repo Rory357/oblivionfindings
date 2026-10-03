@@ -22,7 +22,7 @@ export function CanonicalSupportSection({ clientId, view }: { clientId: number; 
     return <div className="space-y-5">
         <div className="flex justify-end">{link}</div>
         {view === 'bymedicine' ? <MedicationSupportPanel plan={plan} /> : view === 'assessment' ? <SectionCard title="Current support assessment" icon={ClipboardList}>
-            {!assessment ? <p className="text-sm">No assessment is recorded. Staff support stays Administer until the canonical support workflow records a change.</p> : <div className="space-y-4">
+            {!assessment ? <p className="text-sm">No assessment is recorded. Open Support & self-administration to record an assessment and any agreed changes.</p> : <div className="space-y-4">
                 <ReviewRow label="Assessed" value={recordDate(assessment.assessment_date)} /><ReviewRow label="Reassess by" value={recordDate(assessment.reassessment_date)} />
                 <ReviewRow label="Person’s wish" value={assessment.wishes_to_self_administer ? 'Wishes to manage medicines' : 'Staff support requested'} />
                 <ReviewRow label="Maximum independence" value={SUPPORT[plan.cap].label} />
