@@ -24,7 +24,7 @@ class ClientMedicationStock extends Model
                 || app(\App\Services\Medication\Stock\StockAvailability::class)->controlled($stock)) {
                 return;
             }
-            if ($stock->isDirty(['on_hand', 'unit', 'batch_number', 'expiry_date', 'last_counted_at'])) {
+            if ($stock->isDirty(['on_hand', 'unit', 'batch_number', 'expiry_date', 'last_counted_at', 'lots_started_at'])) {
                 $stock->rejectScalarWrite('on_hand');
             }
         });

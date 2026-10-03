@@ -69,3 +69,20 @@ Remaining acceptance gaps include multi-batch receipt / explicit short-delivery 
 - Printed month expiry's final NZ day is usable; accepting within seven days still needs the approved short-expiry reason. This aligns the approved P06 source predicate (expired only when daysFrom < 0).
 - Empty pack counts require explicit physical confirmation before comparing or saving; adding a pack before submission invalidates that empty snapshot. Follow-up count_id links fetch and open the exact canonically scoped record.
 - Seven additional backend regressions and one additional actual WizardShell UI regression authored, for 26 backend tests and two blind-count frontend tests. Backend execution remains delegated to Main's consolidated run. No role or alert hold is bypassed.
+
+## Handoff evidence and holds
+Main integrated 22c01155d as defbe0035. Main retained P02's replacement profile tab; the three legacy stock-tile link/display lines in retired mar.tsx were dropped. Backend profile/operations aliases remain protected; the replacement profile's stock-bearing canonical payload still needs final integrated verification if shown.
+
+Candidate f9bee59d2 includes the approved receipt/count fidelity changes and 26 backend test methods. PHP syntax and diff checks pass. The final five-file TS/JSX syntax probe failed to resolve typescript; node_modules is still the documented junction but the primary target's typescript and vitest files are absent. No dependency changes, installs or test launch were attempted. Earlier six-file TS syntax evidence belongs only to 22c01155d.
+
+Main owns the consolidated backend cold-schema run and full frontend/build/browser checks. Exact backend target: tests/Feature/Emar/StockPacksWorkflowTest.php. Exact UI target: resources/js/test/emar-stock-count.test.tsx (two real WizardShell tests). P06 has no active or queued process.
+
+Held review-only alert diff: C:/Users/steph/.codex/visualizations/2026/10/03/01a100fd-efb3-7bb1-9f7d-1714780a01c9/p06-held-alert-integration.patch. Based on 22c01155d; stock service subsequently gained receipt/count methods, so Main must review/rebase context before any authorised application. It has not been applied. A single human question was submitted before Main asked to consolidate questions; no further question was sent.
+
+Remaining release blockers:
+- Exact receive/lead role grant authoring remains held by auto-review; no migration exists.
+- Clinical alert/source/model-hook change remains held by auto-review. Scheduled CheckMedicationStock and MedicationAlertService signals/dashboard writers plus worker/overview attention, report/calendar projections still need the governed quantity/per-pack expiry reader where they use cached scalar fields. Existing signal/alert behavior is preserved pending this decision.
+- P01 central ordinary-dose integration, corrections/reversals and supplemental photo contract; P07 physical register/lot conservation across its writers; P11 settings/days supply/photo prompt policy are Main-coordinated seams. Do not guess dose conversions or alter CD physical balance.
+- A stale discrepancy's source cannot silently be completed; an authorised recount/supersession mechanism preserving the original count and P08 task history remains outstanding.
+- Legacy scheduled-count scalar completion is rejected for started packs and offers the pack-page link. Completing the old scheduled obligation from a canonically linked pack count remains outstanding; this navigation alone does not mark it done.
+- Integrated permission/privacy/replay/concurrency/rollback/NZ-midnight and real browser proof remain outstanding. The release flag remains OFF.
