@@ -9,16 +9,20 @@ use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
 use App\Models\MedicationAdminRule;
 use App\Models\MedicationCompetencyAssessment;
+use App\Models\MedicationOrderRevision;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\MedicationOrderWorkflow;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 use Database\Factories\UserFactory;
 
@@ -295,9 +299,42 @@ class OneChartAdministrationSafetyTest extends TestCase
         // check isn't owed (P01 recording guard), so verify at 09:00.
         $recordingAt = Carbon::now();
         $this->travelTo(Carbon::parse('2026-07-01 09:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
+        Storage::fake('local');
+        $enterer = User::factory()->create(['approved_at' => now()]);
+        $workflow = app(MedicationOrderWorkflow::class);
+        $medication->refresh();
+        $file = UploadedFile::fake()->create('prescription.pdf', 1, 'application/pdf');
+        $path = $file->store('test-prescription-sources', 'local');
+        $source = [
+            'type' => 'written', 'prescriber' => 'Dr Safety', 'received_at' => now()->subMinute()->toIso8601String(),
+            'description' => 'Signed prescription.', 'file_sha256' => hash_file('sha256', $file->getRealPath()),
+        ];
+        $payload = array_merge($workflow->payload($medication), [
+            'route' => 'oral', 'indication' => 'Indication from the signed source.',
+            'start_date' => now('Pacific/Auckland')->subDay()->toDateString(),
+        ]);
+        $version = $workflow->snapshot($medication, $payload, (int) $medication->version, $enterer->id, $source, 'Safety fixture source');
+        $versionEvidence = $version->fresh()->getAttributes();
+        $revision = MedicationOrderRevision::create([
+            'client_id' => $this->client->id, 'client_medication_id' => $medication->id,
+            'medication_order_version_id' => $version->id, 'base_version' => $medication->version,
+            'entered_by' => $enterer->id,
+        ]);
+        $revision->files()->create([
+            'purpose' => 'source', 'file_name' => 'prescription.pdf', 'file_path' => $path,
+            'file_size' => $file->getSize(), 'mime_type' => 'application/pdf', 'sha256' => $source['file_sha256'],
+            'uploaded_by' => $enterer->id, 'created_at' => now(),
+        ]);
         $this->actingAs($this->admin)
-            ->post("/emar/medications/{$medication->id}/verify")
-            ->assertRedirect();
+            ->post('/emar/order-revisions/'.$revision->id.'/check', [
+                'source_matches' => true,
+                'dose_route_times_checked' => true,
+                'allergies_interactions_checked' => true,
+            ])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('checked', $revision->fresh()->status);
+        $this->assertSame($versionEvidence, $version->fresh()->getAttributes());
+        Storage::disk('local')->assertExists($path);
         $this->travelTo($recordingAt);
 
         $this->assertDatabaseHas('client_medications', [
