@@ -324,7 +324,9 @@ class EnhancedMarService
         // The slot's due time (on the spring-forward day a 02:30 dose is due at 03:00).
         $scheduledFor = $dose['due_at'];
 
-        // Get existing administration for this slot
+        // The slot's current record: the latest effective one. A re-offer
+        // after a refusal (P01) is a second record in the same slot, and the
+        // chart must show what happened last, as the slot outcome does.
         [$slotStartUtc, $slotEndUtc] = $this->scheduleService->utcSlotWindow($scheduledFor);
 
         $existing = ClientMedicationAdministration::query()
@@ -333,6 +335,7 @@ class EnhancedMarService
             ->where('client_medication_id', $medication->id)
             ->whereBetween('scheduled_for', [$slotStartUtc, $slotEndUtc])
             ->with(['administeredBy:id,name', 'witnessedBy:id,name'])
+            ->latest('id')
             ->first();
 
         $scheduleState = $this->getScheduleState($dose, $now, $isToday, $existing);

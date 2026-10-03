@@ -20,18 +20,30 @@ export function SettingsModal({
     footer,
     onClose,
     onCloseAutoFocus,
+    width = 480,
 }: {
     title: string;
-    description: string;
+    description: ReactNode;
     children: ReactNode;
     footer?: ReactNode;
     onClose: () => void;
     onCloseAutoFocus?: ComponentProps<typeof DialogContent>['onCloseAutoFocus'];
+    /** The popup guide's width tokens: 480 (default), 720 or 900 px. */
+    width?: 480 | 720 | 900;
 }) {
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent
-                className="flex max-h-[88vh] flex-col overflow-hidden p-0 sm:max-w-[480px]"
+                className={
+                    width === 480
+                        ? 'flex max-h-[88vh] flex-col overflow-hidden p-0 sm:max-w-[480px]'
+                        : 'flex max-h-[88vh] flex-col overflow-hidden p-0'
+                }
+                style={
+                    width === 480
+                        ? undefined
+                        : { width: `min(92vw, ${width}px)`, maxWidth: `min(92vw, ${width}px)` }
+                }
                 onCloseAutoFocus={onCloseAutoFocus}
             >
                 <div className="shrink-0 border-b p-5 pr-12">

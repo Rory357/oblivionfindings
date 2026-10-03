@@ -29,7 +29,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
-import { PrnWizard } from '@/pages/meds/today/components/prn-wizard';
+import { AsNeededPicker } from '@/components/emar/record-dose/dialogs';
+import { RecordDoseDialog } from '@/components/emar/record-dose/record-dose-dialog';
 import type {
     ClientInfo,
     PrnFollowUp,
@@ -274,7 +275,6 @@ export default function PrnRecords(props: Props) {
         pending_reviews: reviews,
         prn_medications: prnMeds,
         clients,
-        witnesses,
         board_user: signer,
         date,
         today,
@@ -1582,20 +1582,54 @@ export default function PrnRecords(props: Props) {
                 )}
             </div>
 
-            {canRecord && modal?.type === 'record' && (
-                <PrnWizard
-                    medications={recordablePrnMeds}
-                    clients={clientsMap}
-                    date={date}
-                    witnesses={witnesses}
-                    signedAs={{
-                        name: signer.name,
-                        role_label: signer.role_label,
-                    }}
-                    initialMedId={modal.initialMedId ?? null}
-                    onClose={() => setModal(null)}
-                />
-            )}
+            {/* eMAR P01: choose the person and medicine, then the one
+                recording dialog every entry point opens. */}
+            {canRecord &&
+                modal?.type === 'record' &&
+                modal.initialMedId == null && (
+                    <AsNeededPicker
+                        choices={recordablePrnMeds}
+                        onClose={() => setModal(null)}
+                        onPick={(medId) =>
+                            setModal({ type: 'record', initialMedId: medId })
+                        }
+                    />
+                )}
+            {canRecord &&
+                modal?.type === 'record' &&
+                modal.initialMedId != null &&
+                (() => {
+                    const medication = recordablePrnMeds.find(
+                        (m) => m.id === modal.initialMedId,
+                    );
+                    return medication ? (
+                        <RecordDoseDialog
+                            key={`prn:${medication.id}`}
+                            target={{
+                                kind: 'prn',
+                                orderId: medication.id,
+                                label: {
+                                    person:
+                                        clientsMap.get(medication.client_id)
+                                            ?.preferred ??
+                                        medication.client_name,
+                                    medicine: medication.name,
+                                },
+                            }}
+                            entry="prn-records"
+                            signedAs={{
+                                name: signer.name,
+                                role_label: signer.role_label,
+                            }}
+                            onRecorded={(result) => {
+                                if (result.status !== 'queued') {
+                                    router.reload({ preserveScroll: true });
+                                }
+                            }}
+                            onClose={() => setModal(null)}
+                        />
+                    ) : null;
+                })()}
             {modal?.type === 'effect' && canRecordFollowUp(modal.followUp) && (
                 <PrnEffectivenessDialog
                     followUp={modal.followUp}

@@ -1468,8 +1468,10 @@ class EmarController extends Controller
             $administrations = $medDoses->map(function (array $dose) use ($med, &$matchedAdministrationIds, $scheduleService) {
                 $scheduledAt = $dose['due_at'];
                 [$slotStartUtc, $slotEndUtc] = $scheduleService->utcSlotWindow($scheduledAt);
-                // Find an administration record matching this time slot
-                $admin = $med->administrations->first(function ($a) use ($slotStartUtc, $slotEndUtc) {
+                // The slot's current record: the latest one matching this time
+                // slot (a re-offer after a refusal is a second record; P01).
+                // Earlier records still show below as the slot's history.
+                $admin = $med->administrations->sortByDesc('id')->first(function ($a) use ($slotStartUtc, $slotEndUtc) {
                     $scheduledFor = $this->administrationDateUtc($a, 'scheduled_for');
 
                     return $scheduledFor?->betweenIncluded($slotStartUtc, $slotEndUtc) === true;
