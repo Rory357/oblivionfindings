@@ -170,6 +170,11 @@ const PEOPLE = [
     'Pharmacist',
     'Key worker',
 ];
+const PREVIOUS_STORAGE_LABELS: Record<string, string> = {
+    lockable_drawer: 'Lockable drawer in their room',
+    staff_cabinet: 'Staff cabinet',
+    cd_cabinet: 'Controlled-drug cabinet',
+};
 const STORAGE = [
     { value: 'own_drawer', label: 'Their own locked drawer' },
     { value: 'own_room', label: 'In their room (not locked)' },
@@ -353,26 +358,39 @@ export function AssessmentDialog({
         if (form.isDirty && !saved) setDiscard(true);
         else onClose();
     };
-    const send = (confirmed: boolean) =>
-        form
-            .transform((data) => ({
-                ...data,
-                confirm_loosening: confirmed,
-                people_involved: data.people_involved.map((p) =>
-                    p === 'Welfare guardian or EPOA'
-                        ? 'Welfare guardian or EPOA: ' + guardian.trim()
-                        : p,
-                ),
-                med_scope: editable.map((m) => ({
-                    med_id: m.id,
-                    scope: effective(m),
-                })),
-            }))
-            .post('/emar/self-admin', {
-                preserveScroll: true,
-                onError: revealErrors,
-                onSuccess: () => setSaved(true),
-            });
+    const storageOptions =
+        prior?.storage_location &&
+        !STORAGE.some((option) => option.value === prior.storage_location)
+            ? [
+                  ...STORAGE,
+                  {
+                      value: prior.storage_location,
+                      label:
+                          PREVIOUS_STORAGE_LABELS[prior.storage_location] ??
+                          'Previously recorded location',
+                  },
+              ]
+            : STORAGE;
+    const send = (confirmed: boolean) => {
+        form.transform((data) => ({
+            ...data,
+            confirm_loosening: confirmed,
+            people_involved: data.people_involved.map((p) =>
+                p === 'Welfare guardian or EPOA'
+                    ? 'Welfare guardian or EPOA: ' + guardian.trim()
+                    : p,
+            ),
+            med_scope: editable.map((m) => ({
+                med_id: m.id,
+                scope: effective(m),
+            })),
+        }));
+        form.post('/emar/self-admin', {
+            preserveScroll: true,
+            onError: revealErrors,
+            onSuccess: () => setSaved(true),
+        });
+    };
     const save = () => {
         const e = validate();
         form.clearErrors();
@@ -710,7 +728,7 @@ export function AssessmentDialog({
                                     onChange={(v) =>
                                         form.setData('storage_location', v)
                                     }
-                                    options={STORAGE}
+                                    options={storageOptions}
                                     error={form.errors.storage_location}
                                 />
                                 <Field
@@ -850,7 +868,7 @@ export function AssessmentDialog({
                                     <ReviewRow
                                         label="Kept"
                                         value={
-                                            STORAGE.find(
+                                            storageOptions.find(
                                                 (s) =>
                                                     s.value ===
                                                     form.data.storage_location,
@@ -949,23 +967,23 @@ export function AgreementDialog({
         if (form.isDirty && !saved) setDiscard(true);
         else onClose();
     };
-    const send = () =>
-        form
-            .transform((data) => ({
-                ...data,
-                witness_id:
-                    data.method === 'verbal' ? Number(data.witness_id) : null,
-                confirm_loosening: true,
-            }))
-            .post('/emar/self-admin/' + plan.assessment!.id + '/agreement', {
-                forceFormData: true,
-                preserveScroll: true,
-                onSuccess: () => setSaved(true),
-                onError: (e) => {
-                    setStep(0);
-                    focusError(e);
-                },
-            });
+    const send = () => {
+        form.transform((data) => ({
+            ...data,
+            witness_id:
+                data.method === 'verbal' ? Number(data.witness_id) : null,
+            confirm_loosening: true,
+        }));
+        form.post('/emar/self-admin/' + plan.assessment!.id + '/agreement', {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => setSaved(true),
+            onError: (e) => {
+                setStep(0);
+                focusError(e);
+            },
+        });
+    };
     return (
         <>
             <WizardShell
@@ -1372,18 +1390,18 @@ export function MedicineSupportDialog({
         plan.can_assess &&
         (!medicine.controlled || plan.can_set_controlled) &&
         !!plan.assessment;
-    const send = (confirmed: boolean) =>
-        form
-            .transform((data) => ({
-                ...data,
-                med_scope: [{ med_id: medicine.id, scope: mode }],
-                confirm_loosening: confirmed,
-            }))
-            .put('/emar/self-admin/' + plan.assessment!.id, {
-                preserveScroll: true,
-                onSuccess: onClose,
-                onError: focusError,
-            });
+    const send = (confirmed: boolean) => {
+        form.transform((data) => ({
+            ...data,
+            med_scope: [{ med_id: medicine.id, scope: mode }],
+            confirm_loosening: confirmed,
+        }));
+        form.put('/emar/self-admin/' + plan.assessment!.id, {
+            preserveScroll: true,
+            onSuccess: onClose,
+            onError: focusError,
+        });
+    };
     return (
         <>
             <Dialog open onOpenChange={(open) => !open && close()}>
