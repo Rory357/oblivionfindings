@@ -104,10 +104,12 @@ export function EntityKebab({
     actions,
     className,
     label = 'More actions',
+    frontline = false,
 }: {
     actions: MenuItem[];
     className?: string;
     label?: string;
+    frontline?: boolean;
 }) {
     const menuId = useId();
 
@@ -122,6 +124,7 @@ export function EntityKebab({
                         aria-label={label}
                         className={cn(
                             'frontline-hit flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
+                            frontline && 'frontline-tap frontline-focus',
                             className,
                         )}
                     >
@@ -148,6 +151,8 @@ export function EntityKebab({
                                 }
                                 className={cn(
                                     DISABLED_ITEM_CLASS,
+                                    frontline &&
+                                        'frontline-tap frontline-focus',
                                     'focus:text-muted-foreground',
                                 )}
                             >
@@ -161,6 +166,8 @@ export function EntityKebab({
                                 key={i}
                                 onClick={it.onClick}
                                 className={cn(
+                                    frontline &&
+                                        'frontline-tap frontline-focus',
                                     it.danger &&
                                         'text-status-critical focus:text-status-critical',
                                 )}

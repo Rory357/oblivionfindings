@@ -131,6 +131,27 @@ function replacedQuery() {
 }
 
 describe('controlled register reader filters', () => {
+    it('gives phone record links and all action menu items real frontline targets', () => {
+        render(<ControlledRegister product={product} />);
+        expect(
+            screen.getByRole('button', {
+                name: 'Synthetic medicine',
+                exact: true,
+            }),
+        ).toHaveClass('frontline-tap');
+        const actions = screen.getByRole('button', {
+            name: 'Actions for Synthetic medicine',
+            exact: true,
+        });
+        expect(actions).toHaveClass('frontline-tap', 'frontline-focus');
+        fireEvent.pointerDown(actions, { button: 0, ctrlKey: false });
+        const items = screen.getAllByRole('menuitem');
+        expect(items.length).toBeGreaterThan(0);
+        items.forEach((item) =>
+            expect(item).toHaveClass('frontline-tap', 'frontline-focus'),
+        );
+    });
+
     it('clears dependent person and medicine IDs when the house changes', () => {
         render(<ControlledRegister product={product} />);
         fireEvent.click(screen.getByRole('button', { name: 'Clear House' }));

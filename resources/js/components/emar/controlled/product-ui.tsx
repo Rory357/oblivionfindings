@@ -112,7 +112,7 @@ export function Field({
         ) => onChange(event.target.value),
         'aria-invalid': !!error,
         'aria-describedby': `controlled-${name}-help`,
-        className: 'min-h-11',
+        className: 'frontline-tap frontline-focus',
     };
     return (
         <div className="space-y-1.5">
@@ -193,7 +193,7 @@ export function Picker({
                         aria-expanded={open}
                         aria-invalid={!!error}
                         aria-describedby={`controlled-${id}-error`}
-                        className="min-h-11 w-full justify-between whitespace-normal text-left"
+                        className="frontline-tap frontline-focus w-full justify-between text-left whitespace-normal"
                     >
                         <span>{current?.name ?? placeholder}</span>
                         <ChevronsUpDown className="size-4 shrink-0" />
@@ -220,7 +220,7 @@ export function Picker({
                                             onChange(option.id);
                                             setOpen(false);
                                         }}
-                                        className="min-h-11 items-start"
+                                        className="frontline-tap frontline-focus items-start"
                                     >
                                         <div className="min-w-0 flex-1">
                                             <p>{option.name}</p>
@@ -294,7 +294,7 @@ export function Tiles<K extends string>({
                         disabled={!!option.disabled}
                         onClick={() => onChange(option.key)}
                         className={cn(
-                            'h-auto min-h-16 justify-start whitespace-normal p-3 text-left',
+                            'h-auto min-h-16 justify-start p-3 text-left whitespace-normal',
                             value === option.key &&
                                 'border-primary bg-primary/10',
                         )}
@@ -397,7 +397,7 @@ export function WitnessField({
                 </Notice>
             ) : null}
             <WitnessPinInput
-                className="[&_input]:min-h-11"
+                className="[&_input]:min-h-[44px]"
                 id={`controlled-${key}witness_credential`}
                 value={value.pin}
                 onChange={(pin) => onChange({ ...value, pin })}
@@ -423,8 +423,8 @@ export function MedicineContext({
     medicine: ControlledMedicine;
 }) {
     return (
-        <Card className="border-primary/30 bg-primary/5 flex flex-row gap-3 p-3">
-            <ShieldCheck className="text-primary mt-0.5 size-5 shrink-0" />
+        <Card className="flex flex-row gap-3 border-primary/30 bg-primary/5 p-3">
+            <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" />
             <div>
                 <p className="text-sm font-semibold">
                     {medicine.name} · {medicine.client_name}
@@ -538,11 +538,11 @@ export function RecordList<T>({
                         >
                             <Card className="gap-3 p-4">
                                 <div className="flex items-start gap-3">
-                                    <Icon className="text-primary mt-1 size-5" />
+                                    <Icon className="mt-1 size-5 text-primary" />
                                     <div className="min-w-0 flex-1">
                                         <Button
                                             variant="link"
-                                            className="h-auto min-h-11 justify-start whitespace-normal p-0 text-left"
+                                            className="frontline-tap frontline-focus h-auto justify-start p-0 text-left whitespace-normal"
                                             onClick={() => onOpen(row)}
                                         >
                                             {record.name}
@@ -552,6 +552,7 @@ export function RecordList<T>({
                                         </p>
                                     </div>
                                     <EntityKebab
+                                        frontline
                                         actions={actionsFor(row)}
                                         label={`Actions for ${record.name}`}
                                     />
