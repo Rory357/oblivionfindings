@@ -74,7 +74,15 @@ export function MedicationSupportPanel({
                         <PlanBadge plan={plan} />
                     </AlertTitle>
                     <AlertDescription className="space-y-2">
-                        {plan.state === 'none' ? (
+                        {plan.legacy_review_required ? (
+                            <p>
+                                Existing support stays as recorded. Ask a house
+                                lead, coordinator or clinical lead to review the
+                                agreement evidence. Self-managed medicines
+                                remain informational; this review does not
+                                instruct staff to give another dose.
+                            </p>
+                        ) : plan.state === 'none' ? (
                             <p>
                                 No assessment — staff give every medicine
                                 (Administer).
@@ -128,8 +136,9 @@ export function MedicationSupportPanel({
                     <FileSignature className="size-4" />
                     <AlertTitle>Agreement needed</AlertTitle>
                     <AlertDescription>
-                        Self-managed and Prompt choices stay Administer until
-                        the agreement is recorded.
+                        {plan.legacy_review_required
+                            ? 'Record the formal agreement for the existing plan. Existing support stays as shown while its evidence is reviewed; new Self-managed or Prompt choices await the agreement.'
+                            : 'Self-managed and Prompt choices stay Administer until the agreement is recorded.'}
                         {plan.can_assess && onAgreement && (
                             <div className="mt-3">
                                 <Button onClick={onAgreement}>

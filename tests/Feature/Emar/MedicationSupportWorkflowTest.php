@@ -6,6 +6,8 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationDoseSlot;
+use App\Models\MedicationError;
 use App\Models\MedicationFollowup;
 use App\Models\MedicationFollowupEvent;
 use App\Models\MedicationSelfAdminAssessment;
@@ -247,6 +249,113 @@ class MedicationSupportWorkflowTest extends TestCase
         $this->assertSame('late', $projection->rows($scope, '2026-10-03', '2026-10-03', CarbonImmutable::now('UTC'))->sole()['state']);
     }
 
+    public function test_legacy_slot_evidence_stays_informational_without_an_automatic_staff_give_instruction(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-03 10:00', 'Pacific/Auckland')->utc());
+        foreach (['2026-10-02', '2026-10-03', '2026-10-04'] as $date) {
+            MedicationDoseSlot::query()->create([
+                'client_id' => $this->person->id, 'client_medication_id' => $this->medicine->id,
+                'nz_date' => $date, 'ordered_time' => '08:00',
+                'due_at' => Carbon::parse($date.' 08:00', 'Pacific/Auckland')->utc(),
+                'self_managed' => true, 'generated_at' => now(), 'reconstructed' => true,
+            ]);
+        }
+        $support = app(MedicationSupport::class);
+        $this->assertSame('self_managed', $support->mode($this->medicine));
+        $summary = $support->summary($this->person, $this->actor);
+        $this->assertSame('self_managed', $summary['medicines'][0]['mode']);
+        $this->assertTrue($summary['legacy_review_required']);
+        $this->assertNull($summary['agreement']);
+        $rows = app(DoseSlotProjection::class)->rows(DoseSlotReaderScope::internal([$this->person->id]),
+            '2026-10-02', '2026-10-04', CarbonImmutable::now('UTC'))->keyBy('nz_date');
+        $this->assertSame('self_managed', $rows['2026-10-02']['state']);
+        $this->assertSame('self_managed', $rows['2026-10-02']['support_mode']);
+        $this->assertSame('self_managed', $rows['2026-10-03']['state']);
+        $this->assertSame('self_managed', $rows['2026-10-03']['support_mode']);
+        $this->assertSame('self_managed', $rows['2026-10-04']['state']);
+        $this->assertSame('self_managed', $rows['2026-10-04']['support_mode']);
+        // Opposite alias case: stored flags remain true but explicit withdrawal
+        // produces the computed staff mode for today's/future owed doses.
+        $legacy = MedicationSelfAdminAssessment::query()->create([
+            ...$this->payload('self_managed'), 'status' => 'completed', 'outcome' => 'independent',
+            'assessment_date' => '2026-10-02', 'assessed_by' => $this->actor->id,
+            'agreement_signed_at' => now()->subDay(), 'agreement_signed_by' => $this->actor->id,
+        ]);
+        $this->actingAs($this->actor)->post('/emar/self-admin/'.$legacy->id.'/consent', [
+            'direction' => 'less', 'said' => 'Staff please.', 'occurred_at' => '2026-10-03T09:59+13:00',
+        ])->assertSessionHasNoErrors();
+        $this->assertSame(3, MedicationDoseSlot::query()->where('self_managed', true)->count());
+        $rows = app(DoseSlotProjection::class)->rows(DoseSlotReaderScope::internal([$this->person->id]),
+            '2026-10-02', '2026-10-04', CarbonImmutable::now('UTC'))->keyBy('nz_date');
+        $this->assertSame('self_managed', $rows['2026-10-02']['state']);
+        $this->assertSame('late', $rows['2026-10-03']['state']);
+        $this->assertSame('staff_given', $rows['2026-10-03']['support_mode']);
+        $this->assertSame('not_due', $rows['2026-10-04']['state']);
+        $this->assertSame('staff_given', $rows['2026-10-04']['support_mode']);
+        $this->assertSame('staff_given', $support->mode($this->medicine));
+    }
+
+    public function test_existing_approved_per_medicine_plan_is_preserved_and_marked_for_formal_review(): void
+    {
+        $legacy = MedicationSelfAdminAssessment::query()->create([
+            ...$this->payload('self_managed'), 'status' => 'completed', 'outcome' => 'independent',
+            'assessment_date' => '2026-10-02', 'assessed_by' => $this->actor->id,
+            'agreement_signed_at' => now()->subDay(), 'agreement_signed_by' => $this->actor->id,
+            'ordering_responsibility' => 'self', 'agreement_responsibilities' => 'Existing recorded support.',
+        ]);
+        $this->travelTo(Carbon::parse('2026-10-03 10:00', 'Pacific/Auckland')->utc());
+        DB::transaction(fn () => app(DoseSlotGenerator::class)->generateAhead($this->medicine));
+        $support = app(MedicationSupport::class);
+        $summary = $support->summary($this->person, $this->actor);
+        $this->assertSame('self_managed', $summary['medicines'][0]['mode']);
+        $this->assertTrue($summary['legacy_review_required']);
+        $this->assertTrue($summary['agreement_needed']);
+        $this->assertNull($summary['agreement']);
+        $this->assertSame('reassess', $summary['state']);
+        // Raw flag false -> computed mode true: the outer state CASE must read
+        // the projected alias, never the stored slot flag.
+        $this->assertFalse(MedicationDoseSlot::query()->where('nz_date', '2026-10-03')->sole()->self_managed);
+        $this->assertSame('self_managed', app(DoseSlotProjection::class)->rows(DoseSlotReaderScope::internal([$this->person->id]), '2026-10-03', '2026-10-03', CarbonImmutable::now('UTC'))->sole()['state']);
+        $newOrder = ClientMedication::factory()->create(['client_id' => $this->person->id, 'controlled_drug' => false, 'state' => 'active', 'active' => true, 'approval_status' => 'verified']);
+        $this->assertSame('staff_given', $support->mode($newOrder));
+        $this->assertDatabaseCount('medication_support_changes', 0);
+        $this->assertDatabaseCount('medication_support_agreements', 0);
+        try {
+            ClientMedicationAdministration::create(['client_id' => $this->person->id, 'client_medication_id' => $this->medicine->id,
+                'status' => 'given', 'administered_at' => now(), 'administered_by' => $this->actor->id]);
+            $this->fail('A retained Self-managed medicine must not become a staff dose.');
+        } catch (ValidationException $error) {
+            $this->assertArrayHasKey('status', $error->errors());
+        }
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertSame('self_managed', $support->mode($this->medicine));
+        $this->assertSame($legacy->med_scope, $legacy->fresh()->med_scope);
+    }
+
+    public function test_unchanged_legacy_support_survives_reassessment_until_real_agreement_or_explicit_withdrawal(): void
+    {
+        $legacy = MedicationSelfAdminAssessment::query()->create([
+            ...$this->payload('self_managed'), 'status' => 'completed', 'outcome' => 'independent',
+            'assessment_date' => '2026-10-02', 'assessed_by' => $this->actor->id,
+            'agreement_signed_at' => now()->subDay(), 'agreement_signed_by' => $this->actor->id,
+        ]);
+        $this->actingAs($this->actor)->post('/emar/self-admin', [...$this->payload('self_managed'), 'supersedes_id' => $legacy->id])->assertSessionHasNoErrors();
+        $current = app(MedicationSupport::class)->current((int) $this->person->id);
+        $this->assertSame('self_managed', app(MedicationSupport::class)->mode($this->medicine));
+        $this->assertSame('legacy_support_retained', MedicationSupportChange::query()->sole()->reason);
+        $this->assertSame('self_managed', MedicationSupportChange::query()->sole()->previous_mode);
+        $this->assertTrue(app(MedicationSupport::class)->summary($this->person, $this->actor)['legacy_review_required']);
+        $this->assertDatabaseCount('medication_support_agreements', 0);
+        $this->agree($current);
+        $this->assertFalse(app(MedicationSupport::class)->summary($this->person, $this->actor)['legacy_review_required']);
+        $this->assertSame('self_managed', app(MedicationSupport::class)->mode($this->medicine));
+        $this->actingAs($this->actor)->post('/emar/self-admin/'.$current->id.'/consent', [
+            'direction' => 'less', 'said' => 'Staff please.', 'occurred_at' => '2026-10-03T06:59+13:00',
+        ])->assertSessionHasNoErrors();
+        $this->assertSame('staff_given', app(MedicationSupport::class)->mode($this->medicine));
+        $this->assertSame($legacy->agreement_signed_at->toIso8601String(), $legacy->fresh()->agreement_signed_at->toIso8601String());
+    }
+
     public function test_canonical_model_refuses_fabricated_self_managed_refusal(): void
     {
         $a = $this->assess('self_managed');
@@ -370,21 +479,24 @@ class MedicationSupportWorkflowTest extends TestCase
 
     public function test_trigger_delivery_failure_keeps_the_source_and_receipt_and_retries_once(): void
     {
-        $a = $this->assess();
-        DB::transaction(function () {
-            Client::query()->whereKey($this->person->id)->lockForUpdate()->firstOrFail();
-            $this->medicine->update(['dosage' => '2 synthetic units']);
-        });
+        $this->assess();
+        // Exercise the continuing canonical clinical source endpoint and its transaction.
+        $this->actingAs($this->actor)->post(route('emar.errors.store'), [
+            'client_id' => $this->person->id, 'client_medication_id' => $this->medicine->id,
+            'error_type' => 'wrong_dose', 'severity' => 'minor', 'description' => 'Synthetic recorded error.',
+        ])->assertSessionHasNoErrors()->assertRedirect();
+        $source = MedicationError::query()->sole();
         $receipt = MedicationSupportTriggerOutbox::query()->sole();
         $this->followups->shouldReceive('request')->once()->andThrow(new \RuntimeException('Synthetic ledger unavailable'));
-        $delivery = app(SupportReviewDelivery::class);
-        $this->assertFalse($delivery->deliver($receipt->id));
-        $this->assertSame('2 synthetic units', $this->medicine->fresh()->dosage);
+        $this->artisan('emar:support-review-delivery')->expectsOutput('0 support triggers delivered.')->assertSuccessful();
+        $this->assertSame('Synthetic recorded error.', $source->fresh()->description);
+        $this->assertDatabaseCount('medication_errors', 1);
         $this->assertNull($receipt->fresh()->delivered_at);
         $this->assertSame(1, $receipt->fresh()->attempts);
         $this->app->forgetInstance(SupportFollowupAdapter::class);
-        $this->assertTrue($delivery->deliver($receipt->id));
-        $this->assertTrue($delivery->deliver($receipt->id));
+        $this->travel(2)->minutes();
+        $this->artisan('emar:support-review-delivery')->expectsOutput('1 support triggers delivered.')->assertSuccessful();
+        $this->artisan('emar:support-review-delivery')->expectsOutput('0 support triggers delivered.')->assertSuccessful();
         $this->assertDatabaseCount('medication_followups', 1);
         $this->assertNotNull($receipt->fresh()->delivered_at);
         $work = MedicationFollowup::query()->sole();
@@ -395,19 +507,24 @@ class MedicationSupportWorkflowTest extends TestCase
     {
         $this->assess();
         $old = $this->medicine->dosage;
-        $delivery = Mockery::mock(SupportReviewDelivery::class);
-        $delivery->shouldReceive('enqueue')->once()->andThrow(new \RuntimeException('Synthetic receipt unavailable'));
-        $this->app->instance(SupportReviewDelivery::class, $delivery);
+        $event = 'eloquent.creating: '.MedicationSupportTriggerOutbox::class;
+        // Fail actual receipt persistence, rather than bypassing the enqueue service.
+        Event::listen($event, fn () => throw new \RuntimeException('Synthetic receipt unavailable'));
+        $this->withoutExceptionHandling();
         try {
-            DB::transaction(function () {
-                Client::query()->whereKey($this->person->id)->lockForUpdate()->firstOrFail();
-                $this->medicine->update(['dosage' => '3 synthetic units']);
-            });
+            $this->actingAs($this->actor)->post(route('emar.errors.store'), [
+                'client_id' => $this->person->id, 'client_medication_id' => $this->medicine->id,
+                'error_type' => 'wrong_dose', 'severity' => 'minor', 'description' => 'Synthetic rolled back error.',
+            ]);
             $this->fail('Expected receipt failure');
         } catch (\RuntimeException $error) {
             $this->assertSame('Synthetic receipt unavailable', $error->getMessage());
+        } finally {
+            Event::forget($event);
         }
         $this->assertSame($old, $this->medicine->fresh()->dosage);
+        $this->assertSame('verified', $this->medicine->fresh()->approval_status);
+        $this->assertDatabaseCount('medication_errors', 0);
         $this->assertDatabaseCount('medication_support_trigger_outbox', 0);
     }
 
@@ -428,6 +545,33 @@ class MedicationSupportWorkflowTest extends TestCase
         $this->assertTrue(app(SupportReviewDelivery::class)->deliver($receipt->id));
         $this->assertDatabaseCount('medication_followups', 1);
         $this->assertSame($receipt->assessment_id, MedicationFollowup::query()->sole()->context['support_assessment_id']);
+    }
+
+    public function test_source_retry_after_reassessment_keeps_the_original_receipt_and_is_covered(): void
+    {
+        $this->app->forgetInstance(SupportFollowupAdapter::class);
+        $prior = $this->assess();
+        $emit = function () {
+            DB::transaction(function () {
+                Client::query()->whereKey($this->person->id)->lockForUpdate()->firstOrFail();
+                Event::dispatch('App\\Events\\MedicationReconciliationApplied', [(object) [
+                    'clientId' => $this->person->id, 'reconciliationId' => 1002, 'actorId' => $this->actor->id,
+                ]]);
+            });
+        };
+        $emit();
+        $receipt = MedicationSupportTriggerOutbox::query()->sole();
+        $originalTime = $receipt->occurred_at->toIso8601String();
+        $this->travel(1)->hours();
+        $this->actingAs($this->actor)->post('/emar/self-admin', [...$this->payload(), 'supersedes_id' => $prior->id])
+            ->assertSessionHasNoErrors()->assertRedirect();
+        $emit();
+        $this->assertDatabaseCount('medication_support_trigger_outbox', 1);
+        $this->assertSame($prior->id, $receipt->fresh()->assessment_id);
+        $this->assertSame($originalTime, $receipt->fresh()->occurred_at->toIso8601String());
+        $this->artisan('emar:support-review-delivery')->expectsOutput('1 support triggers delivered.')->assertSuccessful();
+        $this->assertNotNull($receipt->fresh()->delivered_at);
+        $this->assertDatabaseCount('medication_followups', 0);
     }
 
     public function test_nz_dst_gap_and_ambiguous_minute_are_not_silently_shifted(): void

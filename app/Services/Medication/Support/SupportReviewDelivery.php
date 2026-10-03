@@ -18,7 +18,9 @@ class SupportReviewDelivery
         }
         $row = MedicationSupportTriggerOutbox::firstOrCreate(['source_key' => $sourceKey], [
             'client_id' => $assessment->client_id, 'assessment_id' => $assessment->id, 'kind' => $kind, 'reason' => $reason, 'occurred_at' => now('UTC')]);
-        abort_unless((int) $row->client_id === (int) $assessment->client_id && (int) $row->assessment_id === (int) $assessment->id && $row->kind === $kind, 404);
+        // A retried source keeps its first captured assessment/time even after reassessment.
+        // Delivery recognizes that the newer assessment already covers this older event.
+        abort_unless((int) $row->client_id === (int) $assessment->client_id && $row->kind === $kind, 404);
     }
 
     public function deliver(int $id): bool

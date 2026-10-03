@@ -224,12 +224,12 @@ class EmarListPersonScopeTest extends TestCase
         }
 
         $page = $this->actingAs($this->worker)->get(route('emar.self_admin'))->assertOk();
-        $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('assessments'), 'client_id'));
-        $this->assertSame(2, $page->inertiaProps('kpis.total'));
-        $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('clients'), 'id'));
+        $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('register'), 'client_id'));
+        $this->assertSame(2, $page->inertiaProps('counts.people'));
+        $this->assertSame(0, $page->inertiaProps('counts.self_managed'));
 
         $lead = $this->actingAs($this->lead())->get(route('emar.self_admin'))->assertOk();
-        $this->assertSame($this->allIds(), $this->sortedIds($lead->inertiaProps('assessments'), 'client_id'));
+        $this->assertSame($this->allIds(), $this->sortedIds($lead->inertiaProps('register'), 'client_id'));
     }
 
     /** @return array<int, Client> */

@@ -91,6 +91,7 @@ export type Medicine = {
     mode: SupportMode;
     requested_mode: SupportMode | null;
     agreement_needed: boolean;
+    legacy_support?: boolean;
     is_prn: boolean;
 };
 export type Agreement = {
@@ -118,6 +119,7 @@ export type SupportPlan = {
     concealed_count: number;
     agreement: Agreement | null;
     agreement_needed: boolean;
+    legacy_review_required?: boolean;
     reviews: {
         id: number | string;
         trigger: string;

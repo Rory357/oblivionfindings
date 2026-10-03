@@ -4,6 +4,7 @@ namespace App\Services\Medication\Support;
 
 use App\Models\Client;
 use App\Models\ClientMedication;
+use App\Models\MedicationDoseSlot;
 use App\Models\MedicationSelfAdminAssessment;
 use App\Models\MedicationSupportAgreement;
 use App\Models\MedicationSupportChange;
@@ -44,7 +45,32 @@ final class MedicationSupport
             ->orderByDesc('effective_at')->orderByDesc('id');
         $change = ($lock ? $query->sharedLock() : $query)->first();
 
-        return $change?->mode ?? 'staff_given';
+        if ($change) {
+            return $change->mode;
+        }
+        $assessment = $this->current((int) $order->client_id);
+        $legacy = $this->legacyMode($assessment, (int) $order->id);
+        if ($legacy !== null && $assessment->created_at->lessThanOrEqualTo($at)) {
+            return $legacy;
+        }
+
+        // Retained slot evidence never becomes a staff-give instruction just
+        // because the new event/agreement tables have no row yet.
+        return MedicationDoseSlot::query()->where('client_id', $order->client_id)
+            ->where('client_medication_id', $order->id)->whereNull('superseded_at')
+            ->whereDate('nz_date', $at->setTimezone('Pacific/Auckland')->toDateString())
+            ->where('self_managed', true)->exists() ? 'self_managed' : 'staff_given';
+    }
+
+    /** Read existing recorded support, without inventing a formal agreement. */
+    private function legacyMode(?MedicationSelfAdminAssessment $assessment, int $medicationId): ?string
+    {
+        if ($assessment?->status !== 'completed') {
+            return null;
+        }
+        $entry = collect($assessment->med_scope ?? [])->firstWhere('med_id', $medicationId);
+
+        return in_array($entry['scope'] ?? null, SupportMode::MODES, true) ? $entry['scope'] : null;
     }
 
     /** Public component/payload contract for P02 and the read-only care-plan summary. */
@@ -66,6 +92,11 @@ final class MedicationSupport
             ->get()->groupBy('client_id');
         $all = ClientMedication::query()->active()->whereIn('client_id', $ids)->orderBy('name')->get();
         $medicines = $all->groupBy('client_id');
+        $legacySelfManaged = MedicationDoseSlot::query()->join('client_medications as legacy_order', 'legacy_order.id', '=', 'medication_dose_slots.client_medication_id')
+            ->whereColumn('legacy_order.client_id', 'medication_dose_slots.client_id')
+            ->whereIn('medication_dose_slots.client_medication_id', $all->pluck('id'))
+            ->whereNull('medication_dose_slots.superseded_at')->whereDate('nz_date', now('Pacific/Auckland')->toDateString())
+            ->where('self_managed', true)->pluck('medication_dose_slots.client_medication_id')->flip();
         $changes = MedicationSupportChange::query()->whereIn('client_id', $ids)->whereIn('client_medication_id', $all->pluck('id'))
             ->where('effective_at', '<=', now('UTC'))
             ->whereNotExists(fn ($newer) => $newer->selectRaw('1')->from('medication_support_changes as newer')
@@ -79,7 +110,7 @@ final class MedicationSupport
         $agreements = MedicationSupportAgreement::query()->whereIn('id', $assessments->flatten(1)->pluck('support_agreement_id')->filter())->get()->keyBy('id');
         $reviews = app(SupportFollowupAdapter::class)->openForClients($ids, $viewer)->groupBy('client_id');
 
-        return $clients->map(function ($client) use ($viewer, $assessments, $medicines, $changes, $agreements, $reviews) {
+        return $clients->map(function ($client) use ($viewer, $assessments, $medicines, $changes, $agreements, $reviews, $legacySelfManaged) {
             $current = $assessments->get($client->id, collect());
             abort_if($current->count() > 1, 409, 'This support record needs reconciliation before it can be used.');
             $a = $current->first();
@@ -89,16 +120,28 @@ final class MedicationSupport
             }
 
             return $this->summaryFrom($client, $viewer, $a, $medicines->get($client->id, collect()),
-                $changes->get($client->id, collect())->keyBy('client_medication_id'), $agreement, $reviews->get($client->id, collect()));
+                $changes->get($client->id, collect())->keyBy('client_medication_id'), $agreement, $reviews->get($client->id, collect()), $legacySelfManaged);
         });
     }
 
-    private function summaryFrom(Client $client, User $viewer, ?MedicationSelfAdminAssessment $a, Collection $all, Collection $changes, ?MedicationSupportAgreement $agreement, Collection $reviews): array
+    private function summaryFrom(Client $client, User $viewer, ?MedicationSelfAdminAssessment $a, Collection $all, Collection $changes, ?MedicationSupportAgreement $agreement, Collection $reviews, Collection $legacySelfManaged): array
     {
         $visible = $all->filter(fn ($m) => ! $m->controlled_drug || $viewer->canDo('medications.controlled.view'));
         $scope = collect($a?->med_scope ?? [])->keyBy('med_id');
+        $modes = $visible->mapWithKeys(function ($m) use ($a, $changes, $legacySelfManaged) {
+            $change = $changes->get($m->id);
+            $legacy = $this->legacyMode($a, (int) $m->id) ?? ($legacySelfManaged->has($m->id) ? 'self_managed' : null);
+
+            return [$m->id => ['mode' => $change?->mode ?? $legacy ?? 'staff_given',
+                'legacy' => $change ? $change->reason === 'legacy_support_retained' : $legacy !== null]];
+        });
+        $legacyReview = ! $agreement && $modes->contains(fn ($row) => $row['legacy'] && SupportMode::needsAgreement($row['mode']));
         $today = now('Pacific/Auckland')->toDateString();
         $state = ! $a ? 'none' : ($reviews->isNotEmpty() ? 'reassess' : (! $a->reassessment_date ? 'unknown' : ($a->reassessment_date->toDateString() < $today ? 'overdue' : ($a->reassessment_date->toDateString() <= now('Pacific/Auckland')->addDays(30)->toDateString() ? 'soon' : 'current'))));
+
+        if ($legacyReview) {
+            $state = 'reassess';
+        }
 
         return [
             'client_id' => $client->id, 'client_name' => trim($client->first_name.' '.$client->last_name),
@@ -111,12 +154,13 @@ final class MedicationSupport
             ]), 'people_involved' => $a->people_involved ?? [], 'support_adjustments' => $a->support_adjustments ?? []] : null,
             'medicines' => $visible->map(fn ($m) => [
                 'id' => $m->id, 'name' => $m->name, 'dosage' => $m->dosage, 'controlled' => (bool) $m->controlled_drug,
-                'mode' => $changes->get($m->id)?->mode ?? 'staff_given', 'requested_mode' => $scope->get($m->id)['scope'] ?? null,
+                'mode' => $modes->get($m->id)['mode'], 'legacy_support' => $modes->get($m->id)['legacy'], 'requested_mode' => $scope->get($m->id)['scope'] ?? null,
                 'agreement_needed' => SupportMode::needsAgreement($scope->get($m->id)['scope'] ?? 'staff_given') && ! $agreement,
                 'is_prn' => (bool) $m->is_prn,
             ])->values()->all(),
             'concealed_count' => $all->count() - $visible->count(),
             'agreement' => $agreement ? [...$agreement->only(['id', 'agreed_by_role', 'agreed_by_name', 'method', 'witness_id', 'ordering_responsibility', 'person_responsibilities', 'staff_responsibilities', 'storage_notes', 'created_at']), 'attachment_url' => $agreement->attachment_path ? route('emar.support.agreement.file', $agreement) : null] : null,
+            'legacy_review_required' => $legacyReview,
             'agreement_needed' => ! $agreement && $visible->contains(fn ($m) => SupportMode::needsAgreement($scope->get($m->id)['scope'] ?? 'staff_given')),
             'reviews' => $reviews->all(),
             'can_assess' => $viewer->canDo('medications.orders.manage'),
@@ -142,6 +186,7 @@ final class MedicationSupport
             'reassessment_date' => now('Pacific/Auckland')->addMonthsNoOverflow($data['reassessment_interval_months'] ?? 12)->toDateString(),
         ]);
         $oldScope = collect($prior?->med_scope ?? [])->keyBy('med_id');
+        $priorAgreement = $this->agreement($prior);
         $orders = ClientMedication::query()->active()->where('client_id', $client->id)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
         $submitted = collect($data['med_scope'] ?? []);
         $this->assertSubmitted($submitted, $orders, $actor);
@@ -156,12 +201,17 @@ final class MedicationSupport
 
             return ['med_id' => $order->id, 'scope' => $mode];
         })->values()->all();
+        $previousModes = [];
         foreach ($scope as $entry) {
             $order = $orders->get($entry['med_id']);
             if ($order->controlled_drug && ! $this->canSetControlled($actor)) {
                 continue;
             }
-            if (SupportMode::loosens($entry['scope'], $this->mode($order)) && ! ($data['confirm_loosening'] ?? false)) {
+            $previousModes[$order->id] = $this->mode($order);
+            if (! $priorAgreement && SupportMode::needsAgreement($previousModes[$order->id]) && SupportMode::needsAgreement($entry['scope']) && $entry['scope'] !== $previousModes[$order->id]) {
+                throw ValidationException::withMessages(['med_scope' => 'Record the agreement before changing existing Self-managed or Prompt support. The recorded support stays in place.']);
+            }
+            if (SupportMode::loosens($entry['scope'], $previousModes[$order->id]) && ! ($data['confirm_loosening'] ?? false)) {
                 throw ValidationException::withMessages(['confirm_loosening' => 'Confirm that this reassessment loosens staff support.']);
             }
         }
@@ -173,8 +223,10 @@ final class MedicationSupport
             if ($order->controlled_drug && ! $this->canSetControlled($actor)) {
                 continue;
             }
-            $effective = SupportMode::needsAgreement($entry['scope']) && ! $agreement ? 'staff_given' : $entry['scope'];
-            $this->change($order, $assessment, $actor, $effective, 'assessment');
+            $retainedLegacy = ! $priorAgreement && ! $agreement && SupportMode::needsAgreement($entry['scope'])
+                && ($previousModes[$order->id] ?? null) === $entry['scope'];
+            $effective = SupportMode::needsAgreement($entry['scope']) && ! $agreement && ! $retainedLegacy ? 'staff_given' : $entry['scope'];
+            $this->change($order, $assessment, $actor, $effective, $retainedLegacy ? 'legacy_support_retained' : 'assessment', previousMode: $previousModes[$order->id] ?? null);
         }
 
         return $assessment;
@@ -269,11 +321,11 @@ final class MedicationSupport
         app(SupportFollowupAdapter::class)->request($assessment, $kind, $sourceKey, $reason);
     }
 
-    private function change(ClientMedication $order, MedicationSelfAdminAssessment $assessment, User $actor, string $mode, string $reason, ?string $notes = null, ?CarbonImmutable $occurred = null): void
+    private function change(ClientMedication $order, MedicationSelfAdminAssessment $assessment, User $actor, string $mode, string $reason, ?string $notes = null, ?CarbonImmutable $occurred = null, ?string $previousMode = null): void
     {
         MedicationSupportChange::create([
             'client_id' => $order->client_id, 'client_medication_id' => $order->id, 'assessment_id' => $assessment->id,
-            'previous_mode' => $this->mode($order), 'mode' => $mode, 'reason' => $reason, 'notes' => $notes,
+            'previous_mode' => $previousMode ?? $this->mode($order), 'mode' => $mode, 'reason' => $reason, 'notes' => $notes,
             'recorded_by' => $actor->id, 'occurred_at' => ($occurred ?? CarbonImmutable::now('UTC'))->utc(), 'effective_at' => now('UTC'),
         ]);
     }
