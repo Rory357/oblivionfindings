@@ -4,6 +4,7 @@ namespace App\Services\Medication\Reviews;
 
 use App\Models\AppSetting;
 use App\Models\Client;
+use App\Models\MedicationReviewEvent;
 use App\Models\MedicationSettingChange;
 use App\Services\Medication\Settings\MedicationSettingDefinition;
 use App\Services\Medication\Settings\MedicationSettingGroup;
@@ -46,6 +47,18 @@ final class MedicationReviewCadence
         $own = $client->medication_review_interval_months;
         $org = $this->organisation();
 
-        return ['months' => $own !== null ? (int) $own : $org['months'], 'own' => $own !== null, 'reviewed' => $own !== null || $org['reviewed']];
+        if ($own === null) {
+            return ['months' => $org['months'], 'own' => false, 'reviewed' => $org['reviewed']];
+        }
+
+        // A value carried forward from the old chart field has no recorded
+        // approval. Only the latest real interval decision can mark it reviewed.
+        $decision = MedicationReviewEvent::query()->where('client_id', $client->id)
+            ->whereNull('review_id')->where('event', 'interval_changed')->latest('id')->first();
+        $reviewed = $decision !== null && $decision->actor_id !== null
+            && ($decision->details['to_months'] ?? null) !== null
+            && (int) $decision->details['to_months'] === (int) $own;
+
+        return ['months' => (int) $own, 'own' => true, 'reviewed' => $reviewed];
     }
 }
