@@ -219,8 +219,8 @@ final class DowntimePackService
             'site' => $site, 'people' => $people, 'orders' => $orders,
             'stocks' => $this->boundedEvidence($reads, ClientMedicationStock::query()->whereIn('client_medication_id', $orderIds)->orderBy('id')->select(['id', 'client_medication_id', 'on_hand', 'unit']), self::MAX_ORDERS),
             'rules' => $this->boundedEvidence($reads, MedicationAdminRule::query()->orderBy('id')->select(['id', 'site_id', 'match_type', 'match_value', 'requires_countersign', 'required_observations', 'active', 'updated_at']), self::MAX_ORDERS),
-            'allergies' => $this->boundedEvidence($reads, MedicationAllergy::query()->whereIn('client_id', $clientIds)->orderBy('id')->select(['id', 'client_id', 'allergen', 'severity', 'reaction']), self::MAX_DOSES),
-            'profiles' => $this->boundedEvidence($reads, ClientMedicalProfile::query()->whereIn('client_id', $clientIds)->orderBy('id')->select(['id', 'client_id', 'allergies']), self::MAX_PEOPLE),
+            'allergies' => $this->boundedEvidence($reads, MedicationAllergy::query()->whereIn('client_id', $clientIds)->orderBy('id')->select(['id', 'client_id', 'allergen', 'severity', 'reaction', 'notes', 'identified_date', 'identified_by']), self::MAX_DOSES),
+            'profiles' => $this->boundedEvidence($reads, ClientMedicalProfile::query()->whereIn('client_id', $clientIds)->orderBy('id')->select(['id', 'client_id', 'allergies', 'allergy_records', 'allergies_canonical_at']), self::MAX_PEOPLE),
             'slots' => $this->boundedEvidence($reads, DB::table('medication_dose_slots')->whereIn('client_id', $clientIds)->where('nz_date', $day)->orderBy('id')
                 ->select(['id', 'client_id', 'client_medication_id', 'schedule_version_id', 'nz_date', 'ordered_time', 'due_at', 'controlled', 'order_change_pending',
                     'dst_adjustment', 'self_managed', 'last_day', 'reconstructed', 'outcome', 'outcome_administration_id', 'outcome_at', 'superseded_at']), self::MAX_DOSES),

@@ -4,6 +4,7 @@ namespace Tests\Feature\Emar;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
+use App\Models\ClientMedicalProfile;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationAdminRule;
@@ -561,6 +562,31 @@ class MedicationDowntimeTest extends TestCase
             $response->assertConflict();
             $this->assertStringNotContainsString('%PDF-sensitive', $response->getContent());
         }
+        $this->assertSame(0, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
+    }
+
+    public function test_changed_canonical_allergy_reaction_during_render_releases_no_bytes_or_export_event(): void
+    {
+        $this->assertCanonicalAllergyEditWithheld('reaction', 'Anaphylaxis');
+    }
+
+    public function test_changed_canonical_allergy_severity_during_render_releases_no_bytes_or_export_event(): void
+    {
+        $this->assertCanonicalAllergyEditWithheld('severity', 'life_threatening');
+    }
+
+    private function assertCanonicalAllergyEditWithheld(string $field, string $value): void
+    {
+        $entry = ['key' => (string) Str::uuid(), 'allergen' => 'Synthetic allergen', 'reaction' => 'Rash', 'severity' => 'mild'];
+        $profile = ClientMedicalProfile::query()->create([
+            'client_id' => $this->client->id, 'allergies' => ['Synthetic allergen'],
+            'allergy_records' => [$entry], 'allergies_canonical_at' => now(),
+        ]);
+        $this->fakePackRender(fn () => $profile->update(['allergy_records' => [[...$entry, $field => $value]]]));
+        $response = $this->actingAs($this->lead)->postJson('/emar/downtime/pack', ['site_id' => $this->site->id, 'nz_date' => '2026-10-03']);
+        $response->assertConflict();
+        $this->assertSame(['Synthetic allergen'], $profile->fresh()->allergies);
+        $this->assertStringNotContainsString('%PDF-sensitive', $response->getContent());
         $this->assertSame(0, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
     }
 
