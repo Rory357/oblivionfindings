@@ -9,6 +9,7 @@ use App\Models\ClientMedicationAdministration;
 use App\Models\ServiceContext;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
+use App\Services\Medication\Reporting\MedicationReportPeriod;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -316,12 +317,7 @@ class MedicationsReportController extends Controller
             'discrepancy_status' => ['nullable', 'in:open,under_review,closed'],
         ]);
 
-        $dateFrom = isset($filters['date_from']) && $filters['date_from']
-            ? Carbon::parse($filters['date_from'])->startOfDay()
-            : now()->subDays(14)->startOfDay();
-        $dateTo = isset($filters['date_to']) && $filters['date_to']
-            ? Carbon::parse($filters['date_to'])->endOfDay()
-            : now()->endOfDay();
+        [$dateFrom, $dateTo] = MedicationReportPeriod::fromRequest($request)->bounds();
         [, $readerSiteIds] = $this->readerSiteIds($request, $filters, true);
 
         $q = $this->governanceScope->scopeCanonicalClientMedicationRows(
@@ -354,7 +350,7 @@ class MedicationsReportController extends Controller
         return response()->streamDownload(function () use ($q) {
             $out = fopen('php://output', 'w');
             $this->putCsv($out, [
-                'Reported At',
+                'Reported At (Pacific/Auckland)',
                 'Status',
                 'Client',
                 'Medication',
@@ -365,7 +361,7 @@ class MedicationsReportController extends Controller
                 'Reported By',
                 'Witnessed By',
                 'Service Context',
-                'Resolved At',
+                'Resolved At (Pacific/Auckland)',
                 'Resolved By',
                 'Resolution Notes',
                 'Notes',
@@ -375,7 +371,7 @@ class MedicationsReportController extends Controller
                 foreach ($rows as $d) {
                     $clientName = trim(($d->client?->first_name ?? '').' '.($d->client?->last_name ?? ''));
                     $this->putCsv($out, [
-                        optional($d->reported_at)->toDateTimeString(),
+                        $d->reported_at?->timezone('Pacific/Auckland')->format('Y-m-d H:i:s T'),
                         $d->status,
                         $clientName,
                         $d->medication?->name ?? '',
@@ -386,7 +382,7 @@ class MedicationsReportController extends Controller
                         $d->reportedBy?->name ?? '',
                         $d->witnessedBy?->name ?? '',
                         $d->serviceContext?->name ?? '',
-                        optional($d->resolved_at)->toDateTimeString(),
+                        $d->resolved_at?->timezone('Pacific/Auckland')->format('Y-m-d H:i:s T'),
                         $d->resolvedBy?->name ?? '',
                         $d->resolution_notes,
                         $d->notes,
