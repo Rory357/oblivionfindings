@@ -1803,10 +1803,12 @@ class MedicationControllerTest extends TestCase
 
         $this->actingAs($this->providerManager)
             ->post("/clients/{$this->client->id}/break-glass", [
+                'reason_category' => 'Covering an absence', 'authorization_mode' => 'self',
+                'acknowledged_min_necessary' => true, 'acknowledged_incident_report' => true,
                 'reason' => 'Emergency medication query',
             ])
             ->assertRedirect()
-            ->assertSessionHas('success');
+            ->assertSessionHasNoErrors()->assertSessionHas('success');
 
         $access = ClientBreakGlassAccess::where('client_id', $this->client->id)
             ->where('user_id', $this->providerManager->id)
@@ -1825,11 +1827,13 @@ class MedicationControllerTest extends TestCase
 
         $this->actingAs($this->providerManager)
             ->post("/clients/{$this->client->id}/break-glass", [
+                'reason_category' => 'Covering an absence', 'authorization_mode' => 'self',
+                'acknowledged_min_necessary' => true, 'acknowledged_incident_report' => true,
                 'reason' => 'Extended review needed',
                 'minutes' => 120,
             ])
             ->assertRedirect()
-            ->assertSessionHas('success');
+            ->assertSessionHasNoErrors()->assertSessionHas('success');
 
         $access = ClientBreakGlassAccess::where('client_id', $this->client->id)->first();
         $minutesUntilExpiry = now()->diffInMinutes($access->expires_at, false);
@@ -1955,9 +1959,11 @@ class MedicationControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->delete("/clients/{$this->client->id}/break-glass/{$access->id}")
+            ->delete("/clients/{$this->client->id}/break-glass/{$access->id}", ['reason' => 'Covering staff have arrived; emergency access can end.'])
             ->assertRedirect()
-            ->assertSessionHas('success');
+            ->assertSessionHasNoErrors()->assertSessionHas('success');
+        $this->assertFalse(ClientBreakGlassAccess::withTrashed()->findOrFail($access->id)->isRunning());
+        $this->assertSame('Covering staff have arrived; emergency access can end.', ClientBreakGlassAccess::withTrashed()->findOrFail($access->id)->end_reason);
 
         // Soft-deleted for the audit trail, not hard-erased.
         $this->assertSoftDeleted('client_break_glass_accesses', ['id' => $access->id]);
@@ -1975,9 +1981,11 @@ class MedicationControllerTest extends TestCase
         // Coordinator has breakglass but is not the owner, not admin/provider_manager
         // However coordinator has medications.audit.view so they should be able to revoke
         $this->actingAs($this->coordinator)
-            ->delete("/clients/{$this->client->id}/break-glass/{$access->id}")
+            ->delete("/clients/{$this->client->id}/break-glass/{$access->id}", ['reason' => 'Covering staff have arrived; emergency access can end.'])
             ->assertRedirect()
-            ->assertSessionHas('success');
+            ->assertSessionHasNoErrors()->assertSessionHas('success');
+        $this->assertFalse(ClientBreakGlassAccess::withTrashed()->findOrFail($access->id)->isRunning());
+        $this->assertSame('Covering staff have arrived; emergency access can end.', ClientBreakGlassAccess::withTrashed()->findOrFail($access->id)->end_reason);
     }
 
     public function test_break_glass_destroy_returns_404_for_mismatched_client(): void
