@@ -304,9 +304,9 @@ class WorkerMedsTodayPayloadTest extends TestCase
 
         $this->actingAs($worker)->get('/meds/today')->assertOk();
 
-        $adminQueries = collect(DB::getQueryLog())
-            ->filter(fn (array $entry) => str_contains($entry['query'], 'client_medication_administrations'))
-            ->count();
+        $administrationReads = collect(DB::getQueryLog())
+            ->filter(fn (array $entry) => str_contains($entry['query'], 'client_medication_administrations'));
+        $adminQueries = $administrationReads->count();
 
         DB::disableQueryLog();
 
@@ -315,7 +315,7 @@ class WorkerMedsTodayPayloadTest extends TestCase
         // follow-ups) and the sidebar overdue-badge window query in
         // HandleInertiaRequests (cached for 60s after this first load).
         // Before F1 the list issued one administration query PER SLOT.
-        $this->assertSame(2, $adminQueries);
+        $this->assertSame(2, $adminQueries, $administrationReads->pluck('query')->implode(PHP_EOL));
     }
 
     public function test_sidebar_badge_keeps_an_overnight_shift_after_midnight(): void

@@ -238,15 +238,15 @@ it('matches every dose slot with a single administration query (no N+1)', functi
             ->assertOk()
             ->assertInertia(fn ($page) => $page->has('medications_due', 6));
 
-        $adminQueries = collect(DB::getQueryLog())
-            ->filter(fn ($entry) => str_contains($entry['query'], 'client_medication_administrations'))
-            ->count();
+        $administrationReads = collect(DB::getQueryLog())
+            ->filter(fn ($entry) => str_contains($entry['query'], 'client_medication_administrations'));
+        $adminQueries = $administrationReads->count();
     } finally {
         DB::disableQueryLog();
         DB::flushQueryLog();
     }
 
-    expect($adminQueries)->toBe(1);
+    $this->assertSame(1, $adminQueries, $administrationReads->pluck('query')->implode(PHP_EOL));
 })->group('my-day');
 
 it('does not disclose shift medications without an exact medication capability', function () {
