@@ -819,10 +819,13 @@ class MedicationOrderLifecycleTest extends TestCase
             $version->fresh()->medication?->historicalDisplayName(),
         );
 
-        $csv = $this->actingAs($this->manager)
-            ->get('/emar/reports/export?report_type=administration&client_id='.$this->client->id)
+        $reportPermissions = Permission::query()->whereIn('key', ['medications.reports.view', 'medications.reports.export'])->pluck('id');
+        $this->assertCount(2, $reportPermissions);
+        $this->manager->permissionOverrides()->syncWithoutDetaching($reportPermissions->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])->all());
+        $csv = $this->actingAs($this->manager->refresh())
+            ->postJson(route('emar.reports.export'), ['type' => 'doses', 'period' => 'today', 'client_id' => $this->client->id, 'purpose' => 'audit'])
             ->assertOk()
-            ->streamedContent();
+            ->getContent();
         $this->assertStringContainsString(
             'Legacy retained administration order (legacy removed order)',
             $csv,

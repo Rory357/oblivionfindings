@@ -121,11 +121,21 @@ it('offers the guarded downtime pack only within the existing clinical export bo
 });
 
 it('rejects a multi-person PDF when an included person moves during rendering', function () {
-    p09Medicine($this->person);
+    $now = Carbon::getTestNow();
+    Carbon::setTestNow(Carbon::parse('2026-09-28 12:00', 'Pacific/Auckland')->utc());
+    try {
+        p09Medicine($this->person);
+    } finally {
+        Carbon::setTestNow($now);
+    }
     $other = Site::factory()->create(['is_active' => true]);
     $renderer = Mockery::mock(Barryvdh\DomPDF\PDF::class);
     Pdf::shouldReceive('setOption')->once()->andReturn($renderer);
-    $renderer->shouldReceive('loadView')->once()->andReturnSelf();
+    $renderer->shouldReceive('loadView')->once()->with('pdf.medication-report', Mockery::on(function (array $payload) {
+        expect(collect($payload['evidence']['rows'])->pluck(0)->all())->toContain($this->person->full_name);
+
+        return true;
+    }))->andReturnSelf();
     $renderer->shouldReceive('setPaper')->once()->andReturnSelf();
     $renderer->shouldReceive('output')->once()->andReturnUsing(function () use ($other) {
         $this->person->update(['site_id' => $other->id]);
