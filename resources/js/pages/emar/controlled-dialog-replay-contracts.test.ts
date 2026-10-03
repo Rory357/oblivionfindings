@@ -323,30 +323,31 @@ describe('controlled mutation dialog replay contracts', () => {
             'client_request_uuid: crypto.randomUUID()',
         );
         expect(shiftMedicationSource).toContain(
-            'uuid: createOfflineRequestUuid()',
+            "import { RecordDoseDialog } from '@/components/emar/record-dose/record-dose-dialog'",
+        );
+        expect(shiftMedicationSource).toContain('<RecordDoseDialog');
+        expect(shiftMedicationSource).toContain(
+            'orderId: activeRow.medication.id',
         );
         expect(shiftMedicationSource).toContain(
-            'fingerprint: null as string | null',
+            'scheduledFor: activeRow.scheduled_for!',
         );
-        expect(shiftMedicationSource).toContain('materialFingerprint');
+        expect(shiftMedicationSource).toContain('entry="shift"');
+        expect(shiftMedicationSource).toContain('shiftContext={{');
+        expect(shiftMedicationSource).toContain('shiftId,');
         expect(shiftMedicationSource).toContain(
-            'client_request_uuid: administrationReplay.current.uuid',
+            'activeRow.medication.scan_verification',
+        );
+        expect(shiftMedicationSource).toContain(
+            "if (result.status !== 'queued')",
+        );
+        expect(shiftMedicationSource).toContain(
+            'router.reload({ preserveScroll: true })',
         );
         expect(shiftMedicationSource).not.toContain(
             'client_request_uuid: crypto.randomUUID()',
         );
-        expect(shiftMedicationSource).toContain("witness_credential: ''");
-        expect(shiftMedicationSource).toContain('<WitnessPinInput');
         expect(shiftMedicationSource).not.toContain('password or PIN');
-        expect(shiftMedicationSource).toContain(
-            'witness_credential: witnessCredential',
-        );
-        expect(shiftMedicationSource).toContain(
-            'allowQueueWhenOffline: !needsWitness',
-        );
-        expect(shiftMedicationSource).toContain(
-            'if (!emarMutationWasAccepted(result.status))',
-        );
     });
 
     it('blocks witness-gated quick PRN actions and gives queueable actions a payload-aware UUID', () => {
