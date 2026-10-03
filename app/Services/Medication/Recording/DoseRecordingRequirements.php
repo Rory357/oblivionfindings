@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationAdminRule;
+use App\Models\MedicationRefusalFollowup;
 use App\Models\Shift;
 use App\Models\User;
 use App\Services\MarScheduleService;
@@ -15,10 +16,12 @@ use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\ControlledMedicationTransportWitnessService;
 use App\Services\Medication\DoseSlots\DoseOrderTimelineFactory;
 use App\Services\Medication\DoseSlots\DoseWindowResolver;
+use App\Services\Medication\ForgottenWitnessPinService;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationCompetencyRestrictionRules;
 use App\Services\Medication\MedicationSecondPersonService;
 use App\Services\Medication\MedicationRecordAccess;
+use App\Services\Medication\MedicationSafetyPolicySettings;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Medication\Settings\MedicineRuleWording;
 use App\Services\Medication\WitnessPinService;
@@ -302,6 +305,12 @@ final class DoseRecordingRequirements
             'competency' => $competency,
             'second_person' => [
                 'kind' => $kind,
+                // PIN-2 stays off until its own-login consumer and expiry job
+                // are integrated; the recorder never advertises a dead flow.
+                'forgotten_pin_allowed' => app(ForgottenWitnessPinService::class)->available()
+                    && ! $order->controlled_drug
+                    && in_array($kind, [RecordingContract::SECOND_RULE, RecordingContract::SECOND_AMOUNT, RecordingContract::SECOND_COSIGNER], true),
+                'confirm_within_minutes' => ForgottenWitnessPinService::CONFIRM_WITHIN_MINUTES,
                 'rule_sentences' => $detail && $kind === RecordingContract::SECOND_RULE
                     ? $this->ruleSentences($adminRules, true)
                     : [],
@@ -687,7 +696,7 @@ final class DoseRecordingRequirements
                 'source' => $match['details']['source'] ?? null,
                 'severity' => $match['details']['severity'] ?? null,
             ],
-            'rule' => app(\App\Services\Medication\MedicationSafetyPolicySettings::class)->profileAllergyMatch(),
+            'rule' => app(MedicationSafetyPolicySettings::class)->profileAllergyMatch(),
         ];
     }
 
@@ -839,7 +848,7 @@ final class DoseRecordingRequirements
             return null;
         }
 
-        $followUp = \App\Models\MedicationRefusalFollowup::query()
+        $followUp = MedicationRefusalFollowup::query()
             ->whereIn('client_medication_administration_id', array_values(array_unique([$rootId, (int) $existing->id])))
             ->whereNull('follow_up_completed_at')
             ->latest('id')

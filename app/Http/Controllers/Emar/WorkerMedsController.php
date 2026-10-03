@@ -842,6 +842,7 @@ class WorkerMedsController extends Controller
                             'more_severity',
                             'more_immediate_action',
                             'second_person_unavailable',
+                            'second_person_pin_forgotten',
                             'effect_check_due_at',
                         ]),
                         ...$scan,

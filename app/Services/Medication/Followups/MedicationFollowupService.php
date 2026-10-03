@@ -164,7 +164,11 @@ final class MedicationFollowupService
                     ['outcome' => $refusal->follow_up_outcome], $this->instant($refusal, 'follow_up_completed_at'));
             }
         }
-        if ($administration->review_required && filled($administration->review_reason_key)) {
+        // PIN-2 no/expiry already owns one canonical disputed follow-up.
+        if ($administration->review_required && filled($administration->review_reason_key)
+            && ! in_array($administration->review_reason_key, [
+                'second_person_disputed', 'second_person_confirmation_expired',
+            ], true)) {
             $type = str_contains($administration->review_reason_key, 'partial') ? 'partial' : 'unconfirmed';
             $this->ensure('dose-review:'.$administration->id, $type, $client, $medication,
                 $administration, null, $this->nextShiftEnd($client, $administration),
@@ -541,7 +545,13 @@ final class MedicationFollowupService
 
             return $row;
         }
-        $row->loadMissing(['client', 'medication', 'administration']);
+        // Source expiry still closes durable work after a parent is deleted.
+        // Reader projections retain their normal soft-delete/privacy scopes.
+        $row->setRelation('client', Client::withTrashed()->findOrFail($row->client_id));
+        $row->setRelation('medication', $row->client_medication_id
+            ? ClientMedication::withTrashed()->findOrFail($row->client_medication_id) : null);
+        $row->setRelation('administration', $row->administration_id
+            ? ClientMedicationAdministration::withTrashed()->findOrFail($row->administration_id) : null);
         if ($row->type === 'confirm' && in_array($outcome, ['no', 'expired'], true)) {
             $this->ensure('disputed:'.$row->id, 'disputed', $row->client, $row->medication,
                 $row->administration, null, $row->administration ? $this->nextShiftEnd($row->client, $row->administration) : null,
@@ -554,7 +564,7 @@ final class MedicationFollowupService
             actorId: $actor ? (int) $actor->id : null, occurredAt: CarbonImmutable::now('UTC'),
             summary: 'Medication follow-up completed in its source workflow.',
             facts: ['outcome' => $outcome, 'revision' => $row->revision],
-            clientId: (int) $row->client_id, controlled: (bool) $row->medication?->controlled_drug,
+            clientId: $row->client->trashed() ? null : (int) $row->client_id, controlled: (bool) $row->medication?->controlled_drug,
         );
         if ($auditEvents !== null) {
             $auditEvents[] = $audit;

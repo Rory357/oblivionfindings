@@ -18,6 +18,8 @@ use App\Models\User;
 use App\Services\Medication\DoseSlots\DoseOrderTimelineFactory;
 use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
+use App\Services\Medication\Followups\MedicationFollowupService;
+use App\Services\Medication\ForgottenWitnessPinService;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationCompetencyRestrictionRules;
 use App\Services\Medication\MedicationGovernanceScopeService;
@@ -57,6 +59,7 @@ class EnhancedMarService
         protected MedicationGovernanceScopeService $medicationGovernanceScope,
         protected MedicationCompetencyRestrictionRules $competencyRestrictions,
         protected RecordingContractEnforcer $recordingContract,
+        protected ForgottenWitnessPinService $forgottenPins,
     ) {
         $this->scheduleService = $scheduleService;
         $this->safetyService = $safetyService;
@@ -1052,18 +1055,32 @@ class EnhancedMarService
                 // medication row is locked. The shared governance service then
                 // locks the witness and their current Site staff profile in this
                 // same transaction before any administration or stock write.
-                $witnessValidation = $secondPersonUnconfirmed ? ['success' => true] : $this->validateWitness(
-                    $client,
-                    $medication,
-                    $currentAdminRules,
-                    $data,
-                    $userId,
-                    $adminAt,
-                    $lockedAuthorizationUsers,
-                    $lockedPresenceShifts,
-                    $requiresCosigner,
-                    $secondPersonKind === RecordingContract::SECOND_AMOUNT,
-                );
+                $forgottenPin = filter_var($data['second_person_pin_forgotten'] ?? false, FILTER_VALIDATE_BOOL);
+                if ($forgottenPin && $secondPersonUnconfirmed) {
+                    throw ValidationException::withMessages([
+                        'witnessed_by' => 'Choose the eligible colleague who was there, or use the separate nobody-on-shift option.',
+                    ]);
+                }
+                if ($forgottenPin) {
+                    $witnessValidation = $this->forgottenPins->prepare(
+                        $lockedActor, $client, $medication, $secondPersonKind,
+                        (int) ($data['witnessed_by'] ?? 0), $adminAt,
+                        $lockedAuthorizationUsers, $lockedPresenceShifts,
+                    );
+                } else {
+                    $witnessValidation = $secondPersonUnconfirmed ? ['success' => true] : $this->validateWitness(
+                        $client,
+                        $medication,
+                        $currentAdminRules,
+                        $data,
+                        $userId,
+                        $adminAt,
+                        $lockedAuthorizationUsers,
+                        $lockedPresenceShifts,
+                        $requiresCosigner,
+                        $secondPersonKind === RecordingContract::SECOND_AMOUNT,
+                    );
+                }
                 if (! ($witnessValidation['success'] ?? false)) {
                     return $witnessValidation;
                 }
@@ -1336,7 +1353,7 @@ class EnhancedMarService
                 $admin->client_medication_id = $medication->id;
                 $admin->shift_id = $shiftId;
                 $admin->administered_by = $userId;
-                $admin->witnessed_by = $witnessValidation['witnessed_by'] ?? null;
+                $admin->witnessed_by = $forgottenPin ? null : ($witnessValidation['witnessed_by'] ?? null);
                 $admin->witnessed_at = $witnessValidation['witnessed_at'] ?? null;
                 $admin->witness_method = $witnessValidation['witness_method'] ?? null;
                 $admin->scheduled_for = $scheduledFor?->copy()->utc();
@@ -1376,6 +1393,7 @@ class EnhancedMarService
                 $admin->second_person_status = match (true) {
                     $secondPersonKind === null => null,
                     $secondPersonUnconfirmed => RecordingContract::SECOND_NOT_CONFIRMED,
+                    $forgottenPin => RecordingContract::SECOND_NOT_VERIFIED,
                     default => RecordingContract::SECOND_VERIFIED,
                 };
                 if ($secondPersonUnconfirmed) {
@@ -1413,6 +1431,13 @@ class EnhancedMarService
                 }
 
                 $admin->save();
+
+                $secondPersonNomination = null;
+                if ($forgottenPin) {
+                    $admin->setRelation('client', $client);
+                    $admin->setRelation('medication', $medication);
+                    $secondPersonNomination = $this->forgottenPins->start($admin, $witnessValidation);
+                }
 
                 if ($overrideAudit !== null) {
                     AuditLogger::logOrFail(
@@ -1463,7 +1488,7 @@ class EnhancedMarService
                     $this->recordingContract->raiseMoreThanOrderedError($client, $medication, $admin, $lockedActor, $data);
                 }
 
-                app(\App\Services\Medication\Followups\MedicationFollowupService::class)->syncAdministration($admin);
+                app(MedicationFollowupService::class)->syncAdministration($admin);
 
                 AuditLogger::logOrFail('medications.administration.record', $admin, [
                     'actor_id' => $userId,
@@ -1491,13 +1516,18 @@ class EnhancedMarService
                     $requestFingerprint,
                 );
 
+                // P09 Site head is locked only after domain writes and receipt.
+                if ($secondPersonNomination !== null) {
+                    $this->forgottenPins->appendEvent($secondPersonNomination, $admin, $userId);
+                }
+
                 return [
                     'success' => true,
                     'administration' => $admin,
                     'safety_check' => $safetyCheck,
                     'prn_over_limit_attempt' => $prnOverLimitAttempt,
                 ];
-            }, 3);
+            }, 5);
         } catch (QueryException $exception) {
             if ($clientRequestUuid === null) {
                 throw $exception;
@@ -1951,6 +1981,7 @@ class EnhancedMarService
             'queued_offline',
             'scan_verified',
             'second_person_unavailable',
+            'second_person_pin_forgotten',
         ], true)) {
             return filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? (bool) $value;
         }
