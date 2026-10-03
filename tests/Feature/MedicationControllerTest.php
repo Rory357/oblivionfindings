@@ -398,28 +398,33 @@ class MedicationControllerTest extends TestCase
 
     public function test_audit_index_accessible_by_admin(): void
     {
-        $this->actingAs($this->admin)
-            ->get('/medications/audit')
+        $this->p09ControllerCanonicalRead($this->admin, '/medications/audit')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->component('medications/audit')
-                ->has('logs')
+                ->component('emar/reports/hub')
+                ->where('filters.view', 'audit')
+                ->where('can.audit', true)
+                ->has('page.data')
                 ->has('filters')
             );
     }
 
     public function test_audit_index_accessible_by_coordinator(): void
     {
-        $this->actingAs($this->coordinator)
-            ->get('/medications/audit')
-            ->assertOk();
+        $actor = $this->p09ControllerReportActor($this->coordinator);
+        $this->p09ControllerCanonicalRead($actor, '/medications/audit')
+            ->assertOk()->assertInertia(fn ($page) => $page
+                ->component('emar/reports/hub')
+                ->where('filters.view', 'audit')->where('can.audit', true));
     }
 
     public function test_audit_index_accessible_by_auditor(): void
     {
-        $this->actingAs($this->auditor)
-            ->get('/medications/audit')
-            ->assertOk();
+        $actor = $this->p09ControllerReportActor($this->auditor);
+        $this->p09ControllerCanonicalRead($actor, '/medications/audit')
+            ->assertOk()->assertInertia(fn ($page) => $page
+                ->component('emar/reports/hub')
+                ->where('filters.view', 'audit')->where('can.audit', true));
     }
 
     public function test_audit_index_forbidden_for_support_worker(): void
@@ -447,10 +452,27 @@ class MedicationControllerTest extends TestCase
 
     public function test_audit_export_accessible_by_admin(): void
     {
+        $medicine = $this->p09ControllerReportMedicine();
+        \App\Models\AuditLog::query()->create([
+            'client_id' => $this->client->id,
+            'user_id' => $this->admin->id,
+            'action' => 'Report fixture change',
+            'auditable_type' => ClientMedication::class,
+            'auditable_id' => $medicine->id,
+            'meta' => ['fields' => ['dosage'], 'history' => 'PRIVATE AUDIT HISTORY'],
+        ]);
         $this->actingAs($this->admin)
             ->get('/medications/audit/export')
-            ->assertOk()
-            ->assertHeader('content-type', 'text/csv; charset=utf-8');
+            ->assertSessionHasErrors('purpose');
+        $this->assertSame(0, \App\Models\MedicationEvent::where('kind', 'export.created')->count());
+        $csv = $this->get(route('medications.audit.export', ['purpose' => 'audit', 'client_id' => $this->client->id, 'period' => 'today']))
+            ->assertOk()->assertHeader('content-type', 'text/csv; charset=utf-8')->getContent();
+        $this->assertStringContainsString('Report fixture change', $csv);
+        $this->assertStringContainsString('dosage', $csv);
+        $this->assertStringNotContainsString('PRIVATE AUDIT HISTORY', $csv);
+        $event = \App\Models\MedicationEvent::where('kind', 'export.created')->sole();
+        $this->assertSame('Audit or inspection', $event->facts['purpose']);
+        $this->assertSame($this->client->id, $event->client_id);
     }
 
     public function test_audit_export_forbidden_for_support_worker(): void
@@ -462,9 +484,15 @@ class MedicationControllerTest extends TestCase
 
     public function test_audit_export_forbidden_for_auditor_without_export_permission(): void
     {
-        $this->actingAs($this->auditor)
-            ->get('/medications/audit/export')
+        $actor = $this->p09ControllerReportActor($this->auditor, ['medications.reports.view'], ['medications.audit.export']);
+        $this->assertTrue($actor->canDo('medications.audit.view'));
+        $this->assertFalse($actor->canDo('medications.audit.export'));
+        $this->actingAs($actor)
+            ->get(route('medications.audit.export', ['purpose' => 'audit']))
             ->assertForbidden();
+        $this->postJson(route('emar.reports.export'), ['type' => 'audit', 'period' => 'today', 'purpose' => 'audit'])
+            ->assertForbidden();
+        $this->assertSame(0, \App\Models\MedicationEvent::where('kind', 'export.created')->count());
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -478,16 +506,16 @@ class MedicationControllerTest extends TestCase
 
     public function test_reports_index_accessible_by_admin(): void
     {
-        $this->actingAs($this->admin)
-            ->get('/reports/medications')
+        $this->p09ControllerCanonicalRead($this->admin, '/reports/medications')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->component('reports/medications')
+                ->component('emar/reports/hub')
+                ->where('filters.report', 'doses')
                 ->has('filters')
-                ->has('clients')
-                ->has('service_contexts')
-                ->has('administrations')
-                ->has('discrepancies')
+                ->has('people')
+                ->has('sites')
+                ->has('page.data')
+                ->has('data.totals')
             );
     }
 
@@ -505,10 +533,16 @@ class MedicationControllerTest extends TestCase
 
     public function test_reports_mar_export_accessible_by_admin(): void
     {
-        $this->actingAs($this->admin)
-            ->get('/reports/medications/export-mar')
-            ->assertOk()
-            ->assertHeader('content-type', 'text/csv; charset=UTF-8');
+        $medicine = $this->p09ControllerReportMedicine(['name' => 'Ordinary export medicine']);
+        $this->p09ControllerReportAdministration($medicine);
+        $csv = $this->actingAs($this->admin)
+            ->get(route('reports.medications.export_mar', ['client_id' => $this->client->id, 'period' => 'today', 'purpose' => 'care']))
+            ->assertOk()->assertHeader('content-type', 'text/csv; charset=UTF-8')->getContent();
+        $this->assertStringContainsString('Ordinary export medicine', $csv);
+        $this->assertStringContainsString('given', $csv);
+        $event = \App\Models\MedicationEvent::where('kind', 'export.created')->sole();
+        $this->assertSame('Care and handover', $event->facts['purpose']);
+        $this->assertSame($this->client->id, $event->client_id);
     }
 
     public function test_reports_discrepancies_export_requires_authentication(): void
@@ -518,10 +552,23 @@ class MedicationControllerTest extends TestCase
 
     public function test_reports_discrepancies_export_accessible_by_admin(): void
     {
-        $this->actingAs($this->admin)
-            ->get('/reports/medications/export-controlled-discrepancies')
-            ->assertOk()
-            ->assertHeader('content-type', 'text/csv; charset=UTF-8');
+        $medicine = $this->p09ControllerReportMedicine(['name' => 'Controlled discrepancy export medicine', 'controlled_drug' => true]);
+        ClientControlledDrugDiscrepancy::query()->create([
+            'client_id' => $this->client->id,
+            'client_medication_id' => $medicine->id,
+            'reported_at' => now(),
+            'reported_by' => $this->admin->id,
+            'difference' => -1,
+            'status' => 'open',
+        ]);
+        $csv = $this->actingAs($this->admin)
+            ->get(route('reports.medications.export_discrepancies', ['client_id' => $this->client->id, 'period' => 'week', 'purpose' => 'audit']))
+            ->assertOk()->assertHeader('content-type', 'text/csv; charset=UTF-8')->getContent();
+        $this->assertStringContainsString('Controlled discrepancy export medicine', $csv);
+        $this->assertStringContainsString('open', $csv);
+        $event = \App\Models\MedicationEvent::where('kind', 'export.created')->sole();
+        $this->assertSame('Audit or inspection', $event->facts['purpose']);
+        $this->assertTrue($event->controlled);
     }
 
     public function test_reports_discrepancies_export_forbidden_for_support_worker(): void
@@ -2528,23 +2575,40 @@ class MedicationControllerTest extends TestCase
 
     public function test_coordinator_can_view_audit_log(): void
     {
-        $this->actingAs($this->coordinator)
-            ->get('/medications/audit')
-            ->assertOk();
+        $actor = $this->p09ControllerReportActor($this->coordinator);
+        $this->p09ControllerCanonicalRead($actor, '/medications/audit')
+            ->assertOk()->assertInertia(fn ($page) => $page
+                ->component('emar/reports/hub')
+                ->where('filters.view', 'audit')->where('can.history', true));
     }
 
     public function test_finance_user_can_view_reports(): void
     {
-        $this->actingAs($this->financeUser)
-            ->get('/reports/medications')
-            ->assertOk();
+        $actor = $this->p09ControllerReportActor($this->financeUser);
+        $medicine = $this->p09ControllerReportMedicine();
+        ClientMedicationStock::query()->create(['client_medication_id' => $medicine->id, 'on_hand' => 10, 'unit' => 'tablets']);
+        $this->p09ControllerCanonicalRead($actor, '/reports/medications')
+            ->assertOk()->assertInertia(fn ($page) => $page
+                ->component('emar/reports/hub')
+                ->where('finance', true)->where('filters.report', 'stock')
+                ->has('page.data', 1)->where('page.data.0.on_hand', 10)
+                ->missing('page.data.0.client_id')->missing('page.data.0.person')
+                ->missing('page.data.0.reference')->where('can.audit', false));
+        $this->get('/emar/reports?report=doses')->assertForbidden();
+        $this->get('/emar/reports?report=stock&client_id='.$this->client->id)->assertForbidden();
     }
 
-    public function test_auditor_with_general_report_permission_can_view_medication_reports(): void
+    public function test_auditor_needs_exact_medication_report_permission_beside_general_reporting_access(): void
     {
-        $this->actingAs($this->auditor)
-            ->get('/reports/medications')
-            ->assertOk();
+        $actor = $this->p09ControllerReportActor($this->auditor, ['reports.viewAny'], ['medications.reports.view']);
+        $this->assertTrue($actor->canDo('reports.viewAny'));
+        $this->assertFalse($actor->canDo('medications.reports.view'));
+        $this->actingAs($actor)->get('/reports/medications')->assertForbidden();
+        $this->get('/emar/reports')->assertForbidden();
+        $actor = $this->p09ControllerReportActor($actor);
+        $this->p09ControllerCanonicalRead($actor, '/reports/medications')
+            ->assertOk()->assertInertia(fn ($page) => $page
+                ->component('emar/reports/hub')->where('filters.report', 'doses'));
     }
 
     public function test_coordinator_can_manage_medications(): void
@@ -2639,10 +2703,11 @@ class MedicationControllerTest extends TestCase
         $from = '2025-01-01';
         $to = '2025-01-31';
 
-        $this->actingAs($this->admin)
-            ->get("/reports/medications?date_from={$from}&date_to={$to}")
+        $this->p09ControllerCanonicalRead($this->admin, route('reports.medications', ['period' => 'custom', 'date_from' => $from, 'date_to' => $to]))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
+                ->component('emar/reports/hub')
+                ->where('filters.period', 'custom')
                 ->where('filters.date_from', $from)
                 ->where('filters.date_to', $to)
             );
@@ -2650,21 +2715,33 @@ class MedicationControllerTest extends TestCase
 
     public function test_reports_index_applies_client_filter(): void
     {
-        $this->actingAs($this->admin)
-            ->get("/reports/medications?client_id={$this->client->id}")
+        Client::factory()->create(['site_id' => $this->site->id]);
+        $this->p09ControllerCanonicalRead($this->admin, route('reports.medications', ['client_id' => $this->client->id]))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('filters.client_id', (string) $this->client->id)
+                ->component('emar/reports/hub')
+                ->where('filters.client_id', $this->client->id)
+                ->has('page.data', 1)->where('page.data.0.client_id', $this->client->id)
             );
+        $foreign = Client::factory()->create(['site_id' => Site::factory()->create()->id]);
+        $actor = $this->p09ControllerReportActor($this->coordinator, ['medications.reports.view'], ['clinical.accessAllSites', 'sites.viewAll']);
+        $this->p09ControllerCanonicalRead($actor, route('reports.medications', ['client_id' => $foreign->id]))->assertNotFound();
+        $this->p09ControllerCanonicalRead($actor, route('reports.medications', ['client_id' => 999999]))->assertNotFound();
     }
 
-    public function test_reports_index_applies_status_filter(): void
+    public function test_reports_index_filters_dose_outcomes_by_the_canonical_event_kind(): void
     {
-        $this->actingAs($this->admin)
-            ->get('/reports/medications?status=refused')
+        $this->p09ControllerReportEvent('dose.given', 'Dose given fixture');
+        $refused = $this->p09ControllerReportEvent('dose.refused', 'Dose refused fixture');
+        // Individual outcomes are now filtered in the event list. The dose
+        // report is a per-person total, so its former status prop is retired.
+        $this->p09ControllerCanonicalRead($this->admin, route('reports.medications', ['view' => 'audit', 'period' => 'today', 'kind' => 'dose.refused']))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('filters.status', 'refused')
+                ->component('emar/reports/hub')
+                ->where('filters.view', 'audit')->where('filters.kind', 'dose.refused')
+                ->has('page.data', 1)->where('page.data.0.id', $refused->id)
+                ->where('page.data.0.kind', 'dose.refused')
             );
     }
 
@@ -2674,14 +2751,101 @@ class MedicationControllerTest extends TestCase
 
     public function test_audit_index_applies_filters(): void
     {
-        $this->actingAs($this->admin)
-            ->get("/medications/audit?client_id={$this->client->id}&from=2025-01-01&to=2025-12-31")
+        $this->p09ControllerCanonicalRead($this->admin, route('medications.audit.index', ['client_id' => $this->client->id, 'period' => 'custom', 'date_from' => '2025-01-01', 'date_to' => '2025-12-31']))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('filters.client_id', (string) $this->client->id)
-                ->where('filters.from', '2025-01-01')
-                ->where('filters.to', '2025-12-31')
+                ->component('emar/reports/hub')->where('filters.view', 'audit')
+                ->where('filters.client_id', $this->client->id)
+                ->where('filters.date_from', '2025-01-01')
+                ->where('filters.date_to', '2025-12-31')
             );
+    }
+
+    private function p09ControllerCanonicalRead(User $actor, string $url): \Illuminate\Testing\TestResponse
+    {
+        $redirect = $this->actingAs($actor)->get($url)->assertRedirect();
+        $location = $redirect->headers->get('Location');
+        $this->assertStringContainsString('/emar/reports', $location);
+
+        return $this->get($location);
+    }
+
+    /** Test-only exact grants; shared role defaults and writer fixtures stay intact. */
+    private function p09ControllerReportActor(
+        User $actor,
+        array $grants = ['medications.reports.view'],
+        array $denials = [],
+    ): User {
+        foreach ([true => $grants, false => $denials] as $allowed => $keys) {
+            $permissions = Permission::query()->whereIn('key', $keys)->pluck('id');
+            $this->assertCount(count($keys), $permissions, 'Missing exact report permission fixture.');
+            $actor->permissionOverrides()->syncWithoutDetaching(
+                $permissions->mapWithKeys(fn ($id) => [$id => ['allowed' => (bool) $allowed]])->all(),
+            );
+        }
+
+        return $actor->refresh();
+    }
+
+    private function p09ControllerReportMedicine(array $overrides = []): ClientMedication
+    {
+        $now = Carbon::getTestNow();
+        Carbon::setTestNow($this->workerNow()->subDay()->utc());
+        try {
+            return ClientMedication::query()->create(array_replace([
+                'client_id' => $this->client->id,
+                'name' => 'Ordinary report fixture medicine',
+                'dosage' => '500 mg',
+                'frequency' => 'Daily',
+                'dose_times' => [$this->workerNow()->format('H:i')],
+                'is_prn' => false,
+                'controlled_drug' => false,
+                'high_risk' => false,
+                'active' => true,
+                'state' => 'active',
+                'approval_status' => 'verified',
+                'start_date' => $this->workerNow()->subDays(2)->toDateString(),
+                'end_date' => null,
+            ], $overrides));
+        } finally {
+            Carbon::setTestNow($now);
+        }
+    }
+
+    private function p09ControllerReportAdministration(
+        ClientMedication $medicine,
+        string $status = 'given',
+    ): ClientMedicationAdministration {
+        return ClientMedicationAdministration::query()->create([
+            'client_id' => $this->client->id,
+            'client_medication_id' => $medicine->id,
+            'service_context_id' => $this->serviceContext->id,
+            'administered_by' => $this->admin->id,
+            'scheduled_for' => $this->workerNow()->utc(),
+            'administered_at' => $this->workerNow()->utc(),
+            'status' => $status,
+            'dose_given' => $status === 'given' ? '500 mg' : null,
+            'reason' => $status === 'refused' ? 'Person declined' : null,
+        ]);
+    }
+
+    private function p09ControllerReportEvent(string $kind, string $summary): \App\Models\MedicationEvent
+    {
+        $medicine = $this->p09ControllerReportMedicine();
+        $record = $this->p09ControllerReportAdministration($medicine, $kind === 'dose.refused' ? 'refused' : 'given');
+
+        return \Illuminate\Support\Facades\DB::transaction(fn () => app(\App\Services\Medication\Audit\MedicationEventRecorder::class)
+            ->append(new \App\Services\Medication\Audit\MedicationEventData(
+                (int) $this->site->id,
+                $kind,
+                'medication_administration',
+                (string) $record->id,
+                (int) $this->admin->id,
+                \Carbon\CarbonImmutable::instance($record->administered_at)->utc(),
+                $summary,
+                ['status' => $record->status],
+                (int) $this->client->id,
+            )));
     }
 
     // ══════════════════════════════════════════════════════════════
