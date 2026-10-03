@@ -158,7 +158,7 @@ final class MedicationReconciliationWorkflow
             }
             $newIds = [];
             foreach ($items->whereNull('client_medication_id')->where('decision', 'start') as $item) {
-                $revision = MedicationOrderRevision::query()->whereKey((int) ($input['revision_ids'][$item->id] ?? 0))->where('client_id', $client->id)->where('status', 'pending')->first();
+                $revision = MedicationOrderRevision::query()->canonicalVersion()->whereKey((int) ($input['revision_ids'][$item->id] ?? 0))->where('client_id', $client->id)->where('status', 'pending')->first();
                 if ($revision !== null && OrderAllergyMatcher::normalise($revision->version->name) === OrderAllergyMatcher::normalise($item->medicine_name)) {
                     $newIds[] = (int) $revision->client_medication_id;
                 }
@@ -172,9 +172,12 @@ final class MedicationReconciliationWorkflow
                 if ($item->decision === null) {
                     $this->invalid('items', 'Match every medicine before applying changes.');
                 }
+                if ($item->decision === 'continue' && $item->medication?->approval_status !== 'verified') {
+                    $this->invalid('items', 'This chart entry is not checked. Enter its source and link the waiting order version before continuing it.');
+                }
                 if (in_array($item->decision, ['change', 'start'], true)) {
                     $revisionId = (int) ($input['revision_ids'][$item->id] ?? 0);
-                    $revision = MedicationOrderRevision::query()->whereKey($revisionId)
+                    $revision = MedicationOrderRevision::query()->canonicalVersion()->whereKey($revisionId)
                         ->where('client_id', $client->id)->where('status', 'pending')
                         ->when($item->client_medication_id !== null, fn ($q) => $q->where('client_medication_id', $item->client_medication_id))
                         ->first();
@@ -199,6 +202,10 @@ final class MedicationReconciliationWorkflow
                     }
                     app(MedicationFollowupService::class)->ensureForSource('reconciliation-query', $item->id, $client, $item->medication, null, null, $item->next_dose_at,
                         ['reconciliation_id' => $record->id, 'item_id' => $item->id, 'question' => $item->notes, 'source_url' => '/emar/prescriptions?view=reconciliation']);
+                }
+                if ($item->client_medication_id !== null) {
+                    $appliedOrder = ClientMedication::query()->whereKey($item->client_medication_id)->where('client_id', $client->id)->firstOrFail();
+                    $item->source_order = [...($item->source_order ?? []), 'applied_chart_version' => (int) $appliedOrder->version];
                 }
                 $item->applied_at = now();
                 $item->save();
@@ -227,6 +234,9 @@ final class MedicationReconciliationWorkflow
                 if ($item->decision === null || $item->applied_at === null) {
                     $this->invalid('items', 'Match every medicine and apply the decisions before signing off.');
                 }
+            }
+            if (! $this->appliedChartStillMatched($client, $items)) {
+                $this->invalid('items', 'The chart changed after these decisions were applied. Start a fresh reconciliation and compare every current medicine.');
             }
             $record->forceFill(['status' => 'signed_off', 'signed_off_by' => $actor->id, 'signed_off_at' => now()])->save();
             $this->refreshRespiteForClient($client, $actor);
@@ -285,7 +295,7 @@ final class MedicationReconciliationWorkflow
                 $client = $result->client;
                 $events = $audits->map(fn ($audit) => new MedicationEventData(
                     siteId: (int) $client->site_id, kind: str_replace('medication_reconciliation.', 'reconciliation.', $audit->action),
-                    subjectType: 'medication_reconciliation', subjectId: (string) $result->id, actorId: (int) data_get($audit->meta, 'actor_id', $result->created_by),
+                    subjectType: 'medication_reconciliation', subjectId: (string) $result->id, actorId: (int) ($audit->user_id ?? $result->created_by),
                     occurredAt: CarbonImmutable::now('UTC'), summary: 'Medication reconciliation updated.',
                     facts: ['audit_id' => $audit->id, 'status' => $result->status, 'support_reassessment_required' => $result->support_reassessment_required],
                     clientId: (int) $client->id, controlled: $result->items()->where('controlled', true)->exists(),
@@ -304,9 +314,12 @@ final class MedicationReconciliationWorkflow
         $records = MedicationReconciliation::query()->where('client_id', $client->id)->whereNotNull('respite_stay_id')->whereNotNull('signed_off_at')->orderBy('id')->lockForUpdate()->get();
         foreach ($records as $record) {
             $items = $record->items()->orderBy('id')->lockForUpdate()->get();
-            $unresolved = $items->contains(fn ($item) => ($item->decision === 'ask' && $item->prescriber_query_resolved_at === null)
+            $unresolved = ! $this->appliedChartStillMatched($client, $items)
+                || $items->contains(fn ($item) => ($item->decision === 'ask' && $item->prescriber_query_resolved_at === null)
+                || ($item->decision !== 'stop' && $item->client_medication_id !== null
+                    && ! ClientMedication::query()->whereKey($item->client_medication_id)->where('client_id', $client->id)->where('state', '!=', 'ceased')->where('approval_status', 'verified')->exists())
                 || ($item->medication_order_revision_id !== null && ! MedicationOrderRevision::query()->whereKey($item->medication_order_revision_id)
-                    ->where('client_id', $client->id)->where('client_medication_id', $item->client_medication_id)->whereIn('status', ['checked', 'checked_alone'])->exists()));
+                    ->canonicalVersion()->where('client_id', $client->id)->where('client_medication_id', $item->client_medication_id)->whereIn('status', ['checked', 'checked_alone'])->exists()));
             $type = $record->reason === 'respite_leaving' ? 'discharge' : 'admission';
             $bridge = RespiteMedicationReconciliation::query()->firstOrNew(['stay_id' => $record->respite_stay_id, 'type' => $type]);
             // Do not overwrite a later reconciliation's bridge with older evidence.
@@ -352,5 +365,36 @@ final class MedicationReconciliationWorkflow
                 $this->invalid('items', 'The chart changed after this reconciliation started. Start a fresh reconciliation and compare the current versions.');
             }
         }
+    }
+
+    private function appliedChartStillMatched(Client $client, $items): bool
+    {
+        $orders = ClientMedication::query()->current()->where('client_id', $client->id)->get()->keyBy('id');
+        $capturedIds = $items->whereNotNull('client_medication_id')->pluck('client_medication_id');
+        if ($orders->where('state', '!=', 'ceased')->keys()->diff($capturedIds)->isNotEmpty()) {
+            return false;
+        }
+        foreach ($items->whereNotNull('client_medication_id') as $item) {
+            $order = $orders->get($item->client_medication_id);
+            if ($order === null || ($item->decision === 'stop') !== ($order->state === 'ceased')) {
+                return false;
+            }
+            $expectedVersion = (int) data_get($item->source_order, 'applied_chart_version', data_get($item->source_order, 'chart_version'));
+            if ($item->medication_order_revision_id !== null) {
+                $revision = MedicationOrderRevision::query()->canonicalVersion()->whereKey($item->medication_order_revision_id)
+                    ->where('client_id', $client->id)->where('client_medication_id', $order->id)->with('version')->first();
+                if ($revision === null) {
+                    return false;
+                }
+                if (in_array($revision->status, ['checked', 'checked_alone'], true)) {
+                    $expectedVersion = (int) $revision->version->version_number;
+                }
+            }
+            if ((int) $order->version !== $expectedVersion) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

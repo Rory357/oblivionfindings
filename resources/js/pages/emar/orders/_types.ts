@@ -181,6 +181,7 @@ export type Reconciliation = {
     items: ReconciliationItem[];
     restricted_medicines: boolean;
     can_manage: boolean;
+    can_apply: boolean;
     can_sign_off: boolean;
     support_reassessment_required: boolean;
 };

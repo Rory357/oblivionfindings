@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -15,6 +16,13 @@ class MedicationOrderRevision extends Model
         'second_checked_at' => 'datetime', 'written_due_at' => 'datetime',
         'written_confirmation' => 'array', 'allergy_confirmation' => 'array',
     ];
+
+    public function scopeCanonicalVersion(Builder $query): Builder
+    {
+        return $query->whereHas('version', fn (Builder $version) => $version
+            ->whereColumn('medication_order_versions.client_id', 'medication_order_revisions.client_id')
+            ->whereColumn('medication_order_versions.client_medication_id', 'medication_order_revisions.client_medication_id'));
+    }
 
     public function medication(): BelongsTo
     {

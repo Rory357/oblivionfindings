@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MedicationCovertAuthorisation extends Model
 {
@@ -49,6 +50,11 @@ class MedicationCovertAuthorisation extends Model
     public function recordedByUser()
     {
         return $this->belongsTo(User::class, 'recorded_by');
+    }
+
+    public function files(): HasMany
+    {
+        return $this->hasMany(MedicationOrderFile::class, 'medication_covert_authorisation_id');
     }
 
     public function scopeActive($query)

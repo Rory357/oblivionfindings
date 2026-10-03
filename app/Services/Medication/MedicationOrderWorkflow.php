@@ -530,9 +530,9 @@ final class MedicationOrderWorkflow
         $source = Validator::make($sourceInput, [
             'type' => 'required|in:written,phone,verbal', 'prescriber' => 'required|string|max:255',
             'received_at' => 'required|date|before_or_equal:now', 'description' => 'nullable|string|max:4000',
-            'read_back_confirmed' => 'required_if:type,phone,verbal|accepted',
-            'witness_id' => 'required_if:type,phone,verbal|integer',
-            'witness_pin' => 'required_if:type,phone,verbal|string|size:6',
+            'read_back_confirmed' => 'exclude_if:type,written|required_if:type,phone,verbal|accepted',
+            'witness_id' => 'exclude_if:type,written|required_if:type,phone,verbal|integer',
+            'witness_pin' => 'exclude_if:type,written|required_if:type,phone,verbal|string|size:6',
         ])->validate();
         if ($source['type'] === 'written' && $file === null) {
             $this->invalid('source_file', 'Attach the written prescription before saving.');

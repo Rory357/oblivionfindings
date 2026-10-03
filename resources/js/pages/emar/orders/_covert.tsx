@@ -3,6 +3,7 @@ import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { Button } from '@/components/ui/button';
 import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import { TilePicker } from '@/components/wizard/primitives';
 import { ReviewCard, ReviewRow, WizardShell } from '@/components/wizard/shell';
@@ -18,7 +19,7 @@ import {
     Users,
 } from 'lucide-react';
 import { useState } from 'react';
-import { Errors, Field, Note, useDraftClose } from './_parts';
+import { Errors, Field, Note, SourceFiles, useDraftClose } from './_parts';
 export type Covert = {
     id: number;
     client_id: number;
@@ -43,7 +44,30 @@ export type Covert = {
     medication: { name: string };
     client: { first_name: string; last_name: string };
     can_manage: boolean;
+    files: { id: number; file_name: string; purpose: string }[];
 };
+
+export function CovertStatus({ record }: { record: Covert }) {
+    if (record.status !== 'active')
+        return <StatusBadge variant="neutral">Stopped</StatusBadge>;
+    const today = toDateInput(new Date());
+    const days = Math.round(
+        (Date.parse(`${record.review_date}T00:00:00Z`) -
+            Date.parse(`${today}T00:00:00Z`)) /
+            86400000,
+    );
+    if (days < 0)
+        return (
+            <StatusBadge variant="critical">
+                Review overdue — covert giving blocked
+            </StatusBadge>
+        );
+    return (
+        <StatusBadge variant={days <= 14 ? 'warning' : 'success'}>
+            {days <= 14 ? 'Review due' : 'Active'}
+        </StatusBadge>
+    );
+}
 
 export function CovertWizard({
     orderId,
@@ -178,6 +202,14 @@ export function CovertWizard({
             >
                 <div className="grid gap-5">
                     <Errors errors={form.errors} />
+                    {existing && (
+                        <ReviewCard
+                            icon={FileText}
+                            title="Previous signed authorisation"
+                        >
+                            <SourceFiles files={existing.files ?? []} />
+                        </ReviewCard>
+                    )}
                     {step === 0 && (
                         <>
                             <TilePicker
@@ -531,11 +563,12 @@ export function StopCovert({
 }) {
     const [confirm, setConfirm] = useState(false);
     const form = useForm({ reason: '' });
+    const close = useDraftClose(form.isDirty, form.processing, onClose);
     return (
         <>
             <WizardShell
                 open
-                onClose={onClose}
+                onClose={close.close}
                 title="Stop covert giving"
                 description="The prescription carries on, offered openly."
                 railIcon={ShieldCheck}
@@ -553,7 +586,7 @@ export function StopCovert({
                 onStepClick={() => undefined}
                 pct={null}
                 footerStart={
-                    <Button variant="outline" onClick={onClose}>
+                    <Button variant="outline" onClick={close.close}>
                         Cancel
                     </Button>
                 }
@@ -602,6 +635,7 @@ export function StopCovert({
                     })
                 }
             />
+            {close.confirm}
         </>
     );
 }

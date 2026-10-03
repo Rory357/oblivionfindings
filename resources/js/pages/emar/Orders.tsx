@@ -39,7 +39,12 @@ import {
     XCircle,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { CovertWizard, StopCovert, type Covert } from './orders/_covert';
+import {
+    CovertStatus,
+    CovertWizard,
+    StopCovert,
+    type Covert,
+} from './orders/_covert';
 import { OrderDetail } from './orders/_detail';
 import { OrderEntry } from './orders/_entry';
 import { Note, OrderStatus } from './orders/_parts';
@@ -686,17 +691,7 @@ export default function Orders(props: Props) {
                                     label: 'State',
                                     width: '1fr',
                                     cell: (record) => (
-                                        <StatusBadge
-                                            variant={
-                                                record.status === 'active'
-                                                    ? 'warning'
-                                                    : 'neutral'
-                                            }
-                                        >
-                                            {record.status === 'active'
-                                                ? 'Active — review required'
-                                                : 'Stopped'}
-                                        </StatusBadge>
+                                        <CovertStatus record={record} />
                                     ),
                                 },
                             ]}
@@ -821,7 +816,12 @@ export default function Orders(props: Props) {
                         railTitle="Order evidence"
                         railSub="Current record"
                         steps={[
-                            { key: 'open', label: 'Open order', icon: Eye },
+                            {
+                                key: 'open',
+                                label: 'Open order',
+                                blurb: 'Current record and evidence',
+                                icon: Eye,
+                            },
                         ]}
                         stepIndex={0}
                         onStepClick={() => {}}
@@ -880,7 +880,7 @@ export default function Orders(props: Props) {
                         order={modal.detail.summary}
                         detail={modal.detail}
                         me={props.me.id}
-                        canManage={props.can.manage}
+                        canManage={modal.detail.summary.can_manage}
                         review={modal.review}
                         initialAction={
                             modal.action === 'entry' ? 'view' : modal.action

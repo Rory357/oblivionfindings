@@ -540,8 +540,7 @@ export function ReconcileMedicines({
                                 disabled={
                                     form.processing ||
                                     !record.can_manage ||
-                                    (step >= 2 &&
-                                        record.restricted_medicines) ||
+                                    (step >= 2 && !record.can_apply) ||
                                     (step === 3 &&
                                         (!record.can_sign_off ||
                                             record.status !==
@@ -578,6 +577,15 @@ export function ReconcileMedicines({
                             the full reconciliation.
                         </Note>
                     )}
+                    {!record.restricted_medicines &&
+                        record.can_manage &&
+                        !record.can_apply && (
+                            <Note>
+                                An authorised colleague must apply and sign off
+                                the controlled-medicine decisions in this
+                                reconciliation.
+                            </Note>
+                        )}
                     {step === 0 && (
                         <ReviewCard
                             icon={FileText}
@@ -1026,10 +1034,16 @@ function PrescriberResponse({
                 railTitle="Prescriber’s response"
                 railSub={item.medicine_name}
                 steps={[
-                    { key: 'response', label: 'The response', icon: FileText },
+                    {
+                        key: 'response',
+                        label: 'The response',
+                        blurb: 'Prescriber and instruction',
+                        icon: FileText,
+                    },
                     {
                         key: 'review',
                         label: 'Review & save',
+                        blurb: 'Keep the response with this query',
                         icon: ClipboardCheck,
                     },
                 ]}

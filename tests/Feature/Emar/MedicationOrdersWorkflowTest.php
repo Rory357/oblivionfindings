@@ -25,6 +25,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\CheckedOrderAllergyConfirmation;
+use App\Services\Medication\MedicationOrderWorkflow;
 use Carbon\Carbon;
 use Database\Factories\UserFactory;
 use Database\Seeders\RbacSeeder;
@@ -109,6 +110,14 @@ class MedicationOrdersWorkflowTest extends TestCase
         $this->assertSame(3, $order->refresh()->version);
     }
 
+    public function test_stopped_unchecked_order_does_not_count_as_waiting_to_check(): void
+    {
+        $revision = $this->enter();
+        $this->actingAs($this->enterer)->post('/emar/orders/'.$revision->client_medication_id.'/stop', ['reason' => 'Prescriber withdrew this prescription before the first dose.', 'request_key' => 'stop-unchecked'])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs($this->checker)->get('/emar/prescriptions?view=to_check')->assertInertia(fn (Assert $page) => $page->has('orders.data', 0)->where('counts.to_check', 0));
+    }
+
     public function test_new_order_blocks_doses_and_lone_check_needs_reason_and_independent_second_check(): void
     {
         $revision = $this->enter();
@@ -135,7 +144,7 @@ class MedicationOrdersWorkflowTest extends TestCase
         $third = $this->staff();
         $this->check($revision, $third);
         $this->actingAs($this->enterer)->post('/emar/orders/'.$revision->client_medication_id.'/stop', ['reason' => 'Prescriber stopped the course.', 'client_id' => $this->client->id, 'request_key' => 'stop-phone'])->assertSessionHasNoErrors();
-        $this->actingAs($this->enterer)->post('/emar/order-revisions/'.$revision->id.'/written', ['method' => 'signed_prescription', 'received_at' => '2026-10-03T10:40', 'matches' => true, 'file' => UploadedFile::fake()->create('signed.pdf', 1, 'application/pdf')])->assertSessionHasNoErrors();
+        $this->actingAs($this->enterer)->post('/emar/order-revisions/'.$revision->id.'/written-confirmation', ['method' => 'signed_prescription', 'received_at' => '2026-10-03T10:40', 'matches' => true, 'file' => UploadedFile::fake()->create('signed.pdf', 1, 'application/pdf')])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertNotNull($revision->refresh()->written_confirmation);
         $this->assertNotNull(MedicationFollowup::where('source_key', 'phone-written-confirmation:'.$revision->id)->sole()->completed_at);
         $this->actingAs($this->enterer)->get('/emar/order-files/'.$revision->written_confirmation['file_id'])->assertOk()->assertHeader('Cache-Control', 'no-store, private');
@@ -147,10 +156,10 @@ class MedicationOrdersWorkflowTest extends TestCase
         $revision = $this->enter();
         $this->actingAs($this->checker)->postJson('/emar/order-revisions/'.$revision->id.'/check', $this->checkInput())->assertUnprocessable()->assertJsonValidationErrors('allergy');
         $confirmation = ['prescriber' => 'Dr Test', 'method' => 'phone', 'confirmed_at' => '2026-10-03T10:40', 'instruction' => 'Confirmed this exact prescribed version following review of the recorded reaction.'];
-        $this->actingAs($this->enterer)->post('/emar/order-revisions/'.$revision->id.'/allergy', $confirmation)->assertSessionHasNoErrors();
+        $this->actingAs($this->enterer)->post('/emar/order-revisions/'.$revision->id.'/allergy-confirmation', $confirmation)->assertRedirect()->assertSessionHasNoErrors();
         $allergy->update(['reaction' => 'Updated reaction evidence']);
         $this->actingAs($this->checker)->postJson('/emar/order-revisions/'.$revision->id.'/check', $this->checkInput())->assertUnprocessable()->assertJsonValidationErrors('allergy');
-        $this->actingAs($this->enterer)->post('/emar/order-revisions/'.$revision->id.'/allergy', $confirmation)->assertSessionHasNoErrors();
+        $this->actingAs($this->enterer)->post('/emar/order-revisions/'.$revision->id.'/allergy-confirmation', $confirmation)->assertRedirect()->assertSessionHasNoErrors();
         $this->check($revision);
         $this->assertNotNull(app(CheckedOrderAllergyConfirmation::class)->forOrder($revision->medication->refresh()));
         $allergy->update(['severity' => 'severe']);
@@ -202,6 +211,20 @@ class MedicationOrdersWorkflowTest extends TestCase
         $other = Client::factory()->create(['site_id' => $this->site->id, 'service_context_id' => $this->client->service_context_id, 'status' => 'active']);
         MedicationCovertAuthorisation::create(['client_id' => $other->id, 'client_medication_id' => $order->id, 'status' => 'active', 'authorised_by_name' => 'Foreign evidence', 'authorised_date' => '2026-10-03', 'review_date' => '2027-01-03', 'legal_basis' => 'Foreign source', 'clinical_justification' => 'Other person assessment', 'administration_method' => 'Other person method', 'recorded_by' => $this->enterer->id]);
         $this->actingAs($this->checker)->get('/emar/prescriptions?view=covert')->assertInertia(fn (Assert $page) => $page->has('covert', 0)->where('counts.covert', 0));
+    }
+
+    public function test_revision_with_another_medicines_version_is_concealed_in_detail_candidates_and_files(): void
+    {
+        $order = $this->order();
+        $revision = $this->enter($order, ['dosage' => '20 mg']);
+        $fileId = $revision->files()->sole()->id;
+        $foreign = $this->order(['name' => 'Foreign medicine']);
+        app(MedicationOrderWorkflow::class)->snapshotExisting($foreign);
+        $revision->forceFill(['medication_order_version_id' => $foreign->versions()->sole()->id])->save();
+        $this->actingAs($this->checker)->getJson('/emar/orders/'.$order->id)->assertOk()->assertJsonCount(1, 'revisions')->assertJsonMissing(['name' => 'Foreign medicine']);
+        $this->actingAs($this->checker)->get('/emar/order-files/'.$fileId)->assertNotFound();
+        $response = $this->actingAs($this->checker)->getJson('/emar/orders/candidates/'.$this->client->id)->assertOk();
+        $this->assertNull(collect($response->json('orders'))->firstWhere('id', $order->id)['pending']);
     }
 
     public function test_agreed_review_change_links_waiting_version_and_replays_without_publication(): void
@@ -293,6 +316,41 @@ class MedicationOrdersWorkflowTest extends TestCase
         $this->assertSame('in_progress', RespiteMedicationReconciliation::where('stay_id', $stay->id)->sole()->status);
         $this->check($revision);
         $this->assertSame('completed', RespiteMedicationReconciliation::where('stay_id', $stay->id)->sole()->status);
+        $this->assertSame($this->checker->id, MedicationEvent::where('kind', 'reconciliation.signed_off')->sole()->actor_id);
+    }
+
+    public function test_reconciliation_cannot_sign_off_after_another_medicine_arrives(): void
+    {
+        $this->order();
+        $record = $this->startReconciliation();
+        $item = $record->items()->sole();
+        $this->actingAs($this->enterer)->put('/emar/reconciliations/'.$record->id, ['items' => [['id' => $item->id, 'decision' => 'continue']]])->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs($this->enterer)->post('/emar/reconciliations/'.$record->id.'/apply')->assertRedirect()->assertSessionHasNoErrors();
+        $this->order(['name' => 'Another chart medicine']);
+        $this->actingAs($this->checker)->postJson('/emar/reconciliations/'.$record->id.'/sign-off')->assertUnprocessable()->assertJsonValidationErrors('items');
+        $this->assertNull($record->refresh()->signed_off_at);
+    }
+
+    public function test_reconciliation_cannot_sign_off_a_continued_order_changed_after_apply(): void
+    {
+        $order = $this->order();
+        $record = $this->startReconciliation();
+        $item = $record->items()->sole();
+        $this->actingAs($this->enterer)->put('/emar/reconciliations/'.$record->id, ['items' => [['id' => $item->id, 'decision' => 'continue']]])->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs($this->enterer)->post('/emar/reconciliations/'.$record->id.'/apply')->assertRedirect()->assertSessionHasNoErrors();
+        $this->check($this->enter($order, ['dosage' => '20 mg']));
+        $this->actingAs($this->checker)->postJson('/emar/reconciliations/'.$record->id.'/sign-off')->assertUnprocessable()->assertJsonValidationErrors('items');
+        $this->assertNull($record->refresh()->signed_off_at);
+    }
+
+    public function test_unchecked_chart_entry_cannot_be_applied_as_continue(): void
+    {
+        $this->enter();
+        $record = $this->startReconciliation();
+        $item = $record->items()->sole();
+        $this->actingAs($this->enterer)->put('/emar/reconciliations/'.$record->id, ['items' => [['id' => $item->id, 'decision' => 'continue']]])->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs($this->enterer)->postJson('/emar/reconciliations/'.$record->id.'/apply')->assertUnprocessable()->assertJsonValidationErrors('items');
+        $this->assertNull($item->refresh()->applied_at);
     }
 
     public function test_covert_requires_pharmacist_capacity_and_signed_source_and_keeps_review_day_inclusive(): void
@@ -307,6 +365,8 @@ class MedicationOrdersWorkflowTest extends TestCase
         $this->actingAs($this->enterer)->postJson('/emar/orders/'.$order->id.'/covert', $missing)->assertUnprocessable()->assertJsonValidationErrors('capacity_lacking');
         $this->actingAs($this->enterer)->post('/emar/orders/'.$order->id.'/covert', $input)->assertSessionHasNoErrors();
         $auth = MedicationCovertAuthorisation::sole();
+        $this->actingAs($this->checker)->get('/emar/prescriptions?view=covert')->assertInertia(fn (Assert $page) => $page
+            ->where('covert.0.authorised_date', '2026-10-03')->where('covert.0.review_date', '2027-01-03')->has('covert.0.files', 1)->missing('covert.0.files.0.file_path'));
         $this->assertSame('covert_review', MedicationFollowup::where('source_key', 'covert-review:'.$auth->id)->sole()->type);
         Carbon::setTestNow(Carbon::parse('2027-01-03 23:59', 'Pacific/Auckland')->utc());
         $this->assertFalse($auth->isExpired());
@@ -360,7 +420,7 @@ class MedicationOrdersWorkflowTest extends TestCase
 
     private function check(MedicationOrderRevision $revision, ?User $actor = null): void
     {
-        $this->actingAs($actor ?? $this->checker)->post('/emar/order-revisions/'.$revision->id.'/check', $this->checkInput())->assertSessionHasNoErrors();
+        $this->actingAs($actor ?? $this->checker)->post('/emar/order-revisions/'.$revision->id.'/check', $this->checkInput())->assertRedirect()->assertSessionHasNoErrors();
     }
 
     private function order(array $changes = []): ClientMedication

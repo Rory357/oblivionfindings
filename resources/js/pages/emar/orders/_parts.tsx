@@ -3,7 +3,7 @@ import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
-import { formatDateOnly, formatDateTime } from '@/lib/datetime';
+import { formatDateOnly, formatDateTime, toDateInput } from '@/lib/datetime';
 import { useState, type ReactNode } from 'react';
 import type { Order } from './_types';
 
@@ -19,7 +19,7 @@ export function Field({
     error?: string;
 }) {
     return (
-        <div className="grid gap-1.5">
+        <div id={`${id}-field`} className="grid gap-1.5">
             <Label htmlFor={id}>{label}</Label>
             {children}
             <InputError message={error} />
@@ -112,12 +112,31 @@ export function orderStatus(order: Order): {
             variant: 'warning',
             line: `Attach the prescriber’s confirmation by ${formatDateTime(checked.written_due_at)}.`,
         };
-    if (order.end_date)
+    if (order.end_date) {
+        const today = toDateInput(new Date());
+        const days = Math.round(
+            (Date.parse(`${order.end_date}T00:00:00Z`) -
+                Date.parse(`${today}T00:00:00Z`)) /
+                86400000,
+        );
+        if (days < 0)
+            return {
+                label: 'Ended',
+                variant: 'neutral',
+                line: `Last day was ${formatDateOnly(order.end_date)}. This course cannot be given.`,
+            };
+        if (days <= 14)
+            return {
+                label: 'Ending soon',
+                variant: 'warning',
+                line: `Ends ${formatDateOnly(order.end_date)}. The last NZ day is included.`,
+            };
         return {
             label: 'Checked',
             variant: 'success',
             line: `Ends ${formatDateOnly(order.end_date)}. The last NZ day is included.`,
         };
+    }
     return { label: 'Checked', variant: 'success', line: '' };
 }
 export function OrderStatus({ order }: { order: Order }) {

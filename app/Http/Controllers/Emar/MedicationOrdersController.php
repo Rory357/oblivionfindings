@@ -51,8 +51,8 @@ final class MedicationOrdersController extends Controller
             ->when(! $actor->canDo('medications.controlled.view'), fn ($q) => $q->where('controlled_drug', false));
         $counts = [
             'current' => (clone $query)->where('state', '!=', 'ceased')->count(),
-            'to_check' => (clone $query)->where(fn ($q) => $q->where('approval_status', '!=', 'verified')->orWhereIn('id', $this->actionableRevisionIds(true)))->count(),
-            'written' => MedicationOrderRevision::query()->whereIn('client_medication_id', (clone $query)->where('state', '!=', 'ceased')->select('id'))
+            'to_check' => (clone $query)->where('state', '!=', 'ceased')->where(fn ($q) => $q->where('approval_status', '!=', 'verified')->orWhereIn('id', $this->actionableRevisionIds(true)))->count(),
+            'written' => MedicationOrderRevision::query()->canonicalVersion()->whereIn('client_medication_id', (clone $query)->where('state', '!=', 'ceased')->select('id'))
                 ->whereNotNull('written_due_at')->whereNull('written_confirmation')->whereIn('status', ['pending', 'checked', 'checked_alone'])->count(),
             'ending' => (clone $query)->where('state', '!=', 'ceased')->whereBetween('end_date', [now()->timezone('Pacific/Auckland')->toDateString(), now()->timezone('Pacific/Auckland')->addDays(14)->toDateString()])->count(),
             'covert' => $this->scope->scopeCanonicalClientMedicationRows(MedicationCovertAuthorisation::query(), $sites, false)->whereIn('client_medication_id', (clone $query)->select('id'))->whereIn('client_id', $readableIds)->active()->count(),
@@ -80,7 +80,7 @@ final class MedicationOrdersController extends Controller
             $query->where(fn ($q) => $q->where('name', 'like', $search)->orWhereHas('client', fn ($c) => $c->where('first_name', 'like', $search)->orWhere('last_name', 'like', $search)));
         }
         $page = $query->with('client:id,first_name,last_name,site_id')->orderBy('name')->paginate(40)->withQueryString();
-        $revisions = $this->scope->scopeCanonicalClientMedicationRows(MedicationOrderRevision::query(), $sites, false)->whereIn('client_medication_id', $page->pluck('id'))
+        $revisions = $this->scope->scopeCanonicalClientMedicationRows(MedicationOrderRevision::query()->canonicalVersion(), $sites, false)->whereIn('client_medication_id', $page->pluck('id'))
             ->with(['version', 'enterer:id,name', 'checker:id,name', 'witness:id,name'])->orderBy('id')->get()->groupBy('client_medication_id');
         $page->through(fn ($medication) => $this->summary($medication, $revisions->get($medication->id, collect()), $actor, $writableIds));
         $reconciliations = MedicationReconciliation::query()->whereIn('client_id', $readableIds)->with(['client:id,first_name,last_name', 'items'])->orderByDesc('id')->limit(100)->get()
@@ -88,8 +88,11 @@ final class MedicationOrdersController extends Controller
         $covert = $this->scope->scopeCanonicalClientMedicationRows(MedicationCovertAuthorisation::query(), $sites, false)->whereIn('client_id', $readableIds)
             ->whereIn('client_medication_id', ClientMedication::query()->whereIn('client_id', $readableIds)
                 ->when(! $actor->canDo('medications.controlled.view'), fn ($q) => $q->where('controlled_drug', false))->select('id'))
-            ->with(['medication:id,name,client_id,controlled_drug', 'client:id,first_name,last_name'])->orderByDesc('id')->limit(100)->get()
-            ->map(fn ($record) => $record->toArray() + ['can_manage' => $actor->canDo('medications.orders.manage') && (! $record->medication->controlled_drug || $actor->canDo('medications.controlled.record'))]);
+            ->with(['medication:id,name,client_id,controlled_drug', 'client:id,first_name,last_name', 'files'])->orderByDesc('id')->limit(100)->get()
+            ->map(fn ($record) => array_merge($record->toArray(), [
+                'authorised_date' => $record->authorised_date?->toDateString(), 'review_date' => $record->review_date?->toDateString(),
+                'can_manage' => $actor->canDo('medications.orders.manage') && (! $record->medication->controlled_drug || $actor->canDo('medications.controlled.record')),
+            ]));
         $handoff = null;
         if ($request->integer('review_item')) {
             abort_unless($actor->canDo('medications.orders.manage'), 403);
@@ -120,7 +123,7 @@ final class MedicationOrdersController extends Controller
     public function detail(Request $request, int $medication)
     {
         $order = $this->readableOrder($request->user(), $medication);
-        $revisions = MedicationOrderRevision::query()->where('client_medication_id', $order->id)->where('client_id', $order->client_id)
+        $revisions = MedicationOrderRevision::query()->canonicalVersion()->where('client_medication_id', $order->id)->where('client_id', $order->client_id)
             ->with(['version', 'enterer:id,name', 'checker:id,name', 'witness:id,name', 'files'])->orderByDesc('id')->get();
         $actions = MedicationOrderAction::query()->where('client_medication_id', $order->id)->orderByDesc('id')->limit(100)->get();
         $last = ClientMedicationAdministration::query()->effectiveClinicalEvidence()->where('client_id', $order->client_id)
@@ -158,7 +161,7 @@ final class MedicationOrdersController extends Controller
         $query = ClientMedication::query()->current()->where('client_id', $person->id)->where('state', '!=', 'ceased')
             ->when(! $request->user()->canDo('medications.controlled.view'), fn ($q) => $q->where('controlled_drug', false));
         $orders = $query->with('client:id,first_name,last_name,site_id')->orderBy('name')->get();
-        $revisions = MedicationOrderRevision::query()->where('client_id', $person->id)->whereIn('client_medication_id', $orders->pluck('id'))->with('version')->orderBy('id')->get()->groupBy('client_medication_id');
+        $revisions = MedicationOrderRevision::query()->canonicalVersion()->where('client_id', $person->id)->whereIn('client_medication_id', $orders->pluck('id'))->with('version')->orderBy('id')->get()->groupBy('client_medication_id');
         $workIds = $this->work->clientIdsWithCurrentAuthority($request->user(), [$person->id], now());
 
         return response()->json(['orders' => $orders->map(fn ($order) => $this->summary($order, $revisions->get($order->id, collect()), $request->user(), $workIds))])->header('Cache-Control', 'private, no-store');
@@ -292,6 +295,8 @@ final class MedicationOrdersController extends Controller
             $revision = $record->revision;
             $order = $this->readableOrder($request->user(), $revision->client_medication_id);
             abort_unless((int) $order->client_id === (int) $revision->client_id, 404);
+            abort_unless((int) $revision->version?->client_id === (int) $order->client_id
+                && (int) $revision->version?->client_medication_id === (int) $order->id, 404);
         } elseif ($record->medication_covert_authorisation_id !== null) {
             $covert = MedicationCovertAuthorisation::query()->findOrFail($record->medication_covert_authorisation_id);
             $order = $this->readableOrder($request->user(), $covert->client_medication_id);
@@ -328,14 +333,15 @@ final class MedicationOrdersController extends Controller
                 if (! $order->isAdministrable()) {
                     throw ValidationException::withMessages(['order' => 'Covert giving requires an active, checked prescription.']);
                 }
+                $today = now()->timezone('Pacific/Auckland')->toDateString();
                 $evidence = $request->validate([
                     'capacity_lacking' => 'required|accepted', 'capacity_assessor' => 'required|string|max:255',
-                    'capacity_date' => 'required|date|before_or_equal:today', 'capacity_record' => 'required|string|max:4000',
+                    'capacity_date' => 'required|date_format:Y-m-d|before_or_equal:'.$today, 'capacity_record' => 'required|string|max:4000',
                     'consulted_name' => 'required|string|max:255', 'consulted_role' => 'required|string|max:255',
                     'consulted_record' => 'required|string|max:4000', 'pharmacist_name' => 'required|string|max:255',
                     'pharmacist_advice' => 'required|string|max:4000', 'authorised_by_name' => 'required|string|max:255',
-                    'authorised_date' => 'required|date|before_or_equal:today', 'legal_basis' => 'required|string|max:255',
-                    'administration_method' => 'required|string|max:4000', 'review_date' => 'required|date|after_or_equal:today',
+                    'authorised_date' => 'required|date_format:Y-m-d|before_or_equal:'.$today, 'legal_basis' => 'required|string|max:255',
+                    'administration_method' => 'required|string|max:4000', 'review_date' => 'required|date_format:Y-m-d|after_or_equal:'.$today,
                     'request_key' => 'required|string|max:100', 'gp_file' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
                 ]);
                 unset($evidence['gp_file']);
@@ -460,7 +466,9 @@ final class MedicationOrdersController extends Controller
         }
         $data['restricted_medicines'] = $hidden;
         $data['can_manage'] = $actor->canDo('medications.orders.manage') && in_array((int) $record->client_id, $workIds, true);
-        $data['can_sign_off'] = $data['can_manage'] && $actor->canDo('medications.orders.verify') && ! $hidden;
+        $data['can_apply'] = $data['can_manage'] && ! $hidden
+            && (! $record->items->contains('controlled', true) || $actor->canDo('medications.controlled.record'));
+        $data['can_sign_off'] = $data['can_apply'] && $actor->canDo('medications.orders.verify');
 
         return $data;
     }

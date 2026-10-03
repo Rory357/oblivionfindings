@@ -168,6 +168,9 @@ export function OrderEntry(props: Props) {
             const target =
                 pane.current?.querySelector<HTMLElement>(`#${errorTarget}`) ??
                 pane.current?.querySelector<HTMLElement>(
+                    `#${errorTarget}-field input, #${errorTarget}-field textarea, #${errorTarget}-field button`,
+                ) ??
+                pane.current?.querySelector<HTMLElement>(
                     'input, textarea, button[role="combobox"]',
                 );
             target?.focus();
@@ -261,7 +264,16 @@ export function OrderEntry(props: Props) {
                     'description',
                     'source_file',
                 ].includes(field);
-                setStep(readback && spoken ? 2 : source ? 0 : 1);
+                const swap = ['stop_reason', 'confirm_swap'].includes(field);
+                setStep(
+                    swap
+                        ? steps.length - 1
+                        : readback && spoken
+                          ? 2
+                          : source
+                            ? 0
+                            : 1,
+                );
                 const ids: Record<string, string> = {
                     client_id: 'order-person',
                     prescriber: 'order-prescriber',
@@ -280,6 +292,13 @@ export function OrderEntry(props: Props) {
                     prn_reason: 'order-prn-reason',
                     max_per_day: 'order-prn-max',
                     min_hours_between_doses: 'order-prn-interval',
+                    type: 'order-source',
+                    source_file: 'order-source-file',
+                    witness_pin: 'order-witness-pin',
+                    witness_id: 'order-witness',
+                    read_back_confirmed: 'order-readback-confirmed',
+                    stop_reason: 'order-swap-stop',
+                    confirm_swap: 'order-swap-stop',
                 };
                 setErrorTarget(ids[field] ?? 'order-error-control');
             },
@@ -300,9 +319,11 @@ export function OrderEntry(props: Props) {
                         <WizardSuccessPane
                             title="Order saved — waiting to be checked"
                             blurb={
-                                props.order
-                                    ? `Staff keep giving version ${props.order.version} until this change is checked. A colleague who did not enter or witness it checks the saved source and prescription.`
-                                    : 'A colleague who did not enter or witness this order checks the saved source and prescription before the first dose.'
+                                props.review?.outcome === 'swap'
+                                    ? `${props.review.name_snapshot} has stopped. The replacement is waiting for a colleague who did not enter or witness it to check the source and prescription before the first dose.`
+                                    : props.order
+                                      ? `Staff keep giving version ${props.order.version} until this change is checked. A colleague who did not enter or witness it checks the saved source and prescription.`
+                                      : 'A colleague who did not enter or witness this order checks the saved source and prescription before the first dose.'
                             }
                             actions={
                                 <Button onClick={props.onClose}>
@@ -479,18 +500,20 @@ export function OrderEntry(props: Props) {
                                 </Field>
                                 {!spoken && (
                                     <>
-                                        <FileDropzone
-                                            multiple={false}
-                                            accept=".pdf,.jpg,.jpeg,.png"
-                                            title="Attach the prescription"
-                                            hint="One PDF, JPG or PNG · up to 10 MB"
-                                            onFiles={(files) =>
-                                                form.setData(
-                                                    'source_file',
-                                                    files[0] ?? null,
-                                                )
-                                            }
-                                        />
+                                        <div id="order-source-file-field">
+                                            <FileDropzone
+                                                multiple={false}
+                                                accept=".pdf,.jpg,.jpeg,.png"
+                                                title="Attach the prescription"
+                                                hint="One PDF, JPG or PNG · up to 10 MB"
+                                                onFiles={(files) =>
+                                                    form.setData(
+                                                        'source_file',
+                                                        files[0] ?? null,
+                                                    )
+                                                }
+                                            />
+                                        </div>
                                         {form.data.source_file && (
                                             <StagedFileCard
                                                 file={form.data.source_file}
@@ -952,6 +975,7 @@ export function OrderEntry(props: Props) {
                                 </ReviewCard>
                                 <label className="frontline-tap flex items-center gap-2">
                                     <Checkbox
+                                        id="order-readback-confirmed"
                                         checked={
                                             form.data.source.read_back_confirmed
                                         }
@@ -988,6 +1012,7 @@ export function OrderEntry(props: Props) {
                                     />
                                 </Field>
                                 <WitnessPinInput
+                                    id="order-witness-pin"
                                     value={form.data.source.witness_pin}
                                     onChange={(value) =>
                                         setSource('witness_pin', value)
