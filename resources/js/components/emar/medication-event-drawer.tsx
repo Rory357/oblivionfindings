@@ -439,7 +439,8 @@ export function MedicationEventDrawer({
     return (
         <Dialog open onOpenChange={(next) => !next && onClose()}>
             <DialogContent
-                className="overflow-hidden p-0 [&>button]:hidden"
+                showCloseButton={false}
+                className="overflow-hidden p-0"
                 style={{
                     maxWidth: 'min(94vw, 1040px)',
                     width: 'min(94vw, 1040px)',
@@ -483,7 +484,7 @@ export function MedicationEventDrawer({
                                     type="button"
                                     onClick={() => goToSection(s.key)}
                                     className={cn(
-                                        'flex items-center gap-2.5 rounded-md p-2 text-left text-[13px] font-semibold transition-colors',
+                                        'frontline-tap frontline-focus flex items-center gap-2.5 rounded-md p-2 text-left text-[13px] font-semibold transition-colors',
                                         isActive
                                             ? 'bg-primary-fill/10 text-primary'
                                             : 'text-muted-foreground hover:bg-muted',
@@ -541,7 +542,7 @@ export function MedicationEventDrawer({
                                 type="button"
                                 onClick={onClose}
                                 aria-label="Close"
-                                className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted"
+                                className="frontline-tap frontline-focus grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted"
                             >
                                 <X className="h-5 w-5" />
                             </button>
@@ -725,7 +726,7 @@ export function MedicationEventDrawer({
                                     {link && (
                                         <a
                                             href={link.href}
-                                            className="rounded-full border px-3 py-1 text-xs font-medium text-primary hover:bg-accent"
+                                            className="frontline-tap frontline-focus inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium text-primary hover:bg-accent"
                                         >
                                             {link.label}
                                         </a>
@@ -733,7 +734,7 @@ export function MedicationEventDrawer({
                                     {event.client_id && (
                                         <a
                                             href={`/clients/${event.client_id}`}
-                                            className="rounded-full border px-3 py-1 text-xs font-medium text-primary hover:bg-accent"
+                                            className="frontline-tap frontline-focus inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium text-primary hover:bg-accent"
                                         >
                                             Client profile
                                         </a>
@@ -744,14 +745,19 @@ export function MedicationEventDrawer({
 
                         {/* Footer Options bar — read-only / navigational actions only
                             (adapts the prn-detail-dialog pattern): Close · View client ·
-                            Open on … · Verify integrity · Export event · Flag · Resolve gap. */}
+                            Open on … · Verify integrity · Export event · Flag · Review source record. */}
                         <footer className={WIZARD_FOOTER_CLASS}>
-                            <Button variant="outline" onClick={onClose}>
+                            <Button
+                                className="frontline-tap frontline-focus h-auto max-w-full shrink-0 whitespace-normal"
+                                variant="outline"
+                                onClick={onClose}
+                            >
                                 Close
                             </Button>
-                            <div className="flex flex-wrap items-center justify-end gap-1.5">
+                            <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
                                 {event.client_id ? (
                                     <Button
+                                        className="frontline-tap frontline-focus h-auto max-w-full whitespace-normal"
                                         variant="ghost"
                                         size="sm"
                                         onClick={() =>
@@ -765,6 +771,7 @@ export function MedicationEventDrawer({
                                     </Button>
                                 ) : null}
                                 <Button
+                                    className="frontline-tap frontline-focus h-auto max-w-full whitespace-normal"
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => router.visit(primaryHref)}
@@ -773,6 +780,7 @@ export function MedicationEventDrawer({
                                     Open on {link.label}
                                 </Button>
                                 <Button
+                                    className="frontline-tap frontline-focus h-auto max-w-full whitespace-normal"
                                     variant="ghost"
                                     size="sm"
                                     onClick={verifyIntegrity}
@@ -783,6 +791,7 @@ export function MedicationEventDrawer({
                                 </Button>
                                 {onExport && (
                                     <Button
+                                        className="frontline-tap frontline-focus h-auto max-w-full whitespace-normal"
                                         variant="ghost"
                                         size="sm"
                                         onClick={onExport}
@@ -793,6 +802,7 @@ export function MedicationEventDrawer({
                                 )}
                                 {integrity?.backed ? (
                                     <Button
+                                        className="frontline-tap frontline-focus h-auto max-w-full whitespace-normal"
                                         variant="ghost"
                                         size="sm"
                                         onClick={onFlag}
@@ -803,12 +813,16 @@ export function MedicationEventDrawer({
                                     </Button>
                                 ) : null}
                                 {isGap ? (
-                                    <a href={resolveHref}>
-                                        <Button size="sm">
+                                    <Button
+                                        className="frontline-tap frontline-focus h-auto max-w-full whitespace-normal"
+                                        asChild
+                                        size="sm"
+                                    >
+                                        <a href={resolveHref}>
                                             <Check className="h-4 w-4" />
-                                            Resolve gap
-                                        </Button>
-                                    </a>
+                                            Review source record
+                                        </a>
+                                    </Button>
                                 ) : null}
                             </div>
                         </footer>

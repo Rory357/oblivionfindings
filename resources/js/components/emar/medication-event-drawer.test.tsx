@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+    cleanup,
+    fireEvent,
+    render,
+    screen,
+    within,
+} from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     eventPrimaryLink,
@@ -7,8 +13,9 @@ import {
 } from './medication-event-drawer';
 
 const visit = vi.hoisted(() => vi.fn());
+const post = vi.hoisted(() => vi.fn());
 vi.mock('@inertiajs/react', () => ({
-    router: { visit },
+    router: { visit, post },
 }));
 
 const event = (overrides: Partial<AuditEvent> = {}): AuditEvent => ({
@@ -239,4 +246,81 @@ describe('history drawer New Zealand timestamp', () => {
             screen.getByText('3 October 2026, 12:30 am'),
         ).toBeInTheDocument();
     });
+});
+
+describe('history drawer touch controls', () => {
+    it('gives the real close controls, section rail, footer actions and chips the shared tap/focus styles', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockResolvedValue({
+                ok: true,
+                json: async () => ({ backed: true }),
+            }),
+        );
+        render(
+            <MedicationEventDrawer
+                event={event({ flags: ['no_actor'] })}
+                onClose={vi.fn()}
+                onExport={vi.fn()}
+            />,
+        );
+        await screen.findByRole('button', { name: 'Flag for investigation' });
+        const dialog = screen.getByRole('dialog');
+        expect(
+            within(dialog).getAllByRole('button', { name: 'Close' }),
+        ).toHaveLength(2);
+        const controls = [
+            ...within(dialog).getAllByRole('button'),
+            ...within(dialog).getAllByRole('link'),
+        ];
+        for (const control of controls) {
+            expect(control).toHaveClass('frontline-tap', 'frontline-focus');
+        }
+        for (const name of ['Medicines', 'Client profile']) {
+            expect(within(dialog).getByRole('link', { name })).toHaveClass(
+                'inline-flex',
+                'items-center',
+            );
+        }
+        expect(
+            within(dialog).getByRole('button', { name: 'Export event' }),
+        ).toBeEnabled();
+        expect(dialog.querySelector('header')?.nextElementSibling).toHaveClass(
+            'min-h-0',
+            'overflow-y-auto',
+        );
+        expect(visit).not.toHaveBeenCalled();
+        expect(post).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        { flags: ['no_actor'], href: '/emar/medications?client_id=42' },
+        { flags: ['missing_witness'], href: '/emar/controlled?client_id=42' },
+    ])(
+        'presents the gap navigation as one truthful source-record link ($flags)',
+        ({ flags, href }) => {
+            vi.stubGlobal(
+                'fetch',
+                vi.fn(() => new Promise(() => {})),
+            );
+            render(
+                <MedicationEventDrawer
+                    event={event({ flags })}
+                    onClose={vi.fn()}
+                />,
+            );
+            const link = screen.getByRole('link', {
+                name: 'Review source record',
+            });
+            expect(link).toHaveAttribute('href', href);
+            expect(link).toHaveAttribute('data-slot', 'button');
+            expect(link).toHaveClass('frontline-tap', 'frontline-focus');
+            expect(
+                screen.getByRole('dialog').querySelector('a button, button a'),
+            ).toBeNull();
+            expect(screen.queryByText('Resolve gap')).not.toBeInTheDocument();
+            expect(visit).not.toHaveBeenCalled();
+            expect(post).not.toHaveBeenCalled();
+        },
+    );
 });
