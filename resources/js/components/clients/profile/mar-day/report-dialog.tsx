@@ -136,7 +136,7 @@ export function MarReportDialog({
     return (
         <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
             <DialogContent
-                className="max-h-[90vh] overflow-y-auto"
+                className="max-h-[90vh] overflow-x-hidden overflow-y-auto"
                 style={{
                     maxWidth: 'min(92vw, 720px)',
                     width: 'min(92vw, 720px)',
@@ -164,7 +164,6 @@ export function MarReportDialog({
 
                     {range === 'custom' ? (
                         <div className="space-y-2">
-                            <Label>Choose the first and last day</Label>
                             <LeaveCalendarRange
                                 start={custom.start}
                                 end={custom.end}

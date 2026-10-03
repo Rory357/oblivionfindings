@@ -58,6 +58,8 @@ function cellSubline(dose: DayDose, kind: CellKind): string | null {
                 : null;
         case 'overdue':
             return 'not recorded';
+        case 'away':
+            return dose.away_reason ?? null;
         default:
             return null;
     }
@@ -272,6 +274,10 @@ export function MarDayGrid({
                                     }
                                     const kind = cellKind(dose, isToday);
                                     const label = cellLabel(dose, kind);
+                                    const pill =
+                                        kind === 'away'
+                                            ? CELL_META.away.label
+                                            : label;
                                     const blocked = recordBlock(
                                         dose,
                                         kind,
@@ -333,11 +339,11 @@ export function MarDayGrid({
                                                 className="max-w-full"
                                             >
                                                 <span className="truncate">
-                                                    {label}
+                                                    {pill}
                                                 </span>
                                             </StatusBadge>
                                             {sub ? (
-                                                <span className="text-caption text-muted-foreground">
+                                                <span className="text-caption line-clamp-2 max-w-[160px] text-muted-foreground">
                                                     {sub}
                                                 </span>
                                             ) : null}

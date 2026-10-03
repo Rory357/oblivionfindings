@@ -59,12 +59,15 @@ export function dayLabel(
     tomorrow: string,
 ): string {
     const [y, m, d] = date.split('-').map(Number);
-    const words = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-NZ', {
+    const parts = new Intl.DateTimeFormat('en-NZ', {
         weekday: 'short',
         day: 'numeric',
         month: 'short',
         timeZone: 'UTC',
-    });
+    }).formatToParts(new Date(Date.UTC(y, m - 1, d)));
+    const part = (type: string) =>
+        parts.find((p) => p.type === type)?.value ?? '';
+    const words = `${part('weekday')} ${part('day')} ${part('month')}`;
     if (date === today) return `Today, ${words}`;
     if (date === tomorrow) return `Tomorrow, ${words}`;
     return words;
