@@ -41,8 +41,18 @@ export function MedicationSupportPanel({
 }) {
     const ctx = useEntityContextMenu<Medicine>();
     const actions = (m: Medicine): MenuItem[] => [
-        { label: 'View support', icon: Pill, onClick: () => onMedicine?.(m) },
-        ...(plan.can_assess && onMedicine
+        ...(onMedicine
+            ? [
+                  {
+                      label: 'View support',
+                      icon: Pill,
+                      onClick: () => onMedicine(m),
+                  },
+              ]
+            : []),
+        ...(plan.can_assess &&
+        onMedicine &&
+        (!m.controlled || plan.can_set_controlled)
             ? [
                   {
                       label: m.requested_mode

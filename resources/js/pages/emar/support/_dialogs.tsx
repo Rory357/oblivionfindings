@@ -175,6 +175,7 @@ const STORAGE = [
 ];
 type AssessmentForm = Record<(typeof SCORES)[number]['key'], number | null> &
     Record<(typeof CHECKS)[number]['key'], boolean> & {
+        client_request_uuid: string;
         client_id: number;
         supersedes_id: number | null;
         wishes_to_self_administer: boolean | null;
@@ -204,6 +205,7 @@ export function AssessmentDialog({
 }) {
     const prior = plan.assessment;
     const form = useForm<AssessmentForm>({
+        client_request_uuid: crypto.randomUUID(),
         client_id: plan.client_id,
         supersedes_id: prior?.id ?? null,
         wishes_to_self_administer: prior?.wishes_to_self_administer ?? null,
@@ -913,6 +915,7 @@ export function AgreementDialog({
 }) {
     const prev = plan.agreement;
     const form = useForm({
+        client_request_uuid: crypto.randomUUID(),
         agreed_by_role: 'person' as 'person' | 'guardian' | 'epoa',
         agreed_by_name: '',
         method: '' as '' | 'signed' | 'verbal',
@@ -1339,11 +1342,18 @@ export function MedicineSupportDialog({
     onClose: () => void;
 }) {
     const [mode, setMode] = useState<SupportMode>(medicine.mode),
-        [confirm, setConfirm] = useState(false);
+        [confirm, setConfirm] = useState(false),
+        [discard, setDiscard] = useState(false);
     const form = useForm({
+        client_request_uuid: crypto.randomUUID(),
         med_scope: [{ med_id: medicine.id, scope: medicine.mode }],
         confirm_loosening: false,
     });
+    const close = () => {
+        if (form.processing) return;
+        if (mode !== medicine.mode) setDiscard(true);
+        else onClose();
+    };
     const allowed = allowedModes(plan.cap, medicine.controlled);
     const canEdit =
         plan.can_assess &&
@@ -1351,7 +1361,8 @@ export function MedicineSupportDialog({
         !!plan.assessment;
     const send = (confirmed: boolean) =>
         form
-            .transform(() => ({
+            .transform((data) => ({
+                ...data,
                 med_scope: [{ med_id: medicine.id, scope: mode }],
                 confirm_loosening: confirmed,
             }))
@@ -1362,10 +1373,7 @@ export function MedicineSupportDialog({
             });
     return (
         <>
-            <Dialog
-                open
-                onOpenChange={(open) => !open && !form.processing && onClose()}
-            >
+            <Dialog open onOpenChange={(open) => !open && close()}>
                 <DialogContent
                     style={{
                         width: 'min(92vw, 720px)',
@@ -1419,7 +1427,7 @@ export function MedicineSupportDialog({
                     <DialogFooter>
                         <Button
                             variant="outline"
-                            onClick={onClose}
+                            onClick={close}
                             disabled={form.processing}
                         >
                             Close
@@ -1452,6 +1460,15 @@ export function MedicineSupportDialog({
                 description="This new medicine will use the selected support. The assessment cap and agreement still apply."
                 confirmText="Set support"
             />
+            <ConfirmDialog
+                open={discard}
+                onClose={() => setDiscard(false)}
+                onConfirm={onClose}
+                title="Discard this support change?"
+                description="This choice has not been saved."
+                confirmText="Discard"
+                cancelText="Keep going"
+            />
         </>
     );
 }
@@ -1464,6 +1481,7 @@ export function ConsentDialog({
     onClose: () => void;
 }) {
     const form = useForm({
+        client_request_uuid: crypto.randomUUID(),
         client_medication_id: 'all',
         direction: 'less',
         said: '',

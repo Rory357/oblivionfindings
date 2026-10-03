@@ -1,3 +1,8 @@
+import {
+    EntityContextMenu,
+    useEntityContextMenu,
+    type MenuItem,
+} from '@/components/lists/entity-menu';
 import { EntityTable } from '@/components/lists/entity-table';
 import { ListCaption } from '@/components/lists/list-caption';
 import {
@@ -69,6 +74,27 @@ export default function SupportRecord({
     );
     const [medicine, setMedicine] = useState<Medicine | null>(null),
         [past, setPast] = useState<SupportHistory | null>(null);
+    const historyContext = useEntityContextMenu<SupportHistory>();
+    const changeContext = useEntityContextMenu<Change>();
+    const historyActions = (h: SupportHistory): MenuItem[] => [
+        {
+            label: 'View assessment',
+            icon: ClipboardList,
+            onClick: () => setPast(h),
+        },
+    ];
+    const changeActions = (c: Change): MenuItem[] => [
+        {
+            label: 'View medicine support',
+            icon: Pill,
+            onClick: () =>
+                setMedicine(
+                    support.medicines.find(
+                        (m) => m.id === c.client_medication_id,
+                    ) ?? null,
+                ),
+        },
+    ];
     const activeMedicine = medicine
         ? (support.medicines.find((m) => m.id === medicine.id) ?? medicine)
         : null;
@@ -352,13 +378,10 @@ export default function SupportRecord({
                                             ),
                                     },
                                 ]}
-                                actionsFor={(h) => [
-                                    {
-                                        label: 'View assessment',
-                                        icon: ClipboardList,
-                                        onClick: () => setPast(h),
-                                    },
-                                ]}
+                                actionsFor={historyActions}
+                                onRowContextMenu={(e, h) =>
+                                    historyContext.open(e, h)
+                                }
                                 onOpen={setPast}
                                 minWidth={500}
                             />
@@ -584,20 +607,10 @@ export default function SupportRecord({
                                             c.recorded_by ?? 'Not recorded',
                                     },
                                 ]}
-                                actionsFor={(c) => [
-                                    {
-                                        label: 'View medicine support',
-                                        icon: Pill,
-                                        onClick: () =>
-                                            setMedicine(
-                                                support.medicines.find(
-                                                    (m) =>
-                                                        m.id ===
-                                                        c.client_medication_id,
-                                                ) ?? null,
-                                            ),
-                                    },
-                                ]}
+                                actionsFor={changeActions}
+                                onRowContextMenu={(e, c) =>
+                                    changeContext.open(e, c)
+                                }
                                 rowHeight="content"
                                 minWidth={720}
                             />
@@ -644,6 +657,26 @@ export default function SupportRecord({
                         plan={support}
                         medicine={activeMedicine}
                         onClose={() => setMedicine(null)}
+                    />
+                )}
+                {historyContext.ctx && (
+                    <EntityContextMenu
+                        x={historyContext.ctx.x}
+                        y={historyContext.ctx.y}
+                        title="Assessment"
+                        icon={ClipboardList}
+                        items={historyActions(historyContext.ctx.record)}
+                        onClose={historyContext.close}
+                    />
+                )}
+                {changeContext.ctx && (
+                    <EntityContextMenu
+                        x={changeContext.ctx.x}
+                        y={changeContext.ctx.y}
+                        title="Support change"
+                        icon={History}
+                        items={changeActions(changeContext.ctx.record)}
+                        onClose={changeContext.close}
                     />
                 )}
                 {past && (
