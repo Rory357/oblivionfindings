@@ -1233,7 +1233,7 @@ class EnhancedMarService
                         ];
                     }
                     if ($reofferOfId !== null && $existing !== null) {
-                        $reofferFollowUp = $this->recordingContract->openReofferFollowUp($existing, $reofferOfId, $adminAt);
+                        $reofferFollowUp = $this->recordingContract->openReofferFollowUp($existing, $reofferOfId);
                         if ($reofferFollowUp !== null) {
                             $existing = null;
                         } elseif ($existing->status === 'refused') {
@@ -1291,18 +1291,16 @@ class EnhancedMarService
 
                         // NF-18: never assume one unit. The quantity is what the
                         // worker entered, or the order's own amount when it is in
-                        // the stock's unit; otherwise it must be entered.
-                        $quantity = ($data['quantity_administered'] ?? null) !== null
-                            ? MedicationStockQuantity::normalizeMovement($data['quantity_administered'])
-                            : $this->recordingContract->stockQuantity($data, $medication, $stock->unit);
-                        if ($quantity === null || ! MedicationStockQuantity::greaterThan($quantity, 0)) {
-                            return [
-                                'success' => false,
-                                'error' => 'Enter how many were taken from the controlled-drug stock for this dose.',
-                                'error_field' => 'quantity_administered',
-                            ];
+                        // the stock's unit; otherwise it must be entered. P0-2:
+                        // less or more is always entered, and anything taken but
+                        // not given is the dose's witnessed waste.
+                        $stockUse = $this->recordingContract->controlledStockUse($data, $medication, $stock->unit);
+                        if (($stockUse['success'] ?? null) === false) {
+                            return $stockUse;
                         }
+                        $quantity = $stockUse['removed'];
                         $data['quantity_administered'] = $quantity;
+                        $data['quantity_wasted'] = $stockUse['wasted'];
 
                         $before = MedicationStockQuantity::normalize($stock->on_hand);
                         if (MedicationStockQuantity::greaterThan($quantity, $before)) {
@@ -1342,7 +1340,10 @@ class EnhancedMarService
                 $admin->status = $data['status'];
                 $admin->reason = $data['reason'] ?? null;
                 $admin->reason_code = $data['reason_code'] ?? null;
-                $admin->dose_given = $data['dose_given'] ?? null;
+                // P1-3: less or more than ordered records the amount actually
+                // given as the dose, never the order's own dose text.
+                $admin->dose_given = $this->recordingContract->doseGivenText($data, $medication)
+                    ?? ($data['dose_given'] ?? null);
                 $admin->notes = $data['notes'] ?? null;
                 $admin->blood_glucose_level = $data['blood_glucose_level'] ?? null;
                 $admin->pulse_bpm = $data['pulse_bpm'] ?? null;
@@ -1436,6 +1437,7 @@ class EnhancedMarService
                         $data['captured_offline_at'] ?? null,
                         $data['origin_device_id'] ?? null,
                         (bool) ($data['queued_offline'] ?? false),
+                        $data['quantity_wasted'] ?? null,
                     );
                 }
 
@@ -2344,7 +2346,10 @@ class EnhancedMarService
     }
 
     /**
-     * Record controlled drug entry
+     * Record controlled drug entry. $quantity is everything taken from the
+     * stock for the dose; $wasted, when some of it wasn't given, is recorded
+     * as its own witnessed waste entry (the register's disposal type), so the
+     * register always comes down by what physically left the stock (P0-2).
      */
     public function recordControlledDrugEntry(
         ClientMedication $medication,
@@ -2356,6 +2361,7 @@ class EnhancedMarService
         mixed $capturedOfflineAt = null,
         mixed $originDeviceId = null,
         bool $queuedOffline = false,
+        int|float|string|null $wasted = null,
     ): void {
         // NF-18: a register entry records exactly what was taken — never an
         // assumed single unit.
@@ -2363,6 +2369,17 @@ class EnhancedMarService
         if (! MedicationStockQuantity::greaterThan($quantity, 0)) {
             throw ValidationException::withMessages([
                 'quantity_administered' => 'Enter how many were taken from the controlled-drug stock for this dose.',
+            ]);
+        }
+        $wasted = $wasted !== null ? MedicationStockQuantity::normalizeMovement($wasted) : null;
+        if ($wasted !== null && ! MedicationStockQuantity::greaterThan($quantity, $wasted)) {
+            throw ValidationException::withMessages([
+                'quantity_administered' => 'More was given than was taken from the stock. Enter how many were taken from the controlled-drug stock for this dose.',
+            ]);
+        }
+        if ($wasted !== null && $witnessedBy === null) {
+            throw ValidationException::withMessages([
+                'witnessed_by' => 'A second person must witness what wasn’t given.',
             ]);
         }
         $stock = $medication->stock;
@@ -2380,30 +2397,14 @@ class EnhancedMarService
             ]);
         }
 
+        $given = $wasted !== null ? MedicationStockQuantity::subtract($quantity, $wasted) : $quantity;
+        $afterDose = MedicationStockQuantity::subtract($before, $given);
         $after = MedicationStockQuantity::subtract($before, $quantity);
         $stock->on_hand = $after;
         $stock->last_counted_at = now();
         $stock->save();
 
-        // Create controlled drug register entry
-        $entry = ClientControlledDrugEntry::create([
-            'client_id' => $admin->client_id,
-            'client_medication_id' => $medication->id,
-            'shift_id' => $admin->shift_id,
-            'service_context_id' => $admin->service_context_id,
-            'entry_type' => 'administered',
-            'quantity' => $quantity,
-            'unit' => $stock?->unit,
-            'on_hand_before' => $before,
-            'on_hand_after' => $after,
-            'reason' => $admin->reason,
-            'notes' => $admin->notes,
-            'recorded_at' => $admin->administered_at,
-            'recorded_by' => $recordedBy,
-            'witnessed_by' => $witnessedBy,
-        ]);
-
-        AuditLogger::logOrFail('medications.controlled.entry.record', $entry, [
+        $provenance = [
             'actor_id' => $recordedBy,
             'client_id' => $admin->client_id,
             'client_medication_id' => $medication->id,
@@ -2412,11 +2413,63 @@ class EnhancedMarService
             'origin_device_id' => $originDeviceId,
             'queued_offline' => $queuedOffline,
             'stock_id' => $stock->id,
-            'entry_type' => 'administration',
             'witnessed_by' => $witnessedBy,
             'witness_method' => $admin->witness_method,
             'witnessed_at' => $admin->witnessed_at?->toIso8601String(),
+        ];
+
+        // Create controlled drug register entry
+        $entry = ClientControlledDrugEntry::create([
+            'client_id' => $admin->client_id,
+            'client_medication_id' => $medication->id,
+            'shift_id' => $admin->shift_id,
+            'service_context_id' => $admin->service_context_id,
+            'entry_type' => 'administered',
+            'quantity' => $given,
+            'unit' => $stock?->unit,
             'on_hand_before' => $before,
+            'on_hand_after' => $afterDose,
+            'reason' => $admin->reason,
+            'notes' => $admin->notes,
+            'recorded_at' => $admin->administered_at,
+            'recorded_by' => $recordedBy,
+            'witnessed_by' => $witnessedBy,
+        ]);
+
+        AuditLogger::logOrFail('medications.controlled.entry.record', $entry, [
+            ...$provenance,
+            'entry_type' => 'administration',
+            'on_hand_before' => $before,
+            'on_hand_after' => $afterDose,
+        ]);
+
+        if ($wasted === null) {
+            return;
+        }
+
+        $reasonLabel = RecordingContract::AMOUNT_REASONS[(string) $admin->amount_reason] ?? null;
+        $waste = ClientControlledDrugEntry::create([
+            'client_id' => $admin->client_id,
+            'client_medication_id' => $medication->id,
+            'shift_id' => $admin->shift_id,
+            'service_context_id' => $admin->service_context_id,
+            'entry_type' => 'disposal',
+            'quantity' => $wasted,
+            'unit' => $stock?->unit,
+            'on_hand_before' => $afterDose,
+            'on_hand_after' => $after,
+            'reason' => 'Wasted at a dose — taken from the stock but not given'.($reasonLabel !== null ? ' ('.$reasonLabel.')' : '').'.',
+            'notes' => $admin->notes,
+            'recorded_at' => $admin->administered_at,
+            'recorded_by' => $recordedBy,
+            'witnessed_by' => $witnessedBy,
+        ]);
+
+        AuditLogger::logOrFail('medications.controlled.entry.record', $waste, [
+            ...$provenance,
+            'entry_type' => 'disposal',
+            'client_medication_administration_id' => $admin->id,
+            'on_hand_before' => $afterDose,
             'on_hand_after' => $after,
         ]);
     }

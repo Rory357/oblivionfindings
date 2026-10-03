@@ -193,6 +193,24 @@ final class RecordingContractEnforcer
     }
 
     /**
+     * P1-3: the dose text for less or more than ordered — the amount actually
+     * given, never the order's own dosage. Null otherwise (the caller's text
+     * stands).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function doseGivenText(array $data, ClientMedication $medication): ?string
+    {
+        if (($data['status'] ?? null) !== 'given'
+            || ! in_array($data['amount_mode'] ?? null, [RecordingContract::AMOUNT_LESS, RecordingContract::AMOUNT_MORE], true)) {
+            return null;
+        }
+        $quantity = $this->decimal($data['quantity_given'] ?? null);
+
+        return $quantity === null ? null : $this->amountLabel($quantity, $medication);
+    }
+
+    /**
      * NF-18: how much controlled stock a "given" dose uses when the worker
      * didn't say. Only the order's own amount (or the worker's less/more
      * figure) in the stock's own unit counts; anything else must be entered.
@@ -214,6 +232,71 @@ final class RecordingContractEnforcer
         return $quantity === null || $quantity <= 0 ? null : $this->movement($quantity);
     }
 
+    /**
+     * P0-2: what a controlled "given" dose takes off the stock, and how much
+     * of that was not given (witnessed waste). Everything taken comes off, so
+     * the register is never left above the physical count:
+     *
+     *  - less or more than ordered: how many were taken from the stock is
+     *    entered, never worked out from the order;
+     *  - what was taken can't be less than what was given;
+     *  - more taken than given: the rest is the dose's witnessed waste;
+     *  - less than ordered when the dose and stock are counted in different
+     *    units can't be balanced here, so it is refused until P07b.
+     *
+     * The dose amount is only compared when the dialog said how much was
+     * given (amount_mode); a caller that doesn't (Fleet, the older API)
+     * records what it took, as before.
+     *
+     * @param  array<string, mixed>  $data  quantity_administered already normalised
+     * @return array{removed: string, wasted: ?string}|array{success: false, error: string, error_field: string}
+     */
+    public function controlledStockUse(array $data, ClientMedication $medication, ?string $stockUnit): array
+    {
+        $mode = $data['amount_mode'] ?? null;
+        $partial = in_array($mode, [RecordingContract::AMOUNT_LESS, RecordingContract::AMOUNT_MORE], true);
+        $comparable = $this->unitKey($medication->dose_unit) !== null
+            && $this->unitKey($medication->dose_unit) === $this->unitKey($stockUnit);
+
+        if ($mode === RecordingContract::AMOUNT_LESS && ! $comparable) {
+            return $this->error(
+                'amount_mode',
+                'Less than ordered can’t be recorded for this controlled medicine here: its dose and stock are counted in different units. '
+                    .'Record what was removed and report the remainder through Controlled drugs › Loss.',
+            );
+        }
+
+        $entered = ($data['quantity_administered'] ?? null) !== null
+            ? MedicationStockQuantity::normalizeMovement($data['quantity_administered'])
+            : null;
+        if ($partial && $entered === null) {
+            return $this->error('quantity_administered', 'Enter how many were taken from the controlled-drug stock for this dose.');
+        }
+
+        $removed = $entered ?? $this->stockQuantity($data, $medication, $stockUnit);
+        if ($removed === null || ! MedicationStockQuantity::greaterThan($removed, 0)) {
+            return $this->error('quantity_administered', 'Enter how many were taken from the controlled-drug stock for this dose.');
+        }
+
+        $given = $mode !== null && $comparable ? $this->stockQuantity($data, $medication, $stockUnit) : null;
+        if ($given === null) {
+            return ['removed' => $removed, 'wasted' => null];
+        }
+        if (MedicationStockQuantity::greaterThan($given, $removed)) {
+            return $this->error(
+                'quantity_administered',
+                'More was given than was taken from the stock. Enter how many were taken from the controlled-drug stock for this dose.',
+            );
+        }
+
+        return [
+            'removed' => $removed,
+            'wasted' => MedicationStockQuantity::greaterThan($removed, $given)
+                ? MedicationStockQuantity::subtract($removed, $given)
+                : null,
+        ];
+    }
+
     /** A stock-precision quantity, or null when it doesn't fit two decimals. */
     private function movement(float $quantity): ?string
     {
@@ -228,13 +311,13 @@ final class RecordingContractEnforcer
 
     /**
      * The refusal a re-offer follows, when it may still be re-offered: the
-     * slot's current record is that refusal, it was made on the same NZ day,
-     * and its follow-up is still open. Returns the follow-up (locked).
+     * slot's current record is that refusal, it was made today (NZ, by the
+     * server's clock — never a time the device sends), and its follow-up is
+     * still open. Returns the follow-up (locked).
      */
     public function openReofferFollowUp(
         ClientMedicationAdministration $existing,
         int $reofferOfId,
-        CarbonInterface $administeredAt,
     ): ?MedicationRefusalFollowup {
         $rootId = $existing->is_correction && $existing->corrected_of_id !== null
             ? (int) $existing->corrected_of_id
@@ -247,7 +330,7 @@ final class RecordingContractEnforcer
         $tz = (string) config('app.worker_timezone', 'Pacific/Auckland');
         if ($refusedAt === null
             || $refusedAt->setTimezone($tz)->toDateString()
-                !== CarbonImmutable::instance($administeredAt)->setTimezone($tz)->toDateString()) {
+                !== CarbonImmutable::now()->setTimezone($tz)->toDateString()) {
             return null;
         }
 

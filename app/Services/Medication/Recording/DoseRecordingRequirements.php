@@ -16,6 +16,7 @@ use App\Services\Medication\DoseSlots\DoseOrderTimelineFactory;
 use App\Services\Medication\DoseSlots\DoseWindowResolver;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationCompetencyRestrictionRules;
+use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Medication\Settings\MedicineRuleWording;
 use App\Services\Medication\WitnessPinService;
@@ -26,6 +27,7 @@ use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 /**
  * eMAR P01 — what recording one dose needs and allows, for the person
@@ -37,10 +39,13 @@ use Illuminate\Support\Collection;
  * The answer is facts and keys, never copy: the dialog words them (P01).
  *
  *  - block_all: nothing can be recorded (not clocked in, not on this
- *    person's shift, house outside your access, as-needed limit reached);
+ *    person's shift, house outside your access, a controlled medicine you
+ *    may not record, order waiting to be checked, as-needed limit reached).
+ *    The answer is then only the reason and the house: nothing about the
+ *    person or the order;
  *  - block_given: "given" can't be recorded, a refusal, withhold or absence
- *    still can (order waiting to be checked, covert authorisation overdue,
- *    an allergy or other safety block, no eligible witness);
+ *    still can (covert authorisation overdue, an allergy or other safety
+ *    block, no eligible witness);
  *  - competency: current, expired / not current, restricted (Block),
  *    co-signer (restricted, Co-signer mode) or a competency area not passed;
  *  - second person, rule readings, allergy status and match, covert plan,
@@ -70,6 +75,8 @@ final class DoseRecordingRequirements
 
     public const BLOCK_PRN_LIMIT = 'prnLimit';
 
+    public const BLOCK_CONTROLLED_NOT_ALLOWED = 'controlledNotAllowed';
+
     /** Rule observation token => what the dialog asks for. */
     public const OBSERVATIONS = [
         'blood_glucose' => ['label' => 'Blood sugar (BSL)', 'unit' => 'mmol/L', 'fields' => ['blood_glucose_level']],
@@ -94,28 +101,58 @@ final class DoseRecordingRequirements
         private readonly DoseWindowResolver $windows,
         private readonly MarScheduleService $schedule,
         private readonly RecordingContractEnforcer $contract,
+        private readonly MedicationRecordAccess $recordAccess,
     ) {}
 
     /**
-     * Not found unless the viewer may see this order: its person's house is
-     * in their access, or a clocked-in shift of theirs includes the person
-     * (someone who moved house mid-shift). Controlled orders also need
-     * controlled-medicine access.
+     * Not found unless the viewer may see this order: they may read this
+     * person's medicines (the person gate every chart read uses), and the
+     * person's house is in their access or a clocked-in shift of theirs
+     * includes the person (someone who moved house mid-shift). Controlled
+     * orders also need controlled-medicine access.
      */
     public function assertVisible(User $viewer, ClientMedication $order): void
     {
-        $client = $order->client;
-        abort_unless(
-            $client instanceof Client
-            && $order->deleted_at === null
-            && $order->superseded_by === null
-            && $viewer->canDo('medications.administer.record')
-            && (! $order->controlled_drug || $viewer->canDo('medications.controlled.view')),
-            404,
-        );
+        abort_unless($this->isVisible($viewer, $order), 404);
+    }
 
-        $siteVisible = in_array((int) $client->site_id, $this->siteAccess->accessibleSiteIds($viewer, self::SITE_BYPASS), true);
-        abort_unless($siteVisible || $this->hasShiftWith($viewer, $client, CarbonImmutable::now()), 404);
+    /** assertVisible() as a yes/no, for lists that leave unseen rows out. */
+    public function isVisible(User $viewer, ClientMedication $order, ?RequirementsCache $cache = null): bool
+    {
+        $client = $order->client;
+        if (! $client instanceof Client
+            || $order->deleted_at !== null
+            || $order->superseded_by !== null
+            || ! $viewer->canDo('medications.administer.record')
+            || ($order->controlled_drug && ! $viewer->canDo('medications.controlled.view'))) {
+            return false;
+        }
+
+        $clientId = (int) $client->id;
+        if ($cache !== null && array_key_exists($clientId, $cache->personVisible)) {
+            return $cache->personVisible[$clientId];
+        }
+
+        $visible = $this->personReadable($viewer, $client)
+            && (in_array((int) $client->site_id, $cache?->siteIds ?? $this->siteAccess->accessibleSiteIds($viewer, self::SITE_BYPASS), true)
+                || $this->hasShiftWith($viewer, $client, CarbonImmutable::now()));
+        if ($cache !== null) {
+            $cache->personVisible[$clientId] = $visible;
+        }
+
+        return $visible;
+    }
+
+    /** The one per-person medication record gate (MedicationRecordAccess, P02). */
+    private function personReadable(User $viewer, Client $client): bool
+    {
+        try {
+            $this->recordAccess->assertReadable($viewer, $client);
+
+            return true;
+        } catch (HttpExceptionInterface) {
+            return false;
+        }
     }
 
     /**
@@ -150,28 +187,45 @@ final class DoseRecordingRequirements
      * belong to the viewer or the house are read once.
      *
      * @param  iterable<array{order: ClientMedication, due_at: ?CarbonInterface}>  $doses
-     * @return array<string, array{block_all: ?string, block_given: ?string, competency: string, second_person: ?string, witness_available: bool, allergy_match: bool, not_simple: list<string>, window: ?string}>
+     * @return array<string, array{block_all: ?string, block_given: ?string, competency: ?string, second_person: ?string, witness_available: bool, allergy_match: bool, not_simple: list<string>, window: ?string}>
      */
     public function forBoard(User $viewer, iterable $doses, ?CarbonInterface $now = null): array
     {
         $now = CarbonImmutable::instance($now ?? CarbonImmutable::now())->utc();
         $cache = new RequirementsCache;
+        $cache->siteIds = $this->siteAccess->accessibleSiteIds($viewer, self::SITE_BYPASS);
         $rows = [];
 
         foreach ($doses as $dose) {
             $order = $dose['order'];
+            // The board answers only for doses the viewer may see (person
+            // gate, controlled access): anything else is left out, unnamed.
+            if (! $this->isVisible($viewer, $order, $cache)) {
+                continue;
+            }
             $dueAt = $dose['due_at'] !== null ? CarbonImmutable::instance($dose['due_at'])->utc() : null;
             $full = $this->build($viewer, $order, $now, $dueAt, $cache, detail: false);
-            $rows[self::boardKey((int) $order->id, $dueAt)] = [
-                'block_all' => $full['block_all']['key'] ?? null,
-                'block_given' => $full['block_given']['key'] ?? null,
-                'competency' => $full['competency']['state'],
-                'second_person' => $full['second_person']['kind'],
-                'witness_available' => $full['second_person']['anyone_available'],
-                'allergy_match' => $full['allergy']['match'] !== null,
-                'not_simple' => $full['not_simple'],
-                'window' => $full['due']['state'] ?? null,
-            ];
+            $rows[self::boardKey((int) $order->id, $dueAt)] = $full['block_all'] !== null
+                ? [
+                    'block_all' => $full['block_all']['key'],
+                    'block_given' => null,
+                    'competency' => null,
+                    'second_person' => null,
+                    'witness_available' => false,
+                    'allergy_match' => false,
+                    'not_simple' => ['blocked'],
+                    'window' => null,
+                ]
+                : [
+                    'block_all' => null,
+                    'block_given' => $full['block_given']['key'] ?? null,
+                    'competency' => $full['competency']['state'],
+                    'second_person' => $full['second_person']['kind'],
+                    'witness_available' => $full['second_person']['anyone_available'],
+                    'allergy_match' => $full['allergy']['match'] !== null,
+                    'not_simple' => $full['not_simple'],
+                    'window' => $full['due']['state'] ?? null,
+                ];
         }
 
         return $rows;
@@ -198,7 +252,24 @@ final class DoseRecordingRequirements
         $siteId = (int) $client->site_id;
 
         $blockAll = $this->blockAll($viewer, $client, $now, $cache);
+        // The record path refuses every outcome on a controlled medicine
+        // without controlled-recording access, and (P1-2) on an order waiting
+        // for its check, so neither can be recorded at all.
+        if ($blockAll === null && $order->controlled_drug && ! $viewer->canDo('medications.controlled.record')) {
+            $blockAll = ['key' => self::BLOCK_CONTROLLED_NOT_ALLOWED, 'facts' => []];
+        }
+        if ($blockAll === null && ! $order->isVerifiedForAdministration()) {
+            $blockAll = ['key' => self::BLOCK_AWAITING_VERIFICATION, 'facts' => []];
+        }
+        if ($blockAll !== null) {
+            return $this->blockedOnly($order, $client, $blockAll, $now, $detail);
+        }
+
         $safetyCheck = $this->safety->performSafetyCheck($client, $order, null, null, $viewer->canDo('medications.controlled.view'));
+        if ($order->is_prn && $this->prnLimitReached($safetyCheck)) {
+            return $this->blockedOnly($order, $client, $this->prnLimitBlock($order, $safetyCheck), $now, $detail);
+        }
+
         $adminRules = $this->rules->requirementsFor($order);
         $competency = $this->competencyFor($viewer, $order, $siteId, $now, $cache);
         $requiresCosigner = $competency['state'] === 'cosigner';
@@ -210,14 +281,9 @@ final class DoseRecordingRequirements
             default => null,
         };
         $candidates = $cache->candidates[$siteId] ??= $this->candidates($viewer, $siteId, $now);
-        $anyoneAvailable = $candidates->contains(fn (array $c): bool => $c['eligible'] && $c['pin'] === WitnessPinService::STATUS_SET);
+        $anyoneAvailable = $candidates->contains(fn (array $c): bool => $c['can_confirm']);
 
-        if ($blockAll === null && $order->is_prn && $this->prnLimitReached($safetyCheck)) {
-            $blockAll = $this->prnLimitBlock($order, $safetyCheck);
-        }
-        $blockGiven = $blockAll === null
-            ? $this->blockGiven($order, $safetyCheck, $kind, $anyoneAvailable)
-            : null;
+        $blockGiven = $this->blockGiven($order, $safetyCheck, $kind, $anyoneAvailable);
 
         $allergy = $this->allergyFor($client, $safetyCheck, $cache);
         $covert = $this->covertFor($order);
@@ -228,7 +294,7 @@ final class DoseRecordingRequirements
             'kind' => $order->is_prn ? 'prn' : 'scheduled',
             'order' => $orderFacts,
             'due' => $due,
-            'block_all' => $blockAll,
+            'block_all' => null,
             'block_given' => $blockGiven,
             'competency' => $competency,
             'second_person' => [
@@ -238,8 +304,10 @@ final class DoseRecordingRequirements
                     : [],
                 'anyone_available' => $anyoneAvailable,
                 // Q2: a rule's second person (or a smaller amount) may go
-                // unconfirmed only when nobody on shift can confirm.
-                'may_go_unconfirmed' => ! $anyoneAvailable,
+                // unconfirmed only when nobody on shift can confirm. A
+                // witness or a restricted worker's co-signer never can.
+                'may_go_unconfirmed' => ! $anyoneAvailable
+                    && ! in_array($kind, [RecordingContract::SECOND_WITNESS, RecordingContract::SECOND_COSIGNER], true),
                 'candidates' => $detail ? $candidates->values()->all() : [],
             ],
             'observations' => array_values(array_filter(array_map(
@@ -279,6 +347,31 @@ final class DoseRecordingRequirements
         return $result;
     }
 
+    /**
+     * P0-1: when nothing can be recorded the answer is the reason and the
+     * house only — no person, allergy, order, covert plan or colleague
+     * details. An as-needed limit also says when it was last given, so the
+     * worker knows when it can be given again.
+     *
+     * @param  array{key: string, facts: array<string, mixed>}  $blockAll
+     * @return array<string, mixed>
+     */
+    private function blockedOnly(ClientMedication $order, Client $client, array $blockAll, CarbonImmutable $now, bool $detail): array
+    {
+        $result = [
+            'kind' => $order->is_prn ? 'prn' : 'scheduled',
+            'block_all' => [
+                'key' => $blockAll['key'],
+                'facts' => ['house' => $client->site?->name, ...$blockAll['facts']],
+            ],
+        ];
+        if ($detail) {
+            $result['checked_at'] = $now->toIso8601String();
+        }
+
+        return $result;
+    }
+
     /** @return array{key: string, facts: array<string, mixed>}|null */
     private function blockAll(User $viewer, Client $client, CarbonImmutable $now, RequirementsCache $cache): ?array
     {
@@ -294,31 +387,19 @@ final class DoseRecordingRequirements
 
         $siteIds = $cache->siteIds ??= $this->siteAccess->accessibleSiteIds($viewer, self::SITE_BYPASS);
         if (! in_array((int) $client->site_id, $siteIds, true)) {
-            return ['key' => self::BLOCK_SITE_NOT_APPROVED, 'facts' => ['house' => $client->site?->name]];
+            return ['key' => self::BLOCK_SITE_NOT_APPROVED, 'facts' => []];
         }
 
-        $clockedInShift = $this->clockedInShiftAtSite($viewer, (int) $client->site_id, $now);
-        if ($clockedInShift !== null) {
-            return ['key' => self::BLOCK_NOT_ON_SHIFT, 'facts' => [
-                'house' => $client->site?->name,
-                'shift_starts_at' => DoseOrderTimelineFactory::rawInstant($clockedInShift->getRawOriginal('starts_at'))?->toIso8601String(),
-                'shift_ends_at' => DoseOrderTimelineFactory::rawInstant($clockedInShift->getRawOriginal('ends_at'))?->toIso8601String(),
-            ]];
+        if ($this->clockedInShiftAtSite($viewer, (int) $client->site_id, $now) !== null) {
+            return ['key' => self::BLOCK_NOT_ON_SHIFT, 'facts' => []];
         }
 
-        return ['key' => self::BLOCK_NOT_CLOCKED_IN, 'facts' => ['house' => $client->site?->name]];
+        return ['key' => self::BLOCK_NOT_CLOCKED_IN, 'facts' => []];
     }
 
     /** @return array{key: string, facts: array<string, mixed>}|null */
     private function blockGiven(ClientMedication $order, array $safetyCheck, ?string $kind, bool $anyoneAvailable): ?array
     {
-        if (! $order->isVerifiedForAdministration()) {
-            return ['key' => self::BLOCK_AWAITING_VERIFICATION, 'facts' => [
-                'prescriber' => $order->prescriber,
-                'created_at' => DoseOrderTimelineFactory::rawInstant($order->getRawOriginal('created_at'))?->toIso8601String(),
-            ]];
-        }
-
         $covert = $order->covertAuthorisation;
         if ($covert !== null && $covert->isExpired()) {
             return ['key' => self::BLOCK_COVERT_MISSING, 'facts' => [
@@ -370,9 +451,14 @@ final class DoseRecordingRequirements
             fn ($w): bool => is_array($w) && in_array($w['type'] ?? null, ['prn_limit', 'prn_interval'], true),
         );
 
+        $prn = $this->prnFacts($order);
+
         return ['key' => self::BLOCK_PRN_LIMIT, 'facts' => [
             'type' => $warning['type'] ?? 'prn_limit',
-            ...$this->prnFacts($order),
+            'count_24h' => $prn['count_24h'],
+            'max_24h' => $prn['max_24h'],
+            'min_hours_between' => $prn['min_hours_between'],
+            'last_at' => $prn['last_at'],
         ]];
     }
 
@@ -404,9 +490,11 @@ final class DoseRecordingRequirements
 
     /**
      * Colleagues on shift at the house now (clocked in, or on a shift that
-     * proves presence), and whether each can be the second person.
+     * proves presence), and whether each can confirm this dose: qualified,
+     * current and holding a usable witness PIN. Never why not — a colleague's
+     * competency isn't the recorder's to read.
      *
-     * @return Collection<int, array{id: int, name: string, eligible: bool, pin: string, reasons: list<string>}>
+     * @return Collection<int, array{id: int, name: string, can_confirm: bool}>
      */
     private function candidates(User $viewer, int $siteId, CarbonImmutable $now): Collection
     {
@@ -427,30 +515,12 @@ final class DoseRecordingRequirements
             ->all();
         $pins = $this->pins->pickerRows($users)->keyBy('id');
 
-        return $users->map(function (User $user) use ($eligibleIds, $pins, $siteId, $now): array {
-            $eligible = in_array((int) $user->id, $eligibleIds, true);
-            $pin = (string) ($pins[(int) $user->id]['witness_pin'] ?? WitnessPinService::STATUS_NOT_SET);
-            $reasons = [];
-            if (! $eligible) {
-                if (! $user->canDo('medications.controlled.witness')) {
-                    $reasons[] = 'not_a_witness';
-                } else {
-                    $decision = $this->competency->evaluate($user, $siteId, $now);
-                    $reasons[] = ($decision['allowed'] ?? false) ? 'not_eligible' : 'competency_not_current';
-                }
-            }
-            if ($pin !== WitnessPinService::STATUS_SET) {
-                $reasons[] = 'pin_'.$pin;
-            }
-
-            return [
-                'id' => (int) $user->id,
-                'name' => (string) $user->name,
-                'eligible' => $eligible,
-                'pin' => $pin,
-                'reasons' => $reasons,
-            ];
-        })->values();
+        return $users->map(fn (User $user): array => [
+            'id' => (int) $user->id,
+            'name' => (string) $user->name,
+            'can_confirm' => in_array((int) $user->id, $eligibleIds, true)
+                && ($pins[(int) $user->id]['witness_pin'] ?? WitnessPinService::STATUS_NOT_SET) === WitnessPinService::STATUS_SET,
+        ])->values();
     }
 
     /** @return Collection<int, int> */

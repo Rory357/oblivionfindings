@@ -15,6 +15,9 @@ final class RequirementsCache
     /** @var list<int>|null */
     public ?array $siteIds = null;
 
+    /** @var array<int, bool> whether the viewer may see each person's medicines */
+    public array $personVisible = [];
+
     /** @var array<int, array<string, mixed>> competency decision by Site */
     public array $competency = [];
 

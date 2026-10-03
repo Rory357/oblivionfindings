@@ -1022,7 +1022,13 @@ class MedicationsApiController extends Controller
                     ], 422);
                 }
 
-                if (($data['queued_offline'] ?? false) && ! $medication->is_prn && ! empty($data['scheduled_for'])) {
+                // A queued re-offer follows the refusal already in the slot:
+                // the record path decides whether it may (P1-1), not this
+                // "already recorded" pre-check.
+                if (($data['queued_offline'] ?? false)
+                    && ! $medication->is_prn
+                    && ! empty($data['scheduled_for'])
+                    && blank($data['reoffer_of_id'] ?? null)) {
                     $isDurableReplay = filled($data['client_request_uuid'] ?? null)
                         && ClientMedicationAdministration::withTrashed()
                             ->where('client_id', $client->id)
