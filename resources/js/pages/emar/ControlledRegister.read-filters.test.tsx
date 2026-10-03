@@ -142,19 +142,16 @@ describe('controlled register reader filters', () => {
         expect(
             screen.getByRole('button', {
                 name: 'Synthetic medicine',
-                exact: true,
             }),
         ).toHaveClass('frontline-tap');
         const mobileRecord = screen
             .getByRole('button', {
                 name: 'Synthetic medicine',
-                exact: true,
             })
             .closest('li');
         expect(mobileRecord).not.toBeNull();
         const actions = within(mobileRecord!).getByRole('button', {
             name: 'Actions for Synthetic medicine',
-            exact: true,
         });
         expect(actions).toHaveClass('frontline-tap', 'frontline-focus');
         fireEvent.pointerDown(actions, { button: 0, ctrlKey: false });
