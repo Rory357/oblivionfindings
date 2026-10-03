@@ -111,14 +111,14 @@ final class MedicationReportDataset
             $totals = ['movements' => $rows->count(), 'witnessed' => $rows->sum('witnessed'), 'receipts' => $rows->where('movement', 'receipt')->count(), 'disposals' => $rows->whereIn('movement', ['disposal', 'destruction'])->count(), 'counts' => $counts, 'discrepancies' => $discrepancies, 'losses' => $losses, 'given' => $given];
         } elseif ($report === 'errors') {
             $bounds = $period->bounds();
-            $records = $this->canonical(MedicationError::query(), $siteIds, $clientIds, true)->whereRaw('COALESCE(occurred_at, reported_at) BETWEEN ? AND ?', $bounds)->orderByRaw('COALESCE(occurred_at, reported_at)')->orderBy('id')->get();
+            $records = $this->errorQuery($actor, $siteIds, $clientIds)->whereRaw('COALESCE(occurred_at, reported_at) BETWEEN ? AND ?', $bounds)->orderByRaw('COALESCE(occurred_at, reported_at)')->orderBy('id')->get();
             // Only recorded facts. Free-text accounts may name a controlled
             // medicine, so they never enter this report or the builder domain.
-            $rows = $records->map(fn ($e) => $this->person($clients->get($e->client_id), $period) + ['reference' => $e->reference_number, 'date' => ($e->occurred_at ?? $e->reported_at)?->timezone('Pacific/Auckland')->toDateString(), 'occurred_at' => ($e->occurred_at ?? $e->reported_at)?->toIso8601String(), 'reported_at' => $e->reported_at?->toIso8601String(), 'error_type' => $e->error_type, 'reached' => $e->reached_client ?? 'unknown', 'harm' => $e->harm_level ?? 'unknown', 'status' => $e->stage(), 'confirmed_sac' => $e->confirmed_sac, 'href' => '/emar/errors?error_id='.$e->id, 'in_error' => $e->status === 'in_error' ? 1 : 0])->values();
+            $rows = $records->map(fn ($e) => array_replace($this->person($clients->get($e->client_id), $period), ['reference' => $e->reference_number, 'date' => ($e->occurred_at ?? $e->reported_at)?->timezone('Pacific/Auckland')->toDateString(), 'occurred_at' => ($e->occurred_at ?? $e->reported_at)?->toIso8601String(), 'reported_at' => $e->reported_at?->toIso8601String(), 'error_type' => $e->error_type, 'reached' => $e->reached_client ?? 'unknown', 'harm' => $e->harm_level ?? 'unknown', 'status' => $e->stage(), 'confirmed_sac' => $e->confirmed_sac, 'href' => '/emar/errors?error='.$e->id, 'in_error' => $e->status === 'in_error' ? 1 : 0]))->values();
             $effective = $rows->where('in_error', 0);
-            $totals = ['reached' => $effective->where('reached', 'yes')->count(), 'near_misses' => $effective->where('reached', 'no')->count(), 'with_harm' => $effective->whereIn('harm', ['minor', 'moderate', 'severe', 'severe_permanent', 'death'])->count(), 'open' => $effective->whereNotIn('status', ['closed', 'resolved'])->count(), 'reach_unknown' => $effective->whereNotIn('reached', ['yes', 'no'])->count()];
+            $totals = ['reached' => $effective->where('reached', 'yes')->count(), 'near_misses' => $effective->where('reached', 'no')->count(), 'with_harm' => $effective->whereIn('harm', ['minor', 'moderate', 'severe', 'severe_permanent', 'death'])->count(), 'open' => $effective->where('status', '!=', 'closed')->count(), 'reach_unknown' => $effective->whereNotIn('reached', ['yes', 'no'])->count()];
         } elseif ($report === 'reviews') {
-            $rows = MedicationReview::query()->whereIn('client_id', $clientIds)->where(fn ($q) => $q->whereBetween('scheduled_date', [$period->from, $period->to])->orWhereBetween('happened_at', $period->bounds())->orWhere(fn ($q) => $q->whereNull('happened_at')->whereBetween('completed_date', [$period->from, $period->to])))->orderBy('scheduled_date')->orderBy('id')->get()->map(fn ($r) => $this->person($clients->get($r->client_id), $period) + ['reference' => 'review:'.$r->id, 'date' => $r->scheduled_date?->toDateString(), 'status' => $r->status, 'happened_at' => $r->happened_at?->toIso8601String(), 'completed_date' => $r->happened_at?->timezone('Pacific/Auckland')->toDateString() ?? $r->completed_date?->toDateString(), 'next_review_date' => $r->next_review_date?->toDateString(), 'href' => '/emar/reviews?review='.$r->id])->values();
+            $rows = MedicationReview::query()->whereIn('client_id', $clientIds)->where(fn ($q) => $q->whereBetween('scheduled_date', [$period->from, $period->to])->orWhereBetween('happened_at', $period->bounds())->orWhere(fn ($q) => $q->whereNull('happened_at')->whereBetween('completed_date', [$period->from, $period->to])))->orderBy('scheduled_date')->orderBy('id')->get()->map(fn ($r) => array_replace($this->person($clients->get($r->client_id), $period), ['reference' => 'review:'.$r->id, 'date' => $r->scheduled_date?->toDateString(), 'status' => $r->status, 'happened_at' => $r->happened_at?->toIso8601String(), 'completed_date' => $r->happened_at?->timezone('Pacific/Auckland')->toDateString() ?? $r->completed_date?->toDateString(), 'next_review_date' => $r->next_review_date?->toDateString(), 'href' => '/emar/reviews?review='.$r->id]))->values();
             $totals = ['due' => $rows->whereBetween('date', [$period->from, $period->to])->count(), 'done' => $rows->where('status', 'completed')->whereBetween('completed_date', [$period->from, $period->to])->count(), 'overdue' => MedicationReview::query()->whereIn('client_id', $clientIds)->whereIn('status', ['scheduled', 'overdue', 'in_progress'])->whereDate('scheduled_date', '<', $now->timezone('Pacific/Auckland')->toDateString())->count()];
         } elseif ($report === 'stock') {
             $query = ClientMedicationStock::query()->whereHas('medication.client', fn ($q) => $q->whereIn('site_id', $siteIds))->with(['medication.client.site:id,name', 'lots']);
@@ -220,6 +220,21 @@ final class MedicationReportDataset
             'medicine' => $a->medication?->historicalDisplayName(), 'dose' => $a->dose_given, 'route' => $a->medication?->route,
             'status' => $a->status, 'due_at' => null, 'window_ends_at' => null, 'recorded_at' => $a->administered_at->toIso8601String(), 'late' => 0, 'away' => 0,
         ])->all();
+    }
+
+    /** P08b's reporter/account axis with current per-person reads on every export recheck. */
+    public function errorQuery(User $actor, array $sites, ?array $clients = null): Builder
+    {
+        $query = $this->canonical(MedicationError::query(), $sites, $clients ?? $this->access->clientIds($actor, $sites), true);
+        if (! $actor->canDo('medications.controlled.view')) {
+            $this->scope->scopeWithoutControlledMedicationRows($query);
+        }
+        if (! $actor->canDo('medications.errors.manage') && ! $actor->canDo('medications.audit.view')) {
+            $query->where(fn ($q) => $q->where('reported_by', $actor->id)
+                ->orWhereHas('entries', fn ($entries) => $entries->where('kind', 'account')->where('actor_id', $actor->id)));
+        }
+
+        return $query;
     }
 
     private function canonical(Builder $query, array $sites, array $clients, bool $nullMedicine = false): Builder

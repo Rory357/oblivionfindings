@@ -36,7 +36,7 @@ final class MedicationGovernanceReports
         $sites = $access->siteIds($actor, $siteId);
         $period = new MedicationReportPeriod($from, $to);
         $data = app(MedicationReportDataset::class)->read($actor, 'errors', $period, $sites);
-        $used = app(MedicationGovernanceScopeService::class)->scopeCanonicalClientMedicationRows(MedicationError::query(), $sites, true)->whereIn('client_id', $access->clientIds($actor, $sites))->where('status', '!=', 'in_error')->exists();
+        $used = app(MedicationReportDataset::class)->errorQuery($actor, $sites)->where('status', '!=', 'in_error')->exists();
         $base = '/emar/reports?'.http_build_query(['report' => 'errors', 'period' => 'custom', 'date_from' => $from, 'date_to' => $to] + ($siteId ? ['site_id' => $siteId] : []));
 
         return ['HCG-001' => ['value' => $data['totals']['reached'], 'status' => $this->status($data['totals']['reached']), 'recorded' => $used, 'source_href' => $base.'&reached=yes'], 'HCG-005' => ['value' => $data['totals']['near_misses'], 'status' => 'reported', 'recorded' => $used, 'source_href' => $base.'&reached=no']];

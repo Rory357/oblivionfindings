@@ -185,6 +185,31 @@ it('reports actual error occurrence rather than the later report time', function
     expect(app(MedicationReportDataset::class)->read($actor, 'errors', new MedicationReportPeriod('2026-09-29', '2026-09-29'), [$this->site->id])['rows'])->toBe([]);
 });
 
+it('applies the error reporter and account scope before report builder and governance totals', function () {
+    $actor = p09Reader('support_worker', $this->site);
+    $id = Permission::where('key', 'medications.reports.view')->value('id');
+    $actor->permissionOverrides()->syncWithoutDetaching([$id => ['allowed' => true]]);
+    $actor = $actor->fresh();
+    $other = p09Reader('coordinator', $this->site);
+    $make = fn (array $extra = []) => App\Models\MedicationError::create(array_replace(['client_id' => $this->person->id, 'error_type' => 'wrong_dose', 'severity' => 'minor', 'reached_client' => 'yes', 'harm_level' => 'none', 'description' => 'Synthetic account', 'reported_by' => $other->id, 'occurred_at' => now(), 'reported_at' => now(), 'status' => 'resolved', 'workflow_stage' => 'actions'], $extra));
+    $own = $make(['reported_by' => $actor->id]);
+    $account = $make();
+    App\Models\MedicationErrorEntry::create(['medication_error_id' => $account->id, 'kind' => 'account', 'actor_id' => $actor->id, 'text' => 'Synthetic account', 'created_at' => now()]);
+    $make();
+    $controlled = p09Medicine($this->person, ['controlled_drug' => true]);
+    $make(['reported_by' => $actor->id, 'client_medication_id' => $controlled->id]);
+    DB::table('client_medications')->where('id', $controlled->id)->update(['deleted_at' => now()]);
+    $period = new MedicationReportPeriod('2026-09-29', '2026-09-29');
+    $data = app(MedicationReportDataset::class)->read($actor, 'errors', $period, [$this->site->id]);
+    expect(array_column($data['rows'], 'reference'))->toBe([$own->reference_number, $account->reference_number])
+        ->and($data['totals']['reached'])->toBe(2)->and($data['totals']['open'])->toBe(2)
+        ->and($data['rows'][0]['href'])->toBe('/emar/errors?error='.$own->id);
+    $builder = app(App\Services\Medication\Reporting\MedicationBuilderSource::class)->read($actor, ['source' => 'medication_errors', 'date_from' => $period->from, 'date_to' => $period->to], [$this->site->id]);
+    expect(array_column($builder['rows'], 'reference'))->toBe([$own->reference_number, $account->reference_number]);
+    $governance = app(App\Services\Medication\Reporting\MedicationGovernanceReports::class)->values($actor, $period->from, $period->to, $this->site->id);
+    expect($governance['HCG-001']['value'])->toBe(2);
+});
+
 it('reports usable packs while retaining unknown cost and controlled physical balance', function () {
     $actor = p09Reader('admin', $this->site);
     $medicine = p09Medicine($this->person);
@@ -203,10 +228,10 @@ it('reports usable packs while retaining unknown cost and controlled physical ba
 
 it('uses the actual review date and a witnessed ledger entry as count evidence', function () {
     $actor = p09Reader('admin', $this->site);
-    App\Models\MedicationReview::create(['client_id' => $this->person->id, 'review_type' => 'routine', 'status' => 'completed', 'scheduled_date' => '2026-09-10', 'completed_date' => '2026-09-28', 'happened_at' => Carbon::parse('2026-09-29 09:00', 'Pacific/Auckland')->utc()]);
+    $review = App\Models\MedicationReview::create(['client_id' => $this->person->id, 'review_type' => 'routine', 'status' => 'completed', 'scheduled_date' => '2026-09-10', 'completed_date' => '2026-09-28', 'happened_at' => Carbon::parse('2026-09-29 09:00', 'Pacific/Auckland')->utc()]);
     $period = new MedicationReportPeriod('2026-09-29', '2026-09-29');
     $reviews = app(MedicationReportDataset::class)->read($actor, 'reviews', $period, [$this->site->id]);
-    expect($reviews['totals']['done'])->toBe(1)->and($reviews['rows'][0]['completed_date'])->toBe('2026-09-29');
+    expect($reviews['totals']['done'])->toBe(1)->and($reviews['rows'][0]['completed_date'])->toBe('2026-09-29')->and($reviews['rows'][0]['href'])->toBe('/emar/reviews?review='.$review->id);
     $medicine = p09Medicine($this->person, ['controlled_drug' => true]);
     App\Models\ClientControlledDrugEntry::create(['client_id' => $this->person->id, 'client_medication_id' => $medicine->id, 'entry_type' => 'balance_check', 'quantity' => 0, 'on_hand_before' => 8, 'on_hand_after' => 8, 'recorded_at' => now(), 'recorded_by' => $actor->id, 'witnessed_by' => p09Reader('coordinator', $this->site)->id]);
     expect(app(MedicationReportDataset::class)->read($actor, 'controlled', $period, [$this->site->id])['totals']['counts'])->toBe(1);
