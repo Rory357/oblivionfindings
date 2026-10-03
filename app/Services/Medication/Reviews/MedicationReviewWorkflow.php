@@ -382,9 +382,9 @@ final class MedicationReviewWorkflow
         return in_array(strtolower((string) $review->review_type), ['regular', 'routine'], true);
     }
 
-    private function forClient(User $actor, int $clientId, string $capability, Closure $callback): mixed
+    private function forClient(User $actor, int $clientId, string $capability, Closure $callback, array $authorizationUserIds = []): mixed
     {
-        return DB::transaction(fn () => $this->scope->forClient($actor, $clientId, $capability, $callback), 5);
+        return DB::transaction(fn () => $this->scope->forClient($actor, $clientId, $capability, $callback, $authorizationUserIds), 5);
     }
 
     private function forClientRecord(User $actor, MedicationReview $review, string $capability, Closure $callback): mixed
