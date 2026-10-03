@@ -133,7 +133,7 @@ export function MarDayGrid({
                 role="region"
                 aria-label={`Scheduled medication chart for ${personName}. Scroll horizontally to see all dose times.`}
                 tabIndex={0}
-                className="min-w-0 max-w-full overflow-x-auto rounded-lg border border-border outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                className="relative min-w-0 max-w-full overflow-x-auto rounded-lg border border-border outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
             >
                 <table
                     role="grid"
