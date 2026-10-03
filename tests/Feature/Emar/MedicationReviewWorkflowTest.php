@@ -87,6 +87,27 @@ class MedicationReviewWorkflowTest extends TestCase
         $this->assertSame(3, MedicationReview::query()->where('client_id', $client->id)->count());
     }
 
+    public function test_booking_owner_requires_current_review_permission_and_membership_of_the_persons_house(): void
+    {
+        ['actor' => $actor, 'site' => $site, 'client' => $client] = $this->context();
+        $withoutReviewPermission = $this->userAt($site, ['medications.view']);
+        $this->actingAs($actor)->postJson('/emar/reviews', [
+            ...$this->bookingPayload($actor, $client), 'owner_id' => $withoutReviewPermission->id,
+        ])->assertUnprocessable()->assertJsonValidationErrors('owner_id');
+
+        $otherSite = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+        $otherHouseOwner = $this->userAt($otherSite, ['medications.view', 'medications.reviews.manage']);
+        $this->actingAs($actor)->postJson('/emar/reviews', [
+            ...$this->bookingPayload($actor, $client), 'owner_id' => $otherHouseOwner->id,
+        ])->assertUnprocessable()->assertJsonValidationErrors('owner_id');
+        $this->assertDatabaseCount('medication_reviews', 0);
+        $this->assertDatabaseCount('medication_review_events', 0);
+
+        $owner = $this->userAt($site, ['medications.view', 'medications.reviews.manage']);
+        $review = $this->book($actor, $client, 'regular', ['owner_id' => $owner->id]);
+        $this->assertSame($owner->id, $review->owner_id);
+    }
+
     public function test_booking_uses_the_nz_day_and_requires_an_other_trigger_reason(): void
     {
         ['actor' => $actor, 'client' => $client] = $this->context();

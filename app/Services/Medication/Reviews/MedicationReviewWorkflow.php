@@ -19,6 +19,7 @@ use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -52,7 +53,7 @@ final class MedicationReviewWorkflow
         $this->access->client($actor, $clientId);
 
         return $this->forClient($actor, $clientId, self::MANAGE,
-            function (Client $client, User $lockedActor) use ($input): MedicationReview {
+            function (Client $client, User $lockedActor, Collection $lockedUsers) use ($input): MedicationReview {
                 $this->access->assertReadable($lockedActor, $client);
                 $this->assertActive($client);
                 $data = Validator::make($input, [
@@ -79,7 +80,7 @@ final class MedicationReviewWorkflow
                         return $existing;
                     }
                 }
-                $this->assertOwner($lockedActor, $client, (int) $data['owner_id']);
+                $this->assertOwner($lockedUsers->get((int) $data['owner_id']), $client);
                 if ($data['review_type'] === 'regular' && $this->regularOpen($client)->exists()) {
                     throw ValidationException::withMessages(['review_type' => 'A regular review is already booked. Move that review instead.']);
                 }
@@ -425,11 +426,15 @@ final class MedicationReviewWorkflow
             'watch_text' => $outcome === 'watch' ? trim($data['watch_text']) : null, 'watch_until' => $outcome === 'watch' ? $data['watch_until'] : null];
     }
 
-    private function assertOwner(User $actor, Client $client, int $ownerId): void
+    private function assertOwner(?User $candidate, Client $client): void
     {
-        $candidate = User::query()->find($ownerId);
+        // The governing scope already locked and validated this current staff
+        // member's User, RBAC and HR evidence. Do not replace it with a snapshot read.
+        $profile = $candidate?->hrEmployeeProfile;
+        $siteIds = collect([$profile?->primary_site_id, ...($profile?->secondary_site_ids ?? [])])
+            ->map(fn ($siteId): int => (int) $siteId);
         $eligible = $candidate !== null && $candidate->canDo(self::MANAGE)
-            && $this->scope->staffPicker([(int) $client->site_id])->contains(fn (array $row) => (int) $row['id'] === $ownerId);
+            && $profile !== null && $siteIds->contains((int) $client->site_id);
         if (! $eligible) {
             throw ValidationException::withMessages(['owner_id' => 'Choose a current review owner at this person’s house.']);
         }
