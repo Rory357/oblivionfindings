@@ -539,3 +539,5 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         Route::get('/pdf/round-sheet', [EmarPdfController::class, 'roundSheet'])->name('emar.pdf.round_sheet');
     });
 });
+
+require __DIR__.'/emar-stock.php';

@@ -7,6 +7,10 @@ return [
     // P02-4) and the switch is then removed.
     'person_record' => env('EMAR_PERSON_RECORD', 'legacy'),
 
+    // P06 release gate: enable only after every stock writer and P07 ledger
+    // adapter are integrated. This is not a clinical policy setting.
+    'stock_lots_enabled' => env('MEDICATION_STOCK_LOTS_ENABLED', false),
+
     // Dose timing defaults. Medication › Settings › Rounds & timing saves the
     // organisation's own values; DoseTimingSettings reads them, falling back
     // to these until someone saves one.

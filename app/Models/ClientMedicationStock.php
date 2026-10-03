@@ -32,6 +32,7 @@ class ClientMedicationStock extends Model
     protected $casts = [
         'on_hand' => 'decimal:2',
         'last_counted_at' => 'datetime',
+        'lots_started_at' => 'datetime',
         'expiry_date' => 'date',
         'last_reorder_alert_at' => 'datetime',
     ];
@@ -39,6 +40,11 @@ class ClientMedicationStock extends Model
     public function medication()
     {
         return $this->belongsTo(ClientMedication::class, 'client_medication_id');
+    }
+
+    public function lots()
+    {
+        return $this->hasMany(MedicationStockLot::class, 'client_medication_stock_id');
     }
 
     // ─── Scopes ─────────────────────────────────────────────
@@ -120,3 +126,5 @@ class ClientMedicationStock extends Model
         return $this->isLowStock() || $this->isExpiringSoon() || $this->isExpired();
     }
 }
+
+
