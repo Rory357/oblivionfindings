@@ -434,6 +434,8 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
             'reports.medications',
             'reports.medications.export_mar',
             'reports.medications.export_discrepancies',
+            'api.medications.reports',
+            'api.medications.reports.export',
         ] as $routeName) {
             $middleware = Route::getRoutes()->getByName($routeName)?->gatherMiddleware() ?? [];
             $this->assertContains(
@@ -442,7 +444,7 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
                 $routeName,
             );
             $this->assertNotContains('permission:medications.reports.export|reports.viewAny', $middleware, $routeName);
-            if (! in_array($routeName, ['emar.reports', 'emar.reports.export', 'reports.medications'], true)) {
+            if (! in_array($routeName, ['emar.reports', 'emar.reports.export', 'reports.medications', 'api.medications.reports'], true)) {
                 $this->assertContains('permission:medications.reports.export', $middleware, $routeName);
             }
             $this->assertNotContains('permission:medications.view', $middleware, $routeName);

@@ -294,6 +294,19 @@ class ControlledMedicationReportAuthorizationTest extends TestCase
                 ->missing('can_record_controlled'));
     }
 
+    public function test_exact_api_report_reader_does_not_need_export_authority_and_cannot_export(): void
+    {
+        $actor = $this->userWithPermissions(['medications.reports.view', 'sites.viewAll']);
+        $site = Site::factory()->create(['is_active' => true]);
+        Client::factory()->create(['site_id' => $site->id]);
+        $this->assertFalse($actor->canDo('medications.reports.export'));
+        $this->actingAs($actor)->getJson(route('api.medications.reports', ['type' => 'mar']))
+            ->assertOk()->assertJsonCount(0, 'records');
+        $this->actingAs($actor)->getJson(route('api.medications.reports.export', ['type' => 'mar', 'purpose' => 'care']))
+            ->assertForbidden();
+        $this->assertDatabaseCount('medication_events', 0);
+    }
+
     /** @param list<string> $permissions */
     private function userWithPermissions(array $permissions): User
     {

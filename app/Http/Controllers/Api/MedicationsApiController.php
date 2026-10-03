@@ -1640,7 +1640,7 @@ class MedicationsApiController extends Controller
 
         abort_unless(
             $user
-            && ($user->canDo('reports.viewAny') || $user->canDo('medications.reports.export')),
+            && $user->canDo('medications.reports.view'),
             403,
         );
 
@@ -1709,7 +1709,7 @@ class MedicationsApiController extends Controller
 
         abort_unless(
             $user
-            && ($user->canDo('reports.viewAny') || $user->canDo('medications.reports.export')),
+            && $user->canDo('medications.reports.view') && $user->canDo('medications.reports.export'),
             403,
         );
 
