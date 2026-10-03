@@ -299,10 +299,10 @@ final class ForgottenWitnessPinService
                 'witness_method' => self::CONFIRMED_METHOD,
             ])->save();
         } else {
-            // One flag on the original record: the existing P01/P08a lead
-            // follow-up reads it. No separate duplicate clinical task or dose.
-            $dose->forceFill([
-                'second_person_status' => $status,
+            // Keep any existing clinical review evidence. PIN-2 has its own
+            // canonical disputed follow-up, so it must not replace an earlier
+            // reason, timestamp or owner on the original administration.
+            $review = $dose->review_required ? [] : [
                 'review_required' => true,
                 'review_reason_key' => $status === MedicationSecondPersonConfirmation::DISPUTED ? self::REVIEW_DISPUTED : self::REVIEW_EXPIRED,
                 'review_reason' => $status === MedicationSecondPersonConfirmation::DISPUTED
@@ -310,7 +310,8 @@ final class ForgottenWitnessPinService
                     : 'Second person did not confirm within 30 minutes — check this dose.',
                 'review_flagged_at' => now(),
                 'review_flagged_by' => $row->recorded_by,
-            ])->save();
+            ];
+            $dose->forceFill(['second_person_status' => $status, ...$review])->save();
         }
         AuditLogger::logOrFail('medications.second_person.'.$status, $dose, [
             'actor_id' => $actorId,

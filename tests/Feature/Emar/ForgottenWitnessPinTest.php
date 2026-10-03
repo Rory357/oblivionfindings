@@ -33,6 +33,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Tests\TestCase;
 
@@ -410,6 +411,55 @@ class ForgottenWitnessPinTest extends TestCase
         $this->assertTrue($dose->refresh()->review_required);
         $this->assertSame(1, MedicationFollowup::query()->where('type', 'disputed')->count());
         $this->assertSame(1, MedicationEvent::query()->where('kind', 'second_person.expired')->count());
+    }
+
+    #[DataProvider('priorReviewOutcomes')]
+    public function test_terminal_attestation_preserves_an_existing_clinical_review(?bool $wasThere, string $status): void
+    {
+        [$dose, $confirmation, $witness] = $this->nominate();
+        $flaggedAt = now()->subMinute();
+        $dose->forceFill([
+            'review_required' => true,
+            'review_reason_key' => 'partial_taken',
+            'review_reason' => 'Existing clinical concern — only part taken.',
+            'review_flagged_at' => $flaggedAt,
+            'review_flagged_by' => $this->worker->id,
+        ])->save();
+
+        $service = app(ForgottenWitnessPinService::class);
+        if ($wasThere === null) {
+            $this->travel(30)->minutes();
+            $this->assertSame(1, $service->expireDue());
+            $this->assertSame(0, $service->expireDue());
+        } else {
+            $this->assertSame(['status' => $status, 'replayed' => false],
+                $service->respond($witness, $confirmation->id, $wasThere));
+        }
+
+        $dose->refresh();
+        $this->assertTrue($dose->review_required);
+        $this->assertSame('partial_taken', $dose->review_reason_key);
+        $this->assertSame('Existing clinical concern — only part taken.', $dose->review_reason);
+        $this->assertSame($flaggedAt->timestamp, $dose->review_flagged_at->timestamp);
+        $this->assertSame($this->worker->id, $dose->review_flagged_by);
+        $this->assertSame($status, $confirmation->refresh()->status);
+        $this->assertSame($wasThere === true ? RecordingContract::SECOND_VERIFIED : $status, $dose->second_person_status);
+        $this->assertSame($wasThere === true ? 0 : 1, MedicationFollowup::query()->where('type', 'disputed')->count());
+
+        DB::transaction(fn () => app(MedicationFollowupService::class)->syncAdministration($dose->refresh()));
+        $this->assertSame(1, MedicationFollowup::query()->where('source_key', 'dose-review:'.$dose->id)->count(),
+            'The prior clinical concern retains its own canonical follow-up.');
+        $this->assertSame($wasThere === true ? 0 : 1, MedicationFollowup::query()->where('type', 'disputed')->count());
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+    }
+
+    public static function priorReviewOutcomes(): array
+    {
+        return [
+            'confirmed' => [true, 'confirmed'],
+            'disputed' => [false, 'disputed'],
+            'expired' => [null, 'expired'],
+        ];
     }
 
     /** @return array<string, mixed> */
