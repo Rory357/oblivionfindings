@@ -271,6 +271,9 @@ final class WitnessPinService
             throw ValidationException::withMessages([$errorKey => $this->lockedMessage($who, $record->locked_until)]);
         }
 
+        // Configuration failures are not incorrect-PIN attempts.
+        $hashInput = $this->hashInput((string) $pin, $record->hash_version ?? self::HASH_RAW, $errorKey);
+
         // Per recorder + witness budget (the organisation's attempt limit). If
         // the limiter's store survives a rollback, the attempt is reserved
         // before the PIN is compared, so parallel requests from one account
@@ -295,7 +298,7 @@ final class WitnessPinService
             }
         }
 
-        if (preg_match('/^\d{'.self::LENGTH.'}$/', (string) $pin) === 1 && Hash::check($this->hashInput((string) $pin, $record->hash_version ?? self::HASH_RAW, $errorKey), $record->pin_hash)) {
+        if (preg_match('/^\d{'.self::LENGTH.'}$/', (string) $pin) === 1 && Hash::check($hashInput, $record->pin_hash)) {
             if ($record->failed_attempts > 0) {
                 $record->forceFill(['failed_attempts' => 0, 'last_failed_at' => null])->save();
             }
@@ -467,6 +470,21 @@ final class WitnessPinService
     }
 
     /** Owner reset changes the credential generation and releases every old recorder budget. */
+    /** Check credential infrastructure without asking for, or comparing, a PIN. */
+    public function assertCredentialConfigured(UserWitnessPin $pin, string $errorKey): void
+    {
+        $this->hashInput('', $pin->hash_version ?? self::HASH_RAW, $errorKey);
+    }
+
+    /** Wrong owner-password checks must survive the replacement transaction rollback. */
+    public function recordOwnerLoginFailure(User $owner, string $purpose): void
+    {
+        $this->whenOutsideTransactions(fn () => AuditLogger::log(
+            'medications.witness_pin.login_check_failed', $owner,
+            ['actor_id' => (int) $owner->id, 'purpose' => $purpose],
+        ));
+    }
+
     public function attemptBudgetKey(int $actorId, UserWitnessPin $pin): string
     {
         return 'medication-witness-pin:'.$actorId.':'.$pin->user_id.':'.hash('sha256', (string) $pin->pin_hash);

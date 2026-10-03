@@ -641,12 +641,13 @@ class WitnessPinTest extends TestCase
         $pins->verify($witness->fresh(), '708142', 'witness_credential');
         config(['medications.witness_pin.pepper' => null]);
         try {
-            $pins->verify($witness->fresh(), '708142', 'cd_witness_credential');
+            $pins->verify($witness->fresh(), '708142', 'cd_witness_credential', ['actor_id' => (int) $witness->id]);
             $this->fail('A missing pepper must not silently treat a protected PIN as a raw PIN.');
         } catch (ValidationException $error) {
             $this->assertStringContainsString('not configured', $error->errors()['cd_witness_credential'][0]);
         }
         $this->assertSame(0, $pin->refresh()->failed_attempts);
+        $this->assertSame(0, RateLimiter::attempts($pins->attemptBudgetKey((int) $witness->id, $pin)));
     }
 
     public function test_wrong_pin_message_names_the_actual_remaining_attempts(): void

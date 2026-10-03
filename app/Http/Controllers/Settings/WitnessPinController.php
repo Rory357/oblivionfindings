@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Settings;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\UserWitnessPin;
-use App\Services\AuditLogger;
 use App\Services\Medication\WitnessPinService;
 use App\Services\Medication\WitnessPinSettings;
 use Illuminate\Http\RedirectResponse;
@@ -123,10 +122,7 @@ class WitnessPinController extends Controller
             return;
         }
 
-        AuditLogger::log('medications.witness_pin.login_check_failed', $user, [
-            'actor_id' => (int) $user->id,
-            'purpose' => $purpose,
-        ]);
+        $this->pins->recordOwnerLoginFailure($user, $purpose);
 
         throw ValidationException::withMessages([
             'current_password' => 'That isn’t your login password.',
