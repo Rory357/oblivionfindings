@@ -1,5 +1,7 @@
 # eMAR hero and navigation re-audit — 4 October 2026
 
+Implementation follow-up: Main subsequently corrected reachable headers, tab geometry and modal layouts, with bounded backend fixes delegated to Sol. See [corrections and verification](../hero-tabs-modal-fixes-2026-10-04.md). The verdict and line references below describe the earlier audited revision and supplied deployment, not the later integration code.
+
 **Verdict: the module does not pass Rory's hero and tab acceptance rules.** Six of the seven supplied screenshots show the superseded hero and a white, bordered second tab bar. Settings is substantially closer, but its sub-tab geometry still differs from the current page-header specification. The earlier description of the module's headers as “Rory-aligned” was too broad and is withdrawn.
 
 This is a focused design and navigation audit, not a clinical release assessment. No application code, permissions, feature flags, medication records or settings were changed. Existing clinical release holds remain in force.
