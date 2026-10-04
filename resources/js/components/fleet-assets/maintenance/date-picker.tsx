@@ -1,5 +1,6 @@
 import { LeaveCalendarRange } from '@/components/hr/leave-calendar-range';
 import { Button } from '@/components/ui/button';
+import { useCompactDateTime } from '@/components/ui/date-time-presentation';
 import {
     Popover,
     PopoverContent,
@@ -22,7 +23,7 @@ export function DatePicker({
     allowClear = false,
     disabled = false,
     trigger,
-    compact = false,
+    compact: compactOverride,
 }: {
     id: string;
     label: string;
@@ -36,6 +37,7 @@ export function DatePicker({
     /** A touch-sized single-line trigger for dense operational forms. */
     compact?: boolean;
 }) {
+    const compact = useCompactDateTime(compactOverride);
     const [open, setOpen] = useState(false);
     const pickerTrigger = useRef<HTMLButtonElement>(null);
     const pickerSide = usePickerPlacement(open, 390, pickerTrigger);

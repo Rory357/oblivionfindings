@@ -267,8 +267,8 @@
     gap: 4px;
 }
 
-/* Medication forms use the same calendar/clock with ordinary field proportions.
-   Opt-in only: maintenance and other existing consumers keep their card layout. */
+/* Dialogs and sheets use the same calendar/clock with ordinary field proportions.
+   Other surfaces can opt in; page filters retain their existing presentation. */
 .date-time-field[data-compact] {
     border: 0;
     border-radius: 0;
@@ -284,6 +284,9 @@
 }
 .date-time-field[data-compact] > p {
     margin-top: 8px;
+}
+.date-time-field[data-compact] > button {
+    min-height: 44px;
 }
 .time-picker-trigger[data-compact] {
     min-height: 44px;

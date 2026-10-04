@@ -524,9 +524,11 @@ or release authority, and it does not approve changes to those contracts.
 
 ## Field group rules
 
-### Compact medication date and time fields
+### Compact date and time fields in modals
 
-Inside eMAR forms, use the shared date/time controls with `compact`. A timestamp
+Inside dialogs, wizards and sheets, the shared date/time controls inherit compact
+presentation from the shared shell. Use `compact` explicitly for an inline form
+that needs the same presentation. A timestamp
 is an ordinary field group: one purpose legend with its timezone, short Date and
 Time labels, and single-line calendar/clock triggers at least 44 CSS pixels high.
 Do not put a second padded card around the pair or repeat the purpose in each

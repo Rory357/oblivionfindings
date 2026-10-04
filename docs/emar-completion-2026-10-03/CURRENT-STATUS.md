@@ -1,5 +1,18 @@
 # eMAR implementation and verification status
 
+## On-call card and cross-module modal fields — 5 October 2026
+
+The [cross-module sizing follow-up](cross-module-modal-sizing-2026-10-05.md)
+records the house-profile-style on-call card and compact date/time presentation
+inherited through shared dialog and sheet shells. Fleet, transport, assets,
+maintenance and location forms now inherit the same compact picker proportions.
+The full frontend suite passed **537 files / 3,632 tests**; TypeScript, scoped
+lint and formatting passed. Browser checks covered desktop and 320px transport
+fields, exact-minute entry, cancellation/draft protection, asset date fields and
+the on-call card's fit and destination. Full evidence and final build details
+are in the follow-up. Existing clinical release gates remain open; these are UI
+corrections in draft PR #16, not a deployment.
+
 ## Modal sizing follow-up — 5 October 2026
 
 The [modal sizing audit](modal-sizing-audit-2026-10-05.md) records the latest UI

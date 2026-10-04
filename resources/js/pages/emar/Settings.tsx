@@ -253,6 +253,16 @@ export default function EmarSettings(props: Props) {
                 site_id: h.site_id,
                 name: h.name,
                 configured: !!h.rule,
+                contact: h.rule?.backup
+                    ? {
+                          id: h.rule.backup.id,
+                          name: h.rule.backup.name,
+                          detail:
+                              h.rule.mode === 'fixed'
+                                  ? 'Configured fixed contact'
+                                  : 'Configured backup contact',
+                      }
+                    : undefined,
             })),
             alert_reach: {
                 houses: props.alertReach.houses,

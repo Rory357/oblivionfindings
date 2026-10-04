@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { useCompactDateTime } from '@/components/ui/date-time-presentation';
 import {
     Popover,
     PopoverContent,
@@ -23,7 +24,7 @@ export function TimePicker({
     onChange,
     invalid,
     describedBy,
-    compact = false,
+    compact: compactOverride,
 }: {
     id: string;
     label: string;
@@ -34,6 +35,7 @@ export function TimePicker({
     /** A touch-sized single-line trigger for dense operational forms. */
     compact?: boolean;
 }) {
+    const compact = useCompactDateTime(compactOverride);
     const [open, setOpen] = useState(false);
     const pickerTrigger = useRef<HTMLButtonElement>(null);
     const pickerSide = usePickerPlacement(open, 346, pickerTrigger);

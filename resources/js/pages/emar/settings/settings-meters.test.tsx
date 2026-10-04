@@ -138,7 +138,7 @@ describe('Settings header meters', () => {
         expect(screen.queryByText(/on-call/i)).toBeNull();
     });
 
-    it('counts houses with an on-call contact as a donut, linked to On-call contacts (B2 C4)', () => {
+    it('counts configured houses in the profile-style contact card and opens their settings', () => {
         const go = vi.fn();
         render(
             <SettingsMeters
@@ -160,9 +160,46 @@ describe('Settings header meters', () => {
         const meter = screen.getByRole('button', {
             name: 'View on-call contacts, 1 of 3 set',
         });
-        expect(meter).toHaveTextContent('1 of 3 set');
-        expect(meter).toHaveTextContent('2 not configured');
+        expect(meter).toHaveTextContent('1/3');
+        expect(meter).toHaveTextContent('2 houses to configure');
+        expect(meter).not.toHaveTextContent('%');
         meter.click();
         expect(go).toHaveBeenCalledWith('alerts', 'oncall');
+    });
+
+    it('shows a configured contact once across houses without counting them as live availability', () => {
+        const contact = {
+            id: 7,
+            name: 'Sam Taylor',
+            detail: 'Configured backup contact',
+        };
+        render(
+            <SettingsMeters
+                built={{ alerts: ['oncall'] }}
+                view="alerts"
+                sec="oncall"
+                go={vi.fn()}
+                pending={[]}
+                rules={[]}
+                templates={[]}
+                pins={[]}
+                oncall={[
+                    { configured: true, contact },
+                    { configured: true, contact },
+                    {
+                        configured: false,
+                        contact: { id: 9, name: 'Alex Smith' },
+                    },
+                ]}
+            />,
+        );
+        expect(
+            screen.getByRole('button', {
+                name: 'View on-call contacts, 2 of 3 set',
+            }),
+        ).toHaveTextContent('1 house to configure');
+        expect(screen.getAllByText('ST')).toHaveLength(1);
+        expect(screen.queryByText('AS')).not.toBeInTheDocument();
+        expect(screen.queryByText(/on call now/i)).not.toBeInTheDocument();
     });
 });

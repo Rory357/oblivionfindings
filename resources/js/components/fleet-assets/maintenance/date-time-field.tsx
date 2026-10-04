@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { useCompactDateTime } from '@/components/ui/date-time-presentation';
 import { formatDateOnly } from '@/lib/datetime';
 import { DatePicker } from './date-picker';
 import { TimePicker, displayTime } from './time-picker';
@@ -24,7 +25,7 @@ export function DateTimeField({
     error,
     hint,
     clearable = true,
-    compact = false,
+    compact: compactOverride,
 }: {
     id: string;
     label: string;
@@ -35,9 +36,10 @@ export function DateTimeField({
     /** Show "Clear date and time" once there is a value (the default). Pass
      *  false for a required date and time that must not be emptied. */
     clearable?: boolean;
-    /** Inline form presentation for medication dialogs; retains the same pickers. */
+    /** Defaults to compact inside dialogs and sheets; retains the same pickers. */
     compact?: boolean;
 }) {
+    const compact = useCompactDateTime(compactOverride);
     const [date = '', time = ''] = value.split('T');
     const update = (nextDate: string, nextTime: string) =>
         onChange(nextDate || nextTime ? `${nextDate}T${nextTime}` : '');
