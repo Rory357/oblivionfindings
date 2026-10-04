@@ -92,7 +92,7 @@ export function SecondPersonConfirmationDialog(
     return (
         <Dialog open={props.open} onOpenChange={props.onOpenChange}>
             <DialogContent
-                className="max-h-[90vh] overflow-y-auto p-0"
+                className="frontline-dialog max-h-[90vh] overflow-y-auto p-0"
                 style={{
                     width: 'min(92vw, 480px)',
                     maxWidth: 'min(92vw, 480px)',
@@ -289,7 +289,7 @@ function ConfirmationBody({
         <>
             <DialogHeader className="border-b px-6 py-5 pr-14 text-left">
                 <div className="flex items-center gap-3">
-                    <span className="bg-primary/10 text-primary rounded-xl p-2.5">
+                    <span className="rounded-xl bg-primary/10 p-2.5 text-primary">
                         <UserCheck className="size-5" aria-hidden="true" />
                     </span>
                     <div>
@@ -352,7 +352,7 @@ function ConfirmationBody({
                         {terminal === 'confirmed' ? (
                             <p className="flex gap-2 text-sm">
                                 <CheckCircle2
-                                    className="text-primary size-5 shrink-0"
+                                    className="size-5 shrink-0 text-primary"
                                     aria-hidden="true"
                                 />
                                 Your confirmation is recorded.
@@ -368,7 +368,7 @@ function ConfirmationBody({
                                 will need to check this dose.
                             </p>
                         ) : (
-                            <p className="text-muted-foreground flex gap-2 text-sm">
+                            <p className="flex gap-2 text-sm text-muted-foreground">
                                 <Clock
                                     className="size-4 shrink-0"
                                     aria-hidden="true"
@@ -385,7 +385,7 @@ function ConfirmationBody({
                         {saveError && (
                             <p
                                 role="alert"
-                                className="text-destructive text-sm"
+                                className="text-sm text-destructive"
                             >
                                 {saveError}
                             </p>
@@ -393,7 +393,7 @@ function ConfirmationBody({
                     </>
                 )}
             </div>
-            <DialogFooter className="bg-muted/30 border-t px-6 py-4">
+            <DialogFooter className="border-t bg-muted/30 px-6 py-4">
                 <Button
                     variant="outline"
                     className="frontline-hit"
@@ -438,6 +438,7 @@ function ConfirmationBody({
                 )}
             </DialogFooter>
             <ConfirmDialog
+                frontline
                 open={choice !== null && !expired}
                 onClose={() => !sending && setChoice(null)}
                 title={

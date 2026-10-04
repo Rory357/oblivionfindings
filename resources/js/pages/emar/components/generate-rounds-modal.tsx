@@ -126,6 +126,7 @@ export function GenerateRoundsModal({
                         <Label className="sr-only">Round date</Label>
                         {/* eslint-disable-next-line no-restricted-syntax -- native date input; no shadcn date control in the wizard primitives. */}
                         <DatePicker
+                            compact
                             id="emar-generate-rounds-modal-1"
                             label="Round date"
                             value={date}

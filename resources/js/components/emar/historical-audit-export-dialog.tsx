@@ -65,7 +65,7 @@ export function HistoricalAuditExportDialog({
     return (
         <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
             <DialogContent
-                className="flex max-h-[88vh] flex-col overflow-hidden p-0"
+                className="frontline-dialog flex max-h-[88vh] flex-col overflow-hidden p-0"
                 style={{
                     width: 'min(92vw, 720px)',
                     maxWidth: 'min(92vw, 720px)',

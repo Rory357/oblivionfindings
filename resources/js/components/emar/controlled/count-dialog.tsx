@@ -315,6 +315,7 @@ export function CountDialog({
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={requestClose}
                 title={`${title} — ${medicines[0].site_name}`}
@@ -685,6 +686,7 @@ export function CountDialog({
                 </WizardStepPane>
             </WizardShell>
             <ConfirmDialog
+                frontline
                 open={discard}
                 onClose={() => setDiscard(false)}
                 onConfirm={onClose}

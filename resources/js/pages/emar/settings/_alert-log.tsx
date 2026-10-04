@@ -353,6 +353,7 @@ export function AlertLogView({ row }: { row: AlertLogRow }) {
     const { close, go } = useSettings();
     return (
         <SettingsModal
+            frontline
             title={title(row)}
             description={
                 row.concealed

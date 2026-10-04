@@ -518,6 +518,7 @@ export function OnCallDialog({
     };
     return (
         <SettingsModal
+            frontline
             title={`On-call contact — ${h.name}`}
             description="Who staff at this house call when they need help. Shown on escalations and follow-ups."
             onClose={close}
@@ -613,6 +614,7 @@ export function OnCallView({
     const r = h.rule;
     return (
         <SettingsModal
+            frontline
             title={`On-call contact — ${h.name}`}
             description="Only someone who manages settings for this house can change it."
             onClose={close}
@@ -670,6 +672,7 @@ export function OnCallRemove({
     if (!h || !h.can_manage) return <NotFound what="house" />;
     return (
         <ConfirmDialog
+            frontline
             open
             onClose={close}
             variant="destructive"

@@ -435,6 +435,7 @@ export function MedicationEventDrawer({
 
     return (
         <WizardShell
+            frontline
             open
             onClose={onClose}
             title={`${meta.label} — audit record`}

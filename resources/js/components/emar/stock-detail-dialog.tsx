@@ -165,7 +165,9 @@ export function StockDetailDialog({
     const pill = stockStatusPill(item);
     const reorder = item.reorder_level ?? 0;
     const ratio =
-        reorder > 0 ? Math.min(100, ((item.on_hand ?? 0) / (reorder * 2)) * 100) : 100;
+        reorder > 0
+            ? Math.min(100, ((item.on_hand ?? 0) / (reorder * 2)) * 100)
+            : 100;
     const barTone = item.is_low
         ? 'bg-status-critical'
         : (item.on_hand ?? 0) <= reorder * 1.4
@@ -175,6 +177,7 @@ export function StockDetailDialog({
 
     return (
         <WizardShell
+            frontline
             open
             onClose={onClose}
             title="Stock item detail"
@@ -282,7 +285,10 @@ export function StockDetailDialog({
                                 <span
                                     className={`font-mono font-semibold tabular-nums ${item.is_low ? 'text-status-critical' : ''}`}
                                 >
-                                    {item.on_hand === null ? 'Unknown' : item.on_hand} {item.on_hand === null ? '' : item.unit}
+                                    {item.on_hand === null
+                                        ? 'Unknown'
+                                        : item.on_hand}{' '}
+                                    {item.on_hand === null ? '' : item.unit}
                                 </span>
                             }
                         />
@@ -354,7 +360,11 @@ export function StockDetailDialog({
                             />
                             <ReviewRow
                                 label="On hand now"
-                                value={item.on_hand === null ? 'Unknown' : `${item.on_hand} ${item.unit}`}
+                                value={
+                                    item.on_hand === null
+                                        ? 'Unknown'
+                                        : `${item.on_hand} ${item.unit}`
+                                }
                             />
                         </ReviewCard>
                         {openOrder ? (

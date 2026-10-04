@@ -281,11 +281,15 @@ export function HistorySection({
                 <DoseDetail
                     clientId={clientId}
                     doseId={detail}
-                    onClose={() => { setDetail(null); onDetailClose?.(); }}
+                    onClose={() => {
+                        setDetail(null);
+                        onDetailClose?.();
+                    }}
                 />
             )}
             {change && (
                 <WizardShell
+                    frontline
                     open
                     onClose={() => setChange(null)}
                     title="Recorded change"
@@ -350,6 +354,7 @@ function DoseDetail({
     );
     return (
         <WizardShell
+            frontline
             open
             onClose={onClose}
             title="Dose record"
@@ -512,6 +517,7 @@ function CorrectionDialog({
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={requestClose}
                 title={title}

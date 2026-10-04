@@ -154,7 +154,8 @@ function MedicineTable({
                   {
                       label: 'Details need controlled-medicine access',
                       icon: Pill,
-                      disabled: 'Controlled-medicine access is needed to open these details.',
+                      disabled:
+                          'Controlled-medicine access is needed to open these details.',
                   },
               ]
             : [
@@ -441,6 +442,7 @@ export function RecordMedicineDialog({
     const order = data?.medicine;
     return (
         <WizardShell
+            frontline
             open
             onClose={onClose}
             title={order?.name ?? 'Medicine details'}

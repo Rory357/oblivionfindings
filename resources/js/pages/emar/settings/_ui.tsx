@@ -558,7 +558,10 @@ export function RecordPicker({
                     </Button>
                 </PopoverTrigger>
                 <PopoverContent
-                    className="w-[--radix-popover-trigger-width] min-w-[360px] p-0"
+                    className="p-0"
+                    style={{
+                        width: 'min(max(var(--radix-popover-trigger-width), 360px), calc(100vw - 32px))',
+                    }}
                     align="start"
                 >
                     <Command>
@@ -570,6 +573,7 @@ export function RecordPicker({
                             </CommandEmpty>
                             {items.map((x) => (
                                 <CommandItem
+                                    className="min-h-[44px]"
                                     key={x.id}
                                     value={`${x.name} ${x.sub}`}
                                     disabled={!x.ok}

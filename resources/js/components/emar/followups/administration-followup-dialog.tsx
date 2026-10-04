@@ -1,6 +1,3 @@
-import axios from 'axios';
-import { router } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -10,6 +7,9 @@ import {
 } from '@/components/ui/dialog';
 import { ErrorState } from '@/components/ui/error-state';
 import { LoadingState } from '@/components/ui/loading-state';
+import { router } from '@inertiajs/react';
+import axios from 'axios';
+import { useEffect, useState } from 'react';
 import { MedicationFollowupDialog } from './followup-dialog';
 import type { MedicationFollowup } from './types';
 
@@ -53,7 +53,13 @@ export function AdministrationFollowupDialog({
         );
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
-            <DialogContent>
+            <DialogContent
+                className="frontline-dialog max-h-[88vh] overflow-y-auto"
+                style={{
+                    width: 'min(92vw, 480px)',
+                    maxWidth: 'min(92vw, 480px)',
+                }}
+            >
                 <DialogHeader>
                     <DialogTitle>Medication effect check</DialogTitle>
                     <DialogDescription>

@@ -869,6 +869,7 @@ export default function Orders(props: Props) {
                 )}
                 {modal?.type === 'opening' && (
                     <WizardShell
+                        frontline
                         open
                         onClose={close}
                         title="Medication order"

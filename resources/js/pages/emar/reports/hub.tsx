@@ -1070,6 +1070,7 @@ export default function ReportsHub(props: Props) {
             )}
             {detailOpen && (
                 <SettingsModal
+                    frontline
                     title="Recorded details"
                     description="Times use Pacific/Auckland. Recorded facts remain separate from clinical interpretation."
                     width={720}

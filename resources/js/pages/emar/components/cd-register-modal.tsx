@@ -446,6 +446,7 @@ export function CdRegisterModal({
                     <Field label="Expiry date">
                         {/* eslint-disable-next-line no-restricted-syntax -- native date input; no shadcn date control in wizard primitives. */}
                         <DatePicker
+                            compact
                             id="emar-cd-register-modal-1"
                             label="Expiry date"
                             value={expiry}

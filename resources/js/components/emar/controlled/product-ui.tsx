@@ -458,6 +458,7 @@ export function LocalDateTimeField({
             </legend>
             <div className="grid gap-3 sm:grid-cols-2">
                 <DatePicker
+                    compact
                     id={`controlled-${name}`}
                     label={`${label} date`}
                     value={day}
@@ -465,6 +466,7 @@ export function LocalDateTimeField({
                     invalid={!!error}
                 />
                 <TimePicker
+                    compact
                     id={`controlled-${name}-time`}
                     label={`${label} time`}
                     value={time}

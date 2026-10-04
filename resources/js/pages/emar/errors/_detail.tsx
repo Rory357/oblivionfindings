@@ -302,6 +302,7 @@ export function ErrorDetail({
                         onChange={(id) => set('owner_id', id)}
                     />
                     <DateTimeField
+                        compact
                         id="investigation-due"
                         label="Investigation due"
                         value={field('investigation_due_at')}
@@ -354,6 +355,7 @@ export function ErrorDetail({
                         onChange={(id) => set('owner_id', id)}
                     />
                     <DateTimeField
+                        compact
                         id="action-due"
                         label="Action due"
                         value={field('due_at')}
@@ -506,6 +508,7 @@ export function ErrorDetail({
                                 />
                             </div>
                             <DateTimeField
+                                compact
                                 id="disclosure-at"
                                 label="When they were told"
                                 value={field('at')}
@@ -1133,6 +1136,7 @@ export function ErrorDetail({
                 }}
             />
             <ConfirmDialog
+                frontline
                 open={confirm}
                 onClose={() => {
                     if (!saving) setConfirm(false);

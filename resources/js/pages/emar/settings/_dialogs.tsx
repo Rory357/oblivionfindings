@@ -183,6 +183,7 @@ export function ReviewChanges({ view }: { view: ViewKey }) {
 
     return (
         <SettingsModal
+            frontline
             title={`Review ${VIEW_LABEL[view].toLowerCase()} changes`}
             description={`${ch.length} ${ch.length === 1 ? 'change' : 'changes'} · nothing applies until you save.`}
             onClose={close}
@@ -299,6 +300,7 @@ export function DiscardView({ view }: { view: ViewKey }) {
     const ch = changes(s, draft, view);
     return (
         <ConfirmDialog
+            frontline
             open
             onClose={close}
             title={`Discard ${VIEW_LABEL[view].toLowerCase()} changes?`}
@@ -338,6 +340,7 @@ export function UnsavedList() {
     const views = [...new Set(ch.map((c) => c.view))];
     return (
         <SettingsModal
+            frontline
             title="Unsaved changes"
             description="Nothing applies until you review and save each view."
             onClose={close}
@@ -374,6 +377,7 @@ export function LeaveGuard({ url }: { url: string }) {
     const { s, draft, close, leave } = useSettings();
     return (
         <SettingsModal
+            frontline
             title="Leave with an unsaved draft?"
             description="Your saved settings will stay unchanged."
             onClose={close}
@@ -411,6 +415,7 @@ export function HistDetail({ id }: { id: number }) {
     if (!h) return <NotFound what="change" />;
     return (
         <SettingsModal
+            frontline
             title={historyWhat(h)}
             description={`${whenText(h.at)} NZ time · ${h.who ?? 'Someone'}${h.note ? ` · ${h.note}` : ''}`}
             onClose={close}
@@ -463,6 +468,7 @@ export function NotFound({ what = 'record' }: { what?: string }) {
     const { close } = useSettings();
     return (
         <SettingsModal
+            frontline
             title="We can’t show this record"
             description="It may not exist, or it may not be available to you."
             onClose={close}
@@ -492,6 +498,7 @@ export function RestoreValue({ id }: { id: number }) {
     const where = VIEW_LABEL[h.view].toLowerCase();
     return (
         <ConfirmDialog
+            frontline
             open
             onClose={close}
             variant={weaker ? 'destructive' : 'default'}
@@ -568,6 +575,7 @@ export function KeepDefault({
         : null;
     return (
         <ConfirmDialog
+            frontline
             open
             onClose={close}
             variant="default"
@@ -721,6 +729,7 @@ export function ReviewDefaults() {
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={() => leave(null)}
                 title="Review the defaults"
@@ -927,6 +936,7 @@ export function ReviewDefaults() {
                 </WizardStepPane>
             </WizardShell>
             <DiscardDraftDialog
+                frontline
                 open={guard !== null}
                 mode="edit"
                 description="The values you chose to keep haven’t been applied. Leaving now loses them."

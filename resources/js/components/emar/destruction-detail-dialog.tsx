@@ -114,6 +114,7 @@ export function DestructionDetailDialog({
 
     return (
         <WizardShell
+            frontline
             open
             onClose={onClose}
             title="Destruction record"

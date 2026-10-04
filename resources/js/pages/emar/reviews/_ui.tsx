@@ -117,7 +117,7 @@ export function Notice({
                 />
                 <div className="min-w-0">
                     <p className="text-sm font-semibold">{title}</p>
-                    <div className="text-muted-foreground mt-1 text-sm">
+                    <div className="mt-1 text-sm text-muted-foreground">
                         {children}
                     </div>
                 </div>
@@ -131,7 +131,7 @@ export function Facts({ rows }: { rows: [string, ReactNode][] }) {
             {rows.map(([label, value]) => (
                 <div key={label} className="min-w-0">
                     <dt className="text-caption">{label}</dt>
-                    <dd className="mt-1 break-words text-sm font-medium">
+                    <dd className="mt-1 text-sm font-medium break-words">
                         {value || '—'}
                     </dd>
                 </div>
@@ -147,7 +147,7 @@ export function ConcealedMedicine({
     return (
         <div className="flex min-w-0 items-start gap-2">
             <LockKeyhole
-                className="text-muted-foreground mt-0.5 size-4 shrink-0"
+                className="mt-0.5 size-4 shrink-0 text-muted-foreground"
                 aria-hidden="true"
             />
             <div>
@@ -245,10 +245,10 @@ export function ChoiceTiles<K extends string>({
                                     [target]?.focus();
                             }}
                             onClick={() => onChange(option)}
-                            className={`h-auto min-h-16 justify-start gap-3 whitespace-normal p-3 text-left ${value === option ? 'border-primary bg-primary/10' : ''}`}
+                            className={`h-auto min-h-16 justify-start gap-3 p-3 text-left whitespace-normal ${value === option ? 'border-primary bg-primary/10' : ''}`}
                         >
                             <Icon
-                                className="text-primary size-5 shrink-0"
+                                className="size-5 shrink-0 text-primary"
                                 aria-hidden="true"
                             />
                             <span className="min-w-0">
@@ -261,7 +261,7 @@ export function ChoiceTiles<K extends string>({
                             </span>
                             {value === option && (
                                 <Check
-                                    className="text-primary ml-auto size-4 shrink-0"
+                                    className="ml-auto size-4 shrink-0 text-primary"
                                     aria-hidden="true"
                                 />
                             )}
@@ -394,7 +394,7 @@ export function ReviewPicker({
                             {loading ? (
                                 <div
                                     role="status"
-                                    className="text-muted-foreground p-4 text-sm"
+                                    className="p-4 text-sm text-muted-foreground"
                                 >
                                     Loading choices…
                                 </div>
@@ -618,6 +618,7 @@ export function OutcomeFields({
                         error={errors[`${prefix}-watch_until`]}
                     >
                         <DatePicker
+                            compact
                             id={`${prefix}-watch_until`}
                             label="Watch until"
                             value={value.watch_until}
@@ -736,14 +737,14 @@ export function StoredSource({
                 type="button"
                 variant="outline"
                 onClick={() => setOpen(true)}
-                className="h-auto w-full justify-start gap-3 whitespace-normal py-3 text-left"
+                className="h-auto w-full justify-start gap-3 py-3 text-left whitespace-normal"
             >
                 <FileText
-                    className="text-primary size-5 shrink-0"
+                    className="size-5 shrink-0 text-primary"
                     aria-hidden="true"
                 />
                 <span className="min-w-0">
-                    <span className="block break-words font-medium">
+                    <span className="block font-medium break-words">
                         {source.name}
                     </span>
                     <span className="text-caption block">
@@ -811,6 +812,7 @@ export function DiscardDialog({
 }) {
     return (
         <ConfirmDialog
+            frontline
             open={open}
             onClose={onClose}
             onConfirm={onDiscard}
@@ -824,7 +826,7 @@ export function DiscardDialog({
 export function RequestErrors({ errors }: { errors: Record<string, string> }) {
     const entries = Object.entries(errors);
     return entries.length ? (
-        <div role="alert" className="text-status-critical space-y-1 text-sm">
+        <div role="alert" className="space-y-1 text-sm text-status-critical">
             <p className="font-semibold">We couldn’t save this yet.</p>
             {entries.map(([key, value]) => (
                 <p key={key}>{value}</p>

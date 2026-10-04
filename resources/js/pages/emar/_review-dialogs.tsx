@@ -273,6 +273,7 @@ export function ScheduleReviewDialog({
                             error={form.errors.scheduled_date}
                         >
                             <DatePicker
+                                compact
                                 id="emar-review-dialogs-1"
                                 label="Scheduled date"
                                 value={form.data.scheduled_date}
@@ -748,6 +749,7 @@ export function ConductReviewDialog({
                             error={form.errors.next_review_date}
                         >
                             <DatePicker
+                                compact
                                 id="emar-review-dialogs-2"
                                 label="Next review date"
                                 value={form.data.next_review_date}
@@ -886,6 +888,7 @@ export function RescheduleReviewDialog({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="New date" required>
                     <DatePicker
+                        compact
                         id="emar-review-dialogs-3"
                         label="New date"
                         value={form.data.scheduled_date}

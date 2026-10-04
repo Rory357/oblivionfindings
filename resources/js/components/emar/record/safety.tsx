@@ -237,6 +237,7 @@ export function SafetySection({
                 />
             )}
             <ConfirmDialog
+                frontline
                 open={resolve !== null}
                 onClose={() => setResolve(null)}
                 title="Resolve this chart alert?"

@@ -55,7 +55,7 @@ export default function RoundAuditDialog({
     return (
         <Dialog open onOpenChange={(o) => !o && onClose()}>
             <DialogContent
-                className="flex max-h-[88vh] flex-col gap-0 overflow-hidden p-0"
+                className="frontline-dialog flex max-h-[88vh] flex-col gap-0 overflow-hidden p-0"
                 style={{
                     width: 'min(92vw, 720px)',
                     maxWidth: 'min(92vw, 720px)',

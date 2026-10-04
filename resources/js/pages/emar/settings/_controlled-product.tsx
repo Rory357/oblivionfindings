@@ -409,6 +409,7 @@ export function ControlledProductSettings({
                                         htmlFor="cd-count-weekly-time"
                                     >
                                         <TimePicker
+                                            compact
                                             id="cd-count-weekly-time"
                                             label="Weekly count time"
                                             value={anchor.time}

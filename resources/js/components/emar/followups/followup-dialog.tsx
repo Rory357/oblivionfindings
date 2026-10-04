@@ -167,7 +167,13 @@ export function MedicationFollowupDialog(props: Props) {
     if (!row || loadedKey !== loadKey || !mayRead)
         return (
             <Dialog open onOpenChange={(open) => !open && props.onClose()}>
-                <DialogContent>
+                <DialogContent
+                    className="frontline-dialog max-h-[88vh] overflow-y-auto"
+                    style={{
+                        width: 'min(92vw, 480px)',
+                        maxWidth: 'min(92vw, 480px)',
+                    }}
+                >
                     <DialogHeader>
                         <DialogTitle>Medication follow-up</DialogTitle>
                         <DialogDescription>
@@ -832,6 +838,7 @@ function FollowupBody({
                     <>
                         {textField('reason', 'Why couldn’t you check?')}
                         <DateTimeField
+                            compact
                             id="fu-again"
                             label={
                                 row.type === 'reoffer'
@@ -1140,6 +1147,7 @@ function FollowupBody({
     );
     const discardDialog = (
         <ConfirmDialog
+            frontline
             open={discard}
             onClose={() => setDiscard(false)}
             title="Discard this follow-up draft?"
@@ -1155,6 +1163,7 @@ function FollowupBody({
         return (
             <>
                 <WizardShell
+                    frontline
                     open
                     onClose={requestClose}
                     title={`Follow up a refusal — ${row.client.name}`}
@@ -1261,7 +1270,7 @@ function FollowupBody({
         <>
             <Dialog open onOpenChange={(open) => !open && requestClose()}>
                 <DialogContent
-                    className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0"
+                    className="frontline-dialog flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0"
                     style={{
                         width: 'min(92vw, 720px)',
                         maxWidth: 'min(92vw, 720px)',

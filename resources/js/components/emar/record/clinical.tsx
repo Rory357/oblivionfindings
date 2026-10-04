@@ -729,6 +729,7 @@ function ClinicalCommandDialog({
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={requestClose}
                 title={title}
@@ -830,6 +831,7 @@ function ClinicalCommandDialog({
                                     true,
                                 )}
                                 <DatePicker
+                                    compact
                                     id="inr-tested"
                                     label="Tested on"
                                     value={fields.tested_on ?? ''}
@@ -853,6 +855,7 @@ function ClinicalCommandDialog({
                                     'number',
                                 )}
                                 <DatePicker
+                                    compact
                                     id="inr-next"
                                     label="Next test date"
                                     value={fields.next_test_date ?? ''}

@@ -398,7 +398,7 @@ function LoadingOrMissing({
     return (
         <Dialog open onOpenChange={(o) => !o && onClose()}>
             <DialogContent
-                className="flex max-h-[88vh] flex-col overflow-hidden p-0"
+                className="frontline-dialog flex max-h-[88vh] flex-col overflow-hidden p-0"
                 style={{
                     width: 'min(92vw, 480px)',
                     maxWidth: 'min(92vw, 480px)',
@@ -1555,6 +1555,7 @@ function RecordDoseForm({
                                 </span>
                             </p>
                             <DateTimeField
+                                compact
                                 id="rd-follow"
                                 label="Follow up by"
                                 value={f.followBy}
@@ -1614,6 +1615,7 @@ function RecordDoseForm({
                     ) : null}
                     <div data-field="when">
                         <DateTimeField
+                            compact
                             id="rd-when"
                             label={
                                 f.outcome === 'reoffered' ||
@@ -1816,6 +1818,7 @@ function RecordDoseForm({
                                 </span>
                             </p>
                             <DateTimeField
+                                compact
                                 id="rd-check"
                                 label="Check by"
                                 value={f.checkBy}
@@ -2244,6 +2247,7 @@ function RecordDoseForm({
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={requestClose}
                 onCloseAutoFocus={(e) => {
@@ -2308,6 +2312,7 @@ function RecordDoseForm({
                 </WizardStepPane>
             </WizardShell>
             <ConfirmDialog
+                frontline
                 open={discard}
                 onClose={() => setDiscard(false)}
                 onConfirm={() => {

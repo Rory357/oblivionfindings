@@ -141,6 +141,7 @@ export function CovertWizard({
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={close.close}
                 title={
@@ -276,6 +277,7 @@ export function CovertWizard({
                                         label="Assessment date"
                                     >
                                         <DatePicker
+                                            compact
                                             id="capacity-date"
                                             label="Capacity assessment"
                                             value={form.data.capacity_date}
@@ -405,6 +407,7 @@ export function CovertWizard({
                             </Field>
                             <Field id="gp-date" label="Authorised date">
                                 <DatePicker
+                                    compact
                                     id="gp-date"
                                     label="Authorised"
                                     value={form.data.authorised_date}
@@ -462,6 +465,7 @@ export function CovertWizard({
                             </Field>
                             <Field id="covert-review" label="Review by">
                                 <DatePicker
+                                    compact
                                     id="covert-review"
                                     label="Review by"
                                     value={form.data.review_date}
@@ -567,6 +571,7 @@ export function StopCovert({
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={close.close}
                 title="Stop covert giving"
@@ -622,6 +627,7 @@ export function StopCovert({
                 </div>
             </WizardShell>
             <ConfirmDialog
+                frontline
                 open={confirm}
                 onClose={() => setConfirm(false)}
                 title={`Stop covert giving of ${record.medication.name}?`}

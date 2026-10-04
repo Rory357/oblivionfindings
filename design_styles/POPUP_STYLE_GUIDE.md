@@ -23,12 +23,12 @@ When you build a new popup, follow this guide.
 
 ## When to use which
 
-| Simple dialog | Wizard dialog (WizardShell) | Full page |
-| --- | --- | --- |
-| Single-section create/edit (≤ ~8 fields) | Add/edit of an entity record (site, client, staff, asset, …) | List/index views |
-| Quick confirmation (delete, archive) | Any form with 2+ logical sections or steps | Anything that needs its own URL for sharing |
-| In-context detail view (contact card, KPI drill-in) | Structured report flows (incident, injury, inspection) | Free-form canvas/editor surfaces (plan builder, rostering board) |
-| Picking from a small set of options | Detail viewers with multiple SECTIONS (use `headerLabel`) | |
+| Simple dialog                                       | Wizard dialog (WizardShell)                                  | Full page                                                        |
+| --------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------- |
+| Single-section create/edit (≤ ~8 fields)            | Add/edit of an entity record (site, client, staff, asset, …) | List/index views                                                 |
+| Quick confirmation (delete, archive)                | Any form with 2+ logical sections or steps                   | Anything that needs its own URL for sharing                      |
+| In-context detail view (contact card, KPI drill-in) | Structured report flows (incident, injury, inspection)       | Free-form canvas/editor surfaces (plan builder, rostering board) |
+| Picking from a small set of options                 | Detail viewers with multiple SECTIONS (use `headerLabel`)    |                                                                  |
 
 Do **not** send a long or multi-step form to a full page any more — that was
 the old rule from before `WizardShell` existed. New create/edit flows for
@@ -171,8 +171,10 @@ inline `style` form above.
 ## Body pattern
 
 ```tsx
-function NewFooBody({ onClose, /* … */ }: NewFooBodyProps) {
-    const form = useForm<FooFormValues>({ /* initial */ });
+function NewFooBody({ onClose /* … */ }: NewFooBodyProps) {
+    const form = useForm<FooFormValues>({
+        /* initial */
+    });
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -204,7 +206,9 @@ function NewFooBody({ onClose, /* … */ }: NewFooBodyProps) {
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
-                    {form.processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {form.processing && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
                     Save foo
                 </Button>
             </DialogFooter>
@@ -243,8 +247,12 @@ option.
                     <Icon className={cn('h-4 w-4', t.accent)} />
                 </span>
                 <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium">{t.label}</span>
-                    <span className="block text-xs text-muted-foreground">{t.description}</span>
+                    <span className="block truncate text-sm font-medium">
+                        {t.label}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                        {t.description}
+                    </span>
                 </span>
             </button>
         );
@@ -516,6 +524,21 @@ or release authority, and it does not approve changes to those contracts.
 
 ## Field group rules
 
+### Compact medication date and time fields
+
+Inside eMAR forms, use the shared date/time controls with `compact`. A timestamp
+is an ordinary field group: one purpose legend with its timezone, short Date and
+Time labels, and single-line calendar/clock triggers at least 44 CSS pixels high.
+Do not put a second padded card around the pair or repeat the purpose in each
+visible label. Keep the full purpose in each trigger's accessible name. Let the
+pair stack according to the space inside the form, not just the screen width.
+
+Compact changes presentation only. Preserve exact-minute entry, the calendar and
+clock, pending selection and Cancel/Escape behaviour, required/optional clearing,
+inline errors and the paired value. Keep picker footers reachable on a 320 CSS
+pixel viewport. eMAR dialog shells and confirmations opt into `frontline` so
+smaller fields never mean smaller touch targets. Footer actions wrap when needed.
+
 Use Tailwind's `grid gap-3 sm:grid-cols-2` for the body, then `sm:col-span-2`
 on full-width fields. Group related fields in the same row.
 
@@ -545,7 +568,9 @@ an info card instead of an editable select:
     <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-medium">{lockedLabel}</span>
-            <Badge variant="outline" className="text-[10px]">From meeting</Badge>
+            <Badge variant="outline" className="text-[10px]">
+                From meeting
+            </Badge>
         </div>
         <p className="mt-0.5 text-xs text-muted-foreground">
             Locked from the meeting you opened.
@@ -575,14 +600,22 @@ For delete / archive / discard:
         <DialogHeader>
             <DialogTitle>Delete contact?</DialogTitle>
             <DialogDescription>
-                <span className="font-medium">{name}</span> will be removed from this site. This
-                cannot be undone.
+                <span className="font-medium">{name}</span> will be removed from
+                this site. This cannot be undone.
             </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={submitting}>
-                {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button variant="outline" onClick={onClose}>
+                Cancel
+            </Button>
+            <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={submitting}
+            >
+                {submitting && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 Delete contact
             </Button>
         </DialogFooter>
@@ -670,6 +703,7 @@ final check.
 - [ ] `preserveScroll` and `preserveState` set on the Inertia request.
 - [ ] Trigger button gated by permission.
 - [ ] Accessible (`DialogTitle`, `DialogDescription`, `aria-label`, `aria-pressed`).
+
 # User-authorized catalog and interval amendment · 22 September 2026
 
 Apply this alongside the searchable record-selector contract below. Use shared Popover + Command controls for growing configurable catalogs such as service types, checklist purposes and interval presets. Search existing values before offering a clearly labelled **Add custom: [value]** action; preserve the selected value, trim/normalize input, reject duplicates and invalid numeric values, and support keyboard selection. Creation must be explicit and permission-aware, with a returned catalog identity and audit trail in the implemented application. A prototype may demonstrate local creation if it clearly states that scope.
@@ -679,7 +713,6 @@ This is not a blanket free-text substitute for existing-record relationships. St
 Service recurrence uses **calendar months**, not a fixed conversion to days. Offer searchable month presets and positive whole-number custom months; clamp month-end recurrence to the target month's last valid date. Offer distance presets plus a positive custom kilometre interval. Either trigger may apply; show both and say which is first due. Recalculate suggested next triggers from actual completion date/odometer and require review. Reminder lead times may still use days because they represent offsets rather than service recurrence.
 
 Every structured form must show meaningful initial choices, concise guidance, optional/required state, validation and a useful review. Preserve selected custom values through step changes and retry. Do not leave large blank free-text fields where users should choose a known catalog option. Keep the shared wizard rail/header/footer contract and avoid nested scrolling in the page body.
-
 
 ## User-requested catalogue and document follow-up · PKG-02B v7
 

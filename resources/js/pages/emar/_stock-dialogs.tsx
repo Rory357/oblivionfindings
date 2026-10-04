@@ -69,6 +69,7 @@ function PackWorkflowNotice({
 }) {
     return (
         <SettingsModal
+            frontline
             title="Open pack records"
             description="This medicine is tracked by its physical packs."
             onClose={onClose}
@@ -493,6 +494,7 @@ export function NewPharmacyOrderDialog({
                             error={form.errors.batch_expiry}
                         >
                             <DatePicker
+                                compact
                                 id="emar-stock-dialogs-1"
                                 label="Batch expiry"
                                 value={form.data.batch_expiry}
@@ -823,6 +825,7 @@ export function ReceiveStockDialog({
                             error={form.errors.expiry_date}
                         >
                             <DatePicker
+                                compact
                                 id="emar-stock-dialogs-2"
                                 label="Expiry date"
                                 value={form.data.expiry_date}
@@ -1107,6 +1110,7 @@ export function PharmacyDeliveryDialog({
                 </Field>
                 <Field label="Expiry" error={form.errors.batch_expiry}>
                     <DatePicker
+                        compact
                         id="emar-stock-dialogs-3"
                         label="Expiry"
                         value={form.data.batch_expiry}
@@ -2134,6 +2138,7 @@ export function AdjustStockDialog({
                             error={form.errors.expiry_date}
                         >
                             <DatePicker
+                                compact
                                 id="emar-stock-dialogs-4"
                                 label="Expiry date"
                                 value={form.data.expiry_date}

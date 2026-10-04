@@ -183,6 +183,7 @@ export function OverrideFollowupDialog({
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={close}
                 title="Check doses given without a witness"
@@ -433,6 +434,7 @@ export function OverrideFollowupDialog({
                 </WizardStepPane>
             </WizardShell>
             <ConfirmDialog
+                frontline
                 open={discard}
                 onClose={() => setDiscard(false)}
                 onConfirm={onClose}

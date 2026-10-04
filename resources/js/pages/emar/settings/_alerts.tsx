@@ -46,8 +46,8 @@ import {
     ChevronLeft,
     ChevronRight,
     Eye,
-    Home,
     History,
+    Home,
     LockKeyhole,
     Mail,
     Phone,
@@ -1459,6 +1459,7 @@ export function MessagePreview({
     ];
     return (
         <WizardShell
+            frontline
             open
             onClose={close}
             title="Message preview"
@@ -1789,6 +1790,7 @@ export function AlertWho({ k, data }: { k: string; data: AlertData }) {
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={onClose}
                 title={`Who gets “${meta.label}”`}
@@ -2046,6 +2048,7 @@ export function AlertWho({ k, data }: { k: string; data: AlertData }) {
                 </WizardStepPane>
             </WizardShell>
             <DiscardDraftDialog
+                frontline
                 open={guard}
                 mode="edit"
                 description="Your changes to who gets this alert haven’t been applied. Closing now loses them."
@@ -2090,6 +2093,7 @@ export function AlertPersonDialog({ k, data }: { k: string; data: AlertData }) {
     };
     return (
         <SettingsModal
+            frontline
             title={`Add a person to “${meta.label}”`}
             description="They get it for every house they have access to."
             onClose={close}

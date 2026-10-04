@@ -406,6 +406,7 @@ export function AssessmentDialog({
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={close}
                 title={
@@ -912,6 +913,7 @@ export function AssessmentDialog({
                 </WizardStepPane>
             </WizardShell>
             <ConfirmDialog
+                frontline
                 open={discard}
                 onClose={() => setDiscard(false)}
                 onConfirm={onClose}
@@ -921,6 +923,7 @@ export function AssessmentDialog({
                 cancelText="Keep going"
             />
             <ConfirmDialog
+                frontline
                 open={confirm}
                 onClose={() => setConfirm(false)}
                 onConfirm={() => {
@@ -1006,6 +1009,7 @@ export function AgreementDialog({
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={close}
                 title="Record the agreement"
@@ -1365,6 +1369,7 @@ export function AgreementDialog({
                 </WizardStepPane>
             </WizardShell>
             <ConfirmDialog
+                frontline
                 open={discard}
                 onClose={() => setDiscard(false)}
                 onConfirm={onClose}
@@ -1374,6 +1379,7 @@ export function AgreementDialog({
                 cancelText="Keep going"
             />
             <ConfirmDialog
+                frontline
                 open={confirm}
                 onClose={() => setConfirm(false)}
                 onConfirm={() => {
@@ -1431,7 +1437,7 @@ export function MedicineSupportDialog({
         <>
             <Dialog open onOpenChange={(open) => !open && close()}>
                 <DialogContent
-                    className="flex max-h-[88vh] flex-col overflow-hidden p-0"
+                    className="frontline-dialog flex max-h-[88vh] flex-col overflow-hidden p-0"
                     style={{
                         width: 'min(92vw, 720px)',
                         maxWidth: 'min(92vw, 720px)',
@@ -1507,6 +1513,7 @@ export function MedicineSupportDialog({
                 </DialogContent>
             </Dialog>
             <ConfirmDialog
+                frontline
                 open={confirm}
                 onClose={() => setConfirm(false)}
                 onConfirm={() => {
@@ -1518,6 +1525,7 @@ export function MedicineSupportDialog({
                 confirmText="Set support"
             />
             <ConfirmDialog
+                frontline
                 open={discard}
                 onClose={() => setDiscard(false)}
                 onConfirm={onClose}
@@ -1630,7 +1638,7 @@ export function ConsentDialog({
         return (
             <Dialog open onOpenChange={(open) => !open && onClose()}>
                 <DialogContent
-                    className="flex max-h-[88vh] flex-col overflow-hidden p-0"
+                    className="frontline-dialog flex max-h-[88vh] flex-col overflow-hidden p-0"
                     style={{
                         width: 'min(92vw, 480px)',
                         maxWidth: 'min(92vw, 480px)',
@@ -1661,7 +1669,7 @@ export function ConsentDialog({
                         width: 'min(92vw, 720px)',
                         maxWidth: 'min(92vw, 720px)',
                     }}
-                    className="flex max-h-[88vh] flex-col overflow-hidden p-0"
+                    className="frontline-dialog flex max-h-[88vh] flex-col overflow-hidden p-0"
                 >
                     <DialogHeader className="shrink-0 border-b p-5 pr-12">
                         <DialogTitle>
@@ -1719,6 +1727,7 @@ export function ConsentDialog({
                             />
                         </Field>
                         <DateTimeField
+                            compact
                             id="occurred_at"
                             label="When"
                             value={form.data.occurred_at}
@@ -1768,6 +1777,7 @@ export function ConsentDialog({
                 </DialogContent>
             </Dialog>
             <ConfirmDialog
+                frontline
                 open={discard}
                 onClose={() => setDiscard(false)}
                 onConfirm={onClose}
@@ -1794,7 +1804,7 @@ export function AssessmentHistoryDialog({
                     width: 'min(92vw, 720px)',
                     maxWidth: 'min(92vw, 720px)',
                 }}
-                className="flex max-h-[88vh] flex-col overflow-hidden p-0"
+                className="frontline-dialog flex max-h-[88vh] flex-col overflow-hidden p-0"
             >
                 <DialogHeader className="shrink-0 border-b p-5 pr-12">
                     <DialogTitle>

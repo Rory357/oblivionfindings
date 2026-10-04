@@ -223,6 +223,7 @@ function AllergyEditor({
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={requestClose}
                 title={

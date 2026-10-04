@@ -1642,6 +1642,7 @@ export function ActionDialog({
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={requestClose}
                 title={title}
@@ -1791,6 +1792,7 @@ export function ActionDialog({
                 </WizardStepPane>
             </WizardShell>
             <ConfirmDialog
+                frontline
                 open={confirm}
                 onClose={() => setConfirm(false)}
                 onConfirm={() => void submit()}
@@ -1805,6 +1807,7 @@ export function ActionDialog({
                 processing={saving}
             />
             <ConfirmDialog
+                frontline
                 open={discard}
                 onClose={() => setDiscard(false)}
                 onConfirm={onClose}

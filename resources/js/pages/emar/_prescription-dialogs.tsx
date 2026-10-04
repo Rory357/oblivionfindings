@@ -368,6 +368,7 @@ export function NewOrderDialog({
                             error={form.errors.order_date}
                         >
                             <DatePicker
+                                compact
                                 id="emar-prescription-dialogs-1"
                                 label="Order date"
                                 value={form.data.order_date}
@@ -554,6 +555,7 @@ export function NewOrderDialog({
                         </Field>
                         <Field label="Effective date">
                             <DatePicker
+                                compact
                                 id="emar-prescription-dialogs-2"
                                 label="Effective date"
                                 value={form.data.effective_date}
@@ -565,6 +567,7 @@ export function NewOrderDialog({
                         </Field>
                         <Field label="Expiry date">
                             <DatePicker
+                                compact
                                 id="emar-prescription-dialogs-3"
                                 label="Expiry date"
                                 value={form.data.expiry_date}
@@ -879,6 +882,7 @@ export function DispenseDialog({
                 </Field>
                 <Field label="Batch expiry">
                     <DatePicker
+                        compact
                         id="emar-prescription-dialogs-4"
                         label="Batch expiry"
                         value={form.data.batch_expiry}
@@ -894,6 +898,7 @@ export function DispenseDialog({
                     error={form.errors.dispensed_at}
                 >
                     <DatePicker
+                        compact
                         id="emar-prescription-dialogs-5"
                         label="Dispensed date"
                         value={form.data.dispensed_at}

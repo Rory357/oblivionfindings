@@ -260,6 +260,7 @@ export function ReachDetail({ id, gaps }: { id: number; gaps: ReachGap[] }) {
     if (!r) return <NotFound what="person" />;
     return (
         <SettingsModal
+            frontline
             title={`Why ${r.gap.name} can’t always be reached`}
             description={`${r.gap.role} · ${r.gap.houses}`}
             onClose={close}

@@ -329,6 +329,7 @@ function ReportErrorForm({
                             </div>
                         )}
                         <DateTimeField
+                            compact
                             id="error-occurred"
                             label="When it happened"
                             value={occurred}

@@ -514,6 +514,7 @@ export function RecordCdEntryDialog({
                             error={form.errors.expiry_date}
                         >
                             <DatePicker
+                                compact
                                 id="emar-cd-dialogs-1"
                                 label={
                                     isReceipt

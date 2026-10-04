@@ -581,6 +581,7 @@ export function RuleWizard({
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={onClose}
                 title={src ? 'Edit medicine rule' : 'Add a medicine rule'}
@@ -922,6 +923,7 @@ export function RuleWizard({
                 </WizardStepPane>
             </WizardShell>
             <DiscardDraftDialog
+                frontline
                 open={guard}
                 mode={src ? 'edit' : 'create'}
                 description="Nothing you’ve entered here has been saved. Closing now loses it."
@@ -1075,6 +1077,7 @@ export function RuleView({ id, data }: { id: number; data: RuleData }) {
     if (r.concealed)
         return (
             <SettingsModal
+                frontline
                 title="Controlled-medicine rule"
                 description={`${whereOf(r)} · ${r.active ? 'Active' : 'Paused'}`}
                 onClose={close}
@@ -1092,6 +1095,7 @@ export function RuleView({ id, data }: { id: number; data: RuleData }) {
         );
     return (
         <SettingsModal
+            frontline
             title="Medicine rule"
             description={r.sentence}
             onClose={close}
@@ -1136,6 +1140,7 @@ export function RuleToggle({ id, data }: { id: number; data: RuleData }) {
     if (!r || !r.can_change) return <NotFound what="rule" />;
     return (
         <ConfirmDialog
+            frontline
             open
             onClose={close}
             processing={saving}
@@ -1193,6 +1198,7 @@ export function RuleHistory({ id, data }: { id: number; data: RuleData }) {
     );
     return (
         <SettingsModal
+            frontline
             title="Rule change history"
             description={r.sentence}
             onClose={close}

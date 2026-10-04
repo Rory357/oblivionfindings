@@ -51,6 +51,7 @@ export function LegacyOrderLink({
         );
     return (
         <WizardShell
+            frontline
             open={open}
             onClose={onClose}
             title={

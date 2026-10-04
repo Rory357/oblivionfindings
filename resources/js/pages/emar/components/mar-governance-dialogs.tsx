@@ -343,6 +343,7 @@ function RecordInrDialog({
                                 error={form.errors.tested_on}
                             >
                                 <DatePicker
+                                    compact
                                     id="emar-mar-governance-dialogs-1"
                                     label="Tested on"
                                     value={form.data.tested_on}
@@ -399,6 +400,7 @@ function RecordInrDialog({
                                 error={form.errors.next_test_date}
                             >
                                 <DatePicker
+                                    compact
                                     id="emar-mar-governance-dialogs-2"
                                     label="Next test date"
                                     value={form.data.next_test_date}
@@ -688,6 +690,7 @@ export function SyringeDriverDialog({
                         />
                     </Field>
                     <DateTimeField
+                        compact
                         id="syringe-commenced-at"
                         label="Commenced at"
                         value={form.data.commenced_at}

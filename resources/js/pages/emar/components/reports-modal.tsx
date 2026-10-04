@@ -242,6 +242,7 @@ export function ReportsModal({
                         <Field label="Date" required span>
                             {/* eslint-disable-next-line no-restricted-syntax -- native date input; no shadcn date control in wizard primitives. */}
                             <DatePicker
+                                compact
                                 id="emar-reports-modal-1"
                                 label="Date"
                                 value={singleDate}
@@ -253,6 +254,7 @@ export function ReportsModal({
                             <Field label="From" required>
                                 {/* eslint-disable-next-line no-restricted-syntax -- native date input. */}
                                 <DatePicker
+                                    compact
                                     id="emar-reports-modal-2"
                                     label="From"
                                     value={dateFrom}
@@ -262,6 +264,7 @@ export function ReportsModal({
                             <Field label="To" required>
                                 {/* eslint-disable-next-line no-restricted-syntax -- native date input. */}
                                 <DatePicker
+                                    compact
                                     id="emar-reports-modal-3"
                                     label="To"
                                     value={dateTo}

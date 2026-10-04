@@ -149,6 +149,7 @@ export function OrderDetail({
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={close.close}
                 title={`${order.name} — ${actionTitle[action]}`}
@@ -858,6 +859,7 @@ export function OrderDetail({
                                 ]}
                             />
                             <DateTimeField
+                                compact
                                 id="allergy-confirmed-at"
                                 label="Confirmed"
                                 value={form.data.confirmed_at}
@@ -913,6 +915,7 @@ export function OrderDetail({
                                 ]}
                             />
                             <DateTimeField
+                                compact
                                 id="written-received"
                                 label="Received"
                                 value={form.data.received_at}
@@ -985,6 +988,7 @@ export function OrderDetail({
             </WizardShell>
             {close.confirm}
             <ConfirmDialog
+                frontline
                 open={confirmStop}
                 onClose={() => setConfirmStop(false)}
                 title={`Stop ${order.name}?`}

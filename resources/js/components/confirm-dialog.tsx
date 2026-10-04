@@ -8,6 +8,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { cn } from '@/lib/utils';
 import type { ComponentProps, ReactNode } from 'react';
 
 /**
@@ -33,6 +34,7 @@ export function ConfirmDialog({
     processing,
     buttonClassName,
     onCloseAutoFocus,
+    frontline = false,
 }: {
     open: boolean;
     onClose: () => void;
@@ -46,6 +48,8 @@ export function ConfirmDialog({
     processing?: boolean;
     /** Optional sizing for both confirmation controls, such as frontline-hit. */
     buttonClassName?: string;
+    /** Medication confirmations use pixel-based bounds and 44px touch targets. */
+    frontline?: boolean;
     onCloseAutoFocus?: ComponentProps<
         typeof AlertDialogContent
     >['onCloseAutoFocus'];
@@ -59,7 +63,22 @@ export function ConfirmDialog({
                 if (!isOpen) onClose();
             }}
         >
-            <AlertDialogContent onCloseAutoFocus={onCloseAutoFocus}>
+            <AlertDialogContent
+                onCloseAutoFocus={onCloseAutoFocus}
+                className={
+                    frontline
+                        ? 'frontline-dialog max-h-[88vh] overflow-y-auto'
+                        : undefined
+                }
+                style={
+                    frontline
+                        ? {
+                              width: 'min(92vw, 480px)',
+                              maxWidth: 'min(92vw, 480px)',
+                          }
+                        : undefined
+                }
+            >
                 <AlertDialogHeader>
                     <AlertDialogTitle>{title}</AlertDialogTitle>
                     <AlertDialogDescription asChild>
@@ -70,7 +89,10 @@ export function ConfirmDialog({
                     <AlertDialogCancel
                         onClick={onClose}
                         disabled={processing}
-                        className={buttonClassName}
+                        className={cn(
+                            frontline && 'whitespace-normal',
+                            buttonClassName,
+                        )}
                     >
                         {cancelText}
                     </AlertDialogCancel>
@@ -87,7 +109,10 @@ export function ConfirmDialog({
                         }}
                         disabled={processing}
                         variant={variant}
-                        className={buttonClassName}
+                        className={cn(
+                            frontline && 'whitespace-normal',
+                            buttonClassName,
+                        )}
                     >
                         {confirmText}
                     </AlertDialogAction>

@@ -436,6 +436,7 @@ export function BookReviewDialog({
                             hint="It becomes overdue the day after, in NZ time."
                         >
                             <DatePicker
+                                compact
                                 id="book-due"
                                 label="Due by"
                                 value={due}
@@ -458,6 +459,7 @@ export function BookReviewDialog({
                         {clinician && (
                             <>
                                 <DateTimeField
+                                    compact
                                     id="book-appointment"
                                     label="Appointment"
                                     value={appointment}
@@ -920,6 +922,7 @@ export function RecordReviewDialog({
                             />
                         </Field>
                         <DateTimeField
+                            compact
                             id="record-when"
                             label="When it happened"
                             value={when}
@@ -1262,6 +1265,7 @@ export function RecordReviewDialog({
                                 error={errors['record-earlier']}
                             >
                                 <DatePicker
+                                    compact
                                     id="record-earlier"
                                     label="Earlier review date"
                                     value={earlierDate}

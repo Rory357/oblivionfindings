@@ -226,6 +226,7 @@ export default function MedicationRecordHub(props: Props) {
                                 ]}
                             />
                             <DatePicker
+                                compact
                                 id="medication-hub-day"
                                 label="NZ calendar day"
                                 value={props.filters.date}

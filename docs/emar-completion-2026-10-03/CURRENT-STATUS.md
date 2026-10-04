@@ -1,5 +1,18 @@
 # eMAR implementation and verification status
 
+## Modal sizing follow-up — 5 October 2026
+
+The [modal sizing audit](modal-sizing-audit-2026-10-05.md) records the latest UI
+follow-up. All 72 eMAR date/time picker usages use the compact shared controls;
+modal shells, confirmations and discard prompts consistently use frontline
+sizing. Phone clock/dropdown overflow, footer wrapping and the oversized house
+selector footer are corrected. The final build passed in 3m47s, the complete
+frontend suite passed **536 files / 3,628 tests**, and TypeScript, scoped lint and
+formatting passed. The browser verified `app-BSfYpu4V.js` at desktop, 720px and
+320px CSS widths, including exact-minute entry, picker dismissal and house
+switching. Draft PR #16 remains unmerged and undeployed; the clinical release
+gates below remain open.
+
 ## Current repair pass — 5 October 2026
 
 The [linked-workflow re-audit](linked-workflow-re-audit-2026-10-05.md) supersedes the prior final-asset, secondary-tab and CI claims below. Guided rounds prevent stale-chart next-dose recording and keep exact offline doses pending until acknowledged. Rory secondary-tab dimensions were corrected and measured. Medication error dialogs now protect unsaved work, explicitly discarded reports reopen empty, and phone discard controls measure 44px. Roster day grouping uses New Zealand dates; shift reports again support custom periods. Nonclinical users can open the general report hub without gaining medication data. The latest full frontend suite passed **536 files / 3,624 tests**; TypeScript, scoped lint and the 3m54s build passed. The browser verified `app-Czgn9PcE.js` and the oversight report-discard/reopen journey. Earlier phone draft recovery and custom report-date evidence remains recorded. Whole-file backend results and independent disposable-schema cleanup are in the current ledger.

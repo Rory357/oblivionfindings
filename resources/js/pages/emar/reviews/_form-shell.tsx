@@ -72,6 +72,7 @@ export function ReviewFormShell({
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={close}
                 title={title}

@@ -130,6 +130,7 @@ export function PrnDetailDialog({
 
     return (
         <WizardShell
+            frontline
             open
             onClose={onClose}
             title="PRN administration detail"

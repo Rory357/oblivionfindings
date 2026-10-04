@@ -97,7 +97,7 @@ export function ReviewDetailDialog({
                         {status.label}
                     </StatusBadge>
                     {review.away && (
-                        <span className="text-muted-foreground text-sm">
+                        <span className="text-sm text-muted-foreground">
                             Away — {review.away}
                         </span>
                     )}
@@ -218,7 +218,7 @@ export function ReviewDetailDialog({
                             <h3 className="text-section-title">
                                 Medicines reviewed
                             </h3>
-                            <ul className="mt-2 list-disc space-y-1 break-words pl-5 text-sm">
+                            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm break-words">
                                 {review.legacy_medications_reviewed.map(
                                     (medicine, index) => (
                                         <li key={index}>{medicine}</li>
@@ -228,7 +228,7 @@ export function ReviewDetailDialog({
                         </div>
                     ) : null}
                     {review.legacy_recommendations && (
-                        <p className="whitespace-pre-wrap break-words text-sm">
+                        <p className="text-sm break-words whitespace-pre-wrap">
                             {review.legacy_recommendations}
                         </p>
                     )}
@@ -290,12 +290,12 @@ export function ReviewDetailDialog({
                                                     {itemOutcomeLabel(item)}
                                                 </p>
                                                 {item.recommendation && (
-                                                    <p className="mt-1 break-words text-sm">
+                                                    <p className="mt-1 text-sm break-words">
                                                         {item.recommendation}
                                                     </p>
                                                 )}
                                                 {item.watch_text && (
-                                                    <p className="mt-1 break-words text-sm">
+                                                    <p className="mt-1 text-sm break-words">
                                                         Watch for{' '}
                                                         {item.watch_text} ·
                                                         until{' '}
@@ -426,7 +426,7 @@ export function ReviewDetailDialog({
                     <h3 className="text-section-title">
                         In the clinician’s words
                     </h3>
-                    <p className="mt-2 whitespace-pre-wrap break-words text-sm">
+                    <p className="mt-2 text-sm break-words whitespace-pre-wrap">
                         {review.clinical_summary}
                     </p>
                 </div>
@@ -465,11 +465,11 @@ export function ReviewDetailDialog({
                 {(review.history ?? []).map((event) => (
                     <li key={event.id} className="flex items-start gap-3">
                         <History
-                            className="text-primary mt-1 size-4 shrink-0"
+                            className="mt-1 size-4 shrink-0 text-primary"
                             aria-hidden="true"
                         />
                         <div>
-                            <p className="break-words text-sm">
+                            <p className="text-sm break-words">
                                 {historyLabel(event)}
                             </p>
                             <p className="text-caption mt-1">
@@ -489,6 +489,7 @@ export function ReviewDetailDialog({
     };
     return (
         <WizardShell
+            frontline
             open
             onClose={onClose}
             title={`Review ${review.id} — ${review.client_name}`}

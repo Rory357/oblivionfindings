@@ -199,6 +199,7 @@ export function DetailDialog({
     if (!record)
         return (
             <WizardShell
+                frontline
                 open
                 onClose={onClose}
                 title="We can’t show this record"
@@ -756,6 +757,7 @@ export function DetailDialog({
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={onClose}
                 title={title}

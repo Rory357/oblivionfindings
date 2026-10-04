@@ -24,6 +24,7 @@ export function useDraftClose(
         },
         confirmation: (
             <ConfirmDialog
+                frontline
                 open={confirm}
                 onClose={() => setConfirm(false)}
                 onConfirm={onClose}

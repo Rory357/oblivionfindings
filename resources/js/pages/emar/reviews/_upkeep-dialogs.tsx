@@ -124,6 +124,7 @@ export function MoveReviewDialog({
                             error={command.errors['move-date']}
                         >
                             <DatePicker
+                                compact
                                 id="move-date"
                                 label="New due date"
                                 value={date}
@@ -425,6 +426,7 @@ export function AppointmentDialog({
                 ) : step === 1 ? (
                     <>
                         <DateTimeField
+                            compact
                             id="appointment-when"
                             label="Appointment"
                             value={when}

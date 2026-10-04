@@ -78,6 +78,7 @@ export function StartReconciliation({
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={close.close}
                 title="Reconcile medicines"
@@ -493,6 +494,7 @@ export function ReconcileMedicines({
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={close.close}
                 title="Reconcile medicines"
@@ -724,6 +726,7 @@ export function ReconcileMedicines({
                                             {row(item.id)?.decision ===
                                                 'ask' && (
                                                 <DateTimeField
+                                                    compact
                                                     id={`rec-next-${item.id}`}
                                                     label="Next affected dose due"
                                                     value={
@@ -794,6 +797,7 @@ export function ReconcileMedicines({
                                                         />
                                                     </Field>
                                                     <DateTimeField
+                                                        compact
                                                         id={`last-dose-at-${item.id}`}
                                                         label="Last dose actually given"
                                                         value={
@@ -987,6 +991,7 @@ export function ReconcileMedicines({
             </WizardShell>
             {close.confirm}
             <ConfirmDialog
+                frontline
                 open={confirmApply}
                 onClose={() => setConfirmApply(false)}
                 title="Apply these stop decisions?"
@@ -1026,6 +1031,7 @@ function PrescriberResponse({
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={close.close}
                 title="Record the prescriber’s response"
@@ -1118,6 +1124,7 @@ function PrescriberResponse({
                                 ]}
                             />
                             <DateTimeField
+                                compact
                                 id="query-time"
                                 label="When they confirmed"
                                 clearable={false}

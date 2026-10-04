@@ -419,10 +419,16 @@ export function WizardShell({
 
                             <footer
                                 data-wizard-region="footer"
-                                className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-muted/30 px-5 py-3.5"
+                                className={cn(
+                                    'flex shrink-0 items-center justify-between gap-3 border-t border-border bg-muted/30 px-5 py-3.5',
+                                    frontline &&
+                                        'flex-wrap [&_button]:max-w-full [&_button]:whitespace-normal',
+                                )}
                             >
-                                <div>{footerStart}</div>
-                                <div className="flex min-w-0 flex-wrap items-center justify-end gap-2.5">
+                                <div className="max-w-full min-w-0">
+                                    {footerStart}
+                                </div>
+                                <div className="flex max-w-full min-w-0 flex-wrap items-center justify-end gap-2.5">
                                     {footerEnd}
                                 </div>
                             </footer>

@@ -307,6 +307,7 @@ export function OrderEntry(props: Props) {
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={close.close}
                 title={props.order ? 'Enter an order change' : 'Enter an order'}
@@ -474,6 +475,7 @@ export function OrderEntry(props: Props) {
                                     />
                                 </Field>
                                 <DateTimeField
+                                    compact
                                     id="order-received"
                                     label="Received"
                                     value={form.data.source.received_at}
@@ -740,6 +742,7 @@ export function OrderEntry(props: Props) {
                                                 className="flex items-center gap-2"
                                             >
                                                 <TimePicker
+                                                    compact
                                                     id={`order-time-${index}`}
                                                     label={`Dose time ${index + 1}`}
                                                     value={time}
@@ -873,6 +876,7 @@ export function OrderEntry(props: Props) {
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <Field id="order-start" label="Starts">
                                         <DatePicker
+                                            compact
                                             id="order-start"
                                             label="Starts"
                                             value={p.start_date}
@@ -886,6 +890,7 @@ export function OrderEntry(props: Props) {
                                         label="Optional last day"
                                     >
                                         <DatePicker
+                                            compact
                                             id="order-end"
                                             label="Last day"
                                             value={p.end_date ?? ''}
@@ -1125,6 +1130,7 @@ export function OrderEntry(props: Props) {
             </WizardShell>
             {close.confirm}
             <ConfirmDialog
+                frontline
                 open={confirmSwap}
                 onClose={() => setConfirmSwap(false)}
                 title={`Stop ${props.review?.name_snapshot} and enter its replacement?`}

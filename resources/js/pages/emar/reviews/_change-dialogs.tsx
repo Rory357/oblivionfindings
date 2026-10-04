@@ -324,7 +324,7 @@ export function ChangeDialog({
                             ? 'Entered in Orders — check status there'
                             : 'Enter the agreed change in Orders'}
                     </h3>
-                    <p className="text-muted-foreground text-sm">
+                    <p className="text-sm text-muted-foreground">
                         {item.linked_order_version_id
                             ? `Linked order version ${item.linked_order_version_id}. This link alone does not confirm it is checked or effective.`
                             : item.decision === 'agreed'
@@ -354,6 +354,7 @@ export function ChangeDialog({
     };
     return (
         <WizardShell
+            frontline
             open
             onClose={onClose}
             title={`${item.name} — ${review.client_name}`}
@@ -495,7 +496,7 @@ export function DecisionDialog({
                     <>
                         <Card className="gap-1 p-4">
                             <p className="text-caption">The recommendation</p>
-                            <p className="break-words text-sm">
+                            <p className="text-sm break-words">
                                 {item.recommendation}
                             </p>
                         </Card>
@@ -550,6 +551,7 @@ export function DecisionDialog({
                             />
                         </Field>
                         <DateTimeField
+                            compact
                             id="decision-when"
                             label={
                                 state === 'waiting'

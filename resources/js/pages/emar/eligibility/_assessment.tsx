@@ -172,6 +172,7 @@ export function AssessmentView({
     const a = x.assessment;
     return (
         <WizardShell
+            frontline
             open
             onClose={onClose}
             title={`${x.name} — medication competency`}
@@ -722,6 +723,7 @@ export function AssessmentWizard({
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={close}
                 title={title}
@@ -877,6 +879,7 @@ export function AssessmentWizard({
                                     htmlFor="aw-date"
                                 >
                                     <DatePicker
+                                        compact
                                         id="aw-date"
                                         label="Assessment date"
                                         value={A.date}
@@ -903,6 +906,7 @@ export function AssessmentWizard({
                                     htmlFor="aw-until"
                                 >
                                     <DatePicker
+                                        compact
                                         id="aw-until"
                                         label="Ends"
                                         value={A.until}
@@ -1544,6 +1548,7 @@ export function AssessmentWizard({
                 </WizardStepPane>
             </WizardShell>
             <DiscardDraftDialog
+                frontline
                 open={guard}
                 mode={editing ? 'edit' : 'create'}
                 description="Nothing you’ve entered in this assessment has been saved. Closing now loses it."

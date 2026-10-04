@@ -672,6 +672,7 @@ export default function StaffEligibility(props: Props) {
                 />
             ) : null}
             <ConfirmDialog
+                frontline
                 open={dialog?.kind === 'delete'}
                 onClose={() => setDialog(null)}
                 processing={busy}
@@ -696,6 +697,7 @@ export default function StaffEligibility(props: Props) {
                 variant="destructive"
             />
             <ConfirmDialog
+                frontline
                 open={dialog?.kind === 'reset'}
                 onClose={() => setDialog(null)}
                 processing={busy}

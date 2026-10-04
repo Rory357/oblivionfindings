@@ -155,7 +155,7 @@ export function DuplicateResolutionDialog({
                 }}
             >
                 <DialogContent
-                    className="flex max-h-[88vh] flex-col overflow-hidden p-0"
+                    className="frontline-dialog flex max-h-[88vh] flex-col overflow-hidden p-0"
                     style={{
                         width: 'min(92vw, 720px)',
                         maxWidth: 'min(92vw, 720px)',
@@ -315,6 +315,7 @@ export function DuplicateResolutionDialog({
                 </DialogContent>
             </Dialog>
             <ConfirmDialog
+                frontline
                 open={discard}
                 title="Discard this duplicate review?"
                 description="Your review has not been saved."
@@ -372,6 +373,7 @@ export function DeclareDowntimeDialog({
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={close}
                 title="Record a downtime"
@@ -442,6 +444,7 @@ export function DeclareDowntimeDialog({
                                     }
                                 />
                                 <DateTimeField
+                                    compact
                                     id="dt-start"
                                     label="When it started"
                                     value={form.data.started_at}
@@ -450,6 +453,7 @@ export function DeclareDowntimeDialog({
                                     }
                                 />
                                 <DateTimeField
+                                    compact
                                     id="dt-end"
                                     label="When it ended"
                                     value={form.data.ended_at}
@@ -571,6 +575,7 @@ export function DeclareDowntimeDialog({
                 </WizardStepPane>
             </WizardShell>
             <ConfirmDialog
+                frontline
                 open={discard}
                 onClose={() => setDiscard(false)}
                 onConfirm={onClose}
@@ -680,6 +685,7 @@ export function PaperEntryDialog({
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={close}
                 title={
@@ -814,6 +820,7 @@ export function PaperEntryDialog({
                                     }
                                 />
                                 <DateTimeField
+                                    compact
                                     id="paper-time"
                                     label="The actual time on paper"
                                     value={form.data.given_at}
@@ -1059,6 +1066,7 @@ export function PaperEntryDialog({
                 </WizardStepPane>
             </WizardShell>
             <ConfirmDialog
+                frontline
                 open={discard}
                 onClose={() => setDiscard(false)}
                 onConfirm={onClose}
@@ -1095,7 +1103,7 @@ export function ConfirmationDialog({
             }}
         >
             <DialogContent
-                className="flex max-h-[88vh] flex-col overflow-hidden p-0"
+                className="frontline-dialog flex max-h-[88vh] flex-col overflow-hidden p-0"
                 style={{
                     width: 'min(92vw, 720px)',
                     maxWidth: 'min(92vw, 720px)',
@@ -1293,7 +1301,7 @@ export function PackDialog({
             }}
         >
             <DialogContent
-                className="flex max-h-[88vh] flex-col overflow-hidden p-0"
+                className="frontline-dialog flex max-h-[88vh] flex-col overflow-hidden p-0"
                 style={{
                     width: 'min(92vw, 900px)',
                     maxWidth: 'min(92vw, 900px)',
