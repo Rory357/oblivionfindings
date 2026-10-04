@@ -1,5 +1,7 @@
 # eMAR repair pass and re-audit — 4 October 2026
 
+The [5 October linked-workflow re-audit](linked-workflow-re-audit-2026-10-05.md) supersedes earlier final-asset, tab-conformance and CI claims where newer evidence is recorded. It contains the current verification ledger and remaining release boundaries.
+
 Status: the resumed repairs and follow-up CI fixture corrections are locally verified for draft PR #16. Complete CI is not green; cross-module clinical acceptance also remains a release gate. No production deployment has occurred.
 
 ## Round privacy and final browser re-audit — current evidence
@@ -206,6 +208,3 @@ The final browser check also confirmed the Orders-specific override is gone: act
 - **Local setup is not ready for real medication work.** The inspected synthetic preview contains unchecked orders, missing on-call contacts and deliberately ineligible/off-shift actors. Those states are shown rather than bypassed.
 
 No operational medication outcome, stock movement, permission change, migration, main-branch merge or deployment was performed in the browser audit. Saved browser form values were synthetic unsaved drafts and were explicitly discarded.
-# Latest continuation
-
-The [5 October linked-workflow re-audit](linked-workflow-re-audit-2026-10-05.md) supersedes earlier final-asset, tab-conformance and CI claims where newer evidence is recorded. It contains the current verification ledger and remaining release boundaries.

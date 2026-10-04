@@ -8,6 +8,7 @@ use App\Models\ClientIncident;
 use App\Models\ControlRoom\Shift;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
+use App\Models\IncidentLifecycleSignal;
 use App\Models\MedicationError;
 use App\Models\Permission;
 use App\Models\Role;
@@ -44,8 +45,14 @@ final class IncidentHandoverE2ESeeder extends Seeder
 
     public function run(): void
     {
-        $site = $this->site();
-        $client = $this->client($site);
+        $manifest = DB::transaction(fn (): array => $this->seedGeneration());
+        $this->command?->line('INCIDENT_HANDOVER_MANIFEST='.json_encode($manifest, JSON_THROW_ON_ERROR));
+    }
+
+    private function seedGeneration(): array
+    {
+        $this->assertNoUnrelatedActiveShift();
+        [$site, $client] = $this->activeFixtureGeneration();
 
         $operator = $this->staff(self::OPERATOR_EMAIL, 'Playwright Control Room Operator', 'coordinator', $site);
         $incoming = $this->staff(self::INCOMING_EMAIL, 'Playwright Incoming Control Room Operator', 'coordinator', $site);
@@ -111,7 +118,6 @@ final class IncidentHandoverE2ESeeder extends Seeder
         $this->grant($actionOwner, ['hazards.view', 'hazards.manage']);
         $this->grant($verifier, ['hazards.view', 'hazards.manage', 'healthSafety.viewAllSites']);
 
-        $this->assertNoUnrelatedActiveShift();
         $client->supportWorkers()->syncWithoutDetaching([$worker->id, $operator->id]);
         $this->clearPriorJourneys($client);
         $this->retirePriorFixtureShifts();
@@ -144,14 +150,61 @@ final class IncidentHandoverE2ESeeder extends Seeder
             ],
         ];
 
-        $this->command?->line('INCIDENT_HANDOVER_MANIFEST='.json_encode($manifest, JSON_THROW_ON_ERROR));
+        return $manifest;
     }
 
-    private function site(): Site
+    /** @return array{Site, Client} */
+    private function activeFixtureGeneration(): array
     {
-        $site = Site::query()->find(self::SITE_ID) ?? new Site(['id' => self::SITE_ID]);
+        $client = Client::withTrashed()
+            ->where('first_name', 'Playwright')
+            ->where(fn ($query) => $query->where('last_name', 'Aroha Handover')
+                ->orWhere('last_name', 'like', 'Aroha Handover [%]'))
+            ->orderByDesc('id')
+            ->first();
+
+        if ($client === null) {
+            $site = $this->site();
+
+            return [$site, $this->client($site)];
+        }
+
+        $site = Site::query()->findOrFail($client->site_id);
+        $generation = (int) $site->id === self::SITE_ID ? '' : '-generation-'.$site->id;
+        $nameSuffix = $generation === '' ? '' : ' ['.$site->id.']';
+        if ($client->trashed()
+            || $client->email !== 'aroha-handover'.$generation.'@demo.test'
+            || $client->first_name !== 'Playwright'
+            || $client->last_name !== 'Aroha Handover'.$nameSuffix
+            || $client->nhi_number !== 'E2EH'.$site->id
+            || ($generation === '' && (int) $client->id !== self::CLIENT_ID)
+            || $site->email !== 'incident-handover-house'.$generation.'@demo.test'
+            || $site->name !== 'Playwright Incident Handover House'.$nameSuffix) {
+            throw new \RuntimeException('Refusing to replace records outside the exact incident handover fixture.');
+        }
+
+        // A completed/reopened journey has append-only clinical provenance.
+        // Keep that entire generation, including active reopened alerts, and
+        // give the next synthetic journey its own approved Site and person.
+        if (IncidentLifecycleSignal::query()->where('client_id', $client->id)->exists()) {
+            $site = $this->site(nextGeneration: true);
+
+            return [$site, $this->client($site)];
+        }
+
+        return [$site, $client];
+    }
+
+    private function site(bool $nextGeneration = false): Site
+    {
+        $site = $nextGeneration
+            ? new Site
+            : (Site::query()->find(self::SITE_ID) ?? new Site(['id' => self::SITE_ID]));
+        if ($site->exists && ($site->email !== 'incident-handover-house@demo.test'
+            || $site->name !== 'Playwright Incident Handover House')) {
+            throw new \RuntimeException('The reserved incident handover Site belongs to unrelated records.');
+        }
         $site->forceFill([
-            'id' => self::SITE_ID,
             'tenant_id' => 1,
             'name' => 'Playwright Incident Handover House',
             'type' => 'house',
@@ -161,28 +214,42 @@ final class IncidentHandoverE2ESeeder extends Seeder
             'region' => 'Wellington',
             'postcode' => '6011',
             'phone' => '04 555 9401',
-            'email' => 'incident-handover-house@demo.test',
+            'email' => $nextGeneration ? null : 'incident-handover-house@demo.test',
             'is_active' => true,
         ])->save();
+        if ($nextGeneration) {
+            $site->forceFill([
+                'name' => 'Playwright Incident Handover House ['.$site->id.']',
+                'address_line_1' => $site->id.' Handover Lane',
+                'email' => 'incident-handover-house-generation-'.$site->id.'@demo.test',
+            ])->save();
+        }
 
         return $site;
     }
 
     private function client(Site $site): Client
     {
-        $client = Client::query()->find(self::CLIENT_ID) ?? new Client(['id' => self::CLIENT_ID]);
+        $baseGeneration = (int) $site->id === self::SITE_ID;
+        $client = $baseGeneration
+            ? (Client::withTrashed()->find(self::CLIENT_ID) ?? new Client(['id' => self::CLIENT_ID]))
+            : new Client;
+        if ($client->exists && ($client->trashed() || $client->email !== 'aroha-handover@demo.test'
+            || $client->first_name !== 'Playwright' || $client->last_name !== 'Aroha Handover'
+            || (int) $client->site_id !== (int) $site->id)) {
+            throw new \RuntimeException('The reserved incident handover person belongs to unrelated records.');
+        }
         $client->forceFill([
-            'id' => self::CLIENT_ID,
             'organization_id' => 1,
             'site_id' => $site->id,
             'first_name' => 'Playwright',
-            'last_name' => 'Aroha Handover',
+            'last_name' => 'Aroha Handover'.($baseGeneration ? '' : ' ['.$site->id.']'),
             'preferred_name' => 'Aroha',
-            'nhi_number' => 'E2EH9401',
+            'nhi_number' => 'E2EH'.$site->id,
             'date_of_birth' => '1988-01-01',
             'phone' => '021 555 9401',
-            'email' => 'aroha-handover@demo.test',
-            'address_line_1' => '9401 Handover Lane',
+            'email' => 'aroha-handover'.($baseGeneration ? '' : '-generation-'.$site->id).'@demo.test',
+            'address_line_1' => $site->id.' Handover Lane',
             'city' => 'Wellington',
             'postcode' => '6011',
             'status' => 'active',
@@ -324,13 +391,13 @@ final class IncidentHandoverE2ESeeder extends Seeder
     ): Collection {
         return collect([
             [
-                'reference_number' => self::REQUIRED_ALERT_REFERENCES[0],
+                'reference_number' => self::REQUIRED_ALERT_REFERENCES[0].((int) $site->id === self::SITE_ID ? '' : '-G'.$site->id),
                 'alert_type' => 'E2E welfare escalation',
                 'severity' => 'high',
                 'notes' => 'Deterministic serious alert for the seven-persona closure relay.',
             ],
             [
-                'reference_number' => self::REQUIRED_ALERT_REFERENCES[1],
+                'reference_number' => self::REQUIRED_ALERT_REFERENCES[1].((int) $site->id === self::SITE_ID ? '' : '-G'.$site->id),
                 'alert_type' => 'E2E follow-up decision',
                 'severity' => 'medium',
                 'notes' => 'Deterministic decision-relevant handover alert.',
