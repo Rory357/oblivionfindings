@@ -119,19 +119,19 @@ function AvailableRecord({
     );
     const breadcrumbs = useEmarRecordBreadcrumbs({
         title: person.preferred,
-        href: `/emar/mar?client_id=${person.id}`,
+        href: emarScopedHref(`/emar/mar?client_id=${person.id}`, page.url),
     });
     const go = useCallback(
         (next: RecordLocation) => {
             setLocation(next);
             setSearch('');
             router.push({
-                url: `/emar/mar${locationSearch(person.id, next)}`,
+                url: `/emar/mar${locationSearch(person.id, next, {}, page.url.split('?')[1])}`,
                 preserveState: true,
                 preserveScroll: true,
             });
         },
-        [person.id],
+        [person.id, page.url],
     );
     useEffect(() => {
         setLocation(readLocation(page.url.split('?')[1] ?? ''));
@@ -149,7 +149,7 @@ function AvailableRecord({
         : section.views[0].key;
     const navigateQuery = (extra: Record<string, string | null>) =>
         router.push({
-            url: `/emar/mar${locationSearch(person.id, location, extra)}`,
+            url: `/emar/mar${locationSearch(person.id, location, extra, page.url.split('?')[1])}`,
             preserveState: true,
             preserveScroll: true,
         });

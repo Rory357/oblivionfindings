@@ -187,7 +187,7 @@ export function AsNeededView({
                                                         </StatusBadge>
                                                     ) : (
                                                         <StatusBadge variant="neutral">
-                                                            Available
+                                                            Within PRN limits
                                                         </StatusBadge>
                                                     )}
                                                     <MobileMedsFacts
@@ -349,7 +349,7 @@ export function AsNeededView({
                                                 </StatusBadge>
                                             ) : (
                                                 <StatusBadge variant="neutral">
-                                                    Available
+                                                    Within PRN limits
                                                 </StatusBadge>
                                             ),
                                     },

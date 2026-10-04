@@ -49,6 +49,9 @@ final class MedicationStockService
         if ($stock->on_hand === null) {
             throw ValidationException::withMessages(['quantity' => 'The stock balance is unknown. Count and reconcile it before setting up packs.']);
         }
+        if (trim((string) $stock->unit) === '') {
+            throw ValidationException::withMessages(['unit' => 'The stock unit is unknown. Confirm the counted unit before setting up packs. Your recorded balance has not been changed.']);
+        }
         if (Qty::greaterThan($stock->on_hand, 0)) {
             $lot = MedicationStockLot::create([
                 'client_medication_stock_id' => $stock->id,

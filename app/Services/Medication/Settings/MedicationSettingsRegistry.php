@@ -462,7 +462,7 @@ class MedicationSettingsRegistry
         return new MedicationSettingGroup(
             key: 'timing',
             view: self::VIEW_ROUNDS,
-            effect: 'From the next dose shown on Meds today, at every house — recording is never blocked',
+            effect: 'From the next dose shown on Meds today, at every house — giving outside the time window needs a reason',
             auditEvent: 'medications.mar_timing.updated',
             definitions: [
                 $number('early', $timing::EARLY_MINUTES, 'Doses can be given from', 'minutes before the dose time', $looser),

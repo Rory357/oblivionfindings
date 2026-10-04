@@ -295,6 +295,9 @@ final class ControlledRegisterService
         if ($original->entry_type === 'balance_check' || $original->reverses_entry_id !== null) {
             throw ValidationException::withMessages(['target_id' => 'Counts and reversal entries remain as evidence. Record a new witnessed count instead.']);
         }
+        if ($original->requiresGovernedReconciliation()) {
+            throw ValidationException::withMessages(['target_id' => 'Administration, waste and destruction entries remain as evidence. Correct the clinical record through its correction workflow and reconcile physical stock through a new witnessed count.']);
+        }
         abort_if(ClientControlledDrugEntry::query()->where('reverses_entry_id', $original->id)->exists(), 409, 'This entry was already voided.');
         $delta = Quantity::subtract($original->on_hand_after, $original->on_hand_before);
         $reversal = $this->write($actor, $medication, $stock, $witness, 'reversal', Quantity::absoluteDifference($original->on_hand_after, $original->on_hand_before), Quantity::subtract($stock->on_hand, $delta), $reason, ['reverses_entry_id' => $original->id]);

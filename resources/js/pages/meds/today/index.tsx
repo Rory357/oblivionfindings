@@ -64,6 +64,7 @@ import {
 import { EmptyState } from '@/components/ui/empty-state';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
+import { medsTodayQuery } from '@/lib/meds-today-location';
 import { ReportErrorModal } from '@/pages/emar/components/report-error-modal';
 import {
     MyEligibility,
@@ -140,7 +141,7 @@ type Overlay =
 const query = () =>
     typeof window === 'undefined'
         ? new URLSearchParams()
-        : new URLSearchParams(window.location.search);
+        : medsTodayQuery(window.location.search);
 
 /** "Mon 28 Sep 2026" from the board's "2026-09-28". */
 function shortDate(ymd: string): string {
@@ -195,9 +196,10 @@ export default function MedsToday(props: MedsTodayProps) {
     const [grouping, setGrouping] = useState<Grouping>(() =>
         query().get('group') === 'person' ? 'person' : 'time',
     );
-    const [person, setPerson] = useState<number | null>(() =>
-        query().get('pp') ? Number(query().get('pp')) : null,
-    );
+    const person =
+        props.selected_client_id !== undefined
+            ? props.selected_client_id
+            : Number(query().get('client_id')) || null;
     const range = query().get('range') === 'today' ? 'today' : '24h';
     const outcome = query().get('outcome') ?? 'all';
     const [overlay, setOverlay] = useState<Overlay>(null);
@@ -246,8 +248,8 @@ export default function MedsToday(props: MedsTodayProps) {
     };
 
     const clientById = useMemo(
-        () => new Map(clients.map((c) => [c.id, c])),
-        [clients],
+        () => new Map((props.person_options ?? clients).map((c) => [c.id, c])),
+        [clients, props.person_options],
     );
     // A refused dose's row says who follows it up and by when.
     const scheduleRows = useMemo(() => {
@@ -642,17 +644,30 @@ export default function MedsToday(props: MedsTodayProps) {
             Updated {props.now_label} {tz}
         </PageHeaderFilterButton>
     );
-    const peopleOptions = [
-        ...new Map(
-            prn_medications.map((m) => [
-                m.client_id,
-                clientById.get(m.client_id)?.preferred ?? m.client_name,
-            ]),
-        ).entries(),
-    ].map(([id, name]) => ({
-        value: String(id),
-        label: name,
-    }));
+    const personFilter = (
+        <PageHeaderFilterSelect
+            label="All people"
+            value={person === null ? 'all' : String(person)}
+            options={[
+                { value: 'all', label: 'All people' },
+                ...(props.person_options ?? clients).map((client) => ({
+                    value: String(client.id),
+                    label: client.name,
+                })),
+            ]}
+            onChange={(value) => {
+                const params = query();
+                if (value === 'all') params.delete('client_id');
+                else params.set('client_id', value);
+                params.delete('page');
+                params.delete('round');
+                router.get('/meds/today', Object.fromEntries(params), {
+                    preserveState: true,
+                    preserveScroll: true,
+                });
+            }}
+        />
+    );
     const filters =
         view === 'schedule' ? (
             <>
@@ -689,21 +704,7 @@ export default function MedsToday(props: MedsTodayProps) {
                 {updated}
             </>
         ) : view === 'asneeded' ? (
-            <>
-                <PageHeaderFilterSelect
-                    label="All people"
-                    value={person === null ? 'all' : String(person)}
-                    options={[
-                        { value: 'all', label: 'All people' },
-                        ...peopleOptions,
-                    ]}
-                    onChange={(v) => {
-                        setPerson(v === 'all' ? null : Number(v));
-                        writeUrl({ pp: v === 'all' ? null : v });
-                    }}
-                />
-                {updated}
-            </>
+            <>{updated}</>
         ) : view === 'activity' ? (
             <>
                 <PageHeaderFilterSelect
@@ -874,7 +875,12 @@ export default function MedsToday(props: MedsTodayProps) {
                 </>
             }
             meters={meters}
-            filters={filters}
+            filters={
+                <>
+                    {personFilter}
+                    {filters}
+                </>
+            }
             rail={rail}
         />
     );
@@ -951,7 +957,10 @@ export default function MedsToday(props: MedsTodayProps) {
                     ) : null}
                     {view === 'controlled' ? (
                         board_can.view_controlled ? (
-                            <ControlledChecks search={search} />
+                            <ControlledChecks
+                                search={search}
+                                pageUrl={`/meds/today?${query()}`}
+                            />
                         ) : (
                             <EmptyState
                                 icon={ClipboardCheck}
@@ -976,14 +985,33 @@ export default function MedsToday(props: MedsTodayProps) {
                                             'noopener',
                                         )
                                     }
-                                    onClose={() =>
+                                    onClose={() => {
+                                        const params = query();
+                                        params.set('view', 'rounds');
+                                        params.delete('round');
                                         router.get(
                                             '/meds/today',
-                                            { view: 'rounds' },
+                                            Object.fromEntries(params),
                                             { preserveScroll: true },
-                                        )
-                                    }
+                                        );
+                                    }}
                                     workerBoard
+                                    workerContext={{
+                                        ...(person
+                                            ? { client_id: person }
+                                            : {}),
+                                        ...(Number(
+                                            query().get('site_id') ||
+                                                query().get('site'),
+                                        ) > 0
+                                            ? {
+                                                  site_id: Number(
+                                                      query().get('site_id') ||
+                                                          query().get('site'),
+                                                  ),
+                                              }
+                                            : {}),
+                                    }}
                                 />
                             )}
                             <RoundsTab

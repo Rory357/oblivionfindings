@@ -3219,7 +3219,7 @@ class EmarController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
-        $date = $request->input('date', today()->toDateString());
+        $date = app(MarScheduleService::class)->dateFromInput($request->input('date'))->toDateString();
         $siteFilter = $request->integer('site_id') ?: null;
         $canReadRounds = (bool) $user?->canDo('medications.view');
         $canRecordRounds = (bool) $user?->canDo('medications.administer.record');

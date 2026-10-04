@@ -48,6 +48,7 @@ type Props = {
     onClose: () => void;
     /** Worker board stays on Meds today through start/finish redirects. */
     workerBoard?: boolean;
+    workerContext?: { client_id?: number; site_id?: number };
 };
 
 const slotKey = (item: RoundItem) =>
@@ -61,6 +62,7 @@ export default function GuidedRoundDialog({
     onPrint,
     onClose,
     workerBoard = false,
+    workerContext,
 }: Props) {
     const { round, items, progress } = guided;
     const mobile = useIsMobile();
@@ -124,7 +126,7 @@ export default function GuidedRoundDialog({
             action === 'start'
                 ? `/emar/rounds/${round.id}/guided/start`
                 : `/emar/rounds/${round.id}/guided/complete`,
-            workerBoard ? { return_to: 'meds-today' } : {},
+            workerBoard ? { return_to: 'meds-today', ...workerContext } : {},
             {
                 preserveScroll: true,
                 onError: () =>
@@ -190,6 +192,15 @@ export default function GuidedRoundDialog({
                         {progress.completed} of {progress.total} recorded ·{' '}
                         {round.scheduled_time} · ±{round.window_minutes} min
                     </p>
+                    {guided.selected_progress &&
+                        guided.selected_progress.total !== progress.total && (
+                            <p className="text-caption">
+                                Showing the selected person:{' '}
+                                {guided.selected_progress.completed} of{' '}
+                                {guided.selected_progress.total} recorded. Round
+                                progress includes everyone in your view.
+                            </p>
+                        )}
                     {notOwedCaption(progress.waiting, progress.away) && (
                         <p className="text-caption">
                             {notOwedCaption(progress.waiting, progress.away)}

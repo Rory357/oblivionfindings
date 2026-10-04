@@ -47,13 +47,15 @@ export function ControlledChecks({
     search = '',
     siteId,
     needsDoingNow = false,
+    pageUrl,
 }: {
     initialPayload?: ControlledProductPayload;
     search?: string;
     siteId?: number;
     needsDoingNow?: boolean;
+    pageUrl?: string;
 }) {
-    const workspace = useControlledProduct(initialPayload);
+    const workspace = useControlledProduct(initialPayload, pageUrl);
     return (
         <ControlledChecksContent
             workspace={workspace}

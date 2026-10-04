@@ -8,6 +8,7 @@ use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
+use App\Models\MedicationRefusalFollowup;
 use App\Models\MedicationRound;
 use App\Models\Permission;
 use App\Models\Role;
@@ -23,6 +24,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\MedicationReadQueryInventory;
 use Tests\TestCase;
 
@@ -572,6 +574,334 @@ class WorkerMedsTodayPayloadTest extends TestCase
         $this->assertSame($secondSiteRound->id, $completedResponse->inertiaProps('active_round.id'));
         $this->assertSame(1, $completedResponse->inertiaProps('active_round.total'));
         $this->assertDatabaseCount('client_medication_administrations', 2);
+    }
+
+    public function test_round_export_capability_requires_the_exact_medication_report_permissions(): void
+    {
+        ['worker' => $worker] = $this->personSelectionFixture();
+        $before = $this->personSelectionEvidence();
+
+        $this->grantPermissions($worker, ['reports.viewAny']);
+        $genericReader = $worker->fresh();
+        $this->assertTrue($genericReader->canDo('reports.viewAny'));
+        $this->assertFalse($genericReader->canDo('medications.reports.view'));
+        $this->assertFalse($genericReader->canDo('medications.reports.export'));
+        $this->actingAs($genericReader)->get('/meds/today')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('board_can.export_round', false));
+
+        $this->grantPermissions($worker, ['medications.reports.export']);
+        $exportOnly = $worker->fresh();
+        $this->assertFalse($exportOnly->canDo('medications.reports.view'));
+        $this->assertTrue($exportOnly->canDo('medications.reports.export'));
+        $this->actingAs($exportOnly)->get('/meds/today')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('board_can.export_round', false));
+
+        $this->grantPermissions($worker, ['medications.reports.view']);
+        $medicationReporter = $worker->fresh();
+        $this->assertTrue($medicationReporter->canDo('medications.reports.view'));
+        $this->assertTrue($medicationReporter->canDo('medications.reports.export'));
+        $this->actingAs($medicationReporter)->get('/meds/today')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('board_can.export_round', true));
+
+        $this->denyPermissions($worker, ['medications.reports.view']);
+        $revokedReader = $worker->fresh();
+        $this->assertFalse($revokedReader->canDo('medications.reports.view'));
+        $this->assertTrue($revokedReader->canDo('medications.reports.export'));
+        $this->actingAs($revokedReader)->get('/meds/today')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('board_can.export_round', false));
+
+        $this->assertSame($before, $this->personSelectionEvidence());
+    }
+
+    #[DataProvider('personSelectionAliases')]
+    public function test_person_selection_scopes_the_whole_board_and_partial_activity(string $alias, bool $withConflictingAlias = false): void
+    {
+        $fixture = $this->personSelectionFixture();
+        ['worker' => $worker, 'people' => $people, 'orders' => $orders, 'round' => $round] = $fixture;
+        [$selected, $other, $offShift] = $people;
+        $query = [$alias => $selected->id, 'view' => 'activity', 'round' => $round->id, 'date' => '2026-04-30'];
+        if ($withConflictingAlias) {
+            $query += ['client' => $other->id, 'pp' => $other->id];
+        }
+        $before = $this->personSelectionEvidence();
+        $response = $this->actingAs($worker)->get('/meds/today?'.http_build_query($query))->assertOk();
+        $this->assertSame($selected->id, $response->inertiaProps('selected_client_id'));
+        $this->assertEqualsCanonicalizing(
+            [$selected->id, $other->id, $offShift->id],
+            collect($response->inertiaProps('person_options'))->pluck('id')->all(),
+        );
+        $this->assertSame([$selected->id], collect($response->inertiaProps('clients'))->pluck('id')->all());
+        foreach (['schedule', 'due_now', 'due_later', 'prn_medications', 'prn_follow_ups', 'refusal_follow_ups', 'prn_recorded_today', 'activity_page.data', 'guidedRound.items'] as $path) {
+            $this->assertNotEmpty($response->inertiaProps($path), $path);
+            $this->assertSame([$selected->id], collect($response->inertiaProps($path))->pluck('client_id')->unique()->values()->all(), $path);
+        }
+        $this->assertSame([
+            'meds_due' => 2, 'meds_overdue' => 0, 'due_now' => 1, 'due_later' => 1, 'upcoming_rounds' => 1,
+        ], $response->inertiaProps('stats'));
+        // The future fixture is beyond the inclusive due-soon boundary,
+        // while the current dose is inside its canonical NZ window.
+        $this->assertSame('due', $response->inertiaProps('due_now.0.status'));
+        $this->assertSame('upcoming', $response->inertiaProps('due_later.0.status'));
+        $this->assertSame('2026-04-30 09:30', Carbon::parse($response->inertiaProps('due_now.0.scheduled_for'))->timezone(config('app.worker_timezone'))->format('Y-m-d H:i'));
+        $this->assertSame('2026-04-30 11:30', Carbon::parse($response->inertiaProps('due_later.0.scheduled_for'))->timezone(config('app.worker_timezone'))->format('Y-m-d H:i'));
+        $this->assertSame(1, $response->inertiaProps('hidden_controlled_doses'));
+        $this->assertSame(0, $response->inertiaProps('hidden_controlled_overdue'));
+        $this->assertSame(0, $response->inertiaProps('people_after_clock_in'));
+        $this->assertSame([], $response->inertiaProps('off_shift'));
+        $this->assertSame([$selected->id], $response->inertiaProps('mar_client_ids'));
+        $this->assertSame([$orders[$selected->id]['stock']->id], collect($response->inertiaProps('stock_alerts'))->pluck('id')->all());
+        $this->assertSame([$orders[$selected->id]['event']->id], collect($response->inertiaProps('activity'))->pluck('id')->all());
+        $this->assertSame(2, $response->inertiaProps('activity_page.total'));
+        $roundKey = $orders[$selected->id]['scheduled']->id.':'.Carbon::parse('2026-04-30 09:30', config('app.worker_timezone'))->utc()->format('YmdHi');
+        foreach (['active_round', 'rounds.0', 'upcoming_rounds.0'] as $path) {
+            $this->assertSame([$roundKey], $response->inertiaProps($path.'.dose_keys'));
+            $this->assertSame(1, $response->inertiaProps($path.'.total'));
+        }
+        $this->assertSame(2, $response->inertiaProps('guidedRound.progress.total'));
+        $this->assertSame(1, $response->inertiaProps('guidedRound.selected_progress.total'));
+        $this->assertFalse($response->inertiaProps('guidedRound.can_complete'));
+        $this->assertStringNotContainsString('PRIVATE FILTER CONTROLLED', $response->getContent());
+        $this->assertSame($before, $this->personSelectionEvidence());
+
+        // Optional activity is also selected when Inertia requests only that
+        // prop while the page URL still has its default schedule view.
+        unset($query['view'], $query['round']);
+        $partial = $this->get(
+            '/meds/today?'.http_build_query($query),
+            $this->inertiaPartialHeaders('meds/today/index', 'activity_page'),
+        )->assertOk();
+        $this->assertSame(2, $partial->json('props.activity_page.total'));
+        $this->assertSame([$selected->id], collect($partial->json('props.activity_page.data'))->pluck('client_id')->unique()->values()->all());
+        $this->assertSame($before, $this->personSelectionEvidence());
+    }
+
+    public static function personSelectionAliases(): array
+    {
+        return [
+            'canonical' => ['client_id'],
+            'legacy_client' => ['client'],
+            'legacy_pp' => ['pp'],
+            'canonical_wins' => ['client_id', true],
+        ];
+    }
+
+    public function test_selected_off_shift_person_stays_off_shift_and_keeps_their_name_available(): void
+    {
+        ['worker' => $worker, 'people' => $people] = $this->personSelectionFixture();
+        $offShift = $people[2];
+        $before = $this->personSelectionEvidence();
+        $response = $this->actingAs($worker)->get('/meds/today?client_id='.$offShift->id.'&view=activity')->assertOk();
+        $this->assertSame($offShift->id, $response->inertiaProps('selected_client_id'));
+        $this->assertCount(3, $response->inertiaProps('person_options'));
+        $option = collect($response->inertiaProps('person_options'))->firstWhere('id', $offShift->id);
+        $this->assertSame($offShift->first_name, $option['preferred']);
+        foreach (['clients', 'schedule', 'prn_medications', 'prn_follow_ups', 'refusal_follow_ups', 'prn_recorded_today', 'stock_alerts', 'activity', 'rounds', 'upcoming_rounds', 'mar_client_ids'] as $path) {
+            $this->assertSame([], $response->inertiaProps($path), $path);
+        }
+        $this->assertSame(null, $response->inertiaProps('active_round'));
+        $this->assertSame(0, $response->inertiaProps('stats.meds_due'));
+        $this->assertSame(0, $response->inertiaProps('activity_page.total'));
+        $this->assertSame(0, $response->inertiaProps('hidden_controlled_doses'));
+        $this->assertCount(1, $response->inertiaProps('off_shift'));
+        $this->assertSame($offShift->id, $response->inertiaProps('off_shift.0.client_id'));
+        $this->assertSame('notOnShift', $response->inertiaProps('off_shift.0.req.block_all'));
+        $this->assertSame($before, $this->personSelectionEvidence());
+    }
+
+    public function test_inaccessible_or_invalid_person_selection_does_not_fall_back_to_everyone(): void
+    {
+        ['worker' => $worker, 'people' => $people, 'foreign' => $foreign, 'unassigned' => $unassigned] = $this->personSelectionFixture();
+        $before = $this->personSelectionEvidence();
+        foreach ([
+            ['client_id' => $foreign->id], ['client' => $unassigned->id], ['pp' => $foreign->id],
+            ['client_id' => 'not-a-person', 'pp' => $people[0]->id], ['client_id' => 0], ['client_id' => -1],
+            ['client_id' => [$people[0]->id]], ['client_id' => 999999999],
+        ] as $query) {
+            $this->actingAs($worker)->get('/meds/today?'.http_build_query($query))->assertNotFound();
+            $this->assertSame($before, $this->personSelectionEvidence());
+        }
+        $all = $this->actingAs($worker)->get('/meds/today?client_id=&pp='.$people[0]->id)->assertOk();
+        $this->assertNull($all->inertiaProps('selected_client_id'));
+        $this->assertEqualsCanonicalizing([$people[0]->id, $people[1]->id], collect($all->inertiaProps('schedule'))->pluck('client_id')->unique()->all());
+        $this->assertSame([$people[2]->id], collect($all->inertiaProps('off_shift'))->pluck('client_id')->unique()->all());
+        $this->assertEqualsCanonicalizing([$people[0]->id, $people[1]->id, $people[2]->id], collect($all->inertiaProps('person_options'))->pluck('id')->all());
+        $this->assertStringNotContainsString('PRIVATE FILTER FOREIGN', $all->getContent());
+        $this->assertStringNotContainsString('PRIVATE FILTER UNASSIGNED', $all->getContent());
+        $this->assertSame($before, $this->personSelectionEvidence());
+    }
+
+    public function test_selected_round_doses_cannot_make_the_shared_round_complete(): void
+    {
+        ['worker' => $worker, 'people' => $people, 'orders' => $orders, 'round' => $round] = $this->personSelectionFixture();
+        $selected = $people[0];
+        ClientMedicationAdministration::query()->create([
+            'client_id' => $selected->id, 'client_medication_id' => $orders[$selected->id]['scheduled']->id,
+            'medication_round_id' => $round->id, 'scheduled_for' => Carbon::parse('2026-04-30 09:30', config('app.worker_timezone'))->utc(),
+            'administered_at' => now(), 'administered_by' => $worker->id, 'status' => 'given',
+        ]);
+        $before = $this->personSelectionEvidence();
+        $response = $this->actingAs($worker)->get('/meds/today?client_id='.$selected->id.'&round='.$round->id)->assertOk();
+        $this->assertSame(1, $response->inertiaProps('guidedRound.selected_progress.total'));
+        $this->assertSame(1, $response->inertiaProps('guidedRound.selected_progress.completed'));
+        $this->assertSame(2, $response->inertiaProps('guidedRound.progress.total'));
+        $this->assertSame(1, $response->inertiaProps('guidedRound.progress.completed'));
+        $this->assertFalse($response->inertiaProps('guidedRound.can_complete'));
+        $this->postJson(route('meds.round.complete', $round), [
+            'return_to' => 'meds-today', 'client_id' => $selected->id, 'site_id' => $selected->site_id,
+        ])->assertUnprocessable()->assertJsonValidationErrors('round');
+        $this->assertSame('in_progress', $round->fresh()->status);
+        $this->assertSame($before, $this->personSelectionEvidence());
+    }
+
+    public function test_round_entry_and_transitions_keep_validated_person_day_and_site_context(): void
+    {
+        ['worker' => $worker, 'people' => $people, 'orders' => $orders, 'round' => $round, 'foreign' => $foreign] = $this->personSelectionFixture();
+        $selected = $people[0];
+        $round->forceFill(['status' => 'pending', 'started_by' => null, 'started_at' => null])->save();
+        $context = ['client_id' => $selected->id, 'site_id' => $selected->site_id];
+        $target = route('meds.today', ['view' => 'rounds', 'round' => $round->id, 'date' => '2026-04-30', ...$context]);
+        $entry = route('meds.round.show', ['round' => $round->id, 'date' => '2026-04-30', ...$context]);
+        $before = $this->personSelectionEvidence();
+        $board = $this->actingAs($worker)->get('/meds/today?'.http_build_query($context))->assertOk();
+        $this->assertSame($entry, $board->inertiaProps('active_round.url'));
+        $this->assertSame($entry, $board->inertiaProps('rounds.0.url'));
+        $this->get($entry)->assertRedirect($target);
+        $this->assertSame($before, $this->personSelectionEvidence());
+        foreach ([
+            ['client_id' => $foreign->id], ['client_id' => $people[2]->id],
+            ['client_id' => 'invalid'], ['site_id' => $foreign->site_id], ['site_id' => 'invalid'],
+        ] as $invalid) {
+            $badContext = [...$context, ...$invalid];
+            $this->get(route('meds.round.show', ['round' => $round->id, ...$badContext]))->assertNotFound();
+            $this->postJson(route('meds.round.start', $round), ['return_to' => 'meds-today', ...$badContext])->assertNotFound();
+            $this->assertSame($before, $this->personSelectionEvidence());
+        }
+        // Supplied dates and return URLs cannot override the canonical round
+        // day or introduce a destination outside the fixed board route.
+        $this->post(route('meds.round.start', $round), [
+            'return_to' => 'meds-today', 'date' => '2026-05-01', 'return_url' => 'https://example.invalid/', ...$context,
+        ])->assertRedirect($target);
+        $this->assertSame('in_progress', $round->fresh()->status);
+        $started = $this->personSelectionEvidence();
+        $this->post(route('meds.round.start', $round), ['return_to' => 'meds-today', ...$context])->assertRedirect($target);
+        $this->assertSame($started, $this->personSelectionEvidence());
+        $this->postJson(route('meds.round.complete', $round), [
+            'return_to' => 'meds-today', ...$context, 'site_id' => $foreign->site_id,
+        ])->assertNotFound();
+        $this->postJson(route('meds.round.complete', $round), ['return_to' => 'meds-today', ...$context])
+            ->assertUnprocessable()->assertJsonValidationErrors('round');
+        $this->assertSame($started, $this->personSelectionEvidence());
+
+        // Existing completed history needs a real round-linked dose to bind
+        // the selected person. This tests replay, not clinical completion.
+        $historicalDose = ClientMedicationAdministration::query()->create([
+            'client_id' => $selected->id, 'client_medication_id' => $orders[$selected->id]['scheduled']->id,
+            'medication_round_id' => $round->id, 'scheduled_for' => Carbon::parse('2026-04-30 09:30', config('app.worker_timezone'))->utc(),
+            'administered_at' => now(), 'administered_by' => $worker->id, 'status' => 'given',
+        ]);
+        $round->forceFill(['status' => 'completed', 'completed_by' => $worker->id, 'completed_at' => now()])->save();
+        $history = app(GuidedRoundService::class)->items($round->fresh(), false, [$selected->id]);
+        $this->assertCount(1, $history);
+        $this->assertSame($selected->id, $history[0]['client_id']);
+        $this->assertSame($historicalDose->id, $history[0]['administration']['id']);
+        $this->assertSame('given', $history[0]['administration']['status']);
+        $completed = $this->personSelectionEvidence();
+        $this->post(route('meds.round.complete', $round), ['return_to' => 'meds-today', ...$context])->assertRedirect($target);
+        $this->post(route('meds.round.complete', $round), $context)
+            ->assertRedirect(route('meds.round.show', ['round' => $round->id, ...$context]));
+        $this->assertSame($completed, $this->personSelectionEvidence());
+    }
+
+    private function personSelectionFixture(): array
+    {
+        $timezone = config('app.worker_timezone', 'Pacific/Auckland');
+        Carbon::setTestNow(Carbon::parse('2026-04-30 09:30', $timezone)->utc());
+        $this->seed(RbacSeeder::class);
+        $worker = $this->makeRoleUser('support_worker');
+        $this->grantPermissions($worker, ['medications.view', 'medications.administer.record']);
+        $this->denyPermissions($worker, [
+            'medications.controlled.view', 'medications.controlled.record', 'clinical.accessAllSites', 'sites.viewAll', 'clients.viewAny',
+            'medications.stock.update', 'medications.audit.view', 'medications.reports.view', 'medications.reports.export',
+        ]);
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $worker->id, 'primary_site_id' => $site->id, 'secondary_site_ids' => [],
+            'start_date' => now()->subMonth(), 'end_date' => null, 'is_active' => true,
+        ]);
+        $context = ServiceContext::factory()->create(['site_id' => $site->id, 'is_active' => true]);
+        $people = [];
+        $orders = [];
+        foreach (['Aroha', 'Hemi', 'Mere'] as $index => $name) {
+            $person = Client::factory()->create([
+                'first_name' => $name, 'last_name' => 'Filter fixture', 'preferred_name' => null,
+                'site_id' => $site->id, 'service_context_id' => $context->id, 'status' => 'active',
+            ]);
+            $person->supportWorkers()->attach($worker->id);
+            $people[] = $person;
+            if ($index < 2) {
+                Shift::factory()->create([
+                    'client_id' => $person->id, 'site_id' => $site->id, 'service_context_id' => $context->id, 'user_id' => $worker->id,
+                    'starts_at' => now()->subHour(), 'ends_at' => now()->addHours(4), 'actual_starts_at' => now()->subHour(), 'status' => 'in_progress',
+                ]);
+            }
+            $scheduled = Carbon::withTestNow(Carbon::parse('2026-04-30 00:00', $timezone)->utc(), fn () => ClientMedication::query()->create([
+                'client_id' => $person->id, 'name' => 'Scheduled '.$name, 'dosage' => '1 tablet', 'frequency' => 'Daily',
+                'dose_times' => $index < 2 ? ['08:00', '09:30', '11:30'] : ['09:00'], 'is_prn' => false,
+                'active' => true, 'state' => 'active', 'approval_status' => 'verified', 'start_date' => '2026-04-01',
+            ]));
+            $orders[$person->id]['scheduled'] = $scheduled;
+            if ($index === 2) {
+                continue;
+            }
+            $prn = ClientMedication::query()->create([
+                'client_id' => $person->id, 'name' => 'PRN '.$name, 'dosage' => '1 tablet', 'frequency' => 'As needed',
+                'dose_times' => [], 'is_prn' => true, 'prn_reason' => 'Pain', 'active' => true, 'state' => 'active',
+            ]);
+            $dose = ClientMedicationAdministration::query()->create([
+                'client_id' => $person->id, 'client_medication_id' => $prn->id, 'administered_by' => $worker->id,
+                'administered_at' => now()->subMinutes(30), 'effect_check_due_at' => now()->addMinutes(30), 'status' => 'given',
+            ]);
+            $refusal = ClientMedicationAdministration::query()->create([
+                'client_id' => $person->id, 'client_medication_id' => $scheduled->id, 'administered_by' => $worker->id,
+                'scheduled_for' => Carbon::parse('2026-04-30 08:00', $timezone)->utc(), 'administered_at' => now()->subHour(), 'status' => 'refused',
+            ]);
+            MedicationRefusalFollowup::query()->create([
+                'client_id' => $person->id, 'client_medication_administration_id' => $refusal->id, 'reason_category' => 'personal_choice',
+                'follow_up_due_at' => now()->addHour(), 'created_by' => $worker->id, 'owner_id' => $worker->id,
+            ]);
+            $orders[$person->id]['stock'] = ClientMedicationStock::query()->create([
+                'client_medication_id' => $prn->id, 'on_hand' => 1, 'reorder_level' => 2, 'unit' => 'tablets',
+            ]);
+            $orders[$person->id]['event'] = TimelineEvent::query()->create([
+                'source_type' => ClientMedicationAdministration::class, 'source_id' => $dose->id,
+                'occurred_at' => $dose->administered_at, 'type' => 'medication_given', 'actor_user_id' => $worker->id,
+                'client_id' => $person->id, 'subject' => 'Given PRN '.$name, 'visibility' => 'internal', 'is_pinned' => false, 'created_by' => $worker->id,
+            ]);
+            Carbon::withTestNow(Carbon::parse('2026-04-30 00:00', $timezone)->utc(), fn () => ClientMedication::query()->create([
+                'client_id' => $person->id, 'name' => 'PRIVATE FILTER CONTROLLED '.$name, 'dosage' => '1 tablet', 'frequency' => 'Daily',
+                'dose_times' => $index === 0 ? ['09:30'] : ['09:30', '10:30'], 'is_prn' => false, 'controlled_drug' => true,
+                'active' => true, 'state' => 'active', 'approval_status' => 'verified', 'start_date' => '2026-04-01',
+            ]));
+        }
+        $foreign = Client::factory()->create([
+            'first_name' => 'PRIVATE FILTER FOREIGN', 'site_id' => Site::factory()->create(['is_active' => true])->id, 'status' => 'active',
+        ]);
+        $foreign->supportWorkers()->attach($worker->id);
+        $unassigned = Client::factory()->create(['first_name' => 'PRIVATE FILTER UNASSIGNED', 'site_id' => $site->id, 'status' => 'active']);
+        $round = MedicationRound::query()->create([
+            'site_id' => $site->id, 'service_context_id' => $context->id, 'name' => 'Filter morning', 'round_date' => '2026-04-30',
+            'scheduled_time' => '09:30', 'window_minutes' => 5, 'assigned_to' => $worker->id, 'status' => 'in_progress',
+            'started_by' => $worker->id, 'started_at' => now()->subMinutes(5),
+        ]);
+
+        return compact('worker', 'people', 'orders', 'round', 'foreign', 'unassigned');
+    }
+
+    private function personSelectionEvidence(): array
+    {
+        return collect(['client_medication_administrations', 'medication_refusal_followups', 'client_medication_stocks', 'medication_rounds', 'medication_followups'])
+            ->mapWithKeys(fn (string $table): array => [$table => DB::table($table)->orderBy('id')->get()->map(fn ($row): array => (array) $row)->all()])
+            ->all();
     }
 
     protected function makeRoleUser(string $roleName): User

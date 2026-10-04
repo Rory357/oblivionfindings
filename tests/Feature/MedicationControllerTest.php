@@ -2639,7 +2639,7 @@ class MedicationControllerTest extends TestCase
     public function test_mar_export_csv_returns_csv_for_admin(): void
     {
         $this->actingAs($this->admin)
-            ->get("/clients/{$this->client->id}/mar/export.csv")
+            ->get("/clients/{$this->client->id}/mar/export.csv?purpose=care")
             ->assertOk()
             ->assertHeader('content-type', 'text/csv; charset=utf-8');
     }

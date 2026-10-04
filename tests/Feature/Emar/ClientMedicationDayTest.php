@@ -7,17 +7,21 @@ use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationDoseSlot;
+use App\Models\MedicationEvent;
 use App\Models\MedicationOrderRevision;
 use App\Models\MedicationOrderVersion;
 use App\Models\Permission;
+use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\Reporting\MedicationReportAccess;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -58,6 +62,33 @@ class ClientMedicationDayTest extends TestCase
     {
         Carbon::setTestNow();
         parent::tearDown();
+    }
+
+    public static function reportPermissions(): array
+    {
+        return [
+            'generic report only' => [['reports.viewAny' => true, 'medications.reports.view' => false, 'medications.reports.export' => false], 'support_worker', false],
+            'exact export only' => [['reports.viewAny' => false, 'medications.reports.view' => false, 'medications.reports.export' => true], 'support_worker', false],
+            'exact view and export' => [['reports.viewAny' => false, 'medications.reports.view' => true, 'medications.reports.export' => true], 'support_worker', true],
+            'finance only' => [['reports.viewAny' => true, 'medications.reports.view' => true, 'medications.reports.export' => true], 'finance', false],
+        ];
+    }
+
+    #[DataProvider('reportPermissions')]
+    public function test_person_day_report_capability_matches_the_canonical_export_permissions(array $permissions, string $role, bool $expected): void
+    {
+        $this->reader->update(['role' => $role]);
+        if ($role === 'finance') {
+            $this->reader->roles()->attach(Role::query()->where('name', 'finance')->firstOrFail());
+        }
+        $this->assertSame($role === 'finance', app(MedicationReportAccess::class)->financeOnly($this->reader->fresh()));
+        foreach ($permissions as $key => $allowed) {
+            $permission = Permission::query()->where('key', $key)->firstOrFail();
+            $this->reader->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => $allowed]]);
+        }
+        $events = MedicationEvent::count();
+        $this->assertSame($expected, $this->day()['can']['report']);
+        $this->assertSame($events, MedicationEvent::count());
     }
 
     public function test_the_day_lists_each_medicine_by_dose_time_with_meds_todays_states(): void

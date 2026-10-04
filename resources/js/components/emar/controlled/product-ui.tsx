@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/popover';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
+import { Field as FormField } from '@/components/wizard/primitives';
 import {
     formatDateOnly,
     formatDateTime,
@@ -457,22 +458,26 @@ export function LocalDateTimeField({
                 {label} <span className="text-status-critical">*</span>
             </legend>
             <div className="grid gap-3 sm:grid-cols-2">
-                <DatePicker
-                    compact
-                    id={`controlled-${name}`}
-                    label={`${label} date`}
-                    value={day}
-                    onChange={(date) => onChange(`${date}T${time}`)}
-                    invalid={!!error}
-                />
-                <TimePicker
-                    compact
-                    id={`controlled-${name}-time`}
-                    label={`${label} time`}
-                    value={time}
-                    onChange={(clock) => onChange(`${day}T${clock}`)}
-                    invalid={!!error}
-                />
+                <FormField label="Date">
+                    <DatePicker
+                        compact
+                        id={`controlled-${name}`}
+                        label={`${label} date`}
+                        value={day}
+                        onChange={(date) => onChange(`${date}T${time}`)}
+                        invalid={!!error}
+                    />
+                </FormField>
+                <FormField label="Time">
+                    <TimePicker
+                        compact
+                        id={`controlled-${name}-time`}
+                        label={`${label} time`}
+                        value={time}
+                        onChange={(clock) => onChange(`${day}T${clock}`)}
+                        invalid={!!error}
+                    />
+                </FormField>
             </div>
             <p className="text-caption">
                 {day ? formatDateOnly(day) : 'Choose a date'}

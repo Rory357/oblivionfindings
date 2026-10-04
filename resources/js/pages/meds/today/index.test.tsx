@@ -10,8 +10,19 @@ vi.mock('@/hooks/use-emar-breadcrumbs', () => ({
     useEmarBreadcrumbs: () => [],
 }));
 vi.mock('@/components/emar/controlled/controlled-checks', () => ({
-    ControlledChecks: ({ search }: { search: string }) => (
-        <section aria-label="Controlled checks workspace">{search}</section>
+    ControlledChecks: ({
+        search,
+        pageUrl,
+    }: {
+        search: string;
+        pageUrl?: string;
+    }) => (
+        <section
+            aria-label="Controlled checks workspace"
+            data-read-url={pageUrl}
+        >
+            {search}
+        </section>
     ),
 }));
 vi.mock('@inertiajs/react', () => ({
@@ -310,6 +321,82 @@ function props(over: Partial<MedsTodayProps> = {}): MedsTodayProps {
 
 describe('Meds today (P01 C3)', () => {
     beforeEach(() => window.history.replaceState(null, '', '/meds/today'));
+
+    it.each(['client_id', 'client', 'pp'])(
+        'retains %s person scope between schedule and controlled checks',
+        (alias) => {
+            window.history.replaceState(
+                null,
+                '',
+                `/meds/today?${alias}=1&date=2026-04-30&site_id=5`,
+            );
+            const data = props();
+            render(
+                <MedsToday
+                    {...data}
+                    schedule={data.schedule.filter(
+                        (row) => row.client_id === 1,
+                    )}
+                    clients={data.clients.filter((client) => client.id === 1)}
+                    person_options={data.clients}
+                    selected_client_id={1}
+                    board_can={{ ...data.board_can, view_controlled: true }}
+                />,
+            );
+            expect(
+                screen.getByRole('button', { name: 'Clear All people' }),
+            ).toBeInTheDocument();
+            expect(
+                screen.queryByText('Sertraline 50mg'),
+            ).not.toBeInTheDocument();
+            fireEvent.click(
+                screen.getByRole('tab', { name: 'Controlled checks' }),
+            );
+            const scope = new URL(
+                screen
+                    .getByRole('region', {
+                        name: 'Controlled checks workspace',
+                    })
+                    .getAttribute('data-read-url')!,
+                'https://example.test',
+            ).searchParams;
+            expect(Object.fromEntries(scope)).toMatchObject({
+                client_id: '1',
+                date: '2026-04-30',
+                site_id: '5',
+                view: 'controlled',
+            });
+            expect(scope.has('client')).toBe(false);
+            expect(scope.has('pp')).toBe(false);
+        },
+    );
+
+    it('clears person scope through a fresh server read while retaining the selected day and view', async () => {
+        const { router } = await import('@inertiajs/react');
+        window.history.replaceState(
+            null,
+            '',
+            '/meds/today?client=1&date=2026-04-30&site_id=5&view=asneeded&page=2',
+        );
+        render(
+            <MedsToday
+                {...props()}
+                selected_client_id={1}
+                person_options={props().clients}
+            />,
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Clear All people' }),
+        );
+        expect(router.get).toHaveBeenLastCalledWith(
+            '/meds/today',
+            { date: '2026-04-30', site_id: '5', view: 'asneeded' },
+            expect.objectContaining({
+                preserveState: true,
+                preserveScroll: true,
+            }),
+        );
+    });
 
     it('opens the controlled-checks deep link for a reader without recording authority', () => {
         window.history.replaceState(

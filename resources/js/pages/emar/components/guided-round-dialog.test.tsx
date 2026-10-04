@@ -143,6 +143,52 @@ describe('guided round save sequencing', () => {
         on.mockReturnValue(unsubscribe);
     });
 
+    it('keeps whole-round completion separate from a finished person filter', () => {
+        const completePerson = round([{ ...first, administration: saved }]);
+        const wholeRound = round([{ ...first, administration: saved }, second]);
+        render(
+            <GuidedRoundDialog
+                {...props}
+                guided={{
+                    ...completePerson,
+                    can_complete: false,
+                    progress: wholeRound.progress,
+                    selected_progress: completePerson.progress,
+                }}
+            />,
+        );
+        expect(
+            screen.getByText(/Showing the selected person: 1 of 1 recorded/),
+        ).toBeInTheDocument();
+        expect(screen.getByText(/1 of 2 recorded/)).toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Finish round' }),
+        ).not.toBeInTheDocument();
+        expect(post).not.toHaveBeenCalled();
+    });
+
+    it('returns a worker to the selected person and house after starting a round', () => {
+        const pending = round();
+        render(
+            <GuidedRoundDialog
+                {...props}
+                guided={{
+                    ...pending,
+                    can_start: true,
+                    round: { ...pending.round, status: 'pending' },
+                }}
+                workerBoard
+                workerContext={{ client_id: 1, site_id: 2 }}
+            />,
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Start round' }));
+        expect(post).toHaveBeenCalledWith(
+            '/emar/rounds/1/guided/start',
+            { return_to: 'meds-today', client_id: 1, site_id: 2 },
+            expect.any(Object),
+        );
+    });
+
     it('blocks stale next-dose and row actions until the saved chart has refreshed', () => {
         const view = render(<GuidedRoundDialog {...props} guided={round()} />);
         fireEvent.click(

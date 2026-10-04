@@ -72,6 +72,39 @@ class StockPacksWorkflowTest extends TestCase
                 $quantities, array_keys($quantities))];
     }
 
+    public function test_pack_initialization_requires_a_known_unit_before_any_stock_evidence_is_written(): void
+    {
+        extract($this->fixture(startPacks: false));
+        foreach ([null, '', '   '] as $unit) {
+            $stock->forceFill(['unit' => $unit])->save();
+            $before = $stock->refresh()->getRawOriginal();
+            $auditCount = DB::table('audit_logs')->count();
+            $receiptCount = DB::table('medication_idempotency_results')->count();
+            $data = ['action' => 'initialise', 'client_medication_id' => $med->id,
+                'request_uuid' => (string) Str::uuid(), 'confirm_balance' => true];
+            $this->actingAs($actor)->postJson('/emar/stock/packs/commands', $data)
+                ->assertUnprocessable()->assertJsonValidationErrors('unit');
+            $this->assertSame($before, $stock->refresh()->getRawOriginal());
+            $this->assertDatabaseCount('medication_stock_lots', 0);
+            $this->assertDatabaseCount('medication_stock_movements', 0);
+            $this->assertDatabaseCount('medication_events', 0);
+            $this->assertSame($auditCount, DB::table('audit_logs')->count());
+            $this->assertSame($receiptCount, DB::table('medication_idempotency_results')->count());
+        }
+        // Supplying the confirmed existing unit permits the same canonical
+        // initialization. It carries the recorded balance once, never a receipt.
+        $stock->forceFill(['unit' => 'tablets'])->save();
+        $this->actingAs($actor)->postJson('/emar/stock/packs/commands', $data)->assertOk();
+        $this->postJson('/emar/stock/packs/commands', $data)->assertOk()->assertJsonPath('duplicate', true);
+        $this->assertSame('10.00', $stock->fresh()->on_hand);
+        $this->assertNotNull($stock->fresh()->lots_started_at);
+        $this->assertDatabaseCount('medication_stock_lots', 1);
+        $this->assertDatabaseCount('medication_stock_movements', 1);
+        $this->assertSame('opening', MedicationStockMovement::sole()->kind);
+        $this->assertSame('recorded_balance', MedicationStockLot::sole()->source);
+        $this->assertSame('10.00', MedicationStockLot::sole()->quantity_remaining);
+    }
+
     public function test_two_batch_delivery_uses_dispensed_quantity_closes_once_and_preserves_each_label(): void
     {
         extract($this->fixture());

@@ -1285,6 +1285,11 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
     min-height: max(44px, 2.75rem);
 }
 
+/* The neutral off track must remain visible against light dialog surfaces. */
+.frontline-dialog [data-slot='switch'][data-state='unchecked'] {
+    background-color: var(--muted-foreground);
+}
+
 /* Keep the handle visible on both the active and inactive dark tracks. */
 .dark .frontline-dialog [data-slot='switch-thumb'] {
     background-color: var(--foreground);

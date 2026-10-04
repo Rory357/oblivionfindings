@@ -74,6 +74,7 @@ use App\Http\Controllers\StaffTimeOffController;
 use App\Http\Controllers\SummaryController;
 use App\Http\Controllers\TimelineController;
 use App\Http\Controllers\TimesheetController;
+use App\Http\Middleware\ClientMarExportGuard;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -203,6 +204,7 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
             ->whereNumber('client')
             ->name('operations.clients.mar.show');
         Route::get('/clients/{client}/mar/export.csv', [ClientMarController::class, 'exportCsv'])
+            ->middleware(ClientMarExportGuard::class)
             ->whereNumber('client')
             ->name('operations.clients.mar.export_csv');
 

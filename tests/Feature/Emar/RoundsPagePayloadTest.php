@@ -18,6 +18,7 @@ use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -33,6 +34,55 @@ class RoundsPagePayloadTest extends TestCase
         Carbon::setTestNow();
 
         parent::tearDown();
+    }
+
+    #[DataProvider('newZealandDayBoundaries')]
+    public function test_rounds_default_to_the_new_zealand_day_and_preserve_explicit_dates(string $utcNow, string $localDate): void
+    {
+        Carbon::setTestNow(Carbon::parse($utcNow, 'UTC'));
+        $this->seed(RbacSeeder::class);
+        $utcDate = now()->toDateString();
+        $this->assertNotSame($utcDate, $localDate);
+        $site = Site::factory()->create(['is_active' => true]);
+        $foreignSite = Site::factory()->create(['is_active' => true]);
+        $reader = $this->makeSiteUser($site, ['medications.view']);
+        $localRound = $this->makeRound($site, ['name' => 'NZ day round', 'round_date' => $localDate]);
+        $priorRound = $this->makeRound($site, ['name' => 'Prior day round', 'round_date' => $utcDate]);
+        $foreignRound = $this->makeRound($foreignSite, ['name' => 'Concealed foreign round', 'round_date' => $localDate]);
+        $records = [$localRound, $priorRound, $foreignRound];
+        $before = array_map(fn (MedicationRound $round) => $round->refresh()->getRawOriginal(), $records);
+
+        foreach ([[], ['date' => '']] as $query) {
+            $this->actingAs($reader)->get(route('emar.rounds', $query))
+                ->assertOk()
+                ->assertInertia(fn (Assert $page) => $page
+                    ->component('emar/Rounds')
+                    ->where('date', $localDate)
+                    ->has('rounds', 1)
+                    ->where('rounds.0.id', $localRound->id)
+                    ->where('rounds.0.round_date', $localDate)
+                    ->has('sites', 1)
+                    ->where('sites.0.id', $site->id)
+                );
+        }
+
+        $this->actingAs($reader)->get(route('emar.rounds', ['date' => $utcDate]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('date', $utcDate)
+                ->has('rounds', 1)
+                ->where('rounds.0.id', $priorRound->id)
+                ->where('rounds.0.round_date', $utcDate)
+            );
+        $this->assertSame($before, array_map(fn (MedicationRound $round) => $round->refresh()->getRawOriginal(), $records));
+    }
+
+    public static function newZealandDayBoundaries(): array
+    {
+        return [
+            'standard_time' => ['2026-05-03 12:01:00', '2026-05-04'],
+            'daylight_saving_time' => ['2026-10-04 11:01:00', '2026-10-05'],
+        ];
     }
 
     public function test_exact_record_worker_uses_read_only_get_and_explicit_idempotent_start(): void

@@ -117,15 +117,31 @@ export function locationSearch(
     clientId: number,
     location: RecordLocation,
     extra: Record<string, string | null | undefined> = {},
+    currentSearch = '',
 ): string {
     const section = RECORD_SECTIONS.find((s) => s.key === location.tab)!;
     const params = new URLSearchParams({ client_id: String(clientId) });
+    const current = new URLSearchParams(currentSearch);
+    // Person/day/house are record context, not section-specific filters.
+    // Never carry a previous section's page, dose, or medicine selection.
+    for (const key of ['date', 'site_id', 'mode']) {
+        const value = current.get(key);
+        const valid =
+            value &&
+            (key === 'date'
+                ? /^\d{4}-\d{2}-\d{2}$/.test(value)
+                : key === 'site_id'
+                  ? /^[1-9]\d*$/.test(value)
+                  : value === 'week');
+        if (valid) params.set(key, value);
+    }
     if (location.tab !== RECORD_SECTIONS[0].key)
         params.set('tab', location.tab);
     if (location.view !== section.views[0].key)
         params.set('view', location.view);
     for (const [key, value] of Object.entries(extra)) {
         if (value) params.set(key, value);
+        else params.delete(key);
     }
     return `?${params.toString()}`;
 }

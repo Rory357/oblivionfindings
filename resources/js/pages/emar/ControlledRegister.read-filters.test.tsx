@@ -200,9 +200,11 @@ describe('controlled register reader filters', () => {
 
     it('shows a labelled NZ history date, current-stock explanation and accessible frontline controls', () => {
         render(<ControlledRegister product={product} />);
-        const date = screen.getByLabelText('Register history NZ date');
-        expect(date).toHaveValue('2020-01-01');
-        expect(date).toHaveClass('frontline-tap', 'frontline-focus');
+        const date = screen.getByRole('button', {
+            name: 'Register history NZ date: 1 Jan 2020',
+        });
+        expect(date).toHaveTextContent('1 Jan 2020');
+        expect(date).toHaveClass('frontline-tap');
         expect(
             screen.getByRole('button', { name: 'Ada Synthetic' }),
         ).toHaveClass('frontline-tap');
@@ -218,10 +220,15 @@ describe('controlled register reader filters', () => {
     });
 
     it('preserves person, medicine, house, view and search when the date changes or clears', () => {
+        state.url = state.url.replace('2020-01-01', '2026-09-01');
         render(<ControlledRegister product={product} />);
-        fireEvent.change(screen.getByLabelText('Register history NZ date'), {
-            target: { value: '2026-09-27' },
-        });
+        fireEvent.click(
+            screen.getByRole('button', { name: /Register history NZ date:/ }),
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Sun 27 September 2026' }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Use date' }));
         expect(Object.fromEntries(replacedQuery())).toMatchObject({
             site_id: '8',
             client_id: '42',
@@ -241,18 +248,18 @@ describe('controlled register reader filters', () => {
         const page = render(<ControlledRegister product={product} />);
         state.url = '/emar/controlled?site_id=8&client_id=43&date=2026-04-05';
         page.rerender(<ControlledRegister product={product} />);
-        expect(screen.getByLabelText('Register history NZ date')).toHaveValue(
-            '2026-04-05',
-        );
+        expect(
+            screen.getByRole('button', { name: /Register history NZ date:/ }),
+        ).toHaveTextContent('5 Apr 2026');
         expect(
             screen.getByRole('button', { name: 'Rewi Synthetic' }),
         ).toBeInTheDocument();
         expect(state.read).toHaveBeenLastCalledWith(state.url);
         state.url = '/emar/controlled?client_id=42&date=2020-01-01';
         page.rerender(<ControlledRegister product={product} />);
-        expect(screen.getByLabelText('Register history NZ date')).toHaveValue(
-            '2020-01-01',
-        );
+        expect(
+            screen.getByRole('button', { name: /Register history NZ date:/ }),
+        ).toHaveTextContent('1 Jan 2020');
         expect(
             screen.getByRole('button', { name: 'Ada Synthetic' }),
         ).toBeInTheDocument();

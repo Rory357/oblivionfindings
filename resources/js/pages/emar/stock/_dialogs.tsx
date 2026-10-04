@@ -151,7 +151,7 @@ export function NewSupplyOrder({
                     value={quantity}
                     onChange={(event) => setQuantity(event.target.value)}
                 />
-                <Label>Needed by</Label>
+                <Label htmlFor="needed_by">Needed by</Label>
                 <DatePicker
                     compact
                     id="needed_by"
@@ -380,7 +380,9 @@ export function SupplyOrderDialog({
                                         setDispensed(event.target.value)
                                     }
                                 />
-                                <Label>Due to arrive</Label>
+                                <Label htmlFor="expected_delivery">
+                                    Due to arrive
+                                </Label>
                                 <DatePicker
                                     compact
                                     id="expected_delivery"

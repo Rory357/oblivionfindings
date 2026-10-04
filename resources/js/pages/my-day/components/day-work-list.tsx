@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { formatDateTime, formatTime, toDateInput } from '@/lib/datetime';
+import { medsTodayHref } from '@/lib/meds-today-location';
 import {
     CalendarWorkRows,
     WorkSchedule,
@@ -108,8 +109,7 @@ export function DayWorkList(p: Props) {
                     variant={
                         item.kind === 'med' && item.data.status === 'missed'
                             ? 'critical'
-                            : item.kind === 'med' &&
-                                item.data.status === 'away'
+                            : item.kind === 'med' && item.data.status === 'away'
                               ? 'info'
                               : done
                                 ? 'success'
@@ -125,9 +125,7 @@ export function DayWorkList(p: Props) {
             onOpen: () =>
                 item.kind === 'task'
                     ? p.onOpenTask(item.data.id)
-                    : router.visit(
-                          `/meds/today?client_id=${item.data.client_id}`,
-                      ),
+                    : router.visit(medsTodayHref(item.data.client_id)),
             detail: steps.length ? (
                 <ul className="space-y-2 pb-2">
                     {steps.map((step) => (
@@ -153,9 +151,7 @@ export function DayWorkList(p: Props) {
                     onClick: () =>
                         item.kind === 'task'
                             ? p.onOpenTask(item.data.id)
-                            : router.visit(
-                                  `/meds/today?client_id=${item.data.client_id}`,
-                              ),
+                            : router.visit(medsTodayHref(item.data.client_id)),
                 },
                 ...(item.clientId
                     ? [

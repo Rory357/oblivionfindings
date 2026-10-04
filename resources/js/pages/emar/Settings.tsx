@@ -233,7 +233,6 @@ const DirtyDot = () => (
 );
 
 export default function EmarSettings(props: Props) {
-    const breadcrumbs = useEmarBreadcrumbs();
     const { witnessPin, settingsAccess, readOnlyAudit, alertAccess } = props;
     // The settings, with the names alert values list and house names, so
     // every change reads in words (P11 B2).
@@ -346,6 +345,20 @@ export default function EmarSettings(props: Props) {
         parseHash(window.location.hash, built),
     );
     const { view, sec } = route;
+    const breadcrumbs = useEmarBreadcrumbs(
+        `/emar/settings${settingsHash(view, sec)}`,
+    ).map((crumb, index, trail) =>
+        index === trail.length - 1
+            ? {
+                  ...crumb,
+                  title:
+                      sec === 'overview'
+                          ? SET_VIEWS[view].label
+                          : sectionLabel(view, sec),
+                  href: `/emar/settings${settingsHash(view, sec)}`,
+              }
+            : crumb,
+    );
     const [draft, setDraftState] = useState<Draft>({});
     const [dialog, setDialog] = useState<Dialog | null>(null);
     const [lensOpen, setLensOpen] = useState(false);
@@ -396,7 +409,11 @@ export default function EmarSettings(props: Props) {
             setMessage(null);
         };
         window.addEventListener('hashchange', onHash);
-        return () => window.removeEventListener('hashchange', onHash);
+        window.addEventListener('popstate', onHash);
+        return () => {
+            window.removeEventListener('hashchange', onHash);
+            window.removeEventListener('popstate', onHash);
+        };
     }, [built, setMessage]);
 
     // The server says what was saved; show it on the page (Fleet's status

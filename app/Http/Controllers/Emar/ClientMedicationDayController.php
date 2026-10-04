@@ -16,6 +16,7 @@ use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationRecordDayService;
 use App\Services\Medication\MedicationRecordSafetyPrivacy;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\Medication\Reporting\MedicationReportAccess;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -135,7 +136,7 @@ class ClientMedicationDayController extends Controller
                     default => null,
                 },
                 'record_controlled' => $actor->canDo('medications.controlled.record'),
-                'report' => $actor->canDo('medications.reports.export') || $actor->canDo('reports.viewAny'),
+                'report' => app(MedicationReportAccess::class)->canExport($actor, 'doses'),
             ],
             // What today's recorder (the seam) needs; only for someone who can record here.
             'recorder' => $hasAuthority ? [

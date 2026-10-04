@@ -1,5 +1,13 @@
 # eMAR implementation and verification status
 
+## Whole-module audit repairs — 5 October 2026
+
+The [whole-module repair ledger](whole-module-repairs-2026-10-05.md) supersedes prior asset and test counts. All eleven audit findings have repairs: PRN safety timing, linked controlled evidence, export and notification privacy, shift read authority, NZ round dates, person/house/day entry context, hero wrapping, Settings breadcrumbs and labelled modal fields. Additional repairs cover consistent NZ export clocks, stock-unit initialization and recoverable page-load failures.
+
+The full frontend suite passed **541 files / 3,648 tests** and the final overlapping run passed **5 files / 41 tests**. Full TypeScript, scoped lint/format, final build and desktop checks at 1280×900 and 1440×900 passed; the verified asset is `app-BKfQQVwh.js`. The latest disjoint backend union passed **16 complete files / 445 tests / 6,767 assertions**, including clinical safety, privacy, exports, current site authority and entry-point context. The linked ledger retains the initial fixture failures and subsequent verified repairs without summing overlapping runs. Current work is **desktop web only**; earlier phone evidence below is historical and is not an ongoing workstream.
+
+Draft PR #16 remains unmerged and undeployed. Pack-stock rollout, historical given/controlled/PRN/witnessed recovery and complete release acceptance remain held. The page-load recovery screen is verified; the intermittent dynamic-import failure's root cause remains unconfirmed. The separately requested Workforce chat is independent and outside this branch.
+
 ## Desktop eMAR modal controls — 5 October 2026
 
 The user explicitly requires **desktop web only**. The [modal-controls audit](modal-controls-audit-2026-10-05.md)

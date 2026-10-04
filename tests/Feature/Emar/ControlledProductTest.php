@@ -349,6 +349,111 @@ class ControlledProductTest extends TestCase
         $this->assertDatabaseCount('client_controlled_drug_entries', 1);
     }
 
+    public function test_generic_void_cannot_restore_a_pharmacy_return_before_or_after_administrative_void(): void
+    {
+        $result = $this->perform('destruction', ['method' => 'pharmacy_return', 'reason' => 'expired', 'quantity' => 2], $this->lead);
+        $destruction = MedicationDestruction::query()->sole();
+
+        $this->assertProtectedEntryCannotBeVoided($result['entry_id'], '8.00');
+        $this->assertNull($destruction->refresh()->voided_at);
+        $this->perform('destruction_void', ['target_id' => $destruction->id,
+            'notes' => 'The return documentation needs review; physical stock remains unresolved.'], $this->lead);
+        $this->assertProtectedEntryCannotBeVoided($result['entry_id'], '8.00');
+        $this->assertNotNull($destruction->refresh()->voided_at);
+        $this->assertSame($result['entry_id'], (int) $destruction->register_entry_id);
+    }
+
+    public function test_generic_void_cannot_restore_a_recorded_controlled_dose_or_its_waste(): void
+    {
+        ClientMedication::query()->whereKey($this->medication->id)->update(['dose_amount' => 1, 'dose_unit' => 'tablet']);
+        $this->actingAs($this->recorder->fresh())->postJson('/meds/today/record', [
+            'client_medication_id' => $this->medication->id, 'scheduled_for' => '2026-04-30T09:30:00+12:00',
+            'status' => 'given', 'amount_mode' => 'as_ordered', 'quantity_administered' => 2, 'cd_balance' => 8,
+            'witnessed_by' => $this->witness->id, 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
+        ])->assertOk();
+        $dose = ClientMedicationAdministration::query()->sole();
+        $entries = ClientControlledDrugEntry::query()->where('client_medication_administration_id', $dose->id)->get();
+        $this->assertSame(['administered', 'disposal'], $entries->pluck('entry_type')->sort()->values()->all());
+
+        foreach ($entries as $entry) {
+            $this->assertProtectedEntryCannotBeVoided($entry->id, '8.00');
+        }
+        $this->assertSame('given', $dose->refresh()->status);
+        $this->assertNull($dose->deleted_at);
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+    }
+
+    public function test_legacy_administration_and_disposal_without_links_still_require_governed_reconciliation(): void
+    {
+        $this->stock->update(['on_hand' => 8]);
+        foreach (['administered', 'disposal'] as $offset => $type) {
+            $entry = ClientControlledDrugEntry::query()->create([
+                'client_id' => $this->client->id, 'client_medication_id' => $this->medication->id,
+                'entry_type' => $type, 'quantity' => 1, 'on_hand_before' => 10 - $offset,
+                'on_hand_after' => 9 - $offset, 'unit' => 'tablet', 'recorded_at' => now(),
+                'recorded_by' => $this->recorder->id, 'witnessed_by' => $this->witness->id,
+            ]);
+            $this->assertProtectedEntryCannotBeVoided($entry->id, '8.00');
+        }
+    }
+
+    public function test_destruction_link_protects_an_entry_even_when_its_legacy_type_is_a_movement(): void
+    {
+        $entryId = $this->perform('movement', ['movement_type' => 'going_out', 'quantity' => 2, 'actual_balance' => 8])['entry_id'];
+        MedicationDestruction::query()->create([
+            'client_id' => $this->client->id, 'client_medication_id' => $this->medication->id, 'site_id' => $this->site->id,
+            'medication_name' => $this->medication->name, 'quantity' => 2, 'unit' => 'tablet',
+            'reason' => 'expired', 'disposal_method' => 'pharmacy_return', 'is_controlled_drug' => true,
+            'destroyed_by' => $this->lead->id, 'witness_1_id' => $this->witness->id, 'destroyed_at' => now(),
+            'register_entry_id' => $entryId, 'voided_at' => now(), 'voided_by' => $this->lead->id,
+            'void_reason' => 'Legacy documentation under review.',
+        ]);
+        // Soft deletion is fixture state, not a supported way to remove physical-use evidence.
+        MedicationDestruction::query()->withTrashed()->sole()->delete();
+
+        $this->assertProtectedEntryCannotBeVoided($entryId, '8.00');
+    }
+
+    public function test_administration_link_protects_an_entry_even_when_its_legacy_type_is_a_movement(): void
+    {
+        $dose = ClientMedicationAdministration::query()->create([
+            'client_id' => $this->client->id, 'client_medication_id' => $this->medication->id,
+            'administered_by' => $this->recorder->id, 'administered_at' => now(), 'status' => 'given',
+        ]);
+        $entry = ClientControlledDrugEntry::query()->create([
+            'client_id' => $this->client->id, 'client_medication_id' => $this->medication->id,
+            'client_medication_administration_id' => $dose->id, 'entry_type' => 'transfer_out',
+            'quantity' => 1, 'on_hand_before' => 10, 'on_hand_after' => 9, 'unit' => 'tablet',
+            'recorded_at' => now(), 'recorded_by' => $this->recorder->id, 'witnessed_by' => $this->witness->id,
+        ]);
+        $this->stock->update(['on_hand' => 9]);
+
+        $this->assertProtectedEntryCannotBeVoided($entry->id, '9.00');
+        $this->assertSame('given', $dose->refresh()->status);
+    }
+
+    private function assertProtectedEntryCannotBeVoided(int $entryId, string $balance): void
+    {
+        $entriesBefore = ClientControlledDrugEntry::query()->count();
+        $eventsBefore = MedicationEvent::query()->count();
+        $requestsBefore = DB::table('controlled_product_requests')->count();
+        $original = ClientControlledDrugEntry::query()->findOrFail($entryId)->getRawOriginal();
+        $payload = $this->actingAs($this->lead->fresh())->getJson('/emar/controlled/product')->assertOk();
+        $this->assertFalse(collect($payload->json('entries'))->firstWhere('id', $entryId)['can_void']);
+        $input = ['target_id' => $entryId, 'notes' => 'Attempt a register-only reversal of physical-use evidence.',
+            'correction_quantity' => 1, 'correction_direction' => 'in'];
+
+        $this->actionRequest('void', $input, $this->lead)->assertUnprocessable()->assertJsonValidationErrors('target_id');
+        $this->invalid('target_id', fn () => $this->perform('void', $input, $this->lead));
+
+        $this->assertSame($balance, $this->stock->refresh()->on_hand);
+        $this->assertSame($original, ClientControlledDrugEntry::query()->findOrFail($entryId)->getRawOriginal());
+        $this->assertSame(0, ClientControlledDrugEntry::query()->where('reverses_entry_id', $entryId)->count());
+        $this->assertSame($entriesBefore, ClientControlledDrugEntry::query()->count());
+        $this->assertSame($eventsBefore, MedicationEvent::query()->count());
+        $this->assertSame($requestsBefore, DB::table('controlled_product_requests')->count());
+    }
+
     public function test_support_worker_cannot_manage_and_manage_deny_wins_for_a_provider_manager(): void
     {
         $entryId = $this->perform('movement', ['quantity' => 1, 'actual_balance' => 9, 'movement_type' => 'going_out'])['entry_id'];

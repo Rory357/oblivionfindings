@@ -15,7 +15,7 @@ use Illuminate\Container\Attributes\Scoped;
  * reads these values. The defaults are today's (config/medications.php,
  * Stephan 29 Sep 2026: keep them until the clinical lead reviews them) and
  * show as "Default — not yet reviewed" until someone saves or keeps them.
- * Recording a dose is never blocked by these times.
+ * Giving outside the time window needs a reason; other safety checks still apply.
  *
  * Read once per request: the container keeps one instance per request or
  * queued job (#[Scoped]) and it reads every timing value in one query. A save

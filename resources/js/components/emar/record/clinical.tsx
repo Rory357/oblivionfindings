@@ -830,15 +830,17 @@ function ClinicalCommandDialog({
                                     'number',
                                     true,
                                 )}
-                                <DatePicker
-                                    compact
-                                    id="inr-tested"
-                                    label="Tested on"
-                                    value={fields.tested_on ?? ''}
-                                    onChange={(value) =>
-                                        set('tested_on', value)
-                                    }
-                                />
+                                <Field label="Tested on" required>
+                                    <DatePicker
+                                        compact
+                                        id="inr-tested"
+                                        label="Tested on"
+                                        value={fields.tested_on ?? ''}
+                                        onChange={(value) =>
+                                            set('tested_on', value)
+                                        }
+                                    />
+                                </Field>
                                 {input(
                                     'target_range_low',
                                     'Target from prescriber — low',
@@ -854,16 +856,18 @@ function ClinicalCommandDialog({
                                     'Dose instruction (mg)',
                                     'number',
                                 )}
-                                <DatePicker
-                                    compact
-                                    id="inr-next"
-                                    label="Next test date"
-                                    value={fields.next_test_date ?? ''}
-                                    onChange={(value) =>
-                                        set('next_test_date', value)
-                                    }
-                                    allowClear
-                                />
+                                <Field label="Next test date">
+                                    <DatePicker
+                                        compact
+                                        id="inr-next"
+                                        label="Next test date"
+                                        value={fields.next_test_date ?? ''}
+                                        onChange={(value) =>
+                                            set('next_test_date', value)
+                                        }
+                                        allowClear
+                                    />
+                                </Field>
                                 <Field
                                     label="Prescriber or clinic instruction"
                                     required

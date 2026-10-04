@@ -10,6 +10,7 @@ use App\Models\MedicationRound;
 use App\Services\EnhancedMarService;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Timeline\TimelineEmitter;
@@ -44,13 +45,13 @@ class GuidedRoundController extends Controller
         $user = $request->user();
         abort_unless($this->canWork($user), 403);
 
-        return $this->medicationScope->forRound($user, $round, now(), function (MedicationScopeDecision $scope) {
+        return $this->medicationScope->forRound($user, $round, now(), function (MedicationScopeDecision $scope) use ($request) {
             // Keep the selected day when opening the shared board walk-through.
             $dateStr = $scope->round->round_date instanceof \DateTimeInterface
                 ? $scope->round->round_date->format('Y-m-d')
                 : (string) $scope->round->round_date;
 
-            return redirect()->route('meds.today', ['view' => 'rounds', 'round' => $scope->round->id, 'date' => $dateStr]);
+            return redirect()->route('meds.today', ['view' => 'rounds', 'round' => $scope->round->id, 'date' => $dateStr, ...$this->boardContext($request, $scope)]);
         });
     }
 
@@ -71,6 +72,7 @@ class GuidedRoundController extends Controller
             $round,
             now(),
             function (MedicationScopeDecision $scope) use ($request) {
+                $context = $this->boardContext($request, $scope);
                 if ($scope->round->status === 'pending') {
                     $scope->round->forceFill([
                         'status' => 'in_progress',
@@ -86,7 +88,7 @@ class GuidedRoundController extends Controller
                     : (string) $scope->round->round_date;
 
                 if ($request->input('return_to') === 'meds-today') {
-                    return redirect()->route('meds.today', ['view' => 'rounds', 'round' => $scope->round->id, 'date' => $dateStr]);
+                    return redirect()->route('meds.today', ['view' => 'rounds', 'round' => $scope->round->id, 'date' => $dateStr, ...$context]);
                 }
 
                 return redirect()->route('emar.rounds', [
@@ -359,7 +361,8 @@ class GuidedRoundController extends Controller
             $user,
             $round,
             now(),
-            function (MedicationScopeDecision $scope) {
+            function (MedicationScopeDecision $scope) use ($request) {
+                $context = $this->boardContext($request, $scope);
                 if ($scope->round->status !== 'completed') {
                     if (! $this->guidedRoundService->canCompleteCanonicalRoundUnderLock($scope->round)) {
                         throw ValidationException::withMessages([
@@ -376,11 +379,57 @@ class GuidedRoundController extends Controller
                     $this->medicationScope->recordBreakGlassUse($scope, 'completed_medication_round');
                 }
 
-                return redirect()->route('meds.round.show', $scope->round);
+                if ($request->input('return_to') === 'meds-today') {
+                    return redirect()->route('meds.today', [
+                        'view' => 'rounds', 'round' => $scope->round->id,
+                        'date' => $scope->round->round_date->toDateString(), ...$context,
+                    ]);
+                }
+
+                return redirect()->route('meds.round.show', ['round' => $scope->round->id, ...$context]);
             },
             ['in_progress', 'completed'],
             lockCanonicalMembership: true,
         );
+    }
+
+    /** Only canonical person/Site context, never a caller-provided return URL. */
+    private function boardContext(Request $request, MedicationScopeDecision $scope): array
+    {
+        $context = [];
+        foreach (['client_id', 'client', 'pp'] as $key) {
+            if (! $request->exists($key)) {
+                continue;
+            }
+            $value = $request->input($key);
+            if ($value === null || (is_string($value) && trim($value) === '')) {
+                break;
+            }
+            $id = is_string($value) || is_int($value)
+                ? filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : false;
+            abort_unless($id !== false
+                && in_array($id, DoseSlotReaderScope::forViewerClients($scope->performer, [$id])->clientIds ?? [], true), 404);
+            abort_unless($this->guidedRoundService->items($scope->round, true, [$id]) !== [], 404);
+            $context['client_id'] = $id;
+            break;
+        }
+        foreach (['site_id', 'site'] as $key) {
+            if (! $request->exists($key)) {
+                continue;
+            }
+            $value = $request->input($key);
+            if ($value === null || (is_string($value) && trim($value) === '')) {
+                break;
+            }
+            $id = is_string($value) || is_int($value)
+                ? filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : false;
+            // forRound already rechecked current approval and this exact Site.
+            abort_unless($id !== false && $id === (int) $scope->round->site_id, 404);
+            $context['site_id'] = $id;
+            break;
+        }
+
+        return $context;
     }
 
     private function canWork($user): bool

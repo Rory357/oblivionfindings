@@ -552,12 +552,12 @@ export function PageHeaderMeterBlock({
     const body = (
         <>
             <ArrowUpRight aria-hidden="true" className="eh-meter-go" />
-            <span className="flex w-full items-baseline justify-between gap-3 pr-2.5">
-                <span className="eh-meter-label text-[10px] leading-none font-semibold tracking-[0.08em] whitespace-nowrap uppercase">
+            <span className="flex w-full min-w-0 items-baseline justify-between gap-3 pr-2.5">
+                <span className="eh-meter-label min-w-0 text-[10px] leading-snug font-semibold tracking-[0.08em] break-words uppercase">
                     {label}
                 </span>
                 {value != null ? (
-                    <span className="eh-meter-value text-[13px] leading-none font-bold tabular-nums">
+                    <span className="eh-meter-value shrink-0 text-[13px] leading-none font-bold tabular-nums">
                         {value}
                     </span>
                 ) : null}

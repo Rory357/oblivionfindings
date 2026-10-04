@@ -333,6 +333,9 @@ export interface MedsTodayProps {
     rounds: RoundInfo[];
     schedule: ScheduleRow[];
     clients: ClientInfo[];
+    /** Current person scope; options retain all people this viewer may select. */
+    selected_client_id?: number | null;
+    person_options?: ClientInfo[];
     sites: SiteInfo[];
     prn_medications: PrnMedication[];
     prn_follow_ups: PrnFollowUp[];

@@ -71,6 +71,19 @@ class ClientControlledDrugEntry extends Model
         return $this->belongsTo(ClientMedicationAdministration::class, 'client_medication_administration_id')->withTrashed();
     }
 
+    public function destructions()
+    {
+        return $this->hasMany(MedicationDestruction::class, 'register_entry_id')->withTrashed();
+    }
+
+    /** Clinical and physical-use evidence cannot be undone by a register-only reversal. */
+    public function requiresGovernedReconciliation(): bool
+    {
+        return $this->client_medication_administration_id !== null
+            || in_array($this->entry_type, ['administered', 'administration', 'disposal', 'waste'], true)
+            || (bool) ($this->getAttribute('destructions_exists') ?? $this->destructions()->exists());
+    }
+
     public function pharmacyOrder()
     {
         return $this->belongsTo(MedicationPharmacyOrder::class, 'pharmacy_order_id');

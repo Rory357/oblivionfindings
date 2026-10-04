@@ -1218,10 +1218,11 @@ class EnhancedMarService
                 // creation for the same order. Recompute after acquiring the
                 // lock so a stale client check or concurrent PRN dose cannot be
                 // used as the authority for an override.
+                // Queued doses keep their clinical time for temporal PRN checks.
                 $safetyCheck = $this->safetyService->performSafetyCheck(
                     $client,
                     $medication,
-                    null,
+                    $adminAt,
                     $data['dose_given'] ?? null,
                     $includeControlled,
                 );

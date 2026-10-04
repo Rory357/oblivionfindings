@@ -65,7 +65,7 @@ final class ControlledProductPayload
             $historyQuery->where('recorded_at', '>=', $start->utc())
                 ->where('recorded_at', '<', $start->addDay()->utc());
         }
-        $entries = (clone $historyQuery)->with(['recordedBy:id,name', 'witnessedBy:id,name'])->latest('id')->limit(self::HISTORY_LIMIT)->get();
+        $entries = (clone $historyQuery)->with(['recordedBy:id,name', 'witnessedBy:id,name'])->withExists('destructions')->latest('id')->limit(self::HISTORY_LIMIT)->get();
         $latest = (clone $entriesQuery)->selectRaw('client_medication_id, MAX(id) AS latest_id')->groupBy('client_medication_id')->pluck('latest_id', 'client_medication_id');
         $counts = app(ControlledCountStatus::class)->latestWitnessedCounts($ids, $siteIds);
         $reversals = $this->scope->scopeCanonicalClientMedicationRows(ClientControlledDrugEntry::query(), $siteIds, false)
@@ -156,7 +156,7 @@ final class ControlledProductPayload
                 'recorded_by_name' => $e->recordedBy?->name, 'witnessed_by_name' => $e->witnessedBy?->name, 'second_witness_name' => $names[$e->second_witness_id] ?? null,
                 'notes' => $e->notes, 'voided_at' => $reversals->get($e->id)?->recorded_at?->toIso8601String(), 'void_reason' => $reversals->get($e->id)?->reason,
                 'voided_by_name' => $reversals->get($e->id)?->recordedBy?->name, 'void_witness_name' => $reversals->get($e->id)?->witnessedBy?->name,
-                'can_void' => $manage && $e->entry_type !== 'balance_check' && $e->reverses_entry_id === null && ! $reversals->has($e->id)]),
+                'can_void' => $manage && $e->entry_type !== 'balance_check' && $e->reverses_entry_id === null && ! $reversals->has($e->id) && ! $e->requiresGovernedReconciliation()]),
             'discrepancies' => $discrepancies->map(fn ($d): array => ['id' => $d->id, 'client_medication_id' => $d->client_medication_id, 'status' => $d->status,
                 'expected_balance' => $d->on_hand_before === null ? null : Quantity::toFloat($d->on_hand_before), 'actual_balance' => $d->on_hand_after === null ? null : Quantity::toFloat($d->on_hand_after),
                 'reported_at' => $d->reported_at?->toIso8601String(), 'reported_by_name' => $d->reportedBy?->name, 'witnessed_by_name' => $d->witnessedBy?->name,

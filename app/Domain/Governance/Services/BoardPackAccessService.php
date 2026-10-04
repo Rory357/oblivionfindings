@@ -10,6 +10,7 @@ use App\Domain\Governance\Notifications\BoardPackPublishedNotification;
 use App\Domain\Governance\Notifications\PreReadReminderNotification;
 use App\Domain\Governance\Support\BoardPackContainedSources;
 use App\Models\User;
+use App\Services\Medication\Alerts\MedicationNotificationVisibility;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Notifications\DatabaseNotification;
@@ -218,7 +219,7 @@ final class BoardPackAccessService
             ? $viewer->unreadNotifications()
             : $viewer->notifications();
 
-        return $query->where(function (Builder $notifications) use ($visiblePackIds, $visibleMeetingIds): void {
+        return app(MedicationNotificationVisibility::class)->apply($query, $viewer)->where(function (Builder $notifications) use ($visiblePackIds, $visibleMeetingIds): void {
             $notifications
                 ->whereNotIn('type', self::PROTECTED_NOTIFICATION_TYPES)
                 ->orWhere(function (Builder $packNotifications) use ($visiblePackIds): void {

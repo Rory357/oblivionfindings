@@ -14,6 +14,7 @@ import {
 import { EntryList } from '@/components/emar/controlled/record-views';
 import { useControlledDialogs } from '@/components/emar/controlled/workspace-dialogs';
 import { EmarHubRail } from '@/components/emar/emar-hub-rail';
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { compactMenu, type MenuItem } from '@/components/lists/entity-menu';
 import { ListCaption } from '@/components/lists/list-caption';
 import {
@@ -39,6 +40,7 @@ import { formatDateOnly } from '@/lib/datetime';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
     BookOpen,
+    CalendarDays,
     ClipboardCheck,
     FileWarning,
     Home,
@@ -328,18 +330,27 @@ export default function ControlledRegister({
                         ]}
                         onChange={(client) => change({ client })}
                     />
-                    <label className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-band-foreground">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-band-foreground">
                         Register history (NZ date)
-                        <input
-                            type="date"
-                            aria-label="Register history NZ date"
+                        <DatePicker
+                            compact
+                            id="controlled-history-date"
+                            label="Register history NZ date"
                             value={filters.date}
-                            onChange={(event) =>
-                                change({ date: event.target.value })
+                            onChange={(date) => change({ date })}
+                            allowClear
+                            trigger={
+                                <PageHeaderFilterButton
+                                    icon={CalendarDays}
+                                    aria-label={`Register history NZ date: ${filters.date ? formatDateOnly(filters.date) : 'All dates'}`}
+                                >
+                                    {filters.date
+                                        ? formatDateOnly(filters.date)
+                                        : 'All dates'}
+                                </PageHeaderFilterButton>
                             }
-                            className="frontline-tap frontline-focus min-w-0 rounded-md border border-band-foreground/20 bg-band-foreground/10 px-2 py-2 text-sm"
                         />
-                    </label>
+                    </div>
                     {filters.date && (
                         <PageHeaderFilterButton
                             onClick={() => change({ date: '' })}
@@ -469,9 +480,10 @@ export default function ControlledRegister({
                     {filters.date
                         ? 'Only register entries use the selected NZ date. Stock, count status and outstanding follow-up are current. '
                         : ''}
-                    Entries are never edited or deleted. Wrong entries are
-                    voided with a reason and witness, and stay visible in the
-                    history.
+                    Entries are never edited or deleted. Standalone movements
+                    can be voided with a reason and witness and stay visible in
+                    the history. Entries linked to doses, waste or destruction
+                    cannot be voided here.
                 </p>
             </>
         );

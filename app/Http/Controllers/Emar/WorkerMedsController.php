@@ -30,6 +30,7 @@ use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Medication\Recording\DoseRecordingRequirements;
 use App\Services\Medication\Recording\PrnEffectCheckQueue;
 use App\Services\Medication\Recording\RecordingContract;
+use App\Services\Medication\Reporting\MedicationReportAccess;
 use App\Services\Medication\StaffEligibilityRegister;
 use App\Services\MedicationScanVerificationService;
 use App\Services\Timeline\TimelineEmitter;
@@ -106,6 +107,24 @@ class WorkerMedsController extends Controller
             $date->copy()->addDay()->endOfDay()->utc(),
         );
 
+        // Keep the complete authorized board for selector options and for the
+        // off-shift exclusion: choosing one person must not move their fellow
+        // on-shift people into the off-shift list.
+        $boardClientIds = array_values(array_map('intval', $assignedClientIds));
+        $offShiftClientIds = $isToday ? $this->offShiftPeople($user, $boardClientIds) : [];
+        $personOptionIds = array_values(array_unique(array_merge($boardClientIds, $offShiftClientIds)));
+        $selectedClientId = $this->selectedClientId($request, $personOptionIds);
+        if ($selectedClientId !== null) {
+            $assignedClientIds = in_array($selectedClientId, $boardClientIds, true) ? [$selectedClientId] : [];
+            $offShiftClientIds = in_array($selectedClientId, $offShiftClientIds, true) ? [$selectedClientId] : [];
+            $peopleAfterClockIn = 0;
+        }
+        $personOptions = $this->boardPayload->clientsPayload($personOptionIds);
+        $clients = array_values(array_filter(
+            $personOptions,
+            fn (array $person): bool => in_array((int) $person['id'], $assignedClientIds, true),
+        ));
+
         // One detailed administrations query for the whole selected day. It is
         // reused for (a) matching scheduled dose slots, and (b) deriving the
         // PRN follow-up queue — keeping the today() path at a single
@@ -150,8 +169,15 @@ class WorkerMedsController extends Controller
         $dueLater = array_values(array_filter($medsDue, fn ($m) => $m['status'] === 'upcoming'));
         $overdue = array_values(array_filter($medsDue, fn ($m) => $m['status'] === 'overdue'));
 
-        $activeRound = $isToday ? $this->activeRound($user, $now, $assignedClientIds) : null;
-        $rounds = $this->roundsForDate($user, $date, $assignedClientIds);
+        $roundContext = ['client_id' => $selectedClientId];
+        $siteContext = $request->query('site_id', $request->query('site'));
+        $siteId = is_string($siteContext) || is_int($siteContext)
+            ? filter_var($siteContext, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : false;
+        if ($siteId !== false) {
+            $roundContext['site_id'] = $siteId;
+        }
+        $activeRound = $isToday ? $this->activeRound($user, $now, $assignedClientIds, $roundContext) : null;
+        $rounds = $this->roundsForDate($user, $date, $assignedClientIds, $roundContext);
         $upcomingRounds = array_values(array_filter(
             $rounds,
             fn ($r) => in_array($r['status'], ['pending', 'in_progress'], true),
@@ -177,12 +203,14 @@ class WorkerMedsController extends Controller
             'upcoming_rounds' => $upcomingRounds,
             'rounds' => $rounds,
             'guidedRound' => $request->filled('round')
-                ? $this->guidedRound($user, $request->integer('round'), $assignedClientIds, $includeControlled)
+                ? $this->guidedRound($user, $request->integer('round'), $assignedClientIds, $includeControlled, $boardClientIds)
                 : null,
             'due_now' => $dueNow,
             'due_later' => $dueLater,
             'schedule' => $schedule,
-            'clients' => $this->boardPayload->clientsPayload($assignedClientIds),
+            'clients' => $clients,
+            'person_options' => $personOptions,
+            'selected_client_id' => $selectedClientId,
             'sites' => $this->boardPayload->sitesPayload($assignedClientIds),
             'prn_medications' => $prnMedications,
             'prn_follow_ups' => app(PrnEffectCheckQueue::class)->payload(
@@ -198,7 +226,7 @@ class WorkerMedsController extends Controller
             // assessment waiting for their acknowledgement.
             'my_eligibility' => app(StaffEligibilityRegister::class)->myEligibility($user),
             'board_can' => [
-                'export_round' => $user->canDo('medications.reports.export') || $user->canDo('reports.viewAny'),
+                'export_round' => app(MedicationReportAccess::class)->canExport($user, 'doses'),
                 'view_emar' => $user->canDo('medications.view'),
                 'view_audit' => $user->canDo('medications.audit.view'),
                 'record_administration' => $user->canDo('medications.administer.record'),
@@ -223,7 +251,7 @@ class WorkerMedsController extends Controller
             'house_label' => $this->houseLabel($assignedClientIds),
             'on_call' => $this->onCallFor($assignedClientIds, $now),
             'off_shift' => $isToday
-                ? $this->offShiftRows($user, $assignedClientIds, $date, $now, $includeControlled)
+                ? $this->offShiftRows($user, $offShiftClientIds, $date, $now, $includeControlled)
                 : [],
             'refusal_follow_ups' => $this->refusalFollowUps($assignedClientIds, $includeControlled, $now, $timezone),
             'prn_recorded_today' => $this->prnRecordedToday($dayAdministrations, $timezone),
@@ -359,6 +387,28 @@ class WorkerMedsController extends Controller
         ];
     }
 
+    /** @param list<int> $personOptionIds */
+    private function selectedClientId(Request $request, array $personOptionIds): ?int
+    {
+        foreach (['client_id', 'client', 'pp'] as $key) {
+            if (! $request->query->has($key)) {
+                continue;
+            }
+            $value = $request->query($key);
+            if ($value === null || (is_string($value) && trim($value) === '')) {
+                return null;
+            }
+            $id = is_string($value) || is_int($value)
+                ? filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]])
+                : false;
+            abort_unless($id !== false && in_array($id, $personOptionIds, true), 404);
+
+            return $id;
+        }
+
+        return null;
+    }
+
     /**
      * People this worker may open (assigned to them, at a house in their
      * access) who aren't on their shift today: their due or late doses are
@@ -366,9 +416,9 @@ class WorkerMedsController extends Controller
      * (P01: "At Kōwhai House, not on your shift").
      *
      * @param  array<int, int>  $boardClientIds
-     * @return list<array<string, mixed>>
+     * @return list<int>
      */
-    private function offShiftRows(User $user, array $boardClientIds, Carbon $date, Carbon $now, bool $includeControlled): array
+    private function offShiftPeople(User $user, array $boardClientIds): array
     {
         try {
             $siteIds = $this->siteAccess->accessibleSiteIds($user, ['clinical.accessAllSites', 'sites.viewAll']);
@@ -382,10 +432,22 @@ class WorkerMedsController extends Controller
                 ->pluck('id')
                 ->map(fn ($id): int => (int) $id)
                 ->all();
-            $people = $candidates === [] ? [] : app(MarLinkService::class)->openableClientIds($user, $candidates);
-            if ($people === []) {
-                return [];
-            }
+
+            return $candidates === [] ? [] : app(MarLinkService::class)->openableClientIds($user, $candidates);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return [];
+        }
+    }
+
+    /** @param list<int> $people */
+    private function offShiftRows(User $user, array $people, Carbon $date, Carbon $now, bool $includeControlled): array
+    {
+        if ($people === []) {
+            return [];
+        }
+        try {
             $bySlot = $this->boardPayload->slotIndex($this->boardPayload->administrationsForDay($people, $date, $includeControlled));
             $rows = array_values(array_filter(
                 $this->boardPayload->scheduleForDate($people, $date, $now, $bySlot, $includeControlled),
@@ -1311,7 +1373,7 @@ class WorkerMedsController extends Controller
      * The single round the worker should walk right now, matching the
      * `/my-day` banner exactly (same service, same precedence).
      */
-    private function activeRound(User $user, Carbon $now, array $clientIds): ?array
+    private function activeRound(User $user, Carbon $now, array $clientIds, array $context): ?array
     {
         if (! $user->canDo('medications.administer.record')) {
             return null;
@@ -1361,7 +1423,7 @@ class WorkerMedsController extends Controller
                     'total' => $progress['total'],
                     'completed' => $progress['completed'],
                     'percent' => $progress['percent'],
-                    'url' => route('meds.round.show', $round),
+                    'url' => $this->roundUrl($round, $context),
                 ];
             }
 
@@ -1378,14 +1440,16 @@ class WorkerMedsController extends Controller
      * unassigned ones they may pick up, and anything they already walked —
      * so the board can show completed rounds alongside what's next.
      */
-    private function guidedRound(User $user, int $roundId, array $clientIds, bool $includeControlled): array
+    private function guidedRound(User $user, int $roundId, array $clientIds, bool $includeControlled, array $boardClientIds): array
     {
         $round = MedicationRound::query()->findOrFail($roundId);
 
-        return $this->medicationScope->forRound($user, $round, now(), function (MedicationScopeDecision $scope) use ($clientIds, $includeControlled): array {
+        return $this->medicationScope->forRound($user, $round, now(), function (MedicationScopeDecision $scope) use ($clientIds, $includeControlled, $boardClientIds): array {
             $round = $scope->round;
             $round->load(['template:id,name', 'assignedTo:id,name', 'startedBy:id,name', 'completedBy:id,name']);
             $items = $this->guidedRoundService->items($round, $includeControlled, $clientIds);
+            $boardItems = $clientIds === $boardClientIds ? $items
+                : $this->guidedRoundService->items($round, $includeControlled, $boardClientIds);
 
             return [
                 'can_record' => $round->status === 'in_progress',
@@ -1404,7 +1468,10 @@ class WorkerMedsController extends Controller
                     'completed_by' => $round->completedBy?->name,
                 ],
                 'items' => $items,
-                'progress' => $this->guidedRoundService->summarise($items),
+                // Person selection narrows visible doses, never the round's
+                // completion decision or its other authorized members.
+                'progress' => $this->guidedRoundService->summarise($boardItems),
+                'selected_progress' => $this->guidedRoundService->summarise($items),
             ];
         }, ['pending', 'partial', 'in_progress', 'completed']);
     }
@@ -1421,7 +1488,22 @@ class WorkerMedsController extends Controller
         );
     }
 
-    private function roundsForDate(User $user, Carbon $date, array $clientIds): array
+    private function roundUrl(MedicationRound $round, array $context): string
+    {
+        $query = ['round' => $round->id, 'date' => $round->round_date->toDateString()];
+        if (($context['client_id'] ?? null) !== null) {
+            $query['client_id'] = $context['client_id'];
+        }
+        // The list already approved this round's Site. Do not carry a
+        // different Site into the canonical round's return context.
+        if (($context['site_id'] ?? null) === (int) $round->site_id) {
+            $query['site_id'] = $context['site_id'];
+        }
+
+        return route('meds.round.show', $query);
+    }
+
+    private function roundsForDate(User $user, Carbon $date, array $clientIds, array $context): array
     {
         $siteIds = $this->siteAccess->accessibleSiteIds(
             $user,
@@ -1446,7 +1528,7 @@ class WorkerMedsController extends Controller
             $includeControlled = $user->canDo('medications.controlled.view');
 
             return $rounds
-                ->map(function (MedicationRound $round) use ($includeControlled, $clientIds) {
+                ->map(function (MedicationRound $round) use ($includeControlled, $clientIds, $context) {
                     $items = $this->guidedRoundService->items($round, $includeControlled, $clientIds);
                     $progress = $this->guidedRoundService->summarise($items);
 
@@ -1460,7 +1542,7 @@ class WorkerMedsController extends Controller
                         'total' => $progress['total'],
                         'completed' => $progress['completed'],
                         'percent' => $progress['percent'],
-                        'url' => route('meds.round.show', $round),
+                        'url' => $this->roundUrl($round, $context),
                     ];
                 })
                 ->filter(fn ($r) => $r['total'] > 0)
