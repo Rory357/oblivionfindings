@@ -16,17 +16,17 @@ Shared seams: EnhancedMarService source hook, legacy refusal/PRN adapters, TaskA
 
 Namespace: App\Services\Medication\Followups\MedicationFollowupService. ensureForSource(source, sourceId, client, medication, administration, ownerId, dueAt, context) supplies the stable source key and approved type:
 
-| source | type | owner package |
-|---|---|---|
-| support-reassessment | reassess_support | P03 |
-| order-check | order_check | P04 |
-| phone-written-confirmation | written_confirmation | P04 |
-| second-check | second_check | P04 |
-| reconciliation-query | reconciliation_query | P04 |
-| review-watch | review_watch | P05 |
-| stock-discrepancy | stock_discrepancy | P06 |
-| confirm | confirm | PIN-2 |
-| witness-override | override | P07a |
+| source                     | type                 | owner package |
+| -------------------------- | -------------------- | ------------- |
+| support-reassessment       | reassess_support     | P03           |
+| order-check                | order_check          | P04           |
+| phone-written-confirmation | written_confirmation | P04           |
+| second-check               | second_check         | P04           |
+| reconciliation-query       | reconciliation_query | P04           |
+| review-watch               | review_watch         | P05           |
+| stock-discrepancy          | stock_discrepancy    | P06           |
+| confirm                    | confirm              | PIN-2         |
+| witness-override           | override             | P07a          |
 
 ensure and ensureForSource are domain-only and require an active transaction. Source callers must authorize the current actor, canonical person/medicine/source ownership and clinical evidence, and lock the canonical Client aggregate before invoking them. Context may include a canonical local source_url. Existing identities never change original_owner_id or silently reassign/update a due time on retry. Source records remain authoritative; no duplicate Tasks table or records are introduced.
 
@@ -42,7 +42,9 @@ Deployment: migration adds only workflow/history and grants. emar:workflow-follo
 
 Legacy readiness correction: `emar:workflow-followups --preview` is a read-only batch preview and `--import` prepares at most 100 administration sources by default (maximum `--limit=1000`). `--after` and the printed fixed `--through` boundary permit reviewable resumption; `--site` and `--client` narrow the source set. Source preparation returns before the separate scheduled handover pass. Given PRN sources without a chosen check time are included, retain `due_at=null`, and record preparation provenance in their immutable creation event. Both preview and import leave clinical dose/effect evidence untouched. These options have not been run on production data.
 
-Before preparation, `/medication-followups` returns scoped, read-only `legacy_effect_checks` counts and at most 25 rows. Existing source, person, current site and controlled privacy rules apply before counts/search. The explicit administration prepare POST supplies the durable identity without recording an outcome. The `medication-effect-source` Tasks provider projects the same missing source, with an administration-specific namespace, until its canonical workflow exists; it persists no second task or lifecycle. Worker effect queues read the canonical workflow's current owner, due time and completion when prepared. Existing clinical effect evidence conceals stale outstanding work in both worker and oversight projections until the explicit import reconciles its history. Person and handover workflow consumers acquire missing legacy work after this explicit preparation/import; they do not silently create workflow identities during reads.
+Before preparation, `/medication-followups` returns scoped, read-only `legacy_effect_checks` counts and at most 25 rows. Existing source, person, current site and controlled privacy rules apply before counts/search. The explicit administration prepare POST supplies the durable identity without recording an outcome. The `medication-effect-source` Tasks provider projects the same missing source, with an administration-specific namespace, until its canonical workflow exists; it persists no second task or lifecycle. Worker effect queues read the canonical workflow's current owner, due time and completion when prepared. Existing clinical effect evidence conceals stale outstanding work in both worker and oversight projections until the explicit import reconciles its history.
+
+`MedicationFollowupProjection::forClient` combines existing canonical `followups`, bounded `legacy_effect_checks` and exact `followup_counts` (`open`, `effect`, `overdue`, `unscheduled`). Person `/emar/clients/{client}/day` responses and eMAR handover medication snapshots expose this same live current-work projection, including unresolved sources older than the selected chart day or outgoing shift. No operational import is required for visibility, and GETs prepare no workflows, deadlines, owners or clinical outcomes. The separate handover shift-window statistics retain their original window semantics. Canonical and legacy lists are disjoint; explicit preparation replaces the source projection with its durable workflow, and valid clinical completion removes outstanding work from all consumers. A bounded legacy list reports `has_more` and complete counts, allowing navigation to the existing scoped Follow-ups screen without hiding remaining work.
 
 An explicit `administration` link also returns nullable `selected_followup_id`, resolved through the authorized canonical effect query independently of list pagination and filters. Existing work opens through the detail GET, including completed history. Missing work prepares only when its selected legacy source has `can_prepare=true`; view-only links never initiate preparation. Hidden or invalid canonical sources return no selected identity.
 
@@ -83,3 +85,11 @@ PIN-2 confirm rows use context.nomination_id to mount the source-owned SecondPer
 The follow-up dialog scopes private loads to actor and workflow identity, aborts stale requests, clears on read-access loss and renders otherwise unmapped server validation errors. Typed grant expiry keeps the draft open with a contextual emergency-access link in another tab; after starting access the same entries may be retried. The expired grant itself never authorizes that retry.
 
 Candidate verification: four changed PHP files pass syntax and Pint; diff whitespace passes. Nine new synthetic cases bring the feature file to 45 cases, plus three pure time cases. These have not been run after the consumer changes. Main explicitly retained database-suite ownership for one final integrated snapshot. The formerly shared TypeScript/Prettier package paths are currently absent/empty, so the latest PIN-2 consumer edit has no local transpile/full-type/browser verification. Main must run the integrated checks with its restored dependencies. No new heavy/database launch was made after the hold.
+
+## Current consumer verification — 4 October 2026
+
+The frozen eight-file backend regression run passed all 132 cases with 2,741 assertions and zero failures/errors (718.46 seconds, exit 0). This includes all 59 follow-up workflow cases, 15 person-day cases, 22 handover medication-lens cases, worker payloads, reports, and the three Tasks suites. The report is `storage/logs/emar-legacy-consumer-parity-tests.xml`.
+
+The new lifecycle case exercises the actual worker, person-day, handover and Tasks routes before preparation, after preparation, and after effect completion. All four surfaces keep one administration identity; explicit preparation changes its representation without increasing open work, and completion removes it everywhere. Reads preserve administration, effect-result, workflow-history and P09 evidence. Additional cases cover 26 older unscheduled sources with a bounded 25-row list and honest full counts, and exact read-only, controlled, foreign-site and mismatched-source denial.
+
+This verification uses an isolated synthetic test database. It does not import operational legacy records or write clinical evidence during page reads. Main owns integrated frontend, browser and release verification.

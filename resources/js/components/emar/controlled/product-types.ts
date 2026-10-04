@@ -50,6 +50,8 @@ export interface ControlledMedicine {
             | 'not_configured'
             | 'notConfigured';
         title: string;
+        cadence?: string | null;
+        next_at?: string | null;
         due_at: string | null;
         overdue_at: string | null;
         last_at: string | null;

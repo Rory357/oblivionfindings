@@ -268,11 +268,13 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:15');
 
-// Controlled-drug balance checks not done in ≥7 days → dashboard alert: 07:30 NZ
+// Evaluate configured controlled-count deadlines promptly; clinical timing comes from policy.
 app(Schedule::class)
     ->command('emar:escalate-overdue-cd-checks')
     ->timezone('Pacific/Auckland')
-    ->dailyAt('07:30');
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->onOneServer();
 
 // OKR & development reminders: check-in due / overdue / KR-due / dev review: 08:00 NZ
 app(Schedule::class)

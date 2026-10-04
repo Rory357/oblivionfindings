@@ -34,6 +34,7 @@ import {
     WizardStepPane,
     WizardSuccessPane,
 } from '@/components/wizard/shell';
+import { formatDateTime } from '@/lib/datetime';
 import {
     createMedicationMutationReplayState,
     prepareMedicationMutationReplayState,
@@ -48,7 +49,6 @@ import {
 } from '@/lib/medication-scan';
 import { readServerSyncOutcome } from '@/lib/offline-queue';
 import { cn } from '@/lib/utils';
-import { formatDateTime } from '@/lib/datetime';
 import axios from 'axios';
 import {
     Check,
@@ -601,7 +601,10 @@ function RecordDoseForm({
     const nobodyToConfirm = !req.second_person.anyone_available;
     // Only a medication rule's second person or a smaller amount may go
     // unconfirmed (Q2); a witness or co-signer never can.
-    const unconfirmed = !req.witness_override && (secondKind === 'rule' || secondKind === 'amount') && nobodyToConfirm;
+    const unconfirmed =
+        !req.witness_override &&
+        (secondKind === 'rule' || secondKind === 'amount') &&
+        nobodyToConfirm;
 
     /* ── controlled stock (NF-18, P0-2) ── */
     const controlledGiven = givenLike && req.order.controlled;
@@ -820,7 +823,10 @@ function RecordDoseForm({
             ...(givenLike && shiftContext?.scanVerification
                 ? toMedicationScanPayload(scanCapture)
                 : {}),
-            witness_override_id: givenLike && req.witness_override && !f.second.id ? req.witness_override.id : null,
+            witness_override_id:
+                givenLike && req.witness_override && !f.second.id
+                    ? req.witness_override.id
+                    : null,
         };
         const second =
             secondKind && !unconfirmed && f.second.id
@@ -922,7 +928,8 @@ function RecordDoseForm({
                 {
                     action: isPrn ? 'prn' : 'administration',
                     // A witness PIN is checked live; it is never stored on the device.
-                    allowQueueWhenOffline: !needsPin && !body.witness_override_id,
+                    allowQueueWhenOffline:
+                        !needsPin && !body.witness_override_id,
                     queuedMessage: `Saved on this device — ${med} for ${p} isn’t on the chart yet. It will send when you reconnect. Don’t record it again.`,
                 },
             );
@@ -989,7 +996,9 @@ function RecordDoseForm({
                 `${med} for ${p}: ${(tiles.find((t) => t.key === f.outcome)?.label ?? 'recorded').toLowerCase()} at ${givenLike ? localLabel(f.when).split(' · ')[1] : localLabel(nowLocal).split(' · ')[1]}. It’s on ${p}’s chart.`,
             ];
             if (req.witness_override && !f.second.id && givenLike)
-                lines.push('Recorded under an approved witness override · a house lead must take part in a witnessed count and sign off this dose.');
+                lines.push(
+                    'Recorded under an approved witness override · a house lead must take part in a witnessed count and sign off this dose.',
+                );
             if (unconfirmed)
                 lines.push(
                     secondKind === 'amount'
@@ -1552,7 +1561,7 @@ function RecordDoseForm({
                                 onChange={(v) => set({ followBy: v })}
                                 error={errors.followBy}
                                 clearable={false}
-                                hint="Offer again, or record why not. No default time is set: the re-offer rule is not configured."
+                                hint="Use the agreed re-offer time. If none is recorded, ask the medication lead; do not guess. Offer again, or record why not."
                             />
                             <p className="text-caption">
                                 It shows in your follow-ups until you record a
@@ -1566,11 +1575,23 @@ function RecordDoseForm({
             {givenLike ? (
                 <div className="space-y-4">
                     {req.witness_override && !f.second.id ? (
-                        <Notice tone="warning" title="Approved dose witness override">
-                            Applies until {formatDateTime(req.witness_override.expires_at)}. A house lead must take part in a witnessed count after this dose and sign it off by {formatDateTime(req.witness_override.followup_due_at)}. This dose needs a connection to save.
+                        <Notice
+                            tone="warning"
+                            title="Approved dose witness override"
+                        >
+                            Applies until{' '}
+                            {formatDateTime(req.witness_override.expires_at)}. A
+                            house lead must take part in a witnessed count after
+                            this dose and sign it off by{' '}
+                            {formatDateTime(
+                                req.witness_override.followup_due_at,
+                            )}
+                            . This dose needs a connection to save.
                         </Notice>
                     ) : null}
-                    {secondKind && secondKind !== 'amount' ? secondPerson : null}
+                    {secondKind && secondKind !== 'amount'
+                        ? secondPerson
+                        : null}
                     {isPrn ? (
                         <div data-field="prnReason" className="space-y-2">
                             <Label
@@ -1801,7 +1822,7 @@ function RecordDoseForm({
                                 onChange={(v) => set({ checkBy: v })}
                                 error={errors.checkBy}
                                 clearable={false}
-                                hint="No default: the response-time policy isn’t configured. The check stays open across midnight and shift change until someone records it."
+                                hint="Use the check time in the prescription or agreed support plan. If none is recorded, ask the medication lead; do not guess. The check stays open across shifts until someone records it."
                             />
                         </div>
                     ) : null}

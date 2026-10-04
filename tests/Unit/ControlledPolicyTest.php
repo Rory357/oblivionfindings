@@ -234,9 +234,88 @@ class ControlledPolicyTest extends TestCase
         $this->assertTrue($groups['controlled_counts']->definition('cadence')->accepts('shift'));
         $this->assertCount(3, $groups['controlled_counts']->definition('cadence')->options);
         $this->assertSame('week', $groups['controlled_counts']->definition('cadence')->normalise('week'));
-        $this->assertSame('Weekly — timing unavailable', $groups['controlled_counts']->definition('cadence')->format('week'));
-        $this->assertStringContainsString('Weekly due and overdue reminders are unavailable.', $groups['controlled_counts']->toClient()['effect']);
+        $this->assertSame('Once a week, on the chosen day and time', $groups['controlled_counts']->definition('cadence')->format('week'));
+        $this->assertStringContainsString('Finish any due weekly counts before changing weekly timing.', $groups['controlled_counts']->toClient()['effect']);
         $this->assertNotNull($groups['controlled_counts']->definition('cadence')->whenNotConfigured);
+    }
+
+    public function test_weekly_schedule_uses_only_the_reviewed_weekday_and_local_time(): void
+    {
+        $policy = $this->policy();
+        $anchor = ['day' => 5, 'time' => '10:00'];
+        $cutoff = $this->at('2026-10-01 12:00');
+        $next = $policy->countStatusForWeeklyAnchor($this->at('2026-10-02 09:29:59'), null, $anchor, 90, 'Pacific/Auckland', $cutoff);
+        $this->assertSame('upcoming', $next['status']);
+        $this->assertSame('2026-10-02T10:00:00+13:00', $next['change_at']);
+        $due = $policy->countStatusForWeeklyAnchor($this->at('2026-10-02 09:30'), null, $anchor, 90, 'Pacific/Auckland', $cutoff);
+        $this->assertSame('due', $due['status']);
+        $this->assertSame('2026-10-02T09:30:00+13:00', $due['due_at']);
+        $this->assertSame('2026-10-02T11:30:00+13:00', $due['overdue_at']);
+        $this->assertSame('2026-10-09T10:00:00+13:00', $due['next_change_at']);
+        $this->assertSame('overdue', $policy->countStatusForWeeklyAnchor($this->at('2026-10-02 11:30'), null, $anchor, 90, 'Pacific/Auckland', $cutoff)['status']);
+    }
+
+    public function test_weekly_counts_need_current_real_witnessed_evidence_inside_the_due_window(): void
+    {
+        $policy = $this->policy();
+        $anchor = ['day' => 5, 'time' => '10:00'];
+        $now = $this->at('2026-10-02 11:00');
+        $this->assertSame('complete', $policy->countStatusForWeeklyAnchor($now, $this->at('2026-10-02 09:30'), $anchor)['status']);
+        foreach (['2026-10-02 09:29:59', '2026-10-02 12:00', '2026-09-25 10:00'] as $invalid) {
+            $this->assertSame('overdue', $policy->countStatusForWeeklyAnchor($now, $this->at($invalid), $anchor)['status']);
+        }
+    }
+
+    public function test_weekly_runtime_needs_an_anchor_and_starts_at_the_next_boundary_after_publication_or_order_creation(): void
+    {
+        $policy = $this->policy();
+        $policy->organisation[ControlledPolicy::COUNT_CADENCE] = 'week';
+        $medicine = new ClientMedication(['controlled_drug' => true, 'active' => true, 'state' => 'active', 'approval_status' => 'verified']);
+        $this->assertSame('schedule_unavailable', $policy->countStatus($medicine, $this->at('2026-10-03 12:00'))['status']);
+        $policy->organisation[ControlledPolicy::COUNT_WEEKLY_ANCHOR] = '{"day":5,"time":"10:00"}';
+        $policy->effectiveAt = $this->at('2026-10-03 11:00');
+        $status = $policy->countStatus($medicine, $this->at('2026-10-03 12:00'));
+        $this->assertSame('upcoming', $status['status']);
+        $this->assertSame('2026-10-09T10:00:00+13:00', $status['change_at']);
+        $policy->effectiveAt = $this->at('2026-10-01 11:00');
+        $this->assertSame('overdue', $policy->countStatus($medicine, $this->at('2026-10-03 12:00'))['status']);
+        $medicine->setDateFormat('Y-m-d H:i:s');
+        $medicine->setRawAttributes([...$medicine->getAttributes(), 'created_at' => '2026-10-03 00:00:00']);
+        $this->assertSame('upcoming', $policy->countStatus($medicine, $this->at('2026-10-03 12:00'))['status']);
+    }
+
+    public function test_weekly_local_calendar_preserves_clock_time_across_both_nz_dst_changes(): void
+    {
+        $policy = $this->policy();
+        $anchor = ['day' => 7, 'time' => '03:30'];
+        foreach ([
+            ['2026-09-20 04:30', '2026-09-20T03:30:00+12:00', '2026-09-27T03:30:00+13:00', 167],
+            ['2026-03-29 04:30', '2026-03-29T03:30:00+13:00', '2026-04-05T03:30:00+12:00', 169],
+        ] as [$now, $current, $next, $hours]) {
+            $status = $policy->countStatusForWeeklyAnchor($this->at($now), null, $anchor);
+            $this->assertSame($current, $status['change_at']);
+            $this->assertSame($next, $status['next_change_at']);
+            $this->assertEquals($hours * 3600, CarbonImmutable::parse($next)->timestamp - CarbonImmutable::parse($current)->timestamp);
+        }
+        $spring = $policy->countStatusForWeeklyAnchor($this->at('2026-09-27 04:30'), null, $anchor);
+        $this->assertSame('2026-09-27T03:00:00+13:00', $spring['due_at']);
+        $this->assertSame('2026-09-27T04:30:00+13:00', $spring['overdue_at']);
+        $this->assertSame('schedule_unavailable', $policy->countStatusForWeeklyAnchor($this->at('2026-09-27 04:30'), null, ['day' => 7, 'time' => '02:30'])['status']);
+    }
+
+    public function test_monday_midnight_count_keeps_the_following_week_visible_before_calendar_week_rollover(): void
+    {
+        $policy = $this->policy();
+        $anchor = ['day' => 1, 'time' => '00:00'];
+        $clock = $this->at('2026-10-04 23:45');
+        $complete = $policy->countStatusForWeeklyAnchor($clock, $this->at('2026-10-04 23:40'), $anchor);
+        $this->assertSame('complete', $complete['status']);
+        $this->assertSame('2026-10-05T00:00:00+13:00', $complete['change_at']);
+        $this->assertSame('2026-10-04T23:30:00+13:00', $complete['due_at']);
+        $this->assertSame('2026-10-12T00:00:00+13:00', $complete['next_change_at']);
+        $pending = $policy->countStatusForWeeklyAnchor($clock, null, $anchor);
+        $this->assertSame('due', $pending['status']);
+        $this->assertSame('2026-10-12T00:00:00+13:00', $pending['next_change_at']);
     }
 
     private function at(string $time): CarbonImmutable
@@ -253,6 +332,13 @@ class ControlledPolicyTest extends TestCase
             public array $house = [];
 
             public array $roster = [];
+
+            public ?CarbonImmutable $effectiveAt = null;
+
+            protected function weeklyPolicyEffectiveAt(): ?CarbonImmutable
+            {
+                return $this->effectiveAt;
+            }
 
             protected function organisationValue(string $key): mixed
             {

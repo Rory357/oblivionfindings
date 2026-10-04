@@ -580,8 +580,8 @@ export function CountDialog({
                                 })}
                                 <p className="text-caption">
                                     Count what is physically present. A count of
-                                    one medicine does not complete the
-                                    shift-change counts for the others.
+                                    one medicine does not complete the scheduled
+                                    counts for the others.
                                 </p>
                             </>
                         ) : step === 1 ? (

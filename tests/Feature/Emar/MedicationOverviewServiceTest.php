@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AppSetting;
 use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientControlledDrugEntry;
@@ -8,11 +9,14 @@ use App\Models\ClientInrRecord;
 use App\Models\ClientMedication;
 use App\Models\MedicationReview;
 use App\Models\Permission;
+use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\Controlled\ControlledPolicy;
 use App\Services\MedicationOverviewService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
     Carbon::setTestNow(Carbon::parse('2026-06-14 11:15:00', 'Pacific/Auckland')->utc());
@@ -201,6 +205,10 @@ it('keeps med cd scope balance checks due when today entry has noncanonical owne
         'active' => true,
         'state' => 'active',
     ]);
+    AppSetting::updateOrCreate(['key' => ControlledPolicy::COUNT_CADENCE], ['value' => 'shift']);
+    DB::table('client_medications')->where('id', $medication->id)->update(['created_at' => now()->subDay(), 'approval_status' => 'verified']);
+    Shift::factory()->create(['site_id' => $owner->site_id, 'client_id' => $owner->id,
+        'starts_at' => now()->subHours(2), 'ends_at' => now()->addHours(2), 'status' => 'in_progress', 'is_on_call' => false]);
     ClientControlledDrugEntry::query()->create([
         'client_id' => $otherClient->id,
         'client_medication_id' => $medication->id,
@@ -209,6 +217,7 @@ it('keeps med cd scope balance checks due when today entry has noncanonical owne
         'on_hand_after' => '10.00',
         'recorded_at' => now(),
         'recorded_by' => $user->id,
+        'witnessed_by' => User::factory()->create()->id,
     ]);
 
     $feed = app(MedicationOverviewService::class)->actionCentre(today());
@@ -217,7 +226,7 @@ it('keeps med cd scope balance checks due when today entry has noncanonical owne
     expect($due)->not->toBeNull()
         ->and($due['type'])->toBe('cd_balance')
         ->and($due['client_id'])->toBe($owner->id)
-        ->and($due['summary'])->toContain('no balance count recorded today');
+        ->and($due['summary'])->toContain('a witnessed count is due under the configured policy');
 });
 
 it('surfaces an overdue medication review in the action centre', function () {

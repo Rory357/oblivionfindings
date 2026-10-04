@@ -9,6 +9,10 @@ use App\Models\MedicationSettingChange;
 use App\Models\MedicationSiteSetting;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Medication\Controlled\ControlledCountStatus;
+use App\Services\Medication\Controlled\ControlledPolicy;
+use App\Services\Medication\Controlled\WeeklyCountAnchorCodec;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -190,6 +194,8 @@ class MedicationSettingsStore
                     'loosens' => $definition->loosens($before['value'], $change['value']),
                 ];
             }
+
+            $this->assertControlledCountPolicyConsistent($changes);
 
             if (! $confirmLoosening && collect($planned)->contains('loosens', true)) {
                 throw ValidationException::withMessages([
@@ -524,6 +530,41 @@ class MedicationSettingsStore
         AppSetting::query()->updateOrCreate(['key' => $definition->storageKey], ['value' => $value]);
         if ($definition->group === 'ea') {
             app(EmergencyAccessPolicySettings::class)->write($definition->key, $value);
+        }
+    }
+
+    private function assertControlledCountPolicyConsistent(array $changes): void
+    {
+        $countChanges = array_filter($changes, fn (array $change): bool => $change['definition']->group === 'controlled_counts');
+        if ($countChanges === []) {
+            return;
+        }
+        // The global revision lock already serialises the complete prospective group.
+        $before = $this->groupSnapshot('controlled_counts', null);
+        $after = $before;
+        foreach ($countChanges as $change) {
+            $after[$change['definition']->key] = $change['value'];
+        }
+        $codec = new WeeklyCountAnchorCodec(config('app.worker_timezone', 'Pacific/Auckland'));
+        if ($after['cadence'] === 'week' && $codec->decode($after['weekly_anchor']) === null) {
+            throw ValidationException::withMessages([
+                'controlled_counts.weekly_anchor' => 'Choose a weekly count day and time before saving weekly counts.',
+            ]);
+        }
+        $anchor = $codec->decode($before['weekly_anchor']);
+        if ($before['cadence'] === 'week' && $anchor !== null
+            && ($before['weekly_anchor'] !== $after['weekly_anchor'] || $before['cadence'] !== $after['cadence'])) {
+            $effectiveAt = AppSetting::query()->whereIn('key', [ControlledPolicy::COUNT_CADENCE, ControlledPolicy::COUNT_WEEKLY_ANCHOR])
+                ->sharedLock()->get(['updated_at'])->max('updated_at');
+            if (! app(ControlledCountStatus::class)->hasUnfinishedWeeklyCounts($anchor,
+                $effectiveAt === null ? null : CarbonImmutable::instance($effectiveAt), (int) $before['overdue_minutes'])) {
+                return;
+            }
+            // A timing change cannot erase already-due witnessed-count obligations.
+            // Keep this generic: publication authority does not expose person details.
+            throw ValidationException::withMessages([
+                'controlled_counts.weekly_anchor' => 'Finish the due weekly witnessed counts before changing count timing.',
+            ]);
         }
     }
 

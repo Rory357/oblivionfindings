@@ -73,7 +73,7 @@ export function PrnStrip({
                             <Button
                                 size="sm"
                                 variant="outline"
-                                className="frontline-tap shrink-0"
+                                className="frontline-tap w-full shrink-0 sm:w-auto"
                                 aria-disabled={blocked ? true : undefined}
                                 onClick={() => {
                                     if (!blocked) onRecord(med.id);
@@ -86,7 +86,7 @@ export function PrnStrip({
                         return (
                             <li
                                 key={med.key ?? med.id}
-                                className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5"
+                                className="flex flex-col items-stretch gap-3 rounded-lg border border-border bg-card px-3 py-2.5 sm:flex-row sm:items-center"
                             >
                                 <div className="min-w-0 flex-1">
                                     <div className="flex flex-wrap items-center gap-1.5">

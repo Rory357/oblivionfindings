@@ -6,7 +6,11 @@ use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\MedicationDashboardAlert;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use Carbon\CarbonImmutable;
+use DateTimeInterface;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 
 /** One organisation count policy and canonical witnessed evidence for all projections. */
 final class ControlledCountStatus
@@ -36,15 +40,62 @@ final class ControlledCountStatus
     }
 
     /** Approved sites, with historical stock retained until physically cleared. */
-    public function relevantMedicines(?int $siteId = null): Collection
+    public function relevantMedicines(?int $siteId = null, bool $currentRead = false): Collection
     {
         return ClientMedication::withTrashed()->controlled()
             ->whereHas('client.site', fn ($site) => $site->where('is_active', true)
                 ->where(fn ($q) => $q->where('archived', false)->orWhereNull('archived'))->whereNull('archived_at'))
             ->when($siteId !== null, fn ($q) => $q->whereHas('client', fn ($client) => $client->where('site_id', $siteId)))
             ->where(fn ($q) => $q->where(fn ($active) => $active->active())
-                ->orWhereHas('stock', fn ($stock) => $stock->where('on_hand', '>', 0)))
-            ->with(['client.site', 'stock'])->get();
+                // The outer medicine lock does not make this subquery a current
+                // read. A committed historical correction can restore stock
+                // after publication has established its older read view.
+                ->orWhereHas('stock', fn ($stock) => $stock->where('on_hand', '>', 0)
+                    ->when($currentRead, fn ($query) => $query->lock('for share nowait'))))
+            ->with(['client.site', 'stock' => fn ($query) => $currentRead ? $query->lock('for share nowait') : $query])
+            ->when($currentRead, fn ($query) => $query->lock('for share nowait'))->get();
+    }
+
+    /**
+     * Publication supplies its locked policy values, rather than an older
+     * implicit settings snapshot. Current medicine/stock reads retain scope;
+     * count evidence is append-only, so missing a concurrent completion only
+     * conservatively asks the publisher to retry.
+     *
+     * @param  array{day: int, time: string}  $anchor
+     */
+    public function hasUnfinishedWeeklyCounts(array $anchor, ?DateTimeInterface $effectiveAt, int $overdueMinutes): bool
+    {
+        try {
+            // Publication already holds actor locks. Never wait for a medicine
+            // or stock lock held by a writer that will next require that actor.
+            $medicines = $this->relevantMedicines(currentRead: true);
+        } catch (QueryException $exception) {
+            if ((int) ($exception->errorInfo[1] ?? 0) !== 3572) {
+                throw $exception;
+            }
+            throw ValidationException::withMessages([
+                'controlled_counts.weekly_anchor' => 'Counts are being recorded now. Wait for that work to finish, then review this change again.',
+            ]);
+        }
+        $counts = $this->latestWitnessedCounts($medicines->pluck('id'));
+        $clock = CarbonImmutable::now('UTC');
+        foreach ($medicines as $medicine) {
+            if (! $this->policy->countRequired($medicine)) {
+                continue;
+            }
+            $notBefore = $effectiveAt;
+            if ($medicine->created_at !== null && ($notBefore === null || $medicine->created_at->greaterThan($notBefore))) {
+                $notBefore = $medicine->created_at;
+            }
+            $status = $this->policy->countStatusForWeeklyAnchor($clock, $counts->get($medicine->id)?->recorded_at,
+                $anchor, $overdueMinutes, config('app.worker_timezone', 'Pacific/Auckland'), $notBefore);
+            if (in_array($status['status'], ['due', 'overdue'], true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** @return Collection<int, ClientMedication> */

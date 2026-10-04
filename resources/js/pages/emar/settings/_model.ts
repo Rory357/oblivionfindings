@@ -37,7 +37,16 @@ export type SettingDefinition = {
     } | null;
     /** A value that isn't one option or number (P11 B2): who gets an alert, a list of people, a list of groups,
      * a time ("21:00" or "off", B2 C5) or a house's quiet hours. */
-    kind?: 'alert' | 'people' | 'groups' | 'time' | 'quiet' | null;
+    kind?:
+        | 'alert'
+        | 'people'
+        | 'groups'
+        | 'time'
+        | 'quiet'
+        | 'weekly_anchor'
+        | null;
+    weekday_options?: { value: string; label: string }[];
+    timezone?: string;
     /** The words before a time ("From 9:00 pm"). */
     time_prefix?: string;
     /** The name "Still to decide" uses ("Alert: Overdue doses"). */
@@ -79,6 +88,43 @@ export const fmtT = (t: string) => {
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 export const TIME_OFF = 'off';
+
+export type WeeklyAnchor = { day: number | null; time: string };
+
+/** Partial values remain a local draft; publication requires both choices. */
+export function parseWeeklyAnchor(value: string): WeeklyAnchor | null {
+    try {
+        const parsed = JSON.parse(value);
+        return parsed &&
+            !Array.isArray(parsed) &&
+            (parsed.day === null ||
+                (Number.isInteger(parsed.day) &&
+                    parsed.day >= 1 &&
+                    parsed.day <= 7)) &&
+            typeof parsed.time === 'string'
+            ? { day: parsed.day, time: parsed.time }
+            : null;
+    } catch {
+        return null;
+    }
+}
+
+export function weeklyAnchorError(
+    def: SettingDefinition,
+    value: string,
+): string | null {
+    const anchor = parseWeeklyAnchor(value);
+    if (!anchor?.day || !TIME.test(anchor.time))
+        return 'Choose a day and time for the weekly count.';
+    if (
+        def.timezone === 'Pacific/Auckland' &&
+        anchor.day === 7 &&
+        anchor.time.startsWith('02:')
+    ) {
+        return 'Choose a Sunday time outside 2:00–2:59 am, when the clocks can change in New Zealand.';
+    }
+    return null;
+}
 
 /** A house's quiet hours (B2 C5, v5 Q12): follow the organisation, its own hours, or none. */
 export type QuietHouse = {
@@ -437,10 +483,16 @@ export const isNumber = (def: SettingDefinition) =>
 
 /** The value meaning "switched off", for a number that can be off. */
 export const offValue = (def: SettingDefinition) =>
-    isNumber(def) ? (def.numeric?.off ?? null) : null;
+    def.kind === 'weekly_anchor'
+        ? TIME_OFF
+        : isNumber(def)
+          ? (def.numeric?.off ?? null)
+          : null;
 
 /** Is this a value the setting accepts? (The server checks the same.) */
 export function accepts(def: SettingDefinition, value: string): boolean {
+    if (def.kind === 'weekly_anchor')
+        return value === TIME_OFF || weeklyAnchorError(def, value) === null;
     if (def.kind === 'alert') {
         const a = parseAlert(value);
         return !!a && a.groups.every((g) => def.alert!.groups.includes(g));
@@ -472,7 +524,23 @@ export function format(
     value: string,
     names?: Record<string, string>,
 ): string {
-    if (def.when_not_configured && def.default === '' && value === '' && def.options.length > 0) return 'Not configured';
+    if (def.kind === 'weekly_anchor') {
+        const anchor = parseWeeklyAnchor(value);
+        if (!anchor?.day || !TIME.test(anchor.time))
+            return 'Day and time not configured';
+        const day =
+            def.weekday_options?.find(
+                (option) => String(option.value) === String(anchor.day),
+            )?.label ?? `Day ${anchor.day}`;
+        return `${day} at ${fmtT(anchor.time)}${def.timezone ? ` · ${def.timezone}` : ''}`;
+    }
+    if (
+        def.when_not_configured &&
+        def.default === '' &&
+        value === '' &&
+        def.options.length > 0
+    )
+        return 'Not configured';
     if (def.kind === 'alert') {
         const a = parseAlert(value);
         if (!a) return value;
@@ -534,7 +602,10 @@ export function format(
 export const notConfigured = (
     def: SettingDefinition | undefined,
     value: string,
-) => !!def?.when_not_configured && (value === offValue(def) || (def.default === '' && value === '' && def.options.length > 0));
+) =>
+    !!def?.when_not_configured &&
+    (value === offValue(def) ||
+        (def.default === '' && value === '' && def.options.length > 0));
 
 /** Does changing from one value to another turn a check off or make it less strict? */
 export function loosens(
@@ -543,6 +614,11 @@ export function loosens(
     to: string,
 ): boolean {
     if (from === to) return false;
+    if (def.kind === 'weekly_anchor')
+        return (
+            parseWeeklyAnchor(from)?.day != null &&
+            weeklyAnchorError(def, from) === null
+        );
     // Quiet hours only hold email and push, never the bell (v5: never a loosening).
     if (def.kind === 'time' || def.kind === 'quiet') return false;
     if (def.kind === 'alert') {
@@ -839,6 +915,14 @@ export function validateView(
             const to = draft[g.key]?.[key];
             if (def && isNumber(def) && to !== undefined && !accepts(def, to))
                 errors[`${g.key}.${key}`] = numberError(def);
+            if (
+                def?.kind === 'weekly_anchor' &&
+                to !== undefined &&
+                to !== TIME_OFF
+            ) {
+                const error = weeklyAnchorError(def, to);
+                if (error) errors[`${g.key}.${key}`] = error;
+            }
             // P11 v5: an alert with every channel off tells nobody.
             const a =
                 def?.kind === 'alert' && to !== undefined
@@ -855,6 +939,20 @@ export function validateView(
                     `“${def.alert.label}”: turn on ${channelWords(def.alert.channels)} — otherwise nobody is told.`;
         });
     });
+    if (
+        s.groups.controlled_counts?.view === view &&
+        draft.controlled_counts &&
+        draftValue(s, draft, 'controlled_counts', 'cadence') === 'week'
+    ) {
+        const def = definitionOf(s, 'controlled_counts', 'weekly_anchor');
+        if (def) {
+            const error = weeklyAnchorError(
+                def,
+                draftValue(s, draft, 'controlled_counts', 'weekly_anchor'),
+            );
+            if (error) errors['controlled_counts.weekly_anchor'] = error;
+        }
+    }
     if (
         s.groups.ea?.view === view &&
         draft.ea &&

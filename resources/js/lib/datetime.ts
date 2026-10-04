@@ -133,6 +133,18 @@ export function toDateInput(value: DateInput): string {
     return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
+/** Completed calendar years on the worker's NZ day; a birth date is not an instant. */
+export function ageOnWorkerDay(
+    birthDate: string | null | undefined,
+    asAt: DateInput = new Date(),
+): number | null {
+    if (!birthDate || !formatDateOnly(birthDate, '')) return null;
+    const today = toDateInput(asAt);
+    if (!today || birthDate > today) return null;
+    const years = Number(today.slice(0, 4)) - Number(birthDate.slice(0, 4));
+    return years - (today.slice(5) < birthDate.slice(5) ? 1 : 0);
+}
+
 /** "July 2026" — month heading for Fleet calendars and reports. */
 export function formatMonthYear(
     value: DateInput,

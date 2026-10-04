@@ -40,7 +40,7 @@ final class ControlledSettingsFragment
             new MedicationSettingGroup(
                 key: 'controlled_counts',
                 view: MedicationSettingsRegistry::VIEW_RULES,
-                effect: 'From the next count due at each house. Weekly due and overdue reminders are unavailable.',
+                effect: 'From the next configured count time at each house. Finish any due weekly counts before changing weekly timing.',
                 auditEvent: 'medications.controlled_count_policy.updated',
                 definitions: [
                     new Definition(
@@ -48,9 +48,16 @@ final class ControlledSettingsFragment
                         storageKey: ControlledPolicy::COUNT_CADENCE,
                         scope: Definition::SCOPE_ORGANISATION, section: 'controlled',
                         label: 'How often controlled medicines are counted',
-                        options: ['shift' => 'Every shift change', 'day' => 'Once a day, at the morning shift change', 'week' => 'Weekly — timing unavailable'],
+                        options: ['shift' => 'Every shift change', 'day' => 'Once a day, at the morning shift change', 'week' => 'Once a week, on the chosen day and time'],
                         default: '', rank: ['week', 'day', 'shift'],
                         whenNotConfigured: 'Not configured — nothing shows as due or overdue until the count cadence is saved.',
+                    ),
+                    new Definition(
+                        group: 'controlled_counts', key: 'weekly_anchor',
+                        storageKey: ControlledPolicy::COUNT_WEEKLY_ANCHOR,
+                        scope: Definition::SCOPE_ORGANISATION, section: 'controlled',
+                        label: 'Weekly count day and time', options: [], default: WeeklyCountAnchorCodec::OFF,
+                        codec: new WeeklyCountAnchorCodec,
                     ),
                     new Definition(
                         group: 'controlled_counts', key: 'overdue_minutes',
@@ -58,7 +65,7 @@ final class ControlledSettingsFragment
                         scope: Definition::SCOPE_ORGANISATION, section: 'controlled',
                         label: 'Counts as overdue', options: [], default: '60',
                         numeric: ['direction' => Definition::HIGHER_IS_LOOSER, 'off' => null, 'off_is_loosest' => false],
-                        range: [1, 1440], unit: 'minutes after the shift change',
+                        range: [1, 1440], unit: 'minutes after the count time',
                     ),
                 ],
             ),

@@ -15,6 +15,7 @@ import {
 } from '@/components/clients/profile/overview-grid';
 import { BehaviourAbcTab } from '@/components/clients/profile/tabs/behaviour-abc';
 import { type HealthSummary } from '@/components/clinical/health-summary-card';
+import { AllergyRecord } from '@/components/emar/record/allergy-record';
 import { RaRegisterSection } from '@/components/health-safety/risk-assessments/ra-register-section';
 import type {
     RaPickers,
@@ -67,7 +68,7 @@ import { Separator } from '@/components/ui/separator';
 import { Ring } from '@/components/wizard/primitives';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTimeLong } from '@/lib/datetime';
+import { ageOnWorkerDay, formatDateTimeLong } from '@/lib/datetime';
 import { formatDateTime as formatDT } from '@/lib/fleet-utils';
 import type { WitnessPickerOption } from '@/lib/witness-pin';
 import { ClientClinicalRecordLaunchers } from '@/pages/health-clinical/components/client-clinical-launchers';
@@ -108,7 +109,6 @@ import { RhythmsRoutinesTab } from '@/pages/operations/clients/tabs/rhythms-rout
 import { ClientTimelineTab } from '@/pages/operations/clients/tabs/timeline-tab';
 import { useCreateShiftLauncher } from '@/pages/operations/shifts/components/use-create-shift-launcher';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { AllergyRecord } from '@/components/emar/record/allergy-record';
 import {
     Activity,
     AlertTriangle,
@@ -1688,12 +1688,7 @@ export default function ClientShow({
         ? client.status.charAt(0).toUpperCase() + client.status.slice(1)
         : 'Unknown';
 
-    const clientAge = client.date_of_birth
-        ? Math.floor(
-              (Date.now() - new Date(client.date_of_birth).getTime()) /
-                  31557600000,
-          )
-        : null;
+    const clientAge = ageOnWorkerDay(client.date_of_birth);
     const identityLine = [
         client.preferred_name && client.preferred_name !== name
             ? `“${client.preferred_name}”`
@@ -3531,7 +3526,11 @@ export default function ClientShow({
 
                         {tab === 'medical' && (
                             <div className="space-y-4">
-                                <AllergyRecord key={client.id} clientId={client.id} editable />
+                                <AllergyRecord
+                                    key={client.id}
+                                    clientId={client.id}
+                                    editable
+                                />
 
                                 {/* Quick Stats */}
                                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -4206,7 +4205,9 @@ export default function ClientShow({
                                 />
                                 <HealthMonitoringTab
                                     clientId={client.id}
-                                    canViewDoseReadings={canShowProfileTab('medical')}
+                                    canViewDoseReadings={canShowProfileTab(
+                                        'medical',
+                                    )}
                                     data={healthMonitoring}
                                     isLoading={!hasHealthMonitoringProp}
                                 />

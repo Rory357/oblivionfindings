@@ -19,6 +19,8 @@ use App\Models\ControlledWorkflowEvent;
 use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationDashboardAlert;
 use App\Models\MedicationDestruction;
+use App\Models\MedicationEvent;
+use App\Models\MedicationSettingChange;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
@@ -32,7 +34,9 @@ use App\Services\Medication\Controlled\ControlledRegisterService;
 use Carbon\Carbon;
 use Database\Factories\UserFactory;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
@@ -616,6 +620,246 @@ class ControlledProductTest extends TestCase
         $this->actingAs($this->manager->fresh())->putJson('/emar/settings/changes', ['view' => 'rules', 'changes' => [
             ['group' => 'controlled_counts', 'key' => 'cadence', 'from' => 'shift', 'value' => 'day'],
         ]])->assertForbidden();
+    }
+
+    public function test_weekly_settings_publish_one_complete_anchor_and_start_at_the_next_boundary(): void
+    {
+        $anchor = '{"day":4,"time":"09:00"}';
+        $this->actingAs($this->manager->fresh())->putJson('/emar/settings/changes', ['view' => 'rules', 'changes' => [
+            ['group' => 'controlled_counts', 'key' => 'cadence', 'from' => '', 'value' => 'week'],
+            ['group' => 'controlled_counts', 'key' => 'weekly_anchor', 'from' => 'off', 'value' => '{"time":"09:00","day":4}'],
+        ]])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame($anchor, AppSetting::where('key', ControlledPolicy::COUNT_WEEKLY_ANCHOR)->sole()->value);
+        $history = MedicationSettingChange::where('setting_group', 'controlled_counts')->where('setting_key', 'weekly_anchor')->sole();
+        $this->assertSame('off', $history->before_value);
+        $this->assertSame($anchor, $history->after_value);
+        $this->assertSame('Thursday at 9:00 am (Pacific/Auckland)', $history->after_text);
+        $this->assertFalse($history->loosens);
+        $this->assertDatabaseCount('medication_setting_changes', 2);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'medications.controlled_count_policy.updated']);
+        $payload = $this->getJson('/emar/controlled/product')->assertOk();
+        $payload->assertJsonPath('cadence.configured', true)
+            ->assertJsonPath('medicines.0.count.cadence', 'week')
+            ->assertJsonPath('medicines.0.count.state', 'next')
+            ->assertJsonPath('medicines.0.count.due_at', '2026-05-07T08:30:00+12:00')
+            ->assertJsonPath('medicines.0.count.next_at', '2026-05-07T09:00:00+12:00');
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $this->assertSame('10.00', $this->stock->fresh()->on_hand);
+    }
+
+    public function test_any_weekly_count_group_draft_requires_an_anchor_without_writing_partial_policy(): void
+    {
+        AppSetting::updateOrCreate(['key' => ControlledPolicy::COUNT_CADENCE], ['value' => 'week']);
+        $before = AppSetting::where('key', ControlledPolicy::COUNT_CADENCE)->sole()->getRawOriginal();
+        $payload = $this->actingAs($this->manager->fresh())->getJson('/emar/controlled/product')->assertOk();
+        $payload->assertJsonPath('cadence.configured', false)->assertJsonPath('medicines.0.count.state', 'not_configured')
+            ->assertJsonPath('medicines.0.count.due_at', null)->assertJsonPath('medicines.0.count.overdue_at', null);
+        $auditBefore = AuditLog::count();
+        $this->putJson('/emar/settings/changes', ['view' => 'rules', 'changes' => [
+            ['group' => 'controlled_counts', 'key' => 'overdue_minutes', 'from' => '60', 'value' => '90'],
+        ], 'confirm_loosening' => true])->assertUnprocessable()->assertJsonValidationErrors('controlled_counts.weekly_anchor');
+        $this->assertSame($before, AppSetting::where('key', ControlledPolicy::COUNT_CADENCE)->sole()->getRawOriginal());
+        $this->assertDatabaseMissing('app_settings', ['key' => ControlledPolicy::COUNT_OVERDUE_MINUTES]);
+        $this->assertDatabaseMissing('app_settings', ['key' => ControlledPolicy::COUNT_WEEKLY_ANCHOR]);
+        $this->assertDatabaseCount('medication_setting_changes', 0);
+        $this->assertDatabaseCount('medication_events', 0);
+        $this->assertDatabaseCount('audit_logs', $auditBefore);
+    }
+
+    public function test_weekly_publication_rejects_nz_ambiguous_hour_and_partial_values_before_any_effect(): void
+    {
+        $auditBefore = AuditLog::count();
+        foreach (['{"day":7,"time":"02:00"}', '{"day":7,"time":"02:59"}', '{"day":null,"time":""}', '{"day":1}'] as $value) {
+            $this->actingAs($this->manager->fresh())->putJson('/emar/settings/changes', ['view' => 'rules', 'changes' => [
+                ['group' => 'controlled_counts', 'key' => 'cadence', 'from' => '', 'value' => 'week'],
+                ['group' => 'controlled_counts', 'key' => 'weekly_anchor', 'from' => 'off', 'value' => $value],
+            ]])->assertUnprocessable()->assertJsonValidationErrors('changes.1.value');
+        }
+        $this->assertDatabaseMissing('app_settings', ['key' => ControlledPolicy::COUNT_CADENCE]);
+        $this->assertDatabaseMissing('app_settings', ['key' => ControlledPolicy::COUNT_WEEKLY_ANCHOR]);
+        $this->assertDatabaseCount('medication_setting_changes', 0);
+        $this->assertDatabaseCount('medication_events', 0);
+        $this->assertDatabaseCount('audit_logs', $auditBefore);
+    }
+
+    public function test_weekly_anchor_keeps_exact_settings_controlled_authority_and_compare_and_swap(): void
+    {
+        $change = ['group' => 'controlled_counts', 'key' => 'weekly_anchor', 'from' => 'off', 'value' => '{"day":1,"time":"09:00"}'];
+        foreach (['medications.controlled.view', 'medications.settings.manage'] as $capability) {
+            $this->permissions($this->manager, [$capability => false]);
+            $this->actingAs($this->manager->fresh())->putJson('/emar/settings/changes', ['view' => 'rules', 'changes' => [$change]])->assertForbidden();
+            $this->permissions($this->manager, [$capability => true]);
+        }
+        $this->actingAs($this->recorder->fresh())->putJson('/emar/settings/changes', ['view' => 'rules', 'changes' => [$change]])->assertForbidden();
+        $this->actingAs($this->manager->fresh())->putJson('/emar/settings/changes', ['view' => 'rules', 'changes' => [$change]])->assertRedirect()->assertSessionHasNoErrors();
+        $this->putJson('/emar/settings/changes', ['view' => 'rules', 'changes' => [[...$change, 'value' => '{"day":2,"time":"09:00"}']]])->assertUnprocessable();
+        $this->assertDatabaseCount('medication_setting_changes', 1);
+        $this->assertSame($change['value'], AppSetting::where('key', ControlledPolicy::COUNT_WEEKLY_ANCHOR)->sole()->value);
+    }
+
+    public function test_configured_weekly_anchor_change_and_history_restore_require_loosening_confirmation(): void
+    {
+        $first = '{"day":1,"time":"09:00"}';
+        $second = '{"day":2,"time":"10:00"}';
+        AppSetting::updateOrCreate(['key' => ControlledPolicy::COUNT_WEEKLY_ANCHOR], ['value' => $first]);
+        $change = ['group' => 'controlled_counts', 'key' => 'weekly_anchor', 'from' => $first, 'value' => $second];
+        $this->actingAs($this->manager->fresh())->putJson('/emar/settings/changes', ['view' => 'rules', 'changes' => [$change]])->assertUnprocessable()->assertJsonValidationErrors('confirm_loosening');
+        $this->assertDatabaseCount('medication_setting_changes', 0);
+        $this->putJson('/emar/settings/changes', ['view' => 'rules', 'changes' => [$change], 'confirm_loosening' => true])->assertRedirect()->assertSessionHasNoErrors();
+        $history = MedicationSettingChange::where('setting_key', 'weekly_anchor')->sole();
+        $this->assertTrue($history->loosens);
+        $this->assertSame($first, $history->before_value);
+        $restore = [...$change, 'from' => $second, 'value' => $history->before_value];
+        $this->putJson('/emar/settings/changes', ['view' => 'rules', 'changes' => [$restore]])->assertUnprocessable()->assertJsonValidationErrors('confirm_loosening');
+        $this->putJson('/emar/settings/changes', ['view' => 'rules', 'changes' => [$restore], 'confirm_loosening' => true])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame($first, AppSetting::where('key', ControlledPolicy::COUNT_WEEKLY_ANCHOR)->sole()->value);
+        $this->assertDatabaseCount('medication_setting_changes', 2);
+    }
+
+    public function test_weekly_timing_cannot_clear_an_unfinished_due_count_but_completion_allows_reviewed_transition(): void
+    {
+        $anchor = '{"day":4,"time":"09:00"}';
+        $this->seedWeeklyPolicy($anchor);
+        $change = ['group' => 'controlled_counts', 'key' => 'weekly_anchor', 'from' => $anchor, 'value' => '{"day":4,"time":"11:00"}'];
+        $this->actingAs($this->manager->fresh())->putJson('/emar/settings/changes', ['view' => 'rules', 'changes' => [$change], 'confirm_loosening' => true])
+            ->assertUnprocessable()->assertJsonValidationErrors('controlled_counts.weekly_anchor');
+        $this->putJson('/emar/settings/changes', ['view' => 'rules', 'changes' => [
+            ['group' => 'controlled_counts', 'key' => 'cadence', 'from' => 'week', 'value' => 'shift'],
+        ], 'confirm_loosening' => true])->assertUnprocessable()->assertJsonValidationErrors('controlled_counts.weekly_anchor');
+        $this->assertSame($anchor, AppSetting::where('key', ControlledPolicy::COUNT_WEEKLY_ANCHOR)->sole()->value);
+        $this->assertDatabaseCount('medication_setting_changes', 0);
+        $this->perform('count', ['actual_balance' => 10]);
+        $this->actingAs($this->manager->fresh())->putJson('/emar/settings/changes', ['view' => 'rules', 'changes' => [$change], 'confirm_loosening' => true])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(['day' => 4, 'time' => '11:00'], app(ControlledPolicy::class)->weeklyAnchor());
+        $this->assertSame('upcoming', app(ControlledPolicy::class)->countStatus($this->medication->fresh(), now(), ClientControlledDrugEntry::sole()->recorded_at)['status']);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 1);
+        $this->assertSame('10.00', $this->stock->fresh()->on_hand);
+    }
+
+    public function test_weekly_publication_retries_busy_current_medicine_and_stock_locks_without_waiting_or_writing(): void
+    {
+        $anchor = '{"day":4,"time":"09:00"}';
+        $this->seedWeeklyPolicy($anchor);
+        $auditBefore = AuditLog::count();
+        $lockTarget = '';
+        $inject = true;
+        DB::connection()->beforeExecuting(function (string $query, array $bindings, $connection) use (&$lockTarget, &$inject): void {
+            if ($inject && str_contains($query, $lockTarget) && str_contains($query, 'for share nowait')) {
+                $cause = new \PDOException('Statement aborted because locks could not be acquired immediately and NOWAIT is set.');
+                $cause->errorInfo = ['HY000', 3572, $cause->getMessage()];
+                throw new QueryException($connection->getName(), $query, $bindings, $cause);
+            }
+        });
+        try {
+            foreach (['client_medications', 'client_medication_stocks'] as $table) {
+                $lockTarget = $table;
+                $response = $this->actingAs($this->manager->fresh())->putJson('/emar/settings/changes', ['view' => 'rules', 'changes' => [
+                    ['group' => 'controlled_counts', 'key' => 'weekly_anchor', 'from' => $anchor, 'value' => '{"day":4,"time":"11:00"}'],
+                ], 'confirm_loosening' => true])->assertUnprocessable()->assertJsonValidationErrors('controlled_counts.weekly_anchor');
+                $this->assertStringContainsString('Counts are being recorded now', $response->json('errors')['controlled_counts.weekly_anchor'][0], $table);
+                $this->assertSame($anchor, AppSetting::where('key', ControlledPolicy::COUNT_WEEKLY_ANCHOR)->sole()->value);
+                $this->assertDatabaseCount('medication_setting_changes', 0);
+                $this->assertDatabaseCount('audit_logs', $auditBefore);
+                $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+                $this->assertDatabaseCount('controlled_product_requests', 0);
+                $this->assertSame('10.00', $this->stock->fresh()->on_hand);
+            }
+        } finally {
+            $inject = false;
+        }
+    }
+
+    public function test_weekly_publication_uses_locked_current_policy_even_when_implicit_policy_state_is_stale(): void
+    {
+        $anchor = '{"day":4,"time":"09:00"}';
+        $this->seedWeeklyPolicy($anchor);
+        $stale = new class extends ControlledPolicy
+        {
+            protected function organisationValue(string $key): mixed
+            {
+                return null;
+            }
+        };
+        $this->app->instance(ControlledPolicy::class, $stale);
+        $this->app->forgetInstance(ControlledCountStatus::class);
+        $this->assertNull(app(ControlledPolicy::class)->cadence(), 'Simulate an older implicit settings snapshot.');
+        $auditBefore = AuditLog::count();
+        $response = $this->actingAs($this->manager->fresh())->putJson('/emar/settings/changes', ['view' => 'rules', 'changes' => [
+            ['group' => 'controlled_counts', 'key' => 'weekly_anchor', 'from' => $anchor, 'value' => '{"day":4,"time":"11:00"}'],
+        ], 'confirm_loosening' => true])->assertUnprocessable()->assertJsonValidationErrors('controlled_counts.weekly_anchor');
+        $this->assertStringNotContainsString($this->medication->name, json_encode($response->json('errors')));
+        $this->assertStringNotContainsString($this->client->first_name, json_encode($response->json('errors')));
+        $this->assertSame($anchor, AppSetting::where('key', ControlledPolicy::COUNT_WEEKLY_ANCHOR)->sole()->value);
+        $this->assertDatabaseCount('medication_setting_changes', 0);
+        $this->assertDatabaseCount('audit_logs', $auditBefore);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $this->assertSame('10.00', $this->stock->fresh()->on_hand);
+    }
+
+    public function test_weekly_count_alerts_use_actual_witnessed_evidence_for_retained_physical_stock(): void
+    {
+        $this->seedWeeklyPolicy('{"day":4,"time":"08:00"}');
+        DB::table('client_medications')->where('id', $this->medication->id)->update([
+            'state' => 'ceased', 'active' => false, 'deleted_at' => now(),
+            'ceased_at' => now(), 'ceased_by' => $this->manager->id, 'ceased_reason' => 'Synthetic retained stock',
+        ]);
+        $this->artisan('emar:escalate-overdue-cd-checks')->assertExitCode(0);
+        $this->assertDatabaseHas('medication_dashboard_alerts', ['client_medication_id' => $this->medication->id, 'alert_type' => 'controlled_overdue_check', 'status' => 'active']);
+        $this->assertDatabaseHas('medication_alerts', ['type' => 'cdCheck', 'status' => 'open']);
+        $this->actingAs($this->manager->fresh())->getJson('/emar/controlled/product')->assertOk()
+            ->assertJsonPath('medicines.0.count.title', 'Weekly count overdue')->assertJsonPath('medicines.0.count.cadence', 'week');
+        $this->perform('count', ['actual_balance' => 10]);
+        $this->artisan('emar:escalate-overdue-cd-checks')->assertExitCode(0);
+        $this->assertDatabaseMissing('medication_dashboard_alerts', ['alert_type' => 'controlled_overdue_check', 'status' => 'active']);
+        $this->assertDatabaseMissing('medication_alerts', ['type' => 'cdCheck', 'status' => 'open']);
+        $this->assertSame('complete', app(ControlledPolicy::class)->countStatus($this->medication->fresh(), now(), ClientControlledDrugEntry::sole()->recorded_at)['status']);
+        $this->assertSame('10.00', $this->stock->fresh()->on_hand);
+    }
+
+    public function test_weekly_settings_audit_failure_rolls_back_the_whole_policy_and_history(): void
+    {
+        $auditBefore = AuditLog::count();
+        MedicationEvent::creating(function (MedicationEvent $event): void {
+            if ($event->kind === 'settings.changed') {
+                throw new RuntimeException('Injected weekly publication audit failure.');
+            }
+        });
+        try {
+            $this->withoutExceptionHandling()->actingAs($this->manager->fresh())->putJson('/emar/settings/changes', ['view' => 'rules', 'changes' => [
+                ['group' => 'controlled_counts', 'key' => 'cadence', 'from' => '', 'value' => 'week'],
+                ['group' => 'controlled_counts', 'key' => 'weekly_anchor', 'from' => 'off', 'value' => '{"day":4,"time":"09:00"}'],
+            ]]);
+            $this->fail('A publication audit failure must roll back the complete weekly policy.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Injected weekly publication audit failure.', $exception->getMessage());
+        }
+        $this->assertDatabaseMissing('app_settings', ['key' => ControlledPolicy::COUNT_CADENCE]);
+        $this->assertDatabaseMissing('app_settings', ['key' => ControlledPolicy::COUNT_WEEKLY_ANCHOR]);
+        $this->assertDatabaseCount('medication_setting_changes', 0);
+        $this->assertDatabaseCount('audit_logs', $auditBefore);
+        $this->assertDatabaseCount('medication_events', 0);
+    }
+
+    public function test_configured_count_scheduler_checks_deadlines_every_five_minutes_without_overlap(): void
+    {
+        $this->artisan('schedule:list')->assertExitCode(0);
+        $events = collect(app(Schedule::class)->events())->filter(fn ($event): bool => str_contains($event->command ?? '', 'emar:escalate-overdue-cd-checks'));
+        $this->assertCount(1, $events);
+        $event = $events->sole();
+        $this->assertSame('*/5 * * * *', $event->expression);
+        $this->assertSame('Pacific/Auckland', $event->timezone);
+        $this->assertTrue($event->withoutOverlapping);
+        $this->assertTrue($event->onOneServer);
+    }
+
+    private function seedWeeklyPolicy(string $anchor): void
+    {
+        foreach ([ControlledPolicy::COUNT_CADENCE => 'week', ControlledPolicy::COUNT_WEEKLY_ANCHOR => $anchor] as $key => $value) {
+            AppSetting::updateOrCreate(['key' => $key], ['value' => $value]);
+        }
+        DB::table('app_settings')->whereIn('key', [ControlledPolicy::COUNT_CADENCE, ControlledPolicy::COUNT_WEEKLY_ANCHOR])->update(['created_at' => now()->subDay(), 'updated_at' => now()->subDay()]);
+        DB::table('client_medications')->where('id', $this->medication->id)->update(['created_at' => now()->subDay()]);
     }
 
     public function test_class_review_of_ceased_order_changes_only_register_classification(): void

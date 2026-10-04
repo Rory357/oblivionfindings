@@ -2,15 +2,27 @@
  * draft and Review changes; no independent save transport or policy inference
  * from live medicine data. Main supplies visible houses and server-authorised
  * editable house IDs, and wires this fragment into the shared Settings page. */
+import { TimePicker } from '@/components/fleet-assets/maintenance/time-picker';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { Field } from '@/components/wizard/primitives';
 import { ClipboardCheck, FlaskConical, Users } from 'lucide-react';
 import { useSettings } from './_context';
 import {
+    format,
     isDirty,
     isSiteDirty,
+    parseWeeklyAnchor,
     savedValue,
     siteDraftValue,
     siteSlot,
+    weeklyAnchorError,
     withDraft,
 } from './_model';
 import { NoMatches, useRow } from './_sections';
@@ -85,6 +97,19 @@ export function ControlledProductSettings({
     const destruction = useRow(DESTRUCTION);
     const organisationRequired = witness.value('organisation') !== 'off';
     const cadence = counts.value('cadence');
+    const anchorDefinition = s.definitions[COUNTS]?.weekly_anchor;
+    const anchor = parseWeeklyAnchor(counts.value('weekly_anchor')) ?? {
+        day: null,
+        time: '',
+    };
+    const anchorError = errors[`${COUNTS}.weekly_anchor`];
+    const incompleteAnchor =
+        !!anchorDefinition &&
+        !!weeklyAnchorError(anchorDefinition, counts.value('weekly_anchor'));
+    const editAnchor = (patch: Partial<typeof anchor>) => {
+        counts.edit('weekly_anchor', JSON.stringify({ ...anchor, ...patch }));
+        clearError(`${COUNTS}.weekly_anchor`);
+    };
     const cadenceDirty = isDirty(s, draft, COUNTS, 'cadence');
     const cadenceState: RowState =
         !cadenceDirty && savedValue(s, COUNTS, 'cadence') === ''
@@ -246,7 +271,7 @@ export function ControlledProductSettings({
                     id="controlled-counts"
                     icon={ClipboardCheck}
                     title="Counts"
-                    caption="The count follows each house’s roster changes"
+                    caption="Choose the count schedule and when an unfinished count becomes overdue"
                 >
                     {s.definitions[COUNTS]?.cadence ? (
                         <GroupRow
@@ -256,11 +281,14 @@ export function ControlledProductSettings({
                                 cadence === ''
                                     ? 'Recommended: Every shift change. Choose a cadence and review the change before counts show as due.'
                                     : cadence === 'week'
-                                      ? 'Weekly due dates and overdue reminders are not available. Choose an available roster cadence to receive count reminders.'
+                                      ? 'Choose the weekly day and time below. Counts show as due 30 minutes before that time and always need a witness.'
                                       : 'Due 30 minutes before the shift change. Counts always need a witness.'
                             }
                             state={cadenceState}
-                            error={errors[`${COUNTS}.cadence`]}
+                            error={
+                                errors[`${COUNTS}.cadence`] ??
+                                (cadence !== 'week' ? anchorError : undefined)
+                            }
                             errorId="cd-count-cadence-error"
                             hidden={
                                 !counts.shown(
@@ -279,21 +307,131 @@ export function ControlledProductSettings({
                                 disabled={counts.disabled || readOnlyAudit}
                                 onChange={(value) => {
                                     counts.edit('cadence', value);
+                                    if (value !== 'week' && incompleteAnchor) {
+                                        counts.edit(
+                                            'weekly_anchor',
+                                            savedValue(
+                                                s,
+                                                COUNTS,
+                                                'weekly_anchor',
+                                            ) || 'off',
+                                        );
+                                    }
                                     clearError(`${COUNTS}.cadence`);
+                                    clearError(`${COUNTS}.weekly_anchor`);
                                 }}
                             />
-                            {cadence === 'week' ? (
+                            {cadence === 'week' && incompleteAnchor ? (
                                 <StatusBadge variant="warning" size="sm">
                                     Timing not configured
                                 </StatusBadge>
                             ) : null}
                         </GroupRow>
                     ) : null}
+                    {cadence === 'week' && anchorDefinition ? (
+                        <GroupRow
+                            id="cd-count-weekly-anchor"
+                            label="Weekly count day and time"
+                            hint="Choose the agreed count time. The same local time applies each week; no time is assumed."
+                            state={counts.state('weekly_anchor')}
+                            error={anchorError}
+                            errorId="cd-count-weekly-anchor-error"
+                            hidden={
+                                !counts.shown(
+                                    show,
+                                    q,
+                                    'weekly_anchor',
+                                    'Weekly count day and time',
+                                    'Controlled drugs schedule',
+                                ) &&
+                                !anchorError &&
+                                !(cadenceDirty && incompleteAnchor)
+                            }
+                        >
+                            {counts.disabled || readOnlyAudit ? (
+                                <p className="text-[13px]">
+                                    {format(
+                                        anchorDefinition,
+                                        counts.value('weekly_anchor'),
+                                    )}
+                                </p>
+                            ) : (
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    <Field
+                                        label="Day"
+                                        htmlFor="cd-count-weekly-day"
+                                    >
+                                        <Select
+                                            value={
+                                                anchor.day == null
+                                                    ? ''
+                                                    : String(anchor.day)
+                                            }
+                                            onValueChange={(day) =>
+                                                editAnchor({ day: Number(day) })
+                                            }
+                                        >
+                                            <SelectTrigger
+                                                id="cd-count-weekly-day"
+                                                className="min-h-11"
+                                                aria-label="Weekly count day"
+                                                aria-invalid={
+                                                    !!anchorError || undefined
+                                                }
+                                                aria-describedby={
+                                                    anchorError
+                                                        ? 'cd-count-weekly-anchor-error'
+                                                        : undefined
+                                                }
+                                            >
+                                                <SelectValue placeholder="Choose day" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {(
+                                                    anchorDefinition.weekday_options ??
+                                                    []
+                                                ).map((day) => (
+                                                    <SelectItem
+                                                        key={day.value}
+                                                        value={String(
+                                                            day.value,
+                                                        )}
+                                                    >
+                                                        {day.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </Field>
+                                    <Field
+                                        label="Time"
+                                        hint={anchorDefinition.timezone}
+                                        htmlFor="cd-count-weekly-time"
+                                    >
+                                        <TimePicker
+                                            id="cd-count-weekly-time"
+                                            label="Weekly count time"
+                                            value={anchor.time}
+                                            invalid={!!anchorError}
+                                            describedBy={
+                                                anchorError
+                                                    ? 'cd-count-weekly-anchor-error'
+                                                    : undefined
+                                            }
+                                            onChange={(time) =>
+                                                editAnchor({ time })
+                                            }
+                                        />
+                                    </Field>
+                                </div>
+                            )}
+                        </GroupRow>
+                    ) : null}
                     {s.definitions[COUNTS]?.overdue_minutes ? (
                         <GroupRow
                             id="cd-count-overdue"
                             label="Counts as overdue"
-                            hint="Time after the rostered shift change. Recording a dose is never blocked by an open discrepancy."
+                            hint="Time after the scheduled count. Recording a dose is never blocked by an open discrepancy."
                             state={counts.state('overdue_minutes')}
                             error={errors[`${COUNTS}.overdue_minutes`]}
                             errorId="cd-count-overdue-error"
@@ -311,7 +449,7 @@ export function ControlledProductSettings({
                                 id="cd-count-overdue"
                                 label="Counts as overdue"
                                 value={counts.value('overdue_minutes')}
-                                unit="minutes after the shift change"
+                                unit="minutes after the scheduled count"
                                 min={
                                     s.definitions[COUNTS].overdue_minutes
                                         .range?.[0]

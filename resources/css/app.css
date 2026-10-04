@@ -1220,6 +1220,16 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
     min-width: max(44px, 2.75rem);
 }
 
+/* Keep the global phone controls usable at the smaller supported text size.
+   The narrowest layout retains Messages in the existing navigation menu. */
+@media (max-width: 767px) {
+    .frontline-app-header button,
+    .frontline-app-header a[aria-label^='Messages'] {
+        min-height: max(44px, 2.75rem);
+        min-width: max(44px, 2.75rem);
+    }
+}
+
 /* Medication dialogs opt in locally; unrelated settings and wizard forms
    retain their existing geometry. Checkboxes/radios keep their native marks. */
 .frontline-dialog :is(button, [role='combobox']),

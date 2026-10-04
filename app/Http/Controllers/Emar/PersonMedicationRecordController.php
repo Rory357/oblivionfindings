@@ -482,12 +482,19 @@ class PersonMedicationRecordController extends Controller
     /** @return array<string, mixed> */
     private function person(Client $client): array
     {
+        // Birth dates are calendar dates; completed years follow the worker's day.
+        $birthDate = $client->date_of_birth;
+        $today = Carbon::today($this->schedule->workerTimezone());
+        $age = $birthDate && $birthDate->toDateString() <= $today->toDateString()
+            ? $today->year - $birthDate->year - ($today->format('m-d') < $birthDate->format('m-d') ? 1 : 0)
+            : null;
+
         return [
             'id' => $client->id,
             'name' => trim($client->first_name.' '.$client->last_name),
             'preferred' => $client->preferred_name ?: $client->first_name,
             'initials' => mb_strtoupper(mb_substr((string) $client->first_name, 0, 1).mb_substr((string) $client->last_name, 0, 1)),
-            'age' => $client->date_of_birth?->age,
+            'age' => $age,
             'nhi' => $client->nhi_number,
             'status' => $client->status,
             'house' => $client->site?->name,

@@ -233,9 +233,10 @@ export function ControlledChecksContent({
                 </Notice>
             ) : null}
             {!payload.cadence.configured ? (
-                <Notice title="Count cadence is not configured">
+                <Notice title="Count timing is not configured">
                     No count is shown as due or overdue until the organisation
-                    sets the cadence. Counts can still be recorded any time.
+                    sets the schedule, including a day and time for weekly
+                    counts. Counts can still be recorded any time.
                 </Notice>
             ) : null}
             {activeOverrides.map((override) => (

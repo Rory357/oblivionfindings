@@ -127,8 +127,8 @@ final class ControlledProductPayload
             'as_at' => now()->toIso8601String(), 'witnesses_by_site' => $witnessRows,
             'on_site_destruction_allowed' => $this->policy->onsiteAllowed($siteId),
             'can' => ['view' => true, 'record' => $record, 'manage' => $manage, 'override' => $actor->canDo('medications.controlled.override'), 'close_loss' => $manage && $actor->hasRole('provider_manager')],
-            'cadence' => ['configured' => $this->policy->cadence() !== null, 'label' => match ($this->policy->cadence()) {
-                'shift' => 'Every shift change', 'day' => 'Once a day at the morning shift change', 'week' => 'Once a week — anchor not configured', default => 'Not configured'
+            'cadence' => ['configured' => $this->policy->cadence() !== null && ($this->policy->cadence() !== 'week' || $this->policy->weeklyAnchor() !== null), 'label' => match ($this->policy->cadence()) {
+                'shift' => 'Every shift change', 'day' => 'Once a day at the morning shift change', 'week' => $this->policy->weeklyAnchor() === null ? 'Once a week — day and time not configured' : 'Once a week — '.(new WeeklyCountAnchorCodec(config('app.worker_timezone', 'Pacific/Auckland')))->format(json_encode($this->policy->weeklyAnchor())), default => 'Not configured'
             }, 'overdue_after_minutes' => $this->policy->overdueMinutes()],
             'history_limit' => self::HISTORY_LIMIT,
             'history_has_more' => ['entries' => (clone $historyQuery)->count() > self::HISTORY_LIMIT, 'discrepancies' => (clone $discrepancyQuery)->count() > self::HISTORY_LIMIT, 'losses' => (clone $lossQuery)->count() > self::HISTORY_LIMIT, 'destructions' => (clone $destructionQuery)->count() > self::HISTORY_LIMIT, 'overrides' => (clone $overrideQuery)->count() > self::HISTORY_LIMIT],
@@ -146,8 +146,8 @@ final class ControlledProductPayload
                     'entry_version' => $latest[$m->id] ?? null, 'nz_class' => $m->nz_controlled_class, 'class_review_required' => $m->controlled_class_reviewed_at === null,
                     'can_count' => $record && in_array((int) $m->client->site_id, $presentSites, true) && $this->policy->countRequired($m),
                     'can_record' => $canRecord, 'record_reason' => $canRecord ? null : 'Record access and a clocked-in shift at this house are needed.',
-                    'count' => ['state' => $status, 'title' => match ($state['status']) {
-                        'due' => 'Due now — shift-change count', 'overdue' => 'Shift-change count overdue', 'complete' => 'Counted', 'upcoming' => 'Next shift-change count', 'schedule_unavailable' => 'Roster timing not configured', 'not_applicable' => 'No stock count required', default => 'Not configured'
+                    'count' => ['state' => $status, 'cadence' => $state['cadence'], 'next_at' => $state['next_change_at'], 'title' => match ($state['status']) {
+                        'due' => $state['cadence'] === 'week' ? 'Due now — weekly count' : 'Due now — shift-change count', 'overdue' => $state['cadence'] === 'week' ? 'Weekly count overdue' : 'Shift-change count overdue', 'complete' => 'Counted', 'upcoming' => $state['cadence'] === 'week' ? 'Next weekly count' : 'Next shift-change count', 'schedule_unavailable' => $state['cadence'] === 'week' ? 'Weekly count day and time not configured' : 'Roster timing not configured', 'not_applicable' => 'No stock count required', default => 'Not configured'
                     },
                         'due_at' => $state['due_at'], 'overdue_at' => $state['overdue_at'], 'last_at' => $count?->recorded_at?->toIso8601String(), 'last_entry_id' => $count?->id]];
             })->values(),

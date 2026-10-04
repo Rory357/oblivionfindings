@@ -24,6 +24,8 @@ class ControlledPolicy
 
     public const COUNT_CADENCE = 'medications.controlled.count_cadence';
 
+    public const COUNT_WEEKLY_ANCHOR = 'medications.controlled.count_weekly_anchor';
+
     public const COUNT_OVERDUE_MINUTES = 'medications.controlled.count_overdue_minutes';
 
     public const ONSITE_DESTRUCTION = 'medications.controlled.onsite_destruction';
@@ -113,9 +115,16 @@ class ControlledPolicy
         if ($cadence === null) {
             return $this->emptyStatus('not_configured', null, $lastCount);
         }
-        if ($siteId === null || $cadence === 'week') {
-            // The weekly weekday/anchor was never approved. Do not invent it.
+        if ($siteId === null) {
             return $this->emptyStatus('schedule_unavailable', $cadence, $lastCount);
+        }
+        if ($cadence === 'week') {
+            $notBefore = $this->weeklyPolicyEffectiveAt();
+            if ($medication->created_at !== null && ($notBefore === null || $medication->created_at->greaterThan($notBefore))) {
+                $notBefore = CarbonImmutable::instance($medication->created_at);
+            }
+
+            return $this->countStatusForWeeklyAnchor($now, $lastCount, $this->weeklyAnchor(), $this->overdueMinutes(), $this->timezone(), $notBefore);
         }
 
         $clock = CarbonImmutable::instance($now)->setTimezone($this->timezone());
@@ -144,6 +153,36 @@ class ControlledPolicy
         if ($cadence === 'week') {
             return $this->emptyStatus('schedule_unavailable', $cadence, $lastCount);
         }
+
+        return $this->evaluateCountBoundaries($cadence, $now, $lastCount, $changes, $overdueMinutes, $timezone, $notBefore);
+    }
+
+    public function weeklyAnchor(): ?array
+    {
+        return (new WeeklyCountAnchorCodec($this->timezone()))->decode($this->organisationValue(self::COUNT_WEEKLY_ANCHOR));
+    }
+
+    /** An explicit weekly wall-clock recurrence, never a roster-derived anchor. */
+    public function countStatusForWeeklyAnchor(DateTimeInterface $now, ?DateTimeInterface $lastCount, ?array $anchor, int $overdueMinutes = self::DEFAULT_OVERDUE_MINUTES, string $timezone = 'Pacific/Auckland', ?DateTimeInterface $notBefore = null): array
+    {
+        if ($anchor === null || (new WeeklyCountAnchorCodec($timezone))->decode(json_encode($anchor)) === null) {
+            return $this->emptyStatus('schedule_unavailable', 'week', $lastCount);
+        }
+        $clock = CarbonImmutable::instance($now)->setTimezone($timezone);
+        $week = $clock->startOfDay()->subDays($clock->dayOfWeekIso - 1);
+        [$hour, $minute] = array_map('intval', explode(':', $anchor['time']));
+        $changes = [];
+        // Monday's due window can start on Sunday; retain its following week too.
+        foreach ([-1, 0, 1, 2] as $offset) {
+            $changes[] = $week->addWeeks($offset)->addDays($anchor['day'] - 1)->setTime($hour, $minute);
+        }
+
+        return $this->evaluateCountBoundaries('week', $now, $lastCount, $changes, $overdueMinutes, $timezone, $notBefore);
+    }
+
+    /** @param iterable<DateTimeInterface> $changes */
+    private function evaluateCountBoundaries(string $cadence, DateTimeInterface $now, ?DateTimeInterface $lastCount, iterable $changes, int $overdueMinutes, string $timezone, ?DateTimeInterface $notBefore): array
+    {
         $clock = CarbonImmutable::instance($now)->setTimezone($timezone);
         $last = $lastCount === null ? null : CarbonImmutable::instance($lastCount)->setTimezone($timezone);
         if ($last?->greaterThan($clock)) {
@@ -223,6 +262,14 @@ class ControlledPolicy
     protected function organisationValue(string $key): mixed
     {
         return AppSetting::query()->where('key', $key)->value('value');
+    }
+
+    /** A newly reviewed weekly schedule starts at its next chosen boundary. */
+    protected function weeklyPolicyEffectiveAt(): ?CarbonImmutable
+    {
+        $at = AppSetting::query()->whereIn('key', [self::COUNT_CADENCE, self::COUNT_WEEKLY_ANCHOR])->max('updated_at');
+
+        return $at === null ? null : CarbonImmutable::parse($at, 'UTC');
     }
 
     protected function houseValue(int $siteId, string $key): mixed
