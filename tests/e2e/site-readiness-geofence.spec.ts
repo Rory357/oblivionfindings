@@ -76,6 +76,7 @@ echo json_encode(['siteId' => $site->id]);
 test('site readiness geofence flow saves a boundary and reuses the same dialog entry points', async ({
     page,
 }) => {
+    test.setTimeout(90_000);
     const { siteId } = seedSiteGeofenceFixture();
     const consoleErrors = collectConsoleErrors(page);
 
@@ -91,16 +92,75 @@ test('site readiness geofence flow saves a boundary and reuses the same dialog e
     );
 
     await page.getByTestId('readiness-fix-geofence').click();
-    await expect(page.getByTestId('site-geofence-dialog')).toBeVisible();
+    const siteBoundaries = page.getByRole('dialog', {
+        name: 'Shared boundaries · Playwright Geofence House',
+        exact: true,
+    });
+    await expect(siteBoundaries).toBeVisible();
+    await siteBoundaries
+        .getByRole('link', { name: 'Create another boundary', exact: true })
+        .click();
+    await page.waitForURL(
+        (url) =>
+            url.pathname === '/fleet-assets/geofences' &&
+            url.searchParams.get('site_id') === String(siteId) &&
+            url.searchParams.get('new') === '1',
+    );
+    const wizard = page.getByRole('dialog', {
+        name: 'Create boundary',
+        exact: true,
+    });
+    await expect(
+        wizard.getByRole('combobox', { name: 'Owning site', exact: true }),
+    ).toContainText('Playwright Geofence House');
+    await expect(wizard.getByLabel('Latitude', { exact: true })).toHaveValue(
+        '-36.8485',
+    );
+    await expect(wizard.getByLabel('Longitude', { exact: true })).toHaveValue(
+        '174.7633',
+    );
+    await wizard.getByRole('button', { name: 'Continue', exact: true }).click();
+    await wizard.getByLabel('Radius in metres', { exact: false }).fill('120');
+    await wizard
+        .getByRole('checkbox', {
+            name: 'I have verified the position, shape and radius or corners',
+        })
+        .check();
+    await wizard.getByRole('button', { name: 'Continue', exact: true }).click();
+    await wizard
+        .getByLabel('Boundary name', { exact: false })
+        .fill('Playwright House Boundary');
+    await wizard
+        .getByRole('checkbox', { name: 'Vehicles', exact: true })
+        .check();
+    await wizard
+        .getByLabel('Reason for saving', { exact: false })
+        .fill(
+            'Verified fictional site boundary for the readiness browser check.',
+        );
+    await wizard.getByRole('button', { name: 'Continue', exact: true }).click();
+    await wizard
+        .getByRole('checkbox', {
+            name: 'I reviewed the area, permitted uses and impact',
+        })
+        .check();
+    await wizard
+        .getByRole('button', { name: 'Save boundary', exact: true })
+        .click();
+    await expect(
+        page.getByRole('heading', { name: 'Boundary saved', exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText(/No new monitoring has started/)).toBeVisible();
 
-    await page
-        .getByTestId('site-geofence-dialog')
-        .locator('.leaflet-container')
-        .click({ position: { x: 56, y: 220 } });
-    await page.getByText('Geofence Van').click();
-    await page.getByTestId('site-geofence-save').click();
-
-    await expect(page.getByTestId('site-geofence-dialog')).toHaveCount(0);
+    // Site entry points now share the retained boundary library. Saving an
+    // area does not silently create a vehicle or personal monitoring rule.
+    const boundaryId = Number(
+        runLaravelPhp(
+            `echo \\App\\Models\\AssetGeofence::query()->where('site_id', ${siteId})->where('name', 'Playwright House Boundary')->sole()->id;`,
+        ),
+    );
+    expect(boundaryId).toBeGreaterThan(0);
+    await page.goto(`/sites/${siteId}`);
     await page.getByTestId('site-profile-tab-readiness').click();
     await expect(page.getByTestId('readiness-fix-geofence')).toHaveCount(0);
 
@@ -108,11 +168,24 @@ test('site readiness geofence flow saves a boundary and reuses the same dialog e
     await expect(page.getByTestId('site-map-geofence-button')).toContainText(
         'Edit Site Geofence',
     );
+    await page.getByTestId('site-map-geofence-button').click();
+    const boundaryLink = siteBoundaries.getByRole('link', {
+        name: /Playwright House Boundary/,
+    });
+    await expect(boundaryLink).toHaveAttribute(
+        'href',
+        `/fleet-assets/geofences?site_id=${siteId}&selected=${boundaryId}&tab=boundaries&edit=${boundaryId}`,
+    );
+    await siteBoundaries.press('Escape');
 
     await page.getByTestId('site-edit-location-button').click();
     await expect(page.getByTestId('location-geofence-button')).toBeEnabled();
     await page.getByTestId('location-geofence-button').click();
-    await expect(page.getByTestId('site-geofence-dialog')).toBeVisible();
+    await expect(siteBoundaries).toBeVisible();
+    await expect(boundaryLink).toHaveAttribute(
+        'href',
+        `/fleet-assets/geofences?site_id=${siteId}&selected=${boundaryId}&tab=boundaries&edit=${boundaryId}`,
+    );
 
     expectNoConsoleErrors(consoleErrors);
 });

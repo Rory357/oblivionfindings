@@ -18,6 +18,7 @@ use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Tests\TestCase;
 
@@ -110,6 +111,82 @@ class UserSiteAccessCanonicalIntegrityTest extends TestCase
             $this->assertAccessDenied(
                 fn () => $service->assertCanAccessTimesheet($viewer, $timesheet->fresh(), $bypass),
             );
+        }
+    }
+
+    public function test_timesheet_query_matches_direct_linked_worker_eligibility_even_with_broad_reader_permission(): void
+    {
+        $site = Site::factory()->create();
+        $otherSite = Site::factory()->create();
+        $viewer = $this->currentSiteUser($site, permissions: ['reports.viewAny']);
+        $client = $this->clientAt($site);
+        $primaryWorker = $this->currentSiteUser($site);
+        $secondaryWorker = $this->currentSiteUser($otherSite, profileOverrides: [
+            'secondary_site_ids' => [$site->id],
+        ]);
+        $primary = $this->timesheetFor($this->shiftAt($site, $client, $primaryWorker), $client, $primaryWorker, $site);
+        $secondary = $this->timesheetFor($this->shiftAt(null, $client, $secondaryWorker), $client, $secondaryWorker, $site);
+        $invalid = [];
+
+        foreach (['wrong_site', 'inactive', 'ended', 'not_started', 'deleted_profile', 'unapproved', 'portal_role'] as $reason) {
+            $worker = $this->currentSiteUser($site);
+            $timesheet = $this->timesheetFor($this->shiftAt($site, $client, $worker), $client, $worker, $site);
+            $profile = $worker->hrEmployeeProfile;
+            match ($reason) {
+                'wrong_site' => $profile->update(['primary_site_id' => $otherSite->id]),
+                'inactive' => $profile->update(['is_active' => false]),
+                'ended' => $profile->update(['end_date' => now()->subDay()->toDateString()]),
+                'not_started' => $profile->update(['start_date' => now()->addDay()->toDateString()]),
+                'deleted_profile' => $profile->delete(),
+                'unapproved' => $worker->forceFill(['approved_at' => null])->save(),
+                'portal_role' => $worker->forceFill(['role' => 'client'])->save(),
+            };
+            $invalid[$reason] = $timesheet;
+        }
+
+        $service = app(UserSiteAccessService::class);
+        $bypass = ['reports.viewAny'];
+        foreach ([[], $bypass] as $permissions) {
+            $query = Timesheet::query()->whereIn('id', [
+                $primary->id,
+                $secondary->id,
+                ...array_map(fn (Timesheet $timesheet): int => $timesheet->id, $invalid),
+            ])->orderBy('id');
+            $service->applyTimesheetScope($query, $viewer, $permissions);
+
+            $this->assertSame([$primary->id, $secondary->id], $query->pluck('id')->all());
+            $service->assertCanAccessTimesheet($viewer, $primary, $permissions);
+            $service->assertCanAccessTimesheet($viewer, $secondary, $permissions);
+            foreach ($invalid as $timesheet) {
+                $this->assertAccessDenied(fn () => $service->assertCanAccessTimesheet($viewer, $timesheet, $permissions));
+            }
+        }
+    }
+
+    public function test_timesheet_linked_worker_start_and_end_dates_use_the_same_nz_day_as_direct_access(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-03 12:30:00', 'UTC'));
+        $site = Site::factory()->create();
+        $viewer = $this->currentSiteUser($site, permissions: ['reports.viewAny']);
+        $client = $this->clientAt($site);
+        $currentWorker = $this->currentSiteUser($site, profileOverrides: [
+            'start_date' => '2026-10-04',
+            'end_date' => '2026-10-04',
+        ]);
+        $endedWorker = $this->currentSiteUser($site, profileOverrides: ['end_date' => '2026-10-03']);
+        $futureWorker = $this->currentSiteUser($site, profileOverrides: ['start_date' => '2026-10-05']);
+        $current = $this->timesheetFor($this->shiftAt($site, $client, $currentWorker), $client, $currentWorker, $site);
+        $ended = $this->timesheetFor($this->shiftAt($site, $client, $endedWorker), $client, $endedWorker, $site);
+        $future = $this->timesheetFor($this->shiftAt($site, $client, $futureWorker), $client, $futureWorker, $site);
+        $service = app(UserSiteAccessService::class);
+        $bypass = ['reports.viewAny'];
+        $query = Timesheet::query()->whereIn('id', [$current->id, $ended->id, $future->id]);
+        $service->applyTimesheetScope($query, $viewer, $bypass);
+
+        $this->assertSame([$current->id], $query->pluck('id')->all());
+        $service->assertCanAccessTimesheet($viewer, $current, $bypass);
+        foreach ([$ended, $future] as $timesheet) {
+            $this->assertAccessDenied(fn () => $service->assertCanAccessTimesheet($viewer, $timesheet, $bypass));
         }
     }
 

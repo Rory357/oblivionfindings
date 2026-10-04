@@ -316,8 +316,8 @@ describe('controlled mutation dialog replay contracts', () => {
             expect(outcomeSource).toContain(`status === '${status}'`);
         }
         expect(outcomeSource).toContain("setPhase('uncertain');");
-        expect(recordDoseSource).toContain(
-            'allowQueueWhenOffline: !needsPin && !body.witness_override_id',
+        expect(recordDoseSource).toMatch(
+            /allowQueueWhenOffline:\s*!needsPin\s*&&\s*!body\.witness_override_id/,
         );
         expect(recordDoseSource).not.toContain(
             'client_request_uuid: crypto.randomUUID()',

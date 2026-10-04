@@ -47,27 +47,32 @@ async function expectNoPageOverflow(page: Page) {
     expect(widths.scroll).toBeLessThanOrEqual(widths.client);
 }
 
-async function expectGroupedNavigation(page: Page) {
+async function expectInlineNavigation(page: Page, route: string) {
     const navigation = page.getByRole('group', {
         name: 'Security & Devices navigation',
     });
     await expect(navigation).toBeVisible();
 
-    for (const [group, items] of groupedNavigation) {
-        await expect(
-            navigation.getByText(group, { exact: true }),
-        ).toBeVisible();
-
+    // The shared shell keeps the group order but intentionally omits captions
+    // (APP_SHELL_STYLE_GUIDE.md, section 3).
+    for (const [, items] of groupedNavigation) {
         for (const item of items) {
             await expect(
                 navigation.getByRole('link', { name: item, exact: true }),
             ).toBeVisible();
         }
     }
+    await expect(navigation.getByRole('link')).toHaveText(
+        groupedNavigation.flatMap(([, items]) => [...items]),
+    );
+    await expect(navigation.locator(`a[href="${route}"]`)).toHaveAttribute(
+        'aria-current',
+        'page',
+    );
 }
 
-test.describe('Security & Devices grouped navigation', () => {
-    test('keeps grouped navigation inline inside the primary sidebar across every destination', async ({
+test.describe('Security & Devices inline navigation', () => {
+    test('keeps all destinations ordered in the primary sidebar with the current page marked', async ({
         page,
     }) => {
         test.setTimeout(150_000);
@@ -80,7 +85,7 @@ test.describe('Security & Devices grouped navigation', () => {
             await expect(
                 page.getByRole('heading', { name: title, level: 1 }),
             ).toBeVisible();
-            await expectGroupedNavigation(page);
+            await expectInlineNavigation(page, route);
             await expectNoPageOverflow(page);
         }
 

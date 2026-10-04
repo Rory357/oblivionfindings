@@ -54,7 +54,11 @@ test.describe('operations reports', () => {
         await page.getByRole('link', { name: /Shift Operations/i }).click();
         await expect(page).toHaveURL(/\/operations\/reports\/shifts/);
         await expect(
-            page.getByRole('heading', { name: /Shift Operations Reports/i }),
+            page.getByRole('heading', {
+                name: 'Shift operations',
+                level: 1,
+                exact: true,
+            }),
         ).toBeVisible();
         await expect(
             page.getByRole('button', { name: /Apply Filters/i }),

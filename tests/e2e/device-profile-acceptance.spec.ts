@@ -258,6 +258,8 @@ test.describe('Capability-driven device profile', () => {
         await expect(page).toHaveURL(
             new RegExp(`/it/tickets/${fixture.ticketId}$`),
         );
+        await page.getByTestId('it-ticket-group-details').click();
+        await page.getByTestId('it-ticket-tab-links').click();
 
         const deviceFromTicket = page.locator(
             `a[href$="/security-devices/devices/${fixture.deviceId}"]`,

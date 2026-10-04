@@ -22,6 +22,7 @@ export function seedTrackingWorkspaceReadinessFixtures() {
 $admin = \\App\\Models\\User::query()->where('email', 'admin@demo.test')->firstOrFail();
 $site = \\App\\Models\\Site::query()
     ->where('archived', false)
+    ->where('is_active', true)
     ->orderBy('id')
     ->firstOrFail();
 
@@ -71,33 +72,7 @@ $consentType->forceFill([
     'active' => true,
 ])->save();
 
-$upsertConsent = function ($client, string $status) use ($consentType, $admin) {
-    $consent = \\App\\Models\\ClientConsent::withTrashed()
-        ->where('client_id', $client->id)
-        ->where('consent_type_id', $consentType->id)
-        ->first();
-    if (! $consent) {
-        $consent = new \\App\\Models\\ClientConsent();
-    } elseif ($consent->trashed()) {
-        $consent->restore();
-    }
-
-    $consent->forceFill([
-        'client_id' => $client->id,
-        'consent_type_id' => $consentType->id,
-        'status' => $status,
-        'given_at' => now()->subDay(),
-        'given_by_user_id' => $admin->id,
-        'given_method' => 'written',
-        'withdrawn_at' => $status === 'withdrawn' ? now()->subHour() : null,
-        'withdrawn_by_user_id' => $status === 'withdrawn' ? $admin->id : null,
-        'expires_at' => now()->addMonth(),
-        'created_by' => $admin->id,
-        'updated_by' => $admin->id,
-    ])->save();
-
-    return $consent;
-};
+$upsertConsent = fn ($client, string $status) => app(\\Database\\Seeders\\TrackingWorkspaceE2EConsentSeeder::class)->seedConsent($client, $consentType, $admin, $status);
 
 $activeConsent = $upsertConsent($activeClient, 'given');
 $withdrawnConsent = $upsertConsent($withdrawnClient, 'withdrawn');

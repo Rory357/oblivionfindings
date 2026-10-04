@@ -11,6 +11,7 @@ use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\IncidentHandoverE2ESeeder;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
@@ -205,4 +206,81 @@ it('the seeded H&S owner has exact closure authority while the independent verif
     expect($event->refresh()->status)->toBe(HsEvent::STATUS_CLOSED)
         ->and($event->closed_by)->toBe($owner->id)
         ->and($event->closed_at)->not->toBeNull();
+});
+
+it('reseeds after a canonical synthetic medication report while preserving unrelated person evidence', function () {
+    Notification::fake();
+    Queue::fake();
+    $this->seed(RbacSeeder::class);
+    $this->seed(IncidentHandoverE2ESeeder::class);
+    $operator = User::query()->where('email', IncidentHandoverE2ESeeder::OPERATOR_EMAIL)->sole();
+    $client = Client::query()->findOrFail(IncidentHandoverE2ESeeder::CLIENT_ID);
+    $payload = [
+        'client_id' => $client->id,
+        'error_type' => 'wrong_dose',
+        'reached_client' => 'yes',
+        'harm_level' => 'moderate',
+        'occurred_at' => now('Pacific/Auckland')->format('Y-m-d\TH:i'),
+        'report_token' => (string) Str::uuid(),
+        'description' => 'Synthetic medication report before the next handover fixture reset.',
+        'immediate_action' => 'Synthetic dose withheld and prescriber contacted.',
+        'contributing_factors' => 'Synthetic fixture reset regression.',
+        'create_incident' => true,
+    ];
+    $this->actingAs($operator)->post('/emar/errors', $payload)
+        ->assertRedirect()->assertSessionHasNoErrors();
+    $error = MedicationError::query()->where('report_token', $payload['report_token'])->sole();
+    $errorId = $error->id;
+    $incidentId = $error->client_incident_id;
+    expect($incidentId)->not->toBeNull()
+        ->and(DB::table('medication_error_entries')->where('medication_error_id', $errorId)->count())->toBeGreaterThan(0)
+        ->and(DB::table('medication_error_report_receipts')->where('medication_error_id', $errorId)->count())->toBe(1);
+
+    // The clinical parent cannot be deleted while its durable evidence exists.
+    try {
+        MedicationError::withTrashed()->whereKey($errorId)->forceDelete();
+        $this->fail('The restrictive medication evidence allowed its parent to be deleted.');
+    } catch (QueryException $exception) {
+        expect($exception->errorInfo[0])->toBe('23000')
+            ->and((int) $exception->errorInfo[1])->toBe(1451);
+    }
+
+    $otherClient = Client::factory()->create(['site_id' => $client->site_id]);
+    $otherClient->supportWorkers()->attach($operator->id);
+    $otherCover = ClinicalShift::query()->where('notes', IncidentHandoverE2ESeeder::MEDICATION_SHIFT_NOTES)
+        ->sole()->replicate();
+    $otherCover->forceFill([
+        'client_id' => $otherClient->id,
+        'service_context_id' => $otherClient->service_context_id,
+        'notes' => 'Synthetic other-person cover outside the handover reset.',
+    ])->save();
+    $otherPayload = array_replace($payload, [
+        'client_id' => $otherClient->id,
+        'report_token' => (string) Str::uuid(),
+        'description' => 'Synthetic unrelated person evidence must survive the handover reset.',
+    ]);
+    $this->actingAs($operator)->post('/emar/errors', $otherPayload)
+        ->assertRedirect()->assertSessionHasNoErrors();
+    $otherError = MedicationError::query()->where('report_token', $otherPayload['report_token'])->sole();
+    $otherOriginal = $otherError->refresh()->getRawOriginal();
+    $otherEntries = DB::table('medication_error_entries')->where('medication_error_id', $otherError->id)
+        ->orderBy('id')->get()->map(fn ($row): array => (array) $row)->all();
+    $otherReceipts = DB::table('medication_error_report_receipts')->where('medication_error_id', $otherError->id)
+        ->orderBy('token')->get()->map(fn ($row): array => (array) $row)->all();
+    expect($otherEntries)->not->toBeEmpty()->and($otherReceipts)->toHaveCount(1);
+
+    $this->seed(IncidentHandoverE2ESeeder::class);
+
+    expect(MedicationError::withTrashed()->whereKey($errorId)->exists())->toBeFalse()
+        ->and(ClientIncident::query()->whereKey($incidentId)->exists())->toBeFalse()
+        ->and(DB::table('medication_error_entries')->where('medication_error_id', $errorId)->count())->toBe(0)
+        ->and(DB::table('medication_error_actions')->where('medication_error_id', $errorId)->count())->toBe(0)
+        ->and(DB::table('medication_error_report_receipts')->where('medication_error_id', $errorId)->count())->toBe(0)
+        ->and($otherError->fresh()->getRawOriginal())->toBe($otherOriginal)
+        ->and(DB::table('medication_error_entries')->where('medication_error_id', $otherError->id)
+            ->orderBy('id')->get()->map(fn ($row): array => (array) $row)->all())->toBe($otherEntries)
+        ->and(DB::table('medication_error_report_receipts')->where('medication_error_id', $otherError->id)
+            ->orderBy('token')->get()->map(fn ($row): array => (array) $row)->all())->toBe($otherReceipts)
+        ->and(Shift::query()->where('name', IncidentHandoverE2ESeeder::SHIFT_NAME)->active()->count())->toBe(1)
+        ->and(ControlRoomAlert::query()->where('context->fixture_marker', IncidentHandoverE2ESeeder::MARKER)->count())->toBe(2);
 });

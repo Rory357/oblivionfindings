@@ -66,7 +66,18 @@ test.describe('operations rostering — republish flow', () => {
         );
 
         await expect(
-            page.getByRole('heading', { name: /Publish diff/i }),
+            page.getByRole('heading', {
+                name: 'Rostering E2E House',
+                level: 1,
+                exact: true,
+            }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole('heading', {
+                name: 'All changes',
+                level: 2,
+                exact: true,
+            }),
         ).toBeVisible();
         await expect(page.getByText(/Changed/i).first()).toBeVisible();
         await expect(page.getByText(/Rostering/i).first()).toBeVisible();

@@ -682,6 +682,7 @@ class HsEventController extends Controller
         }
 
         $correctiveActionRelations = [
+            'hsEvent:id,created_by',
             'assignedTo:id,name',
             'completedBy:id,name',
             'verifiedBy:id,name',
@@ -1137,7 +1138,7 @@ class HsEventController extends Controller
 
         $query = HsCorrectiveAction::query()
             ->with([
-                'hsEvent:id,reference_number,event_category,severity,status,site_id',
+                'hsEvent:id,reference_number,event_category,severity,status,site_id,created_by',
                 'hsEvent.site:id,name',
                 'assignedTo:id,name',
                 'completedBy:id,name',

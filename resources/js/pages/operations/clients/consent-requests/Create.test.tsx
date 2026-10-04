@@ -236,4 +236,97 @@ describe('canonical consent-request evidence UI', () => {
             }),
         );
     });
+
+    it.each(['+13:00', '+12:00'])(
+        'requires and preserves the recorded repeated-hour occurrence %s',
+        (offset) => {
+            render(<ConsentRequestsCreate {...props} />);
+            fireEvent.change(
+                screen.getByTestId('consent-relationship-select'),
+                {
+                    target: { value: 'welfare_guardian' },
+                },
+            );
+            fireEvent.change(screen.getByLabelText('Assessed at (NZ time)'), {
+                target: { value: '2026-04-05T02:30' },
+            });
+            expect(screen.getByTestId('consent-request-submit')).toBeDisabled();
+            fireEvent.submit(screen.getByTestId('consent-request-create-form'));
+            expect(postMock).not.toHaveBeenCalled();
+
+            fireEvent.change(
+                screen.getByLabelText('Assessed at: which occurrence?'),
+                {
+                    target: { value: offset },
+                },
+            );
+            expect(screen.getByTestId('consent-request-submit')).toBeEnabled();
+            fireEvent.submit(screen.getByTestId('consent-request-create-form'));
+            expect(postMock).toHaveBeenLastCalledWith(
+                '/operations/clients/41/consent-requests',
+                expect.objectContaining({
+                    capacity_assessed_at: `2026-04-05T02:30:00${offset}`,
+                }),
+            );
+
+            fireEvent.change(screen.getByLabelText('Assessed at (NZ time)'), {
+                target: { value: '2026-04-05T02:45' },
+            });
+            expect(
+                screen.getByLabelText('Assessed at: which occurrence?'),
+            ).toHaveValue('');
+            expect(screen.getByTestId('consent-request-submit')).toBeDisabled();
+        },
+    );
+
+    it('blocks nonexistent NZ times and resolves each assessment timestamp independently', () => {
+        render(<ConsentRequestsCreate {...props} />);
+        fireEvent.change(screen.getByTestId('consent-relationship-select'), {
+            target: { value: 'welfare_guardian' },
+        });
+        fireEvent.change(screen.getByLabelText('Assessed at (NZ time)'), {
+            target: { value: '2026-09-27T02:30' },
+        });
+        expect(screen.getByRole('alert')).toHaveTextContent('does not exist');
+        expect(screen.getByTestId('consent-request-submit')).toBeDisabled();
+        fireEvent.submit(screen.getByTestId('consent-request-create-form'));
+        expect(postMock).not.toHaveBeenCalled();
+
+        fireEvent.change(screen.getByLabelText('Assessed at (NZ time)'), {
+            target: { value: '2026-09-27T03:30' },
+        });
+        fireEvent.change(
+            screen.getByLabelText('Assessment expires at (NZ time)'),
+            {
+                target: { value: '2027-04-04T02:30' },
+            },
+        );
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+        expect(screen.getByTestId('consent-request-submit')).toBeDisabled();
+        fireEvent.change(
+            screen.getByLabelText('Assessment expires at: which occurrence?'),
+            {
+                target: { value: '+12:00' },
+            },
+        );
+        fireEvent.submit(screen.getByTestId('consent-request-create-form'));
+        expect(postMock).toHaveBeenLastCalledWith(
+            '/operations/clients/41/consent-requests',
+            expect.objectContaining({
+                capacity_assessed_at: '2026-09-27T03:30',
+                capacity_assessment_expires_at: '2027-04-04T02:30:00+12:00',
+            }),
+        );
+        fireEvent.change(screen.getByTestId('consent-relationship-select'), {
+            target: { value: 'next_of_kin' },
+        });
+        fireEvent.submit(screen.getByTestId('consent-request-create-form'));
+        expect(postMock).toHaveBeenLastCalledWith(
+            '/operations/clients/41/consent-requests',
+            expect.objectContaining({
+                capacity_assessed_at: '',
+                capacity_assessment_expires_at: '',
+            }),
+        );
+    });
 });

@@ -2256,6 +2256,7 @@ class IncidentControllerTest extends TestCase
 
     public function test_review_changes_status_to_reviewed(): void
     {
+        $this->assignCoordinatorToPrimarySite();
         $this->mockNotificationService();
 
         $incident = ClientIncident::factory()->submitted()->create([
@@ -2267,7 +2268,9 @@ class IncidentControllerTest extends TestCase
             ->post("/incidents/{$incident->id}/review", [
                 'review_notes' => 'Reviewed and noted.',
             ])
-            ->assertRedirect();
+            ->assertRedirect()
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success', 'Incident reviewed.');
 
         $incident->refresh();
         $this->assertEquals('reviewed', $incident->status);
@@ -2278,6 +2281,7 @@ class IncidentControllerTest extends TestCase
 
     public function test_review_rolls_back_incident_and_journey_mutations_when_synchronous_verification_fails(): void
     {
+        $this->assignCoordinatorToPrimarySite();
         $incident = ClientIncident::factory()->submitted()->create([
             'client_id' => $this->client->id,
             'site_id' => $this->site->id,
@@ -2326,6 +2330,7 @@ class IncidentControllerTest extends TestCase
 
     public function test_review_sends_notification(): void
     {
+        $this->assignCoordinatorToPrimarySite();
         $mock = $this->mockNotificationService();
         $mock->shouldReceive('notifyCrud')->once()->andReturnNull();
 
@@ -2336,7 +2341,9 @@ class IncidentControllerTest extends TestCase
 
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$incident->id}/review")
-            ->assertRedirect();
+            ->assertRedirect()
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success', 'Incident reviewed.');
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -2610,6 +2617,7 @@ class IncidentControllerTest extends TestCase
 
     public function test_close_requires_closed_outcome(): void
     {
+        $this->assignCoordinatorToPrimarySite();
         $incident = ClientIncident::factory()->reviewed()->create([
             'client_id' => $this->client->id,
             'site_id' => $this->site->id,
@@ -3968,6 +3976,7 @@ class IncidentControllerTest extends TestCase
 
     public function test_review_preserves_existing_review_notes_when_not_provided(): void
     {
+        $this->assignCoordinatorToPrimarySite();
         $this->mockNotificationService();
 
         $incident = ClientIncident::factory()->submitted()->create([
@@ -3978,7 +3987,9 @@ class IncidentControllerTest extends TestCase
 
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$incident->id}/review")
-            ->assertRedirect();
+            ->assertRedirect()
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success', 'Incident reviewed.');
 
         $incident->refresh();
         $this->assertEquals('reviewed', $incident->status);

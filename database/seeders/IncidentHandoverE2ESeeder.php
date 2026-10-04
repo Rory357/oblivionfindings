@@ -16,6 +16,7 @@ use App\Models\Site;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 final class IncidentHandoverE2ESeeder extends Seeder
@@ -351,10 +352,21 @@ final class IncidentHandoverE2ESeeder extends Seeder
 
     private function clearPriorJourneys(Client $client): void
     {
-        MedicationError::withTrashed()->where('client_id', $client->id)->forceDelete();
-        ControlRoomAlert::query()->where('client_id', $client->id)->delete();
-        HsEvent::withTrashed()->where('client_id', $client->id)->get()->each->forceDelete();
-        ClientIncident::query()->where('client_id', $client->id)->delete();
+        DB::transaction(function () use ($client): void {
+            $errorIds = MedicationError::withTrashed()
+                ->where('client_id', $client->id)
+                ->pluck('id');
+
+            // Restrictive clinical evidence remains protected. This synthetic
+            // reset removes only dependencies of this fixture person's errors.
+            DB::table('medication_error_report_receipts')->whereIn('medication_error_id', $errorIds)->delete();
+            DB::table('medication_error_actions')->whereIn('medication_error_id', $errorIds)->delete();
+            DB::table('medication_error_entries')->whereIn('medication_error_id', $errorIds)->delete();
+            MedicationError::withTrashed()->where('client_id', $client->id)->forceDelete();
+            ControlRoomAlert::query()->where('client_id', $client->id)->delete();
+            HsEvent::withTrashed()->where('client_id', $client->id)->get()->each->forceDelete();
+            ClientIncident::query()->where('client_id', $client->id)->delete();
+        });
     }
 
     /** @return array{id: int, email: string, name: string} */

@@ -155,13 +155,23 @@ async function openGuidedRound(page: Page) {
 
 async function recordCurrentRoundItem(
     page: Page,
+    medicine: string,
     action: 'given' | 'refused' | 'held',
     reason?: string,
-    offline = false,
+    queueOffline?: () => Promise<void>,
 ) {
     const start = page.getByRole('button', { name: /^(Start|Resume) round$/ });
     if (await start.isVisible()) await start.click();
-    await page.getByRole('button', { name: /^Record next:/ }).click();
+    const next = page
+        .getByRole('button', { name: /^Record next:/ })
+        .filter({ hasText: medicine });
+    await expect(next).toBeEnabled();
+    await next.click();
+    await expect(
+        page
+            .getByRole('dialog', { name: /Record dose/ })
+            .getByRole('region', { name: 'Medicine', exact: true }),
+    ).toContainText(medicine);
     await page.getByRole('button', { name: /^Continue/ }).click();
     await page
         .getByRole('button', {
@@ -193,12 +203,15 @@ async function recordCurrentRoundItem(
         }
     }
     if (reason)
-        await page.getByLabel('What happened', { exact: true }).fill(reason);
+        await page
+            .getByLabel('What happened (optional)', { exact: true })
+            .fill(reason);
     await page.getByRole('button', { name: /^Continue/ }).click();
+    if (queueOffline) await queueOffline();
     await page
         .getByRole('button', { name: 'Record outcome', exact: true })
         .click();
-    if (!offline)
+    if (!queueOffline)
         await page.getByRole('button', { name: 'Done', exact: true }).click();
 }
 
@@ -381,13 +394,23 @@ test.describe('meds readiness workflows', () => {
         await expect(
             page.getByText('PW Meds Morning Tablets').first(),
         ).toBeVisible();
-        await recordCurrentRoundItem(page, 'given');
+        await recordCurrentRoundItem(page, 'PW Meds Morning Tablets', 'given');
 
         await expect(page.getByText('PW Meds Vitamin D').first()).toBeVisible();
-        await recordCurrentRoundItem(page, 'refused', 'Client declined.');
+        await recordCurrentRoundItem(
+            page,
+            'PW Meds Vitamin D',
+            'refused',
+            'Client declined.',
+        );
 
         await expect(page.getByText('PW Meds Eye Drops').first()).toBeVisible();
-        await recordCurrentRoundItem(page, 'held', 'Held pending review.');
+        await recordCurrentRoundItem(
+            page,
+            'PW Meds Eye Drops',
+            'held',
+            'Held pending review.',
+        );
 
         await expect(
             page.getByRole('button', { name: /Finish round/i }),
@@ -401,7 +424,64 @@ test.describe('meds readiness workflows', () => {
         expectNoUnexpectedConsoleErrors(consoleErrors);
     });
 
-    test('guided round queued item syncs after reconnect', async ({
+    test('guided round keeps a new dose blocked offline until its own safety information loads', async ({
+        page,
+        context,
+    }) => {
+        const consoleErrors = collectConsoleErrors(page);
+        await openGuidedRound(page);
+        await page
+            .getByRole('button', { name: 'Start round', exact: true })
+            .click();
+        const recordNext = page.getByRole('button', { name: /^Record next:/ });
+        await expect(recordNext).toBeEnabled();
+        await context.setOffline(true);
+        await recordNext.click();
+
+        const doseDialog = page.getByRole('dialog', {
+            name: 'Record dose',
+            exact: true,
+        });
+        await expect(
+            doseDialog.getByText('Couldn’t load this dose', { exact: true }),
+        ).toBeVisible();
+        await expect(
+            doseDialog.getByText('Try again, or use the printed MAR.', {
+                exact: true,
+            }),
+        ).toBeVisible();
+        await expect(
+            doseDialog.getByRole('button', { name: /^Continue/ }),
+        ).toHaveCount(0);
+        await expect(
+            doseDialog.getByRole('button', {
+                name: 'Record outcome',
+                exact: true,
+            }),
+        ).toHaveCount(0);
+
+        await context.setOffline(false);
+        await doseDialog
+            .getByRole('button', { name: 'Try again', exact: true })
+            .click();
+        const readyDialog = page.getByRole('dialog', { name: /Record dose/ });
+        await expect(
+            readyDialog.getByText('Step 1 of 3 · Safety checks', {
+                exact: true,
+            }),
+        ).toBeVisible();
+        await expect(
+            readyDialog.getByRole('region', { name: 'Medicine', exact: true }),
+        ).toContainText('PW Meds Morning Tablets');
+        await page.keyboard.press('Escape');
+        await page.reload();
+        await expect(
+            page.getByText('0 of 3 recorded', { exact: false }),
+        ).toBeVisible();
+        expectNoUnexpectedConsoleErrors(consoleErrors);
+    });
+
+    test('guided round prepared dose queues when the connection drops and syncs after reconnect', async ({
         page,
         context,
     }) => {
@@ -412,16 +492,29 @@ test.describe('meds readiness workflows', () => {
         await expect(
             page.getByText('PW Meds Morning Tablets').first(),
         ).toBeVisible();
-        await recordCurrentRoundItem(page, 'given');
+        await recordCurrentRoundItem(page, 'PW Meds Morning Tablets', 'given');
 
         await expect(page.getByText('PW Meds Vitamin D').first()).toBeVisible();
-        await context.setOffline(true);
-        await expect(page.getByRole('status')).toHaveText(/offline/i);
-
-        await recordCurrentRoundItem(page, 'given', undefined, true);
-        await expect(page.getByRole('status')).toHaveText(
-            /1 item will send|1 item waiting/i,
+        // Fetch and review this exact dose's requirements while connected.
+        // A different dose's earlier safety check cannot authorise this one.
+        await recordCurrentRoundItem(
+            page,
+            'PW Meds Vitamin D',
+            'given',
+            undefined,
+            async () => {
+                await context.setOffline(true);
+                await expect(page.getByRole('status')).toHaveText(/offline/i);
+            },
         );
+        await expect(
+            page
+                .getByRole('status')
+                .filter({ hasText: /1 item will send|1 item waiting/i }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole('button', { name: /^Record next:/ }),
+        ).toBeDisabled();
 
         await context.setOffline(false);
         await page.evaluate(() => window.dispatchEvent(new Event('online')));

@@ -356,7 +356,19 @@ test.describe('IT & Support end-to-end acceptance', () => {
             .fill(
                 'A support worker needs approved connectivity at the managed site.',
             );
+        await dialog
+            .getByRole('button', { name: 'Continue', exact: true })
+            .click();
+        await expect(dialog).toContainText(
+            'A support worker needs approved connectivity at the managed site.',
+        );
         await dialog.getByRole('button', { name: 'Submit request' }).click();
+        await expect(
+            dialog.getByRole('heading', { name: 'Request saved', exact: true }),
+        ).toBeVisible();
+        await dialog
+            .getByRole('button', { name: 'Back to IT & Support', exact: true })
+            .click();
         await expect(dialog).toBeHidden();
 
         await page.goto('/it?tab=my-tickets');
@@ -390,6 +402,7 @@ test.describe('IT & Support end-to-end acceptance', () => {
         await expect(
             page.getByText(
                 'Internal technician diagnostic: do not expose to requester.',
+                { exact: true },
             ),
         ).toHaveCount(0);
         await expectNoPageOverflow(page);
@@ -416,6 +429,7 @@ test.describe('IT & Support end-to-end acceptance', () => {
         await expect(
             page.getByText(
                 'Internal technician diagnostic: do not expose to requester.',
+                { exact: true },
             ),
         ).toBeVisible();
 

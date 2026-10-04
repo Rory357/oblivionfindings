@@ -4,38 +4,43 @@ import {
     collectConsoleErrors,
     expectNoConsoleErrors,
     gotoMyDay,
-    loginAsFrontlineDemoWorker,
+    loginAs,
+    runLaravelPhp,
 } from './helpers';
 
-/**
- * Tomorrow card — the seeded demo worker has a shift starting tomorrow at
- * 07:30. The TomorrowPanel renders the briefing bullets + next client name.
- *
- * If the seeded shift has already started by the time the test runs, the
- * page swaps into the active-shift hero — both branches are valid pre-shift
- * UX so we accept either.
- */
 test.describe('pre-shift briefing card', () => {
-    test('renders the Tomorrow panel for the demo worker', async ({ page }) => {
+    test('worker can open the exact next-shift briefing from My shift', async ({
+        page,
+    }) => {
         const consoleErrors = collectConsoleErrors(page);
+        const fixture = JSON.parse(
+            runLaravelPhp(`
+echo json_encode(app(\\Database\\Seeders\\MyDayPreShiftBriefingE2ESeeder::class)->seedFixture(), JSON_THROW_ON_ERROR);
+`),
+        ) as {
+            workerEmail: string;
+            personName: string;
+            siteName: string;
+            notes: string;
+        };
 
-        await loginAsFrontlineDemoWorker(page);
+        await loginAs(page, fixture.workerEmail, 'password');
         await gotoMyDay(page);
-
-        // Either the Tomorrow panel renders (no active shift yet) OR the
-        // active-shift hero renders (the seeded shift has started).
-        await expect(
-            page
-                .locator(
-                    '[data-test="my-day-tomorrow"], [data-test="my-day-whats-next"]',
-                )
-                .first(),
-        ).toBeVisible();
-
-        // The hero shows the worker name in the description regardless.
-        await expect(
-            page.getByText(/Kia ora/i).first(),
-        ).toBeVisible();
+        const shiftTab = page
+            .getByRole('tablist', { name: 'My Day views' })
+            .getByRole('tab', { name: 'My shift', exact: true });
+        await shiftTab.click();
+        await expect(shiftTab).toHaveAttribute('aria-selected', 'true');
+        const briefing = page.getByTestId('my-day-tomorrow');
+        await expect(briefing).toBeVisible();
+        await expect(briefing).toContainText('Next shift');
+        await expect(briefing).toContainText(fixture.personName);
+        await expect(briefing).toContainText(fixture.siteName);
+        await expect(briefing).toContainText(fixture.notes);
+        await expect(briefing.getByRole('link')).toHaveAttribute(
+            'href',
+            '/my-roster',
+        );
 
         expectNoConsoleErrors(consoleErrors);
     });

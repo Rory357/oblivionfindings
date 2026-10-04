@@ -83,12 +83,16 @@ test.describe('canonical client profile care readiness', () => {
         const profileUrl = new URL(page.url());
         await page.goto(`${profileUrl.pathname}?tab=risk_management`);
 
-        await expect(page.getByText('Active risks')).toBeVisible();
+        const riskPanel = page.getByRole('tabpanel', {
+            name: 'Risk Management',
+        });
+        await expect(riskPanel).toBeVisible();
+        await expect(riskPanel.getByText('Active risks')).toBeVisible();
         await expect(
-            page.getByText('PW Meds active mobility risk'),
+            riskPanel.getByText('PW Meds active mobility risk'),
         ).toBeVisible();
         await expect(
-            page.getByText('Use two-person support for transfers.'),
+            riskPanel.getByText('Use two-person support for transfers.'),
         ).toBeVisible();
 
         expectNoUnexpectedConsoleErrors(consoleErrors);

@@ -87,6 +87,8 @@ export default function Show({ run, suggestions }: Props) {
     const { t } = useI18n();
     const isGenerating = run.status === 'pending' || run.status === 'running';
     const canApply = !run.is_expired && run.status === 'completed';
+    const hasAccepted = suggestions.some((item) => item.status === 'accepted');
+    const [processing, setProcessing] = useState(false);
 
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
@@ -148,10 +150,12 @@ export default function Show({ run, suggestions }: Props) {
     );
 
     const applyAccepted = () => {
+        if (!canApply || !hasAccepted || processing) return;
+        setProcessing(true);
         router.post(
             `/operations/rostering/suggestions/${run.id}/apply-accepted`,
             {},
-            { preserveScroll: true },
+            { preserveScroll: true, onFinish: () => setProcessing(false) },
         );
     };
 
@@ -159,10 +163,12 @@ export default function Show({ run, suggestions }: Props) {
         suggestion: Suggestion,
         action: 'accept' | 'dismiss' | 'apply',
     ) => {
+        if (!canApply || processing) return;
+        setProcessing(true);
         router.post(
             `/operations/rostering/suggestions/${suggestion.id}/${action}`,
             {},
-            { preserveScroll: true },
+            { preserveScroll: true, onFinish: () => setProcessing(false) },
         );
     };
 
@@ -213,7 +219,7 @@ export default function Show({ run, suggestions }: Props) {
                     />
                     <PageHeaderPrimaryButton
                         icon={Send}
-                        disabled={!canApply}
+                        disabled={!canApply || !hasAccepted || processing}
                         className="disabled:pointer-events-none disabled:opacity-50"
                         onClick={applyAccepted}
                         data-test="suggestions-apply-accepted"
@@ -381,6 +387,10 @@ export default function Show({ run, suggestions }: Props) {
                                                 (suggestion) => (
                                                     <div
                                                         key={suggestion.id}
+                                                        data-test="suggestion-row"
+                                                        data-status={
+                                                            suggestion.status
+                                                        }
                                                         className="flex flex-col gap-3 rounded-md border p-3 md:flex-row md:items-center md:justify-between"
                                                     >
                                                         <div className="space-y-1">
@@ -479,7 +489,8 @@ export default function Show({ run, suggestions }: Props) {
                                                                 size="sm"
                                                                 variant="outline"
                                                                 disabled={
-                                                                    !canApply
+                                                                    !canApply ||
+                                                                    processing
                                                                 }
                                                                 onClick={() =>
                                                                     postSuggestion(
@@ -499,7 +510,8 @@ export default function Show({ run, suggestions }: Props) {
                                                                 size="sm"
                                                                 variant="outline"
                                                                 disabled={
-                                                                    !canApply
+                                                                    !canApply ||
+                                                                    processing
                                                                 }
                                                                 onClick={() =>
                                                                     postSuggestion(
@@ -517,7 +529,8 @@ export default function Show({ run, suggestions }: Props) {
                                                             <Button
                                                                 size="sm"
                                                                 disabled={
-                                                                    !canApply
+                                                                    !canApply ||
+                                                                    processing
                                                                 }
                                                                 onClick={() =>
                                                                     postSuggestion(

@@ -336,7 +336,7 @@ function SignalRuleDialog({
 
     return (
         <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-            <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto sm:max-h-[85vh] [&>[data-slot=dialog-close]]:inline-flex [&>[data-slot=dialog-close]]:min-h-11 [&>[data-slot=dialog-close]]:min-w-11 [&>[data-slot=dialog-close]]:items-center [&>[data-slot=dialog-close]]:justify-center">
+            <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto sm:max-h-[85vh] [&>[data-slot=dialog-close]]:inline-flex [&>[data-slot=dialog-close]]:min-h-[44px] [&>[data-slot=dialog-close]]:min-w-[44px] [&>[data-slot=dialog-close]]:items-center [&>[data-slot=dialog-close]]:justify-center">
                 <DialogHeader>
                     <DialogTitle>
                         {isEdit ? 'Edit Signal Rule' : 'Create Signal Rule'}
@@ -731,7 +731,7 @@ function TriageQueueDialog({
 
     return (
         <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-            <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto sm:max-h-[85vh] [&>[data-slot=dialog-close]]:inline-flex [&>[data-slot=dialog-close]]:min-h-11 [&>[data-slot=dialog-close]]:min-w-11 [&>[data-slot=dialog-close]]:items-center [&>[data-slot=dialog-close]]:justify-center">
+            <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto sm:max-h-[85vh] [&>[data-slot=dialog-close]]:inline-flex [&>[data-slot=dialog-close]]:min-h-[44px] [&>[data-slot=dialog-close]]:min-w-[44px] [&>[data-slot=dialog-close]]:items-center [&>[data-slot=dialog-close]]:justify-center">
                 <DialogHeader>
                     <DialogTitle>
                         {isEdit ? 'Edit Triage Queue' : 'Create Triage Queue'}
@@ -1038,7 +1038,7 @@ function MaintenanceWindowDialog({
 
     return (
         <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-            <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto sm:max-h-[85vh] [&>[data-slot=dialog-close]]:inline-flex [&>[data-slot=dialog-close]]:min-h-11 [&>[data-slot=dialog-close]]:min-w-11 [&>[data-slot=dialog-close]]:items-center [&>[data-slot=dialog-close]]:justify-center">
+            <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto sm:max-h-[85vh] [&>[data-slot=dialog-close]]:inline-flex [&>[data-slot=dialog-close]]:min-h-[44px] [&>[data-slot=dialog-close]]:min-w-[44px] [&>[data-slot=dialog-close]]:items-center [&>[data-slot=dialog-close]]:justify-center">
                 <DialogHeader>
                     <DialogTitle>
                         {isEdit
@@ -1225,7 +1225,7 @@ function DeleteConfirmDialog({
 }) {
     return (
         <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-            <DialogContent className="w-[calc(100vw-1rem)] max-w-sm [&>[data-slot=dialog-close]]:inline-flex [&>[data-slot=dialog-close]]:min-h-11 [&>[data-slot=dialog-close]]:min-w-11 [&>[data-slot=dialog-close]]:items-center [&>[data-slot=dialog-close]]:justify-center">
+            <DialogContent className="w-[calc(100vw-1rem)] max-w-sm [&>[data-slot=dialog-close]]:inline-flex [&>[data-slot=dialog-close]]:min-h-[44px] [&>[data-slot=dialog-close]]:min-w-[44px] [&>[data-slot=dialog-close]]:items-center [&>[data-slot=dialog-close]]:justify-center">
                 <DialogHeader>
                     <DialogTitle>{title}</DialogTitle>
                     <DialogDescription>{description}</DialogDescription>
@@ -2348,7 +2348,7 @@ export default function ControlRoomSettings({
                             open={optionDialogOpen}
                             onOpenChange={setOptionDialogOpen}
                         >
-                            <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto sm:max-h-[85vh] [&>[data-slot=dialog-close]]:inline-flex [&>[data-slot=dialog-close]]:min-h-11 [&>[data-slot=dialog-close]]:min-w-11 [&>[data-slot=dialog-close]]:items-center [&>[data-slot=dialog-close]]:justify-center">
+                            <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-y-auto sm:max-h-[85vh] [&>[data-slot=dialog-close]]:inline-flex [&>[data-slot=dialog-close]]:min-h-[44px] [&>[data-slot=dialog-close]]:min-w-[44px] [&>[data-slot=dialog-close]]:items-center [&>[data-slot=dialog-close]]:justify-center">
                                 <DialogHeader>
                                     <DialogTitle>Add Option</DialogTitle>
                                     <DialogDescription>

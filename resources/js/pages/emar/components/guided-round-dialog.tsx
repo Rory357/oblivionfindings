@@ -69,6 +69,37 @@ export default function GuidedRoundDialog({
         reoffer: boolean;
     } | null>(null);
     const [saving, setSaving] = useState(false);
+    const [refreshState, setRefreshState] = useState<
+        'idle' | 'loading' | 'failed'
+    >('idle');
+    const [queuedDose, setQueuedDose] = useState<{
+        roundId: number;
+        key: string;
+    } | null>(null);
+    const awaitingQueuedDose =
+        queuedDose?.roundId === round.id &&
+        !items.some(
+            (item) => slotKey(item) === queuedDose.key && item.administration,
+        );
+    const recordingLocked = refreshState !== 'idle' || awaitingQueuedDose;
+    const refreshRound = () => {
+        if (refreshState === 'loading') return;
+        setRefreshState('loading');
+        let loaded = false;
+        const offException = router.on('exception', () => false);
+        const offInvalid = router.on('invalid', () => false);
+        router.reload({
+            preserveScroll: true,
+            onSuccess: () => {
+                loaded = true;
+            },
+            onFinish: () => {
+                offException();
+                offInvalid();
+                setRefreshState(loaded ? 'idle' : 'failed');
+            },
+        });
+    };
     const ctx = useEntityContextMenu<RoundItem>();
     const canRecordRound = guided.can_record && signer.med_competent;
     const canCompleteRound = guided.can_complete && canRecordRound;
@@ -87,7 +118,7 @@ export default function GuidedRoundDialog({
         : next;
     const startable = round.status === 'pending' || round.status === 'partial';
     const transition = (action: 'start' | 'complete') => {
-        if (saving) return;
+        if (saving || recordingLocked) return;
         setSaving(true);
         router.post(
             action === 'start'
@@ -112,19 +143,22 @@ export default function GuidedRoundDialog({
                   {
                       label: 'Record dose',
                       icon: Pill,
-                      ...(permitted(item)
+                      ...(permitted(item) && !recordingLocked
                           ? {
                                 onClick: () =>
                                     setRecording({ item, reoffer: false }),
                             }
                           : {
-                                disabled:
-                                    'Start the round and check your recording permission.',
+                                disabled: recordingLocked
+                                    ? 'Wait for the recorded dose to reach the chart and refresh the round.'
+                                    : 'Start the round and check your recording permission.',
                             }),
                   },
               ]
             : []),
-        ...(item.administration?.status === 'refused' && permitted(item)
+        ...(item.administration?.status === 'refused' &&
+        permitted(item) &&
+        !recordingLocked
             ? [
                   {
                       label: 'Record re-offer',
@@ -136,7 +170,7 @@ export default function GuidedRoundDialog({
         {
             label: 'View dose requirements',
             icon: Eye,
-            ...(permitted(item) && !item.administration
+            ...(permitted(item) && !item.administration && !recordingLocked
                 ? { onClick: () => setRecording({ item, reoffer: false }) }
                 : {
                       disabled: item.administration
@@ -185,7 +219,7 @@ export default function GuidedRoundDialog({
                         <Button
                             className="frontline-tap"
                             onClick={() => transition('start')}
-                            disabled={saving}
+                            disabled={saving || recordingLocked}
                         >
                             <Play className="size-4" />
                             {round.status === 'partial'
@@ -195,6 +229,7 @@ export default function GuidedRoundDialog({
                     ) : next ? (
                         <Button
                             className="frontline-tap max-w-full whitespace-normal"
+                            disabled={recordingLocked}
                             onClick={() =>
                                 setRecording({ item: next, reoffer: false })
                             }
@@ -207,7 +242,7 @@ export default function GuidedRoundDialog({
                         <Button
                             className="frontline-tap"
                             onClick={() => transition('complete')}
-                            disabled={saving}
+                            disabled={saving || recordingLocked}
                         >
                             <Check className="size-4" />
                             Finish round
@@ -221,6 +256,26 @@ export default function GuidedRoundDialog({
                     )}
                 </div>
             </div>
+            {refreshState === 'loading' ? (
+                <p role="status" className="text-caption">
+                    Updating the round before the next dose…
+                </p>
+            ) : refreshState === 'failed' || awaitingQueuedDose ? (
+                <div role="status" className="space-y-2 rounded-lg border p-3">
+                    <p className="text-sm">
+                        {awaitingQueuedDose
+                            ? 'This dose is saved on this device and is waiting to reach the chart. Reconnect and check the round before recording more.'
+                            : 'The dose was recorded, but the round could not refresh. Refresh before recording more; don’t give the dose again.'}
+                    </p>
+                    <Button
+                        className="frontline-tap"
+                        variant="outline"
+                        onClick={refreshRound}
+                    >
+                        Refresh round
+                    </Button>
+                </div>
+            ) : null}
             <Progress
                 value={progress.percent}
                 aria-label="Round progress"
@@ -281,6 +336,7 @@ export default function GuidedRoundDialog({
                             {isRecordable(item) && permitted(item) && (
                                 <Button
                                     className="frontline-tap"
+                                    disabled={recordingLocked}
                                     onClick={() =>
                                         setRecording({ item, reoffer: false })
                                     }
@@ -384,6 +440,7 @@ export default function GuidedRoundDialog({
                                 isRecordable(item) && permitted(item) ? (
                                     <Button
                                         className="frontline-tap"
+                                        disabled={recordingLocked}
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             setRecording({
@@ -452,16 +509,22 @@ export default function GuidedRoundDialog({
                         role_label: signer.role_label ?? null,
                     }}
                     onRecorded={(result) => {
-                        if (result.status !== 'queued')
-                            router.reload({ preserveScroll: true });
+                        if (result.status === 'queued') {
+                            setQueuedDose({
+                                roundId: round.id,
+                                key: slotKey(recording.item),
+                            });
+                        } else {
+                            refreshRound();
+                        }
                     }}
                     nextLabel={
-                        nextAfter
+                        nextAfter && !recordingLocked
                             ? `Next due: ${nextAfter.client_name} · ${nextAfter.medication_name}`
                             : null
                     }
                     onNext={
-                        nextAfter
+                        nextAfter && !recordingLocked
                             ? () =>
                                   setRecording({
                                       item: nextAfter,

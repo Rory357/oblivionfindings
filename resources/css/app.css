@@ -115,6 +115,7 @@
     --color-live: var(--live);
     --color-live-bg: var(--live-bg);
     --color-tone-teal: var(--tone-teal);
+    --color-tone-teal-foreground: var(--tone-teal-foreground);
     --color-tone-chip-teal: var(--tone-chip-teal);
     --color-tone-chip-success: var(--tone-chip-success);
     --color-tone-chip-warning: var(--tone-chip-warning);
@@ -275,6 +276,8 @@
        0/2/3/4 reuse --primary / status tokens; teal is the cycle's own hue —
        a different job from --live, which marks in-progress states. */
     --tone-teal: oklch(45% 0.1 200);
+    /* Readable on tier-2's compounded 12% tab + 18% count tints. */
+    --tone-teal-foreground: oklch(28% 0.07 200);
     /* Solid icon-chip fills for the toned strip stay DEEP in both themes: the
        dark-theme tone tokens go light, which would sink the white glyph below
        AA contrast. Values mirror the light-theme tones — keep in sync. (The
@@ -525,6 +528,7 @@
     /* Tier-2 tone cycle — dark variant. Only the theme-aware tone flips;
        the --tone-chip-* fills intentionally keep their :root (deep) values. */
     --tone-teal: oklch(72% 0.12 200);
+    --tone-teal-foreground: oklch(92% 0.04 200);
 
     /* Category tokens — dark variants (same derivation pattern, different opacity) */
     --category-ops: var(--primary);

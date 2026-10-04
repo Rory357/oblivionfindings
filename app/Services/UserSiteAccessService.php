@@ -1920,7 +1920,7 @@ SQL;
         $userColumn = $query->qualifyColumn('user_id');
         $clientSite = "(SELECT `site_id` FROM `clients` AS `shift_client_site` WHERE `shift_client_site`.`id` = {$row}.`client_id` LIMIT 1)";
         $authoritativeSite = "COALESCE({$row}.`site_id`, {$clientSite})";
-        $today = now()->toDateString();
+        $today = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
 
         return $query
             ->where(function (Builder $siteIntegrity) use ($siteColumn) {
@@ -1961,6 +1961,13 @@ SQL;
         $authoritativeSite = "COALESCE({$directSite}, {$shiftSite}, {$clientSite})";
 
         return $query
+            // Direct access already validates current linked-worker eligibility.
+            // Reuse that Shift query boundary so invalid rows cannot appear as
+            // approvable in the Timesheet list before a durable write denies them.
+            ->where(function (Builder $shiftIntegrity) use ($query): void {
+                $shiftIntegrity->whereNull($query->qualifyColumn('shift_id'))
+                    ->orWhereHas('shift', fn (Builder $shiftQuery) => $this->applyShiftIntrinsicIntegrity($shiftQuery));
+            })
             ->whereRaw("EXISTS (SELECT 1 FROM `users` AS `ts_user` WHERE `ts_user`.`id` = {$row}.`user_id`)")
             ->whereRaw("({$row}.`shift_site_id` IS NULL OR {$row}.`site_id` IS NULL OR {$row}.`shift_site_id` = {$row}.`site_id`)")
             ->whereRaw("{$authoritativeSite} IS NOT NULL")

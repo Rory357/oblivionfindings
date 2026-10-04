@@ -1,0 +1,155 @@
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import type { ComponentProps, ReactNode } from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { Button } from '@/components/ui/button';
+import Show from './Show';
+
+const { post } = vi.hoisted(() => ({ post: vi.fn() }));
+
+vi.mock('@inertiajs/react', () => ({
+    Head: () => null,
+    router: { post, reload: vi.fn() },
+}));
+vi.mock('@/layouts/app-layout', () => ({
+    default: ({ children }: { children: ReactNode }) => children,
+}));
+vi.mock('@/lib/i18n', () => ({
+    useI18n: () => ({ t: (key: string, fallback?: string) => fallback ?? key }),
+}));
+vi.mock('@/components/page', () => {
+    const Content = ({ children }: { children?: ReactNode }) => children;
+    return {
+        PageLayout: ({
+            hero,
+            children,
+        }: {
+            hero: ReactNode;
+            children: ReactNode;
+        }) => (
+            <>
+                {hero}
+                {children}
+            </>
+        ),
+        PageHeader: ({ actions }: { actions: ReactNode }) => actions,
+        PageHeaderPrimaryButton: ({
+            children,
+            onClick,
+            disabled,
+        }: ComponentProps<'button'>) => (
+            <Button onClick={onClick} disabled={disabled}>
+                {children}
+            </Button>
+        ),
+        PageHeaderSearch: () => null,
+        PageHeaderFilterSelect: () => null,
+        PageHeaderMeterBig: Content,
+        PageHeaderMeterBlock: Content,
+        PageHeaderMeterCaption: Content,
+        PageHeaderMeterDonut: () => null,
+        PageHeaderStatusChip: Content,
+    };
+});
+
+const fixture: ComponentProps<typeof Show> = {
+    run: {
+        id: 17,
+        status: 'completed',
+        strategy: 'balanced',
+        week_start: '2026-10-05',
+        week_end: '2026-10-11',
+        site: { id: 2, name: 'Test house' },
+        requested_by: 'Fixture manager',
+        totals: { open_shifts: 1, suggested_shifts: 1, suggestion_count: 1 },
+        parameters: {},
+        expires_at: null,
+        failure_message: null,
+        is_expired: false,
+    },
+    suggestions: [
+        {
+            id: 23,
+            shift_id: 42,
+            rank: 1,
+            score: 80,
+            status: 'suggested',
+            reasons: {},
+            eligibility_snapshot: {},
+            candidate: { id: 3, name: 'Fixture worker' },
+            shift: {
+                id: 42,
+                starts_at: null,
+                ends_at: null,
+                status: 'draft',
+                client: 'Fixture person',
+                site: 'Test house',
+                service_context: null,
+                current_staff: null,
+            },
+        },
+    ],
+};
+
+function acceptedProps(): ComponentProps<typeof Show> {
+    return {
+        ...fixture,
+        suggestions: fixture.suggestions.map((item) => ({
+            ...item,
+            status: 'accepted',
+        })),
+    };
+}
+
+describe('roster suggestion save sequencing', () => {
+    beforeEach(() => post.mockClear());
+
+    it('waits for a saved acceptance before enabling the bulk apply action', () => {
+        const view = render(<Show {...fixture} />);
+        const apply = screen.getByRole('button', {
+            name: 'Apply accepted',
+        });
+        expect(apply).toBeDisabled();
+        fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
+        expect(post).toHaveBeenCalledWith(
+            '/operations/rostering/suggestions/23/accept',
+            {},
+            expect.objectContaining({ onFinish: expect.any(Function) }),
+        );
+        expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
+        view.rerender(<Show {...acceptedProps()} />);
+        expect(apply).toBeDisabled();
+        act(() => post.mock.calls[0][2].onFinish());
+        expect(apply).toBeEnabled();
+        fireEvent.click(apply);
+        fireEvent.click(apply);
+        expect(post).toHaveBeenCalledTimes(2);
+        expect(post.mock.calls[1][0]).toBe(
+            '/operations/rostering/suggestions/17/apply-accepted',
+        );
+        expect(apply).toBeDisabled();
+    });
+
+    it('unlocks retry after a failed save without treating an unsaved selection as accepted', () => {
+        render(<Show {...fixture} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
+        act(() => post.mock.calls[0][2].onFinish());
+        expect(screen.getByRole('button', { name: 'Accept' })).toBeEnabled();
+        expect(
+            screen.getByRole('button', { name: 'Apply accepted' }),
+        ).toBeDisabled();
+    });
+
+    it('keeps expired runs blocked even when an accepted suggestion exists', () => {
+        render(
+            <Show
+                {...acceptedProps()}
+                run={{ ...fixture.run, is_expired: true }}
+            />,
+        );
+        for (const name of ['Accept', 'Dismiss', 'Apply', 'Apply accepted']) {
+            expect(screen.getByRole('button', { name })).toBeDisabled();
+        }
+        expect(post).not.toHaveBeenCalled();
+    });
+});

@@ -12,6 +12,7 @@ use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\HealthSafety\HsInvestigationService;
+use App\Services\Incidents\IncidentJourneyService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -32,7 +33,7 @@ class HsInvestigationAssuranceTest extends TestCase
         $lead = $this->siteActor($site);
         $submitter = $this->siteActor($site);
         $reviewer = $this->siteActor($site);
-        $approver = $this->siteActor($site);
+        $approver = $this->siteActor($site, ['hazards.manage', 'hazards.view']);
         $forged = $this->siteActor($site);
         [$event, $investigation] = $this->underReviewInvestigation($site, $lead, $submitter);
         $path = "/health-safety/events/{$event->id}/investigations/{$investigation->id}/complete";
@@ -123,15 +124,29 @@ class HsInvestigationAssuranceTest extends TestCase
             'is_active' => false,
         ]);
 
-        foreach ([
-            [$unapproved, $unapprovedEvent, $unapprovedInvestigation],
-            [$ended, $endedEvent, $endedInvestigation],
-        ] as [$actor, $event, $investigation]) {
-            $this->actingAs($actor)
-                ->post("/health-safety/events/{$event->id}/investigations/{$investigation->id}/complete")
-                ->assertForbidden();
-            $this->assertSame(HsInvestigation::STATUS_UNDER_REVIEW, $investigation->fresh()->status);
-            $this->assertNull($investigation->fresh()->reviewed_by_id);
+        $this->actingAs($unapproved);
+        $this->assertForbiddenServiceCall(fn () => app(HsInvestigationService::class)
+            ->review($unapprovedInvestigation, $unapproved));
+        $this->post("/health-safety/events/{$unapprovedEvent->id}/investigations/{$unapprovedInvestigation->id}/complete")
+            ->assertRedirect(route('login'))
+            ->assertSessionHasErrors([
+                'email' => 'Your account access has been revoked. Contact your administrator if this is unexpected.',
+            ]);
+        $this->assertGuest();
+
+        $this->actingAs($ended);
+        $this->assertForbiddenServiceCall(fn () => app(HsInvestigationService::class)
+            ->review($endedInvestigation, $ended));
+        $this->post("/health-safety/events/{$endedEvent->id}/investigations/{$endedInvestigation->id}/complete")
+            ->assertNotFound();
+
+        foreach ([$unapprovedInvestigation, $endedInvestigation] as $investigation) {
+            $investigation->refresh();
+            $this->assertSame(HsInvestigation::STATUS_UNDER_REVIEW, $investigation->status);
+            $this->assertNull($investigation->reviewed_by_id);
+            $this->assertNull($investigation->reviewed_at);
+            $this->assertSame(0, $this->terminalAuditCount($investigation, 'healthSafety.investigation.reviewed'));
+            $this->assertSame(0, $this->terminalAuditCount($investigation, 'healthSafety.investigation.approved'));
         }
     }
 
@@ -265,15 +280,18 @@ class HsInvestigationAssuranceTest extends TestCase
         $reviewer = $this->siteActor($site);
         $approver = $this->siteActor($site);
         $client = Client::factory()->create(['site_id' => $site->id]);
-        $incident = ClientIncident::factory()->create([
+        $incident = ClientIncident::factory()->submitted()->create([
             'client_id' => $client->id,
             'site_id' => $site->id,
+            'reported_by' => $lead->id,
+            'submitted_at' => now(),
+            'type' => 'near_miss',
+            'severity' => 'medium',
             'investigation_status' => 'in_progress',
         ]);
-        $event = HsEvent::query()
-            ->where('source_type', ClientIncident::class)
-            ->where('source_id', $incident->id)
-            ->firstOrFail();
+        $event = app(IncidentJourneyService::class)->ensureForSubmittedIncident($incident, $lead)->hsEvent;
+        $this->assertInstanceOf(HsEvent::class, $event);
+        $this->assertSame($event->id, $incident->fresh()->hs_event_id);
         $event->update(['site_id' => $site->id, 'status' => HsEvent::STATUS_INVESTIGATING]);
         $incident->update(['investigation_status' => 'in_progress']);
         $investigation = $this->investigationForEvent($event, $lead, $submitter);
@@ -474,9 +492,10 @@ class HsInvestigationAssuranceTest extends TestCase
         ]);
     }
 
-    private function siteActor(Site $site): User
+    /** @param list<string> $permissionKeys */
+    private function siteActor(Site $site, array $permissionKeys = ['hazards.manage']): User
     {
-        $actor = $this->actorWithPermissions(['hazards.manage']);
+        $actor = $this->actorWithPermissions($permissionKeys);
         HrEmployeeProfile::factory()->create([
             'user_id' => $actor->id,
             'position_role' => 'coordinator',

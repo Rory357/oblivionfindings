@@ -1,5 +1,11 @@
 # eMAR implementation and verification status
 
+## Current repair pass — 5 October 2026
+
+The [linked-workflow re-audit](linked-workflow-re-audit-2026-10-05.md) supersedes the prior final-asset, secondary-tab and CI claims below. Guided rounds now prevent stale-chart next-dose recording and keep exact offline doses pending until acknowledged. Rory secondary-tab dimensions were corrected and measured in the rebuilt browser. Consent NZ-time ambiguity, roster acceptance, Timesheet scope, late-Sunday calendar counts and independent H&S verification availability were repaired. The full frontend suite passed **531 files / 3,612 tests**; TypeScript, scoped lint and the final 3m55s build passed. The browser served `app-whZi_5U1.js`; Settings fits a 320px CSS viewport. Whole-file backend results and independent disposable-schema cleanup are recorded in the current ledger.
+
+Draft PR #16 remains unmerged and undeployed. The previous pushed head's complete CI was non-green; revised acceptance journeys need a fresh full run. Remaining IT/security journeys and screenshot baselines still require verification. The explicit clinical recovery and deployment gates remain open; this checkpoint is not a production-readiness certification.
+
 ## Current repair pass — 4 October 2026
 
 The **Round privacy and final browser re-audit** section of the [completion re-audit](completion-re-audit-2026-10-04.md) now supersedes the CI and final-asset claims below. Round previews use exact canonical dose identities and viewer-scoped totals, and an earlier inaccessible round no longer hides later actionable work. The phone notification panel fits the viewport. Ceased medicines with no physical stock cannot acquire stock through a new controlled count. The latest complete remote run at `7cac7fb3398a6b6a487d7640e5d719e6d2f3ed2b` is non-green; corrected fixtures and browser checks require a new complete run. Draft PR #16 remains unmerged and undeployed.

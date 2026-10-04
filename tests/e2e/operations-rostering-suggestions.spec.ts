@@ -22,6 +22,7 @@ test.describe('operations rostering — suggestions flow', () => {
     test('manager generates, accepts, and applies roster suggestions', async ({
         page,
     }) => {
+        test.setTimeout(90_000);
         const consoleErrors = collectConsoleErrors(page);
 
         resetRosteringReadinessFixtures();
@@ -42,7 +43,12 @@ test.describe('operations rostering — suggestions flow', () => {
             },
         );
 
-        await page.getByTestId('suggestion-accept').first().click();
+        const firstSuggestion = page.getByTestId('suggestion-row').first();
+        await firstSuggestion.getByTestId('suggestion-accept').click();
+        await expect(firstSuggestion).toHaveAttribute(
+            'data-status',
+            'accepted',
+        );
         await expect(
             page.getByTestId('suggestions-apply-accepted'),
         ).toBeEnabled();
@@ -54,6 +60,9 @@ test.describe('operations rostering — suggestions flow', () => {
         await expect(
             page.getByText(/Applied \d+ accepted suggestions/i).first(),
         ).toBeVisible();
+        await expect(firstSuggestion).toHaveAttribute('data-status', 'applied');
+        await page.reload();
+        await expect(firstSuggestion).toHaveAttribute('data-status', 'applied');
 
         expectNoConsoleErrors(consoleErrors);
     });

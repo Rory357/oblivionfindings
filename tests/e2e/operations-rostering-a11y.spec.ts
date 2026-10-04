@@ -48,8 +48,22 @@ async function openPublishDiff(page: Page) {
     await page.goto(
         `${reviewUrl.pathname.replace(/\/review$/, '/diff')}${reviewUrl.search}`,
     );
+    await expect(page).toHaveURL(
+        /\/operations\/rostering\/periods\/\d+\/diff(?:\?|$)/,
+    );
     await expect(
-        page.getByRole('heading', { name: /Publish diff/i }),
+        page.getByRole('heading', {
+            name: 'Rostering E2E House',
+            level: 1,
+            exact: true,
+        }),
+    ).toBeVisible();
+    await expect(
+        page.getByRole('heading', {
+            name: 'All changes',
+            level: 2,
+            exact: true,
+        }),
     ).toBeVisible();
 }
 
@@ -67,6 +81,7 @@ test.describe('operations rostering a11y smoke', () => {
         await loginAsStaff(page);
         await page.goto('/operations/rostering?week=2026-05-04&site_id=9001');
         await expect(page.getByTestId('rostering-publish-panel')).toBeVisible();
+        await expect(page.getByRole('main')).toHaveCount(1);
 
         await expectNoBlockingAxeViolations(page);
         expectNoConsoleErrors(consoleErrors);

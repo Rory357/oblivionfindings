@@ -315,6 +315,7 @@ it('does not emit availability events for a performance-only monitor', function 
     ]);
     $monitor->profile->update(['failure_confirmations' => 1]);
     $site = assignMonitoringSite($monitor);
+    $deviceStatusBefore = $monitor->device->getRawOriginal('status');
 
     $result = app(MonitoringObservationIngestor::class)->ingest(
         $monitor,
@@ -326,8 +327,15 @@ it('does not emit availability events for a performance-only monitor', function 
 
     expect($result->stateChanged)->toBeTrue()
         ->and($monitor->fresh()->current_state)->toBe(MonitorState::Failed)
-        ->and($result->deviceEvent)->toBeNull()
-        ->and(DeviceEvent::where('device_id', $monitor->device_id)->count())->toBe(0);
+        ->and($result->deviceEvent?->event_type)->toBe('monitor_failed')
+        ->and($result->deviceEvent?->device_id)->toBe($monitor->device_id)
+        ->and($result->deviceEvent?->source)->toBe('oblivion_monitoring')
+        ->and($result->deviceEvent?->payload['monitor_id'])->toBe($monitor->id)
+        ->and($result->deviceEvent?->payload['observation_id'])->toBe($result->observation->id)
+        ->and($result->deviceEvent?->payload['site_id'])->toBe($site->id)
+        ->and(DeviceEvent::where('device_id', $monitor->device_id)->count())->toBe(1)
+        ->and(DeviceEvent::where('device_id', $monitor->device_id)->whereIn('event_type', ['online', 'offline'])->count())->toBe(0)
+        ->and($monitor->device->fresh()->getRawOriginal('status'))->toBe($deviceStatusBefore);
 });
 
 it('snapshots canonical device site and collector evidence and rejects a wrong site', function () {

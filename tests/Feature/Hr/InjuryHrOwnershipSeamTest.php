@@ -6,6 +6,7 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use App\Models\WorkplaceInjury;
+use App\Services\UserSiteAccessService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
 
@@ -46,6 +47,16 @@ beforeEach(function () {
     $this->allowedSite = Site::factory()->create(['name' => 'Injury HR Allowed Site']);
     $this->hiddenSite = Site::factory()->create(['name' => 'Injury HR Hidden Site']);
     makeInjuryEmployeeProfile($this->viewer, $this->allowedSite);
+    $this->viewer->permissionOverrides()->syncWithoutDetaching([
+        Permission::query()->where('key', 'hr.employees.viewAllSites')->firstOrFail()->id => ['allowed' => false],
+    ]);
+
+    expect($this->viewer->canDo('hr.employees.viewAny'))->toBeTrue()
+        ->and($this->viewer->canDo('hr.employees.viewAllSites'))->toBeFalse()
+        ->and(app(UserSiteAccessService::class)->accessibleSiteIds(
+            $this->viewer,
+            UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+        ))->toBe([$this->allowedSite->id]);
 });
 
 test('S4 seam: a workplace injury is H&S-owned per-employee data that HR would federate read-only', function () {

@@ -79,11 +79,15 @@ echo json_encode([
         ->value('id'),
 ], JSON_THROW_ON_ERROR);
 `).id;
-        await postLaravel(page, `/control-room/alerts/${alertId}/evidence/${packId}/items`, {
-            item_type: 'note',
-            content:
-                'Photograph logged: loose rail, wet-floor marker, and isolation tape.',
-        });
+        await postLaravel(
+            page,
+            `/control-room/alerts/${alertId}/evidence/${packId}/items`,
+            {
+                item_type: 'note',
+                content:
+                    'Photograph logged: loose rail, wet-floor marker, and isolation tape.',
+            },
+        );
         await postLaravel(page, `/control-room/alerts/${alertId}/escalate`, {
             escalation_reason:
                 'Potential serious harm requires manager and H&S attention.',
@@ -281,6 +285,9 @@ echo json_encode([
             page,
             `/health-safety/events/${eventId}/investigations/${investigationId}/complete`,
         );
+        // The independent verifier must not also create the action they will
+        // verify. The accepted event owner assigns the corrective work.
+        await loginAsFixture(page, manifest.users.owner);
         await postLaravel(
             page,
             `/health-safety/events/${eventId}/investigations/${investigationId}/recommendations/0/disposition`,
@@ -445,10 +452,19 @@ echo json_encode([
                     'Independent check confirmed both the rail and daily control are effective.',
             },
         );
+        state = readGoldenRelayState(incidentId, manifest.users.action_owner);
+        expect(state.action).toMatchObject({
+            status: 'verified',
+            verified_by_user_id: manifest.users.verifier.id,
+        });
         await postLaravel(
             page,
             `/health-safety/events/${eventId}/corrective-actions/${actionId}/close`,
         );
+        expect(
+            readGoldenRelayState(incidentId, manifest.users.action_owner).action
+                ?.status,
+        ).toBe('closed');
 
         // Outgoing operator freezes the complete bounded scope; the incoming
         // operator accepts it, resolves operations, and sees final Close blocked
@@ -543,12 +559,20 @@ echo json_encode([
             closure_summary:
                 'Investigation, recommendation, evidence, and independent verification are complete.',
         });
+        expect(
+            readGoldenRelayState(incidentId, manifest.users.action_owner).event
+                .status,
+        ).toBe('closed');
         await loginAsFixture(page, manifest.users.reviewer);
         await postLaravel(page, `/incidents/${incidentId}/close`, {
             closed_outcome: 'Reviewed journey complete',
             closed_notes:
                 'The official incident and linked governance records are complete.',
         });
+        expect(
+            readGoldenRelayState(incidentId, manifest.users.action_owner)
+                .incident.status,
+        ).toBe('closed');
         await loginAsFixture(page, manifest.users.incoming);
         await postLaravel(page, `/control-room/alerts/${alertId}/close`, {
             closure_notes:

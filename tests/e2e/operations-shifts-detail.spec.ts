@@ -25,7 +25,11 @@ test.describe('operations shifts — detail assignment flow', () => {
         );
 
         await expect(
-            page.getByRole('heading', { name: /Shifts/i }),
+            page.getByRole('heading', {
+                name: 'Shifts',
+                level: 1,
+                exact: true,
+            }),
         ).toBeVisible();
         await page.getByTestId('shift-row-9201').click();
         const quickView = page.getByRole('dialog', {

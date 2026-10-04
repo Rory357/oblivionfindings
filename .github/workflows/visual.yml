@@ -26,6 +26,11 @@ jobs:
           - chromium-desktop-visual
           - it-security-desktop-1440
           - it-security-desktop-1280
+        include:
+          - project: governance-desktop-1366
+            config: playwright.governance.config.ts
+          - project: governance-desktop-1920
+            config: playwright.governance.config.ts
 
     services:
       mysql:
@@ -116,7 +121,7 @@ jobs:
           FEATURE_ROSTERING_AUTO_SCHEDULE: true
           VISUAL_EMAIL: admin@demo.test
           VISUAL_PASSWORD: password
-        run: npx playwright test --project=${{ matrix.project }}
+        run: npx playwright test --config=${{ matrix.config || 'playwright.config.ts' }} --project=${{ matrix.project }}
 
       - name: Upload Playwright Artifacts
         if: failure()
@@ -125,4 +130,5 @@ jobs:
           name: playwright-artifacts-${{ matrix.project }}
           path: |
             playwright-report
+            playwright-report-governance
             test-results

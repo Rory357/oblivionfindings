@@ -80,6 +80,8 @@ export default defineConfig({
             testIgnore: [
                 itSecurityDesktopOnlyTestMatch,
                 legacyAppShellVisualTestMatch,
+                // These journeys require their own disposable database/server.
+                /tests[\\/]e2e[\\/]governance[\\/]/,
             ],
             use: {
                 ...devices['Desktop Chrome'],
@@ -126,4 +128,3 @@ export default defineConfig({
         timeout: 120_000,
     },
 });
-

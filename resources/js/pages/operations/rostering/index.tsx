@@ -2430,7 +2430,7 @@ export default function RosteringIndex(props: Props) {
 
             <PageLayout hero={header}>
                 <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
-                    <main className="min-w-0">
+                    <div className="min-w-0">
                         {tab === 'shifts' ? (
                             <WeekGridPane
                                 days={days}
@@ -2813,7 +2813,7 @@ export default function RosteringIndex(props: Props) {
                                 onNewRecurring={newRecurringShift}
                             />
                         ) : null}
-                    </main>
+                    </div>
                     <SignalRail signals={signals} capacity={capacityRailRows} />
                 </div>
 

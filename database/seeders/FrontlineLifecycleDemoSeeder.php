@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Services\AttendanceService;
 use App\Models\Client;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientIncident;
@@ -1152,6 +1153,16 @@ class FrontlineLifecycleDemoSeeder extends Seeder
 
     private function seedSubmittedApprovalTimesheet(User $worker, User $admin, Client $client, ServiceContext $serviceContext): void
     {
+        $existingTimesheet = Timesheet::query()
+            ->where('user_id', $worker->id)
+            ->whereHas('shift', fn ($shift) => $shift->where('notes', 'PW:submitted-approval:'.$worker->email))
+            ->first();
+        if ($existingTimesheet?->is_protected_from_changes) {
+            // A fixture reset must not undo a real approval or alter retained
+            // payroll evidence. The pending sibling fixture remains available.
+            return;
+        }
+
         $workDate = Carbon::now()->subDays($worker->email === 'sw2@demo.test' ? 3 : 4)->startOfDay();
         $startsAt = $workDate->copy()->setTime(8, 0);
         $endsAt = $workDate->copy()->setTime(16, 0);
@@ -1220,6 +1231,10 @@ class FrontlineLifecycleDemoSeeder extends Seeder
                 'coverage_roles_snapshot' => [],
             ],
         );
+
+        // Enter the canonical attendance lock path rather than fabricating the
+        // HR ledger row that current approval requires for this closed session.
+        app(AttendanceService::class)->projectTimeEntryForSession($worker, $attendance);
     }
 
     /**
