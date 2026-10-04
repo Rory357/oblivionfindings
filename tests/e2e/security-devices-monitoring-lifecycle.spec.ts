@@ -1,15 +1,15 @@
 import { expect, test } from '@playwright/test';
 
 import {
-    chooseSelectOption,
-    seedSecurityDevicesMutatingFixtures,
-} from './security-devices-mutating-fixtures';
-import {
     collectConsoleErrors,
     expectNoConsoleErrors,
     loginAsStaff,
 } from './helpers';
 import { seedNativeMonitoringRuntimeFixtures } from './native-monitoring-runtime-fixtures';
+import {
+    chooseSelectOption,
+    seedSecurityDevicesMutatingFixtures,
+} from './security-devices-mutating-fixtures';
 
 test.describe('Security & Devices native monitor lifecycle', () => {
     let fixture: ReturnType<typeof seedSecurityDevicesMutatingFixtures>;
@@ -33,7 +33,9 @@ test.describe('Security & Devices native monitor lifecycle', () => {
             page.getByRole('heading', { name: 'Monitoring', level: 1 }),
         ).toBeVisible();
 
-        await page.getByRole('button', { name: 'Create direct monitor' }).click();
+        await page
+            .getByRole('button', { name: 'Create direct monitor' })
+            .click();
         const createDialog = page.getByRole('dialog', {
             name: 'Create native direct monitor',
         });
@@ -50,29 +52,37 @@ test.describe('Security & Devices native monitor lifecycle', () => {
         );
         await page.getByLabel('Monitor name').fill(createdName);
         await page.getByLabel('Approved target').fill(fixture.monitorTarget);
-        await page.getByRole('button', { name: 'Create direct monitor' }).click();
+        await page
+            .getByRole('button', { name: 'Create direct monitor' })
+            .click();
 
         await expect(page.getByText(createdName).first()).toBeVisible({
             timeout: 30_000,
         });
 
-        const createdRow = page.locator('article, div').filter({
-            hasText: createdName,
-        }).first();
-        await createdRow.getByRole('button', { name: 'Update monitor' }).click();
+        const createdRow = page.getByRole('article', {
+            name: `Monitor ${createdName}`,
+            exact: true,
+        });
+        await createdRow
+            .getByRole('button', { name: 'Update monitor' })
+            .click();
         const updateDialog = page.getByRole('dialog', {
             name: new RegExp(`Update ${createdName}`),
         });
         await expect(updateDialog).toBeVisible();
         await page.getByLabel('Monitor name').fill(updatedName);
-        await page.getByRole('button', { name: 'Apply monitor update' }).click();
+        await page
+            .getByRole('button', { name: 'Apply monitor update' })
+            .click();
         await expect(page.getByText(updatedName).first()).toBeVisible({
             timeout: 30_000,
         });
 
-        const updatedRow = page.locator('article, div').filter({
-            hasText: updatedName,
-        }).first();
+        const updatedRow = page.getByRole('article', {
+            name: `Monitor ${updatedName}`,
+            exact: true,
+        });
         await updatedRow.getByRole('button', { name: 'Deactivate' }).click();
         const deactivate = page.getByRole('dialog', {
             name: new RegExp(`Deactivate ${updatedName}`),

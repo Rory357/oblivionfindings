@@ -164,7 +164,7 @@ test('site readiness geofence flow saves a boundary and reuses the same dialog e
     await page.getByTestId('site-profile-tab-readiness').click();
     await expect(page.getByTestId('readiness-fix-geofence')).toHaveCount(0);
 
-    await page.getByRole('tab', { name: /^Overview/ }).click();
+    await page.getByTestId('site-profile-tab-overview').click();
     await expect(page.getByTestId('site-map-geofence-button')).toContainText(
         'Edit Site Geofence',
     );

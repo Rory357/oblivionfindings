@@ -50,7 +50,10 @@ test.describe('attendance readiness workflows', () => {
             .getByRole('button', { name: 'Finish shift', exact: true })
             .click();
         await expect(
-            page.getByRole('heading', { name: /End shift for/i }),
+            page.getByRole('heading', {
+                name: 'End shift at Playwright Attendance House',
+                exact: true,
+            }),
         ).toBeVisible();
 
         await page.getByTestId('end-shift-submit').click();
@@ -75,7 +78,10 @@ test.describe('attendance readiness workflows', () => {
         await page
             .getByRole('button', { name: 'Finish shift', exact: true })
             .click();
-        const dialog = page.getByRole('dialog', { name: /End shift for/i });
+        const dialog = page.getByRole('dialog', {
+            name: 'End shift at Playwright Attendance House',
+            exact: true,
+        });
         await expect(dialog.getByText(/Finish shift tasks/i)).toBeVisible();
         await expect(dialog.getByText(/Write handover/i)).toBeVisible();
 
@@ -83,7 +89,10 @@ test.describe('attendance readiness workflows', () => {
             .getByRole('checkbox', { name: 'Playwright checklist task' })
             .check();
         await dialog
-            .getByLabel(/What should the next shift know/i)
+            .getByLabel(
+                'What should the next worker know about Playwright Attendance?',
+                { exact: true },
+            )
             .fill('Checklist completed during atomic clock-out test.');
         const submit = dialog.getByTestId('end-shift-submit');
         await expect(submit).toBeEnabled();

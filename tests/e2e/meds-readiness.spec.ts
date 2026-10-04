@@ -331,9 +331,11 @@ test.describe('meds readiness workflows', () => {
 
         await recordPrnReason(page, 'Pain', true);
 
-        await expect(page.getByRole('status')).toHaveText(
-            /1 item will send|1 item waiting/i,
-        );
+        await expect(
+            page
+                .getByRole('status')
+                .filter({ hasText: /1 item will send|1 item waiting/i }),
+        ).toBeVisible();
 
         await context.setOffline(false);
         await page.evaluate(() => window.dispatchEvent(new Event('online')));
@@ -342,7 +344,7 @@ test.describe('meds readiness workflows', () => {
             page
                 .locator('[role="status"]')
                 .filter({ hasText: /offline|item|sending|syncing/i }),
-        ).toBeHidden({ timeout: 20_000 });
+        ).toHaveCount(0, { timeout: 20_000 });
 
         await page.reload();
         await page
@@ -523,7 +525,7 @@ test.describe('meds readiness workflows', () => {
             page
                 .locator('[role="status"]')
                 .filter({ hasText: /offline|item|sending|syncing/i }),
-        ).toBeHidden({ timeout: 20_000 });
+        ).toHaveCount(0, { timeout: 20_000 });
 
         await page.reload();
         await expect(page.getByText('2 of 3 recorded')).toBeVisible();

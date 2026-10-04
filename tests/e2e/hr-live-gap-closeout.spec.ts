@@ -1195,10 +1195,11 @@ echo \\App\\Domain\\Hr\\Models\\HrLeaveApprovalChain::query()
             'aria-selected',
             'true',
         );
-        await page.getByRole('button', { name: 'Calendar view' }).click();
-        await expect(
-            page.getByRole('button', { name: 'Calendar view' }),
-        ).toBeVisible();
+        const calendarLayout = page
+            .getByRole('radiogroup', { name: 'Layout', exact: true })
+            .getByRole('radio', { name: 'Calendar', exact: true });
+        await calendarLayout.click();
+        await expect(calendarLayout).toHaveAttribute('aria-checked', 'true');
 
         expectNoConsoleErrors(consoleErrors);
         expect(failedTargetRequests).toEqual([]);

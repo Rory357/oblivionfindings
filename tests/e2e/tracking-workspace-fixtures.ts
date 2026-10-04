@@ -54,23 +54,12 @@ $upsertClient = function (string $firstName, string $preferredName) use ($site, 
 $activeClient = $upsertClient('Playwright Active', 'Mere Active');
 $withdrawnClient = $upsertClient('Playwright Withdrawn', 'Ria Withdrawn');
 
-$consentType = \\App\\Models\\ConsentType::withTrashed()
-    ->where('name', 'Asset Location Tracking (Safety)')
-    ->first();
-if (! $consentType) {
-    $consentType = new \\App\\Models\\ConsentType();
-} elseif ($consentType->trashed()) {
-    $consentType->restore();
-}
-$consentType->forceFill([
-    'name' => 'Asset Location Tracking (Safety)',
-    'category' => 'privacy',
-    'description' => 'Personal location tracking used for safety.',
-    'purpose' => 'Personal safety location tracking',
-    'legal_basis' => 'consent',
-    'allows_withdrawal' => true,
-    'active' => true,
-])->save();
+// Use the existing resident-location contract without rewriting its published
+// purpose, legal basis or version to match a generic asset-tracking fixture.
+$consentType = \\App\\Models\\ConsentType::query()
+    ->where('name', 'Personal Tracker (Wandering Risk)')
+    ->where('active', true)
+    ->sole();
 
 $upsertConsent = fn ($client, string $status) => app(\\Database\\Seeders\\TrackingWorkspaceE2EConsentSeeder::class)->seedConsent($client, $consentType, $admin, $status);
 

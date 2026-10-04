@@ -395,7 +395,22 @@ test.describe('IT & Support end-to-end acceptance', () => {
                 level: 1,
             }),
         ).toBeVisible();
-        await expect(page.getByText('via email')).toBeVisible();
+        await page
+            .getByRole('link', { name: 'View response and resolution clocks' })
+            .click();
+        const recordHistory = page.getByRole('tabpanel', {
+            name: 'Service levels',
+            exact: true,
+        });
+        await expect(
+            recordHistory.getByText('Source', { exact: true }),
+        ).toBeVisible();
+        await expect(
+            recordHistory.getByText('Email', { exact: true }),
+        ).toBeVisible();
+        await page
+            .getByRole('link', { name: 'View ticket conversation' })
+            .click();
         await expect(
             page.getByText('Requester confirmed the printer is still offline.'),
         ).toBeVisible();
@@ -462,13 +477,15 @@ test.describe('IT & Support end-to-end acceptance', () => {
                 level: 1,
             }),
         ).toBeVisible();
-        await expect(page.getByText('SEV2', { exact: true })).toBeVisible();
+        await expect(
+            page.getByRole('paragraph').filter({ hasText: /\bSEV2\b/ }),
+        ).toBeVisible();
 
-        await page.goto('/it?tab=provisioning');
+        await page.goto('/it/provisioning');
         await expect(
             page.getByRole('heading', {
-                name: 'Joiner, mover & leaver workflows',
-                level: 2,
+                name: 'Provisioning',
+                level: 1,
             }),
         ).toBeVisible();
         for (const lifecycle of ['Joiner', 'Mover', 'Leaver']) {
@@ -478,14 +495,19 @@ test.describe('IT & Support end-to-end acceptance', () => {
         }
 
         await page.goto('/it/setup');
-        await page.getByRole('tab', { name: 'API identities' }).click();
+        await page.getByRole('tab', { name: 'API', exact: true }).click();
         await expect(
             page.getByRole('heading', { name: 'API identities', level: 2 }),
         ).toBeVisible();
-        await page.getByRole('button', { name: 'New API identity' }).click();
+        await page
+            .getByRole('button', { name: 'New API identity' })
+            .first()
+            .click();
         await expect(page.getByLabel('Execution account')).toBeVisible();
         await page.getByRole('button', { name: 'Cancel' }).click();
-        await page.getByRole('tab', { name: 'Operations audit' }).click();
+        await page
+            .getByRole('tab', { name: 'Operations', exact: true })
+            .click();
         await expect(
             page.getByRole('heading', { name: 'Email delivery', level: 2 }),
         ).toBeVisible();
