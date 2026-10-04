@@ -2302,7 +2302,7 @@ function RecordDoseForm({
                 footerStart={footerStart}
                 footerEnd={footerEnd}
                 success={success}
-                maxWidth="min(94vw, 1040px)"
+                maxWidth="min(92vw, 1100px)"
                 maxHeight="min(86vh, 780px)"
             >
                 <WizardStepPane>

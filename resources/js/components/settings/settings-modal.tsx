@@ -56,7 +56,13 @@ export function SettingsModal({
                 <div className="min-h-0 space-y-4 overflow-y-auto p-5">
                     {children}
                 </div>
-                <DialogFooter className="shrink-0 border-t bg-muted/30 p-4">
+                <DialogFooter
+                    className={cn(
+                        'shrink-0 border-t bg-muted/30 p-4',
+                        frontline &&
+                            'flex-wrap [&_button]:h-auto [&_button]:max-w-full [&_button]:whitespace-normal',
+                    )}
+                >
                     {footer ?? (
                         <Button variant="outline" onClick={onClose}>
                             Close

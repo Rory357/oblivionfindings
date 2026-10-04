@@ -541,6 +541,13 @@ inline errors and the paired value. Keep picker footers reachable on a 320 CSS
 pixel viewport. eMAR dialog shells and confirmations opt into `frontline` so
 smaller fields never mean smaller touch targets. Footer actions wrap when needed.
 
+Compact switches and checkboxes keep the shared primitive's pill or square
+shape. Radix renders these controls as buttons: never apply the generic 44px
+button minimum to their drawn marks. In frontline dialogs, use the expanded
+hit area with sufficient row spacing, and verify it remains clickable outside
+the mark. Show On/Off beside switches. Review-card rows stack when the card
+itself is narrow, including cards in desktop two-column wizards.
+
 Use Tailwind's `grid gap-3 sm:grid-cols-2` for the body, then `sm:col-span-2`
 on full-width fields. Group related fields in the same row.
 

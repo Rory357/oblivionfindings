@@ -2095,6 +2095,7 @@ export function AlertPersonDialog({ k, data }: { k: string; data: AlertData }) {
         <SettingsModal
             frontline
             title={`Add a person to “${meta.label}”`}
+            width={720}
             description="They get it for every house they have access to."
             onClose={close}
             footer={

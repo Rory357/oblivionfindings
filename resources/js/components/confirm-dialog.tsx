@@ -85,12 +85,14 @@ export function ConfirmDialog({
                         <div>{description}</div>
                     </AlertDialogDescription>
                 </AlertDialogHeader>
-                <AlertDialogFooter>
+                <AlertDialogFooter
+                    className={frontline ? 'flex-wrap' : undefined}
+                >
                     <AlertDialogCancel
                         onClick={onClose}
                         disabled={processing}
                         className={cn(
-                            frontline && 'whitespace-normal',
+                            frontline && 'h-auto max-w-full whitespace-normal',
                             buttonClassName,
                         )}
                     >
@@ -110,7 +112,7 @@ export function ConfirmDialog({
                         disabled={processing}
                         variant={variant}
                         className={cn(
-                            frontline && 'whitespace-normal',
+                            frontline && 'h-auto max-w-full whitespace-normal',
                             buttonClassName,
                         )}
                     >

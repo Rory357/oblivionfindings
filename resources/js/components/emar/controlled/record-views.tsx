@@ -785,7 +785,7 @@ export function DetailDialog({
                         {footer}
                     </div>
                 }
-                maxWidth="min(94vw,1100px)"
+                maxWidth="min(92vw, 1100px)"
             >
                 <WizardStepPane>
                     <div className="space-y-5">

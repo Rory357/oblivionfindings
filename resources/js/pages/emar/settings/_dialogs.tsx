@@ -185,6 +185,7 @@ export function ReviewChanges({ view }: { view: ViewKey }) {
         <SettingsModal
             frontline
             title={`Review ${VIEW_LABEL[view].toLowerCase()} changes`}
+            width={720}
             description={`${ch.length} ${ch.length === 1 ? 'change' : 'changes'} · nothing applies until you save.`}
             onClose={close}
             onCloseAutoFocus={(e) => {

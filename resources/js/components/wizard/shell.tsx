@@ -69,7 +69,7 @@ export function WizardShell({
     footerStart,
     footerEnd,
     success,
-    maxWidth = 'min(94vw, 980px)',
+    maxWidth,
     maxHeight = 'min(88vh, 760px)',
     children,
     bodyRef,
@@ -104,7 +104,7 @@ export function WizardShell({
     footerEnd?: ReactNode;
     /** When set, replaces the whole shell body (rail + steps) — success pane. */
     success?: ReactNode;
-    /** Dialog width — defaults to the Add-Client 980px; pass a wider value for matrix-heavy modals. */
+    /** Medication dialogs use Rory's 1100px wizard token; other callers retain 980px. */
     maxWidth?: string;
     /** Dialog body height — defaults to 760px; pass taller (e.g. Add-Client's 860px) for step-heavy modals. */
     maxHeight?: string;
@@ -137,7 +137,14 @@ export function WizardShell({
                     frontline && 'frontline-dialog',
                 )}
                 showCloseButton={false}
-                style={{ maxWidth, width: maxWidth }}
+                style={{
+                    maxWidth:
+                        maxWidth ??
+                        (frontline ? 'min(92vw, 1100px)' : 'min(94vw, 980px)'),
+                    width:
+                        maxWidth ??
+                        (frontline ? 'min(92vw, 1100px)' : 'min(94vw, 980px)'),
+                }}
                 onOpenAutoFocus={onOpenAutoFocus}
                 onCloseAutoFocus={onCloseAutoFocus}
             >
@@ -496,19 +503,19 @@ export function ReviewCard({
     return (
         <div
             className={cn(
-                'rounded-xl border border-border bg-card/70 p-4',
+                'wizard-review-card min-w-0 rounded-xl border border-border bg-card/70 p-4',
                 span && 'sm:col-span-2',
             )}
         >
-            <div className="mb-2 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-sm font-bold">
-                    <Icon className="h-4 w-4 text-primary" /> {title}
+            <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2 text-sm font-bold">
+                    <Icon className="h-4 w-4 shrink-0 text-primary" /> {title}
                 </div>
                 {onEdit ? (
                     <button
                         type="button"
                         onClick={onEdit}
-                        className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary hover:underline"
+                        className="inline-flex shrink-0 items-center gap-1 text-[13px] font-semibold text-primary hover:underline"
                     >
                         <Pencil className="h-3 w-3" /> Edit
                     </button>
@@ -529,7 +536,7 @@ export function ReviewRow({
 }) {
     const empty = value == null || value === '';
     return (
-        <div className="flex justify-between gap-4 border-b border-border py-1.5 last:border-0">
+        <div className="wizard-review-row flex justify-between gap-4 border-b border-border py-1.5 last:border-0">
             <span className="max-w-[45%] shrink-0 text-[13px] break-words text-muted-foreground">
                 {label}
             </span>

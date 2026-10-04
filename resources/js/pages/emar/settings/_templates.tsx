@@ -1340,6 +1340,7 @@ export function CreateRounds({ data }: { data: TemplateData }) {
         <SettingsModal
             frontline
             title="Create rounds for a day"
+            width={720}
             description="Rounds are created automatically at 12:05 am each day. Use this to create them sooner — for example after adding a template."
             onClose={close}
             footer={

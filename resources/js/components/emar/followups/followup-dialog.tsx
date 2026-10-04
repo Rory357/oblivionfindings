@@ -679,11 +679,19 @@ function FollowupBody({
                 <div key={toggle} className="space-y-3">
                     <div className="flex items-center justify-between gap-3">
                         <Label htmlFor={`fu-${toggle}`}>{label}</Label>
-                        <Switch
-                            id={`fu-${toggle}`}
-                            checked={form[toggle]}
-                            onCheckedChange={(v) => set({ [toggle]: v })}
-                        />
+                        <span className="frontline-tap inline-flex shrink-0 items-center gap-3">
+                            <Switch
+                                id={`fu-${toggle}`}
+                                checked={form[toggle]}
+                                onCheckedChange={(v) => set({ [toggle]: v })}
+                            />
+                            <span
+                                className="w-7 text-muted-foreground"
+                                aria-hidden="true"
+                            >
+                                {form[toggle] ? 'On' : 'Off'}
+                            </span>
+                        </span>
                     </div>
                     {form[toggle] &&
                         textField(
@@ -887,17 +895,28 @@ function FollowupBody({
                             <Label htmlFor="fu-escalation">
                                 Someone else needs to know
                             </Label>
-                            <Switch
-                                id="fu-escalation"
-                                checked={
-                                    form.escalation_needed ||
+                            <span className="frontline-tap inline-flex shrink-0 items-center gap-3">
+                                <Switch
+                                    id="fu-escalation"
+                                    checked={
+                                        form.escalation_needed ||
+                                        form.outcome === 'not_effective'
+                                    }
+                                    disabled={form.outcome === 'not_effective'}
+                                    onCheckedChange={(v) =>
+                                        set({ escalation_needed: v })
+                                    }
+                                />
+                                <span
+                                    className="w-7 text-muted-foreground"
+                                    aria-hidden="true"
+                                >
+                                    {form.escalation_needed ||
                                     form.outcome === 'not_effective'
-                                }
-                                disabled={form.outcome === 'not_effective'}
-                                onCheckedChange={(v) =>
-                                    set({ escalation_needed: v })
-                                }
-                            />
+                                        ? 'On'
+                                        : 'Off'}
+                                </span>
+                            </span>
                         </div>
                         {(form.escalation_needed ||
                             form.outcome === 'not_effective') && (

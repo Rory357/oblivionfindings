@@ -1234,9 +1234,14 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
     }
 }
 
-/* Medication dialogs opt in locally; unrelated settings and wizard forms
-   retain their existing geometry. Checkboxes/radios keep their native marks. */
-.frontline-dialog :is(button, [role='combobox']),
+/* Compact control marks retain their shape. Their separate hit area below
+   supplies touch clearance without stretching a switch into a circle. */
+.frontline-dialog
+    :is(button, [role='combobox']):not(
+        .frontline-hit,
+        [data-slot='switch'],
+        [data-slot='checkbox']
+    ),
 .eh-header-frontline :is(button, [role='combobox']):not(.frontline-hit) {
     min-height: max(44px, 2.75rem);
     min-width: max(44px, 2.75rem);
@@ -1258,11 +1263,13 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
 
 /* In the components layer so an `absolute`/`fixed` utility on the host wins. */
 @layer components {
-    .frontline-hit {
+    .frontline-hit,
+    .frontline-dialog :is([data-slot='switch'], [data-slot='checkbox']) {
         position: relative;
     }
 }
-.frontline-hit::after {
+.frontline-hit::after,
+.frontline-dialog :is([data-slot='switch'], [data-slot='checkbox'])::after {
     content: '';
     position: absolute;
     top: 50%;
@@ -1270,6 +1277,32 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
     width: max(100%, 44px, 2.75rem);
     height: max(100%, 44px, 2.75rem);
     transform: translate(-50%, -50%);
+}
+
+/* Keep neighbouring compact controls' touch areas separate. */
+.frontline-dialog .emar-on-off,
+.frontline-dialog label:has([data-slot='checkbox']) {
+    min-height: max(44px, 2.75rem);
+}
+
+/* Keep the handle visible on both the active and inactive dark tracks. */
+.dark .frontline-dialog [data-slot='switch-thumb'] {
+    background-color: var(--foreground);
+}
+
+/* A review card can be narrow even inside a desktop two-column wizard. */
+.frontline-dialog .wizard-review-card {
+    container: modal-review / inline-size;
+}
+@container modal-review (max-width: 400px) {
+    .wizard-review-row {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    .wizard-review-row > span {
+        max-width: 100%;
+        text-align: left;
+    }
 }
 
 /* ──────────────────────────────────────────────────────────────────────────

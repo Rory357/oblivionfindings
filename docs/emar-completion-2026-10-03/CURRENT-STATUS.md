@@ -1,5 +1,16 @@
 # eMAR implementation and verification status
 
+## Desktop eMAR modal controls — 5 October 2026
+
+The user explicitly requires **desktop web only**. The [modal-controls audit](modal-controls-audit-2026-10-05.md)
+records the 208-call source inventory and repairs for distorted switches and
+checkboxes, dark switch contrast, form and wizard widths, review-card layout,
+footer text, and unsaved on-call changes. The full frontend suite passed
+**537 files / 3,633 tests**; the final settings/shell rerun passed 30 overlapping
+tests. TypeScript, changed-source lint and formatting passed. Desktop browser
+coverage and the final asset are recorded in the audit. Draft PR #16 remains
+unmerged and undeployed; existing clinical release gates remain open.
+
 ## On-call card and cross-module modal fields — 5 October 2026
 
 The [cross-module sizing follow-up](cross-module-modal-sizing-2026-10-05.md)

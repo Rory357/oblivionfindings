@@ -72,7 +72,7 @@ export function OnOff({
     invalid?: boolean;
 }) {
     return (
-        <span className="inline-flex items-center gap-3">
+        <span className="emar-on-off inline-flex shrink-0 items-center gap-3">
             <Switch
                 id={id}
                 checked={checked}

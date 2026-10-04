@@ -343,6 +343,7 @@ export function SupplyOrderDialog({
                                             key={value}
                                             variant="outline"
                                             aria-pressed={method === value}
+                                            className="h-auto min-w-0 whitespace-normal"
                                             onClick={() => setMethod(value)}
                                         >
                                             {label}
@@ -572,6 +573,7 @@ export function MovementDialog({
                                         key={value}
                                         variant="outline"
                                         aria-pressed={kind === value}
+                                        className="h-auto min-w-0 whitespace-normal"
                                         onClick={() => setKind(value)}
                                     >
                                         {label}
