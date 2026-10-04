@@ -7,6 +7,7 @@ import {
     DateTimeField,
     localDateTimeLabel,
 } from '@/components/fleet-assets/maintenance/date-time-field';
+import { DiscardDraftDialog } from '@/components/governance/DiscardDraftDialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -57,6 +58,7 @@ type Command =
     | 'accounts'
     | 'complete'
     | 'link-incident';
+type CommandData = Record<string, string | number | string[] | null>;
 const titles: Record<Command, string> = {
     review: 'Triage the error',
     notes: 'Add an investigation note',
@@ -139,9 +141,11 @@ export function ErrorDetail({
     const [review, setReview] = useState(false);
     const [saving, setSaving] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
-    const [data, setData] = useState<
-        Record<string, string | number | string[] | null>
-    >({});
+    const [data, setData] = useState<CommandData>({});
+    const [initialData, setInitialData] = useState<CommandData>({});
+    const [pendingLeave, setPendingLeave] = useState<
+        'dialog' | 'command' | null
+    >(null);
     const [actionId, setActionId] = useState<number | null>(null);
     const [confirm, setConfirm] = useState(false);
     const [preview, setPreview] = useState<PreviewFile | null>(null);
@@ -154,7 +158,7 @@ export function ErrorDetail({
         setReview(false);
         setErrors({});
         setActionId(action ?? null);
-        setData(
+        const nextData: CommandData =
             kind === 'review'
                 ? {
                       error_type: e.error_type,
@@ -169,8 +173,25 @@ export function ErrorDetail({
                   ? { owner_id: e.owner?.id ?? null, due_at: '' }
                   : kind === 'disclosure'
                     ? { state: 'not_yet', who: [] }
-                    : {},
-        );
+                    : {};
+        setData(nextData);
+        setInitialData(nextData);
+    };
+    const finishLeave = (target: 'dialog' | 'command') => {
+        if (saving) return;
+        setPendingLeave(null);
+        if (target === 'dialog') onClose();
+        else {
+            setCommand(null);
+            setReview(false);
+            setErrors({});
+        }
+    };
+    const requestLeave = (target: 'dialog' | 'command') => {
+        if (saving) return;
+        if (command && JSON.stringify(data) !== JSON.stringify(initialData)) {
+            setPendingLeave(target);
+        } else finishLeave(target);
     };
     const submit = () => {
         if (!command) return;
@@ -502,10 +523,9 @@ export function ErrorDetail({
     return (
         <>
             <WizardShell
+                frontline
                 open
-                onClose={() => {
-                    if (!saving) onClose();
-                }}
+                onClose={() => requestLeave('dialog')}
                 title={`${e.ref} · ${personName(e)}`}
                 description="Medication error record and append-only investigation history."
                 railIcon={AlertTriangle}
@@ -537,6 +557,7 @@ export function ErrorDetail({
                     }
                 }}
                 sequential={!!command}
+                headerLabel={!command ? SECTIONS[section].label : undefined}
                 pct={command ? (review ? 100 : 50) : 100}
                 pctLabel={command ? 'Completeness' : 'Record'}
                 footerStart={
@@ -547,8 +568,8 @@ export function ErrorDetail({
                             command
                                 ? review
                                     ? setReview(false)
-                                    : setCommand(null)
-                                : onClose()
+                                    : requestLeave('command')
+                                : requestLeave('dialog')
                         }
                     >
                         {command ? 'Back' : 'Done'}
@@ -1102,6 +1123,15 @@ export function ErrorDetail({
                     </div>
                 </WizardStepPane>
             </WizardShell>
+            <DiscardDraftDialog
+                frontline
+                open={pendingLeave !== null}
+                description="Your saved error record is kept. Only the unsaved details you entered here will be discarded."
+                onKeepEditing={() => setPendingLeave(null)}
+                onDiscard={() => {
+                    if (pendingLeave) finishLeave(pendingLeave);
+                }}
+            />
             <ConfirmDialog
                 open={confirm}
                 onClose={() => {

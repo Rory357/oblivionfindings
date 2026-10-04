@@ -131,6 +131,7 @@ export function MedsWizardDialog({
     const guardedFooter = footerItems.map(guardFooter);
     const guard = (
         <DiscardDraftDialog
+            frontline
             open={discard}
             description="These medication changes have not been saved."
             onKeepEditing={() => setDiscard(false)}

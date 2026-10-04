@@ -488,7 +488,7 @@ export default function SiteComplianceIndex({
                     </PageHeaderStatusChip>
                 )
             }
-            subline="Site compliance \u00b7 certifications, checks and regulatory requirements"
+            subline="Site compliance · certifications, checks and regulatory requirements"
             actions={
                 <>
                     <PageHeaderSearch

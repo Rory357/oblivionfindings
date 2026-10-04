@@ -109,10 +109,14 @@ export default function ReportsIndex() {
                                       label: 'Incidents',
                                       value: kpis.openIncidents,
                                   },
-                                  {
-                                      label: 'Med Exceptions',
-                                      value: kpis.missedMeds7d,
-                                  },
+                                  ...(typeof kpis.missedMeds7d === 'number'
+                                      ? [
+                                            {
+                                                label: 'Medication exceptions',
+                                                value: kpis.missedMeds7d,
+                                            },
+                                        ]
+                                      : []),
                                   {
                                       label: 'Shifts (7d)',
                                       value: kpis.completedShifts7d,

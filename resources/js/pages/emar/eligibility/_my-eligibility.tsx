@@ -268,6 +268,7 @@ export function MyEligibility({
     if (!x.records_doses) {
         return (
             <SettingsModal
+                frontline
                 title="My medication eligibility"
                 description={`${name} · ${x.role ?? 'Staff'} · ${checked}`}
                 onClose={onClose}
@@ -300,6 +301,7 @@ export function MyEligibility({
     const a = x.assessment;
     return (
         <WizardShell
+            frontline
             open
             onClose={onClose}
             title="My medication eligibility"

@@ -1,5 +1,7 @@
+import { LeaveCalendarRange } from '@/components/hr/leave-calendar-range';
 import {
     PageHeader,
+    PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
@@ -13,7 +15,13 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import AppLayout from '@/layouts/app-layout';
+import { toDateInput } from '@/lib/datetime';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     CalendarRange,
@@ -69,6 +77,18 @@ export default function ShiftReports({
 
     const [view, setView] = useState<ViewKey>('risk');
     const [search, setSearch] = useState('');
+    const [rangeOpen, setRangeOpen] = useState(false);
+    const [rangeFrom, setRangeFrom] = useState<string | null>(
+        filters.date_from,
+    );
+    const [rangeTo, setRangeTo] = useState<string | null>(filters.date_to);
+    const openRange = (open: boolean) => {
+        if (open) {
+            setRangeFrom(filters.date_from);
+            setRangeTo(filters.date_to);
+        }
+        setRangeOpen(open);
+    };
 
     const applyServer = (overrides: Partial<Record<string, string>>) => {
         router.get(
@@ -87,9 +107,9 @@ export default function ShiftReports({
         );
     };
 
-    // Period presets — the URL still carries raw date_from/date_to, so
-    // deep-linked custom ranges keep working and show as "Custom range".
-    const today = new Date();
+    // Calendar arithmetic uses the NZ date as a civil date, independent of the
+    // browser's timezone. The URL retains exact dates for custom periods.
+    const today = new Date(`${toDateInput(new Date())}T12:00:00Z`);
     const presets: Record<string, { from: string; to: string; label: string }> =
         {
             last7: {
@@ -104,16 +124,36 @@ export default function ShiftReports({
             },
             this_month: {
                 from: isoDate(
-                    new Date(today.getFullYear(), today.getMonth(), 1),
+                    new Date(
+                        Date.UTC(
+                            today.getUTCFullYear(),
+                            today.getUTCMonth(),
+                            1,
+                        ),
+                    ),
                 ),
                 to: isoDate(today),
                 label: 'This month',
             },
             last_month: {
                 from: isoDate(
-                    new Date(today.getFullYear(), today.getMonth() - 1, 1),
+                    new Date(
+                        Date.UTC(
+                            today.getUTCFullYear(),
+                            today.getUTCMonth() - 1,
+                            1,
+                        ),
+                    ),
                 ),
-                to: isoDate(new Date(today.getFullYear(), today.getMonth(), 0)),
+                to: isoDate(
+                    new Date(
+                        Date.UTC(
+                            today.getUTCFullYear(),
+                            today.getUTCMonth(),
+                            0,
+                        ),
+                    ),
+                ),
                 label: 'Last month',
             },
         };
@@ -126,14 +166,7 @@ export default function ShiftReports({
             value,
             label: p.label,
         })),
-        ...(currentPreset === 'custom'
-            ? [
-                  {
-                      value: 'custom',
-                      label: `${filters.date_from} – ${filters.date_to}`,
-                  },
-              ]
-            : []),
+        { value: 'custom', label: 'Custom period' },
     ];
 
     const exportDataset = (dataset: string) => {
@@ -490,6 +523,10 @@ export default function ShiftReports({
                         allValue="__none__"
                         options={periodOptions}
                         onChange={(v) => {
+                            if (v === 'custom') {
+                                openRange(true);
+                                return;
+                            }
                             const preset = presets[v];
                             if (preset) {
                                 applyServer({
@@ -499,6 +536,48 @@ export default function ShiftReports({
                             }
                         }}
                     />
+                    <Popover open={rangeOpen} onOpenChange={openRange}>
+                        <PopoverTrigger asChild>
+                            <PageHeaderFilterButton
+                                icon={CalendarRange}
+                                active={currentPreset === 'custom'}
+                            >
+                                Custom dates
+                            </PageHeaderFilterButton>
+                        </PopoverTrigger>
+                        <PopoverContent
+                            align="start"
+                            className="w-auto max-w-[90vw]"
+                            aria-label="Custom report period"
+                        >
+                            <p className="mb-3 text-sm font-semibold">
+                                Choose the report period
+                            </p>
+                            <LeaveCalendarRange
+                                start={rangeFrom}
+                                end={rangeTo}
+                                onChange={(from, to) => {
+                                    setRangeFrom(from);
+                                    setRangeTo(to);
+                                }}
+                                required
+                            />
+                            <Button
+                                className="mt-3 w-full"
+                                disabled={!rangeFrom || !rangeTo}
+                                onClick={() => {
+                                    if (!rangeFrom || !rangeTo) return;
+                                    applyServer({
+                                        date_from: rangeFrom,
+                                        date_to: rangeTo,
+                                    });
+                                    setRangeOpen(false);
+                                }}
+                            >
+                                Apply period
+                            </Button>
+                        </PopoverContent>
+                    </Popover>
                     <PageHeaderFilterSelect
                         icon={MapPin}
                         label="All sites"

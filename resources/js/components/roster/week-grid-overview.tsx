@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
 import StaffStatus from '@/components/staff-status';
+import { formatTime, toDateInput } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 
 import { Button as GuardrailButton } from '@/components/ui/button';
@@ -19,15 +20,6 @@ function startOfMondayWeek(reference: Date) {
 
 function dayKey(d: Date) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function formatTime(iso: string | null) {
-    if (!iso) return '';
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '';
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mm = String(d.getMinutes()).padStart(2, '0');
-    return `${hh}:${mm}`;
 }
 
 export type WeekGridOverviewProps = {
@@ -76,7 +68,7 @@ export default function WeekGridOverview({
             if (!shift.starts_at) continue;
             const start = new Date(shift.starts_at);
             if (Number.isNaN(start.getTime())) continue;
-            const key = dayKey(start);
+            const key = toDateInput(start);
             if (key in map) {
                 map[key].push(shift);
             }
