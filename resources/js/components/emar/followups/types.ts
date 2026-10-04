@@ -44,7 +44,12 @@ export function followupSourceUrl(row: MedicationFollowup): string | null {
     const value = row.source_url;
     return value?.startsWith('/') &&
         !value.startsWith('//') &&
-        !/[\\\u0000-\u0020\u007f]/.test(value)
+        !Array.from(value).some(
+            (character) =>
+                character === '\\' ||
+                character.charCodeAt(0) <= 32 ||
+                character.charCodeAt(0) === 127,
+        )
         ? value
         : null;
 }

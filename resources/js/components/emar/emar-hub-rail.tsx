@@ -3,6 +3,7 @@ import { router, usePage } from '@inertiajs/react';
 import { PageHeaderRail } from '@/components/page';
 import {
     emarHubForUrl,
+    emarScopedHref,
     visibleEmarViews,
     type EmarNavigationPermissions,
 } from '@/lib/emar-navigation';
@@ -46,7 +47,8 @@ export function EmarHubRail({
             value={match.view.key}
             onSelect={(key) => {
                 const target = items.find((item) => item.key === key);
-                if (target && key !== match.view.key) router.visit(target.href);
+                if (target && key !== match.view.key)
+                    router.visit(emarScopedHref(target.href, page.url));
             }}
             items={items.map((item) => {
                 const alert = alerts?.[item.key];

@@ -51,7 +51,7 @@ function PolicyChoice({
         <div
             role="group"
             aria-label={label}
-            className="[&_button]:focus-visible:ring-ring [&_button]:min-h-11 [&_button]:focus-visible:ring-2"
+            className="[&_button]:min-h-11 [&_button]:focus-visible:ring-2 [&_button]:focus-visible:ring-ring"
         >
             <Choice
                 value={value}
@@ -256,7 +256,7 @@ export function ControlledProductSettings({
                                 cadence === ''
                                     ? 'Recommended: Every shift change. Choose a cadence and review the change before counts show as due.'
                                     : cadence === 'week'
-                                      ? 'Weekly timing is unavailable until its day and shift are configured.'
+                                      ? 'Weekly due dates and overdue reminders are not available. Choose an available roster cadence to receive count reminders.'
                                       : 'Due 30 minutes before the shift change. Counts always need a witness.'
                             }
                             state={cadenceState}

@@ -1,3 +1,5 @@
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
+import { DateTimeField } from '@/components/fleet-assets/maintenance/date-time-field';
 import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { MedsWizardDialog, SummaryRow } from '@/components/meds/wizard-shell';
 import { Button } from '@/components/ui/button';
@@ -11,6 +13,7 @@ import {
     StepHead,
     TilePicker,
 } from '@/components/wizard/primitives';
+import { WizardSuccessPane } from '@/components/wizard/shell';
 import { formatDateOnly } from '@/lib/datetime';
 import { witnessIsSelectable, witnessOptionLabel } from '@/lib/witness-pin';
 import { AddMedicationDialog } from '@/pages/emar/_dialogs';
@@ -180,6 +183,7 @@ function RecordInrDialog({
     onClose: () => void;
 }) {
     const [step, setStep] = useState(0);
+    const [saved, setSaved] = useState(false);
     const [requestUuid] = useState(() => crypto.randomUUID());
     const form = useForm({
         request_uuid: requestUuid,
@@ -210,7 +214,20 @@ function RecordInrDialog({
         }
         form.post(`/emar/clients/${clientId}/inr`, {
             preserveScroll: true,
-            onSuccess: onClose,
+            onSuccess: () => setSaved(true),
+            onError: (errors) =>
+                setStep(
+                    [
+                        'inr_value',
+                        'tested_on',
+                        'target_range_low',
+                        'target_range_high',
+                        'dose_mg',
+                        'next_test_date',
+                    ].some((key) => errors[key])
+                        ? 0
+                        : 1,
+                ),
         });
     };
 
@@ -220,6 +237,21 @@ function RecordInrDialog({
             onClose={onClose}
             title="Record INR"
             formState={form}
+            completeness={{
+                completed: Object.entries(form.data).filter(
+                    ([key, value]) => key !== 'request_uuid' && value.trim(),
+                ).length,
+                total: 10,
+            }}
+            success={
+                saved ? (
+                    <WizardSuccessPane
+                        title="INR recorded"
+                        blurb="The result and supplied instruction are saved in this person’s medication record."
+                        actions={<Button onClick={onClose}>Done</Button>}
+                    />
+                ) : undefined
+            }
             description="Record the test result and the instruction supplied with it."
             railIcon={HeartPulse}
             railTitle="Record INR"
@@ -310,15 +342,14 @@ function RecordInrDialog({
                                 required
                                 error={form.errors.tested_on}
                             >
-                                <Input
-                                    type="date"
+                                <DatePicker
+                                    id="emar-mar-governance-dialogs-1"
+                                    label="Tested on"
                                     value={form.data.tested_on}
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'tested_on',
-                                            e.target.value,
-                                        )
+                                    onChange={(value) =>
+                                        form.setData('tested_on', value)
                                     }
+                                    invalid={Boolean(form.errors.tested_on)}
                                 />
                             </Field>
                             <Field label="Target range (low)">
@@ -367,15 +398,17 @@ function RecordInrDialog({
                                 label="Next test date"
                                 error={form.errors.next_test_date}
                             >
-                                <Input
-                                    type="date"
+                                <DatePicker
+                                    id="emar-mar-governance-dialogs-2"
+                                    label="Next test date"
                                     value={form.data.next_test_date}
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'next_test_date',
-                                            e.target.value,
-                                        )
+                                    onChange={(value) =>
+                                        form.setData('next_test_date', value)
                                     }
+                                    invalid={Boolean(
+                                        form.errors.next_test_date,
+                                    )}
+                                    allowClear
                                 />
                             </Field>
                         </>
@@ -654,19 +687,16 @@ export function SyringeDriverDialog({
                             placeholder="e.g. 10"
                         />
                     </Field>
-                    <Field
+                    <DateTimeField
+                        id="syringe-commenced-at"
                         label="Commenced at"
-                        required
+                        value={form.data.commenced_at}
+                        onChange={(value) =>
+                            form.setData('commenced_at', value)
+                        }
                         error={form.errors.commenced_at}
-                    >
-                        <Input
-                            type="datetime-local"
-                            value={form.data.commenced_at}
-                            onChange={(e) =>
-                                form.setData('commenced_at', e.target.value)
-                            }
-                        />
-                    </Field>
+                        clearable={false}
+                    />
                     <Field label="Rate">
                         <Input
                             value={form.data.rate}

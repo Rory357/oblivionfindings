@@ -1,3 +1,4 @@
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 /* Stock movement — BUILD-NEW modal on the shared Add-Client wizard chrome.
  * Receive (emar.stock.receive) or adjust (emar.stock.adjust) a medication's
  * stock. Both endpoints key on client_medication_id. */
@@ -198,6 +199,16 @@ export function StockMovementModal({
 
     return (
         <MedsWizardDialog
+            formState={{
+                isDirty:
+                    action !== 'receive' ||
+                    clientId !==
+                        (initialClientId ? String(initialClientId) : '') ||
+                    [medId, quantity, newQuantity, reason, batch, expiry].some(
+                        Boolean,
+                    ),
+                processing: saving,
+            }}
             open={open}
             onClose={close}
             title="Stock movement"
@@ -299,11 +310,12 @@ export function StockMovementModal({
                             </Field>
                             <Field label="Expiry date" span>
                                 {/* eslint-disable-next-line no-restricted-syntax -- native date input; no shadcn date control in wizard primitives. */}
-                                <input
-                                    type="date"
+                                <DatePicker
+                                    id="emar-stock-movement-modal-1"
+                                    label="Expiry date"
                                     value={expiry}
-                                    onChange={(e) => setExpiry(e.target.value)}
-                                    className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                                    onChange={(value) => setExpiry(value)}
+                                    allowClear
                                 />
                             </Field>
                         </>

@@ -54,8 +54,8 @@ import {
     type Dialog,
     type SettingsContext,
 } from './settings/_context';
-import { DialogHost } from './settings/_dialogs';
 import { ControlledProductSettings } from './settings/_controlled-product';
+import { DialogHost } from './settings/_dialogs';
 import { EmergencyAccess } from './settings/_emergency';
 import {
     AllChanges,
@@ -80,7 +80,6 @@ import {
     SET_VIEWS,
     settingsHash,
     settingsSectionTabs,
-    visibleSections,
     visibleViews,
     type Built,
 } from './settings/_nav';
@@ -90,6 +89,7 @@ import {
     type OnCallData,
 } from './settings/_oncall';
 import { ReachDialogHost, type ReachGap } from './settings/_reach';
+import { RecordsReporting } from './settings/_records-reporting';
 import { ReviewCadenceSettings } from './settings/_reviews';
 import {
     MedicineRules,
@@ -121,7 +121,6 @@ import {
 } from './settings/_templates';
 import { DoseTiming, RoundsOverview } from './settings/_timing';
 import { SaveBar, StatusMessage } from './settings/_ui';
-import { RecordsReporting } from './settings/_records-reporting';
 
 type Props = {
     rules: MedicineRule[];
@@ -293,7 +292,9 @@ export default function EmarSettings(props: Props) {
                       'safety',
                       ...(s.groups.review_cadence ? ['reviews'] : []),
                       'records',
-                      ...(props.controlledSettingsAccess.view ? ['controlled'] : []),
+                      ...(props.controlledSettingsAccess.view
+                          ? ['controlled']
+                          : []),
                   ]
                 : [],
             // P11 F1: whoever manages a house's round templates reaches them
@@ -326,6 +327,7 @@ export default function EmarSettings(props: Props) {
             settingsAccess,
             templatesOnly,
             witnessPin.can_reset,
+            props.controlledSettingsAccess.view,
             alertAccess.view,
             s.groups.review_cadence,
         ],
@@ -870,8 +872,17 @@ export default function EmarSettings(props: Props) {
                 }}
             />
         ) : view === 'rules' && sec === 'controlled' ? (
-            <ControlledProductSettings q={query} show={f.show} clear={() => { clearQ(); setF({ ...f, show: 'all' }); }}
-                houses={props.sites} houseIds={props.controlledSettingsAccess.manageable_site_ids} readOnlyAudit={readOnlyAudit} />
+            <ControlledProductSettings
+                q={query}
+                show={f.show}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+                houses={props.sites}
+                houseIds={props.controlledSettingsAccess.manageable_site_ids}
+                readOnlyAudit={readOnlyAudit}
+            />
         ) : view === 'rules' && sec === 'records' ? (
             <RecordsReporting q={query} show={f.show} />
         ) : view === 'rules' && sec === 'reviews' ? (

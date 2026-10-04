@@ -40,7 +40,7 @@ final class ControlledSettingsFragment
             new MedicationSettingGroup(
                 key: 'controlled_counts',
                 view: MedicationSettingsRegistry::VIEW_RULES,
-                effect: 'From the next count due at each house',
+                effect: 'From the next count due at each house. Weekly due and overdue reminders are unavailable.',
                 auditEvent: 'medications.controlled_count_policy.updated',
                 definitions: [
                     new Definition(
@@ -48,7 +48,7 @@ final class ControlledSettingsFragment
                         storageKey: ControlledPolicy::COUNT_CADENCE,
                         scope: Definition::SCOPE_ORGANISATION, section: 'controlled',
                         label: 'How often controlled medicines are counted',
-                        options: ['shift' => 'Every shift change', 'day' => 'Once a day, at the morning shift change', 'week' => 'Once a week'],
+                        options: ['shift' => 'Every shift change', 'day' => 'Once a day, at the morning shift change', 'week' => 'Weekly — timing unavailable'],
                         default: '', rank: ['week', 'day', 'shift'],
                         whenNotConfigured: 'Not configured — nothing shows as due or overdue until the count cadence is saved.',
                     ),

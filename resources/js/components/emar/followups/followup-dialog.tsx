@@ -1,19 +1,3 @@
-import { Link, usePage } from '@inertiajs/react';
-import axios from 'axios';
-import {
-    Check,
-    CheckCircle2,
-    ChevronLeft,
-    ChevronRight,
-    ClipboardList,
-    Clock3,
-    HeartHandshake,
-    History,
-    Repeat2,
-    UserRoundCog,
-    X,
-} from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import DraftResumePrompt from '@/components/draft-resume-prompt';
 import DraftSavedIndicator from '@/components/draft-saved-indicator';
@@ -60,7 +44,6 @@ import {
 import { useFormAutosave } from '@/hooks/use-form-autosave';
 import { useOfflineQueueState } from '@/hooks/use-offline-queue';
 import { formatDateTime } from '@/lib/datetime';
-import type { SharedData } from '@/types';
 import {
     createMedicationMutationReplayState,
     prepareMedicationMutationReplayState,
@@ -70,6 +53,23 @@ import {
     readServerSyncOutcome,
     submitOffline,
 } from '@/lib/offline-queue';
+import type { SharedData } from '@/types';
+import { Link, usePage } from '@inertiajs/react';
+import axios from 'axios';
+import {
+    Check,
+    CheckCircle2,
+    ChevronLeft,
+    ChevronRight,
+    ClipboardList,
+    Clock3,
+    HeartHandshake,
+    History,
+    Repeat2,
+    UserRoundCog,
+    X,
+} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { FollowupStatus } from './followup-list';
 import { nzFollowupInstants } from './time';
 import { followupSourceUrl, type MedicationFollowup } from './types';
@@ -277,9 +277,10 @@ function FollowupBody({
             enabled: !!actorId && dirty && !recovery && !saved,
         },
     );
+    const loadDraft = autosave.load;
     useEffect(() => {
         if (!actorId) return;
-        const draft = autosave.load();
+        const draft = loadDraft();
         if (draft) {
             const restored = Object.fromEntries(
                 Object.entries(EMPTY).map(([key, initial]) => [
@@ -303,7 +304,7 @@ function FollowupBody({
                 changed: draft.meta?.revision !== row.revision,
             });
         }
-    }, [actorId, autosave.load, row.revision]);
+    }, [actorId, loadDraft, row.revision]);
     const set = (values: Partial<Form>) => {
         setForm((current) => ({ ...current, ...values }));
         setDirty(true);

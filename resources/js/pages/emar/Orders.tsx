@@ -409,7 +409,7 @@ export default function Orders(props: Props) {
     return (
         <AppLayout breadcrumbs={useEmarBreadcrumbs()}>
             <Head title="Medication orders" />
-            <div className="flex flex-col gap-5 [&_button]:min-h-[44px] [&_button]:min-w-[44px] [&_input[type=search]]:min-h-[44px]">
+            <div className="flex flex-col gap-5 [&_button]:min-w-[44px] [&_button:not(.frontline-hit)]:min-h-[44px] [&_input[type=search]]:min-h-[44px]">
                 <PageHeader
                     frontline
                     icon={Pill}

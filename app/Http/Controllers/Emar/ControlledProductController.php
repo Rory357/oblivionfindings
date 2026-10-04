@@ -16,12 +16,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 final class ControlledProductController extends Controller
 {
     public function destructions(Request $request)
     {
-        return $this->redirectRead($request, 'destructions');
+        return app(EmarController::class)->destructions($request);
     }
 
     public function losses(Request $request)
@@ -60,11 +61,49 @@ final class ControlledProductController extends Controller
             abort_if($request->filled('client_medication_id') && $request->integer('client_medication_id') !== (int) $record->client_medication_id, 404);
             $request->merge(['client_medication_id' => $record->client_medication_id, 'target_id' => $record->id]);
         }
+        if ($action === 'destruction_void') {
+            abort_if($record->is_controlled_drug && ! $request->user()->canDo('medications.controlled.view'), 404);
+            if (! $record->is_controlled_drug || $record->client_medication_id === null || ! $request->filled('client_request_uuid')) {
+                return app(EmarController::class)->voidDestruction($request, $record);
+            }
+            $request->merge(['notes' => $request->input('notes', $request->input('void_reason'))]);
+        }
+        // Canonical read/scope denial precedes clinical form validation; all
+        // writes still recheck the same records under the governing locks.
+        if ($request->integer('client_medication_id') > 0) {
+            $medicine = ClientMedication::withTrashed()->findOrFail($request->integer('client_medication_id'));
+            $client = $this->access->client($request->user(), (int) $medicine->client_id);
+            abort_if($medicine->controlled_drug && ! $request->user()->canDo('medications.controlled.view'), 404);
+            abort_if($request->filled('client_id') && $request->integer('client_id') !== (int) $client->id, 404);
+            abort_if($request->filled('site_id') && $request->integer('site_id') !== (int) $client->site_id, 404);
+            abort_if($action !== 'destruction' && $request->filled('medication_name') && $request->input('medication_name') !== $medicine->name, 404);
+        }
+        if ($action === 'destruction') {
+            $medicine = ClientMedication::query()->find($request->integer('client_medication_id'));
+            if ($medicine && ! $medicine->controlled_drug) {
+                return app(EmarController::class)->storeDestruction($request, ordinaryOnly: true);
+            }
+        }
         if ($action === 'movement') {
             abort_unless(in_array($request->input('movement_type'), ['going_out', 'coming_back', 'breakage', 'spillage'], true), 422, 'Choose a witnessed movement in the controlled register.');
         }
 
-        return $this->action($request, $action);
+        $request->attributes->set('controlled_legacy_command', true);
+
+        try {
+            $response = $this->action($request, $action);
+        } catch (HttpExceptionInterface $exception) {
+            if (! $request->expectsJson() || $exception->getStatusCode() !== 409) {
+                throw $exception;
+            }
+
+            return response()->json(['message' => $exception->getMessage(), 'sync' => ['status' => 'conflict', 'duplicate' => false]], 409);
+        }
+        if (! $request->expectsJson()) {
+            return redirect()->back()->with('success', $response->getData(true)['message']);
+        }
+
+        return $response;
     }
 
     public function __construct(
@@ -112,20 +151,31 @@ final class ControlledProductController extends Controller
         // Witnessed cupboard actions are deliberately online-only; no PIN or
         // stock assertion is retained in the device's offline replay queue.
         abort_if($request->boolean('queued_offline'), 422, 'Controlled checks need a connection. Your entered values have been kept.');
+        $needsWitness = in_array($action, ['count', 'movement', 'void', 'loss_report', 'destruction'], true)
+            || ($action === 'resolve' && $request->input('outcome') !== 'escalate');
         $quantity = ['nullable', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0', MedicationStockQuantity::DECIMAL_10_2_MAX_RULE];
         $input = $request->validate([
             'client_medication_id' => ['required', 'integer', 'min:1'],
+            'client_id' => ['nullable', 'integer', 'min:1'], 'site_id' => ['nullable', 'integer', 'min:1'],
+            'medication_name' => ['nullable', 'string', 'max:255'], 'entry_type' => ['nullable', 'string', 'max:50'],
+            'unit' => ['nullable', 'string', 'max:50'], 'batch_number' => ['nullable', 'string', 'max:255'],
+            'expiry_date' => ['nullable', 'date'], 'cd_schedule' => ['nullable', 'integer'],
+            'on_hand_before' => [Rule::requiredIf($request->attributes->get('controlled_legacy_command') && $action === 'movement'), ...$quantity],
+            'on_hand_after' => [Rule::requiredIf($request->attributes->get('controlled_legacy_command') && $action === 'movement'), ...$quantity],
+            'captured_offline_at' => ['prohibited'], 'origin_device_id' => ['prohibited'], 'initialize_stock' => ['prohibited'],
+            'accountable_officer_name' => ['nullable', 'string', 'max:255'], 'regulator_name' => ['nullable', 'string', 'max:255'],
             'client_request_uuid' => ['required', 'uuid'],
             'target_id' => ['nullable', 'integer', 'min:1'],
             'entry_id' => ['nullable', 'integer', 'min:1'],
             'administration_id' => ['nullable', 'integer', 'min:1'],
             'counted_entry_id' => ['nullable', 'integer', 'min:1'],
             'expected_entry_id' => ['present', 'nullable', 'integer', 'min:1'],
-            'expected_balance' => $quantity, 'actual_balance' => $quantity, 'recount_balance' => $quantity,
+            'expected_balance' => [Rule::requiredIf(in_array($action, ['count', 'movement', 'void', 'resolve', 'loss_report', 'destruction'], true)), ...$quantity],
+            'actual_balance' => [Rule::requiredIf(in_array($action, ['count', 'movement'], true)), ...$quantity], 'recount_balance' => $quantity,
             'quantity' => $quantity, 'correction_quantity' => $quantity,
             'direction' => ['nullable', 'in:in,out'], 'correction_direction' => ['nullable', 'in:in,out'],
             'movement_type' => ['nullable', 'in:going_out,coming_back,breakage,spillage'],
-            'witnessed_by' => ['nullable', 'integer', 'min:1'], 'witness_id' => ['nullable', 'integer', 'min:1'],
+            'witnessed_by' => [Rule::requiredIf($needsWitness), 'nullable', 'integer', 'min:1'], 'witness_id' => ['nullable', 'integer', 'min:1'],
             'witness_credential' => ['nullable', 'string', 'max:255'],
             'second_witness_id' => ['nullable', 'integer', 'min:1'], 'second_witness_credential' => ['nullable', 'string', 'max:255'],
             'outcome' => ['nullable', 'in:recount,recording,found,loss,escalate'],
@@ -141,6 +191,7 @@ final class ControlledProductController extends Controller
             'reported_to_police' => ['nullable', 'boolean'], 'police_reference' => ['nullable', 'string', 'max:255'],
             'reported_to_regulator' => ['nullable', 'boolean'], 'regulator_reference' => ['nullable', 'string', 'max:255'],
             'notified_at' => ['nullable', 'string', 'max:35'], 'discovered_at' => ['nullable', 'string', 'max:35'],
+            'authorised_by_name' => ['nullable', 'string', 'max:255'], 'authorised_by_registration' => ['nullable', 'string', 'max:255'],
             'pharmacist_name' => ['nullable', 'string', 'max:255'], 'pharmacist_registration' => ['nullable', 'string', 'max:255'],
             'received_at' => ['nullable', 'string', 'max:35'], 'starts_at' => ['nullable', 'string', 'max:35'], 'expires_at' => ['nullable', 'string', 'max:35'],
             'decision' => ['nullable', 'in:approved,declined'], 'medicine_ids' => ['nullable', 'array', 'max:100'],
@@ -155,6 +206,16 @@ final class ControlledProductController extends Controller
             $input['photo_upload'] = $photo;
         }
         $result = $this->register->perform($request->user(), $action, $input);
+        if ($request->attributes->get('controlled_legacy_command')) {
+            $duplicate = $this->register->lastRequestWasReplay();
+            $result['sync'] = ['status' => $duplicate ? 'duplicate' : 'saved', 'duplicate' => $duplicate];
+            if (isset($result['entry_id'])) {
+                $result['entry'] = ['id' => (int) $result['entry_id']];
+            }
+            if (isset($result['discrepancy_id'])) {
+                $result['discrepancy'] = ['id' => (int) $result['discrepancy_id']];
+            }
+        }
 
         return response()->json($result)->header('Cache-Control', 'private, no-store');
     }

@@ -20,7 +20,10 @@ use App\Models\ShiftHandover;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\Audit\MedicationEventRecorder;
+use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\Followups\MedicationFollowupService;
+use App\Services\Medication\Recording\PrnEffectCheckQueue;
+use App\Services\Tasks\Providers\LegacyMedicationEffectProvider;
 use App\Services\Tasks\Providers\MedicationFollowupProvider;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
@@ -80,6 +83,224 @@ class MedicationFollowupWorkflowTest extends TestCase
         [, $row] = $this->effect(['effect_check_due_at' => null]);
         $this->assertNull($row->due_at);
         $this->actingAs($this->worker)->getJson('/medication-followups/'.$row->id)->assertOk()->assertJsonPath('due_at', null);
+    }
+
+    public function test_legacy_prn_without_a_deadline_is_visible_read_only_in_oversight_and_tasks_until_prepared(): void
+    {
+        $dose = $this->legacyEffect();
+        $before = $dose->fresh()->getRawOriginal();
+        $this->actingAs($this->worker)->getJson('/medication-followups')->assertOk()
+            ->assertJsonPath('meters.open', 0)->assertJsonPath('legacy_effect_checks.total', 1)
+            ->assertJsonPath('legacy_effect_checks.unscheduled', 1)->assertJsonPath('legacy_effect_checks.data.0.due_at', null)
+            ->assertJsonPath('legacy_effect_checks.data.0.administration_id', $dose->id)
+            ->assertJsonPath('legacy_effect_checks.data.0.can_prepare', true);
+        $tasks = (new LegacyMedicationEffectProvider)->authorizedTasks($this->worker);
+        $this->assertCount(1, $tasks);
+        $this->assertSame('medication-effect-source-'.$dose->id, $tasks[0]->id);
+        $this->assertNull($tasks[0]->dueAt);
+        $this->assertSame('/medication-followups?administration='.$dose->id, $tasks[0]->link);
+        $this->actingAs($this->worker)->getJson('/tasks/detail?source=medication-effect-source&id='.$dose->id)->assertOk();
+        $this->assertDatabaseCount('medication_followups', 0);
+        $this->assertDatabaseCount('medication_followup_events', 0);
+        $this->assertSame($before, $dose->fresh()->getRawOriginal());
+
+        $this->actingAs($this->worker)->postJson('/medication-followups/administrations/'.$dose->id.'/prepare')->assertOk()
+            ->assertJsonPath('due_at', null)->assertJsonPath('context.legacy_preparation.actor_id', $this->worker->id);
+        $this->assertSame([], (new LegacyMedicationEffectProvider)->authorizedTasks($this->worker));
+        $this->assertCount(1, (new MedicationFollowupProvider)->authorizedTasks($this->worker));
+        $this->actingAs($this->worker)->getJson('/medication-followups')->assertOk()->assertJsonPath('legacy_effect_checks.total', 0);
+        $this->assertSame($before, $dose->fresh()->getRawOriginal());
+        $this->assertSame('source_prepare', MedicationFollowup::query()->sole()->events()->sole()->data['legacy_preparation']['method']);
+    }
+
+    public function test_legacy_readiness_counts_respect_state_search_and_person_controlled_boundaries(): void
+    {
+        $this->legacyEffect();
+        $late = $this->legacyEffect(['effect_check_due_at' => now()->subMinutes(15)]);
+        $this->legacyEffect([], ['controlled_drug' => true, 'name' => 'Concealed source medicine']);
+        $foreign = Client::factory()->create(['site_id' => Site::factory()->create(['is_active' => true])->id, 'status' => 'active']);
+        $foreignOrder = ClientMedication::query()->create(['client_id' => $foreign->id, 'name' => 'Wrong-person medicine', 'dosage' => '1 tablet', 'frequency' => 'As needed', 'is_prn' => true, 'active' => true, 'state' => 'active']);
+        ClientMedicationAdministration::query()->create(['client_id' => $this->client->id, 'client_medication_id' => $foreignOrder->id,
+            'administered_by' => $this->worker->id, 'status' => 'given', 'administered_at' => now()->subHour()]);
+        $this->deny($this->worker, ['medications.controlled.view', 'medications.controlled.record']);
+        $this->actingAs($this->worker)->getJson('/medication-followups?state=overdue')->assertOk()
+            ->assertJsonPath('legacy_effect_checks.total', 2)->assertJsonPath('legacy_effect_checks.overdue', 1)
+            ->assertJsonPath('legacy_effect_checks.unscheduled', 1)->assertJsonPath('legacy_effect_checks.filtered_total', 1)
+            ->assertJsonPath('legacy_effect_checks.data.0.administration_id', $late->id);
+        $this->actingAs($this->worker)->getJson('/medication-followups?q=Concealed')->assertOk()->assertJsonPath('legacy_effect_checks.total', 0);
+        $this->actingAs($this->worker)->getJson('/medication-followups?type=reoffer')->assertOk()->assertJsonPath('legacy_effect_checks.total', 0);
+        $this->actingAs($this->worker)->getJson('/medication-followups?state=done')->assertOk()->assertJsonPath('legacy_effect_checks.filtered_total', 0);
+        $this->actingAs($this->worker)->getJson('/medication-followups?client_id='.$foreign->id)->assertNotFound();
+        $this->assertCount(2, (new LegacyMedicationEffectProvider)->authorizedTasks($this->worker));
+        $this->assertDatabaseCount('medication_followups', 0);
+    }
+
+    public function test_a_legacy_task_deep_link_resolves_its_source_beyond_the_readiness_page_limit(): void
+    {
+        $last = null;
+        for ($index = 0; $index < 26; $index++) {
+            $last = $this->legacyEffect();
+        }
+        $this->actingAs($this->worker)->getJson('/medication-followups')->assertOk()
+            ->assertJsonPath('legacy_effect_checks.total', 26)->assertJsonCount(25, 'legacy_effect_checks.data')
+            ->assertJsonPath('legacy_effect_checks.has_more', true);
+        $this->getJson('/medication-followups?administration='.$last->id)->assertOk()
+            ->assertJsonPath('legacy_effect_checks.total', 26)->assertJsonCount(1, 'legacy_effect_checks.data')
+            ->assertJsonPath('legacy_effect_checks.data.0.administration_id', $last->id);
+        $this->assertDatabaseCount('medication_followups', 0);
+        $this->assertDatabaseCount('medication_prn_effectiveness', 0);
+    }
+
+    public function test_an_administration_deep_link_resolves_a_read_only_canonical_row_beyond_the_list_limit_without_writes(): void
+    {
+        for ($index = 0; $index < 26; $index++) {
+            [$dose, $row] = $this->effect();
+        }
+        $this->deny($this->worker, ['medications.administer.record']);
+        $before = $row->fresh()->getRawOriginal();
+        $historyCount = DB::table('medication_followup_events')->count();
+        $eventCount = MedicationEvent::query()->count();
+        $this->actingAs($this->worker)->getJson('/medication-followups')->assertOk()
+            ->assertJsonPath('selected_followup_id', null)->assertJsonCount(25, 'followups.data');
+        $response = $this->getJson('/medication-followups?administration='.$dose->id)->assertOk()
+            ->assertJsonPath('selected_followup_id', $row->id)->assertJsonPath('meters.open', 26)
+            ->assertJsonCount(25, 'followups.data')->assertJsonPath('legacy_effect_checks.total', 0);
+        $this->assertNotContains($row->id, array_column($response->json('followups.data'), 'id'));
+        $this->getJson('/medication-followups/'.$row->id)->assertOk()->assertJsonPath('can_complete', false);
+        $this->postJson('/medication-followups/administrations/'.$dose->id.'/prepare')->assertForbidden();
+        $this->assertSame($before, $row->fresh()->getRawOriginal());
+        $this->assertSame($historyCount, DB::table('medication_followup_events')->count());
+        $this->assertSame($eventCount, MedicationEvent::query()->count());
+        $this->assertDatabaseCount('medication_prn_effectiveness', 0);
+    }
+
+    public function test_a_completed_administration_deep_link_resolves_independently_of_list_filters_without_repreparing(): void
+    {
+        [$dose, $row] = $this->effect();
+        $this->postFollowup($row, ['action' => 'effect', 'outcome' => 'effective'])->assertOk();
+        $this->deny($this->worker, ['medications.administer.record']);
+        $before = $row->fresh()->getRawOriginal();
+        $historyCount = DB::table('medication_followup_events')->count();
+        $eventCount = MedicationEvent::query()->count();
+        $this->actingAs($this->worker)->getJson('/medication-followups?administration='.$dose->id.'&type=reoffer&q=NoMatch&state=open')->assertOk()
+            ->assertJsonPath('selected_followup_id', $row->id)->assertJsonCount(0, 'followups.data')
+            ->assertJsonPath('legacy_effect_checks.total', 0);
+        $this->getJson('/medication-followups/'.$row->id)->assertOk()
+            ->assertJsonPath('state', 'done')->assertJsonPath('can_complete', false);
+        $this->assertSame($before, $row->fresh()->getRawOriginal());
+        $this->assertSame($historyCount, DB::table('medication_followup_events')->count());
+        $this->assertSame($eventCount, MedicationEvent::query()->count());
+        $this->assertDatabaseCount('medication_prn_effectiveness', 1);
+    }
+
+    public function test_a_read_only_legacy_administration_deep_link_exposes_no_preparation_authority_or_clinical_writes(): void
+    {
+        $dose = $this->legacyEffect();
+        $this->deny($this->worker, ['medications.administer.record']);
+        $before = $dose->fresh()->getRawOriginal();
+        $this->actingAs($this->worker)->getJson('/medication-followups?administration='.$dose->id)->assertOk()
+            ->assertJsonPath('selected_followup_id', null)->assertJsonCount(1, 'legacy_effect_checks.data')
+            ->assertJsonPath('legacy_effect_checks.data.0.administration_id', $dose->id)
+            ->assertJsonPath('legacy_effect_checks.data.0.can_prepare', false);
+        $this->postJson('/medication-followups/administrations/'.$dose->id.'/prepare')->assertForbidden();
+        $this->assertDatabaseCount('medication_followups', 0);
+        $this->assertDatabaseCount('medication_followup_events', 0);
+        $this->assertDatabaseCount('medication_prn_effectiveness', 0);
+        $this->assertSame($before, $dose->fresh()->getRawOriginal());
+    }
+
+    public function test_administration_deep_links_conceal_foreign_mismatched_controlled_and_missing_sources(): void
+    {
+        $foreign = Client::factory()->create(['site_id' => Site::factory()->create(['is_active' => true])->id, 'status' => 'active']);
+        [$foreignDose] = $this->effect(['client_id' => $foreign->id], ['client_id' => $foreign->id]);
+        [$mismatchedDose, $mismatchedRow] = $this->effect();
+        DB::table('medication_followups')->where('id', $mismatchedRow->id)->update(['client_medication_id' => $foreignDose->client_medication_id]);
+        [$controlledDose] = $this->effect([], ['controlled_drug' => true]);
+        $this->deny($this->worker, ['medications.controlled.view', 'medications.controlled.record']);
+        $before = MedicationFollowup::query()->orderBy('id')->get()->map->getRawOriginal()->all();
+        $historyCount = DB::table('medication_followup_events')->count();
+        $eventCount = MedicationEvent::query()->count();
+        foreach ([$foreignDose->id, $mismatchedDose->id, $controlledDose->id, $controlledDose->id + 1] as $id) {
+            $this->actingAs($this->worker)->getJson('/medication-followups?administration='.$id)->assertOk()
+                ->assertJsonPath('selected_followup_id', null);
+        }
+        $this->assertSame($before, MedicationFollowup::query()->orderBy('id')->get()->map->getRawOriginal()->all());
+        $this->assertSame($historyCount, DB::table('medication_followup_events')->count());
+        $this->assertSame($eventCount, MedicationEvent::query()->count());
+        $this->assertDatabaseCount('medication_prn_effectiveness', 0);
+    }
+
+    public function test_legacy_source_preview_and_import_are_bounded_repeatable_and_leave_clinical_evidence_unchanged(): void
+    {
+        $first = $this->legacyEffect();
+        $second = $this->legacyEffect();
+        $before = ClientMedicationAdministration::query()->orderBy('id')->get()->map->getRawOriginal()->all();
+        $this->artisan('emar:workflow-followups')->assertExitCode(0);
+        $this->artisan('emar:workflow-followups', ['--preview' => true, '--limit' => 1])->assertExitCode(0);
+        $this->assertDatabaseCount('medication_followups', 0);
+        $this->artisan('emar:workflow-followups', ['--import' => true, '--limit' => 1, '--through' => $second->id])->assertExitCode(0);
+        $this->assertDatabaseCount('medication_followups', 1);
+        $this->assertNull(MedicationFollowup::query()->sole()->due_at);
+        $this->assertSame('explicit_import', MedicationFollowup::query()->sole()->events()->sole()->data['legacy_preparation']['method']);
+        $this->artisan('emar:workflow-followups', ['--import' => true, '--limit' => 1, '--through' => $second->id])->assertExitCode(0);
+        $this->assertDatabaseCount('medication_followup_events', 1);
+        $this->artisan('emar:workflow-followups', ['--import' => true, '--after' => $first->id, '--through' => $second->id])->assertExitCode(0);
+        $this->assertDatabaseCount('medication_followups', 2);
+        $this->assertDatabaseCount('medication_followup_events', 2);
+        $this->assertSame($before, ClientMedicationAdministration::query()->orderBy('id')->get()->map->getRawOriginal()->all());
+        $this->assertDatabaseCount('medication_prn_effectiveness', 0);
+        $this->artisan('emar:workflow-followups', ['--import' => true, '--limit' => 1001])->assertExitCode(2);
+        $this->artisan('emar:workflow-followups', ['--import' => true, '--preview' => true])->assertExitCode(2);
+        $this->assertDatabaseCount('medication_followup_events', 2);
+    }
+
+    public function test_worker_prn_queue_uses_canonical_rescheduling_and_reassignment_and_hides_completion(): void
+    {
+        [$dose, $row] = $this->effect();
+        $cover = $this->staff();
+        $this->onShift($cover);
+        $this->postFollowup($row, ['action' => 'couldnt_check', 'reason' => 'Person is asleep', 'again_at' => '2026-10-03T11:00:00+13:00'])->assertOk();
+        $this->postFollowup($row->fresh(), ['action' => 'reassign', 'reason' => 'Covering worker will check', 'owner_id' => $cover->id])->assertOk();
+        $this->artisan('emar:workflow-followups', ['--import' => true, '--client' => $this->client->id])->assertExitCode(0);
+        $this->assertSame($this->worker->id, $row->fresh()->original_owner_id);
+        $this->assertSame(3, $row->events()->count());
+        $queue = app(PrnEffectCheckQueue::class)->payload(DoseSlotReaderScope::forAuthorisedClients($this->worker, [$this->client->id]), now('UTC'), 'Pacific/Auckland');
+        $this->assertCount(1, $queue);
+        $this->assertSame($row->id, $queue[0]['followup_id']);
+        $this->assertSame($cover->id, $queue[0]['owner_id']);
+        $this->assertSame($cover->name, $queue[0]['owner_name']);
+        $this->assertSame('2026-10-03T11:00:00+13:00', $queue[0]['check_due_at']);
+        $this->assertSame($dose->getRawOriginal('effect_check_due_at'), $dose->fresh()->getRawOriginal('effect_check_due_at'));
+        $this->postFollowup($row->fresh(), ['action' => 'effect', 'outcome' => 'effective'])->assertOk();
+        $this->assertSame([], app(PrnEffectCheckQueue::class)->payload(DoseSlotReaderScope::forAuthorisedClients($this->worker, [$this->client->id]), now('UTC'), 'Pacific/Auckland'));
+    }
+
+    public function test_completed_effects_and_future_or_pending_sources_do_not_create_missing_work(): void
+    {
+        $dose = $this->legacyEffect();
+        MedicationPrnEffectiveness::query()->create(['client_id' => $dose->client_id, 'client_medication_id' => $dose->client_medication_id,
+            'client_medication_administration_id' => $dose->id, 'reviewed_by' => $this->worker->id, 'reviewed_at' => now(), 'effectiveness' => 'effective']);
+        $future = $this->legacyEffect(['administered_at' => now()->addHour()]);
+        $this->legacyEffect(['is_correction' => true, 'corrected_of_id' => $dose->id, 'correction_status' => 'pending']);
+        $this->actingAs($this->worker)->getJson('/medication-followups')->assertOk()->assertJsonPath('legacy_effect_checks.total', 0);
+        $this->assertSame([], (new LegacyMedicationEffectProvider)->authorizedTasks($this->worker));
+        $this->actingAs($this->worker)->postJson('/medication-followups/administrations/'.$future->id.'/prepare')->assertNotFound();
+        $this->assertDatabaseCount('medication_followups', 0);
+    }
+
+    public function test_a_legacy_effect_result_hides_stale_open_work_until_explicit_identity_reconciliation(): void
+    {
+        [$dose, $row] = $this->effect();
+        MedicationPrnEffectiveness::query()->create(['client_id' => $dose->client_id, 'client_medication_id' => $dose->client_medication_id,
+            'client_medication_administration_id' => $dose->id, 'reviewed_by' => $this->worker->id, 'reviewed_at' => now(), 'effectiveness' => 'effective']);
+        $this->actingAs($this->worker)->getJson('/medication-followups')->assertOk()
+            ->assertJsonPath('meters.open', 0)->assertJsonPath('legacy_effect_checks.total', 0);
+        $this->assertCount(0, (new MedicationFollowupProvider)->authorizedTasks($this->worker));
+        $this->assertSame([], app(PrnEffectCheckQueue::class)->payload(DoseSlotReaderScope::forAuthorisedClients($this->worker, [$this->client->id]), now('UTC'), 'Pacific/Auckland'));
+        $this->assertNull($row->fresh()->completed_at);
+        $this->artisan('emar:workflow-followups', ['--import' => true, '--client' => $this->client->id])->assertExitCode(0);
+        $this->assertNotNull($row->fresh()->completed_at);
+        $this->assertSame(1, $row->events()->where('action', 'legacy_effect')->count());
     }
 
     public function test_pending_and_rejected_given_corrections_do_not_create_phantom_effect_work(): void
@@ -674,6 +895,16 @@ class MedicationFollowupWorkflowTest extends TestCase
         DB::transaction(fn () => $this->work()->syncAdministration($dose));
 
         return [$dose, MedicationFollowup::query()->where('source_key', 'effect:'.$dose->id)->sole()];
+    }
+
+    private function legacyEffect(array $doseOverrides = [], array $orderOverrides = []): ClientMedicationAdministration
+    {
+        $order = ClientMedication::query()->create(['client_id' => $this->client->id, 'name' => 'Synthetic legacy PRN',
+            'dosage' => '1 tablet', 'frequency' => 'As needed', 'is_prn' => true, 'state' => 'active', 'active' => true, ...$orderOverrides]);
+
+        return ClientMedicationAdministration::query()->create(['client_id' => $this->client->id, 'client_medication_id' => $order->id,
+            'shift_id' => $this->shift->id, 'administered_by' => $this->worker->id, 'status' => 'given',
+            'administered_at' => now()->subDay(), 'effect_check_due_at' => null, 'is_correction' => false, ...$doseOverrides]);
     }
 
     private function refusal(): array

@@ -37,6 +37,7 @@ import {
     createContext,
     useContext,
     useEffect,
+    useId,
     useLayoutEffect,
     useRef,
     useState,
@@ -114,6 +115,8 @@ export interface PageHeaderProps {
     meters?: ReactNode;
     /** Filter row: compact pills by default; frontline mode grows their real boxes. */
     filters?: ReactNode;
+    /** Keep the current task visible on phones; all meters and filters remain expandable. */
+    mobileSummary?: string;
     /** Bottom edge: the connected-tab rail — <PageHeaderRail>. */
     rail?: ReactNode;
     className?: string;
@@ -134,9 +137,12 @@ export function PageHeader({
     actions,
     meters,
     filters,
+    mobileSummary,
     rail,
     className,
 }: PageHeaderProps) {
+    const [mobileExpanded, setMobileExpanded] = useState(false);
+    const summaryId = useId();
     return (
         <PageHeaderFrontlineContext.Provider value={frontline}>
             <header
@@ -220,21 +226,48 @@ export function PageHeader({
                             ) : null}
                         </div>
 
-                        {/* the meter row — full width, every block a link */}
-                        {meters ? (
-                            <div className="mt-[13px] flex min-h-[80px] flex-wrap items-stretch gap-2">
-                                {meters}
-                            </div>
-                        ) : null}
-
-                        {/* filter row */}
-                        {filters ? (
-                            <div className="mt-[10px] flex flex-wrap items-center justify-end gap-1.5 pb-3">
-                                {filters}
-                            </div>
-                        ) : (
-                            <div className="pb-3" />
+                        {mobileSummary && (
+                            <button
+                                type="button"
+                                className="frontline-tap frontline-focus my-2 flex w-full items-center justify-between gap-2 rounded-lg border border-band-foreground/20 bg-band-foreground/10 px-3 text-left text-[13px] md:hidden"
+                                aria-expanded={mobileExpanded}
+                                aria-controls={summaryId}
+                                onClick={() =>
+                                    setMobileExpanded((value) => !value)
+                                }
+                            >
+                                <span>{mobileSummary}</span>
+                                <span className="shrink-0">
+                                    {mobileExpanded
+                                        ? 'Hide details'
+                                        : 'Details & filters'}
+                                </span>
+                            </button>
                         )}
+                        <div
+                            id={summaryId}
+                            className={cn(
+                                mobileSummary &&
+                                    !mobileExpanded &&
+                                    'hidden md:block',
+                            )}
+                        >
+                            {/* the meter row — full width, every block a link */}
+                            {meters ? (
+                                <div className="mt-[13px] flex min-h-[80px] flex-wrap items-stretch gap-2">
+                                    {meters}
+                                </div>
+                            ) : null}
+
+                            {/* filter row */}
+                            {filters ? (
+                                <div className="mt-[10px] flex flex-wrap items-center justify-end gap-1.5 pb-3">
+                                    {filters}
+                                </div>
+                            ) : (
+                                <div className="pb-3" />
+                            )}
+                        </div>
                     </div>
 
                     {/* the rail — main view tabs, flush with the bottom edge */}
@@ -1092,10 +1125,9 @@ const railTabClass = (on: boolean, frontline = false) =>
               // centre sits 34/2 + 6px margin = 23px above
               // the band edge; (40 − 6)/2 + 6 = 23px here
               // (DESIGN.md "Sunken active-rail labels").
-              'h-10 rounded-t-[12px] bg-background px-[17px] pb-[6px] text-[13.5px] font-semibold text-primary'
+              'h-[40px] rounded-t-[12px] bg-background px-[17px] pb-[6px] text-[13.5px] font-semibold text-primary'
             : 'mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-band-foreground/80 transition-colors hover:bg-band-foreground/10 hover:text-band-foreground',
-        frontline && 'frontline-tap min-w-0 shrink',
-        frontline && on && 'eh-frontline-rail-active',
+        frontline && 'frontline-hit min-w-0 shrink',
     );
 
 /** Ghost utility pills at the rail's end (⋯ More, ⌕ Find) — inactive-pill geometry. */
@@ -1187,7 +1219,7 @@ export function PageHeaderRail<K extends string>({
     decorations?: Partial<Record<K, ReactNode>>;
 }) {
     const frontline = useContext(PageHeaderFrontlineContext);
-    const pillClass = cn(railPillClass, frontline && 'frontline-tap');
+    const pillClass = cn(railPillClass, frontline && 'frontline-hit');
     const [viewsFindOpen, setViewsFindOpen] = useState(false);
     const [moreOpen, setMoreOpen] = useState(false);
     /** Keys of the tabs shown on the rail; null = everything fits. */

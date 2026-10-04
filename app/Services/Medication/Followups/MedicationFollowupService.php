@@ -17,11 +17,13 @@ use App\Services\AuthorizationEvidenceLockService;
 use App\Services\Medication\Audit\MedicationEventData;
 use App\Services\Medication\Audit\MedicationEventFingerprint;
 use App\Services\Medication\Audit\MedicationEventRecorder;
+use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\Medication\Recording\PrnEffectCheckQueue;
 use App\Services\Medication\RefusalEscalationPolicy;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\UserSiteAccessService;
@@ -106,7 +108,8 @@ final class MedicationFollowupService
             && $row->type === $type && (int) $row->administration_id === (int) $administration?->id
             && (int) $row->client_medication_id === (int) $medication?->id, 404);
         if ($row->wasRecentlyCreated) {
-            $this->event($row, $ownerId, 'created', ['due_at' => $row->due_at?->toIso8601String()]);
+            $this->event($row, $ownerId, 'created', ['due_at' => $row->due_at?->toIso8601String()]
+                + (isset($context['legacy_preparation']) ? ['legacy_preparation' => $context['legacy_preparation']] : []));
         }
 
         return $row;
@@ -125,7 +128,7 @@ final class MedicationFollowupService
     }
 
     /** No guessed effect-check time; historical rows without a chosen time stay unscheduled. */
-    public function syncAdministration(ClientMedicationAdministration $administration): void
+    public function syncAdministration(ClientMedicationAdministration $administration, array $sourceContext = []): void
     {
         $administration->loadMissing(['client', 'medication']);
         $client = $administration->client;
@@ -148,7 +151,7 @@ final class MedicationFollowupService
         }
         if ($medication->is_prn && $administration->status === 'given') {
             $row = $this->ensure('effect:'.$administration->id, 'effect', $client, $medication,
-                $administration, $owner, $this->instant($administration, 'effect_check_due_at'));
+                $administration, $owner, $this->instant($administration, 'effect_check_due_at'), $sourceContext);
             $effect = MedicationPrnEffectiveness::query()
                 ->where('client_medication_administration_id', $administration->id)
                 ->where('client_id', $client->id)->where('client_medication_id', $medication->id)->first();
@@ -167,7 +170,7 @@ final class MedicationFollowupService
             ->where('client_id', $client->id)->orderBy('id')->get() as $refusal) {
             $row = $this->ensure('refusal:'.$administration->id, 'reoffer', $client, $medication, $administration,
                 $refusal->owner_id ? (int) $refusal->owner_id : ((int) $refusal->created_by ?: null),
-                $this->instant($refusal, 'follow_up_due_at'), ['refusal_id' => $refusal->id]);
+                $this->instant($refusal, 'follow_up_due_at'), ['refusal_id' => $refusal->id] + $sourceContext);
             if ($refusal->follow_up_completed_at && ! $row->completed_at) {
                 $this->close($row, (int) $refusal->follow_up_completed_by, 'source_completed',
                     ['outcome' => $refusal->follow_up_outcome], $this->instant($refusal, 'follow_up_completed_at'));
@@ -181,7 +184,7 @@ final class MedicationFollowupService
             $type = str_contains($administration->review_reason_key, 'partial') ? 'partial' : 'unconfirmed';
             $this->ensure('dose-review:'.$administration->id, $type, $client, $medication,
                 $administration, null, $this->nextShiftEnd($client, $administration),
-                ['reason' => $administration->review_reason]);
+                ['reason' => $administration->review_reason] + $sourceContext);
         }
         if ($administration->reoffer_of_id && (int) $administration->reoffer_of_id !== (int) $administration->id) {
             $root = ClientMedicationAdministration::query()->whereKey($administration->reoffer_of_id)
@@ -206,6 +209,7 @@ final class MedicationFollowupService
         abort_unless($medication && (int) $medication->client_id === (int) $administration->client_id, 404);
         abort_if($medication->controlled_drug && (! $actor->canDo('medications.controlled.view') || ! $actor->canDo('medications.controlled.record')), 404);
         abort_unless($type === 'effect' ? $medication->is_prn && $administration->status === 'given'
+            && $this->instant($administration, 'administered_at')?->lte(now('UTC'))
             : in_array($administration->status, ['refused', 'withheld'], true), 404);
 
         return $administration;
@@ -225,9 +229,10 @@ final class MedicationFollowupService
             $this->records->assertReadable($actor, $client);
             abort_if($medication->controlled_drug && (! $actor->canDo('medications.controlled.view') || ! $actor->canDo('medications.controlled.record')), 404);
             abort_unless($type === 'effect' ? $medication->is_prn && $administration->status === 'given'
+                && $this->instant($administration, 'administered_at')?->lte(now('UTC'))
                 : in_array($administration->status, ['refused', 'withheld'], true), 404);
             $administration->setRelation('client', $client)->setRelation('medication', $medication);
-            $this->syncAdministration($administration);
+            $this->syncAdministration($administration, ['legacy_preparation' => ['method' => 'source_prepare', 'actor_id' => $actor->id]]);
 
             return MedicationFollowup::query()->where('source_key', ($type === 'effect' ? 'effect:' : 'refusal:').$administration->id)->firstOrFail();
         }, 5);
@@ -248,13 +253,77 @@ final class MedicationFollowupService
                     ->whereColumn('client_medication_administrations.client_medication_id', 'medication_followups.client_medication_id')))
             ->where(fn (Builder $q) => $q->whereNotNull('completed_at')
                 ->orWhereNotIn('type', ['effect', 'reoffer', 'partial', 'unconfirmed'])
-                ->orWhereHas('administration', fn (Builder $a) => $a->effectiveClinicalEvidence()));
+                ->orWhereHas('administration', fn (Builder $a) => $a->effectiveClinicalEvidence()))
+            ->where(fn (Builder $q) => $q->whereNotNull('completed_at')->orWhere('type', '!=', 'effect')
+                ->orWhereDoesntHave('administration.prnEffectiveness', fn (Builder $e) => $e
+                    ->whereColumn('medication_prn_effectiveness.client_id', 'medication_followups.client_id')
+                    ->whereColumn('medication_prn_effectiveness.client_medication_id', 'medication_followups.client_medication_id')))
+            ->where(fn (Builder $q) => $q->whereNotNull('completed_at')->orWhere('type', '!=', 'effect')
+                ->orWhereHas('administration', fn (Builder $a) => $a->where('status', 'given')->where('administered_at', '<=', now('UTC'))
+                    ->whereHas('medication', fn (Builder $m) => $m->where('is_prn', true))));
         if (! $includeControlled && ! $actor->canDo('medications.controlled.view')) {
             $query->where(fn (Builder $q) => $q->whereNull('client_medication_id')
                 ->orWhereHas('medication', fn (Builder $m) => $m->where('controlled_drug', false)->orWhereNull('controlled_drug')));
         }
 
         return $query;
+    }
+
+    /** Missing legacy work is visible before an explicit import; reading never writes clinical evidence. */
+    public function legacyEffectQuery(User $actor): Builder
+    {
+        $sites = $this->governance->readerSiteIds($actor, 'medications.view');
+        $clients = $this->records->readableClientIds($actor, Client::query()->whereIn('site_id', $sites)->pluck('id'));
+
+        return app(PrnEffectCheckQueue::class)->unresolvedQuery(
+            DoseSlotReaderScope::forAuthorisedClients($actor, $clients), now('UTC'), missingOnly: true,
+        );
+    }
+
+    /** Bounded read-only readiness rows use the existing authorized prepare POST. */
+    public function legacyEffectChecks(User $actor, array $filters = []): array
+    {
+        $query = $this->legacyEffectQuery($actor)
+            ->when($filters['client_id'] ?? null, fn ($q, $id) => $q->where('client_id', $id))
+            ->when($filters['site_id'] ?? null, fn ($q, $id) => $q->whereHas('client', fn ($c) => $c->where('site_id', $id)))
+            ->when(isset($filters['type']) && $filters['type'] !== 'effect', fn ($q) => $q->whereRaw('1 = 0'))
+            ->when($filters['q'] ?? null, fn ($q, $term) => $q->where(fn ($q) => $q
+                ->whereHas('client', fn ($c) => $c->where('first_name', 'like', '%'.$term.'%')->orWhere('last_name', 'like', '%'.$term.'%'))
+                ->orWhereHas('medication', fn ($m) => $m->where('name', 'like', '%'.$term.'%'))));
+        $total = (clone $query)->count();
+        $overdue = (clone $query)->where('effect_check_due_at', '<', now('UTC'))->count();
+        $unscheduled = (clone $query)->whereNull('effect_check_due_at')->count();
+        $state = $filters['state'] ?? 'open';
+        $query->when(in_array($state, ['done', 'lead'], true), fn ($q) => $q->whereRaw('1 = 0'))
+            ->when($state === 'overdue', fn ($q) => $q->where('effect_check_due_at', '<', now('UTC')))
+            ->when($state === 'unscheduled', fn ($q) => $q->whereNull('effect_check_due_at'))
+            ->when($filters['administration'] ?? null, fn ($q, $id) => $q->whereKey($id));
+        $filtered = (clone $query)->count();
+        $data = $query->with(['client.site', 'medication', 'administeredBy:id,name'])
+            ->orderByRaw('effect_check_due_at IS NULL')->orderBy('effect_check_due_at')->orderBy('id')->limit(25)
+            ->get()->map(fn ($dose) => $this->presentLegacyEffect($dose, $actor))->all();
+
+        return ['total' => $total, 'overdue' => $overdue, 'unscheduled' => $unscheduled,
+            'filtered_total' => $filtered, 'data' => $data, 'has_more' => $filtered > count($data)];
+    }
+
+    public function presentLegacyEffect(ClientMedicationAdministration $dose, User $actor): array
+    {
+        $dose->loadMissing(['client.site', 'medication', 'administeredBy:id,name']);
+        $canPrepare = $actor->approved_at !== null && $this->staff->isCurrent($actor)
+            && $actor->canDo('medications.administer.record')
+            && (! $dose->medication->controlled_drug || $actor->canDo('medications.controlled.record'));
+        $due = $this->instant($dose, 'effect_check_due_at');
+
+        return ['source_key' => 'effect:'.$dose->id, 'administration_id' => $dose->id,
+            'client' => ['id' => $dose->client_id, 'name' => $dose->client->full_name],
+            'site' => ['id' => $dose->client->site_id, 'name' => $dose->client->site?->name],
+            'medication' => ['id' => $dose->client_medication_id, 'name' => $dose->medication->name],
+            'owner' => $dose->administeredBy ? ['id' => $dose->administeredBy->id, 'name' => $dose->administeredBy->name] : null,
+            'due_at' => $due?->toIso8601String(), 'given_at' => $this->instant($dose, 'administered_at')?->toIso8601String(),
+            'can_prepare' => $canPrepare, 'prepare_url' => '/medication-followups/administrations/'.$dose->id.'/prepare',
+            'record_url' => app(MarLinkService::class)->urlFor($actor, $dose->client_id),
+            'url' => '/medication-followups?administration='.$dose->id];
     }
 
     public function forClient(User $actor, int $clientId): array

@@ -7,6 +7,7 @@ import {
     emarHubForUrl,
     emarHubLinkActive,
     emarReportsHref,
+    emarScopedHref,
     emarSearchEntries,
     emarSidebar,
     visibleEmarViews,
@@ -54,6 +55,22 @@ const labels = (can: EmarNavigationPermissions, key: string) =>
     );
 
 describe('server-authorised medication discovery', () => {
+    it('keeps person and house scope between hubs without carrying the previous view or search', () => {
+        expect(
+            emarScopedHref(
+                '/emar/controlled?view=discrepancies',
+                '/emar/stock?site_id=7&client_id=19&date=2026-10-04&view=orders&q=private',
+            ),
+        ).toBe(
+            '/emar/controlled?view=discrepancies&site_id=7&client_id=19&date=2026-10-04',
+        );
+        expect(
+            emarScopedHref(
+                '/emar/mar?client_id=20',
+                '/emar/stock?client_id=19&site_id=-1&date=invalid',
+            ),
+        ).toBe('/emar/mar?client_id=20');
+    });
     it('retains one Meds today sidebar entry for an ordinary frontline worker', () => {
         expect(emarSidebar(worker)).toEqual({
             mode: 'frontline',

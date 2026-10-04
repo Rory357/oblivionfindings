@@ -38,6 +38,8 @@ export function MedsWizardDialog({
     footer,
     children,
     formState,
+    completeness,
+    success,
     sequential = true,
 }: {
     open: boolean;
@@ -54,6 +56,8 @@ export function MedsWizardDialog({
     footer: ReactNode;
     children: ReactNode;
     sequential?: boolean;
+    completeness?: { completed: number; total: number };
+    success?: ReactNode;
     /** The owning form supplies real dirtiness and request state. Successful saves close through the owner. */
     formState?: {
         isDirty: boolean;
@@ -86,6 +90,10 @@ export function MedsWizardDialog({
         </div>
     ) : null;
     const requestClose = () => {
+        if (success) {
+            onClose();
+            return;
+        }
         if (formState?.processing) return;
         if (formState?.isDirty) setDiscard(true);
         else onClose();
@@ -141,11 +149,11 @@ export function MedsWizardDialog({
                     description={description}
                     width={720}
                     onClose={requestClose}
-                    footer={<>{guardedFooter}</>}
+                    footer={success ? undefined : <>{guardedFooter}</>}
                 >
                     {errorSummary}
-                    {children}
-                    {railFooter}
+                    {success ?? children}
+                    {!success && railFooter}
                 </SettingsModal>
                 {guard}
             </>
@@ -164,8 +172,19 @@ export function MedsWizardDialog({
                 railExtra={railFooter}
                 steps={steps}
                 stepIndex={stepIndex}
-                onStepClick={onStepClick}
+                onStepClick={(index) => {
+                    if (!formState?.processing) onStepClick(index);
+                }}
                 sequential={sequential}
+                pct={
+                    completeness && completeness.total > 0
+                        ? Math.round(
+                              (completeness.completed / completeness.total) *
+                                  100,
+                          )
+                        : undefined
+                }
+                success={success}
                 headerLabel={!sequential ? steps[stepIndex]?.label : undefined}
                 footerStart={guardedFooter[0]}
                 footerEnd={guardedFooter.slice(1)}

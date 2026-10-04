@@ -156,7 +156,6 @@ const nzDay = (iso: string): string =>
     new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date(iso));
 
 export default function MedsToday(props: MedsTodayProps) {
-    const breadcrumbs = useEmarBreadcrumbs();
     const {
         schedule,
         clients,
@@ -188,6 +187,7 @@ export default function MedsToday(props: MedsTodayProps) {
         const v = query().get('view') as View | null;
         return v && VIEWS.includes(v) ? v : 'schedule';
     });
+    const breadcrumbs = useEmarBreadcrumbs(`/meds/today?view=${view}`);
     const [search, setSearch] = useState(() => query().get('q') ?? '');
     const [stateFilter, setStateFilter] = useState<StateFilter>(
         () => (query().get('state') as StateFilter) || 'all',
@@ -790,6 +790,7 @@ export default function MedsToday(props: MedsTodayProps) {
     const header = (
         <PageHeader
             frontline
+            mobileSummary={`${due.length} due now · ${late.length} late`}
             icon={Pill}
             title="Meds today"
             titleChip={
@@ -857,8 +858,12 @@ export default function MedsToday(props: MedsTodayProps) {
                             }
                         />
                     ) : null}
-                    {board_can.record_administration &&
-                    prn_medications.length ? (
+                    {hasShift && !clockedIn ? (
+                        <PageHeaderPrimaryButton asChild icon={LogIn}>
+                            <Link href="/attendance">Clock in</Link>
+                        </PageHeaderPrimaryButton>
+                    ) : board_can.record_administration &&
+                      prn_medications.length ? (
                         <PageHeaderPrimaryButton
                             icon={Plus}
                             onClick={() => open({ kind: 'prn-pick' })}

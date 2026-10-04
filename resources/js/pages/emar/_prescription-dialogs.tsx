@@ -1,3 +1,4 @@
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { LegacyOrderLink } from '@/pages/emar/orders/_legacy-link';
 /* eslint-disable no-restricted-syntax -- summary/detail panes are custom-layout
    bordered surfaces inside the wizard, not Card components; all colours are tokens. */
@@ -230,6 +231,7 @@ export function NewOrderDialog({
 
     return (
         <MedsWizardDialog
+            formState={form}
             open
             onClose={close}
             title="New prescriber order"
@@ -365,12 +367,14 @@ export function NewOrderDialog({
                             required
                             error={form.errors.order_date}
                         >
-                            <Input
-                                type="date"
+                            <DatePicker
+                                id="emar-prescription-dialogs-1"
+                                label="Order date"
                                 value={form.data.order_date}
-                                onChange={(e) =>
-                                    form.setData('order_date', e.target.value)
+                                onChange={(value) =>
+                                    form.setData('order_date', value)
                                 }
+                                invalid={Boolean(form.errors.order_date)}
                             />
                         </Field>
                     </div>
@@ -549,24 +553,25 @@ export function NewOrderDialog({
                             />
                         </Field>
                         <Field label="Effective date">
-                            <Input
-                                type="date"
+                            <DatePicker
+                                id="emar-prescription-dialogs-2"
+                                label="Effective date"
                                 value={form.data.effective_date}
-                                onChange={(e) =>
-                                    form.setData(
-                                        'effective_date',
-                                        e.target.value,
-                                    )
+                                onChange={(value) =>
+                                    form.setData('effective_date', value)
                                 }
+                                allowClear
                             />
                         </Field>
                         <Field label="Expiry date">
-                            <Input
-                                type="date"
+                            <DatePicker
+                                id="emar-prescription-dialogs-3"
+                                label="Expiry date"
                                 value={form.data.expiry_date}
-                                onChange={(e) =>
-                                    form.setData('expiry_date', e.target.value)
+                                onChange={(value) =>
+                                    form.setData('expiry_date', value)
                                 }
+                                allowClear
                             />
                         </Field>
                     </div>
@@ -873,12 +878,14 @@ export function DispenseDialog({
                     />
                 </Field>
                 <Field label="Batch expiry">
-                    <Input
-                        type="date"
+                    <DatePicker
+                        id="emar-prescription-dialogs-4"
+                        label="Batch expiry"
                         value={form.data.batch_expiry}
-                        onChange={(e) =>
-                            form.setData('batch_expiry', e.target.value)
+                        onChange={(value) =>
+                            form.setData('batch_expiry', value)
                         }
+                        allowClear
                     />
                 </Field>
                 <Field
@@ -886,13 +893,14 @@ export function DispenseDialog({
                     required
                     error={form.errors.dispensed_at}
                 >
-                    <Input
-                        type="date"
+                    <DatePicker
+                        id="emar-prescription-dialogs-5"
+                        label="Dispensed date"
                         value={form.data.dispensed_at}
-                        onChange={(e) =>
-                            form.setData('dispensed_at', e.target.value)
+                        onChange={(value) =>
+                            form.setData('dispensed_at', value)
                         }
-                        required
+                        invalid={Boolean(form.errors.dispensed_at)}
                     />
                 </Field>
                 <Field label="Pharmacy notes" span>
@@ -1023,6 +1031,7 @@ export function RevokeCovertDialog({
 
     return (
         <MedsWizardDialog
+            formState={form}
             open
             onClose={close}
             title="Revoke covert authorisation"

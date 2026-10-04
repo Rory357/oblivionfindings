@@ -49,7 +49,7 @@ class ClientControlledDrugDiscrepancy extends Model
 
     public function medication(): BelongsTo
     {
-        return $this->belongsTo(ClientMedication::class, 'client_medication_id');
+        return $this->belongsTo(ClientMedication::class, 'client_medication_id')->withTrashed();
     }
 
     public function serviceContext(): BelongsTo

@@ -3,9 +3,12 @@
 namespace Tests\Feature\Emar;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AppSetting;
+use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientControlledDrugEntry;
+use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
@@ -22,6 +25,8 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\Alerts\MedicationAlertSources;
+use App\Services\Medication\Controlled\ControlledCountStatus;
 use App\Services\Medication\Controlled\ControlledPolicy;
 use App\Services\Medication\Controlled\ControlledRegisterService;
 use Carbon\Carbon;
@@ -36,6 +41,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
+use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Tests\TestCase;
 
@@ -318,7 +324,7 @@ class ControlledProductTest extends TestCase
             'pharmacist_name' => 'Second receipt', 'pharmacist_registration' => 'SYNTHETIC-SECOND'], $this->lead));
     }
 
-    public function test_void_pharmacy_return_keeps_destruction_and_appends_one_witnessed_reversal(): void
+    public function test_void_pharmacy_return_keeps_destruction_and_stock_as_an_administrative_annotation(): void
     {
         $result = $this->perform('destruction', ['method' => 'pharmacy_return', 'reason' => 'expired', 'quantity' => 2], $this->lead);
         $row = MedicationDestruction::query()->sole();
@@ -326,13 +332,16 @@ class ControlledProductTest extends TestCase
         $this->actingAs($this->lead);
         $service = app(ControlledRegisterService::class);
         $response = $service->perform($this->lead, 'destruction_void', $input);
-        $this->assertSame($response, $service->perform($this->lead->fresh(), 'destruction_void', $input));
+        $retry = $service->perform($this->lead->fresh(), 'destruction_void', $input);
+        ksort($response);
+        ksort($retry);
+        $this->assertSame($response, $retry);
         $this->assertNotNull($row->refresh()->voided_at);
         $this->assertSame($result['entry_id'], (int) $row->register_entry_id);
-        $this->assertSame(1, ClientControlledDrugEntry::query()->where('reverses_entry_id', $result['entry_id'])->count());
-        $this->assertSame('10.00', $this->stock->refresh()->on_hand);
+        $this->assertSame(0, ClientControlledDrugEntry::query()->where('reverses_entry_id', $result['entry_id'])->count());
+        $this->assertSame('8.00', $this->stock->refresh()->on_hand);
         $this->assertDatabaseCount('medication_destructions', 1);
-        $this->assertDatabaseCount('client_controlled_drug_entries', 2);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 1);
     }
 
     public function test_support_worker_cannot_manage_and_manage_deny_wins_for_a_provider_manager(): void
@@ -453,7 +462,8 @@ class ControlledProductTest extends TestCase
         $this->actionRequest('destruction_void', ['target_id' => $destructionId, 'notes' => 'Wrong synthetic medicine was selected; actual package is separately recorded.'], $this->lead)->assertOk();
         $this->assertNotNull($row->refresh()->voided_at);
         $this->assertDatabaseCount('medication_destructions', 1);
-        $this->assertDatabaseCount('client_controlled_drug_entries', 2);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 1);
+        $this->assertSame('8.00', $this->stock->fresh()->on_hand);
         Storage::disk('local')->assertExists($row->photo_path);
     }
 
@@ -617,6 +627,186 @@ class ControlledProductTest extends TestCase
         $this->assertSame('C', $this->medication->fresh()->nz_controlled_class);
         $this->expectException(\LogicException::class);
         $this->medication->fresh()->update(['dosage' => '2 tablets']);
+    }
+
+    public function test_replay_rechecks_current_witness_pin_permission_and_recorder_presence_without_repeating_stock(): void
+    {
+        $this->client->supportWorkers()->syncWithoutDetaching([$this->recorder->id]);
+        $input = $this->input(['movement_type' => 'going_out', 'quantity' => 1, 'actual_balance' => 9]);
+        $service = app(ControlledRegisterService::class);
+        $first = $service->perform($this->recorder->fresh(), 'movement', $input);
+        $retry = [...$input, 'quantity' => '1.00', 'expected_balance' => 10, 'actual_balance' => '9.0'];
+        $replayed = $service->perform($this->recorder->fresh(), 'movement', $retry);
+        ksort($first);
+        ksort($replayed);
+        $this->assertSame($first, $replayed);
+        $this->assertTrue($service->lastRequestWasReplay());
+        $this->invalid('witness_credential', fn () => $service->perform($this->recorder->fresh(), 'movement', [...$retry, 'witness_credential' => '000000']));
+        $this->permissions($this->witness, ['medications.controlled.witness' => false]);
+        $this->denied(404, fn () => $service->perform($this->recorder->fresh(), 'movement', $retry));
+        $this->permissions($this->witness, ['medications.controlled.witness' => true]);
+        Shift::query()->where('user_id', $this->recorder->id)->update(['status' => 'cancelled']);
+        $this->invalid('presence', fn () => $service->perform($this->recorder->fresh(), 'movement', $retry));
+        $this->assertDatabaseCount('client_controlled_drug_entries', 1);
+        $this->assertSame('9.00', $this->stock->fresh()->on_hand);
+        $this->assertSame(1, DB::table('controlled_product_requests')->count());
+    }
+
+    public function test_denaturing_retry_rechecks_the_second_witness_and_keeps_canonical_snapshots(): void
+    {
+        AppSetting::query()->updateOrCreate(['key' => ControlledPolicy::ONSITE_DESTRUCTION], ['value' => 'on']);
+        $this->medication->forceFill(['form' => 'tablet', 'dosage' => '5 mg'])->save();
+        $input = $this->input(['quantity' => 2, 'reason' => 'expired', 'method' => 'denaturing',
+            'second_witness_id' => $this->manager->id, 'second_witness_credential' => UserFactory::TEST_WITNESS_PIN,
+            'medication_name' => 'Forged label', 'form' => 'Forged form', 'strength' => 'Forged strength']);
+        $service = app(ControlledRegisterService::class);
+        $first = $service->perform($this->lead->fresh(), 'destruction', $input);
+        $row = MedicationDestruction::query()->sole();
+        $this->assertSame($this->medication->name, $row->medication_name);
+        $this->assertSame('tablet', $row->form);
+        $this->assertSame('5 mg', $row->strength);
+        $this->permissions($this->manager, ['medications.controlled.witness' => false]);
+        $this->denied(404, fn () => $service->perform($this->lead->fresh(), 'destruction', $input));
+        $this->assertSame($row->id, $first['target_id']);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 1);
+        $this->assertSame('8.00', $this->stock->fresh()->on_hand);
+        $payload = $this->actingAs($this->lead->fresh())->getJson('/emar/controlled/product')->assertOk();
+        $payload->assertJsonPath('destructions.0.form', 'tablet')->assertJsonPath('destructions.0.strength', '5 mg');
+    }
+
+    public function test_disposal_void_after_later_movement_keeps_physical_stock_and_original_entry(): void
+    {
+        $result = $this->perform('destruction', ['method' => 'pharmacy_return', 'reason' => 'expired', 'quantity' => 2], $this->lead);
+        $original = ClientControlledDrugEntry::findOrFail($result['entry_id'])->getRawOriginal();
+        $this->perform('movement', ['movement_type' => 'going_out', 'quantity' => 1, 'actual_balance' => 7]);
+        $this->perform('destruction_void', ['target_id' => $result['target_id'], 'expected_balance' => 10,
+            'expected_entry_id' => null, 'witnessed_by' => null, 'witness_credential' => null,
+            'notes' => 'Administrative duplicate; physical stock requires separate reconciliation.'], $this->lead);
+        $this->assertSame('7.00', $this->stock->fresh()->on_hand);
+        $this->assertSame($original, ClientControlledDrugEntry::findOrFail($result['entry_id'])->getRawOriginal());
+        $this->assertDatabaseCount('client_controlled_drug_entries', 2);
+        $audit = AuditLog::where('action', 'medications.destruction.void')->latest('id')->firstOrFail();
+        $this->assertFalse($audit->meta['stock_effect_reversed']);
+        $this->assertTrue($audit->meta['requires_governed_stock_reconciliation']);
+    }
+
+    public function test_count_policy_covers_retained_stock_and_ignores_empty_historical_orders(): void
+    {
+        AppSetting::query()->updateOrCreate(['key' => ControlledPolicy::COUNT_CADENCE], ['value' => 'shift']);
+        DB::table('client_medications')->where('id', $this->medication->id)->update(['created_at' => now()->subDay()]);
+        $stockMedicine = $this->medicine($this->client);
+        $emptyMedicine = $this->medicine($this->client);
+        foreach ([$stockMedicine, $emptyMedicine] as $medicine) {
+            DB::table('client_medications')->where('id', $medicine->id)->update([
+                'state' => 'ceased', 'active' => false, 'created_at' => now()->subDay(),
+                'ceased_at' => now()->subMinutes(5), 'ceased_by' => $this->manager->id, 'ceased_reason' => 'Synthetic cessation',
+                'deleted_at' => now(),
+            ]);
+        }
+        ClientMedicationStock::create(['client_medication_id' => $stockMedicine->id, 'on_hand' => 2, 'unit' => 'tablet']);
+        ClientMedicationStock::create(['client_medication_id' => $emptyMedicine->id, 'on_hand' => 0, 'unit' => 'tablet']);
+        $status = app(ControlledCountStatus::class);
+        $this->assertEqualsCanonicalizing([$this->medication->id, $stockMedicine->id], $status->overdueMedicines($this->site->id)->pluck('id')->all());
+        $payload = $this->actingAs($this->manager->fresh())->getJson('/emar/controlled/product')->assertOk()->json();
+        $rows = collect($payload['medicines'])->keyBy('id');
+        $this->assertSame('overdue', $rows[$stockMedicine->id]['count']['state']);
+        $this->assertSame('No stock count required', $rows[$emptyMedicine->id]['count']['title']);
+        $this->assertSame(2, $payload['meters']['total_overdue_counts']);
+        $this->assertFalse($rows[$stockMedicine->id]['can_record']);
+        $this->assertTrue($rows[$stockMedicine->id]['can_count']);
+        $this->assertFalse($rows[$emptyMedicine->id]['can_count']);
+        $this->assertSame('not_applicable', $rows[$emptyMedicine->id]['count']['state']);
+        $this->perform('count', ['client_medication_id' => $stockMedicine->id, 'expected_entry_id' => null, 'expected_balance' => 2, 'actual_balance' => 2]);
+        $this->assertSame([$this->medication->id], $status->overdueMedicines($this->site->id)->pluck('id')->all());
+        $this->denied(404, fn () => $this->perform('count', ['client_medication_id' => $emptyMedicine->id,
+            'expected_entry_id' => null, 'expected_balance' => 0, 'actual_balance' => 0]));
+    }
+
+    public function test_historical_count_to_zero_replays_its_receipt_without_enabling_a_new_zero_stock_count(): void
+    {
+        DB::table('client_medications')->where('id', $this->medication->id)->update([
+            'state' => 'ceased', 'active' => false, 'deleted_at' => now(),
+            'ceased_at' => now(), 'ceased_by' => $this->manager->id, 'ceased_reason' => 'Synthetic historical stock',
+        ]);
+        $actor = $this->recorder->fresh();
+        $this->actingAs($actor);
+        $input = $this->input([
+            'actual_balance' => 0, 'recount_balance' => 0,
+            'notes' => 'Synthetic retained stock was missing on two independent counts.',
+            'immediate_action_taken' => 'Secured the cupboard and informed the house lead.',
+        ]);
+        $service = app(ControlledRegisterService::class);
+        $injectFailure = true;
+        ClientIncident::creating(function () use (&$injectFailure): void {
+            if ($injectFailure) {
+                throw new RuntimeException('Injected historical count incident failure.');
+            }
+        });
+        try {
+            $service->perform($actor, 'count', $input);
+            $this->fail('The incident failure must roll back the complete historical count.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Injected historical count incident failure.', $exception->getMessage());
+        } finally {
+            $injectFailure = false;
+        }
+        $this->assertSame('10.00', $this->stock->fresh()->on_hand);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $this->assertDatabaseCount('client_controlled_drug_discrepancies', 0);
+        $this->assertDatabaseCount('controlled_product_requests', 0);
+        $this->assertDatabaseCount('client_incidents', 0);
+
+        $result = $service->perform($actor->fresh(), 'count', $input);
+        $original = ClientControlledDrugEntry::query()->sole()->getRawOriginal();
+        $this->assertSame('0.00', $this->stock->fresh()->on_hand);
+        $discrepancy = ClientControlledDrugDiscrepancy::query()->sole();
+        $this->assertSame($this->medication->id, $discrepancy->medication->id);
+        $this->assertTrue($discrepancy->medication->trashed());
+        $incident = $discrepancy->incident;
+        $this->assertNotNull($incident);
+        $this->assertSame($this->client->id, (int) $incident->client_id);
+        $this->assertSame($this->medication->id, $incident->metadata['medication_id']);
+        $this->assertTrue($incident->metadata['controlled_drug']);
+        $this->assertArrayNotHasKey('medication_name', $incident->metadata);
+        $this->assertStringNotContainsString($this->medication->name, $incident->title);
+
+        $this->assertEquals($result, $service->perform($actor->fresh(), 'count', $input));
+        $this->assertTrue($service->lastRequestWasReplay());
+        $this->denied(404, fn () => $service->perform($actor->fresh(), 'count', [
+            ...$input, 'client_request_uuid' => (string) Str::uuid(),
+            'expected_balance' => 0, 'expected_entry_id' => $result['counted_entry_id'],
+        ]));
+
+        $this->assertSame('0.00', $this->stock->fresh()->on_hand);
+        $this->assertSame($original, ClientControlledDrugEntry::query()->sole()->getRawOriginal());
+        $this->assertDatabaseCount('client_controlled_drug_entries', 1);
+        $this->assertDatabaseCount('client_controlled_drug_discrepancies', 1);
+        $this->assertDatabaseCount('controlled_product_requests', 1);
+        $this->assertDatabaseCount('client_incidents', 1);
+    }
+
+    public function test_count_alerts_reconcile_by_configured_policy_and_latest_actual_witnessed_time(): void
+    {
+        $status = app(ControlledCountStatus::class);
+        $this->assertCount(0, $status->overdueMedicines());
+        AppSetting::query()->updateOrCreate(['key' => ControlledPolicy::COUNT_CADENCE], ['value' => 'shift']);
+        DB::table('client_medications')->where('id', $this->medication->id)->update(['created_at' => now()->subDay()]);
+        $this->assertCount(1, $status->refreshDashboardAlerts($this->site->id));
+        $this->assertDatabaseHas('medication_dashboard_alerts', ['alert_type' => 'controlled_overdue_check', 'status' => 'active']);
+        $base = ['client_id' => $this->client->id, 'client_medication_id' => $this->medication->id,
+            'entry_type' => 'balance_check', 'quantity' => 0, 'on_hand_before' => 10, 'on_hand_after' => 10,
+            'recorded_by' => $this->recorder->id, 'witnessed_by' => $this->witness->id];
+        $latest = ClientControlledDrugEntry::create([...$base, 'recorded_at' => now()->subMinutes(10)]);
+        ClientControlledDrugEntry::create([...$base, 'recorded_at' => now()->subHours(3)]);
+        ClientControlledDrugEntry::create([...$base, 'recorded_at' => now()->addHour()]);
+        ClientControlledDrugEntry::create([...$base, 'recorded_at' => now(), 'witnessed_by' => null]);
+        $this->assertSame($latest->id, $status->latestWitnessedCounts([$this->medication->id])->get($this->medication->id)->id);
+        app(MedicationAlertSources::class)->controlledCheckRecorded($this->site->id);
+        $this->assertDatabaseMissing('medication_dashboard_alerts', ['alert_type' => 'controlled_overdue_check', 'status' => 'active']);
+        $payload = $this->actingAs($this->manager->fresh())->getJson('/emar/controlled/product')->assertOk();
+        $payload->assertJsonPath('medicines.0.count.state', 'counted')->assertJsonPath('medicines.0.count.last_entry_id', $latest->id);
+        AppSetting::where('key', ControlledPolicy::COUNT_CADENCE)->sole()->update(['value' => '']);
+        $this->assertCount(0, $status->dueMedicines());
     }
 
     /** Fields sent by the dialogs after their action-specific canonical mapping. */

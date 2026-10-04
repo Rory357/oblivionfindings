@@ -1,3 +1,4 @@
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 /* eslint-disable no-restricted-syntax -- summary/balance panes are custom-layout
    bordered surfaces inside the wizard, not Card components; all colours are tokens. */
 import {
@@ -20,6 +21,7 @@ import {
     StepHead,
     TilePicker,
 } from '@/components/wizard/primitives';
+import { WizardSuccessPane } from '@/components/wizard/shell';
 import {
     createMedicationMutationReplayState,
     emarMutationWasAccepted,
@@ -39,7 +41,7 @@ import {
     medicationStockQuantitiesEqual,
     subtractMedicationStockQuantities,
 } from '@/pages/emar/medication-stock-governance';
-import { useForm } from '@inertiajs/react';
+import { router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowDownUp,
@@ -250,6 +252,7 @@ export function RecordCdEntryDialog({
 
     return (
         <MedsWizardDialog
+            formState={form}
             open
             onClose={onClose}
             title="Record CD entry"
@@ -510,12 +513,18 @@ export function RecordCdEntryDialog({
                             required={isReceipt}
                             error={form.errors.expiry_date}
                         >
-                            <Input
-                                type="date"
-                                value={form.data.expiry_date}
-                                onChange={(e) =>
-                                    form.setData('expiry_date', e.target.value)
+                            <DatePicker
+                                id="emar-cd-dialogs-1"
+                                label={
+                                    isReceipt
+                                        ? 'Expiry date (receipt)'
+                                        : 'Expiry date'
                                 }
+                                value={form.data.expiry_date}
+                                onChange={(value) =>
+                                    form.setData('expiry_date', value)
+                                }
+                                invalid={Boolean(form.errors.expiry_date)}
                             />
                         </Field>
                         <Field label="Notes" span>
@@ -682,6 +691,7 @@ export function BalanceCheckDialog({
 
     return (
         <MedsWizardDialog
+            formState={form}
             open
             onClose={onClose}
             title="Balance check"
@@ -877,6 +887,7 @@ export function ResolveDiscrepancyDialog({
         });
     return (
         <MedsWizardDialog
+            formState={form}
             open
             onClose={onClose}
             title="Resolve discrepancy"
@@ -1061,6 +1072,7 @@ export function ReportLossDialog({
     ];
     return (
         <MedsWizardDialog
+            formState={{ ...form, processing: form.processing || submitting }}
             open
             onClose={resetReplayAndClose}
             title="Report CD loss"
@@ -1094,7 +1106,11 @@ export function ReportLossDialog({
                 <>
                     <Button
                         variant="ghost"
-                        onClick={step === 0 ? onClose : () => setStep(step - 1)}
+                        onClick={
+                            step === 0
+                                ? resetReplayAndClose
+                                : () => setStep(step - 1)
+                        }
                         disabled={submitting}
                     >
                         {step === 0 ? 'Cancel' : 'Back'}
@@ -1404,6 +1420,7 @@ export function LossActionDialog({
         });
     return (
         <MedsWizardDialog
+            formState={form}
             open
             onClose={onClose}
             title={
@@ -1512,6 +1529,7 @@ export function RecordDestructionDialog({
     currentUserId?: number | null;
     onClose: () => void;
 }) {
+    const [saved, setSaved] = useState<string | null>(null);
     const [step, setStep] = useState(0);
     const [submitting, setSubmitting] = useState(false);
     const [initialDestructionRequestUuid] = useState(newControlledMutationUuid);
@@ -1604,7 +1622,14 @@ export function RecordDestructionDialog({
                 },
             );
             if (emarMutationWasAccepted(result.status)) {
-                resetReplayAndClose();
+                setSaved(
+                    result.status === 'queued'
+                        ? 'Disposal waiting to sync'
+                        : 'Disposal recorded',
+                );
+                if (result.status !== 'queued') {
+                    router.reload({ only: ['destructions', 'medications'] });
+                }
             }
         } catch (error) {
             applyFormRequestErrors(
@@ -1639,7 +1664,43 @@ export function RecordDestructionDialog({
     ];
     return (
         <MedsWizardDialog
+            formState={{ ...form, processing: form.processing || submitting }}
             open
+            success={
+                saved ? (
+                    <WizardSuccessPane
+                        title={saved}
+                        blurb={
+                            saved.includes('sync')
+                                ? 'Saved on this device. The shared register will update after a successful sync.'
+                                : 'The disposal has been recorded in the register.'
+                        }
+                        actions={
+                            <Button onClick={resetReplayAndClose}>Done</Button>
+                        }
+                    />
+                ) : undefined
+            }
+            completeness={{
+                completed: [
+                    form.data.medication_name,
+                    form.data.quantity,
+                    form.data.unit,
+                    form.data.reason,
+                    form.data.disposal_method,
+                    form.data.witness_1_id,
+                    ...(isCd
+                        ? [
+                              form.data.witness_2_id,
+                              form.data.witness_1_credential,
+                              form.data.witness_2_credential,
+                              form.data.authorised_by_name,
+                              form.data.denaturing_confirmed,
+                          ]
+                        : []),
+                ].filter(Boolean).length,
+                total: isCd ? 11 : 6,
+            }}
             onClose={resetReplayAndClose}
             title="Record destruction"
             description={
@@ -1676,7 +1737,11 @@ export function RecordDestructionDialog({
                 <>
                     <Button
                         variant="ghost"
-                        onClick={step === 0 ? onClose : () => setStep(step - 1)}
+                        onClick={
+                            step === 0
+                                ? resetReplayAndClose
+                                : () => setStep(step - 1)
+                        }
                         disabled={submitting}
                     >
                         {step === 0 ? 'Cancel' : 'Back'}
@@ -1990,6 +2055,7 @@ export function VoidDestructionDialog({
     };
     return (
         <MedsWizardDialog
+            formState={form}
             open
             onClose={onClose}
             title="Void destruction record"

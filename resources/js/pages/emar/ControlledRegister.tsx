@@ -13,6 +13,7 @@ import {
 } from '@/components/emar/controlled/product-ui';
 import { EntryList } from '@/components/emar/controlled/record-views';
 import { useControlledDialogs } from '@/components/emar/controlled/workspace-dialogs';
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import { compactMenu, type MenuItem } from '@/components/lists/entity-menu';
 import { ListCaption } from '@/components/lists/list-caption';
 import {
@@ -25,7 +26,6 @@ import {
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
     PageHeaderPrimaryButton,
-    PageHeaderRail,
     PageHeaderSearch,
 } from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
@@ -352,14 +352,7 @@ export default function ControlledRegister({
                     </PageHeaderMeterCaption>
                 </>
             }
-            rail={
-                <PageHeaderRail
-                    value={filters.view}
-                    items={VIEWS}
-                    onSelect={(view) => change({ view })}
-                    ariaLabel="Controlled register views"
-                />
-            }
+            rail={<EmarHubRail />}
         />
     );
     let content;

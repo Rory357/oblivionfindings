@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Enums\Medication\NotGivenReason;
 use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
-use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientInrRecord;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
@@ -19,6 +18,7 @@ use App\Models\MedicationSyringeDriver;
 use App\Models\User;
 use App\Services\Emar\MedsBoardPayloadService;
 use App\Services\Medication\CompetencyPolicySettings;
+use App\Services\Medication\Controlled\ControlledCountStatus;
 use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\MedicationGovernanceScopeService;
@@ -442,7 +442,7 @@ class MedicationOverviewService
             'missed' => $doses['missed'],
             'prnToday' => $prnToday,
             'controlledCount' => ClientMedication::active()->controlled()->whereIn('client_id', $allowedClientIds)->count(),
-            'cdDue' => ClientMedication::active()->controlled()->whereIn('client_id', $allowedClientIds)->count(),
+            'cdDue' => app(ControlledCountStatus::class)->dueMedicines()->whereIn('client_id', $allowedClientIds)->count(),
             'activeDiscrepancies' => $cdDiscrepancies,
             'reviewsDue' => $reviewsDue,
             'overdueReviews' => MedicationReview::overdue()->whereIn('client_id', $allowedClientIds)->count(),
@@ -747,37 +747,15 @@ class MedicationOverviewService
 
     private function cdBalanceCheckItems(Carbon $date): Collection
     {
-        // Active controlled meds whose latest balance-check CD entry is not today.
-        $checkedTodayMedIds = $this->canonicalMedicationRows(
-            ClientControlledDrugEntry::where('entry_type', 'balance_check')
-                ->whereIn('client_id', $this->allowedClientIds()),
-            false,
-        )
-            ->whereBetween('recorded_at', $this->utcDay($date))
-            ->pluck('client_medication_id')
-            ->filter()
-            ->all();
-
-        return ClientMedication::active()->controlled()
-            ->whereIn('client_id', $this->allowedClientIds())
-            ->whereNotIn('id', $checkedTodayMedIds)
-            ->with('client:id,first_name,last_name,site_id', 'client.site:id,name')
-            ->limit(8)
-            ->get()
+        // The same configured roster policy and witnessed evidence as the register.
+        return app(ControlledCountStatus::class)->dueMedicines()
+            ->whereIn('client_id', $this->allowedClientIds())->take(8)
             ->map(fn ($med) => [
-                'id' => 'cdbal-'.$med->id,
-                'type' => 'cd_balance',
-                'category' => 'controlled',
-                'code' => 'CD',
-                'severity' => 'info',
-                'client' => $this->clientName($med->client),
-                'client_id' => $med->client_id,
+                'id' => 'cdbal-'.$med->id, 'type' => 'cd_balance', 'category' => 'controlled', 'code' => 'CD', 'severity' => 'info',
+                'client' => $this->clientName($med->client), 'client_id' => $med->client_id,
                 'title' => ($med->client?->site?->name ?: $this->clientName($med->client)).' — CD balance check due',
-                'status' => 'Balance check',
-                'summary' => $med->name.' · no balance count recorded today',
-                'action' => 'Start count',
-                'action_type' => 'cd_balance',
-                'opened_at' => $date->copy()->startOfDay()->toIso8601String(),
+                'status' => 'Balance check', 'summary' => $med->name.' · a witnessed count is due under the configured policy',
+                'action' => 'Start count', 'action_type' => 'cd_balance', 'opened_at' => $date->copy()->startOfDay()->toIso8601String(),
             ]);
     }
 

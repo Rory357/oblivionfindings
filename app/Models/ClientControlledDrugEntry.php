@@ -14,6 +14,7 @@ class ClientControlledDrugEntry extends Model
     protected $fillable = [
         'client_id',
         'client_medication_id',
+        'client_medication_administration_id',
         'pharmacy_order_id',
         'shift_id',
         'service_context_id',
@@ -63,6 +64,11 @@ class ClientControlledDrugEntry extends Model
     public function medication()
     {
         return $this->belongsTo(ClientMedication::class, 'client_medication_id')->withTrashed();
+    }
+
+    public function administration()
+    {
+        return $this->belongsTo(ClientMedicationAdministration::class, 'client_medication_administration_id')->withTrashed();
     }
 
     public function pharmacyOrder()

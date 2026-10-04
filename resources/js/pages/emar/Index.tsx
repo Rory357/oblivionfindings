@@ -34,7 +34,6 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
-    Award,
     CalendarCheck,
     CheckCircle2,
     ChevronLeft,
@@ -51,12 +50,11 @@ import {
     Shield,
     ShieldCheck,
     Syringe,
-    TrendingUp,
     Users,
     X,
     Zap,
 } from 'lucide-react';
-import { useMemo, useState, type ComponentType, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import {
     Area,
     AreaChart,
@@ -363,93 +361,6 @@ const KPI_TONE: Record<KpiTone, string> = {
 };
 
 /** Responsive sparkline that inherits its colour from `currentColor`. */
-function MiniSparkline({
-    data,
-    className,
-}: {
-    data: number[];
-    className?: string;
-}) {
-    if (!data || data.length < 2) return null;
-    const max = Math.max(...data);
-    const min = Math.min(...data);
-    const range = max - min || 1;
-    const step = 100 / (data.length - 1);
-    const points = data
-        .map((v, i) => `${i * step},${20 - ((v - min) / range) * 20}`)
-        .join(' ');
-    return (
-        <svg
-            viewBox="0 0 100 22"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-            className={cn('h-[22px] w-full', className)}
-        >
-            <polyline
-                points={points}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-        </svg>
-    );
-}
-
-/** Design-spec KPI card: tinted icon chip + top-right pill + value + label + footer. */
-function KpiCard({
-    icon: Icon,
-    tone,
-    value,
-    label,
-    pill,
-    sub,
-    footer,
-}: {
-    icon: ComponentType<{ className?: string }>;
-    tone: KpiTone;
-    value: ReactNode;
-    label: string;
-    pill?: { label: string; tone: KpiTone } | null;
-    sub?: string;
-    footer?: ReactNode;
-}) {
-    return (
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <div className="mb-2.5 flex items-center justify-between gap-2">
-                <span
-                    className={cn(
-                        'grid h-8 w-8 shrink-0 place-items-center rounded-lg',
-                        KPI_TONE[tone],
-                    )}
-                >
-                    <Icon className="h-4 w-4" />
-                </span>
-                {pill ? (
-                    <span
-                        className={cn(
-                            'shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-bold',
-                            KPI_TONE[pill.tone],
-                        )}
-                    >
-                        {pill.label}
-                    </span>
-                ) : null}
-            </div>
-            <div className="text-2xl font-bold tracking-tight tabular-nums">
-                {value}
-            </div>
-            <div className="text-xs text-muted-foreground">{label}</div>
-            {footer ? (
-                <div className="mt-2">{footer}</div>
-            ) : sub ? (
-                <p className="mt-1 text-[11px] text-muted-foreground">{sub}</p>
-            ) : null}
-        </div>
-    );
-}
-
 export default function EmarHome(props: Props) {
     const breadcrumbs = useEmarBreadcrumbs();
     const {
@@ -531,16 +442,6 @@ export default function EmarHome(props: Props) {
     const adminRateLabel =
         stats.adminRate === null ? 'n/a' : `${stats.adminRate}%`;
     const deltaLabel = `${deltaUp ? '▲' : '▼'} ${Math.abs(complianceDelta)}`;
-
-    // 6-segment severity bar for the "Doses due now" KPI card.
-    const dueSegments = Array.from({ length: 6 }, (_, i) =>
-        i < Math.min(6, stats.overdue)
-            ? 'bg-status-critical'
-            : i < Math.min(6, stats.dueNow)
-              ? 'bg-status-warning'
-              : 'bg-muted',
-    );
-    const segHeights = ['h-5', 'h-4', 'h-5', 'h-3', 'h-4', 'h-2.5'];
 
     // First overdue dose — named in the critical ribbon, like the design.
     const firstOverdue = actionCentre.find(
@@ -786,7 +687,7 @@ export default function EmarHome(props: Props) {
                                 </PageHeaderMeterCaption>
                             </PageHeaderMeterBlock>
                             <PageHeaderMeterBlock
-                                label="Doses due now"
+                                label="Needs recording"
                                 href={`/emar/mar?date=${encodeURIComponent(date)}`}
                                 tone={stats.overdue > 0 ? 'critical' : 'brand'}
                             >
@@ -797,7 +698,7 @@ export default function EmarHome(props: Props) {
                                 </PageHeaderMeterBig>
                                 <PageHeaderMeterCaption>
                                     {doseCoverage.day_available
-                                        ? `${stats.overdue} overdue`
+                                        ? `${Math.max(0, stats.dueNow - stats.overdue)} due now · ${stats.overdue} overdue`
                                         : doseCoverage.day_notice}
                                 </PageHeaderMeterCaption>
                             </PageHeaderMeterBlock>
@@ -853,7 +754,7 @@ export default function EmarHome(props: Props) {
                                     {inrOutOfRange}
                                 </PageHeaderMeterBig>
                                 <PageHeaderMeterCaption>
-                                    Current clinical alerts
+                                    Out-of-range results shown below
                                 </PageHeaderMeterCaption>
                             </PageHeaderMeterBlock>
                             {can.view_controlled ? (
@@ -906,113 +807,25 @@ export default function EmarHome(props: Props) {
                     </div>
                 ) : null}
 
-                {/* ── KPI strip ── */}
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-                    <KpiCard
-                        icon={TrendingUp}
-                        tone="success"
-                        value={adminRateLabel}
-                        label="Admin rate · target 95%"
-                        pill={{
-                            label: deltaLabel,
-                            tone: deltaUp ? 'success' : 'critical',
-                        }}
-                        footer={
-                            <MiniSparkline
-                                data={stats.givenTrend}
-                                className={
-                                    deltaUp
-                                        ? 'text-status-success'
-                                        : 'text-status-critical'
-                                }
-                            />
-                        }
-                    />
-                    <KpiCard
-                        icon={Clock}
-                        tone="critical"
-                        value={stats.dueNow}
-                        label="Doses due now"
-                        pill={
-                            stats.overdue > 0
-                                ? {
-                                      label: `${stats.overdue} overdue`,
-                                      tone: 'critical',
-                                  }
-                                : null
-                        }
-                        footer={
-                            <div className="flex h-[22px] items-end gap-[3px]">
-                                {dueSegments.map((c, i) => (
-                                    <span
-                                        key={i}
-                                        className={cn(
-                                            'flex-1 rounded-sm',
-                                            c,
-                                            segHeights[i],
-                                        )}
-                                    />
-                                ))}
-                            </div>
-                        }
-                    />
-                    {can.view_controlled ? (
-                        <KpiCard
-                            icon={Lock}
-                            tone="primary"
-                            value={stats.controlledCount}
-                            label="Controlled drugs active"
-                            pill={
-                                stats.activeDiscrepancies > 0
-                                    ? {
-                                          label: `${stats.activeDiscrepancies} discrepancy`,
-                                          tone: 'critical',
-                                      }
-                                    : null
-                            }
-                            sub={`${stats.activeDiscrepancies} discrepancy open`}
-                        />
-                    ) : null}
-                    <KpiCard
-                        icon={ClipboardCheck}
-                        tone="warning"
-                        value={stats.reviewsDue}
-                        label="Chart reviews due"
-                        pill={
-                            stats.overdueReviews > 0
-                                ? {
-                                      label: `${stats.overdueReviews} overdue`,
-                                      tone: 'warning',
-                                  }
-                                : null
-                        }
-                        sub="next 7 days"
-                    />
-                    <KpiCard
-                        icon={Award}
-                        tone="primary"
-                        value={stats.competenciesExpiring}
-                        label="Competencies expiring"
-                        pill={{ label: '30 days', tone: 'neutral' }}
-                        sub="Medication-trained staff"
-                    />
-                    {can.manage_stock ? (
-                        <KpiCard
-                            icon={Package}
-                            tone="warning"
-                            value={stats.stockAlerts}
-                            label="Stock alerts"
-                            pill={
-                                stats.expiredStock > 0
-                                    ? {
-                                          label: `${stats.expiredStock} expired`,
-                                          tone: 'critical',
-                                      }
-                                    : null
-                            }
-                            sub={`${stats.lowStock} low · ${stats.expiringStock} expiring`}
-                        />
-                    ) : null}
+                <div
+                    className="flex flex-wrap gap-3 text-sm"
+                    aria-label="Other medication work"
+                >
+                    <Button variant="link" asChild>
+                        <Link href="/emar/competency">
+                            {stats.competenciesExpiring} staff competencies
+                            expiring within 30 days
+                        </Link>
+                    </Button>
+                    {can.manage_stock && (
+                        <Button variant="link" asChild>
+                            <Link href="/emar/stock">
+                                {stats.stockAlerts} stock alerts ·{' '}
+                                {stats.lowStock} low · {stats.expiringStock}{' '}
+                                expiring
+                            </Link>
+                        </Button>
+                    )}
                 </div>
 
                 {/* ── Main grid: Action centre + right rail ── */}
@@ -1034,8 +847,9 @@ export default function EmarHome(props: Props) {
                                             Action centre
                                         </CardTitle>
                                         <p className="text-xs text-muted-foreground">
-                                            Work needing attention from your
-                                            team today, most urgent first.
+                                            Priority work, most urgent first.
+                                            This is a selection; open each
+                                            workspace for its complete queue.
                                         </p>
                                     </div>
                                 </div>
@@ -1050,7 +864,7 @@ export default function EmarHome(props: Props) {
                                         Report error
                                     </Button>
                                     <span className="rounded-full border border-status-critical/30 bg-status-critical-bg px-2.5 py-0.5 text-[11px] font-bold text-status-critical">
-                                        {acCounts.all} open
+                                        {acCounts.all} shown
                                     </span>
                                 </div>
                             </div>

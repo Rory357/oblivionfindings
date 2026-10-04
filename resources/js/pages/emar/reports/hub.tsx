@@ -228,6 +228,7 @@ function cell(row: Row, key: string) {
 
 export default function ReportsHub(props: Props) {
     const [downtimeOpen, setDowntimeOpen] = useState(false);
+    const [focusedMetric, setFocusedMetric] = useState<string | null>(null);
     const { filters, data, page, finance, can } = props;
     const [search, setSearch] = useState(filters.q),
         [rangeOpen, setRangeOpen] = useState(false),
@@ -309,12 +310,18 @@ export default function ReportsHub(props: Props) {
                           ? '1.3fr'
                           : '100px',
                     cell: (row) => (
-                        <span className="text-subtle break-words">
+                        <span
+                            className={
+                                key === focusedMetric
+                                    ? 'text-subtle font-semibold break-words text-primary'
+                                    : 'text-subtle break-words'
+                            }
+                        >
                             {cell(row, key)}
                         </span>
                     ),
                 })),
-        [fields, finance],
+        [fields, finance, focusedMetric],
     );
     const identity = (row: Row) =>
         audit
@@ -495,24 +502,33 @@ export default function ReportsHub(props: Props) {
                                       <PageHeaderMeterBlock
                                           key={key}
                                           label={label}
-                                          onClick={() =>
-                                              visit(
-                                                  filters.view === 'audit'
-                                                      ? {
-                                                            view: 'audit',
-                                                            sub:
-                                                                key ===
-                                                                'exports'
-                                                                    ? 'exports'
-                                                                    : 'events',
-                                                            kind: '',
-                                                        }
-                                                      : {
-                                                            view: 'standard',
-                                                            report: filters.report,
-                                                        },
-                                              )
-                                          }
+                                          onClick={() => {
+                                              if (filters.view === 'audit') {
+                                                  visit({
+                                                      view: 'audit',
+                                                      sub:
+                                                          key === 'exports'
+                                                              ? 'exports'
+                                                              : 'events',
+                                                      kind: '',
+                                                  });
+                                              } else {
+                                                  setFocusedMetric(key);
+                                                  document
+                                                      .getElementById(
+                                                          'medication-report-breakdown',
+                                                      )
+                                                      ?.focus();
+                                                  document
+                                                      .getElementById(
+                                                          'medication-report-breakdown',
+                                                      )
+                                                      ?.scrollIntoView({
+                                                          block: 'start',
+                                                          behavior: 'smooth',
+                                                      });
+                                              }
+                                          }}
                                       >
                                           {key.endsWith('_pct') ||
                                           key.endsWith('_rate') ? (
@@ -542,11 +558,10 @@ export default function ReportsHub(props: Props) {
                                                           'en-NZ',
                                                       ) ?? 'Not applicable'}
                                                   </PageHeaderMeterBig>
-                                                  {reason && (
-                                                      <PageHeaderMeterCaption>
-                                                          {reason}
-                                                      </PageHeaderMeterCaption>
-                                                  )}
+                                                  <PageHeaderMeterCaption>
+                                                      {reason ||
+                                                          'Selected people, houses and period'}
+                                                  </PageHeaderMeterCaption>
                                               </>
                                           )}
                                       </PageHeaderMeterBlock>
@@ -869,7 +884,27 @@ export default function ReportsHub(props: Props) {
                         )}
                     </div>
                 ) : (
-                    <section aria-label={heading} className="space-y-3">
+                    <section
+                        id="medication-report-breakdown"
+                        tabIndex={-1}
+                        aria-label={heading}
+                        className="scroll-mt-6 space-y-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                        {focusedMetric && (
+                            <p role="status" className="text-subtle">
+                                {
+                                    meterItems.find(
+                                        ([key]) => key === focusedMetric,
+                                    )?.[1]
+                                }
+                                :{' '}
+                                {data.totals[focusedMetric]?.toLocaleString(
+                                    'en-NZ',
+                                ) ?? 'Not applicable'}
+                                . The breakdown below keeps your selected
+                                people, houses and period.
+                            </p>
+                        )}
                         <div className="flex flex-wrap items-end justify-between gap-3">
                             <div>
                                 <h2 className="text-section-title">

@@ -237,7 +237,8 @@ it.each(['text', 'saved file', 'retained selected file'] as const)(
         );
         await waitFor(() => expect(input).toBeEnabled());
         expect(input).toHaveValue('');
-        expect(input).toHaveFocus();
+        // Focus is restored by an effect after the new draft becomes editable.
+        await waitFor(() => expect(input).toHaveFocus());
         fireEvent.change(input, {
             target: { value: 'Second distinct internal note.' },
         });

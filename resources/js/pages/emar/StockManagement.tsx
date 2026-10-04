@@ -27,6 +27,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
+import { emarScopedHref } from '@/lib/emar-navigation';
 import {
     createMedicationMutationReplayState,
     emarMutationWasAccepted,
@@ -47,7 +48,7 @@ import {
     type StockRow,
 } from '@/pages/emar/_stock-dialogs';
 import { pharmacyOrderAdvanceAction } from '@/pages/emar/medication-stock-governance';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     AlertOctagon,
     AlertTriangle,
@@ -69,6 +70,7 @@ import {
     X,
 } from 'lucide-react';
 import {
+    useEffect,
     useMemo,
     useRef,
     useState,
@@ -138,6 +140,13 @@ type Modal =
     | { type: 'detail'; item: StockRow }
     | null;
 
+const stockViewFromUrl = (url: string) => {
+    const view = new URLSearchParams(url.split('?')[1]).get('view');
+    return view &&
+        ['low', 'expiring', 'expired', 'controlled', 'orders'].includes(view)
+        ? view
+        : 'all';
+};
 const STALE_ORDER_DAYS = 7;
 const STAGES = ['draft', 'submitted', 'confirmed', 'dispensed', 'delivered'];
 const STAGE_LABELS = [
@@ -187,7 +196,25 @@ export default function StockManagement({
     client_id: activeClientId,
 }: Props) {
     const breadcrumbs = useEmarBreadcrumbs();
-    const [activeTab, setActiveTab] = useState('all');
+    const { url: pageUrl } = usePage();
+    const [activeTab, setActiveTabState] = useState(() =>
+        stockViewFromUrl(pageUrl),
+    );
+    useEffect(() => {
+        setActiveTabState(stockViewFromUrl(pageUrl));
+    }, [pageUrl]);
+    const setActiveTab = (value: string) => {
+        setActiveTabState(value);
+        const url = new URL(pageUrl, window.location.origin);
+        if (value !== 'all') url.searchParams.set('view', value);
+        else url.searchParams.delete('view');
+        if (url.pathname + url.search !== pageUrl)
+            router.replace({
+                url: url.pathname + url.search,
+                preserveState: true,
+                preserveScroll: true,
+            });
+    };
     const [search, setSearch] = useState('');
     const [siteFilter, setSiteFilter] = useState<number | null>(
         activeSite?.id ?? null,
@@ -512,7 +539,10 @@ export default function StockManagement({
                       {
                           icon: <FileText className="h-3.5 w-3.5" />,
                           label: 'Open CD register',
-                          onClick: () => router.visit('/emar/controlled'),
+                          onClick: () =>
+                              router.visit(
+                                  emarScopedHref('/emar/controlled', pageUrl),
+                              ),
                       } satisfies ShiftCtxItem,
                   ]
                 : []),
@@ -523,7 +553,13 @@ export default function StockManagement({
                           icon: <AlertOctagon className="h-3.5 w-3.5" />,
                           label: 'Investigate discrepancy',
                           tone: 'critical',
-                          onClick: () => router.visit('/emar/controlled'),
+                          onClick: () =>
+                              router.visit(
+                                  emarScopedHref(
+                                      '/emar/controlled?view=discrepancies',
+                                      pageUrl,
+                                  ),
+                              ),
                       } satisfies ShiftCtxItem,
                   ]
                 : []),
@@ -568,6 +604,24 @@ export default function StockManagement({
             return true;
         });
     }, [stockItems, activeTab, chip, search]);
+
+    const filteredOrders = useMemo(() => {
+        const query = search.trim().toLowerCase();
+        return pharmacyOrders.filter((order) =>
+            `${order.medication_name ?? ''} ${order.client_name} ${order.pharmacy_name ?? ''} ${order.batch_number ?? ''}`
+                .toLowerCase()
+                .includes(query),
+        );
+    }, [pharmacyOrders, search]);
+
+    const filteredControlled = useMemo(() => {
+        const query = search.trim().toLowerCase();
+        return controlledRegister.filter((item) =>
+            `${item.medication_name ?? ''} ${item.client_name}`
+                .toLowerCase()
+                .includes(query),
+        );
+    }, [controlledRegister, search]);
 
     const byClient = useMemo(() => {
         const groups = new Map<
@@ -620,7 +674,7 @@ export default function StockManagement({
                 return;
             }
 
-            router.visit('/emar/controlled');
+            router.visit(emarScopedHref('/emar/controlled', pageUrl));
             return;
         }
 
@@ -674,7 +728,8 @@ export default function StockManagement({
         const site = over.site_id !== undefined ? over.site_id : siteFilter;
         const client =
             over.client_id !== undefined ? over.client_id : clientFilter;
-        const params: Record<string, number> = {};
+        const params: Record<string, string | number> = {};
+        if (activeTab !== 'all') params.view = activeTab;
         if (site) params.site_id = site;
         if (client) params.client_id = client;
         router.get('/emar/stock', params, {
@@ -795,8 +850,20 @@ export default function StockManagement({
                             <PageHeaderSearch
                                 value={search}
                                 onChange={setSearch}
-                                placeholder="Search medication, person or batch…"
-                                ariaLabel="Search stock"
+                                placeholder={
+                                    activeTab === 'orders'
+                                        ? 'Search medication, person or pharmacy…'
+                                        : activeTab === 'controlled'
+                                          ? 'Search medication or person…'
+                                          : 'Search medication, person or batch…'
+                                }
+                                ariaLabel={
+                                    activeTab === 'orders'
+                                        ? 'Search pharmacy orders'
+                                        : activeTab === 'controlled'
+                                          ? 'Search controlled stock'
+                                          : 'Search stock'
+                                }
                             />
                             <PageHeaderPrimaryButton
                                 icon={Plus}
@@ -814,47 +881,56 @@ export default function StockManagement({
                     }
                     filters={
                         <div className="flex flex-wrap items-center justify-end gap-2">
-                            <EmarViewFilter
-                                value={activeTab}
-                                onChange={setActiveTab}
-                                items={TABS}
-                                label="Stock view"
-                            />
-                            <div className="flex flex-wrap items-center gap-2">
-                                {[
-                                    {
-                                        id: 'all' as const,
-                                        label: 'All items',
-                                    },
-                                    ...(canViewControlled
-                                        ? [
-                                              {
-                                                  id: 'controlled' as const,
-                                                  label: 'Controlled only',
-                                              },
-                                          ]
-                                        : []),
-                                    {
-                                        id: 'cold_chain' as const,
-                                        label: 'Cold chain',
-                                    },
-                                ].map(({ id, label }) => (
-                                    <PageHeaderFilterButton
-                                        key={id}
-                                        onClick={() => setChip(id)}
-                                        active={chip === id}
-                                        aria-pressed={chip === id}
-                                    >
-                                        {label}
-                                    </PageHeaderFilterButton>
-                                ))}
-                                <PageHeaderGlassButton
-                                    icon={Barcode}
-                                    onClick={() => setModal({ type: 'count' })}
-                                >
-                                    Run stock count
-                                </PageHeaderGlassButton>
-                            </div>
+                            {activeTab !== 'orders' && (
+                                <EmarViewFilter
+                                    value={activeTab}
+                                    onChange={setActiveTab}
+                                    items={TABS.filter(
+                                        (item) => item.id !== 'orders',
+                                    )}
+                                    label="Stock view"
+                                />
+                            )}
+                            {activeTab !== 'orders' &&
+                                activeTab !== 'controlled' && (
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        {[
+                                            {
+                                                id: 'all' as const,
+                                                label: 'All items',
+                                            },
+                                            ...(canViewControlled
+                                                ? [
+                                                      {
+                                                          id: 'controlled' as const,
+                                                          label: 'Controlled only',
+                                                      },
+                                                  ]
+                                                : []),
+                                            {
+                                                id: 'cold_chain' as const,
+                                                label: 'Cold chain',
+                                            },
+                                        ].map(({ id, label }) => (
+                                            <PageHeaderFilterButton
+                                                key={id}
+                                                onClick={() => setChip(id)}
+                                                active={chip === id}
+                                                aria-pressed={chip === id}
+                                            >
+                                                {label}
+                                            </PageHeaderFilterButton>
+                                        ))}
+                                        <PageHeaderGlassButton
+                                            icon={Barcode}
+                                            onClick={() =>
+                                                setModal({ type: 'count' })
+                                            }
+                                        >
+                                            Run stock count
+                                        </PageHeaderGlassButton>
+                                    </div>
+                                )}
                             <div className="flex flex-wrap items-center gap-2">
                                 {search && (
                                     <PageHeaderGlassButton
@@ -947,28 +1023,46 @@ export default function StockManagement({
                                     No stock matches the current filters
                                 </p>
                                 <p className="mt-0.5 text-sm text-muted-foreground">
-                                    Receive a delivery or place a pharmacy order
-                                    to start tracking stock here.
+                                    {stockItems.length > 0
+                                        ? 'Stock is already tracked here. Choose another view or clear your search to see it.'
+                                        : 'Receive a delivery or place a pharmacy order to start tracking stock here.'}
                                 </p>
                             </div>
                             <div className="flex flex-wrap items-center justify-center gap-2">
-                                <Button
-                                    size="sm"
-                                    onClick={() =>
-                                        setModal({ type: 'receive' })
-                                    }
-                                >
-                                    <Truck className="h-3.5 w-3.5" />
-                                    Receive stock
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => setModal({ type: 'order' })}
-                                >
-                                    <Plus className="h-3.5 w-3.5" />
-                                    New order
-                                </Button>
+                                {stockItems.length > 0 ? (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => {
+                                            setSearch('');
+                                            setChip('all');
+                                            setActiveTab('all');
+                                        }}
+                                    >
+                                        Show all stock
+                                    </Button>
+                                ) : (
+                                    <>
+                                        <Button
+                                            size="sm"
+                                            onClick={() =>
+                                                setModal({ type: 'receive' })
+                                            }
+                                        >
+                                            <Truck className="h-3.5 w-3.5" />
+                                            Receive stock
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() =>
+                                                setModal({ type: 'order' })
+                                            }
+                                        >
+                                            <Plus className="h-3.5 w-3.5" />
+                                            New order
+                                        </Button>
+                                    </>
+                                )}
                             </div>
                         </div>
                     ) : (
@@ -1133,9 +1227,11 @@ export default function StockManagement({
                             ) : null}
                         </div>
                         <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-                            {controlledRegister.length === 0 ? (
+                            {filteredControlled.length === 0 ? (
                                 <div className="px-5 py-12 text-center text-sm text-muted-foreground">
-                                    No controlled drugs in stock.
+                                    {controlledRegister.length > 0
+                                        ? 'No controlled stock matches your search.'
+                                        : 'No controlled drugs in stock.'}
                                 </div>
                             ) : (
                                 <div className="overflow-x-auto">
@@ -1163,7 +1259,7 @@ export default function StockManagement({
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {controlledRegister.map((r) => {
+                                            {filteredControlled.map((r) => {
                                                 const reconciled =
                                                     r.discrepancy === null ||
                                                     r.discrepancy === 0;
@@ -1315,12 +1411,14 @@ export default function StockManagement({
                                 New pharmacy order
                             </Button>
                         </div>
-                        {pharmacyOrders.length === 0 ? (
+                        {filteredOrders.length === 0 ? (
                             <div className="rounded-2xl border border-dashed bg-card px-5 py-12 text-center text-sm text-muted-foreground">
-                                No pharmacy orders.
+                                {pharmacyOrders.length > 0
+                                    ? 'No pharmacy orders match your search.'
+                                    : 'No pharmacy orders.'}
                             </div>
                         ) : (
-                            pharmacyOrders.map((o) => (
+                            filteredOrders.map((o) => (
                                 <OrderCard
                                     key={o.id}
                                     o={o}

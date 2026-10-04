@@ -23,6 +23,7 @@ use App\Models\User;
 use App\Services\ShiftHandoverService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 /**
@@ -566,9 +567,12 @@ class FrontlineLifecycleDemoSeeder extends Seeder
             $anchor->copy()->format('H:i'),
             $anchor->copy()->addMinutes(15)->format('H:i'),
         ];
+        // This named synthetic prescription already existed before today's
+        // first due dose. Its first independent check models that history.
+        $fixtureCreatedAt = $anchor->copy()->startOfMinute()->subHour()->utc();
 
         $medications = collect([
-            $this->upsertMedicationFixture($client, [
+            $this->upsertMedicationFixture($client, $admin, $fixtureCreatedAt, [
                 'name' => 'PW Meds Morning Tablets',
                 'dosage' => '1 tablet',
                 'frequency' => 'Three times daily',
@@ -577,7 +581,7 @@ class FrontlineLifecycleDemoSeeder extends Seeder
                 'form' => 'tablet',
                 'instructions' => 'Give with water.',
             ]),
-            $this->upsertMedicationFixture($client, [
+            $this->upsertMedicationFixture($client, $admin, $fixtureCreatedAt, [
                 'name' => 'PW Meds Vitamin D',
                 'dosage' => '1 capsule',
                 'frequency' => 'Daily',
@@ -586,7 +590,7 @@ class FrontlineLifecycleDemoSeeder extends Seeder
                 'form' => 'capsule',
                 'instructions' => 'Give after breakfast.',
             ]),
-            $this->upsertMedicationFixture($client, [
+            $this->upsertMedicationFixture($client, $admin, $fixtureCreatedAt, [
                 'name' => 'PW Meds Eye Drops',
                 'dosage' => '1 drop',
                 'frequency' => 'Daily',
@@ -595,7 +599,7 @@ class FrontlineLifecycleDemoSeeder extends Seeder
                 'form' => 'drops',
                 'instructions' => 'Right eye.',
             ]),
-            $this->upsertMedicationFixture($client, [
+            $this->upsertMedicationFixture($client, $admin, $fixtureCreatedAt, [
                 'name' => 'PW Meds PRN Paracetamol',
                 'dosage' => '500mg',
                 'frequency' => 'As needed',
@@ -608,7 +612,7 @@ class FrontlineLifecycleDemoSeeder extends Seeder
                 'max_per_day' => 4,
                 'min_hours_between_doses' => 1,
             ]),
-            $this->upsertMedicationFixture($client, [
+            $this->upsertMedicationFixture($client, $admin, $fixtureCreatedAt, [
                 'name' => 'PW Meds Controlled PRN',
                 'dosage' => '1 capsule',
                 'frequency' => 'As needed',
@@ -625,12 +629,7 @@ class FrontlineLifecycleDemoSeeder extends Seeder
             ]),
         ]);
 
-        ClientMedicationAdministration::query()
-            ->whereIn('client_medication_id', $medications->pluck('id')->all())
-            ->forceDelete();
-        ClientControlledDrugEntry::query()
-            ->whereIn('client_medication_id', $medications->pluck('id')->all())
-            ->delete();
+        $this->resetMedicationFixtureDoses($client, $medications->pluck('id')->all());
 
         ClientRisk::updateOrCreate(
             [
@@ -644,19 +643,6 @@ class FrontlineLifecycleDemoSeeder extends Seeder
                 'active' => true,
             ],
         );
-
-        $controlledPrn = $medications->firstWhere('name', 'PW Meds Controlled PRN');
-        if ($controlledPrn) {
-            ClientMedicationStock::updateOrCreate(
-                ['client_medication_id' => $controlledPrn->id],
-                [
-                    'on_hand' => 12,
-                    'unit' => 'capsules',
-                    'reorder_level' => 2,
-                    'last_counted_at' => now(),
-                ],
-            );
-        }
 
         $startsAt = $now->copy()->subHour()->utc();
         $endsAt = $now->copy()->addHours(5)->utc();
@@ -724,9 +710,95 @@ class FrontlineLifecycleDemoSeeder extends Seeder
     }
 
     /**
+     * Reset only the named online browser doses. Checked prescription evidence,
+     * the neutral event chain and generic audit history remain immutable.
+     * Wider workflows require their own fixture and cannot be silently erased.
+     *
+     * @param  array<int, int>  $medicationIds
+     */
+    private function resetMedicationFixtureDoses(Client $client, array $medicationIds): void
+    {
+        if (! app()->environment(['local', 'testing'])) {
+            throw new \LogicException('Medication browser fixture reset is only available locally and in tests.');
+        }
+
+        DB::transaction(function () use ($client, $medicationIds): void {
+            $scope = fn ($query) => $query->where('client_id', $client->id)->whereIn('client_medication_id', $medicationIds);
+            $doses = $scope(ClientMedicationAdministration::withTrashed())->lockForUpdate()->get();
+            $doseIds = $doses->pluck('id')->all();
+            $entries = $scope(ClientControlledDrugEntry::query())->lockForUpdate()->get();
+            $entryIds = $entries->pluck('id')->all();
+            $followups = $scope(DB::table('medication_followups'))->whereIn('administration_id', $doseIds)->lockForUpdate()->pluck('id')->all();
+
+            $foreign = fn ($query) => $query->where(fn ($row) => $row
+                ->whereNull('client_id')->orWhereNull('client_medication_id')
+                ->orWhere('client_id', '!=', $client->id)->orWhereNotIn('client_medication_id', $medicationIds));
+            $guards = [
+                'foreign administration ownership' => DB::table('client_medication_administrations')->whereIn('client_medication_id', $medicationIds)->where('client_id', '!=', $client->id),
+                'foreign register ownership' => DB::table('client_controlled_drug_entries')->whereIn('client_medication_id', $medicationIds)->where('client_id', '!=', $client->id),
+                'foreign register dose binding' => $foreign(DB::table('client_controlled_drug_entries')->whereIn('client_medication_administration_id', $doseIds)),
+                'foreign follow-up ownership' => $foreign(DB::table('medication_followups')->whereIn('administration_id', $doseIds)),
+                'foreign dose-slot ownership' => $foreign(DB::table('medication_dose_slots')->whereIn('outcome_administration_id', $doseIds)),
+                'outside dose correction' => DB::table('client_medication_administrations')->whereNotIn('id', $doseIds)->where(fn ($row) => $row->whereIn('corrected_of_id', $doseIds)->orWhereIn('reoffer_of_id', $doseIds)),
+                'medication error report' => DB::table('medication_errors')->whereIn('client_medication_administration_id', $doseIds),
+                'stock allocation' => DB::table('medication_stock_movements')->whereIn('administration_id', $doseIds),
+                'activated stock ledger' => DB::table('client_medication_stocks')->whereIn('client_medication_id', $medicationIds)->whereNotNull('lots_started_at'),
+                'stock pack evidence' => DB::table('medication_stock_lots')->whereIn('client_medication_stock_id', DB::table('client_medication_stocks')->select('id')->whereIn('client_medication_id', $medicationIds)),
+                'stock pack receipt' => DB::table('medication_stock_lots')->whereIn('controlled_entry_id', $entryIds),
+                'register reversal' => DB::table('client_controlled_drug_entries')->whereIn('reverses_entry_id', $entryIds),
+                'controlled discrepancy' => DB::table('client_controlled_drug_discrepancies')->whereIn('count_entry_id', $entryIds),
+                'controlled loss report' => DB::table('controlled_drug_loss_reports')->whereIn('register_entry_id', $entryIds),
+                'controlled destruction' => DB::table('medication_destructions')->whereIn('register_entry_id', $entryIds),
+                'controlled command receipt' => DB::table('controlled_product_requests')->whereIn('result->entry_id', $entryIds),
+                'paper reconciliation' => DB::table('medication_paper_postings')->whereIn('administration_id', $doseIds),
+                'downtime resolution' => DB::table('medication_downtime_resolutions')->whereIn('administration_id', $doseIds),
+                'fleet administration' => DB::table('fleet_medication_transit_logs')->whereIn('medication_administration_id', $doseIds),
+                'fleet event' => DB::table('fleet_resident_transport_events')->whereIn('medication_administration_id', $doseIds),
+            ];
+            foreach ($guards as $reason => $query) {
+                if ($query->exists()) {
+                    throw new \LogicException('Medication browser fixture reset cannot erase '.$reason.' evidence.');
+                }
+            }
+            if ($entries->contains(fn ($entry) => ! in_array((int) $entry->client_medication_administration_id, $doseIds, true))) {
+                throw new \LogicException('Medication browser fixture reset cannot erase unrelated cupboard commands.');
+            }
+
+            $receipts = DB::table('medication_idempotency_results')->where('scope', 'administration.record')
+                ->where(fn ($row) => $row->whereIn('response_payload->administration_id', $doseIds)
+                    ->orWhereIn('response_payload->administration_root_id', $doseIds));
+            if ((clone $receipts)->where(fn ($row) => $row
+                ->whereNull('response_payload->client_id')->orWhereNull('response_payload->client_medication_id')
+                ->orWhere('response_payload->client_id', '!=', $client->id)
+                ->orWhereNotIn('response_payload->client_medication_id', $medicationIds))->exists()) {
+                throw new \LogicException('Medication browser fixture reset cannot erase a foreign replay receipt.');
+            }
+
+            // These children belong only to captured synthetic administrations.
+            // Query deletion is intentional fixture teardown, never a clinical API.
+            DB::table('medication_followup_events')->whereIn('medication_followup_id', $followups)->delete();
+            DB::table('medication_followups')->whereIn('id', $followups)->delete();
+            DB::table('medication_second_person_confirmations')->whereIn('administration_id', $doseIds)->delete();
+            $receipts->delete();
+            $scope(DB::table('medication_dose_slots'))->whereIn('outcome_administration_id', $doseIds)
+                ->update(['outcome' => null, 'outcome_administration_id' => null, 'outcome_at' => null]);
+            $scope(DB::table('client_controlled_drug_entries'))->whereIn('id', $entryIds)->delete();
+            $scope(ClientMedicationAdministration::withTrashed())->whereIn('id', $doseIds)->forceDelete();
+
+            $controlledPrn = ClientMedication::query()->where('client_id', $client->id)->whereIn('id', $medicationIds)
+                ->where('name', 'PW Meds Controlled PRN')->first();
+            if ($controlledPrn !== null) {
+                ClientMedicationStock::updateOrCreate(['client_medication_id' => $controlledPrn->id], [
+                    'on_hand' => 12, 'unit' => 'capsules', 'reorder_level' => 2, 'last_counted_at' => now(),
+                ]);
+            }
+        });
+    }
+
+    /**
      * @param  array<string, mixed>  $overrides
      */
-    private function upsertMedicationFixture(Client $client, array $overrides): ClientMedication
+    private function upsertMedicationFixture(Client $client, User $creator, Carbon $createdAt, array $overrides): ClientMedication
     {
         $attributes = array_merge([
             'client_id' => $client->id,
@@ -748,6 +820,8 @@ class FrontlineLifecycleDemoSeeder extends Seeder
             'active' => true,
             'state' => 'active',
             'version' => 1,
+            'created_by' => $creator->id,
+            'created_at' => $createdAt,
         ], $overrides);
 
         $medication = ClientMedication::withTrashed()
@@ -756,12 +830,28 @@ class FrontlineLifecycleDemoSeeder extends Seeder
             ->first();
 
         if ($medication) {
-            $medication->forceFill(array_merge($attributes, ['deleted_at' => null]))->save();
+            // Reseeding never changes an existing order's original chronology.
+            unset($attributes['created_at']);
+            // This named synthetic order has a published source version.
+            // The acceptance seeder proposes and independently checks any
+            // new fixture schedule; this base reset must not rewrite it.
+            if ($medication->approval_status === 'verified' && $medication->verified_by !== null
+                && $medication->versions()->where('client_id', $client->id)
+                    ->where('version_number', $medication->version)->whereNotNull('entry_request_key')->exists()) {
+                return $medication->fresh() ?? $medication;
+            }
+            $medication->forceFill(array_merge($attributes, [
+                'version' => $medication->version ?: 1,
+                'created_by' => $medication->created_by ?? $creator->id,
+                'deleted_at' => null,
+            ]))->save();
 
             return $medication->fresh() ?? $medication;
         }
 
-        return ClientMedication::create($attributes);
+        // Explicit creation time belongs only to this synthetic new record;
+        // retain normal creating/created hooks and prescription verification.
+        return ClientMedication::query()->forceCreate($attributes);
     }
 
     private function seedPlaywrightAttendanceFixtures(User $admin, Client $client, ServiceContext $serviceContext): void

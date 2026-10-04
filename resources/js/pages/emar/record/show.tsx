@@ -9,7 +9,6 @@ import {
     MedicinesSection,
     RecordMedicineDialog,
 } from '@/components/emar/record/reading';
-import { CanonicalSupportSection } from '@/components/emar/record/support';
 import { RecordDoseLaunch } from '@/components/emar/record/record-dose-launch';
 import { SafetySection } from '@/components/emar/record/safety';
 import {
@@ -18,6 +17,7 @@ import {
     RECORD_SECTIONS,
     type RecordLocation,
 } from '@/components/emar/record/sections';
+import { CanonicalSupportSection } from '@/components/emar/record/support';
 import type { RecordPageProps } from '@/components/emar/record/types';
 import {
     TabSearchPalette,
@@ -40,6 +40,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { useEmarRecordBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTime, formatTime } from '@/lib/datetime';
+import { emarScopedHref } from '@/lib/emar-navigation';
 
 export default function PersonMedicationRecord(props: RecordPageProps) {
     if (props.unavailable)
@@ -87,12 +88,20 @@ function AvailableRecord({
     const page = usePage();
     const query = new URLSearchParams(page.url.split('?')[1]);
     const date = query.get('date');
+    const hubUrl = new URL(
+        emarScopedHref('/emar/mar', page.url),
+        'https://emar.invalid',
+    );
+    hubUrl.searchParams.delete('client_id');
     const week = query.get('mode') === 'week';
     const historyPage = Math.max(1, Number(query.get('page')) || 1);
     const sections = RECORD_SECTIONS.map((item) => ({
         ...item,
         views: item.views.filter(
-            (view) => item.key !== 'history' || view.key !== 'changes' || can.view_audit,
+            (view) =>
+                item.key !== 'history' ||
+                view.key !== 'changes' ||
+                can.view_audit,
         ),
     }));
     const [location, setLocation] = useState(() =>
@@ -151,12 +160,13 @@ function AvailableRecord({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${person.preferred} · Medication record`} />
-            <div className="flex min-w-0 max-w-full flex-col gap-5">
+            <div className="flex max-w-full min-w-0 flex-col gap-5">
                 <PageHeader
                     frontline
                     variant="profile"
                     wrapTitle
-                    backHref="/emar/mar"
+                    mobileSummary={`${meters.medicines.count} medicines · ${person.house ?? 'Medication record'}`}
+                    backHref={hubUrl.pathname + hubUrl.search}
                     mark={
                         <span className="eh-mark-ring text-sm font-semibold">
                             {person.initials}
@@ -324,7 +334,7 @@ function AvailableRecord({
                     id="medication-record-panel"
                     role="tabpanel"
                     aria-labelledby={`medication-record-tab-${activeView}`}
-                    className="min-w-0 max-w-full"
+                    className="max-w-full min-w-0"
                 >
                     {location.tab === 'medicines' ? (
                         <MedicinesSection
@@ -365,8 +375,14 @@ function AvailableRecord({
                             key={`${person.id}:${query.get('dose_id') ?? ''}:${activeView}`}
                             clientId={person.id}
                             view={activeView}
-                            initialDoseId={Number(query.get('dose_id')) > 0 ? Number(query.get('dose_id')) : null}
-                            onDetailClose={() => navigateQuery({ dose_id: null })}
+                            initialDoseId={
+                                Number(query.get('dose_id')) > 0
+                                    ? Number(query.get('dose_id'))
+                                    : null
+                            }
+                            onDetailClose={() =>
+                                navigateQuery({ dose_id: null })
+                            }
                             page={historyPage}
                             onPage={(next) =>
                                 navigateQuery({

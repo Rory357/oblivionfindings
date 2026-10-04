@@ -6,6 +6,7 @@ use App\Models\AppSetting;
 use App\Models\ClientMedication;
 use App\Models\MedicationSiteSetting;
 use App\Models\Shift;
+use App\Support\Medication\MedicationStockQuantity;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 
@@ -104,7 +105,7 @@ class ControlledPolicy
      */
     public function countStatus(ClientMedication $medication, DateTimeInterface $now, ?DateTimeInterface $lastCount = null): array
     {
-        if (! (bool) $medication->controlled_drug) {
+        if (! $this->countRequired($medication)) {
             return $this->emptyStatus('not_applicable', null, $lastCount);
         }
         $siteId = $this->siteId($medication);
@@ -202,6 +203,14 @@ class ControlledPolicy
             'next_change_at' => $next?->toIso8601String(),
             'last_count_at' => $lastCount === null ? null : CarbonImmutable::instance($lastCount)->toIso8601String(),
         ];
+    }
+
+    /** Retained stock still needs witnessed counts after an order ends. */
+    public function countRequired(ClientMedication $medication): bool
+    {
+        return (bool) $medication->controlled_drug
+            && ($medication->isActive() || ($medication->stock?->on_hand !== null
+                && MedicationStockQuantity::greaterThan($medication->stock->on_hand, 0)));
     }
 
     protected function siteId(ClientMedication $medication): ?int

@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Models\ClientMedication;
+use App\Models\ClientMedicationStock;
 use App\Services\Medication\Controlled\ControlledPolicy;
 use App\Services\Medication\Controlled\ControlledSettingsFragment;
 use Carbon\CarbonImmutable;
@@ -70,7 +71,7 @@ class ControlledPolicyTest extends TestCase
     public function test_count_cadence_is_not_configured_until_a_valid_value_is_saved(): void
     {
         $policy = $this->policy();
-        $medication = new ClientMedication(['controlled_drug' => true]);
+        $medication = new ClientMedication(['controlled_drug' => true, 'active' => true, 'state' => 'active', 'approval_status' => 'verified']);
         $this->assertNull($policy->cadence(4));
         $status = $policy->countStatus($medication, $this->at('2026-10-03 14:30'));
         $this->assertSame('not_configured', $status['status']);
@@ -133,16 +134,41 @@ class ControlledPolicyTest extends TestCase
     {
         $policy = $this->policy();
         $policy->organisation[ControlledPolicy::COUNT_CADENCE] = 'shift';
-        $medication = new ClientMedication(['controlled_drug' => true]);
+        $medication = new ClientMedication(['controlled_drug' => true, 'active' => true, 'state' => 'active', 'approval_status' => 'verified']);
         $empty = $policy->countStatus($medication, $this->at('2026-10-03 10:00'));
         $this->assertSame('schedule_unavailable', $empty['status']);
         $this->assertNull($empty['due_at']);
         $policy->roster = [$this->at('2026-10-03 07:00')];
-        $medication->setRawAttributes(['controlled_drug' => true, 'created_at' => '2026-10-04']);
+        $medication->setRawAttributes(['controlled_drug' => true, 'active' => true, 'state' => 'active', 'approval_status' => 'verified', 'created_at' => '2026-10-04']);
         $filtered = $policy->countStatus($medication, $this->at('2026-10-03 10:00'));
         $this->assertSame('schedule_unavailable', $filtered['status']);
         $this->assertNull($filtered['change_at']);
         $this->assertNull($filtered['overdue_at']);
+    }
+
+    public function test_count_requirement_covers_active_orders_and_positive_residual_stock(): void
+    {
+        $policy = $this->policy();
+        $stock = new ClientMedicationStock(['on_hand' => '0.00']);
+        $medication = new ClientMedication([
+            'controlled_drug' => true, 'active' => true, 'state' => 'active', 'approval_status' => 'verified',
+        ]);
+        $medication->setRelation('stock', $stock);
+        $this->assertTrue($policy->countRequired($medication), 'An active controlled order still needs counts at zero stock.');
+
+        $medication->setRawAttributes([...$medication->getAttributes(), 'state' => 'ceased', 'active' => false, 'deleted_at' => '2026-10-03 08:00:00']);
+        $stock->on_hand = '1.00';
+        $this->assertTrue($policy->countRequired($medication), 'Historical positive physical stock remains countable.');
+        $stock->on_hand = '0.00';
+        $this->assertFalse($policy->countRequired($medication));
+        $status = $policy->countStatus($medication, $this->at('2026-10-03 10:00'));
+        $this->assertSame('not_applicable', $status['status']);
+        $this->assertNull($status['due_at']);
+        $this->assertNull($status['overdue_at']);
+
+        $stock->on_hand = '1.00';
+        $medication->controlled_drug = false;
+        $this->assertFalse($policy->countRequired($medication), 'Ordinary physical stock never acquires the controlled count policy.');
     }
 
     public function test_missing_roster_or_unapproved_weekly_anchor_does_not_fabricate_due_times(): void
@@ -207,6 +233,9 @@ class ControlledPolicyTest extends TestCase
         $this->assertFalse($groups['controlled_counts']->definition('cadence')->accepts(''));
         $this->assertTrue($groups['controlled_counts']->definition('cadence')->accepts('shift'));
         $this->assertCount(3, $groups['controlled_counts']->definition('cadence')->options);
+        $this->assertSame('week', $groups['controlled_counts']->definition('cadence')->normalise('week'));
+        $this->assertSame('Weekly — timing unavailable', $groups['controlled_counts']->definition('cadence')->format('week'));
+        $this->assertStringContainsString('Weekly due and overdue reminders are unavailable.', $groups['controlled_counts']->toClient()['effect']);
         $this->assertNotNull($groups['controlled_counts']->definition('cadence')->whenNotConfigured);
     }
 

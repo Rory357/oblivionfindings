@@ -17,6 +17,7 @@ final class MedicationFollowupController extends Controller
     {
         $data = $request->validate([
             'client_id' => ['nullable', 'integer', 'min:1'], 'site_id' => ['nullable', 'integer', 'min:1'],
+            'administration' => ['nullable', 'integer', 'min:1'],
             'type' => ['nullable', 'in:'.implode(',', array_keys(MedicationFollowupService::TYPES))],
             'state' => ['nullable', 'in:open,overdue,lead,unscheduled,done'], 'q' => ['nullable', 'string', 'max:100'],
         ]);
@@ -63,7 +64,14 @@ final class MedicationFollowupController extends Controller
                 ->when($data['client_id'] ?? null, fn ($q, $id) => $q->where('client_id', $id))
                 ->when($data['site_id'] ?? null, fn ($q, $id) => $q->whereHas('client', fn ($c) => $c->where('site_id', $id)))
                 ->whereNull('completed_at')->whereHas('medication', fn ($m) => $m->where('controlled_drug', true))->count();
+        // An explicit dose link resolves independently of list pagination and
+        // filters, through the same authorized scope as the detail GET.
+        $selectedFollowupId = empty($data['administration']) ? null
+            : $this->work->visibleQuery($actor)->where('type', 'effect')
+                ->where('administration_id', (int) $data['administration'])->orderBy('id')->value('id');
         $payload = ['followups' => $rows, 'meters' => $meters, 'filters' => $data, 'hidden_controlled' => $hiddenControlled,
+            'legacy_effect_checks' => $this->work->legacyEffectChecks($actor, $data),
+            'selected_followup_id' => $selectedFollowupId === null ? null : (int) $selectedFollowupId,
             'can_manage' => $actor->canDo(MedicationFollowupService::MANAGE), 'types' => MedicationFollowupService::TYPES];
         if ($request->expectsJson()) {
             return response()->json($payload)->header('Cache-Control', 'private, no-store');

@@ -826,10 +826,11 @@ describe('Meds today (P01 C3)', () => {
 
         expect(screen.getByText('Not clocked in')).toBeInTheDocument();
         expect(screen.getByText('You’re not clocked in')).toBeInTheDocument();
-        expect(screen.getByRole('link', { name: /Clock in/ })).toHaveAttribute(
-            'href',
-            '/attendance',
-        );
+        const clockInLinks = screen.getAllByRole('link', { name: /Clock in/ });
+        expect(clockInLinks).toHaveLength(2);
+        for (const link of clockInLinks) {
+            expect(link).toHaveAttribute('href', '/attendance');
+        }
         expect(screen.getByText('Rangi Parata')).toBeInTheDocument();
     });
 

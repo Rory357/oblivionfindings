@@ -10,6 +10,7 @@ use App\Models\User;
 use Database\Seeders\ClinicalPermissionsSeeder;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class ClientClinicalEventControllerTest extends TestCase
@@ -106,6 +107,8 @@ class ClientClinicalEventControllerTest extends TestCase
     public function test_client_hs_linked_event_requires_immediate_action(): void
     {
         $user = $this->createUserWithRole('coordinator');
+        $clinicalEventsBefore = DB::table('clinical_events')->count();
+        $hsEventsBefore = DB::table('hs_events')->count();
 
         $this->actingAs($user)
             ->postJson("/clients/{$this->client->id}/clinical/events", [
@@ -117,8 +120,8 @@ class ClientClinicalEventControllerTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors('immediate_action_taken');
 
-        $this->assertDatabaseCount('clinical_events', 0);
-        $this->assertDatabaseCount('hs_events', 0);
+        $this->assertDatabaseCount('clinical_events', $clinicalEventsBefore);
+        $this->assertDatabaseCount('hs_events', $hsEventsBefore);
     }
 
     public function test_user_without_event_permission_cannot_record_client_event(): void

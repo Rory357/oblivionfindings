@@ -140,7 +140,7 @@ class IntegrationAlertControllerTest extends TestCase
             ->post("/control-room/integration-alerts/{$hiddenAlert->id}/assign", [
                 'user_id' => $this->assignee->id,
             ])
-            ->assertForbidden();
+            ->assertNotFound();
     }
 
     public function test_integration_alert_actions_reject_non_integration_alerts(): void
@@ -267,7 +267,7 @@ class IntegrationAlertControllerTest extends TestCase
             app(IntegrationAlertController::class)->assign($this->assignmentRequest($alert), $staleAlert);
             $this->fail('A stale visible model must not bypass the locked alert site-access check.');
         } catch (HttpException $exception) {
-            $this->assertSame(403, $exception->getStatusCode());
+            $this->assertSame(404, $exception->getStatusCode());
         }
 
         $this->assertNull($alert->fresh()->assigned_to_user_id);

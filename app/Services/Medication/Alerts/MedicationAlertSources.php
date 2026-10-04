@@ -4,7 +4,6 @@ namespace App\Services\Medication\Alerts;
 
 use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
-use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationStock;
 use App\Models\ControlledDrugLossReport;
@@ -16,6 +15,7 @@ use App\Models\MedicationReview;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\CompetencyPolicySettings;
+use App\Services\Medication\Controlled\ControlledCountStatus;
 use App\Services\Medication\MedicationErrorSummary;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\RefusalEscalationPolicy;
@@ -399,14 +399,15 @@ class MedicationAlertSources
     }
 
     /**
-     * Controlled-drug balance check overdue, one alert per house (v5: "No
-     * controlled-drug balance check at Rimu House for 7 days").
+     * Configured controlled counts overdue, one alert per house.
+     * The deprecated days argument cannot override the organisation count policy.
      *
-     * @param  Collection<int, ClientMedication>  $overdue  Controlled orders with no check within the threshold.
+     * @param  Collection<int, ClientMedication>  $overdue  Canonical orders whose configured roster count is overdue.
      */
-    public function controlledChecks(Collection $overdue, int $days): void
+    public function controlledChecks(Collection $overdue, ?int $days = null, ?int $siteId = null): void
     {
-        $this->safely('cdCheck', function () use ($overdue, $days): void {
+        $this->safely('cdCheck', function () use ($overdue, $siteId): void {
+            $scopeSiteId = $siteId;
             $keys = [];
             $bySite = $overdue
                 ->filter(fn (ClientMedication $order): bool => $order->client?->site_id !== null)
@@ -420,41 +421,31 @@ class MedicationAlertSources
                     siteId: (int) $siteId,
                     title: 'Controlled-drug balance check overdue',
                     message: sprintf(
-                        'No controlled-drug balance check at %s for %d days (%d %s).',
+                        'Configured controlled-drug counts at %s are overdue (%d %s).',
                         $house,
-                        $days,
                         $orders->count(),
                         $orders->count() === 1 ? 'medicine' : 'medicines',
                     ),
                     shortMessage: "A controlled-drug check at {$house} is overdue.",
-                    actionUrl: '/emar/controlled-drugs',
+                    actionUrl: '/emar/controlled?'.http_build_query(['view' => 'register', 'site_id' => (int) $siteId]),
                     controlled: true,
                     context: ['client_medication_ids' => $orders->pluck('id')->map(fn ($id): int => (int) $id)->implode(',')],
                 ));
             }
-            $this->alerts->reconcile(MedicationAlertCatalogue::CD_CHECK, $keys, 'Balance check done');
+            if ($scopeSiteId === null) {
+                $this->alerts->reconcile(MedicationAlertCatalogue::CD_CHECK, $keys, 'Count policy settled');
+            } elseif ($keys === []) {
+                $this->alerts->resolve(MedicationAlertCatalogue::CD_CHECK, 'cd-check:'.$scopeSiteId, 'Count policy settled');
+            }
         });
     }
 
     /** A balance check was recorded: the house's alert is dealt with once no order there is overdue. */
-    public function controlledCheckRecorded(int $siteId, int $days = 7): void
+    public function controlledCheckRecorded(int $siteId, ?int $days = null): void
     {
-        $this->safely('cdCheck', function () use ($siteId, $days): void {
-            $orders = ClientMedication::query()
-                ->active()
-                ->controlled()
-                ->whereHas('client', fn ($client) => $client->where('site_id', $siteId))
-                ->pluck('id');
-            $cutoff = now()->subDays($days);
-            $checked = ClientControlledDrugEntry::query()
-                ->where('entry_type', 'balance_check')
-                ->whereIn('client_medication_id', $orders->all())
-                ->where('recorded_at', '>=', $cutoff)
-                ->distinct()
-                ->pluck('client_medication_id');
-            if ($orders->diff($checked)->isEmpty()) {
-                $this->alerts->resolve(MedicationAlertCatalogue::CD_CHECK, 'cd-check:'.$siteId, 'Balance check done');
-            }
+        $this->safely('cdCheck', function () use ($siteId): void {
+            $overdue = app(ControlledCountStatus::class)->refreshDashboardAlerts($siteId);
+            $this->controlledChecks($overdue, siteId: $siteId);
         });
     }
 
@@ -607,7 +598,7 @@ class MedicationAlertSources
                 title: 'Controlled-drug loss reported',
                 message: sprintf('A controlled-drug loss was reported — %s at %s.', $fresh->medication?->name ?? 'a controlled medicine', $house),
                 shortMessage: "A controlled-drug loss was reported at {$house}.",
-                actionUrl: '/emar/controlled-drugs',
+                actionUrl: '/emar/controlled?'.http_build_query(['view' => 'losses', 'site_id' => (int) $client->site_id, 'client_id' => (int) $client->id, 'client_medication_id' => (int) $fresh->client_medication_id]),
                 severity: 'critical',
                 clientId: (int) $client->id,
                 controlled: true,
@@ -691,7 +682,7 @@ class MedicationAlertSources
                 $difference < 0 ? 'short' : 'over',
             ),
             shortMessage: "A controlled-drug count doesn’t match at {$house}.",
-            actionUrl: '/emar/controlled-drugs',
+            actionUrl: '/emar/controlled?'.http_build_query(['view' => 'discrepancies', 'site_id' => (int) $client->site_id, 'client_id' => (int) $client->id, 'client_medication_id' => (int) $discrepancy->client_medication_id]),
             severity: 'critical',
             clientId: (int) $client->id,
             controlled: true,

@@ -1,6 +1,20 @@
 # eMAR implementation and verification status
 
-Updated 4 October 2026 after implementing the hero, navigation and modal corrections (Pacific/Auckland). This file takes precedence over the dated historical checkpoints in this folder. Reviewed work is published in [draft PR #16](https://github.com/Rory357/oblivionfindings/pull/16); this is not a production or clinical release.
+## Current repair pass — 4 October 2026
+
+The [completion repair and re-audit report](completion-re-audit-2026-10-04.md) is the current source of implementation and verification status after the critical audit of `7318603c0`. Work remains in [draft PR #16](https://github.com/Rory357/oblivionfindings/pull/16), not a production or clinical release. Main completed frontend changes; bounded backend repairs and independent review were delegated to GPT-6.1 Sol Extra high.
+
+This pass corrects measured Rory header/tab geometry, the phone header, modal recovery and confirmation, person/house/day navigation, follow-up queue parity, report/alert destinations, destruction annotation semantics, controlled-dose provenance, current replay authority, ordinary disposal, metadata and count policy. The re-audit found and corrected further historical-count incident linkage, legacy creator provenance, filtered-stock recovery and order search, and shared follow-up link issues.
+
+The complete frontend rerun passed **524 files / 3,579 tests**; five later direct-link regressions also passed. Full application-source lint passed. The controlled latest-result union passed **158 distinct cases**. The final full RBAC/Stock/readiness plus targeted deep-link batch passed **61/61 cases / 1,103 assertions**. Medication orders passed **38 tests / 794 assertions**, and the follow-up/worker/reporting/Tasks latest-result union passed **92 distinct cases**. Exact batches, type/build evidence, browser coverage and remaining gaps are recorded in the linked report. Overlapping test runs must not be added together.
+
+The older 62-case affected-file ledger and 14-of-15 failed CI checkpoint below are **historical**, not the new candidate's current failure total. Many named controlled, follow-up, reporting, PIN and fixture cases have subsequently passed. Fresh complete CI and cross-module clinical acceptance remain required. Weekly count timing still lacks a reviewed anchor; canonical-only consumers still need deliberate preparation/import of legacy follow-ups. No operational import, main merge or deployment has occurred.
+
+The historical approval holds below record the scope of earlier rejected packages. The current pass does not import those broad packages or expand clinical/role grants. Separately reviewed, narrowly scoped integrity repairs have been implemented and tested; the old statement that controlled linking, void semantics and replay checks remain wholly unimplemented is superseded by the current report. Preserve the historical records as provenance, not as current disposition.
+
+## Historical checkpoint before the critical-audit repairs
+
+The remainder records the earlier hero/navigation correction pass and its then-current evidence. Its unresolved-case statements are superseded only where the current report provides newer results.
 
 ## Scope and navigation
 

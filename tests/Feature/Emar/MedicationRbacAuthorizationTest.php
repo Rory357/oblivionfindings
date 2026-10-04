@@ -25,6 +25,7 @@ use App\Services\Fleet\ResidentTransportJourneyScope;
 use App\Services\Fleet\ResidentTransportJourneyService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Tasks\Providers\CdLossReportProvider;
+use Database\Factories\UserFactory;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -35,7 +36,6 @@ use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Tests\TestCase;
-use Database\Factories\UserFactory;
 
 class MedicationRbacAuthorizationTest extends TestCase
 {
@@ -123,7 +123,7 @@ class MedicationRbacAuthorizationTest extends TestCase
     {
         foreach ([
             'emar.controlled' => 'medications.controlled.view',
-            'emar.destructions' => 'medications.controlled.view',
+            'emar.destructions' => 'medications.controlled.view|medications.stock.update',
             'emar.cd_loss.index' => 'medications.controlled.view',
             'emar.stock' => 'medications.stock.update',
         ] as $name => $capability) {
@@ -779,11 +779,11 @@ class MedicationRbacAuthorizationTest extends TestCase
             $navigation,
         );
         $this->assertMatchesRegularExpression(
-            "/label: 'Destructions & returns',\\s*href: '\\/emar\\/destructions',\\s*icon: \\w+,\\s*visible: all\\(view, controlledView\\)/s",
+            "/key: 'destructions',\\s*label: '[^']+',\\s*href: '\\/emar\\/destructions',\\s*icon: \\w+,\\s*visible: all\\(view, any\\(controlledView, stockUpdate\\)\\)/s",
             $navigation,
         );
         $this->assertMatchesRegularExpression(
-            "/label: 'Stock & pharmacy',\\s*href: '\\/emar\\/stock',\\s*icon: \\w+,\\s*visible: all\\(view, stockUpdate\\)/s",
+            "/key: 'stock',\\s*label: '[^']+',\\s*href: '\\/emar\\/stock',\\s*icon: \\w+,\\s*visible: all\\(view, stockUpdate\\)/s",
             $navigation,
         );
         // Standard reports need the exact module reader; audit adds its own gate.
@@ -817,7 +817,12 @@ class MedicationRbacAuthorizationTest extends TestCase
             'medications.view',
             'medications.orders.manage',
         ], $site);
-        $client->supportWorkers()->syncWithoutDetaching([$actor->id]);
+        $this->recordPresence($actor, $client);
+        $witness = $this->userWithPermissions(['medications.controlled.witness'], $site);
+        $this->qualifyControlledWitness($witness, $site, $client, $actor);
+        $this->assertFalse($actor->canDo('medications.controlled.record'));
+        $this->assertFalse($actor->canDo('medications.stock.update'));
+        $this->assertFalse($actor->canDo('medications.administer.record'));
 
         $this->withoutMiddleware(EnsurePermission::class);
 
@@ -826,6 +831,8 @@ class MedicationRbacAuthorizationTest extends TestCase
                 'client_medication_id' => $medication->id, 'client_request_uuid' => (string) Str::uuid(),
                 'movement_type' => 'going_out', 'quantity' => 1, 'expected_balance' => 10,
                 'expected_entry_id' => null, 'actual_balance' => 9,
+                'on_hand_before' => 10, 'on_hand_after' => 9,
+                'witnessed_by' => $witness->id, 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertForbidden();
         $this->actingAs($actor)
@@ -836,6 +843,9 @@ class MedicationRbacAuthorizationTest extends TestCase
                 'client_medication_id' => $medication->id, 'client_request_uuid' => (string) Str::uuid(),
                 'movement_type' => 'going_out', 'quantity' => 1, 'expected_balance' => 10,
                 'expected_entry_id' => null, 'actual_balance' => 9,
+                'on_hand_before' => 10, 'on_hand_after' => 9,
+                'witnessed_by' => $witness->id, 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
+                'notes' => 'Synthetic stock shortfall confirmed.', 'immediate_action_taken' => 'Secured cupboard and informed the house lead.',
             ])
             ->assertForbidden();
         $this->actingAs($actor)
@@ -943,8 +953,10 @@ class MedicationRbacAuthorizationTest extends TestCase
                 'witnessed_by' => $witness->id,
                 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
-            ->assertOk()
+            ->assertRedirect()
             ->assertSessionHasNoErrors();
+        $this->assertSame(8.0, (float) $controlledMedication->stock()->sole()->on_hand);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 1);
         $this->assertDatabaseHas('client_controlled_drug_entries', [
             'client_medication_id' => $controlledMedication->id,
             'recorded_by' => $controlledActor->id,
@@ -1070,6 +1082,7 @@ class MedicationRbacAuthorizationTest extends TestCase
         $entryPayload = [
             'client_medication_id' => $medication->id, 'movement_type' => 'going_out', 'quantity' => 1,
             'expected_entry_id' => null, 'expected_balance' => 10, 'actual_balance' => 9,
+            'on_hand_before' => 10, 'on_hand_after' => 9,
             'witnessed_by' => $witness->id, 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'client_request_uuid' => '0d7527ad-b469-4480-858e-a49a966c9370',
         ];

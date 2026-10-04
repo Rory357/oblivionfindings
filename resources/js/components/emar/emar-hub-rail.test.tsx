@@ -141,7 +141,7 @@ describe('EmarHubRail', () => {
         ).toBe('false');
         fireEvent.click(screen.getByRole('tab', { name: 'Orders to check' }));
         expect(fixture.visit).toHaveBeenCalledWith(
-            '/emar/prescriptions?view=to_check',
+            '/emar/prescriptions?view=to_check&site_id=2',
         );
     });
 

@@ -19,13 +19,13 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Support\Medication\MedicationStockQuantity;
+use Database\Factories\UserFactory;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Testing\AssertableInertia as Assert;
 use RuntimeException;
 use Tests\TestCase;
-use Database\Factories\UserFactory;
 
 /**
  * The redesigned Stock Management page resolves the active site's brand colour,
@@ -1037,6 +1037,19 @@ class StockManagementTest extends TestCase
     {
         $context = $this->seedStock(true);
         $this->grantPermissions($context['user'], ['medications.controlled.record']);
+        // The receipt and every durable retry require the recorder at this house.
+        Shift::factory()->create([
+            'client_id' => $context['client']->id,
+            'site_id' => $context['site']->id,
+            'service_context_id' => $context['client']->service_context_id,
+            'user_id' => $context['user']->id,
+            'starts_at' => now()->subHour()->utc(),
+            'ends_at' => now()->addHour()->utc(),
+            'actual_starts_at' => now()->subHour()->utc(),
+            'actual_ends_at' => null,
+            'status' => 'in_progress',
+            'created_by' => $context['user']->id,
+        ]);
         $witness = $this->makeRoleUser('support_worker');
         $witness->forceFill(['password' => Hash::make('password')])->save();
         $this->grantPermissions($witness, ['medications.controlled.witness']);
@@ -1058,6 +1071,9 @@ class StockManagementTest extends TestCase
             'assessor_declared_at' => now()->subMonth(),
             'staff_acknowledged_at' => now()->subMonth()->addMinute(),
             'can_witness_controlled' => true,
+            'controlled_drugs' => true,
+            'restricted' => false,
+            'not_seen_areas' => [],
         ]);
         Shift::factory()->create([
             'client_id' => $context['client']->id,

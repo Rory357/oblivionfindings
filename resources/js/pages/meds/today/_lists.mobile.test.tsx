@@ -407,6 +407,26 @@ describe('phone medication lists', () => {
         expect(props.onRecord).not.toHaveBeenCalled();
     });
 
+    it('names an unknown effect-check time without inventing a deadline or marking it overdue', () => {
+        render(
+            <FollowUpsView
+                {...followUpProps()}
+                refusals={[]}
+                effects={[{ ...effect, check_due_at: null, check_at: null }]}
+            />,
+        );
+        const cards = screen.getByRole('list', {
+            name: 'Medication follow-up cards',
+        });
+        expect(
+            within(cards).getByText('Check time not set'),
+        ).toBeInTheDocument();
+        expect(within(cards).queryByText('Overdue')).not.toBeInTheDocument();
+        expect(
+            screen.getByText(/If no check time is set, arrange it with/),
+        ).toBeInTheDocument();
+    });
+
     it('shows follow-up medicine, due time and owner and retains both canonical dialog callbacks', () => {
         const props = followUpProps();
         const { rerender } = render(<FollowUpsView {...props} />);

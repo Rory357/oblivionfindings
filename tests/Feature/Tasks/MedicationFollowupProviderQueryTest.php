@@ -10,6 +10,7 @@ use App\Models\MedicationFollowup;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Tasks\Providers\LegacyMedicationEffectProvider;
 use App\Services\Tasks\Providers\MedicationFollowupProvider;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
@@ -113,6 +114,57 @@ class MedicationFollowupProviderQueryTest extends TestCase
         $this->actingAs($actor->fresh())->getJson('/tasks/detail?'.http_build_query([
             'source' => 'medication-followup', 'id' => $visible[0]->id,
         ]))->assertNotFound();
+    }
+
+    public function test_legacy_effect_task_links_are_read_only_without_preparation_authority(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', 'Pacific/Auckland')->utc());
+        $this->seed(RbacSeeder::class);
+        $site = Site::factory()->create(['is_active' => true]);
+        $actor = User::factory()->frontlineWorker()->create();
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $actor->id, 'primary_site_id' => $site->id, 'secondary_site_ids' => [],
+            'is_active' => true, 'start_date' => today()->subYear(), 'end_date' => null,
+        ]);
+        $this->permissions($actor, ['medications.view', 'clients.viewAssigned'], true);
+        $this->permissions($actor, [
+            'medications.administer.record', 'clients.viewAny', 'sites.viewAll', 'clinical.accessAllSites',
+            'medications.audit.view', 'medications.stock.update', 'medications.reports.view',
+            'medications.reports.export', 'medications.controlled.view',
+        ], false);
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        $client->supportWorkers()->attach($actor->id);
+        $medication = ClientMedication::query()->create([
+            'client_id' => $client->id, 'name' => 'Synthetic legacy PRN', 'dosage' => '1 tablet',
+            'is_prn' => true, 'controlled_drug' => false, 'active' => true, 'state' => 'active',
+            'approval_status' => 'verified',
+        ]);
+        $dose = ClientMedicationAdministration::withoutEvents(fn () => ClientMedicationAdministration::query()->create([
+            'client_id' => $client->id, 'client_medication_id' => $medication->id,
+            'administered_by' => $actor->id, 'administered_at' => now()->subMinutes(20), 'status' => 'given',
+        ]));
+        $before = $dose->fresh()->getRawOriginal();
+        $readLink = '/medication-followups?'.http_build_query(['client_id' => $client->id, 'type' => 'effect']);
+        $items = app(LegacyMedicationEffectProvider::class)->authorizedTasks($actor->fresh());
+        $this->assertCount(1, $items);
+        $this->assertSame($readLink, $items[0]->link);
+        $this->assertSame('View effect checks', $items[0]->actionLabel);
+        $this->actingAs($actor->fresh())->getJson('/tasks/detail?'.http_build_query([
+            'source' => 'medication-effect-source', 'id' => $dose->id,
+        ]))->assertOk()->assertJsonPath('item.link', $readLink)->assertJsonPath('item.actionLabel', 'View effect checks');
+        $this->actingAs($actor->fresh())->getJson($readLink)->assertOk()
+            ->assertJsonPath('legacy_effect_checks.total', 1)->assertJsonPath('legacy_effect_checks.data.0.can_prepare', false);
+        $this->actingAs($actor->fresh())->postJson('/medication-followups/administrations/'.$dose->id.'/prepare')->assertForbidden();
+        $this->assertDatabaseCount('medication_followups', 0);
+        $this->assertDatabaseCount('medication_followup_events', 0);
+        $this->assertSame($before, $dose->fresh()->getRawOriginal());
+
+        $this->permissions($actor, ['medications.administer.record'], true);
+        $items = app(LegacyMedicationEffectProvider::class)->authorizedTasks($actor->fresh());
+        $this->assertCount(1, $items);
+        $this->assertSame('/medication-followups?administration='.$dose->id, $items[0]->link);
+        $this->assertSame('Open effect check', $items[0]->actionLabel);
+        $this->assertDatabaseCount('medication_followups', 0);
     }
 
     private function reoffer(Client $client, User $actor, bool $controlled = false): MedicationFollowup

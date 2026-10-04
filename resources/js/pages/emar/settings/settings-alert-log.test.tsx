@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax -- Native controls here are isolated component test doubles. */
 import { router } from '@inertiajs/react';
 import {
     act,

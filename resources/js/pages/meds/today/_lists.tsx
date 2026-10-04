@@ -1,8 +1,8 @@
 /* Meds today lists share rows and authorised actions between phone cards
  * and desktop tables. Activity remains server-paginated, 10 a page. */
 import { EntityCard } from '@/components/lists/entity-card';
-import { compactMenu, type MenuItem } from '@/components/lists/entity-menu';
 import { PersonDisc } from '@/components/lists/entity-cells';
+import { compactMenu, type MenuItem } from '@/components/lists/entity-menu';
 import { EntityTable } from '@/components/lists/entity-table';
 import { ListCaption } from '@/components/lists/list-caption';
 import { Button } from '@/components/ui/button';
@@ -106,7 +106,7 @@ export function AsNeededView({
                 aria-label="As-needed medicines"
             >
                 <ListCaption
-                    className="[&>div:first-child]:flex-wrap [&_h2]:break-words [&_h2]:whitespace-normal"
+                    className="[&_h2]:break-words [&_h2]:whitespace-normal [&>div:first-child]:flex-wrap"
                     title="As-needed medicines for people on your shift"
                     caption={`${rows.length} of ${medications.length} shown`}
                 />
@@ -405,7 +405,7 @@ export function AsNeededView({
                 aria-label="As-needed doses recorded today"
             >
                 <ListCaption
-                    className="[&>div:first-child]:flex-wrap [&_h2]:break-words [&_h2]:whitespace-normal"
+                    className="[&_h2]:break-words [&_h2]:whitespace-normal [&>div:first-child]:flex-wrap"
                     title="As-needed doses recorded today"
                     caption={`${shownRecorded.length} shown`}
                 />
@@ -644,7 +644,7 @@ export function FollowUpsView({
     return (
         <section className="flex flex-col gap-2.5" aria-label="Follow-ups">
             <ListCaption
-                className="[&>div:first-child]:flex-wrap [&_h2]:break-words [&_h2]:whitespace-normal"
+                className="[&_h2]:break-words [&_h2]:whitespace-normal [&>div:first-child]:flex-wrap"
                 title="Follow-ups for people on your shift"
                 caption={`${rows.length} open · ${rows.filter(overdue).length} overdue`}
             />
@@ -762,7 +762,7 @@ export function FollowUpsView({
                                                     ) : dueLabel ? (
                                                         `${dueLabel} NZ time`
                                                     ) : (
-                                                        '—'
+                                                        'Check time not set'
                                                     ),
                                                 },
                                                 {
@@ -838,8 +838,9 @@ export function FollowUpsView({
                             cell: (r) => (
                                 <span className="text-[12.5px] font-semibold tabular-nums">
                                     {r.kind === 'refusal'
-                                        ? (r.f.due_time ?? '—')
-                                        : (r.f.check_at ?? '—')}
+                                        ? (r.f.due_time ?? 'Check time not set')
+                                        : (r.f.check_at ??
+                                          'Check time not set')}
                                 </span>
                             ),
                         },
@@ -911,7 +912,8 @@ export function FollowUpsView({
             </div>
             <p className="text-caption">
                 Times in NZ time. An as-needed check uses the time chosen when
-                the dose was recorded.
+                the dose was recorded. If no check time is set, arrange it with
+                the medication lead.
             </p>
         </section>
     );

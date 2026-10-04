@@ -155,8 +155,26 @@ export function RequestAccessDialog({
         );
     }
 
+    const draftValues = JSON.stringify([
+        client?.id,
+        category,
+        reason,
+        minutes,
+        mode,
+        colleague,
+        pin,
+        ackMinimum,
+        ackReview,
+        nobodyHere,
+    ]);
+    const [draftBaseline] = useState(draftValues);
     return (
         <MedsWizardDialog
+            formState={{
+                isDirty: draftValues !== draftBaseline,
+                processing: busy,
+                errors: errors,
+            }}
             open
             onClose={close}
             title="Start emergency access"
@@ -261,7 +279,7 @@ export function RequestAccessDialog({
                                         ? 'default'
                                         : 'outline'
                                 }
-                                className="frontline-tap h-auto w-full justify-start whitespace-normal py-3"
+                                className="frontline-tap h-auto w-full justify-start py-3 whitespace-normal"
                                 onClick={() => {
                                     setClient(person);
                                     setColleague(null);

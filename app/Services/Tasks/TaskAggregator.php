@@ -87,6 +87,7 @@ class TaskAggregator
             new Providers\FleetFinanceReviewProvider,
             new Providers\MedicationErrorProvider,
             new Providers\MedicationFollowupProvider,
+            new Providers\LegacyMedicationEffectProvider,
             new Providers\MedicationErrorActionProvider,
             new Providers\MedicationReviewProvider,
             new Providers\MedicationReviewChangeProvider,

@@ -1,24 +1,40 @@
 <?php
 
-use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Http\Middleware\MedicationExportGuard;
+use App\Models\AppSetting;
 use App\Models\Client;
+use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
+use App\Models\MedicationDoseSlot;
+use App\Models\MedicationError;
+use App\Models\MedicationErrorEntry;
 use App\Models\MedicationEvent;
+use App\Models\MedicationOrderRevision;
+use App\Models\MedicationOrderVersion;
+use App\Models\MedicationReview;
+use App\Models\MedicationRound;
+use App\Models\MedicationStockLot;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Medication\Reporting\MedicationReportAccess;
-use App\Services\Medication\Reporting\MedicationReportPeriod;
+use App\Services\Medication\Downtime\DowntimePackService;
+use App\Services\Medication\Reporting\MedicationBuilderSource;
+use App\Services\Medication\Reporting\MedicationGovernanceReports;
 use App\Services\Medication\Reporting\MedicationPdfDataset;
+use App\Services\Medication\Reporting\MedicationReportAccess;
 use App\Services\Medication\Reporting\MedicationReportDataset;
+use App\Services\Medication\Reporting\MedicationReportPeriod;
 use App\Services\Medication\Reporting\RecordsReportingSettings;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Database\Seeders\GovernancePermissionsSeeder;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Validation\ValidationException;
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
@@ -101,6 +117,23 @@ it('keeps finance stock aggregated and denies person and clinical reports', func
     expect(MedicationEvent::where('kind', 'export.created')->count())->toBe(1);
 });
 
+it('opens a report person link in the canonical medication record at the report start date', function () {
+    $actor = p09Reader('admin', $this->site);
+    $medicine = p09Medicine($this->person, ['is_prn' => true]);
+    ClientMedicationAdministration::withoutEvents(fn () => ClientMedicationAdministration::create([
+        'client_id' => $this->person->id, 'client_medication_id' => $medicine->id, 'administered_by' => $actor->id,
+        'administered_at' => Carbon::parse('2026-09-29 10:00', 'Pacific/Auckland')->utc(), 'status' => 'given',
+    ]));
+    $reportUrl = '/emar/reports?report=prn&site_id='.$this->site->id.'&period=custom&date_from=2026-09-29&date_to=2026-09-29';
+    $response = $this->actingAs($actor)->get($reportUrl)->assertOk();
+    $href = $response->inertiaProps('page.data.0.href');
+    expect($href)->toBe('/emar/mar?client_id='.$this->person->id.'&date=2026-09-29');
+    $this->get($href)->assertOk();
+    $actor->permissionOverrides()->syncWithoutDetaching([Permission::where('key', 'medications.view')->value('id') => ['allowed' => false]]);
+    $this->actingAs($actor->fresh())->get($reportUrl)->assertOk()->assertInertia(fn ($page) => $page->where('page.data.0.href', null));
+    $this->get($href)->assertForbidden();
+});
+
 it('requires a purpose and gives the auditor audit-only export rights', function () {
     $actor = p09Reader('auditor', $this->site);
     $access = app(MedicationReportAccess::class);
@@ -114,7 +147,7 @@ it('requires a purpose and gives the auditor audit-only export rights', function
 it('offers the guarded downtime pack only within the existing clinical export boundary', function () {
     $this->actingAs(p09Reader('coordinator', $this->site))->get('/emar/reports?view=exports')->assertOk()->assertInertia(fn ($page) => $page
         ->where('downtime_pack.allowed', true)->where('downtime_pack.today', '2026-09-29')->where('downtime_pack.tomorrow', '2026-09-30')
-        ->where('downtime_pack.purpose', App\Services\Medication\Downtime\DowntimePackService::PURPOSE));
+        ->where('downtime_pack.purpose', DowntimePackService::PURPOSE));
     $this->actingAs(p09Reader('auditor', $this->site))->get('/emar/reports?view=exports')->assertOk()->assertInertia(fn ($page) => $page->where('downtime_pack.allowed', false));
     $this->actingAs(p09Reader('finance', $this->site))->get('/emar/reports?view=exports')->assertOk()->assertInertia(fn ($page) => $page->where('downtime_pack', null));
     expect(MedicationEvent::count())->toBe(0);
@@ -171,7 +204,7 @@ it('buffers retained streaming routes before rechecking every person', function 
             $this->person->update(['site_id' => $other->id]);
             echo 'sensitive-person';
         }, 'synthetic.csv');
-    })->middleware(['auth', App\Http\Middleware\MedicationExportGuard::class.':doses']);
+    })->middleware(['auth', MedicationExportGuard::class.':doses']);
     $this->actingAs(p09Reader('admin', $this->site))->getJson('/p09-synthetic-export?'.http_build_query(p09ExportData($this->site)))->assertConflict();
     expect(MedicationEvent::count())->toBe(0);
 });
@@ -207,15 +240,15 @@ it('uses NZ day bounds across daylight saving without changing the submitted per
 it('keeps SAC off by default and requires an explicit severe-harm rating when enabled', function () {
     $settings = app(RecordsReportingSettings::class);
     expect($settings->enabled())->toBeFalse()->and($settings->confirmation('yes', 'severe_permanent', null))->toBeNull();
-    App\Models\AppSetting::updateOrCreate(['key' => RecordsReportingSettings::SAC], ['value' => 'on']);
+    AppSetting::updateOrCreate(['key' => RecordsReportingSettings::SAC], ['value' => 'on']);
     expect($settings->preselection('yes', 'severe_permanent'))->toBeNull()->and($settings->confirmation('no', 'none', null))->toBeNull();
-    expect(fn () => $settings->confirmation('yes', 'severe_permanent', 3))->toThrow(Illuminate\Validation\ValidationException::class);
+    expect(fn () => $settings->confirmation('yes', 'severe_permanent', 3))->toThrow(ValidationException::class);
     expect($settings->confirmation('yes', 'severe_permanent', 2))->toBe(2);
 });
 
 it('reports actual error occurrence rather than the later report time', function () {
     $actor = p09Reader('admin', $this->site);
-    App\Models\MedicationError::create(['client_id' => $this->person->id, 'error_type' => 'wrong_dose', 'severity' => 'minor', 'reached_client' => 'yes', 'harm_level' => 'none', 'description' => 'Synthetic account', 'reported_by' => $actor->id, 'occurred_at' => Carbon::parse('2026-09-27 10:00', 'Pacific/Auckland')->utc(), 'reported_at' => now(), 'status' => 'reported', 'workflow_stage' => 'triage']);
+    MedicationError::create(['client_id' => $this->person->id, 'error_type' => 'wrong_dose', 'severity' => 'minor', 'reached_client' => 'yes', 'harm_level' => 'none', 'description' => 'Synthetic account', 'reported_by' => $actor->id, 'occurred_at' => Carbon::parse('2026-09-27 10:00', 'Pacific/Auckland')->utc(), 'reported_at' => now(), 'status' => 'reported', 'workflow_stage' => 'triage']);
     $data = app(MedicationReportDataset::class)->read($actor, 'errors', new MedicationReportPeriod('2026-09-27', '2026-09-27'), [$this->site->id]);
     expect($data['totals']['reached'])->toBe(1)->and($data['rows'][0]['date'])->toBe('2026-09-27')->and($data['rows'][0]['status'])->toBe('triage');
     expect(app(MedicationReportDataset::class)->read($actor, 'errors', new MedicationReportPeriod('2026-09-29', '2026-09-29'), [$this->site->id])['rows'])->toBe([]);
@@ -229,10 +262,10 @@ it('applies the error reporter and account scope before report builder and gover
     $actor->permissionOverrides()->syncWithoutDetaching([$controlledPermission->id => ['allowed' => false]]);
     $actor = $actor->fresh();
     $other = p09Reader('coordinator', $this->site);
-    $make = fn (array $extra = []) => App\Models\MedicationError::create(array_replace(['client_id' => $this->person->id, 'error_type' => 'wrong_dose', 'severity' => 'minor', 'reached_client' => 'yes', 'harm_level' => 'none', 'description' => 'Synthetic account', 'reported_by' => $other->id, 'occurred_at' => now(), 'reported_at' => now(), 'status' => 'resolved', 'workflow_stage' => 'actions'], $extra));
+    $make = fn (array $extra = []) => MedicationError::create(array_replace(['client_id' => $this->person->id, 'error_type' => 'wrong_dose', 'severity' => 'minor', 'reached_client' => 'yes', 'harm_level' => 'none', 'description' => 'Synthetic account', 'reported_by' => $other->id, 'occurred_at' => now(), 'reported_at' => now(), 'status' => 'resolved', 'workflow_stage' => 'actions'], $extra));
     $own = $make(['reported_by' => $actor->id]);
     $account = $make();
-    App\Models\MedicationErrorEntry::create(['medication_error_id' => $account->id, 'kind' => 'account', 'actor_id' => $actor->id, 'text' => 'Synthetic account', 'created_at' => now()]);
+    MedicationErrorEntry::create(['medication_error_id' => $account->id, 'kind' => 'account', 'actor_id' => $actor->id, 'text' => 'Synthetic account', 'created_at' => now()]);
     $make();
     $controlled = p09Medicine($this->person, ['controlled_drug' => true]);
     $make(['reported_by' => $actor->id, 'client_medication_id' => $controlled->id]);
@@ -242,9 +275,9 @@ it('applies the error reporter and account scope before report builder and gover
     expect(array_column($data['rows'], 'reference'))->toBe([$own->reference_number, $account->reference_number])
         ->and($data['totals']['reached'])->toBe(2)->and($data['totals']['open'])->toBe(2)
         ->and($data['rows'][0]['href'])->toBe('/emar/errors?error='.$own->id);
-    $builder = app(App\Services\Medication\Reporting\MedicationBuilderSource::class)->read($actor, ['source' => 'medication_errors', 'date_from' => $period->from, 'date_to' => $period->to], [$this->site->id]);
+    $builder = app(MedicationBuilderSource::class)->read($actor, ['source' => 'medication_errors', 'date_from' => $period->from, 'date_to' => $period->to], [$this->site->id]);
     expect(array_column($builder['rows'], 'reference'))->toBe([$own->reference_number, $account->reference_number]);
-    $governance = app(App\Services\Medication\Reporting\MedicationGovernanceReports::class)->values($actor, $period->from, $period->to, $this->site->id);
+    $governance = app(MedicationGovernanceReports::class)->values($actor, $period->from, $period->to, $this->site->id);
     expect($governance['HCG-001']['value'])->toBe(2);
 });
 
@@ -254,7 +287,7 @@ it('reports usable packs while retaining unknown cost and controlled physical ba
     $stock = ClientMedicationStock::create(['client_medication_id' => $medicine->id, 'on_hand' => 99, 'unit' => 'tablet', 'reorder_level' => 6]);
     $stock->forceFill(['lots_started_at' => now()])->save();
     foreach ([['open', '2026-10-05', 5], ['open', '2026-09-28', 7], ['quarantined', '2026-10-05', 9], ['closed', '2026-10-05', 11]] as [$state, $expiry, $quantity]) {
-        App\Models\MedicationStockLot::create(['client_medication_stock_id' => $stock->id, 'state' => $state, 'expiry_date' => $expiry, 'quantity_received' => $quantity, 'quantity_remaining' => $quantity, 'source' => 'synthetic', 'received_at' => now()]);
+        MedicationStockLot::create(['client_medication_stock_id' => $stock->id, 'state' => $state, 'expiry_date' => $expiry, 'quantity_received' => $quantity, 'quantity_remaining' => $quantity, 'source' => 'synthetic', 'received_at' => now()]);
     }
     $controlled = p09Medicine($this->person, ['name' => 'Synthetic controlled', 'controlled_drug' => true]);
     $cdStock = ClientMedicationStock::create(['client_medication_id' => $controlled->id, 'on_hand' => 8, 'unit' => 'tablet']);
@@ -266,12 +299,12 @@ it('reports usable packs while retaining unknown cost and controlled physical ba
 
 it('uses the actual review date and a witnessed ledger entry as count evidence', function () {
     $actor = p09Reader('admin', $this->site);
-    $review = App\Models\MedicationReview::create(['client_id' => $this->person->id, 'review_type' => 'routine', 'status' => 'completed', 'scheduled_date' => '2026-09-10', 'completed_date' => '2026-09-28', 'happened_at' => Carbon::parse('2026-09-29 09:00', 'Pacific/Auckland')->utc()]);
+    $review = MedicationReview::create(['client_id' => $this->person->id, 'review_type' => 'routine', 'status' => 'completed', 'scheduled_date' => '2026-09-10', 'completed_date' => '2026-09-28', 'happened_at' => Carbon::parse('2026-09-29 09:00', 'Pacific/Auckland')->utc()]);
     $period = new MedicationReportPeriod('2026-09-29', '2026-09-29');
     $reviews = app(MedicationReportDataset::class)->read($actor, 'reviews', $period, [$this->site->id]);
     expect($reviews['totals']['done'])->toBe(1)->and($reviews['rows'][0]['completed_date'])->toBe('2026-09-29')->and($reviews['rows'][0]['href'])->toBe('/emar/reviews?review='.$review->id);
     $medicine = p09Medicine($this->person, ['controlled_drug' => true]);
-    App\Models\ClientControlledDrugEntry::create(['client_id' => $this->person->id, 'client_medication_id' => $medicine->id, 'entry_type' => 'balance_check', 'quantity' => 0, 'on_hand_before' => 8, 'on_hand_after' => 8, 'recorded_at' => now(), 'recorded_by' => $actor->id, 'witnessed_by' => p09Reader('coordinator', $this->site)->id]);
+    ClientControlledDrugEntry::create(['client_id' => $this->person->id, 'client_medication_id' => $medicine->id, 'entry_type' => 'balance_check', 'quantity' => 0, 'on_hand_before' => 8, 'on_hand_after' => 8, 'recorded_at' => now(), 'recorded_by' => $actor->id, 'witnessed_by' => p09Reader('coordinator', $this->site)->id]);
     expect(app(MedicationReportDataset::class)->read($actor, 'controlled', $period, [$this->site->id])['totals']['counts'])->toBe(1);
 });
 
@@ -279,24 +312,24 @@ it('keeps proposed versions out of historical dose instructions and separates eq
     $actor = p09Reader('admin', $this->site);
     foreach (['1 tablet', '2 tablets'] as $dose) {
         $medicine = p09Medicine($this->person);
-        $version = App\Models\MedicationOrderVersion::create(['client_id' => $this->person->id, 'client_medication_id' => $medicine->id, 'version_number' => 1, 'name' => 'Synthetic medicine', 'dosage' => $dose, 'route' => 'oral', 'changed_by' => $actor->id, 'changed_at' => now()->subDay()]);
-        App\Models\MedicationOrderRevision::create(['client_id' => $this->person->id, 'client_medication_id' => $medicine->id, 'medication_order_version_id' => $version->id, 'base_version' => 1, 'status' => 'checked', 'checked_at' => now()->subDay(), 'entered_by' => $actor->id]);
-        $proposal = App\Models\MedicationOrderVersion::create(['client_id' => $this->person->id, 'client_medication_id' => $medicine->id, 'version_number' => 2, 'name' => 'Synthetic medicine', 'dosage' => '99 tablets', 'route' => 'oral', 'changed_by' => $actor->id, 'changed_at' => now()]);
-        App\Models\MedicationOrderRevision::create(['client_id' => $this->person->id, 'client_medication_id' => $medicine->id, 'medication_order_version_id' => $proposal->id, 'base_version' => 1, 'status' => 'pending', 'entered_by' => $actor->id]);
-        App\Models\MedicationDoseSlot::firstOrCreate(['client_medication_id' => $medicine->id, 'nz_date' => '2026-09-29', 'ordered_time' => '07:00'], ['client_id' => $this->person->id, 'due_at' => Carbon::parse('2026-09-29 07:00', 'Pacific/Auckland')->utc(), 'generated_at' => now(), 'controlled' => false]);
+        $version = MedicationOrderVersion::create(['client_id' => $this->person->id, 'client_medication_id' => $medicine->id, 'version_number' => 1, 'name' => 'Synthetic medicine', 'dosage' => $dose, 'route' => 'oral', 'changed_by' => $actor->id, 'changed_at' => now()->subDay()]);
+        MedicationOrderRevision::create(['client_id' => $this->person->id, 'client_medication_id' => $medicine->id, 'medication_order_version_id' => $version->id, 'base_version' => 1, 'status' => 'checked', 'checked_at' => now()->subDay(), 'entered_by' => $actor->id]);
+        $proposal = MedicationOrderVersion::create(['client_id' => $this->person->id, 'client_medication_id' => $medicine->id, 'version_number' => 2, 'name' => 'Synthetic medicine', 'dosage' => '99 tablets', 'route' => 'oral', 'changed_by' => $actor->id, 'changed_at' => now()]);
+        MedicationOrderRevision::create(['client_id' => $this->person->id, 'client_medication_id' => $medicine->id, 'medication_order_version_id' => $proposal->id, 'base_version' => 1, 'status' => 'pending', 'entered_by' => $actor->id]);
+        MedicationDoseSlot::firstOrCreate(['client_medication_id' => $medicine->id, 'nz_date' => '2026-09-29', 'ordered_time' => '07:00'], ['client_id' => $this->person->id, 'due_at' => Carbon::parse('2026-09-29 07:00', 'Pacific/Auckland')->utc(), 'generated_at' => now(), 'controlled' => false]);
     }
     $data = app(MedicationPdfDataset::class)->read($actor, 'mar', new MedicationReportPeriod('2026-09-29', '2026-09-29'), [$this->site->id], $this->person->id, null);
     expect($data['chart'])->toHaveCount(2)->and(collect($data['chart'])->pluck('dose')->sort()->values()->all())->toBe(['1 tablet', '2 tablets']);
 });
 
 it('scopes both governance periods and keeps the target unconfigured and near misses without RAG', function () {
-    $this->seed(Database\Seeders\GovernancePermissionsSeeder::class);
+    $this->seed(GovernancePermissionsSeeder::class);
     $actor = p09Reader('team_lead', $this->site);
     $permissions = Permission::whereIn('key', ['governance.clinical.view', 'clinical.accessAllSites', 'sites.viewAll'])->get();
     $actor->permissionOverrides()->syncWithoutDetaching($permissions->mapWithKeys(fn ($p) => [$p->id => ['allowed' => $p->key === 'governance.clinical.view']])->all());
     $other = Client::factory()->create(['site_id' => Site::factory()->create(['is_active' => true])->id]);
     foreach ([[$this->person, '2026-09-15', 'yes'], [$this->person, '2026-09-15', 'no'], [$this->person, '2026-08-15', 'yes'], [$other, '2026-09-15', 'yes'], [$other, '2026-08-15', 'yes']] as [$person, $day, $reach]) {
-        App\Models\MedicationError::create(['client_id' => $person->id, 'error_type' => 'wrong_dose', 'severity' => 'minor', 'reached_client' => $reach, 'harm_level' => 'none', 'description' => 'Synthetic account', 'reported_by' => $actor->id, 'occurred_at' => Carbon::parse($day.' 10:00', 'Pacific/Auckland')->utc(), 'reported_at' => now(), 'status' => 'reported']);
+        MedicationError::create(['client_id' => $person->id, 'error_type' => 'wrong_dose', 'severity' => 'minor', 'reached_client' => $reach, 'harm_level' => 'none', 'description' => 'Synthetic account', 'reported_by' => $actor->id, 'occurred_at' => Carbon::parse($day.' 10:00', 'Pacific/Auckland')->utc(), 'reported_at' => now(), 'status' => 'reported']);
     }
     $response = $this->actingAs($actor->fresh())->get('/governance/clinical?site_id='.$this->site->id)->assertOk();
     $values = collect($response->inertiaProps('latestSnapshot.indicator_values'))->keyBy('indicator_code');
@@ -308,10 +341,10 @@ it('uses a rounds own window and keeps Away separate without writing missed reco
     $actor = p09Reader('admin', $this->site);
     foreach ([['07:00', false, 'given'], ['07:00', true, null], ['09:00', false, null], ['07:00', false, 'away']] as [$time, $controlled, $outcome]) {
         $medicine = p09Medicine($this->person, ['dose_times' => [$time], 'controlled_drug' => $controlled]);
-        $slot = App\Models\MedicationDoseSlot::firstOrCreate(['client_medication_id' => $medicine->id, 'nz_date' => '2026-09-29', 'ordered_time' => $time], ['client_id' => $this->person->id, 'due_at' => Carbon::parse('2026-09-29 '.$time, 'Pacific/Auckland')->utc(), 'controlled' => $controlled, 'generated_at' => now()]);
+        $slot = MedicationDoseSlot::firstOrCreate(['client_medication_id' => $medicine->id, 'nz_date' => '2026-09-29', 'ordered_time' => $time], ['client_id' => $this->person->id, 'due_at' => Carbon::parse('2026-09-29 '.$time, 'Pacific/Auckland')->utc(), 'controlled' => $controlled, 'generated_at' => now()]);
         $slot->update(['outcome' => $outcome, 'outcome_at' => $outcome ? Carbon::parse('2026-09-29 07:05', 'Pacific/Auckland')->utc() : null]);
     }
-    $round = App\Models\MedicationRound::create(['site_id' => $this->site->id, 'name' => 'Synthetic morning', 'round_date' => '2026-09-29', 'scheduled_time' => '07:00', 'window_minutes' => 10, 'status' => 'pending']);
+    $round = MedicationRound::create(['site_id' => $this->site->id, 'name' => 'Synthetic morning', 'round_date' => '2026-09-29', 'scheduled_time' => '07:00', 'window_minutes' => 10, 'status' => 'pending']);
     $data = app(MedicationReportDataset::class)->read($actor, 'rounds', new MedicationReportPeriod('2026-09-29', '2026-09-29'), [$this->site->id]);
-    expect($data['rows'])->toHaveCount(1)->and($data['rows'][0]['due'])->toBe(2)->and($data['rows'][0]['recorded'])->toBe(1)->and($data['rows'][0]['away'])->toBe(1)->and($data['rows'][0]['status'])->toBe('not_completed')->and($round->fresh()->status)->toBe('pending')->and(App\Models\ClientMedicationAdministration::count())->toBe(0);
+    expect($data['rows'])->toHaveCount(1)->and($data['rows'][0]['due'])->toBe(2)->and($data['rows'][0]['recorded'])->toBe(1)->and($data['rows'][0]['away'])->toBe(1)->and($data['rows'][0]['status'])->toBe('not_completed')->and($round->fresh()->status)->toBe('pending')->and(ClientMedicationAdministration::count())->toBe(0);
 });

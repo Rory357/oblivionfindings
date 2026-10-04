@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Role;
 use App\Models\ServiceContext;
@@ -9,6 +10,7 @@ use App\Models\ShiftHandover;
 use App\Models\ShiftTask;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ShiftHandoverService;
 use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
@@ -30,6 +32,14 @@ function attendanceTaskUpdateOpenSessionFor(User $worker): array
     $site = Site::factory()->create();
     $client = Client::factory()->create(['site_id' => $site->id]);
     $serviceContext = ServiceContext::factory()->create();
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $worker->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'is_active' => true,
+        'start_date' => now(config('app.worker_timezone', 'Pacific/Auckland'))->subMonth()->toDateString(),
+        'end_date' => null,
+    ]);
     $shift = Shift::query()->create([
         'site_id' => $site->id,
         'client_id' => $client->id,
@@ -87,11 +97,11 @@ test('clock out applies embedded task updates before blocker evaluation', functi
 
     expect(ShiftHandover::query()
         ->where('outgoing_shift_id', $shift->id)
-        ->where('status', 'submitted')
+        ->where('status', ShiftHandoverService::STATUS_DRAFT)
         ->exists())->toBeTrue();
 });
 
-test('clock out with stale task updates returns a clean error with no partial close', function () {
+test('clock out conceals a task from another shift with no partial close', function () {
     [$session, $shift, $task] = attendanceTaskUpdateOpenSessionFor($this->worker);
 
     $otherShift = Shift::query()->create([
@@ -126,7 +136,7 @@ test('clock out with stale task updates returns a clean error with no partial cl
                 'follow_up_needed' => false,
             ],
         ])
-        ->assertSessionHasErrors(['task_updates']);
+        ->assertNotFound();
 
     expect($session->fresh()->status)->toBe('open')
         ->and($task->fresh()->is_completed)->toBeFalse()

@@ -574,9 +574,20 @@ echo json_encode(['id' => \\App\\Models\\ClientIncident::query()->where('control
         await postLaravel(page, '/emar/errors', {
             client_id: manifest.client.id,
             error_type: 'wrong_dose',
-            severity: 'major',
             reached_client: 'yes',
-            open_disclosure: 'pending',
+            harm_level: 'moderate',
+            occurred_at: new Intl.DateTimeFormat('sv-SE', {
+                timeZone: 'Pacific/Auckland',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+            })
+                .format(new Date())
+                .replace(' ', 'T'),
+            report_token: randomUUID(),
             description:
                 'Second similar event: wrong dose, independently reported through eMAR.',
             immediate_action: 'Dose withheld and prescriber contacted.',

@@ -20,6 +20,7 @@ export function DatePicker({
     invalid,
     describedBy,
     allowClear = false,
+    disabled = false,
     trigger,
 }: {
     id: string;
@@ -29,6 +30,7 @@ export function DatePicker({
     invalid?: boolean;
     describedBy?: string;
     allowClear?: boolean;
+    disabled?: boolean;
     trigger?: React.ReactNode;
 }) {
     const [open, setOpen] = useState(false);
@@ -47,6 +49,7 @@ export function DatePicker({
                     <Button
                         type="button"
                         id={id}
+                        disabled={disabled}
                         variant="outline"
                         className="time-picker-trigger"
                         aria-label={`${label}: ${value ? formatDateOnly(value) : 'Choose date'}`}

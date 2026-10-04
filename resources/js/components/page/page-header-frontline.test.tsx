@@ -47,6 +47,37 @@ const views = [
     { key: 'activity', label: 'Activity' },
 ];
 
+describe('compact frontline summary', () => {
+    it('exposes expandable details without removing filters from the header', () => {
+        render(
+            <PageHeader
+                frontline
+                title="Meds today"
+                mobileSummary="5 due now · 12 late"
+                meters={<span>17 need recording</span>}
+                filters={
+                    <PageHeaderSearch
+                        value=""
+                        onChange={() => {}}
+                        placeholder="Find a medicine"
+                    />
+                }
+            />,
+        );
+        const toggle = screen.getByRole('button', {
+            name: /5 due now.*12 late/,
+        });
+        expect(toggle).toHaveAttribute('aria-expanded', 'false');
+        fireEvent.click(toggle);
+        expect(toggle).toHaveAttribute('aria-expanded', 'true');
+        expect(
+            document.getElementById(toggle.getAttribute('aria-controls')!),
+        ).toContainElement(screen.getByPlaceholderText('Find a medicine'));
+        fireEvent.click(toggle);
+        expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    });
+});
+
 function Header({
     frontline,
     onFilter = () => {},
@@ -144,12 +175,13 @@ describe('PageHeader frontline opt-in', () => {
             const { container } = render(<Header frontline />);
             const header = container.querySelector('header')!;
             expect(header).toHaveClass('eh-header-frontline');
-            // The utility's CSS-pixel floor applies to the real boxes, including
-            // clear/filter siblings and hidden rail measurements, rather than an
-            // overlapping pseudo-element hit area.
+            // Fields keep real 44px boxes. Compact connected tabs retain Rory's
+            // drawn geometry and the shared 44px hit area.
             for (const control of header.querySelectorAll('input, button, a')) {
-                expect(control).toHaveClass('frontline-tap');
-                expect(control).not.toHaveClass('frontline-hit');
+                expect(
+                    control.classList.contains('frontline-tap') ||
+                        control.classList.contains('frontline-hit'),
+                ).toBe(true);
             }
             expect(
                 screen.getByRole('radiogroup', { name: 'Group by' }),
@@ -159,7 +191,8 @@ describe('PageHeader frontline opt-in', () => {
                     .parentElement,
             ).toHaveClass('h-auto');
             expect(screen.getByRole('tab', { name: 'Activity' })).toHaveClass(
-                'eh-frontline-rail-active',
+                'h-[40px]',
+                'frontline-hit',
             );
         },
     );
@@ -192,7 +225,7 @@ describe('PageHeader frontline opt-in', () => {
             expect(option).toHaveClass('frontline-tap');
     });
 
-    it('keeps the active view visible and measures the enlarged More and Find controls before collapsing tabs', () => {
+    it('keeps the active view visible with accessible hit areas and measures More and Find before collapsing tabs', () => {
         vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(
             250,
         );
@@ -213,9 +246,9 @@ describe('PageHeader frontline opt-in', () => {
         );
         expect(
             screen.getByRole('button', { name: 'More views (3)' }),
-        ).toHaveClass('frontline-tap');
+        ).toHaveClass('frontline-hit');
         expect(screen.getByRole('button', { name: 'Find a view' })).toHaveClass(
-            'frontline-tap',
+            'frontline-hit',
         );
         const measured = container.querySelector(
             '[aria-hidden="true"].invisible',
@@ -225,7 +258,7 @@ describe('PageHeader frontline opt-in', () => {
             views.length + 2,
         );
         for (const control of measured.querySelectorAll('button'))
-            expect(control).toHaveClass('frontline-tap');
+            expect(control).toHaveClass('frontline-hit');
     });
 
     it('carries sizing into Find and preserves keyboard cancellation focus', async () => {

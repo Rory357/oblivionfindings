@@ -19,6 +19,7 @@ use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -192,12 +193,45 @@ class ControlledProductReadFiltersTest extends TestCase
     {
         $filters = ['site_id' => $this->site->id, 'client_medication_id' => $this->medicine->id,
             'client_id' => $this->person->id, 'date' => '2020-01-01'];
-        foreach (['emar.destructions' => 'destructions', 'emar.cd_loss.index' => 'losses'] as $route => $view) {
+        $page = $this->actingAs($this->reader)->get(route('emar.destructions', $filters))->assertOk();
+        $this->assertEquals($filters, $page->inertiaProps('filters'));
+        $this->assertSame([], $page->inertiaProps('destructions'));
+        $this->actingAs($this->reader)->get(route('emar.destructions', ['client_id' => 999999999]))->assertNotFound();
+        foreach (['emar.cd_loss.index' => 'losses'] as $route => $view) {
             $this->actingAs($this->reader)->get(route($route, $filters))->assertRedirect(
                 '/emar/controlled?'.http_build_query(['view' => $view, ...$filters]),
             );
             $this->actingAs($this->reader)->get(route($route, ['client_id' => 999999999]))->assertNotFound();
         }
+    }
+
+    public function test_ordinary_stock_reader_sees_only_ordinary_disposals_and_keeps_person_and_site_boundaries(): void
+    {
+        $ordinary = ClientMedication::factory()->create(['client_id' => $this->person->id, 'name' => 'Synthetic ordinary medicine',
+            'controlled_drug' => false, 'state' => 'active', 'active' => true, 'approval_status' => 'verified']);
+        foreach ([$ordinary, $this->medicine] as $medicine) {
+            MedicationDestruction::create(['client_id' => $this->person->id, 'site_id' => $this->site->id,
+                'client_medication_id' => $medicine->id, 'medication_name' => $medicine->name, 'quantity' => 1,
+                'unit' => 'tablet', 'reason' => 'expired', 'disposal_method' => 'pharmacy_return',
+                'is_controlled_drug' => $medicine->controlled_drug, 'witness_1_id' => $this->reader->id, 'destroyed_by' => $this->reader->id, 'destroyed_at' => now()]);
+        }
+        $all = $this->actingAs($this->reader)->get(route('emar.destructions'))->assertOk();
+        $this->assertCount(2, $all->inertiaProps('destructions'));
+        $this->reader->permissionOverrides()->syncWithoutDetaching(Permission::whereIn('key', ['medications.controlled.view', 'medications.controlled.record', 'medications.stock.update'])
+            ->get()->mapWithKeys(fn ($p) => [$p->id => ['allowed' => $p->key === 'medications.stock.update']])->all());
+        Cache::flush();
+        $this->reader = $this->reader->fresh();
+        $before = $this->clinicalSnapshot();
+        $page = $this->actingAs($this->reader)->get(route('emar.destructions'))->assertOk();
+        $this->assertSame([$ordinary->id], array_column($page->inertiaProps('medications'), 'id'));
+        $this->assertSame(['Synthetic ordinary medicine'], array_column($page->inertiaProps('destructions'), 'medication_name'));
+        $this->assertFalse($page->inertiaProps('can_record'));
+        $this->assertSame([], $page->inertiaProps('staff'));
+        $this->actingAs($this->reader)->get(route('emar.destructions', ['client_medication_id' => $this->medicine->id]))->assertNotFound();
+        $foreign = Client::factory()->create(['site_id' => Site::factory()->create(['is_active' => true])->id]);
+        $this->actingAs($this->reader)->get(route('emar.destructions', ['client_id' => $foreign->id]))->assertNotFound();
+        $this->assertSame($before, $this->clinicalSnapshot());
+        $this->actingAs($this->reader)->post(route('emar.destructions.store'), ['client_medication_id' => $ordinary->id])->assertForbidden();
     }
 
     private function product(array $filters = [])

@@ -200,20 +200,22 @@ export default function GlobalQueryBar({
                 )}
             </DialogTrigger>
 
-            {/* Mobile trigger */}
-            <DialogTrigger asChild>
-                <Button
-                    type="button"
-                    aria-label="Ask about a client"
-                    title="Ask about a client"
-                    variant="ghost"
-                    size="icon"
-                    className="group h-9 w-9 cursor-pointer lg:hidden"
-                    disabled={!canAsk}
-                >
-                    <Search className="!size-5 opacity-80 group-hover:opacity-100" />
-                </Button>
-            </DialogTrigger>
+            {/* The icon variant already provides its trigger at every width. */}
+            {variant !== 'icon' && (
+                <DialogTrigger asChild>
+                    <Button
+                        type="button"
+                        aria-label="Ask about a client"
+                        title="Ask about a client"
+                        variant="ghost"
+                        size="icon"
+                        className="group h-9 w-9 cursor-pointer lg:hidden"
+                        disabled={!canAsk}
+                    >
+                        <Search className="!size-5 opacity-80 group-hover:opacity-100" />
+                    </Button>
+                </DialogTrigger>
+            )}
 
             <DialogContent className="max-w-2xl">
                 <DialogHeader>

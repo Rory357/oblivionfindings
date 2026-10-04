@@ -6,11 +6,49 @@ import {
     waitFor,
 } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { NewPharmacyOrderDialog } from './_stock-dialogs';
+import { NewPharmacyOrderDialog, ReceiveStockDialog } from './_stock-dialogs';
 
 afterEach(cleanup);
 
 describe('pharmacy order person and medicine selection', () => {
+    it('keeps a receipt draft when closing is cancelled and guards the first-step Cancel too', async () => {
+        const onClose = vi.fn();
+        render(
+            <ReceiveStockDialog
+                medications={[
+                    {
+                        id: 11,
+                        name: 'Synthetic medicine',
+                        client_id: 1,
+                        controlled: false,
+                    },
+                ]}
+                defaultMedId={11}
+                onClose={onClose}
+            />,
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+        fireEvent.change(screen.getByRole('spinbutton'), {
+            target: { value: '12' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+        expect(
+            await screen.findByRole('dialog', {
+                name: 'Discard your changes?',
+            }),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
+        expect(screen.getByRole('spinbutton')).toHaveValue(12);
+        expect(onClose).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(
+            await screen.findByRole('dialog', {
+                name: 'Discard your changes?',
+            }),
+        ).toBeInTheDocument();
+        expect(onClose).not.toHaveBeenCalled();
+    });
     it('retains the selected person, limits their medicines and allows the next step', async () => {
         render(
             <NewPharmacyOrderDialog

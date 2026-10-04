@@ -1,3 +1,5 @@
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
+import { ReviewCard, WizardSuccessPane } from '@/components/wizard/shell';
 /* eslint-disable no-restricted-syntax -- wizard position/variance panes are custom-layout
    bordered surfaces inside the wizard shell, not Card components; all colours are tokens. */
 import MedicationScanVerificationPanel from '@/components/medications/MedicationScanVerificationPanel';
@@ -188,6 +190,7 @@ export function NewPharmacyOrderDialog({
     defaultMedId?: number | null;
     onClose: () => void;
 }) {
+    const [saved, setSaved] = useState<string | null>(null);
     const [step, setStep] = useState(0);
     const presetRow = defaultMedId ? stockFor(stockItems, defaultMedId) : null;
     const form = useForm({
@@ -227,7 +230,7 @@ export function NewPharmacyOrderDialog({
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Pharmacy order placed');
-                onClose();
+                setSaved('Pharmacy order placed');
             },
             onError: () => toast.error('Please check the order details'),
         });
@@ -241,6 +244,19 @@ export function NewPharmacyOrderDialog({
         <MedsWizardDialog
             open
             onClose={onClose}
+            success={
+                saved ? (
+                    <WizardSuccessPane
+                        title={saved}
+                        blurb={
+                            saved === 'Saved on this device'
+                                ? 'This change is waiting to sync. The server register is not updated yet.'
+                                : 'The register has accepted this change. You can now return to the stock workspace.'
+                        }
+                        actions={<Button onClick={onClose}>Done</Button>}
+                    />
+                ) : undefined
+            }
             title="New pharmacy order"
             formState={form}
             description="Order medication stock from a pharmacy."
@@ -273,6 +289,24 @@ export function NewPharmacyOrderDialog({
                     icon: Check,
                 },
             ]}
+            completeness={{
+                completed: [
+                    form.data.client_id,
+                    form.data.client_medication_id,
+                    form.data.pharmacy_name,
+                    form.data.quantity_ordered,
+                    form.data.pharmacy_phone,
+                    form.data.order_notes,
+                ].filter((value) => Boolean(value)).length,
+                total: [
+                    form.data.client_id,
+                    form.data.client_medication_id,
+                    form.data.pharmacy_name,
+                    form.data.quantity_ordered,
+                    form.data.pharmacy_phone,
+                    form.data.order_notes,
+                ].length,
+            }}
             stepIndex={step}
             onStepClick={(i) => i < step && setStep(i)}
             footer={
@@ -458,12 +492,15 @@ export function NewPharmacyOrderDialog({
                             label="Batch expiry"
                             error={form.errors.batch_expiry}
                         >
-                            <Input
-                                type="date"
+                            <DatePicker
+                                id="emar-stock-dialogs-1"
+                                label="Batch expiry"
                                 value={form.data.batch_expiry}
-                                onChange={(e) =>
-                                    form.setData('batch_expiry', e.target.value)
+                                onChange={(value) =>
+                                    form.setData('batch_expiry', value)
                                 }
+                                invalid={Boolean(form.errors.batch_expiry)}
+                                allowClear
                             />
                         </Field>
                     </div>
@@ -513,6 +550,7 @@ export function ReceiveStockDialog({
     defaultMedId?: number | null;
     onClose: () => void;
 }) {
+    const [saved, setSaved] = useState<string | null>(null);
     const [step, setStep] = useState(0);
     const [capture, setCapture] = useState<MedicationScanCapture>(
         emptyMedicationScanCapture(),
@@ -595,7 +633,11 @@ export function ReceiveStockDialog({
                 },
             );
             if (!emarMutationWasAccepted(result.status)) return;
-            resetReplayAndClose();
+            setSaved(
+                result.status === 'queued'
+                    ? 'Saved on this device'
+                    : 'Stock receipt recorded',
+            );
             if (result.status !== 'queued') refreshStock();
         } catch (error: unknown) {
             applyFormRequestErrors(
@@ -627,7 +669,35 @@ export function ReceiveStockDialog({
         <MedsWizardDialog
             open
             onClose={resetReplayAndClose}
+            success={
+                saved ? (
+                    <WizardSuccessPane
+                        title={saved}
+                        blurb={
+                            saved === 'Saved on this device'
+                                ? 'This change is waiting to sync. The server register is not updated yet.'
+                                : 'The register has accepted this change. You can now return to the stock workspace.'
+                        }
+                        actions={<Button onClick={onClose}>Done</Button>}
+                    />
+                ) : undefined
+            }
             title="Receive stock"
+            formState={{
+                ...form,
+                isDirty: form.isDirty || capture.code !== '',
+                processing: busy,
+            }}
+            completeness={{
+                completed: [
+                    form.data.client_medication_id,
+                    form.data.quantity,
+                    form.data.batch_number,
+                    form.data.expiry_date,
+                    form.data.notes,
+                ].filter(Boolean).length,
+                total: 5,
+            }}
             description="Record incoming medication stock into inventory."
             railIcon={Truck}
             railTitle="Receive stock"
@@ -664,7 +734,11 @@ export function ReceiveStockDialog({
                 <>
                     <Button
                         variant="ghost"
-                        onClick={step === 0 ? onClose : () => setStep(step - 1)}
+                        onClick={
+                            step === 0
+                                ? resetReplayAndClose
+                                : () => setStep(step - 1)
+                        }
                         disabled={busy}
                     >
                         {step === 0 ? 'Cancel' : 'Back'}
@@ -748,12 +822,15 @@ export function ReceiveStockDialog({
                             label="Expiry date"
                             error={form.errors.expiry_date}
                         >
-                            <Input
-                                type="date"
+                            <DatePicker
+                                id="emar-stock-dialogs-2"
+                                label="Expiry date"
                                 value={form.data.expiry_date}
-                                onChange={(e) =>
-                                    form.setData('expiry_date', e.target.value)
+                                onChange={(value) =>
+                                    form.setData('expiry_date', value)
                                 }
+                                invalid={Boolean(form.errors.expiry_date)}
+                                allowClear
                             />
                         </Field>
                         <Field label="Notes" error={form.errors.notes}>
@@ -804,7 +881,11 @@ export function ReceiveStockDialog({
                         title="Confirm"
                         blurb="Review and add to stock."
                     />
-                    <div className="rounded-lg border px-4">
+                    <ReviewCard
+                        icon={Package}
+                        title="Delivery details"
+                        onEdit={() => setStep(1)}
+                    >
                         <SummaryRow
                             label="Medication"
                             value={med?.name ?? '—'}
@@ -827,7 +908,23 @@ export function ReceiveStockDialog({
                                     : 'Not required'
                             }
                         />
-                    </div>
+                        <SummaryRow
+                            label="Expiry"
+                            value={form.data.expiry_date || 'Not recorded'}
+                        />
+                        <SummaryRow
+                            label="Notes"
+                            value={form.data.notes || 'None'}
+                        />
+                        <Button variant="link" onClick={() => setStep(0)}>
+                            Change medicine
+                        </Button>
+                        {scanRequired && (
+                            <Button variant="link" onClick={() => setStep(2)}>
+                                Review identity check
+                            </Button>
+                        )}
+                    </ReviewCard>
                 </>
             )}
         </MedsWizardDialog>
@@ -852,6 +949,7 @@ export function PharmacyDeliveryDialog({
     order: PharmacyDeliveryOrder;
     onClose: () => void;
 }) {
+    const [saved, setSaved] = useState<string | null>(null);
     const deliveryReplay = useRef(createMedicationMutationReplayState());
     const [busy, setBusy] = useState(false);
     const form = useForm({
@@ -892,7 +990,11 @@ export function PharmacyDeliveryDialog({
             );
             if (!emarMutationWasAccepted(result.status)) return;
             deliveryReplay.current = createMedicationMutationReplayState();
-            onClose();
+            setSaved(
+                result.status === 'queued'
+                    ? 'Saved on this device'
+                    : 'Delivery recorded',
+            );
             if (result.status !== 'queued') refreshStock();
         } catch (error: unknown) {
             applyFormRequestErrors(
@@ -913,7 +1015,21 @@ export function PharmacyDeliveryDialog({
         <MedsWizardDialog
             open
             onClose={onClose}
+            success={
+                saved ? (
+                    <WizardSuccessPane
+                        title={saved}
+                        blurb={
+                            saved === 'Saved on this device'
+                                ? 'This change is waiting to sync. The server register is not updated yet.'
+                                : 'The register has accepted this change. You can now return to the stock workspace.'
+                        }
+                        actions={<Button onClick={onClose}>Done</Button>}
+                    />
+                ) : undefined
+            }
             title="Receive delivery"
+            formState={{ ...form, processing: busy }}
             description="Record what arrived against this dispensed order."
             railIcon={Truck}
             railTitle="Receive delivery"
@@ -990,12 +1106,15 @@ export function PharmacyDeliveryDialog({
                     />
                 </Field>
                 <Field label="Expiry" error={form.errors.batch_expiry}>
-                    <Input
-                        type="date"
+                    <DatePicker
+                        id="emar-stock-dialogs-3"
+                        label="Expiry"
                         value={form.data.batch_expiry}
-                        onChange={(event) =>
-                            form.setData('batch_expiry', event.target.value)
+                        onChange={(value) =>
+                            form.setData('batch_expiry', value)
                         }
+                        invalid={Boolean(form.errors.batch_expiry)}
+                        allowClear
                     />
                 </Field>
                 <Field
@@ -1042,6 +1161,7 @@ export function ControlledPharmacyDeliveryDialog({
     witnesses: StaffOpt[];
     onClose: () => void;
 }) {
+    const [saved, setSaved] = useState<string | null>(null);
     const [step, setStep] = useState(0);
     // Seed the replay ref from state so render never reads ref.current.
     const [initialDeliveryReplay] = useState(() =>
@@ -1105,7 +1225,7 @@ export function ControlledPharmacyDeliveryDialog({
             onSuccess: () => {
                 deliveryReplay.current = createMedicationMutationReplayState();
                 toast.success('Controlled drug delivery recorded');
-                onClose();
+                setSaved('Controlled drug delivery recorded');
                 refreshStock();
             },
             onError: () =>
@@ -1117,6 +1237,19 @@ export function ControlledPharmacyDeliveryDialog({
         <MedsWizardDialog
             open
             onClose={onClose}
+            success={
+                saved ? (
+                    <WizardSuccessPane
+                        title={saved}
+                        blurb={
+                            saved === 'Saved on this device'
+                                ? 'This change is waiting to sync. The server register is not updated yet.'
+                                : 'The register has accepted this change. You can now return to the stock workspace.'
+                        }
+                        actions={<Button onClick={onClose}>Done</Button>}
+                    />
+                ) : undefined
+            }
             title="Receive stock"
             description="Record incoming controlled-drug stock with a witness."
             formState={form}
@@ -1143,6 +1276,20 @@ export function ControlledPharmacyDeliveryDialog({
                     icon: Check,
                 },
             ]}
+            completeness={{
+                completed: [
+                    form.data.quantity_received,
+                    form.data.witnessed_by,
+                    form.data.witness_credential,
+                    form.data.delivery_notes,
+                ].filter((value) => Boolean(value)).length,
+                total: [
+                    form.data.quantity_received,
+                    form.data.witnessed_by,
+                    form.data.witness_credential,
+                    form.data.delivery_notes,
+                ].length,
+            }}
             stepIndex={step}
             onStepClick={(index) => index < step && setStep(index)}
             footer={
@@ -1401,6 +1548,8 @@ export function StockCountDialog({
     controlledOnly?: boolean;
     onClose: () => void;
 }) {
+    const [saved, setSaved] = useState<string | null>(null);
+    const [busy, setBusy] = useState(false);
     const [step, setStep] = useState(0);
     const [initialControlledCountReplay] = useState(() =>
         createControlledStockCountReplayState(),
@@ -1430,6 +1579,9 @@ export function StockCountDialog({
         form.data.counted === '' ? null : Number(form.data.counted) - expected;
 
     const submit = async () => {
+        if (busy) return;
+        setBusy(true);
+        form.clearErrors();
         if (isCd) {
             const initialPayload = buildControlledStockCountRequest({
                 clientId: med!.client_id,
@@ -1458,12 +1610,19 @@ export function StockCountDialog({
                     controlledCountReplay.current =
                         createControlledStockCountReplayState();
                     toast.success('Balance check recorded');
-                    onClose();
+                    setSaved('Balance check recorded');
                 },
-                onError: () =>
-                    toast.error(
-                        'Check the count — a witness (not yourself) is required',
-                    ),
+                onError: (errors) => {
+                    for (const [field, value] of Object.entries(errors))
+                        (
+                            form.setError as (
+                                field: string,
+                                value: string,
+                            ) => void
+                        )(field, value);
+                    setStep(2);
+                },
+                onFinish: () => setBusy(false),
             });
         } else {
             const payload = {
@@ -1490,11 +1649,27 @@ export function StockCountDialog({
                 if (emarMutationWasAccepted(result.status)) {
                     genericCountReplay.current =
                         createMedicationMutationReplayState();
-                    onClose();
-                    refreshStock();
+                    setSaved(
+                        result.status === 'queued'
+                            ? 'Saved on this device'
+                            : 'Stock count recorded',
+                    );
+                    if (result.status !== 'queued') refreshStock();
                 }
-            } catch {
-                toast.error('Could not record the count');
+            } catch (error) {
+                applyFormRequestErrors(
+                    error,
+                    (field, value) =>
+                        (
+                            form.setError as (
+                                field: string,
+                                value: string,
+                            ) => void
+                        )(field, value),
+                    'Could not record the count.',
+                );
+            } finally {
+                setBusy(false);
             }
         }
     };
@@ -1519,7 +1694,21 @@ export function StockCountDialog({
         <MedsWizardDialog
             open
             onClose={onClose}
+            success={
+                saved ? (
+                    <WizardSuccessPane
+                        title={saved}
+                        blurb={
+                            saved === 'Saved on this device'
+                                ? 'This change is waiting to sync. The server register is not updated yet.'
+                                : 'The register has accepted this change. You can now return to the stock workspace.'
+                        }
+                        actions={<Button onClick={onClose}>Done</Button>}
+                    />
+                ) : undefined
+            }
             title="Stock count"
+            formState={{ ...form, processing: busy }}
             description="Count physical stock and reconcile against the register."
             railIcon={ShieldCheck}
             railTitle="Stock count"
@@ -1544,6 +1733,34 @@ export function StockCountDialog({
                     icon: ShieldCheck,
                 },
             ]}
+            completeness={{
+                completed: [
+                    form.data.client_medication_id,
+                    form.data.counted,
+                    form.data.note,
+                    form.data.confirmed,
+                    ...(isCd
+                        ? [
+                              form.data.witnessed_by,
+                              form.data.witness_credential,
+                              form.data.immediate_action_taken,
+                          ]
+                        : []),
+                ].filter((value) => Boolean(value)).length,
+                total: [
+                    form.data.client_medication_id,
+                    form.data.counted,
+                    form.data.note,
+                    form.data.confirmed,
+                    ...(isCd
+                        ? [
+                              form.data.witnessed_by,
+                              form.data.witness_credential,
+                              form.data.immediate_action_taken,
+                          ]
+                        : []),
+                ].length,
+            }}
             stepIndex={step}
             onStepClick={(i) => i < step && setStep(i)}
             footer={
@@ -1562,7 +1779,7 @@ export function StockCountDialog({
                             Continue
                         </Button>
                     ) : (
-                        <Button onClick={submit} disabled={!valid[2]}>
+                        <Button onClick={submit} disabled={busy || !valid[2]}>
                             Submit count
                         </Button>
                     )}
@@ -1818,6 +2035,10 @@ export function AdjustStockDialog({
             open
             onClose={onClose}
             title="Adjust stock"
+            formState={{
+                ...form,
+                processing: form.processing || savingQuantity,
+            }}
             description={`Update stock details and correct the on-hand count for ${item.medication_name ?? 'this medication'}.`}
             railIcon={Package}
             railTitle="Adjust stock"
@@ -1912,13 +2133,16 @@ export function AdjustStockDialog({
                             label="Expiry date"
                             error={form.errors.expiry_date}
                         >
-                            <Input
-                                type="date"
-                                disabled={!!item.pack_workflow_url}
+                            <DatePicker
+                                id="emar-stock-dialogs-4"
+                                label="Expiry date"
                                 value={form.data.expiry_date}
-                                onChange={(e) =>
-                                    form.setData('expiry_date', e.target.value)
+                                onChange={(value) =>
+                                    form.setData('expiry_date', value)
                                 }
+                                disabled={!!item.pack_workflow_url}
+                                invalid={Boolean(form.errors.expiry_date)}
+                                allowClear
                             />
                         </Field>
                         <Field

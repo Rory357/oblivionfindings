@@ -20,7 +20,8 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTime, formatTime } from '@/lib/datetime';
-import { Head, router } from '@inertiajs/react';
+import { emarScopedHref } from '@/lib/emar-navigation';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     CalendarDays,
     ClipboardList,
@@ -99,6 +100,7 @@ const RAIL = [
 
 export default function MedicationRecordHub(props: Props) {
     const breadcrumbs = useEmarBreadcrumbs();
+    const { url: pageUrl } = usePage();
     const [search, setSearch] = useState(props.filters.q);
     const [effectDose, setEffectDose] = useState<number | null>(null);
     const visit = (
@@ -283,7 +285,12 @@ export default function MedicationRecordHub(props: Props) {
                             ariaLabel="MAR and medicines views"
                             onSelect={(view) =>
                                 view === 'selfadmin'
-                                    ? router.visit(PATHS.selfadmin)
+                                    ? router.visit(
+                                          emarScopedHref(
+                                              PATHS.selfadmin,
+                                              pageUrl,
+                                          ),
+                                      )
                                     : visit({}, view as View)
                             }
                         />

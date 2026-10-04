@@ -67,8 +67,7 @@ final class ControlledProductPayload
         }
         $entries = (clone $historyQuery)->with(['recordedBy:id,name', 'witnessedBy:id,name'])->latest('id')->limit(self::HISTORY_LIMIT)->get();
         $latest = (clone $entriesQuery)->selectRaw('client_medication_id, MAX(id) AS latest_id')->groupBy('client_medication_id')->pluck('latest_id', 'client_medication_id');
-        $lastCounts = (clone $entriesQuery)->where('entry_type', 'balance_check')->whereNotNull('witnessed_by')->selectRaw('client_medication_id, MAX(id) AS latest_id')->groupBy('client_medication_id')->pluck('latest_id', 'client_medication_id');
-        $counts = ClientControlledDrugEntry::query()->whereIn('id', $lastCounts)->get()->keyBy('client_medication_id');
+        $counts = app(ControlledCountStatus::class)->latestWitnessedCounts($ids, $siteIds);
         $reversals = $this->scope->scopeCanonicalClientMedicationRows(ClientControlledDrugEntry::query(), $siteIds, false)
             ->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds)
             ->whereIn('reverses_entry_id', $entries->pluck('id'))
@@ -138,16 +137,17 @@ final class ControlledProductPayload
                 $count = $counts->get($m->id);
                 $state = $this->policy->countStatus($m, now(), $count?->recorded_at);
                 $status = match ($state['status']) {
-                    'complete' => 'counted', 'upcoming' => 'next', 'not_configured', 'schedule_unavailable', 'not_applicable' => 'not_configured', default => $state['status']
+                    'complete' => 'counted', 'upcoming' => 'next', 'not_configured', 'schedule_unavailable' => 'not_configured', default => $state['status']
                 };
-                $canRecord = $record && in_array((int) $m->client->site_id, $presentSites, true) && $m->deleted_at === null && $m->superseded_by === null;
+                $canRecord = $record && in_array((int) $m->client->site_id, $presentSites, true) && (($m->deleted_at === null && $m->superseded_by === null));
 
                 return ['id' => $m->id, 'client_id' => $m->client_id, 'client_name' => $m->client->full_name, 'site_id' => $m->client->site_id, 'site_name' => $m->client->site?->name ?? '',
                     'name' => $m->name, 'unit' => $m->stock?->unit ?? '', 'balance' => $m->stock?->on_hand === null ? null : Quantity::toFloat($m->stock->on_hand),
                     'entry_version' => $latest[$m->id] ?? null, 'nz_class' => $m->nz_controlled_class, 'class_review_required' => $m->controlled_class_reviewed_at === null,
+                    'can_count' => $record && in_array((int) $m->client->site_id, $presentSites, true) && $this->policy->countRequired($m),
                     'can_record' => $canRecord, 'record_reason' => $canRecord ? null : 'Record access and a clocked-in shift at this house are needed.',
                     'count' => ['state' => $status, 'title' => match ($state['status']) {
-                        'due' => 'Due now — shift-change count', 'overdue' => 'Shift-change count overdue', 'complete' => 'Counted', 'upcoming' => 'Next shift-change count', 'schedule_unavailable' => 'Roster timing not configured', default => 'Not configured'
+                        'due' => 'Due now — shift-change count', 'overdue' => 'Shift-change count overdue', 'complete' => 'Counted', 'upcoming' => 'Next shift-change count', 'schedule_unavailable' => 'Roster timing not configured', 'not_applicable' => 'No stock count required', default => 'Not configured'
                     },
                         'due_at' => $state['due_at'], 'overdue_at' => $state['overdue_at'], 'last_at' => $count?->recorded_at?->toIso8601String(), 'last_entry_id' => $count?->id]];
             })->values(),
@@ -175,11 +175,14 @@ final class ControlledProductPayload
                     'resolution_outcome' => $l->resolution_outcome, 'closed_at' => $l->resolved_at?->toIso8601String(),
                     'notes' => $notes->map(fn ($n): array => ['id' => $n->id, 'notes' => $n->payload['notes'] ?? '', 'created_at' => $n->created_at?->toIso8601String(), 'created_by_name' => $names[$n->actor_id] ?? null])->values()];
             }),
-            'destructions' => $destructions->map(fn ($d): array => ['id' => $d->id, 'client_medication_id' => $d->client_medication_id, 'quantity' => Quantity::toFloat($d->quantity),
+            'destructions' => $destructions->map(fn ($d): array => ['id' => $d->id, 'client_medication_id' => $d->client_medication_id, 'medication_name' => $d->medication_name, 'form' => $d->form, 'strength' => $d->strength,
+                'quantity' => Quantity::toFloat($d->quantity),
                 'reason' => $d->reason, 'method' => $d->disposal_method, 'recorded_at' => $d->destroyed_at?->toIso8601String(), 'recorded_by_name' => $d->destroyedByUser?->name,
                 'witnessed_by_name' => $d->witness1?->name, 'second_witness_name' => $d->witness2?->name, 'notes' => $d->notes,
                 'pharmacist_name' => $d->pharmacist_name, 'pharmacist_registration' => $d->pharmacist_registration, 'received_at' => $d->pharmacy_received_at?->toIso8601String(),
                 'voided_at' => $d->voided_at?->toIso8601String(), 'void_reason' => $d->void_reason,
+                'void_stock_semantics' => MedicationDestruction::VOID_STOCK_SEMANTICS,
+                'requires_governed_stock_reconciliation' => $d->voided_at !== null && (bool) $d->is_controlled_drug,
                 'photo' => $d->photo_path ? ['url' => '/emar/controlled/product/destructions/'.$d->id.'/photo', 'download_url' => '/emar/controlled/product/destructions/'.$d->id.'/photo?download=1', 'name' => 'Destruction photo', 'mime_type' => match (strtolower(pathinfo($d->photo_path, PATHINFO_EXTENSION))) {
                     'png' => 'image/png', 'webp' => 'image/webp', default => 'image/jpeg'
                 }] : null]),

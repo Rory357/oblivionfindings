@@ -171,6 +171,44 @@ class MedicationOrdersWorkflowTest extends TestCase
         $this->assertSame(1, MedicationEvent::where('kind', 'order.checked')->count());
     }
 
+    public function test_editing_legacy_order_with_unknown_creator_records_snapshot_actor_without_inventing_original_enterer(): void
+    {
+        $order = $this->order(['created_by' => null]);
+        $revision = $this->enter($order, ['dosage' => '20 mg']);
+        $legacy = $order->versions()->where('version_number', 1)->sole();
+        $legacyRevision = MedicationOrderRevision::query()->where('medication_order_version_id', $legacy->id)->sole();
+        $this->assertSame($this->enterer->id, $legacy->changed_by);
+        $this->assertSame($this->enterer->id, $legacy->source_evidence['snapshot_created_by']);
+        $this->assertArrayHasKey('original_created_by', $legacy->source_evidence);
+        $this->assertNull($legacy->source_evidence['original_created_by']);
+        $this->assertFalse($legacy->source_evidence['original_creator_known']);
+        $this->assertNull($legacyRevision->entered_by);
+        $this->assertNull($order->refresh()->created_by);
+        $this->assertSame('10 mg', $order->dosage);
+        $snapshotBefore = $legacy->getAttributes();
+        // A subsequent caller cannot change retained snapshot authorship.
+        app(MedicationOrderWorkflow::class)->snapshotExisting($order, $this->checker);
+        $this->assertSame($snapshotBefore, $legacy->refresh()->getAttributes());
+        $this->check($revision);
+        $this->assertSame('20 mg', $order->refresh()->dosage);
+        $this->assertSame(2, $order->version);
+        $this->assertNull($order->created_by);
+        $this->assertSame($snapshotBefore, $legacy->refresh()->getAttributes());
+        $this->assertSame($this->checker->id, $revision->refresh()->checked_by);
+    }
+
+    public function test_legacy_snapshot_keeps_known_original_enterer_distinct_from_current_snapshot_actor(): void
+    {
+        $order = $this->order(['created_by' => $this->checker->id]);
+        $this->enter($order, ['dosage' => '20 mg']);
+        $legacy = $order->versions()->where('version_number', 1)->sole();
+        $this->assertSame($this->enterer->id, $legacy->changed_by);
+        $this->assertSame($this->checker->id, $legacy->source_evidence['original_created_by']);
+        $this->assertTrue($legacy->source_evidence['original_creator_known']);
+        $this->assertSame($this->checker->id, MedicationOrderRevision::query()->where('medication_order_version_id', $legacy->id)->sole()->entered_by);
+        $this->assertSame($this->checker->id, $order->refresh()->created_by);
+    }
+
     public function test_identical_entry_retry_keeps_one_version_file_followup_and_event(): void
     {
         $input = $this->entryInput();
@@ -396,7 +434,7 @@ class MedicationOrdersWorkflowTest extends TestCase
         $fileId = $revision->files()->sole()->id;
         $foreign = $this->order(['name' => 'Foreign medicine']);
         $workflow = app(MedicationOrderWorkflow::class);
-        $workflow->snapshotExisting($foreign);
+        $workflow->snapshotExisting($foreign, $this->enterer);
         // The existing snapshot already has its own unique revision. Build a
         // free foreign version so this fixture reaches the ownership check.
         $foreignVersion = $workflow->snapshot($foreign, $workflow->payload($foreign), 2, $this->enterer->id, ['type' => 'written'], 'Foreign source version');

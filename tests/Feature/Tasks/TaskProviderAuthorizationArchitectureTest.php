@@ -5,6 +5,8 @@ use App\Http\Controllers\AllTasksController;
 use App\Http\Controllers\MyTasksController;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Notifications\AppEventNotification;
+use App\Services\Medication\Downtime\DowntimeService;
+use App\Services\Medication\Reviews\MedicationReviewReader;
 use App\Services\NotificationService;
 use App\Services\Tasks\Contracts\ExplicitlyGlobalTaskProvider;
 use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
@@ -30,16 +32,15 @@ use App\Services\Tasks\Providers\ItKnowledgeReviewTaskProvider;
 use App\Services\Tasks\Providers\ItProvisioningTaskProvider;
 use App\Services\Tasks\Providers\ItRecurrenceFailureTaskProvider;
 use App\Services\Tasks\Providers\ItWorkTaskProvider;
+use App\Services\Tasks\Providers\LegacyMedicationEffectProvider;
+use App\Services\Tasks\Providers\MedicationEmergencyAccessReviewProvider;
+use App\Services\Tasks\Providers\MedicationErrorActionProvider;
 use App\Services\Tasks\Providers\MedicationErrorProvider;
 use App\Services\Tasks\Providers\MedicationFollowupProvider;
-use App\Services\Tasks\Providers\MedicationErrorActionProvider;
-use App\Services\Tasks\Providers\MedicationReviewProvider;
-use App\Services\Tasks\Providers\MedicationReviewChangeProvider;
-use App\Services\Tasks\Providers\MedicationEmergencyAccessReviewProvider;
 use App\Services\Tasks\Providers\MedicationPaperGiverConfirmationProvider;
 use App\Services\Tasks\Providers\MedicationPaperWitnessConfirmationProvider;
-use App\Services\Medication\Reviews\MedicationReviewReader;
-use App\Services\Medication\Downtime\DowntimeService;
+use App\Services\Tasks\Providers\MedicationReviewChangeProvider;
+use App\Services\Tasks\Providers\MedicationReviewProvider;
 use App\Services\Tasks\Providers\MedicationRoundProvider;
 use App\Services\Tasks\Providers\RespiteTaskProvider;
 use App\Services\Tasks\Providers\RestraintReviewProvider;
@@ -58,7 +59,7 @@ use Illuminate\Support\Facades\Route;
 it('registers every task source behind exactly one authorization boundary', function () {
     $providers = TaskAggregator::defaultProviders();
 
-    expect($providers)->toHaveCount(39);
+    expect($providers)->toHaveCount(40);
     expect(collect($providers)->mapWithKeys(fn (TaskProvider $provider): array => [
         $provider::class => $provider->sourceKey(),
     ])->all())->toBe([
@@ -84,6 +85,7 @@ it('registers every task source behind exactly one authorization boundary', func
         FleetFinanceReviewProvider::class => 'fleet_finance_review',
         MedicationErrorProvider::class => 'med_error',
         MedicationFollowupProvider::class => 'medication-followup',
+        LegacyMedicationEffectProvider::class => 'medication-effect-source',
         MedicationErrorActionProvider::class => 'med_error_action',
         MedicationReviewProvider::class => 'medication_review',
         MedicationReviewChangeProvider::class => 'medication_review_change',

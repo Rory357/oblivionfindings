@@ -915,7 +915,9 @@ export function ReportWorkspace(props: Props) {
                               ? 'Client tracker reports'
                               : domain === 'staff'
                                 ? 'Staff safety reports'
-                                : domain === 'medication' ? 'Medication reports' : 'My safety history'
+                                : domain === 'medication'
+                                  ? 'Medication reports'
+                                  : 'My safety history'
                 }
                 subline={
                     focusedView?.note ??
@@ -927,7 +929,16 @@ export function ReportWorkspace(props: Props) {
                 }
                 actions={
                     <>
-                        <FleetPageMenu />
+                        {domain === 'medication' ? (
+                            <PageHeaderGlassButton
+                                icon={ArrowLeft}
+                                onClick={() => router.visit('/emar/reports')}
+                            >
+                                Reports & audit
+                            </PageHeaderGlassButton>
+                        ) : (
+                            <FleetPageMenu />
+                        )}
                         {focusedView ? (
                             <>
                                 <PageHeaderGlassButton
@@ -1572,9 +1583,13 @@ export function ReportWorkspace(props: Props) {
                                                     {domain === 'fleet'
                                                         ? 'Find a resource'
                                                         : 'Find an authorised ' +
-                                                          (domain === 'medication' ? 'person' : domain === 'client'
-                                                              ? 'client'
-                                                              : 'session')}
+                                                          (domain ===
+                                                          'medication'
+                                                              ? 'person'
+                                                              : domain ===
+                                                                  'client'
+                                                                ? 'client'
+                                                                : 'session')}
                                                 </Label>
                                                 <div className="flex items-center gap-2">
                                                     <Search className="size-4" />
@@ -3606,33 +3621,42 @@ function ReportChart({
 }
 export default function Workspace(props: Props) {
     const base =
-        props.domain === 'medication' ? '/emar/reports' : props.domain === 'fleet'
-            ? '/fleet-assets'
-            : props.domain === 'self'
-              ? '/my-day'
-              : '/operations';
+        props.domain === 'medication'
+            ? '/emar/reports'
+            : props.domain === 'fleet'
+              ? '/fleet-assets'
+              : props.domain === 'self'
+                ? '/my-day'
+                : '/operations';
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 {
                     title:
-                        props.domain === 'medication' ? 'Medication' : props.domain === 'fleet'
-                            ? 'Fleet & Assets'
-                            : props.domain === 'self'
-                              ? 'My Day'
-                              : 'Operations',
+                        props.domain === 'medication'
+                            ? 'Medication'
+                            : props.domain === 'fleet'
+                              ? 'Fleet & Assets'
+                              : props.domain === 'self'
+                                ? 'My Day'
+                                : 'Operations',
                     href: base,
                 },
                 {
-                    title: props.domain === 'medication' ? 'Reports & audit' : 'Reports',
+                    title:
+                        props.domain === 'medication'
+                            ? 'Reports & audit'
+                            : 'Reports',
                     href:
-                        props.domain === 'medication' ? '/emar/reports' : props.domain === 'fleet'
-                            ? '/fleet-assets/reports'
-                            : props.domain === 'self'
-                              ? '/my-day/safety-reports'
-                              : '/operations/people-location-reports/' +
-                                props.domain,
+                        props.domain === 'medication'
+                            ? '/emar/reports'
+                            : props.domain === 'fleet'
+                              ? '/fleet-assets/reports'
+                              : props.domain === 'self'
+                                ? '/my-day/safety-reports'
+                                : '/operations/people-location-reports/' +
+                                  props.domain,
                 },
             ]}
         >

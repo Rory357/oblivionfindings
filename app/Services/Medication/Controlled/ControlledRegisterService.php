@@ -18,6 +18,7 @@ use App\Models\Shift;
 use App\Models\User;
 use App\Notifications\ControlledWitnessRequested;
 use App\Services\AuditLogger;
+use App\Services\Medication\Alerts\MedicationAlertSources;
 use App\Services\Medication\Audit\MedicationEventData;
 use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\ControlledMedicationTransportWitnessService;
@@ -39,11 +40,18 @@ final class ControlledRegisterService
 {
     public const MANAGE = 'medications.controlled.manage';
 
-    private const STOCK_ACTIONS = ['count', 'movement', 'void', 'resolve', 'loss_report', 'destruction', 'destruction_void'];
+    private const STOCK_ACTIONS = ['count', 'movement', 'void', 'resolve', 'loss_report', 'destruction'];
 
     private const MANAGE_ACTIONS = ['void', 'resolve', 'loss_close', 'destruction_receipt', 'destruction_void', 'class_review', 'override_signoff'];
 
     private ?string $newPhotoPath = null;
+
+    private bool $lastRequestWasReplay = false;
+
+    public function lastRequestWasReplay(): bool
+    {
+        return $this->lastRequestWasReplay;
+    }
 
     public function __construct(
         private readonly MedicationGovernanceScopeService $scope,
@@ -62,6 +70,7 @@ final class ControlledRegisterService
             $capability = 'medications.controlled.witness';
         }
         $this->newPhotoPath = null;
+        $this->lastRequestWasReplay = false;
         try {
             return $this->scope->forMedication(
                 $actor, (int) $input['client_medication_id'], $capability,
@@ -70,27 +79,58 @@ final class ControlledRegisterService
                     $medication->setRelation('client', $client);
                     $this->access->assertReadable($lockedActor, $client);
                     $auditEvents = [];
-                    $binding = $input;
-                    unset($binding['witness_credential'], $binding['second_witness_credential'], $binding['photo_upload']);
-                    ksort($binding);
-                    $fingerprint = hash('sha256', json_encode([$action, $binding], JSON_THROW_ON_ERROR));
-                    $previous = DB::table('controlled_product_requests')->where('actor_id', $lockedActor->id)->where('request_uuid', $input['client_request_uuid'])->first();
-                    if ($previous !== null) {
-                        abort_unless(hash_equals($previous->fingerprint, $fingerprint), 409, 'This request was already used for different details.');
-
-                        return json_decode($previous->result, true, flags: JSON_THROW_ON_ERROR);
+                    abort_if(isset($input['client_id']) && (int) $input['client_id'] !== (int) $client->id, 404);
+                    abort_if(isset($input['site_id']) && (int) $input['site_id'] !== (int) $client->site_id, 404);
+                    if ($action !== 'destruction' && isset($input['medication_name'])) {
+                        abort_unless($input['medication_name'] === $medication->name, 404);
                     }
                     $stock = ClientMedicationStock::query()->where('client_medication_id', $medication->id)->lockForUpdate()->first();
-                    if (in_array($action, self::STOCK_ACTIONS, true)) {
-                        $this->checkSnapshot($medication, $stock, $input);
-                    }
                     $witness = null;
+                    $second = null;
                     if (in_array($action, self::STOCK_ACTIONS, true) && ! ($action === 'resolve' && ($input['outcome'] ?? '') === 'escalate')) {
                         $this->assertPresent($lockedActor, (int) $client->site_id, true);
                         $witness = $this->scope->confirmedControlledWitness(
                             $lockedActor, $client, (int) ($input['witnessed_by'] ?? 0), $input['witness_credential'] ?? null,
                             lockedUsers: $lockedUsers, effectiveAt: now(),
                         );
+                        if ($action === 'destruction' && ($input['method'] ?? '') === 'denaturing') {
+                            if ((int) ($input['second_witness_id'] ?? 0) === (int) $witness->id) {
+                                throw ValidationException::withMessages(['second_witness_id' => 'Choose two different witnesses.']);
+                            }
+                            $second = $this->scope->confirmedControlledWitness(
+                                $lockedActor, $client, (int) ($input['second_witness_id'] ?? 0), $input['second_witness_credential'] ?? null,
+                                'second_witness_id', 'second_witness_credential', lockedUsers: $lockedUsers, effectiveAt: now(),
+                            );
+                            if ($second->id === $witness->id) {
+                                throw ValidationException::withMessages(['second_witness_id' => 'Choose two different witnesses.']);
+                            }
+                        }
+                    }
+                    // Credentials and current witness evidence precede the durable receipt.
+                    // A valid replay does not need the original stock snapshot to remain current.
+                    $binding = $input;
+                    unset($binding['witness_credential'], $binding['second_witness_credential'], $binding['photo_upload']);
+                    foreach (['quantity', 'expected_balance', 'actual_balance', 'recount_balance', 'correction_quantity', 'on_hand_before', 'on_hand_after'] as $quantityField) {
+                        if (isset($binding[$quantityField])) {
+                            $binding[$quantityField] = Quantity::normalize($binding[$quantityField]);
+                        }
+                    }
+                    ksort($binding);
+                    $fingerprint = hash('sha256', json_encode([$action, $binding], JSON_THROW_ON_ERROR));
+                    $previous = DB::table('controlled_product_requests')->where('actor_id', $lockedActor->id)->where('request_uuid', $input['client_request_uuid'])->first();
+                    if ($previous !== null) {
+                        abort_unless(hash_equals($previous->fingerprint, $fingerprint), 409, 'This request was already used for different details.');
+                        $this->lastRequestWasReplay = true;
+
+                        return json_decode($previous->result, true, flags: JSON_THROW_ON_ERROR);
+                    }
+                    // A new historical count needs retained stock; a recorded recount
+                    // remains replayable when that recount cleared the stock to zero.
+                    if ($action === 'count' && ($medication->deleted_at !== null || $medication->superseded_by !== null)) {
+                        abort_unless($stock !== null && Quantity::greaterThan($stock->on_hand, 0), 404);
+                    }
+                    if (in_array($action, self::STOCK_ACTIONS, true)) {
+                        $this->checkSnapshot($medication, $stock, $input);
                     }
                     $result = match ($action) {
                         'count' => $this->count($lockedActor, $medication, $stock, $witness, $input),
@@ -99,7 +139,7 @@ final class ControlledRegisterService
                         'resolve' => $this->resolve($lockedActor, $medication, $stock, $witness, $input),
                         'loss_report' => $this->loss($lockedActor, $medication, $stock, $witness, $input),
                         'loss_note', 'loss_notify', 'loss_close' => $this->lossFollowUp($lockedActor, $medication, $action, $input),
-                        'destruction' => $this->destruction($lockedActor, $medication, $stock, $witness, $lockedUsers, $input),
+                        'destruction' => $this->destruction($lockedActor, $medication, $stock, $witness, $second, $input),
                         'destruction_receipt', 'destruction_void' => $this->destructionFollowUp($lockedActor, $medication, $stock, $witness, $action, $input),
                         'class_review' => $this->classReview($lockedActor, $medication, $input),
                         'witness_request', 'witness_answer', 'witness_cancel' => $this->request($lockedActor, $medication, $action, $input),
@@ -125,8 +165,8 @@ final class ControlledRegisterService
                 },
                 authorizationUserIds: array_values(array_filter([(int) $actor->id, (int) ($input['witnessed_by'] ?? 0), (int) ($input['second_witness_id'] ?? 0), (int) ($input['witness_id'] ?? 0)])),
                 authorizationEffectiveAt: now(),
-                // Historical record maintenance cannot create a new dose, count, movement, loss or destruction.
-                currentOnly: ! in_array($action, ['void', 'resolve', 'loss_note', 'loss_notify', 'loss_close', 'destruction_receipt', 'destruction_void', 'class_review', 'override_signoff'], true),
+                // Historical maintenance cannot create a dose or stock movement; only a witnessed count of retained positive stock is allowed.
+                currentOnly: ! in_array($action, ['count', 'void', 'resolve', 'loss_note', 'loss_notify', 'loss_close', 'destruction_receipt', 'destruction_void', 'class_review', 'override_signoff'], true),
             );
         } catch (\Throwable $exception) {
             if ($this->newPhotoPath !== null) {
@@ -220,12 +260,19 @@ final class ControlledRegisterService
             app(MedicationIncidentIntegrationService::class)->handleControlledDiscrepancy($discrepancy, $actor->id);
         }
         ControlledWitnessRequest::query()->where('client_medication_id', $medication->id)->whereNull('closed_at')->where('purpose', 'count')->update(['closed_at' => now()]);
+        $siteId = (int) $medication->client->site_id;
+        DB::afterCommit(fn () => app(MedicationAlertSources::class)->controlledCheckRecorded($siteId));
 
         return ['message' => $differs ? 'Count saved. A discrepancy has been started.' : 'Count saved — matches the register.', 'entry_id' => $entry->id, 'counted_entry_id' => $entry->id, 'discrepancy_id' => $discrepancy?->id];
     }
 
     private function movement(User $actor, ClientMedication $medication, ClientMedicationStock $stock, User $witness, array $input): array
     {
+        foreach (['on_hand_before' => 'expected_balance', 'on_hand_after' => 'actual_balance'] as $alias => $canonical) {
+            if (isset($input[$alias]) && ! Quantity::equals($input[$alias], $input[$canonical])) {
+                throw ValidationException::withMessages([$alias => 'This balance must match the witnessed register transition.']);
+            }
+        }
         $type = $input['movement_type'] ?? (($input['direction'] ?? '') === 'in' ? 'coming_back' : 'going_out');
         $this->choice($type, ['going_out', 'coming_back', 'breakage', 'spillage'], 'movement_type');
         $quantity = $this->positive($input, 'quantity');
@@ -324,13 +371,14 @@ final class ControlledRegisterService
         $immediate = $this->requiredText($input, 'immediate_action_taken');
         $entry = $this->write($actor, $medication, $stock, $witness, 'loss', $quantity, Quantity::subtract($stock->on_hand, $quantity), $notes);
         $loss = $this->createLoss($actor, $medication, $quantity, $notes, $immediate, $entry->id, (bool) ($input['suspected_theft'] ?? false));
+        $loss->update(['accountable_officer_name' => $input['accountable_officer_name'] ?? null]);
         if (isset($input['discovered_at'])) {
             $loss->update(['discovered_at' => $this->time->parse($input['discovered_at'], 'discovered_at')]);
         }
         foreach (['police', 'regulator'] as $authority) {
             if ($input['reported_to_'.$authority] ?? false) {
                 $reference = $this->requiredText($input, $authority.'_reference');
-                $this->lossFollowUp($actor, $medication, 'loss_notify', ['target_id' => $loss->id, 'authority' => $authority, 'reference' => $reference, 'notes' => 'Notification recorded with the loss report.']);
+                $this->lossFollowUp($actor, $medication, 'loss_notify', ['target_id' => $loss->id, 'authority' => $authority, 'reference' => $reference, 'regulator_name' => $input['regulator_name'] ?? null, 'notes' => 'Notification recorded with the loss report.']);
             }
         }
         $this->event($actor, $medication, 'loss', $loss->id, 'reported', ['notes' => $notes, 'entry_id' => $entry->id, 'witnessed_by' => $witness->id]);
@@ -375,7 +423,7 @@ final class ControlledRegisterService
             $reference = $this->requiredText($input, 'reference');
             $fields = match ($authority) {
                 'police' => ['reported_to_police' => true, 'police_reference' => $reference, 'police_reported_at' => $at],
-                'regulator' => ['reported_to_regulator' => true, 'regulator_name' => 'Medicines Control', 'regulator_reference' => $reference, 'regulator_notified_at' => $at],
+                'regulator' => ['reported_to_regulator' => true, 'regulator_name' => $input['regulator_name'] ?? 'Medicines Control', 'regulator_reference' => $reference, 'regulator_notified_at' => $at],
                 'pharmacy' => ['reported_to_pharmacy' => true, 'pharmacy_name' => $reference, 'pharmacy_notified_at' => $at],
             };
             $loss->update($fields);
@@ -391,12 +439,11 @@ final class ControlledRegisterService
         return ['message' => 'Investigation update saved. Earlier notes remain in the history.', 'target_id' => $loss->id];
     }
 
-    private function destruction(User $actor, ClientMedication $medication, ClientMedicationStock $stock, User $witness, Collection $lockedUsers, array $input): array
+    private function destruction(User $actor, ClientMedication $medication, ClientMedicationStock $stock, User $witness, ?User $second, array $input): array
     {
         $method = $input['method'] ?? 'pharmacy_return';
         $this->choice($method, ['pharmacy_return', 'denaturing'], 'method');
         $this->choice($input['reason'] ?? '', ['expired', 'ceased', 'contaminated', 'damaged', 'deceased', 'discharged', 'surplus'], 'reason');
-        $second = null;
         if ($method === 'denaturing') {
             if (! $this->policy->onsiteAllowed((int) $medication->client->site_id)) {
                 throw ValidationException::withMessages(['method' => 'On-site denaturing is not allowed. Return to the pharmacy.']);
@@ -404,15 +451,17 @@ final class ControlledRegisterService
             if ((int) ($input['second_witness_id'] ?? 0) === (int) $witness->id) {
                 throw ValidationException::withMessages(['second_witness_id' => 'Choose two different witnesses.']);
             }
-            $second = $this->scope->confirmedControlledWitness($actor, $medication->client, (int) ($input['second_witness_id'] ?? 0), $input['second_witness_credential'] ?? null, 'second_witness_id', 'second_witness_credential', lockedUsers: $lockedUsers);
+            abort_unless($second instanceof User, 422);
         }
         $quantity = $this->positive($input, 'quantity');
         $entry = $this->write($actor, $medication, $stock, $witness, 'disposal', $quantity, Quantity::subtract($stock->on_hand, $quantity), $input['reason'], ['second_witness_id' => $second?->id, 'notes' => $input['notes'] ?? null]);
         $destruction = MedicationDestruction::create([
             'client_id' => $medication->client_id, 'client_medication_id' => $medication->id, 'site_id' => $medication->client->site_id,
-            'medication_name' => $medication->name, 'quantity' => $quantity, 'unit' => $stock->unit,
+            'medication_name' => $medication->name, 'form' => $medication->form, 'strength' => $medication->dosage,
+            'quantity' => $quantity, 'unit' => $stock->unit,
             'reason' => $input['reason'], 'disposal_method' => $method, 'is_controlled_drug' => true,
             'controlled_drug_class' => $medication->nz_controlled_class, 'destroyed_by' => $actor->id,
+            'authorised_by_name' => $input['authorised_by_name'] ?? null, 'authorised_by_registration' => $input['authorised_by_registration'] ?? null,
             'witness_1_id' => $witness->id, 'witness_2_id' => $second?->id, 'destroyed_at' => now(),
             'notes' => $input['notes'] ?? null, 'register_entry_id' => $entry->id,
         ]);
@@ -432,13 +481,16 @@ final class ControlledRegisterService
         $d = MedicationDestruction::query()->where('client_medication_id', $medication->id)->where('client_id', $medication->client_id)->lockForUpdate()->findOrFail((int) ($input['target_id'] ?? 0));
         abort_if($d->voided_at !== null, 409, 'This destruction has already been voided.');
         if ($action === 'destruction_void') {
-            if (! $d->register_entry_id) {
-                throw ValidationException::withMessages(['target_id' => 'This legacy destruction has no linked entry. Review and reconcile it before voiding.']);
-            }
-            $void = $input;
-            $void['target_id'] = $d->register_entry_id;
-            $result = $this->voidEntry($actor, $medication, $stock, $witness, $void);
-            $d->update(['voided_at' => now(), 'voided_by' => $actor->id, 'void_reason' => $this->requiredText($input, 'notes')]);
+            $reason = $this->requiredText($input, 'notes');
+            $d->update(['voided_at' => now(), 'voided_by' => $actor->id, 'void_reason' => $reason]);
+            AuditLogger::logOrFail('medications.destruction.void', $d, [
+                'actor_id' => $actor->id, 'client_id' => $medication->client_id,
+                'client_medication_id' => $medication->id, 'void_reason' => $reason,
+                'void_stock_semantics' => MedicationDestruction::VOID_STOCK_SEMANTICS,
+                'stock_effect_reversed' => false, 'requires_governed_stock_reconciliation' => true,
+            ]);
+            $result = ['message' => 'Destruction record voided. Stock and register balances were not changed; record any correction through witnessed reconciliation.',
+                'target_id' => $d->id, 'entry_id' => $d->register_entry_id];
         } else {
             abort_unless($d->disposal_method === 'pharmacy_return' && $d->pharmacy_received_at === null, 409, 'A receipt already exists or does not apply.');
             $receivedAt = $this->time->parse($input['received_at'] ?? null, 'received_at', defaultNow: true);
@@ -563,7 +615,7 @@ final class ControlledRegisterService
             'reason' => $reason, 'recorded_by' => $actor->id, 'witnessed_by' => $witness->id, 'recorded_at' => now(), ...$extra,
         ]);
         $stock->update(['on_hand' => $after]);
-        AuditLogger::logOrFail('medications.controlled.entry.record', $entry, ['actor_id' => $actor->id, 'witnessed_by' => $witness->id, 'source' => 'P07', 'on_hand_after' => $after]);
+        AuditLogger::logOrFail('medications.controlled.entry.record', $entry, ['actor_id' => $actor->id, 'witnessed_by' => $witness->id, 'source' => 'P07', 'witness_method' => WitnessPinService::METHOD, 'on_hand_after' => $after]);
 
         return $entry;
     }

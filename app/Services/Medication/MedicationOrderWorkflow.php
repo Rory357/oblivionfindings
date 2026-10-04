@@ -145,7 +145,7 @@ final class MedicationOrderWorkflow
                     if ($medication->approval_status === 'verified' && $this->samePrescription($payload, $this->payload($medication))) {
                         $this->invalid('prescription', 'Nothing changed. The checked order is still in use.');
                     }
-                    $this->snapshotExisting($medication);
+                    $this->snapshotExisting($medication, $actor);
                     $number = max((int) $medication->version, (int) $medication->versions()->max('version_number')) + 1;
                 }
                 $version = $this->snapshot($medication, $payload, $number, $actor->id, $source, $input['change_reason'] ?? 'New order', $key, $hash);
@@ -459,12 +459,20 @@ final class MedicationOrderWorkflow
         app(MedicationEventRecorder::class)->appendMany($events);
     }
 
-    public function snapshotExisting(ClientMedication $medication): void
+    public function snapshotExisting(ClientMedication $medication, User $snapshotActor): void
     {
         if ($medication->versions()->where('version_number', $medication->version)->exists()) {
             return;
         }
-        $version = $this->snapshot($medication, $this->payload($medication), (int) $medication->version, $medication->created_by, ['type' => 'legacy', 'description' => 'Existing chart entry; original source not attached here'], 'Existing chart snapshot');
+        // changed_by records who creates this immutable snapshot now. The
+        // original chart's enterer remains separate and may be unknown.
+        $snapshotActorId = $snapshotActor->id;
+        $version = $this->snapshot($medication, $this->payload($medication), (int) $medication->version, $snapshotActorId, [
+            'type' => 'legacy', 'description' => 'Existing chart entry; original source not attached here',
+            'original_created_by' => $medication->created_by,
+            'original_creator_known' => $medication->created_by !== null,
+            'snapshot_created_by' => $snapshotActorId,
+        ], 'Existing chart snapshot');
         MedicationOrderRevision::query()->create([
             'client_id' => $medication->client_id, 'client_medication_id' => $medication->id,
             'medication_order_version_id' => $version->id, 'base_version' => $medication->version,

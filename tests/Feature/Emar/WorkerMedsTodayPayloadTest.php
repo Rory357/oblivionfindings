@@ -357,7 +357,7 @@ class WorkerMedsTodayPayloadTest extends TestCase
             // independent canonical evidence by its actual top-level purpose.
             $this->assertSame(2, count($reads['board_day']) + count($reads['scheduled_window']));
             $this->assertSame([
-                'scheduled_window' => 1, 'board_day' => 1, 'prn_unresolved' => 1,
+                'scheduled_window' => 1, 'board_day' => 1, 'prn_unresolved' => 2,
                 'administration_batch' => 0, 'followup_scope' => 1, 'refusal_scope' => 1, 'unexpected' => 0,
             ], MedicationReadQueryInventory::counts($reads), MedicationReadQueryInventory::describe($reads));
             $this->assertDatabaseCount('client_medication_administrations', 0);

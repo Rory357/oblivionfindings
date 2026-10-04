@@ -2,90 +2,23 @@
 
 namespace App\Console\Commands;
 
-use App\Models\ClientControlledDrugEntry;
-use App\Models\ClientMedication;
-use App\Models\MedicationDashboardAlert;
 use App\Services\Medication\Alerts\MedicationAlertSources;
-use App\Services\Medication\MedicationGovernanceScopeService;
-use Carbon\Carbon;
+use App\Services\Medication\Controlled\ControlledCountStatus;
 use Illuminate\Console\Command;
 
-/**
- * Background escalation for the controlled-drug reconciliation cadence: raises a
- * dashboard alert for any active controlled drug with no balance check in the
- * last N days (default 7, matching the page's overdue_check threshold). The
- * alert is cleared when a balance check is next recorded (see storeBalanceCheck).
- */
+/** Escalate configured roster counts and retire stale projections from the same evidence. */
 class EscalateOverdueControlledChecks extends Command
 {
-    protected $signature = 'emar:escalate-overdue-cd-checks {--days=7}';
+    // Retain old scheduled/manual invocations; a day threshold cannot override organisation policy.
+    protected $signature = 'emar:escalate-overdue-cd-checks {--days= : Deprecated; configured count policy is always used}';
 
-    protected $description = 'Raise a dashboard alert for controlled drugs with no balance check in the last N days (default 7).';
+    protected $description = 'Reconcile overdue controlled counts using the configured organisation cadence and roster.';
 
-    public function __construct(private readonly MedicationGovernanceScopeService $governanceScope)
+    public function handle(ControlledCountStatus $counts): int
     {
-        parent::__construct();
-    }
-
-    public function handle(): int
-    {
-        $days = max(1, (int) $this->option('days'));
-        $cutoff = now()->subDays($days);
-
-        $medications = ClientMedication::query()
-            ->active()
-            ->controlled()
-            ->with('client:id,first_name,last_name,site_id')
-            ->get();
-
-        // Last balance check per controlled drug (one grouped query).
-        $lastChecks = $this->governanceScope->scopeCanonicalClientMedicationRows(
-            ClientControlledDrugEntry::query()
-                ->where('entry_type', 'balance_check')
-                ->whereIn('client_medication_id', $medications->pluck('id')->all()),
-            null,
-            false,
-        )
-            ->selectRaw('client_medication_id, MAX(recorded_at) as last_at')
-            ->groupBy('client_medication_id')
-            ->pluck('last_at', 'client_medication_id');
-
-        $raised = 0;
-        $overdueOrders = collect();
-
-        foreach ($medications as $med) {
-            if (! $med->client_id) {
-                continue;
-            }
-
-            $lastAt = $lastChecks[$med->id] ?? null;
-            $overdue = $lastAt === null || Carbon::parse($lastAt)->lt($cutoff);
-
-            if (! $overdue) {
-                continue;
-            }
-            $overdueOrders->push($med);
-
-            $clientName = $med->client ? trim($med->client->first_name.' '.$med->client->last_name) : 'Unknown';
-            $when = $lastAt ? Carbon::parse($lastAt)->diffForHumans() : 'never';
-
-            // createOrUpdateAlert is idempotent per (client, med, type) active alert.
-            MedicationDashboardAlert::createOrUpdateAlert(
-                clientId: $med->client_id,
-                alertType: 'controlled_overdue_check',
-                severity: 'warning',
-                message: "{$med->name} for {$clientName}: controlled-drug balance check overdue (last checked {$when}).",
-                medicationId: $med->id,
-            );
-
-            $raised++;
-        }
-
-        // One alert per house, to whoever Medication Settings › Alerts &
-        // access chooses (P11 B2); a house with no overdue order is dealt with.
-        app(MedicationAlertSources::class)->controlledChecks($overdueOrders, $days);
-
-        $this->info("Overdue CD balance-check escalation complete. {$raised} alert(s) raised/updated (threshold {$days}d).");
+        $overdue = $counts->refreshDashboardAlerts();
+        app(MedicationAlertSources::class)->controlledChecks($overdue);
+        $this->info("Controlled count escalation complete. {$overdue->count()} overdue medicine(s) under the configured count policy.");
 
         return self::SUCCESS;
     }

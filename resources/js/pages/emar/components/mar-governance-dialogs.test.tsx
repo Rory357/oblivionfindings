@@ -1,5 +1,11 @@
 import { router } from '@inertiajs/react';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+    act,
+    cleanup,
+    fireEvent,
+    render,
+    screen,
+} from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import MarGovernanceDialogs, {
     ManageAlertsDialog,
@@ -8,6 +14,7 @@ import MarGovernanceDialogs, {
 afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    vi.useRealTimers();
 });
 
 describe('INR recording review', () => {
@@ -42,11 +49,14 @@ describe('INR recording review', () => {
         );
     });
     it('retains supplied details across steps and sends the existing command only after review', () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2026-10-04T00:00:00Z'));
         const post = vi.spyOn(router, 'post').mockImplementation(() => {});
+        const onClose = vi.fn();
         render(
             <MarGovernanceDialogs
                 modal="inr"
-                onClose={vi.fn()}
+                onClose={onClose}
                 clientId={42}
                 attentionAlerts={[]}
                 awaitingVerification={[]}
@@ -59,9 +69,11 @@ describe('INR recording review', () => {
         fireEvent.change(screen.getByLabelText(/INR value/), {
             target: { value: '2.4' },
         });
-        fireEvent.change(screen.getByLabelText(/Tested on/), {
-            target: { value: '2026-10-04' },
-        });
+        fireEvent.click(screen.getByRole('button', { name: /Tested on:/ }));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Sun 4 October 2026' }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Use date' }));
         fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
         expect(post).not.toHaveBeenCalled();
         fireEvent.change(screen.getByLabelText(/Recorded instruction/), {
@@ -95,5 +107,13 @@ describe('INR recording review', () => {
             }),
             expect.any(Object),
         );
+        expect(onClose).not.toHaveBeenCalled();
+        act(() => {
+            post.mock.calls[0][2]?.onSuccess?.({} as never);
+        });
+        expect(screen.getByText('INR recorded')).toBeInTheDocument();
+        expect(onClose).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+        expect(onClose).toHaveBeenCalledOnce();
     });
 });

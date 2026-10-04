@@ -355,6 +355,7 @@ export function PrnWizard({
             open
             onClose={resetAndClose}
             title="Give as-needed med"
+            formState={{ ...form, processing: submitting }}
             description="A guided, audited walk-through for recording an as-needed (PRN) dose."
             railIcon={Zap}
             railTitle="Give as-needed med"
@@ -371,8 +372,9 @@ export function PrnWizard({
                     </span>
                     <br />
                     Check the reason matches the prescriber&rsquo;s indication,
-                    respect minimum intervals, and record the effect within the
-                    hour.
+                    respect minimum intervals, and record the effect at the
+                    planned check time. If no check time is set, ask your
+                    medication lead.
                 </div>
             }
             footer={
@@ -392,7 +394,7 @@ export function PrnWizard({
                         <Button
                             type="button"
                             variant="outline"
-                            onClick={onClose}
+                            onClick={resetAndClose}
                         >
                             Cancel
                         </Button>

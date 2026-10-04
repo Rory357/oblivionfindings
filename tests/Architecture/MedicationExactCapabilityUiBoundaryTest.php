@@ -66,7 +66,7 @@ it('keeps medication UI flags and authoring routes on their exact capabilities',
             'export const canOpenEmarReports = reportsView;',
             'export const canOpenEmarAudit = all(reportsView, auditView);',
             "label: 'Controlled register',\n                href: '/emar/controlled',\n                icon: Shield,\n                visible: all(view, controlledView),",
-            "label: 'Destructions & returns',\n                href: '/emar/destructions',\n                icon: Ban,\n                visible: all(view, controlledView),",
+            "label: 'Destructions & returns',\n                href: '/emar/destructions',\n                icon: Ban,\n                visible: all(view, any(controlledView, stockUpdate)),",
             '(controlledView(can) && hasManagerCapability(can))',
         )
         ->not->toContain('controlledRecord(can)', 'controlledWitness(can)', 'reportsViewAny')

@@ -54,12 +54,13 @@ export function useMedicationDay(clientId: number, date: string | null) {
         }
     }, [clientId, date]);
 
+    const invalidate = useCallback(() => {
+        latest.current++;
+    }, []);
     useEffect(() => {
         void fetchDay();
-        return () => {
-            latest.current++;
-        };
-    }, [fetchDay]);
+        return invalidate;
+    }, [fetchDay, invalidate]);
 
     const load: DayLoad =
         state.clientId === clientId

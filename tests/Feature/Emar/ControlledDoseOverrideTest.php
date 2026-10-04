@@ -106,7 +106,10 @@ class ControlledDoseOverrideTest extends TestCase
         $this->assertNull($dose->witnessed_at);
         $this->assertNull($dose->witness_method);
         $this->assertSame('4.00', $this->stock->fresh()->on_hand);
-        $this->assertNull(ClientControlledDrugEntry::query()->sole()->witnessed_by);
+        $entry = ClientControlledDrugEntry::query()->sole();
+        $this->assertNull($entry->witnessed_by);
+        $this->assertSame($dose->id, (int) $entry->client_medication_administration_id);
+        $this->assertSame($dose->id, $entry->administration->id);
         $event = ControlledWorkflowEvent::query()->where('subject_type', 'override_dose')->sole();
         $this->assertSame('recorded_under_override', $event->action);
         $this->assertSame($this->override->id, $event->payload['override_id']);
@@ -261,7 +264,22 @@ class ControlledDoseOverrideTest extends TestCase
         $this->assertSame('3.00', $this->stock->fresh()->on_hand);
         $this->assertSame(2, ClientControlledDrugEntry::query()->count());
         $this->assertSame($this->witness->id, (int) ClientControlledDrugEntry::query()->where('entry_type', 'disposal')->sole()->witnessed_by);
-        $this->assertNull(ClientMedicationAdministration::query()->sole()->witness_override_id);
+        $dose = ClientMedicationAdministration::query()->sole();
+        $this->assertNull($dose->witness_override_id);
+        $this->assertSame([$dose->id], ClientControlledDrugEntry::query()->pluck('client_medication_administration_id')->unique()->map(fn ($id) => (int) $id)->all());
+        $migration = require database_path('migrations/2026_10_04_100000_link_controlled_entries_to_administrations.php');
+        try {
+            $migration->down();
+            $this->fail('Populated dose provenance must survive rollback.');
+        } catch (\LogicException $exception) {
+            $this->assertStringContainsString('Cannot remove populated controlled-dose provenance', $exception->getMessage());
+        }
+        $this->assertSame(2, ClientControlledDrugEntry::where('client_medication_administration_id', $dose->id)->count());
+        ClientMedicationAdministration::query()->whereKey($dose->id)->update(['deleted_at' => now()]);
+        foreach (ClientControlledDrugEntry::query()->with('administration')->get() as $entry) {
+            $this->assertSame($dose->id, $entry->administration->id);
+            $this->assertTrue($entry->administration->trashed());
+        }
     }
 
     public function test_active_dose_override_never_bypasses_witnessed_register_counts(): void

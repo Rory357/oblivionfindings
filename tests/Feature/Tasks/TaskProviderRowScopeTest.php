@@ -849,6 +849,7 @@ function taskRbacMatrix(): array
         // Dedicated MedicationTaskProviderScopeTest fixtures cover the six
         // new sources; this cross-module matrix creates none of their work.
         'medication-followup' => ['visible' => [], 'hidden' => []],
+        'medication-effect-source' => ['visible' => [], 'hidden' => []],
         'med_error_action' => ['visible' => [], 'hidden' => []],
         'medication_review' => ['visible' => [], 'hidden' => []],
         'medication_review_change' => ['visible' => [], 'hidden' => []],

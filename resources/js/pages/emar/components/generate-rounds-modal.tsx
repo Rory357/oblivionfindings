@@ -1,3 +1,4 @@
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 /* Generate-rounds modal — first of the eMAR Action-centre accelerators built on
  * the shared Add-Client wizard chrome (MedsWizardDialog + wizard/primitives).
  * Posts to emar.rounds.generate. */
@@ -98,6 +99,10 @@ export function GenerateRoundsModal({
 
     return (
         <MedsWizardDialog
+            formState={{
+                isDirty: date !== defaultDate || scope !== 'today',
+                processing: saving,
+            }}
             open={open}
             onClose={close}
             title="Generate medication rounds"
@@ -120,11 +125,11 @@ export function GenerateRoundsModal({
                     <Field label="Round date" required span>
                         <Label className="sr-only">Round date</Label>
                         {/* eslint-disable-next-line no-restricted-syntax -- native date input; no shadcn date control in the wizard primitives. */}
-                        <input
-                            type="date"
+                        <DatePicker
+                            id="emar-generate-rounds-modal-1"
+                            label="Round date"
                             value={date}
-                            onChange={(e) => setDate(e.target.value)}
-                            className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                            onChange={(value) => setDate(value)}
                         />
                     </Field>
                     <Field

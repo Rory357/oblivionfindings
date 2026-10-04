@@ -231,7 +231,7 @@ export function ErrorDetail({
                     icon={MessageSquareText}
                     title={`${entry.by} · ${formatDateTime(entry.at)}`}
                 >
-                    <p className="whitespace-pre-wrap break-words text-sm">
+                    <p className="text-sm break-words whitespace-pre-wrap">
                         {entry.text}
                     </p>
                     {entry.data.immediate_action ? (
@@ -531,7 +531,10 @@ export function ErrorDetail({
                 }
                 stepIndex={command ? (review ? 1 : 0) : section}
                 onStepClick={(i) => {
-                    if (!saving) command ? setReview(false) : setSection(i);
+                    if (!saving) {
+                        if (command) setReview(false);
+                        else setSection(i);
+                    }
                 }}
                 sequential={!!command}
                 pct={command ? (review ? 100 : 50) : 100}
@@ -722,7 +725,7 @@ export function ErrorDetail({
                                                     <Stage value={e.stage} />
                                                 }
                                             />
-                                            <p className="mt-3 whitespace-pre-wrap break-words text-sm">
+                                            <p className="mt-3 text-sm break-words whitespace-pre-wrap">
                                                 {e.description}
                                             </p>
                                             <ReviewRow
@@ -783,7 +786,7 @@ export function ErrorDetail({
                                         {accounts.length ? (
                                             drawEntries(['reported', 'account'])
                                         ) : (
-                                            <p className="whitespace-pre-wrap break-words text-sm">
+                                            <p className="text-sm break-words whitespace-pre-wrap">
                                                 {e.description}
                                             </p>
                                         )}
@@ -850,7 +853,7 @@ export function ErrorDetail({
                                                         icon={History}
                                                         title="Historical review"
                                                     >
-                                                        <p className="whitespace-pre-wrap break-words">
+                                                        <p className="break-words whitespace-pre-wrap">
                                                             {e.review_notes}
                                                         </p>
                                                         <ReviewRow
@@ -904,7 +907,7 @@ export function ErrorDetail({
                                                     icon={ListChecks}
                                                     title={`Action ${a.id}`}
                                                 >
-                                                    <p className="whitespace-pre-wrap break-words text-sm">
+                                                    <p className="text-sm break-words whitespace-pre-wrap">
                                                         {a.description}
                                                     </p>
                                                     <ReviewRow
@@ -1069,7 +1072,7 @@ export function ErrorDetail({
                                                     'reopened',
                                                     'separate_report',
                                                 ].includes(entry.kind) && (
-                                                    <p className="whitespace-pre-wrap break-words text-sm">
+                                                    <p className="text-sm break-words whitespace-pre-wrap">
                                                         {entry.text}
                                                     </p>
                                                 )}

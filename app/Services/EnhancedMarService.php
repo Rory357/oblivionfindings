@@ -2504,6 +2504,7 @@ class EnhancedMarService
         // Create controlled drug register entry
         $entry = ClientControlledDrugEntry::create([
             'client_id' => $admin->client_id,
+            'client_medication_administration_id' => $admin->id,
             'client_medication_id' => $medication->id,
             'shift_id' => $admin->shift_id,
             'service_context_id' => $admin->service_context_id,
@@ -2533,6 +2534,7 @@ class EnhancedMarService
         $reasonLabel = RecordingContract::AMOUNT_REASONS[(string) $admin->amount_reason] ?? null;
         $waste = ClientControlledDrugEntry::create([
             'client_id' => $admin->client_id,
+            'client_medication_administration_id' => $admin->id,
             'client_medication_id' => $medication->id,
             'shift_id' => $admin->shift_id,
             'service_context_id' => $admin->service_context_id,

@@ -141,6 +141,11 @@ export function resetFrontlineLifecycleReadinessFixtures() {
 
 export function resetMedicationReadinessFixtures() {
     resetFrontlineLifecycleReadinessFixtures();
+    runArtisan([
+        'db:seed',
+        '--class=MedicationReadinessAcceptanceSeeder',
+        '--force',
+    ]);
 }
 
 export function resetJobBoardReadinessFixtures() {

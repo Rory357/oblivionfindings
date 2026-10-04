@@ -110,6 +110,7 @@ export function ControlledChecksContent({
     const q = search.trim().toLowerCase();
     const all = payload.medicines.filter(
         (medicine) =>
+            medicine.count.state !== 'not_applicable' &&
             (!siteId || medicine.site_id === siteId) &&
             (!q ||
                 `${medicine.name} ${medicine.client_name} ${medicine.site_name}`
@@ -139,7 +140,7 @@ export function ControlledChecksContent({
                 disabled:
                     medicine.balance === null
                         ? 'Balance not configured. Record a witnessed receipt first.'
-                        : medicine.can_record
+                        : (medicine.can_count ?? medicine.can_record)
                           ? undefined
                           : (medicine.record_reason ??
                             'You cannot record at this house'),
@@ -265,11 +266,14 @@ export function ControlledChecksContent({
             ))}
             {sites.map((site) => {
                 const siteMedicines = payload.medicines.filter(
-                    (medicine) => medicine.site_id === site.id,
+                    (medicine) =>
+                        medicine.site_id === site.id &&
+                        medicine.count.state !== 'not_applicable',
                 );
                 const eligible = siteMedicines.every(
                     (medicine) =>
-                        medicine.can_record && medicine.balance !== null,
+                        (medicine.can_count ?? medicine.can_record) &&
+                        medicine.balance !== null,
                 );
                 const hasWitness = (
                     payload.witnesses_by_site[String(site.id)] ?? []
@@ -319,7 +323,11 @@ export function ControlledChecksContent({
                                 )
                                     ? 'A balance is not configured for every medicine. Record a witnessed receipt first, then count the medicines at this house.'
                                     : (siteMedicines.find(
-                                          (medicine) => !medicine.can_record,
+                                          (medicine) =>
+                                              !(
+                                                  medicine.can_count ??
+                                                  medicine.can_record
+                                              ),
                                       )?.record_reason ??
                                       'Counts are recorded by permitted staff on shift at this house.')}
                             </p>
@@ -414,8 +422,10 @@ export function ControlledChecksContent({
                                           variant="outline"
                                           className="min-h-11"
                                           disabled={
-                                              !medicine.can_record ||
-                                              medicine.balance === null
+                                              !(
+                                                  medicine.can_count ??
+                                                  medicine.can_record
+                                              ) || medicine.balance === null
                                           }
                                           onClick={(event) => {
                                               event.stopPropagation();

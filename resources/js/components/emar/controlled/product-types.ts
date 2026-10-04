@@ -38,6 +38,7 @@ export interface ControlledMedicine {
     nz_class: 'A' | 'B' | 'C' | null;
     class_review_required: boolean;
     can_record: boolean;
+    can_count?: boolean;
     record_reason?: string | null;
     count: {
         state:
@@ -45,6 +46,7 @@ export interface ControlledMedicine {
             | 'overdue'
             | 'counted'
             | 'next'
+            | 'not_applicable'
             | 'not_configured'
             | 'notConfigured';
         title: string;

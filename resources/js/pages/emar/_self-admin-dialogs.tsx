@@ -351,8 +351,27 @@ export function AssessmentWizardDialog({
         );
     };
     const valid = [!!clientId, true, true, true, confirmed];
+    const draftValues = JSON.stringify([
+        clientId,
+        wishes,
+        people,
+        scores,
+        caps,
+        supports,
+        storage,
+        storageNotes,
+        interval,
+        trigger,
+        risks,
+        confirmed,
+    ]);
+    const [draftBaseline] = useState(draftValues);
     return (
         <MedsWizardDialog
+            formState={{
+                isDirty: draftValues !== draftBaseline,
+                processing: busy,
+            }}
             open
             onClose={onClose}
             title={mode === 'reassess' ? 'Reassessment' : 'New assessment'}
@@ -704,8 +723,14 @@ export function SignAgreementDialog({
             },
         );
     };
+    const draftValues = JSON.stringify([ordering, responsibilities, confirmed]);
+    const [draftBaseline] = useState(draftValues);
     return (
         <MedsWizardDialog
+            formState={{
+                isDirty: draftValues !== draftBaseline,
+                processing: busy,
+            }}
             open
             onClose={onClose}
             title="Self-administration agreement"
@@ -806,8 +831,14 @@ export function MedScopeDialog({
             },
         );
     };
+    const draftValues = JSON.stringify([scopes]);
+    const [draftBaseline] = useState(draftValues);
     return (
         <MedsWizardDialog
+            formState={{
+                isDirty: draftValues !== draftBaseline,
+                processing: busy,
+            }}
             open
             onClose={onClose}
             title="Per-medication scope"

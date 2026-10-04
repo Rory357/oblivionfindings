@@ -302,7 +302,7 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     Route::get('/destructions', [ControlledProductController::class, 'destructions'])
         ->middleware([
             'permission:medications.view',
-            'permission:medications.controlled.view',
+            'permission:medications.controlled.view|medications.stock.update',
         ])
         ->name('emar.destructions');
 

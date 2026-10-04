@@ -174,6 +174,23 @@ const settingsAccess = any(
 export const canOpenEmarReports = reportsView;
 export const canOpenEmarAudit = all(reportsView, auditView);
 
+/** Carry only shared context, never another page's view, status or record action. */
+export function emarScopedHref(href: string, currentUrl: string): string {
+    const target = new URL(href, 'https://emar.invalid');
+    const current = new URL(currentUrl, 'https://emar.invalid');
+    for (const key of ['site_id', 'client_id', 'date']) {
+        const value = current.searchParams.get(key);
+        const valid =
+            value &&
+            (key === 'date'
+                ? /^\d{4}-\d{2}-\d{2}$/.test(value)
+                : /^[1-9]\d*$/.test(value));
+        if (valid && !target.searchParams.has(key))
+            target.searchParams.set(key, value);
+    }
+    return target.pathname + target.search + target.hash;
+}
+
 /** Translate a source page's scope into the canonical report period/filter. */
 export function emarReportsHref(
     reportView: 'standard' | 'audit' | 'exports',
@@ -227,6 +244,34 @@ export const EMAR_HUBS: EmarHub[] = [
                 href: '/meds/today?view=followups',
                 icon: ClipboardList,
                 visible: any(view, administer),
+            },
+            {
+                key: 'asneeded',
+                label: 'As-needed',
+                href: '/meds/today?view=asneeded',
+                icon: Pill,
+                visible: any(view, administer),
+            },
+            {
+                key: 'stockalerts',
+                label: 'Stock alerts',
+                href: '/meds/today?view=stockalerts',
+                icon: Package,
+                visible: any(view, administer),
+            },
+            {
+                key: 'activity',
+                label: 'Activity',
+                href: '/meds/today?view=activity',
+                icon: Activity,
+                visible: any(view, administer),
+            },
+            {
+                key: 'controlled',
+                label: 'Controlled checks',
+                href: '/meds/today?view=controlled',
+                icon: ShieldCheck,
+                visible: controlledView,
             },
         ],
     },
@@ -323,10 +368,24 @@ export const EMAR_HUBS: EmarHub[] = [
         views: [
             {
                 key: 'stock',
-                label: 'Stock & pharmacy',
+                label: 'Stock',
                 href: '/emar/stock',
                 icon: Package,
                 visible: all(view, stockUpdate),
+            },
+            {
+                key: 'orders',
+                label: 'Pharmacy orders',
+                href: '/emar/stock?view=orders',
+                icon: Package,
+                visible: all(view, stockUpdate),
+            },
+            {
+                key: 'discrepancies',
+                label: 'Discrepancies',
+                href: '/emar/controlled?view=discrepancies',
+                icon: OctagonAlert,
+                visible: all(view, controlledView),
             },
             {
                 key: 'controlled',
@@ -348,7 +407,7 @@ export const EMAR_HUBS: EmarHub[] = [
                 label: 'Destructions & returns',
                 href: '/emar/destructions',
                 icon: Ban,
-                visible: all(view, controlledView),
+                visible: all(view, any(controlledView, stockUpdate)),
                 aliases: ['/emar/controlled?view=destructions'],
             },
         ],

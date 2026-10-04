@@ -1,5 +1,7 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import { EmergencyAccessStrip } from '@/components/emar/emergency-access-strip';
+import { EmarViewFilter } from '@/components/emar/workspace-navigation';
 import InputError from '@/components/input-error';
 import { EntityContextMenu, useEntityContextMenu } from '@/components/lists';
 import {
@@ -10,7 +12,6 @@ import {
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
     PageHeaderPrimaryButton,
-    PageHeaderRail,
     PageHeaderSearch,
 } from '@/components/page/page-header';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -294,6 +295,34 @@ export default function AccessPage(props: Props) {
                     }
                     filters={
                         <>
+                            <EmarViewFilter
+                                value={view}
+                                onChange={(value) => selectView(value as View)}
+                                items={[
+                                    {
+                                        id: 'running',
+                                        label: 'Running now',
+                                        icon: Clock,
+                                        badge: props.stats.active,
+                                    },
+                                    ...(props.can_review
+                                        ? [
+                                              {
+                                                  id: 'review',
+                                                  label: 'To review',
+                                                  icon: ShieldAlert,
+                                                  badge: props.stats
+                                                      .awaiting_review,
+                                              },
+                                          ]
+                                        : []),
+                                    {
+                                        id: 'history',
+                                        label: 'History',
+                                        icon: History,
+                                    },
+                                ]}
+                            />
                             <PageHeaderFilterSelect
                                 label="House"
                                 value={String(props.active_site?.id ?? 'all')}
@@ -329,36 +358,7 @@ export default function AccessPage(props: Props) {
                             </PageHeaderFilterButton>
                         </>
                     }
-                    rail={
-                        <PageHeaderRail
-                            value={view}
-                            onSelect={selectView}
-                            items={[
-                                {
-                                    key: 'running',
-                                    label: 'Running now',
-                                    icon: Clock,
-                                    count: props.stats.active,
-                                },
-                                ...(props.can_review
-                                    ? [
-                                          {
-                                              key: 'review' as const,
-                                              label: 'To review',
-                                              icon: ShieldAlert,
-                                              count: props.stats
-                                                  .awaiting_review,
-                                          },
-                                      ]
-                                    : []),
-                                {
-                                    key: 'history',
-                                    label: 'History',
-                                    icon: History,
-                                },
-                            ]}
-                        />
-                    }
+                    rail={<EmarHubRail />}
                 />
                 {view === 'running' &&
                     ownGrants.map((grant) => (
@@ -450,7 +450,7 @@ export default function AccessPage(props: Props) {
                                                 )
                                                     open(grant);
                                             }}
-                                            className="focus-visible:ring-ring cursor-pointer focus-visible:ring-2"
+                                            className="cursor-pointer focus-visible:ring-2 focus-visible:ring-ring"
                                         >
                                             <TableCell>
                                                 <span className="font-medium">
@@ -534,7 +534,7 @@ export default function AccessPage(props: Props) {
                                     <CardContent className="space-y-3 p-4">
                                         <Button
                                             variant="link"
-                                            className="frontline-tap h-auto whitespace-normal p-0"
+                                            className="frontline-tap h-auto p-0 whitespace-normal"
                                             onClick={() => open(grant)}
                                         >
                                             EA-{grant.id} · {grant.client_name}

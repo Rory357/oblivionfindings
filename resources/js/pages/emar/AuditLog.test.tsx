@@ -317,7 +317,7 @@ describe('Medication history server periods and frontline controls', () => {
         for (const control of container.querySelectorAll(
             'button, input, select, a',
         ))
-            expect(control).toHaveClass('frontline-tap');
+            expect(control.className).toMatch(/frontline-(tap|hit)/);
         const actions = screen.getByRole('button', {
             name: 'Actions for Aspirin given to Ada',
         });

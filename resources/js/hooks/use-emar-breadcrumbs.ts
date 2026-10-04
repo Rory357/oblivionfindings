@@ -13,9 +13,9 @@ import type { BreadcrumbItem } from '@/types';
  * (`emarBreadcrumbs` in lib/emar-navigation.ts): Home › Medication › hub ›
  * view, each crumb a page this viewer can open.
  */
-export function useEmarBreadcrumbs(): BreadcrumbItem[] {
+export function useEmarBreadcrumbs(currentUrl?: string): BreadcrumbItem[] {
     const page = usePage<{ auth?: { can?: EmarNavigationPermissions } }>();
-    return emarBreadcrumbs(page.url, page.props.auth?.can);
+    return emarBreadcrumbs(currentUrl ?? page.url, page.props.auth?.can);
 }
 
 /** The trail for a person's medication record (`emarRecordBreadcrumbs`). */

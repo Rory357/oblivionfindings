@@ -14,7 +14,10 @@ test('administration rule readers and writers share a stable rule-set mutex befo
             "MedicationAdminRule::query()\n            ->orderBy('id')\n            ->lockForUpdate()",
         )
         ->and($enhanced)->toContain('requirementsFor($medication, true)')
-        ->and($fleet)->toContain('requirementsFor($medication, true)');
+        ->and($fleet)->toContain(
+            'requiresAdministrationWitness($log, $medication, true)',
+            'requirementsFor($medication, $lockForUpdate)',
+        );
 
     $administration = substr(
         $scope,

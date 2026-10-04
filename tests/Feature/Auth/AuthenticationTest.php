@@ -19,7 +19,7 @@ test('users can authenticate using the login screen', function () {
     ]);
 
     $this->assertAuthenticated();
-    $response->assertRedirect(route('dashboard', absolute: false));
+    $response->assertRedirect(route('my-day', absolute: false));
 });
 
 test('approved unverified users can authenticate and are challenged at verified routes', function () {
@@ -31,7 +31,7 @@ test('approved unverified users can authenticate and are challenged at verified 
     ]);
 
     $this->assertAuthenticatedAs($user);
-    $response->assertRedirect(route('dashboard', absolute: false));
+    $response->assertRedirect(route('my-day', absolute: false));
 
     $this->get(route('dashboard'))
         ->assertRedirect(route('verification.notice'));

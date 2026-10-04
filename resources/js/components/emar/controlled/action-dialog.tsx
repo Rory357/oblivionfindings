@@ -417,7 +417,10 @@ export function ActionDialog({
             if (
                 needsMedicine &&
                 (!medicine ||
-                    (!medicine.can_record && action !== 'class_review'))
+                    (!(action === 'count'
+                        ? (medicine.can_count ?? medicine.can_record)
+                        : medicine.can_record) &&
+                        action !== 'class_review'))
             )
                 result.client_medication_id =
                     'Choose a permitted medicine you can record.';
@@ -787,7 +790,9 @@ export function ActionDialog({
                     name: `${record.name} · ${record.client_name}`,
                     description: `${record.site_name} · ${quantity(record.balance, record.unit)}`,
                     disabled:
-                        !record.can_record && action !== 'class_review'
+                        !(action === 'count'
+                            ? (record.can_count ?? record.can_record)
+                            : record.can_record) && action !== 'class_review'
                             ? (record.record_reason ??
                               'You cannot record at this house')
                             : null,

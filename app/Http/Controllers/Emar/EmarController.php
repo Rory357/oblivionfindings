@@ -45,6 +45,7 @@ use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
 use App\Services\Medication\Alerts\MedicationAlertSources;
 use App\Services\Medication\CompetencyPolicySettings;
+use App\Services\Medication\Controlled\ControlledRegisterService;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Medication\Followups\LegacyEffectFollowupAdapter;
 use App\Services\Medication\Followups\MedicationFollowupService;
@@ -70,6 +71,7 @@ use App\Services\UserSiteAccessService;
 use App\Support\Medication\MedicationStockQuantity;
 use App\Support\WorkerClock;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -3709,12 +3711,19 @@ class EmarController extends Controller
     public function destructions(Request $request)
     {
         $actor = $request->user();
-        abort_unless($actor, 403);
-        $siteFilter = $request->integer('site_id') ?: null;
-        $clientFilter = $request->integer('client_id') ?: null;
+        abort_unless($actor && $actor->canDo('medications.view'), 403);
+        $filters = $request->validate([
+            'site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'],
+            'client_medication_id' => ['nullable', 'integer', 'min:1'], 'date' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+        $siteFilter = isset($filters['site_id']) ? (int) $filters['site_id'] : null;
+        $clientFilter = isset($filters['client_id']) ? (int) $filters['client_id'] : null;
+        $medicineFilter = isset($filters['client_medication_id']) ? (int) $filters['client_medication_id'] : null;
+        $controlledRead = $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY);
+        abort_unless($controlledRead || $actor->canDo(MedicationGovernanceScopeService::STOCK_CAPABILITY), 403);
         $accessibleSiteIds = $this->governanceScope->readerSiteIds(
             $actor,
-            MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
+            $controlledRead ? MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY : MedicationGovernanceScopeService::STOCK_CAPABILITY,
             $siteFilter,
             $clientFilter,
         );
@@ -3723,6 +3732,14 @@ class EmarController extends Controller
             $actor,
             Client::query()->whereIn('site_id', $readerSiteIds)->pluck('id'),
         );
+        abort_if($clientFilter !== null && ! in_array($clientFilter, $openableClientIds, true), 404);
+        if ($medicineFilter !== null) {
+            $medicine = ClientMedication::withTrashed()->whereKey($medicineFilter)
+                ->whereIn('client_id', $openableClientIds)
+                ->when($clientFilter !== null, fn ($q) => $q->where('client_id', $clientFilter))->firstOrFail();
+            abort_if(! $controlledRead && $medicine->controlled_drug, 404);
+        }
+        $dayStart = isset($filters['date']) ? CarbonImmutable::parse($filters['date'], 'Pacific/Auckland')->startOfDay() : null;
 
         // Flat, client-side-filterable disposal register. Voided records remain
         // in the list (struck through) — the register is immutable (MoD Regs 1977).
@@ -3732,6 +3749,10 @@ class EmarController extends Controller
         )
             ->whereIn('client_id', $openableClientIds)
             ->when($clientFilter, fn ($query) => $query->where('client_id', $clientFilter))
+            ->when($medicineFilter !== null, fn ($query) => $query->where('client_medication_id', $medicineFilter))
+            ->when($dayStart !== null, fn ($query) => $query->where('destroyed_at', '>=', $dayStart->utc())->where('destroyed_at', '<', $dayStart->addDay()->utc()))
+            ->when(! $controlledRead, fn ($query) => $query->where('is_controlled_drug', false)
+                ->whereDoesntHave('medication', fn ($med) => $med->withTrashed()->where('controlled_drug', true)))
             ->with([
                 'client:id,first_name,last_name,site_id',
                 'client.site:id,name',
@@ -3751,6 +3772,8 @@ class EmarController extends Controller
             ->whereHas('client', fn ($client) => $client->whereIn('site_id', $readerSiteIds))
             ->whereIn('client_id', $openableClientIds)
             ->when($clientFilter, fn ($query) => $query->where('client_id', $clientFilter))
+            ->when($medicineFilter !== null, fn ($query) => $query->whereKey($medicineFilter))
+            ->when(! $controlledRead, fn ($query) => $query->where('controlled_drug', false))
             ->with(['client:id,first_name,last_name', 'stock'])
             ->orderBy('name')
             ->get();
@@ -3759,6 +3782,7 @@ class EmarController extends Controller
         $activeSite = $siteFilter ? $sites->firstWhere('id', $siteFilter) : null;
 
         return Inertia::render('emar/Destructions', [
+            'filters' => ['site_id' => $siteFilter, 'client_id' => $clientFilter, 'client_medication_id' => $medicineFilter, 'date' => $filters['date'] ?? null],
             'can_record' => $request->user()?->canDo('medications.controlled.record') ?? false,
             'destructions' => $destructions->map(fn (MedicationDestruction $d) => [
                 'id' => $d->id,
@@ -3805,8 +3829,9 @@ class EmarController extends Controller
                     'unit' => $m->stock->unit,
                 ] : null,
             ])->values(),
-            'staff' => $this->governanceScope->controlledWitnessPicker($accessibleSiteIds, $actor->id),
-            'clients' => $this->governanceScope->clientPicker($accessibleSiteIds),
+            'staff' => $actor->canDo('medications.controlled.record') ? $this->governanceScope->controlledWitnessPicker($accessibleSiteIds, $actor->id) : [],
+            'clients' => Client::query()->whereIn('id', $openableClientIds)->get(['id', 'first_name', 'last_name', 'site_id'])
+                ->map(fn ($client) => ['id' => $client->id, 'name' => $client->full_name, 'site_id' => $client->site_id])->values(),
             'sites' => $sites->map(fn (Site $site) => $site->only(['id', 'name']))->values(),
             'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
             'site_brand_colour' => $activeSite?->brand_colour,
@@ -6296,7 +6321,7 @@ class EmarController extends Controller
 
     // ─── Destructions CRUD ──────────────────────────────────
 
-    public function storeDestruction(Request $request)
+    public function storeDestruction(Request $request, bool $ordinaryOnly = false)
     {
         $this->assertMedicationCapability($request, 'medications.controlled.record');
 
@@ -6345,8 +6370,10 @@ class EmarController extends Controller
             ClientMedication $medication,
             User $lockedActor,
             Collection $lockedWitnessUsers,
-        ) use ($request, $rules, $actor, $witnessEffectiveAt) {
+        ) use ($request, $rules, $actor, $witnessEffectiveAt, $ordinaryOnly) {
             $actor = $lockedActor;
+            // The compatibility dispatch cannot admit an order whose classification changed under lock.
+            abort_if($ordinaryOnly && $medication->controlled_drug, 404);
             if ((bool) $medication->controlled_drug) {
                 abort_unless(
                     $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)
@@ -7212,8 +7239,9 @@ class EmarController extends Controller
                 ], JSON_THROW_ON_ERROR));
 
                 // An exact replay is still a controlled-drug action: recheck
-                // the current in-person witness authority and credential before
-                // returning the durable result.
+                // the recorder's presence and the current in-person witness
+                // authority and credential before returning the durable result.
+                app(ControlledRegisterService::class)->assertPresent($lockedActor, (int) $client->site_id, true);
                 $witness = $this->governanceScope->confirmedControlledWitness(
                     $lockedActor,
                     $client,
@@ -8541,6 +8569,9 @@ class EmarController extends Controller
             $actor,
             $destruction,
             function (Client $client, ?ClientMedication $medication, MedicationDestruction $lockedDestruction) use ($request, $actor) {
+                $this->recordAccess()->assertReadable($actor, $client);
+                abort_if(($lockedDestruction->is_controlled_drug || $medication?->controlled_drug)
+                    && ! $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY), 404);
                 $validated = $request->validate([
                     'void_reason' => 'required|string|max:1000',
                 ]);
