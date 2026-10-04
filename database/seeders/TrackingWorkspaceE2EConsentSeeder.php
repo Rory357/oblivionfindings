@@ -43,9 +43,9 @@ final class TrackingWorkspaceE2EConsentSeeder extends Seeder
                 || ! $client->site?->is_active
                 || $client->site->archived
                 || $recorder->email !== 'admin@demo.test'
-                || $type->name !== 'Asset Location Tracking (Safety)'
-                || $type->purpose !== 'Personal safety location tracking'
-                || $type->legal_basis !== 'consent'
+                || $type->name !== 'Personal Tracker (Wandering Risk)'
+                || trim((string) $type->purpose) === ''
+                || trim((string) $type->legal_basis) === ''
                 || ! $type->active
                 || ! is_numeric($type->version)
                 || (int) $type->version < 1) {

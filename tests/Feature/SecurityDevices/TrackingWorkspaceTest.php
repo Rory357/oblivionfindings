@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Services\PersonalTrackingPrivacyService;
 use App\Models\Asset;
 use App\Models\AssetGeofence;
 use App\Models\AssetTracker;
@@ -18,9 +19,11 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ConsentValidationService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
 
@@ -659,10 +662,69 @@ class TrackingWorkspaceTest extends TestCase
         ]);
     }
 
+    public function test_generic_tracking_consent_preserves_specialist_access_without_advertising_resident_location_authority(): void
+    {
+        $site = $this->site('Generic tracking purpose boundary');
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        $type = ConsentType::factory()->create([
+            'name' => 'Asset Location Tracking (Safety)', 'purpose' => 'Personal safety location tracking',
+            'legal_basis' => 'consent', 'active' => true,
+        ]);
+        $consent = AuthoritativeConsentFixture::manualSelf($client, $type, $this->admin);
+        $device = $this->trackingDevice('Generic safety pendant', [
+            'category' => 'personal_tracker', 'latitude' => -36.8485, 'longitude' => 174.7633,
+            'meta' => ['private_location_envelope' => 'GENERIC-PRIVATE-PROVIDER-EVIDENCE'],
+        ]);
+        $this->assign($device, DeviceAssignment::TARGET_CLIENT, $client->id, $consent->id);
+        $assignment = DeviceAssignment::query()->where('device_id', $device->id)->sole();
+        $privacy = app(PersonalTrackingPrivacyService::class);
+        $this->assertTrue(ConsentValidationService::isValidTrackingConsent($consent, $client));
+        $this->assertFalse(ConsentValidationService::isValidResidentLocationConsent($consent, $client));
+        $this->assertTrue($privacy->assignmentAuthorisesClient($assignment, $client));
+        $this->assertFalse($privacy->assignmentAuthorisesResidentLocation($assignment, $client));
+        $records = collect([$site, $client, $type, $consent, $device, $assignment, $consent->consentTypeVersion]);
+        $before = $records->map(fn ($record) => $record->refresh()->getRawOriginal())->all();
+        $counts = collect(['client_consents', 'consent_type_versions', 'device_assignments', 'permission_user', 'role_user'])
+            ->mapWithKeys(fn (string $table): array => [$table => DB::table($table)->count()])->all();
+
+        $this->actingAs($this->admin)->get('/security-devices/tracking?tab=personal-safety')
+            ->assertOk()->assertInertia(function ($page) use ($device): void {
+                $props = $page->toArray()['props'];
+                $rows = collect($props['trackingWorkspace']['activeTab']['devices']);
+                $this->assertCount(1, $rows);
+                $row = $rows->sole();
+                $this->assertSame($device->id, $row['id']);
+                $this->assertSame('active', $row['privacy']['state']);
+                $this->assertTrue($row['privacy']['locationAllowed']);
+                $this->assertSame(-36.8485, $row['location']['latitude']);
+                $this->assertSame(174.7633, $row['location']['longitude']);
+                $this->assertNull($row['canonicalHref']);
+                $this->assertNull($row['historyHref']);
+                $this->assertSame(
+                    'Consent is active for this tracking purpose. Client location requires personal tracker consent.',
+                    $row['privacy']['reason'],
+                );
+                $this->assertStringNotContainsString('GENERIC-PRIVATE-PROVIDER-EVIDENCE', json_encode($props, JSON_THROW_ON_ERROR));
+            });
+        $this->get("/operations/clients/{$client->id}?tab=location")
+            ->assertOk()->assertInertia(fn ($page) => $page
+            ->where('location.trackingRestricted', true)
+            ->where('location.tracker', null)
+            ->where('location.currentLocation', null)
+            ->where('location.trackingConsent', null)
+            ->where('location.canManage', false));
+        $this->getJson("/operations/clients/{$client->id}/location/privacy-status")
+            ->assertOk()->assertJsonPath('active', false)->assertJsonPath('access_fingerprint', null);
+        $this->assertSame($before, $records->map(fn ($record) => $record->fresh()->getRawOriginal())->all());
+        foreach ($counts as $table => $count) {
+            $this->assertDatabaseCount($table, $count);
+        }
+    }
+
     private function trackingConsent(Client $client, array $attributes = []): ClientConsent
     {
         $type = ConsentType::factory()->create([
-            'name' => 'Asset Location Tracking (Safety)',
+            'name' => 'Personal Tracker (Wandering Risk)',
             'category' => 'privacy',
             'purpose' => 'Personal safety location tracking',
             'legal_basis' => 'consent',

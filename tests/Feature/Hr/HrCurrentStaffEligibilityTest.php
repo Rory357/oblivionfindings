@@ -4,9 +4,14 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Validator;
 
 uses(RefreshDatabase::class);
+
+afterEach(function () {
+    $this->travelBack();
+});
 
 /** @return array{0: User, 1: HrEmployeeProfile} */
 function currentStaffFixture(array $profileOverrides = [], array $userOverrides = []): array
@@ -35,11 +40,13 @@ function currentStaffFixture(array $profileOverrides = [], array $userOverrides 
 }
 
 test('current recipient eligibility requires approved staff with a live employment profile', function () {
+    $this->travelTo(Carbon::parse('2026-10-04 12:00:00', 'UTC'));
+    $workerNow = Carbon::now(config('app.worker_timezone', 'Pacific/Auckland'));
     [$current] = currentStaffFixture();
     [$unapproved] = currentStaffFixture([], ['approved_at' => null]);
     [$inactive] = currentStaffFixture(['is_active' => false]);
-    [$ended] = currentStaffFixture(['end_date' => now()->subDay()->toDateString()]);
-    [$future] = currentStaffFixture(['start_date' => now()->addDay()->toDateString()]);
+    [$ended] = currentStaffFixture(['end_date' => $workerNow->copy()->subDay()->toDateString()]);
+    [$future] = currentStaffFixture(['start_date' => $workerNow->copy()->addDay()->toDateString()]);
     [$portal] = currentStaffFixture([], ['role' => 'client']);
     [$family] = currentStaffFixture([], ['role' => 'next_of_kin']);
     $missingProfile = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);

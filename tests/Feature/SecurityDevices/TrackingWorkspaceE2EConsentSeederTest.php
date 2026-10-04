@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\ConsentValidationService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
+use Database\Seeders\StandardConsentTypesSeeder;
 use Database\Seeders\TrackingWorkspaceE2EConsentSeeder;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\AuthoritativeConsentFixture;
@@ -26,10 +27,13 @@ beforeEach(function () {
     ]);
     $this->trackingAdmin->roles()->attach(Role::query()->where('name', 'admin')->sole());
     $this->trackingSite = Site::factory()->create(['is_active' => true, 'archived' => false]);
-    $this->trackingType = ConsentType::factory()->create([
-        'name' => 'Asset Location Tracking (Safety)',
-        'purpose' => 'Personal safety location tracking',
-        'legal_basis' => 'consent', 'active' => true, 'version' => 1,
+    $this->seed(StandardConsentTypesSeeder::class);
+    $this->trackingType = ConsentType::query()->where('name', 'Personal Tracker (Wandering Risk)')->sole();
+    $this->trackingVersion = ConsentTypeVersion::query()->create([
+        'consent_type_id' => $this->trackingType->id, 'version' => (int) $this->trackingType->version,
+        'description' => $this->trackingType->description, 'purpose' => $this->trackingType->purpose,
+        'legal_basis' => $this->trackingType->legal_basis, 'effective_from' => now()->subDays(2),
+        'created_by' => $this->trackingAdmin->id,
     ]);
     $this->trackingActive = Client::factory()->create([
         'site_id' => $this->trackingSite->id, 'status' => 'active', 'user_id' => null,
@@ -79,7 +83,7 @@ it('repairs the exact legacy synthetic self-decisions while preserving withdrawn
     $stopped = trackingE2EAssignment($this->trackingActive, $legacy, 'Already stopped legacy pendant');
     expect($stopped->collection_stop_reason)->toBe('consent_not_active');
     $stoppedBefore = $stopped->refresh()->getRawOriginal();
-    $unchanged = collect([$this->trackingActive, $this->trackingWithdrawn, $this->trackingAdmin, $this->trackingType]);
+    $unchanged = collect([$this->trackingActive, $this->trackingWithdrawn, $this->trackingAdmin, $this->trackingType, $this->trackingVersion]);
     $before = $unchanged->map(fn ($record) => $record->refresh()->getRawOriginal())->all();
     $roleCount = DB::table('role_user')->count();
     $overrideCount = DB::table('permission_user')->count();
@@ -97,6 +101,9 @@ it('repairs the exact legacy synthetic self-decisions while preserving withdrawn
         ->and($active->decision_evidence['decision_actor_kind'])->toBe('identified_client_self')
         ->and($active->decision_evidence['recorder_user_id'])->toBe($this->trackingAdmin->id)
         ->and(ConsentValidationService::isValidTrackingConsent($active, $this->trackingActive))->toBeTrue()
+        ->and(ConsentValidationService::isValidResidentLocationConsent($active, $this->trackingActive))->toBeTrue()
+        ->and($active->consent_type_version_id)->toBe($this->trackingVersion->id)
+        ->and($active->decision_purpose)->toBe($this->trackingVersion->purpose)
         ->and(ConsentValidationService::isValidTrackingConsent($withdrawn, $this->trackingWithdrawn))->toBeFalse()
         ->and($current->isCollectionActive())->toBeTrue()
         ->and($withdrawnAssignment->collection_stop_reason)->toBe('consent_withdrawn')
@@ -130,6 +137,29 @@ it('repairs the exact legacy synthetic self-decisions while preserving withdrawn
                 ->and($stoppedRow['location'])->toBeNull()
                 ->and(json_encode($props, JSON_THROW_ON_ERROR))->not->toContain('PW-RAW-TRACKING-MUST-NOT-RENDER');
         });
+    $this->actingAs($this->trackingAdmin)
+        ->get("/operations/clients/{$this->trackingActive->id}?tab=location")
+        ->assertOk()->assertInertia(fn ($page) => $page
+        ->where('location.trackingRestricted', false)
+        ->where('location.tracker.id', $current->device_id)
+        ->where('location.tracker.detail_url', '/security-devices/devices/'.$current->device_id)
+        ->where('location.tracker.tracking_workspace_url', '/security-devices/tracking?tab=personal-safety')
+        ->where('location.trackingConsent.status', 'given')
+        ->where('location.accessFingerprint', fn ($value): bool => is_string($value) && $value !== ''));
+    $this->getJson("/operations/clients/{$this->trackingActive->id}/location/privacy-status")
+        ->assertOk()->assertJsonPath('active', true)
+        ->assertJsonStructure(['access_fingerprint', 'retention_days']);
+    $this->get("/operations/clients/{$this->trackingWithdrawn->id}?tab=location")
+        ->assertOk()->assertInertia(fn ($page) => $page
+        ->where('location.trackingRestricted', true)
+        ->where('location.tracker', null)
+        ->where('location.currentLocation', null)
+        ->where('location.trackingConsent', null)
+        ->where('location.canManage', false));
+    $this->getJson("/operations/clients/{$this->trackingWithdrawn->id}/location/privacy-status")
+        ->assertOk()->assertJsonPath('active', false)->assertJsonPath('access_fingerprint', null);
+    expect($stopped->fresh()->getRawOriginal())->toBe($stoppedBefore)
+        ->and($unchanged->map(fn ($record) => $record->fresh()->getRawOriginal())->all())->toBe($before);
 });
 
 it('replays the marked decisions without replacing unrelated evidence or writing permissions', function () {
@@ -159,6 +189,11 @@ it('rejects foreign identities purposes and decision status without any evidence
     $status = 'given';
     if ($invalid === 'foreign client') {
         $client = Client::factory()->create(['site_id' => $this->trackingSite->id]);
+    } elseif ($invalid === 'generic tracking type') {
+        $type = ConsentType::factory()->create([
+            'name' => 'Asset Location Tracking (Safety)', 'purpose' => 'Personal safety location tracking',
+            'legal_basis' => 'consent', 'active' => true,
+        ]);
     } elseif ($invalid === 'wrong purpose') {
         $type->update(['purpose' => 'Unrelated location purpose']);
     } elseif ($invalid === 'wrong status') {
@@ -178,7 +213,7 @@ it('rejects foreign identities purposes and decision status without any evidence
         ->toThrow(InvalidArgumentException::class)
         ->and($records->map(fn ($record) => $record->refresh()->getRawOriginal())->all())->toBe($before)
         ->and(trackingE2EConsentCounts())->toBe($counts);
-})->with(['foreign client', 'wrong purpose', 'wrong status', 'withdrawn cannot be active', 'foreign recorder', 'archived site']);
+})->with(['foreign client', 'generic tracking type', 'wrong purpose', 'wrong status', 'withdrawn cannot be active', 'foreign recorder', 'archived site']);
 
 it('refuses to overwrite an existing substitute decision', function () {
     $existing = ClientConsent::query()->create([

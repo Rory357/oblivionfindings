@@ -298,7 +298,15 @@ class TrackingWorkspacePresenter
         $location = $privacy['locationAllowed']
             ? $this->location($device, $asset, $group)
             : null;
-        $canonicalHref = $privacy['locationAllowed']
+        $destinationAllowed = $privacy['locationAllowed'];
+        if ($destinationAllowed && $group === 'personal-safety' && $client) {
+            $destinationAllowed = $assignment !== null
+                && $this->trackingPrivacy->assignmentAuthorisesResidentLocation($assignment, $client);
+            if (! $destinationAllowed) {
+                $privacy['reason'] = 'Consent is active for this tracking purpose. Client location requires personal tracker consent.';
+            }
+        }
+        $canonicalHref = $destinationAllowed
             ? $this->canonicalHref($group, $client, $staff, $session, $asset)
             : null;
 

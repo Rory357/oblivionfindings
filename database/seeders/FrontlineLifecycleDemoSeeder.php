@@ -1031,6 +1031,10 @@ class FrontlineLifecycleDemoSeeder extends Seeder
 
     private function seedActiveChecklistShift(User $worker, User $admin, Client $client, ServiceContext $serviceContext): void
     {
+        // These two named checklist personas do person work under the ordinary
+        // assigned-client policy, as well as having current access to the Site.
+        $client->supportWorkers()->syncWithoutDetaching([$worker->id]);
+
         $startsAt = Carbon::now()->subHours(2)->startOfMinute();
         $endsAt = Carbon::now()->addHours(6)->startOfMinute();
         $shift = $this->upsertPlaywrightShift(

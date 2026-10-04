@@ -11,6 +11,8 @@ use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Notifications\BoardPackPublishedNotification;
 use App\Domain\Governance\Notifications\PreReadReminderNotification;
 use App\Domain\Governance\Services\BoardPackAccessService;
+use App\Domain\Governance\Services\BoardPackBuilderService;
+use App\Domain\Governance\Services\GovernanceRecordAccessService;
 use App\Models\AuditLog;
 use App\Models\Permission;
 use App\Models\User;
@@ -877,6 +879,10 @@ class GovernanceBoardPacksTest extends TestCase
             $permissionIds->mapWithKeys(fn ($id) => [(int) $id => ['allowed' => true]])->all(),
         );
 
+        $this->assertTrue($viewer->canDo('reports.viewAny'));
+        $this->assertFalse($viewer->canDo('medications.reports.view'));
+        $this->assertFalse($viewer->canDo('medications.controlled.view'));
+
         $this->actingAs($manager);
         $pack = $this->createTestPack(
             $manager,
@@ -920,6 +926,10 @@ class GovernanceBoardPacksTest extends TestCase
 
         $reportsResponse = $this->actingAs($viewer)->get('/reports');
         $reportsResponse->assertOk();
+        $this->assertArrayNotHasKey('missedMeds7d', $reportsResponse->inertiaProps('kpis'));
+        $this->assertArrayNotHasKey('openDiscrepancies', $reportsResponse->inertiaProps('kpis'));
+        $this->assertFalse(collect($reportsResponse->inertiaProps('modules'))->contains('key', 'medication_administrations'));
+        $this->assertFalse(collect($reportsResponse->inertiaProps('modules'))->contains('key', 'controlled_drug_discrepancies'));
         $this->assertSame(1, $reportsResponse->inertiaProps('kpis.auditEvents7d'));
         $auditModule = collect($reportsResponse->inertiaProps('modules'))->firstWhere('key', 'audit_logs');
         $this->assertSame(1, data_get($auditModule, 'summary.total_records'));
@@ -1018,7 +1028,7 @@ class GovernanceBoardPacksTest extends TestCase
             'scheduled_at' => now(),
         ]);
 
-        $builder = app(\App\Domain\Governance\Services\BoardPackBuilderService::class);
+        $builder = app(BoardPackBuilderService::class);
         $this->actingAs($admin);
         $packV1 = $builder->build($meeting);
         $packV2 = $builder->regenerate($packV1);
@@ -1041,7 +1051,7 @@ class GovernanceBoardPacksTest extends TestCase
         $member = $this->createBoardMember($memberUser);
         $meeting = $this->createMeeting($admin);
 
-        $builder = app(\App\Domain\Governance\Services\BoardPackBuilderService::class);
+        $builder = app(BoardPackBuilderService::class);
         $this->actingAs($admin);
         $packV1 = $builder->build($meeting);
         $builder->distribute($packV1, [$member->id]);
@@ -1081,7 +1091,7 @@ class GovernanceBoardPacksTest extends TestCase
         $member = $this->createBoardMember($memberUser);
         $meeting = $this->createMeeting($admin);
 
-        $builder = app(\App\Domain\Governance\Services\BoardPackBuilderService::class);
+        $builder = app(BoardPackBuilderService::class);
         $this->actingAs($admin);
         $pack = $builder->build($meeting);
         $builder->distribute($pack, [$member->id]);
@@ -1179,7 +1189,7 @@ class GovernanceBoardPacksTest extends TestCase
         ]));
         $this->assertSame($safeId, (int) $safe->id);
 
-        $recordAccess = app(\App\Domain\Governance\Services\GovernanceRecordAccessService::class);
+        $recordAccess = app(GovernanceRecordAccessService::class);
         $this->assertFalse($recordAccess->canViewResolution($member, $hidden->fresh()));
         $this->assertTrue($recordAccess->canViewResolution($member, $safe->fresh()));
 
