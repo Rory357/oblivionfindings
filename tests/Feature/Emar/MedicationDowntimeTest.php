@@ -3,12 +3,16 @@
 namespace Tests\Feature\Emar;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\BreakGlassAccessEvent;
 use App\Models\Client;
+use App\Models\ClientBreakGlassAccess;
 use App\Models\ClientMedicalProfile;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\ClientMedicationStock;
 use App\Models\MedicationAdminRule;
 use App\Models\MedicationCompetencyAssessment;
+use App\Models\MedicationDoseSlot;
 use App\Models\MedicationDowntime;
 use App\Models\MedicationEvent;
 use App\Models\MedicationPaperEntry;
@@ -24,9 +28,11 @@ use App\Services\Medication\Downtime\DowntimePackService;
 use App\Services\Medication\Downtime\DowntimeService;
 use App\Services\Medication\Downtime\PaperAdministrationWriter;
 use App\Services\Medication\Downtime\PaperEntryService;
+use App\Services\Medication\EmergencyAccess\EmergencyAccessService;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -34,8 +40,8 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use LogicException;
 use Mockery;
-use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Tests\TestCase;
 
 class MedicationDowntimeTest extends TestCase
@@ -319,8 +325,9 @@ class MedicationDowntimeTest extends TestCase
     }
 
     #[DataProvider('nonGivenPaperOutcomes')]
-    public function test_non_given_mapping_retains_paper_reason_without_given_only_fields_or_clinical_posting(string $outcome): void
+    public function test_non_given_mapping_retains_paper_reason_without_given_only_fields_and_requires_explicit_posting(string $outcome): void
     {
+        $this->coveringAuthority();
         $downtime = $this->declare();
         $target = $downtime->doses()->where('client_medication_id', $this->order->id)->firstOrFail();
         $entry = $this->capture($downtime, ['downtime_dose_id' => $target->id, 'outcome' => $outcome, 'dose_on_paper' => null,
@@ -333,10 +340,283 @@ class MedicationDowntimeTest extends TestCase
             $this->assertArrayNotHasKey($key, $facts);
         }
         $preview = app(PaperEntryService::class)->reconciliationPreview($this->lead, $downtime, $entry);
-        $this->assertFalse($preview['can_reconcile']);
-        $this->assertStringContainsString('canonical historical non-given adapter', $preview['unavailable']);
+        $this->assertTrue($preview['can_reconcile']);
+        $this->assertNull($preview['unavailable']);
         $this->assertDatabaseCount('client_medication_administrations', 0);
         $this->assertDatabaseCount('medication_paper_postings', 0);
+    }
+
+    #[DataProvider('nonGivenPaperOutcomes')]
+    public function test_confirmed_historical_non_given_outcome_posts_once_without_stock_or_inferred_clinical_values(string $outcome): void
+    {
+        $shift = $this->coveringAuthority();
+        $stock = ClientMedicationStock::query()->create(['client_medication_id' => $this->order->id, 'on_hand' => 12, 'unit' => 'tablets']);
+        $stockBefore = $stock->fresh()->getRawOriginal();
+        $downtime = $this->declare();
+        $entry = $this->capture($downtime, ['outcome' => $outcome, 'dose_on_paper' => null,
+            'notes' => 'Exact signed paper explanation; no cause category recorded.', 'observations' => ['blood_glucose_level' => 4.2]]);
+        $paperBefore = $entry->fresh()->getRawOriginal();
+        // The completed, actual assignment covers the original paper instant.
+        // Posting two days later records the true entry time without changing it.
+        Carbon::setTestNow(Carbon::parse('2026-10-05 12:00', 'Pacific/Auckland')->utc());
+        $service = app(PaperEntryService::class);
+        $preview = $service->reconciliationPreview($this->lead, $downtime, $entry);
+        $this->assertTrue($preview['can_reconcile']);
+        $result = $service->reconcile($this->lead, $downtime, $entry, $preview['preview_token']);
+        $this->assertTrue($result['success'], json_encode($result));
+        $administration = ClientMedicationAdministration::query()->sole();
+        $this->assertSame($entry->given_by, $administration->administered_by);
+        $this->assertSame($shift->id, $administration->shift_id);
+        $this->assertSame($outcome, $administration->status);
+        $this->assertSame($outcome, $administration->reason_code);
+        $this->assertSame($entry->notes, $administration->reason);
+        $this->assertTrue($administration->administered_at->equalTo($entry->given_at));
+        $this->assertTrue($administration->scheduled_for->equalTo($entry->scheduled_for));
+        $this->assertTrue($administration->created_at->equalTo(now()));
+        foreach (['dose_given', 'quantity_given', 'amount_mode', 'blood_glucose_level', 'witnessed_by', 'witnessed_at', 'witness_method', 'second_person_kind'] as $field) {
+            $this->assertNull($administration->getAttribute($field), $field.' must not be inferred from a non-given paper outcome.');
+        }
+        $this->assertSame($paperBefore, $entry->fresh()->getRawOriginal());
+        $this->assertSame($stockBefore, $stock->fresh()->getRawOriginal());
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $this->assertDatabaseCount('medication_stock_movements', 0);
+        $this->assertDatabaseCount('medication_refusal_followups', 0);
+        $target = $downtime->doses()->whereKey($entry->downtime_dose_id)->firstOrFail();
+        $slot = MedicationDoseSlot::query()->findOrFail($target->dose_slot_id);
+        $this->assertSame($outcome, $slot->outcome);
+        $this->assertSame($administration->id, $slot->outcome_administration_id);
+        $this->assertDatabaseHas('medication_paper_postings', ['paper_entry_id' => $entry->id, 'administration_id' => $administration->id, 'posted_by' => $this->lead->id]);
+        $this->assertSame(1, MedicationEvent::query()->where('kind', 'downtime.paper_reconciled')->count());
+        $this->assertSame(1, DB::table('medication_idempotency_results')->where('scope', 'administration.record')->count());
+
+        $replay = $service->reconcile($this->lead, $downtime, $entry, $preview['preview_token']);
+        $this->assertTrue($replay['duplicate']);
+        $this->assertSame($administration->id, $replay['administration_id']);
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+        $this->assertDatabaseCount('medication_paper_postings', 1);
+        $this->assertSame(1, MedicationEvent::query()->where('kind', 'downtime.paper_reconciled')->count());
+        $this->assertSame($stockBefore, $stock->fresh()->getRawOriginal());
+
+        // A corrected assignment no longer covers the original actor. Keep
+        // the completed Shift and its actual times; cancellation is invalid.
+        $shift->forceFill(['user_id' => User::factory()->create(['approved_at' => now()])->id])->save();
+        $deniedReplay = $service->reconcile($this->lead, $downtime, $entry, $preview['preview_token']);
+        $this->assertFalse($deniedReplay['success']);
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+        $this->assertDatabaseCount('medication_paper_postings', 1);
+    }
+
+    public static function paperAuthorities(): array
+    {
+        return ['completed assignment' => ['assignment'], 'usable emergency grant' => ['grant']];
+    }
+
+    #[DataProvider('paperAuthorities')]
+    public function test_final_paper_posting_event_failure_rolls_back_clinical_slot_receipt_posting_and_grant_use_then_retry_succeeds(string $authority): void
+    {
+        $grant = $authority === 'grant' ? $this->usableEmergencyAuthority() : null;
+        if ($grant === null) {
+            $this->coveringAuthority();
+        }
+        $downtime = $this->declare();
+        $entry = $this->capture($downtime, ['outcome' => 'withheld', 'dose_on_paper' => null]);
+        $service = app(PaperEntryService::class);
+        $preview = $service->reconciliationPreview($this->lead, $downtime, $entry);
+        $eventsBefore = MedicationEvent::query()->count();
+        $realEvents = app(DowntimeEvents::class);
+        $failing = Mockery::mock(DowntimeEvents::class);
+        $failing->shouldReceive('record')->once()->andThrow(new \RuntimeException('Synthetic final reconciliation failure'));
+        $this->app->instance(DowntimeEvents::class, $failing);
+        $this->app->forgetInstance(PaperEntryService::class);
+        try {
+            app(PaperEntryService::class)->reconcile($this->lead, $downtime, $entry, $preview['preview_token']);
+            $this->fail('The final paper event is part of the same transaction.');
+        } catch (\RuntimeException $error) {
+            $this->assertSame('Synthetic final reconciliation failure', $error->getMessage());
+        }
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertDatabaseCount('medication_paper_postings', 0);
+        $this->assertSame(0, DB::table('medication_idempotency_results')->where('scope', 'administration.record')->count());
+        $this->assertSame($eventsBefore, MedicationEvent::query()->count());
+        $this->assertSame(0, BreakGlassAccessEvent::query()->where('action', 'reconciled_paper_outcome')->count());
+        $target = $downtime->doses()->whereKey($entry->downtime_dose_id)->firstOrFail();
+        $this->assertNull(MedicationDoseSlot::query()->findOrFail($target->dose_slot_id)->outcome);
+        $this->assertDatabaseHas('medication_paper_confirmations', ['paper_entry_id' => $entry->id, 'kind' => 'giver']);
+        $this->app->instance(DowntimeEvents::class, $realEvents);
+        $this->app->forgetInstance(PaperEntryService::class);
+        $this->assertTrue(app(PaperEntryService::class)->reconcile($this->lead, $downtime, $entry, $preview['preview_token'])['success']);
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+        $this->assertDatabaseCount('medication_paper_postings', 1);
+        $this->assertSame($grant ? 1 : 0, BreakGlassAccessEvent::query()->where('action', 'reconciled_paper_outcome')->count());
+        if ($grant) {
+            $this->assertDatabaseHas('break_glass_access_events', ['break_glass_access_id' => $grant->id, 'action' => 'reconciled_paper_outcome']);
+        }
+    }
+
+    public function test_historical_paper_outcome_records_one_emergency_grant_use_and_rechecks_it_on_replay(): void
+    {
+        $grant = $this->usableEmergencyAuthority();
+        $grantBefore = $grant->fresh()->getRawOriginal();
+        $downtime = $this->declare();
+        $entry = $this->capture($downtime, ['outcome' => 'refused', 'dose_on_paper' => null]);
+        $service = app(PaperEntryService::class);
+        $preview = $service->reconciliationPreview($this->lead, $downtime, $entry);
+        $this->assertTrue($preview['can_reconcile']);
+        $result = $service->reconcile($this->lead, $downtime, $entry, $preview['preview_token']);
+        $this->assertTrue($result['success'], json_encode($result));
+        $administration = ClientMedicationAdministration::query()->sole();
+        $this->assertNull($administration->shift_id);
+        $this->assertSame($entry->request_uuid, $administration->client_request_uuid);
+        $use = BreakGlassAccessEvent::query()->where('action', 'reconciled_paper_outcome')->sole();
+        $this->assertSame($grant->id, $use->break_glass_access_id);
+        $this->assertSame('Paper entry '.$entry->id.'; refused', $use->detail);
+        $this->assertSame($grantBefore, $grant->fresh()->getRawOriginal());
+        $replay = $service->reconcile($this->lead, $downtime, $entry, $preview['preview_token']);
+        $this->assertTrue($replay['duplicate']);
+        $this->assertSame($administration->id, $replay['administration_id']);
+        $this->assertSame(1, BreakGlassAccessEvent::query()->where('action', 'reconciled_paper_outcome')->count());
+        $this->assertSame(1, MedicationEvent::query()->where('kind', 'downtime.paper_reconciled')->count());
+        app(EmergencyAccessService::class)->end($this->lead, $grant);
+        $this->assertFalse($service->reconcile($this->lead, $downtime, $entry, $preview['preview_token'])['success']);
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+        $this->assertDatabaseCount('medication_paper_postings', 1);
+        $this->assertSame(1, BreakGlassAccessEvent::query()->where('action', 'reconciled_paper_outcome')->count());
+        $this->assertDatabaseCount('medication_stock_movements', 0);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+    }
+
+    public function test_paper_reconciliation_locks_recording_shifts_and_rules_before_any_authorization_user(): void
+    {
+        $this->coveringAuthority();
+        $downtime = $this->declare();
+        $entry = $this->capture($downtime, ['outcome' => 'withheld', 'dose_on_paper' => null]);
+        $service = app(PaperEntryService::class);
+        $preview = $service->reconciliationPreview($this->lead, $downtime, $entry);
+        $lockingQueries = [];
+        $collecting = true;
+        DB::listen(function (QueryExecuted $query) use (&$lockingQueries, &$collecting): void {
+            if ($collecting && preg_match('/for (?:update|share)/i', $query->sql)) {
+                $lockingQueries[] = strtolower($query->sql);
+            }
+        });
+        try {
+            $result = $service->reconcile($this->lead, $downtime, $entry, $preview['preview_token']);
+        } finally {
+            $collecting = false;
+        }
+        $this->assertTrue($result['success'], json_encode($result));
+        $firstShift = collect($lockingQueries)->search(fn (string $sql) => str_contains($sql, 'from `shifts`'));
+        $firstRule = collect($lockingQueries)->search(fn (string $sql) => str_contains($sql, 'from `medication_admin_rules`'));
+        $firstUser = collect($lockingQueries)->search(fn (string $sql) => str_contains($sql, 'from `users`'));
+        $this->assertNotFalse($firstShift, json_encode($lockingQueries));
+        $this->assertNotFalse($firstRule, json_encode($lockingQueries));
+        $this->assertNotFalse($firstUser, json_encode($lockingQueries));
+        $this->assertLessThan($firstRule, $firstShift, 'Recording presence must be locked before the rule set.');
+        $this->assertLessThan($firstUser, $firstRule, 'The rule set must be locked before any User authorization lock.');
+    }
+
+    public static function historicalPaperRevocations(): array
+    {
+        return ['approval' => ['approval'], 'recording capability' => ['recording'], 'approved site' => ['site'], 'covering assignment' => ['assignment']];
+    }
+
+    #[DataProvider('historicalPaperRevocations')]
+    public function test_historical_non_given_posting_rechecks_current_authority_without_any_clinical_effect(string $revocation): void
+    {
+        $shift = $this->coveringAuthority();
+        $downtime = $this->declare();
+        $entry = $this->capture($downtime, ['outcome' => 'refused', 'dose_on_paper' => null]);
+        $service = app(PaperEntryService::class);
+        $preview = $service->reconciliationPreview($this->lead, $downtime, $entry);
+        $this->assertTrue($preview['can_reconcile']);
+        $this->lead->load(['permissionOverrides', 'roles.permissions', 'hrEmployeeProfile']);
+        match ($revocation) {
+            'approval' => User::query()->whereKey($this->lead->id)->update(['approved_at' => null]),
+            'recording' => $this->lead->permissionOverrides()->syncWithoutDetaching([
+                Permission::query()->where('key', 'medications.administer.record')->value('id') => ['allowed' => false],
+            ]),
+            'site' => HrEmployeeProfile::query()->where('user_id', $this->lead->id)->update(['primary_site_id' => Site::factory()->create(['is_active' => true])->id]),
+            'assignment' => $shift->forceFill(['user_id' => User::factory()->create(['approved_at' => now()])->id])->save(),
+        };
+        $eventsBefore = MedicationEvent::query()->count();
+        try {
+            $result = $service->reconcile($this->lead, $downtime, $entry, $preview['preview_token']);
+            $this->assertFalse($result['success']);
+        } catch (HttpExceptionInterface|ValidationException $error) {
+            if ($error instanceof HttpExceptionInterface) {
+                $this->assertContains($error->getStatusCode(), [403, 404]);
+            } else {
+                $this->assertArrayHasKey('preview_token', $error->errors());
+            }
+        }
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertDatabaseCount('medication_paper_postings', 0);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $this->assertDatabaseCount('medication_stock_movements', 0);
+        $this->assertSame(0, DB::table('medication_idempotency_results')->where('scope', 'administration.record')->count());
+        $this->assertSame($eventsBefore, MedicationEvent::query()->count());
+    }
+
+    public function test_a_clinical_outcome_that_arrives_before_paper_posting_invalidates_the_preview_atomically(): void
+    {
+        $this->coveringAuthority();
+        $downtime = $this->declare();
+        $entry = $this->capture($downtime, ['outcome' => 'refused', 'dose_on_paper' => null]);
+        $service = app(PaperEntryService::class);
+        $preview = $service->reconciliationPreview($this->lead, $downtime, $entry);
+        $existing = ClientMedicationAdministration::query()->create([
+            'client_id' => $entry->client_id, 'client_medication_id' => $entry->client_medication_id,
+            'administered_by' => $this->lead->id, 'scheduled_for' => $entry->scheduled_for,
+            'administered_at' => $entry->given_at, 'status' => 'withheld', 'reason_code' => 'withheld',
+            'reason' => 'Independent existing clinical evidence.',
+        ]);
+        $before = $existing->fresh()->getRawOriginal();
+        $eventsBefore = MedicationEvent::query()->count();
+        try {
+            $service->reconcile($this->lead, $downtime, $entry, $preview['preview_token']);
+            $this->fail('A competing clinical outcome must require review of a new preview.');
+        } catch (ValidationException $error) {
+            $this->assertArrayHasKey('preview_token', $error->errors());
+        }
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+        $this->assertSame($before, $existing->fresh()->getRawOriginal());
+        $this->assertDatabaseCount('medication_paper_postings', 0);
+        $this->assertSame(0, DB::table('medication_idempotency_results')->where('scope', 'administration.record')->count());
+        $this->assertSame($eventsBefore, MedicationEvent::query()->count());
+    }
+
+    public static function heldNonGivenPaperKinds(): array
+    {
+        return ['controlled' => ['controlled'], 'named second person' => ['witness'], 'as needed' => ['prn']];
+    }
+
+    #[DataProvider('heldNonGivenPaperKinds')]
+    public function test_non_given_paper_adapter_retains_controlled_second_person_and_prn_holds(string $kind): void
+    {
+        $this->coveringAuthority();
+        ClientMedication::withoutEvents(fn () => $this->order->update(match ($kind) {
+            'controlled' => ['controlled_drug' => true],
+            'prn' => ['is_prn' => true],
+            default => [],
+        }));
+        $downtime = $this->declare();
+        $witness = $kind === 'witness' ? $this->staff($this->site, 'support_worker', ['medications.view', 'medications.administer.record', 'clients.viewAny']) : null;
+        $facts = ['client_medication_id' => $this->order->id, 'downtime_dose_id' => $downtime->doses()->value('id'),
+            'outcome' => 'withheld', 'given_at' => '2026-10-03T09:10', 'given_by' => $this->lead->id,
+            'witness_id' => $witness?->id, 'dose_on_paper' => null, 'notes' => 'Exact signed paper explanation.', 'observations' => []];
+        $service = app(PaperEntryService::class);
+        $preview = $service->preview($this->lead, $downtime, $facts);
+        $this->assertTrue($preview['can_submit'], json_encode($preview));
+        $entry = $service->capture($this->lead, $downtime, $facts + ['request_uuid' => (string) Str::uuid(), 'preview_token' => $preview['preview_token'], 'accountable_confirmation' => true]);
+        $reconciliation = $service->reconciliationPreview($this->lead, $downtime, $entry);
+        $this->assertFalse($reconciliation['can_reconcile']);
+        $this->assertNotNull($reconciliation['unavailable']);
+        $result = $service->reconcile($this->lead, $downtime, $entry, $reconciliation['preview_token']);
+        $this->assertFalse($result['success']);
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertDatabaseCount('medication_paper_postings', 0);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $this->assertDatabaseCount('medication_stock_movements', 0);
     }
 
     public function test_non_given_paper_requires_the_explanation_on_paper(): void
@@ -704,6 +984,26 @@ class MedicationDowntimeTest extends TestCase
         return Shift::factory()->create(['user_id' => $this->lead->id, 'client_id' => $this->client->id, 'site_id' => $this->site->id,
             'starts_at' => Carbon::parse('2026-10-03 08:00', 'Pacific/Auckland')->utc(), 'ends_at' => Carbon::parse('2026-10-03 11:00', 'Pacific/Auckland')->utc(),
             'actual_starts_at' => Carbon::parse('2026-10-03 08:00', 'Pacific/Auckland')->utc(), 'actual_ends_at' => Carbon::parse('2026-10-03 11:00', 'Pacific/Auckland')->utc(), 'status' => 'completed']);
+    }
+
+    private function usableEmergencyAuthority(): ClientBreakGlassAccess
+    {
+        $this->lead->permissionOverrides()->syncWithoutDetaching([
+            Permission::query()->where('key', 'medications.breakglass')->firstOrFail()->id => ['allowed' => true],
+        ]);
+        $this->lead = $this->lead->fresh();
+        $current = Carbon::now();
+        try {
+            Carbon::setTestNow(Carbon::parse('2026-10-03 09:00', 'Pacific/Auckland')->utc());
+
+            return app(EmergencyAccessService::class)->start($this->lead, $this->client, [
+                'reason' => 'Synthetic urgent support when no rostered assignment covers the person.',
+                'reason_category' => 'urgent_support', 'minutes' => 240, 'authorization_mode' => 'self',
+                'acknowledged_min_necessary' => true, 'acknowledged_incident_report' => true,
+            ]);
+        } finally {
+            Carbon::setTestNow($current);
+        }
     }
 
     private function declare(): MedicationDowntime

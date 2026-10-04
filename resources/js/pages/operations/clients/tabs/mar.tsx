@@ -4,6 +4,7 @@
  * it; the allergy and chart-alert lines, Open medication record, Record dose
  * and a Report for this person. Recording goes through the one P02 seam
  * (use-dose-recorder). The tab loads its own day (the Fleet profile pattern). */
+import { OutstandingMedicationWork } from '@/components/emar/followups/outstanding-work';
 import { Link } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -279,16 +280,15 @@ export function MarTab({
     const label = day ? dayLabel(day.date, day.today, day.tomorrow) : 'Today';
     const canGoForward = day ? day.date < day.tomorrow : false;
     const canGoBack = day ? day.date > day.coverage.available_from : false;
-    const medicineCount = new Set(
-        day?.medicines.map((medicine) => medicine.id),
-    ).size;
+    const medicineCount = new Set(day?.medicines.map((medicine) => medicine.id))
+        .size;
 
     return (
-        <div className="min-w-0 max-w-full space-y-5">
+        <div className="max-w-full min-w-0 space-y-5">
             {/* Profile launch point and allergy warnings */}
             {!embedded || day ? (
-                <Card className="min-w-0 max-w-full">
-                    <CardContent className="min-w-0 max-w-full space-y-3 p-5">
+                <Card className="max-w-full min-w-0 gap-0 py-0">
+                    <CardContent className="max-w-full min-w-0 space-y-3 p-5">
                         {!embedded ? (
                             <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div className="flex items-center gap-3">
@@ -300,8 +300,8 @@ export function MarTab({
                                             Medication
                                         </h2>
                                         <p className="text-caption text-muted-foreground">
-                                            The full chart, history, INR and alerts are
-                                            in the medication record
+                                            The full chart, history, INR and
+                                            alerts are in the medication record
                                         </p>
                                     </div>
                                 </div>
@@ -325,7 +325,8 @@ export function MarTab({
                                         </Button>
                                     )}
                                     {day &&
-                                    day.can.record_reason !== 'no_permission' ? (
+                                    day.can.record_reason !==
+                                        'no_permission' ? (
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
                                                 <Button
@@ -369,7 +370,9 @@ export function MarTab({
                                                             >
                                                                 <span className="min-w-0 flex-1">
                                                                     <span className="block truncate font-medium">
-                                                                        {medicine.name}
+                                                                        {
+                                                                            medicine.name
+                                                                        }
                                                                     </span>
                                                                     <span className="text-caption text-muted-foreground">
                                                                         {clockLabel(
@@ -379,7 +382,8 @@ export function MarTab({
                                                                         {
                                                                             CELL_META[
                                                                                 kind
-                                                                            ].label
+                                                                            ]
+                                                                                .label
                                                                         }
                                                                     </span>
                                                                 </span>
@@ -417,11 +421,34 @@ export function MarTab({
                 </Card>
             ) : null}
 
+            {day &&
+            (day.followup_counts?.open ??
+                (day.followups?.length ?? 0) +
+                    (day.legacy_effect_checks?.total ?? 0)) > 0 ? (
+                <Card className="max-w-full min-w-0 gap-0 py-0">
+                    <CardContent className="p-5">
+                        {load.status === 'error' && (
+                            <p
+                                role="status"
+                                className="mb-3 text-sm text-status-warning"
+                            >
+                                Follow-ups could not be refreshed. Open
+                                follow-ups to check the latest state.
+                            </p>
+                        )}
+                        <OutstandingMedicationWork
+                            work={day}
+                            clientId={clientId}
+                        />
+                    </CardContent>
+                </Card>
+            ) : null}
+
             {/* The day */}
-            <Card className="min-w-0 max-w-full">
-                <CardContent className="min-w-0 max-w-full space-y-3 p-5">
+            <Card className="max-w-full min-w-0 gap-0 py-0">
+                <CardContent className="max-w-full min-w-0 space-y-3 p-5">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1.5">
+                        <div className="flex max-w-full min-w-0 flex-wrap items-center gap-1.5">
                             <Button
                                 variant="outline"
                                 size="icon"
@@ -512,7 +539,7 @@ export function MarTab({
                     ) : (
                         <div
                             className={cn(
-                                'min-w-0 max-w-full space-y-2 transition-opacity',
+                                'max-w-full min-w-0 space-y-2 transition-opacity',
                                 load.status === 'loading' && 'opacity-60',
                             )}
                             aria-busy={load.status === 'loading'}
@@ -547,9 +574,7 @@ export function MarTab({
                             />
                             <p className="text-caption text-muted-foreground">
                                 {medicineCount}{' '}
-                                {medicineCount === 1
-                                    ? 'medicine'
-                                    : 'medicines'}{' '}
+                                {medicineCount === 1 ? 'medicine' : 'medicines'}{' '}
                                 · times in NZ time
                                 {day.hidden_controlled.total > 0
                                     ? ` · ${day.hidden_controlled.total} controlled ${day.hidden_controlled.total === 1 ? 'dose' : 'doses'} not shown — needs controlled-medicine access`
@@ -561,8 +586,8 @@ export function MarTab({
             </Card>
 
             {view !== 'scheduled' && day && day.coverage.complete ? (
-                <Card className="min-w-0 max-w-full">
-                    <CardContent className="min-w-0 max-w-full p-5">
+                <Card className="max-w-full min-w-0 gap-0 py-0">
+                    <CardContent className="max-w-full min-w-0 p-5">
                         <PrnStrip
                             rows={day.prn.rows}
                             hidden={day.prn.hidden}

@@ -10,11 +10,13 @@ use App\Models\MedicationCompetencyAssessment;
 use App\Models\Permission;
 use App\Models\Shift;
 use App\Models\User;
+use App\Services\Medication\DoseTimingSettings;
 use App\Services\Medication\MedicationOrderWorkflow;
 use App\Services\Medication\WitnessPinService;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use LogicException;
@@ -23,6 +25,8 @@ use LogicException;
 class MedicationReadinessAcceptanceSeeder extends Seeder
 {
     public const WITNESS_PIN = '593027';
+
+    private const MEDICATION_NAMES = ['PW Meds Morning Tablets', 'PW Meds Vitamin D', 'PW Meds Eye Drops', 'PW Meds PRN Paracetamol', 'PW Meds Controlled PRN'];
 
     public function run(): void
     {
@@ -69,7 +73,11 @@ class MedicationReadinessAcceptanceSeeder extends Seeder
         }
 
         $orders = app(MedicationOrderWorkflow::class);
-        foreach (ClientMedication::query()->where('client_id', $client->id)->where('name', 'like', 'PW Meds %')->get() as $order) {
+        $fixtures = ClientMedication::query()->where('client_id', $client->id)->whereIn('name', self::MEDICATION_NAMES)->orderBy('id')->get();
+        if ($fixtures->count() !== count(self::MEDICATION_NAMES) || $fixtures->pluck('name')->unique()->count() !== count(self::MEDICATION_NAMES)) {
+            throw new LogicException('Medication acceptance requires the exact five unique synthetic orders.');
+        }
+        foreach ($fixtures as $order) {
             if ($order->controlled_drug) {
                 $order->forceFill(['nz_controlled_class' => 'B', 'controlled_class_source' => 'Synthetic reviewed browser acceptance configuration'])->save();
             }
@@ -113,23 +121,59 @@ class MedicationReadinessAcceptanceSeeder extends Seeder
                 $publish();
             }
         }
+        $this->retireObsoleteProjectionSlots($client, $fixtures->pluck('id')->all());
     }
 
     /** @return array<string, string> */
     private function scheduledTimes(): array
     {
         $anchor = now(config('app.worker_timezone', 'Pacific/Auckland'));
-        if ($anchor->hour === 0 && $anchor->minute < 30) {
-            $anchor->setTime(0, 15);
-        } elseif ($anchor->hour === 23 && $anchor->minute > 30) {
-            $anchor->setTime(23, 30);
+        if ($anchor->copy()->addMinutes(15)->toDateString() !== $anchor->toDateString()
+            || app(DoseTimingSettings::class)->earlyMinutes() < 15) {
+            throw new LogicException('Medication acceptance needs three future doses today inside the configured early recording window.');
         }
 
         return [
-            'PW Meds Morning Tablets' => $anchor->copy()->subMinutes(15)->format('H:i'),
-            'PW Meds Vitamin D' => $anchor->format('H:i'),
+            // Every genuine later publication precedes its new due instant.
+            // These are still inside the normal early recording window.
+            'PW Meds Morning Tablets' => $anchor->copy()->addMinutes(5)->format('H:i'),
+            'PW Meds Vitamin D' => $anchor->copy()->addMinutes(10)->format('H:i'),
             'PW Meds Eye Drops' => $anchor->copy()->addMinutes(15)->format('H:i'),
         ];
+    }
+
+    /** Only disposable, unrecorded TODAY projections of these synthetic orders. */
+    private function retireObsoleteProjectionSlots(Client $client, array $medicationIds): void
+    {
+        DB::transaction(function () use ($client, $medicationIds): void {
+            $client = Client::query()->whereKey($client->id)->lockForUpdate()->firstOrFail();
+            $orders = ClientMedication::query()->where('client_id', $client->id)->whereIn('id', $medicationIds)
+                ->whereIn('name', self::MEDICATION_NAMES)->orderBy('id')->lockForUpdate()->get();
+            if ($orders->count() !== count(self::MEDICATION_NAMES)) {
+                throw new LogicException('The synthetic medication reset scope changed.');
+            }
+            foreach ($orders as $order) {
+                if ($order->approval_status !== 'verified' || $order->verified_by === null) {
+                    throw new LogicException('A disposable fixture projection needs its genuinely checked current order.');
+                }
+                $obsolete = DB::table('medication_dose_slots')->where('client_id', $client->id)->where('client_medication_id', $order->id)
+                    ->where('nz_date', now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString())
+                    ->whereNotIn('ordered_time', $order->dose_times ?? [])->whereNull('outcome')->whereNull('outcome_administration_id')
+                    ->whereNull('outcome_at')->where('reconstructed', false)
+                    ->whereNull('superseded_at')->orderBy('id')->lockForUpdate()->get();
+                if ($obsolete->isEmpty()) {
+                    continue;
+                }
+                $disposable = $obsolete->reject(fn ($slot) => DB::table('medication_downtime_doses')->where('dose_slot_id', $slot->id)->exists()
+                    || DB::table('medication_paper_entries')->where('dose_identity', 'slot:'.$slot->id)->exists()
+                    || DB::table('client_medication_administrations')->where('client_medication_id', $order->id)
+                        ->where('scheduled_for', $slot->due_at)->exists());
+                // Match the production projection's explicit invalidation,
+                // without deleting slots or changing any checked history.
+                DB::table('medication_dose_slots')->whereIn('id', $disposable->pluck('id'))
+                    ->update(['superseded_at' => now()->utc(), 'updated_at' => now()->utc()]);
+            }
+        });
     }
 
     private function officeWorker(string $email, string $name, Client $client, string $capability): User

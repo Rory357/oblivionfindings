@@ -327,6 +327,108 @@ describe('handover wizard governance contracts', () => {
         expect(screen.queryByText(/Open CD register/i)).not.toBeInTheDocument();
     });
 
+    it('lets an ordinary worker retry and read scoped follow-ups without controlled-drug access', async () => {
+        mocks.axiosGet
+            .mockRejectedValueOnce(new Error('Unavailable'))
+            .mockResolvedValue({
+                data: {
+                    snapshot: {
+                        window: {
+                            start: '2026-08-28T12:00:00+12:00',
+                            end: '2026-08-28T20:00:00+12:00',
+                        },
+                        counts: {
+                            due: 0,
+                            given: 1,
+                            missed: 0,
+                            refused: 0,
+                            cd_due: 0,
+                            prn_given: 1,
+                            reviews_outstanding: 1,
+                            omissions: 0,
+                        },
+                        due: [],
+                        alerts: [],
+                        generated_at: '2026-08-28T19:00:00+12:00',
+                        followups: [],
+                        followup_counts: {
+                            open: 1,
+                            effect: 1,
+                            overdue: 0,
+                            unscheduled: 1,
+                        },
+                        legacy_effect_checks: {
+                            total: 1,
+                            overdue: 0,
+                            unscheduled: 1,
+                            filtered_total: 1,
+                            has_more: false,
+                            data: [
+                                {
+                                    source_key: 'effect:18',
+                                    administration_id: 18,
+                                    client: { id: 7, name: 'Aroha' },
+                                    site: { id: 10, name: 'Tui House' },
+                                    medication: {
+                                        id: 90,
+                                        name: 'Ordinary medicine',
+                                    },
+                                    owner: null,
+                                    due_at: null,
+                                    given_at: '2026-08-28T18:00:00+12:00',
+                                    can_prepare: false,
+                                    url: '/emar/followups?client_id=7&administration=18',
+                                },
+                            ],
+                        },
+                    },
+                },
+            });
+        renderWizard({
+            view_controlled: false,
+            record_controlled: false,
+            manage_any_shifts: true,
+        });
+        await waitFor(() =>
+            expect(
+                screen.queryByText('Securing this draft for editing…'),
+            ).not.toBeInTheDocument(),
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Show action step' }),
+        );
+        expect(
+            await screen.findByText(/Medication information is unavailable/),
+        ).toBeVisible();
+        expect(
+            screen.queryByText("No medication data for this shift's window."),
+        ).not.toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Retry medication information',
+            }),
+        );
+        expect(
+            await screen.findByRole('link', {
+                name: /Effect check · Ordinary medicine/,
+            }),
+        ).toHaveAttribute(
+            'href',
+            '/emar/followups?client_id=7&administration=18',
+        );
+        expect(mocks.axiosGet).toHaveBeenLastCalledWith(
+            '/emar/handovers/shift-medications',
+            { params: { shift_id: 100 } },
+        );
+        expect(screen.queryByText('CD due')).not.toBeInTheDocument();
+        expect(
+            screen.queryByLabelText('Their witness PIN'),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByText(/Controlled-drug count evidence/i),
+        ).not.toBeInTheDocument();
+    });
+
     it('shows immutable evidence to a view-only reader without mutation fields', async () => {
         renderWizard(
             {

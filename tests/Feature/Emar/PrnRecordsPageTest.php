@@ -24,6 +24,13 @@ class PrnRecordsPageTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Keep the explicit fallback contract; public defaults are covered separately.
+        config(['medications.person_record' => 'legacy']);
+    }
+
     public function test_page_serves_register_prn_meds_and_pending_reviews(): void
     {
         $this->seed(RbacSeeder::class);

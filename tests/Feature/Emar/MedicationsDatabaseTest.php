@@ -27,6 +27,13 @@ class MedicationsDatabaseTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Keep the explicit fallback contract; public defaults are covered separately.
+        config(['medications.person_record' => 'legacy']);
+    }
+
     public function test_medications_page_serves_flat_register_with_brand_colour(): void
     {
         $this->seed(RbacSeeder::class);

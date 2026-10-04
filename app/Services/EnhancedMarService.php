@@ -10,7 +10,9 @@ use App\Models\Client;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationDowntimeDose;
 use App\Models\MedicationIdempotencyResult;
+use App\Models\MedicationPaperEntry;
 use App\Models\MedicationRound;
 use App\Models\ServiceContext;
 use App\Models\Shift;
@@ -19,11 +21,14 @@ use App\Services\Medication\Controlled\ControlledDoseOverrideService;
 use App\Services\Medication\DoseSlots\DoseOrderTimelineFactory;
 use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
+use App\Services\Medication\Downtime\PaperAdministrationWriter;
+use App\Services\Medication\Downtime\PaperEntryService;
 use App\Services\Medication\Followups\MedicationFollowupService;
 use App\Services\Medication\ForgottenWitnessPinService;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationCompetencyRestrictionRules;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationSecondPersonService;
 use App\Services\Medication\Recording\RecordingContract;
 use App\Services\Medication\Recording\RecordingContractEnforcer;
@@ -665,6 +670,60 @@ class EnhancedMarService
                 ? round(($scheduledStats['completed'] / $scheduledStats['total']) * 100, 1)
                 : 0,
         ];
+    }
+
+    /**
+     * Post an explicitly confirmed historical non-given paper outcome through
+     * the same recorder. This typed internal entry point accepts no submitted
+     * stock, clinical readings, witness credentials or historical bypass flag.
+     */
+    public function recordHistoricalPaperOutcome(MedicationPaperEntry $submittedEntry, MedicationScopeDecision $decision): array
+    {
+        if (DB::transactionLevel() < 1 || $decision->lockedPresenceShifts === null
+            || $decision->lockedPresenceEffectiveAt === null || $decision->client === null || $decision->medication === null) {
+            throw new \LogicException('Historical paper outcomes require the canonical locked administration decision.');
+        }
+        $entry = MedicationPaperEntry::query()->whereKey($submittedEntry->id)->lockForUpdate()->firstOrFail();
+        $order = $decision->medication;
+        abort_unless((int) $entry->client_id === (int) $decision->client->id
+            && (int) $entry->client_medication_id === (int) $order->id
+            && (int) $order->client_id === (int) $decision->client->id
+            && (int) $entry->given_by === (int) $decision->performer->id, 404);
+        abort_unless(in_array($entry->outcome, ['refused', 'withheld'], true)
+            && ! $order->controlled_drug && ! ($entry->snapshot['controlled'] ?? false)
+            && ! $order->is_prn && $entry->witness_id === null && ! ($entry->snapshot['second_person_required'] ?? false)
+            && $entry->scheduled_for !== null && filled($entry->notes)
+            && $entry->given_at->equalTo($decision->lockedPresenceEffectiveAt)
+            && $order->isAdministrable() && $order->active && $order->superseded_by === null
+            && PaperEntryService::orderFingerprint($order) === ($entry->snapshot['order_fingerprint'] ?? null), 422);
+        $target = MedicationDowntimeDose::query()->whereKey($entry->downtime_dose_id)
+            ->where('downtime_id', $entry->downtime_id)->where('client_id', $entry->client_id)
+            ->where('client_medication_id', $entry->client_medication_id)->first();
+        abort_unless($target !== null && $target->dose_slot_id !== null
+            && $entry->dose_identity === 'slot:'.$target->dose_slot_id
+            && $target->scheduled_for->equalTo($entry->scheduled_for)
+            && ($target->snapshot['order_fingerprint'] ?? null) === ($entry->snapshot['order_fingerprint'] ?? null), 422);
+        abort_unless($entry->confirmations()->where('kind', 'giver')->where('confirmed_by', $decision->performer->id)
+            ->whereNotNull('confirmed_at')->lockForUpdate()->exists(), 422);
+
+        $result = $this->recordAdministration(
+            $decision->client, $order, app(PaperAdministrationWriter::class)->canonicalData($entry),
+            (int) $decision->performer->id, $decision->shiftId(),
+            prelockedPresenceShifts: $decision->lockedPresenceShifts,
+            prelockedPresenceEffectiveAt: $decision->lockedPresenceEffectiveAt,
+        );
+        if ($result['success'] ?? false) {
+            $administration = $result['administration'];
+            // A different existing clinical outcome is a conflict, never an
+            // inferred reconciliation or a link to somebody else's record.
+            abort_unless($administration->client_request_uuid === $entry->request_uuid
+                && (int) $administration->administered_by === (int) $entry->given_by
+                && $administration->status === $entry->outcome
+                && $administration->administered_at->equalTo($entry->given_at)
+                && $administration->scheduled_for?->equalTo($entry->scheduled_for), 409);
+        }
+
+        return $result;
     }
 
     /**

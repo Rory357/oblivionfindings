@@ -10,6 +10,7 @@ use App\Services\Emar\MedsBoardPayloadService;
 use App\Services\MarScheduleService;
 use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\DoseSlots\DoseSlotCoverage;
+use App\Services\Medication\Followups\MedicationFollowupProjection;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationRecordDayService;
@@ -108,6 +109,9 @@ class ClientMedicationDayController extends Controller
             'medicines' => $medicines,
             'hidden_controlled' => $hidden,
             'prn' => $this->asNeeded($clientIds, $day, $now, $date === $today, $includeControlled),
+            // Live outstanding work includes earlier doses independently of
+            // the selected chart day and the projection's historical coverage.
+            ...app(MedicationFollowupProjection::class)->forClient($actor, (int) $person->id),
             'allergies' => $this->allergies($person),
             'chart_alerts' => ClientMedicationAlert::query()
                 ->where('client_id', $person->id)

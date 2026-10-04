@@ -49,9 +49,9 @@ final class PaperEntryService
     }
 
     /** Bind matching rule revisions as well as their effective requirements. */
-    public function requirementsFingerprint(ClientMedication $order): string
+    public function requirementsFingerprint(ClientMedication $order, bool $lockForUpdate = true): string
     {
-        $locking = DB::transactionLevel() > 0;
+        $locking = $lockForUpdate && DB::transactionLevel() > 0;
         $requirements = $this->rules->requirementsFor($order, lockForUpdate: $locking);
         $revisions = MedicationAdminRule::query()->whereIn('id', array_column($requirements['matched_rules'], 'id'))->orderBy('id')
             ->when($locking, fn ($query) => $query->lockForUpdate())
@@ -228,23 +228,38 @@ final class PaperEntryService
     public function reconcile(User $actor, MedicationDowntime $downtime, MedicationPaperEntry $entry, string $previewToken): array
     {
         return DB::transaction(function () use ($actor, $downtime, $entry, $previewToken): array {
-            [$order, $actor] = $this->lockOrder($actor, $downtime, (int) $entry->client_medication_id);
+            // Reconciliation enters the same Client -> Order -> Shift -> Rule
+            // -> User prefix as online recording. Capture/confirmation do not
+            // acquire recording authority and retain their own access checks.
+            $order = $this->lockOrderParents($actor, $downtime, (int) $entry->client_medication_id);
             $entry = MedicationPaperEntry::query()->whereKey($entry->id)->firstOrFail();
             $this->access->entry($actor, $downtime, (int) $entry->id);
-            if ($posted = $entry->posting()->first()) {
-                return ['success' => true, 'administration_id' => (int) $posted->administration_id, 'duplicate' => true];
-            }
-            $preview = $this->reconciliationPreview($actor, $downtime, $entry, $order);
-            if (! hash_equals($preview['preview_token'], $previewToken)) {
-                throw ValidationException::withMessages(['preview_token' => 'The record changed. Check the reconciliation preview again.']);
-            }
-            if (! $preview['can_reconcile']) {
-                return ['success' => false, 'error' => $preview['unavailable'] ?? 'Confirmations or conflict resolution are still required.'];
+            if (! $entry->posting()->exists()) {
+                // Stale previews also fail while posting is held. This first
+                // check acquires no Rule/User lock; the final locked preview
+                // is recomputed after the canonical authority prefix.
+                $preview = $this->reconciliationPreview($actor, $downtime, $entry, $order, lockRequirements: false);
+                if (! hash_equals($preview['preview_token'], $previewToken)) {
+                    throw ValidationException::withMessages(['preview_token' => 'The record changed. Check the reconciliation preview again.']);
+                }
+                if (! $preview['can_reconcile']) {
+                    return ['success' => false, 'error' => $preview['unavailable'] ?? 'Confirmations or conflict resolution are still required.'];
+                }
             }
 
-            return $this->writer->withinAuthority($entry, $order, $actor, function (MedicationScopeDecision $decision) use ($actor, $downtime, $entry, $previewToken): array {
+            return $this->writer->withinAuthority($entry, $order, $actor, function (MedicationScopeDecision $decision) use ($downtime, $entry, $previewToken): array {
+                $downtime = MedicationDowntime::query()->whereKey($downtime->id)->where('site_id', $decision->siteId)->lockForUpdate()->firstOrFail();
+                $current = $this->access->lockActor($decision->performer, $decision->siteId);
+                $this->access->entry($current, $downtime, (int) $entry->id);
                 $entry = MedicationPaperEntry::query()->whereKey($entry->id)->lockForUpdate()->firstOrFail();
                 if ($posted = $entry->posting()->first()) {
+                    abort_unless((int) $posted->posted_by === (int) $decision->performer->id
+                        && $entry->confirmations()->where('kind', 'giver')->where('confirmed_by', $decision->performer->id)
+                            ->whereNotNull('confirmed_at')->exists()
+                        && ClientMedicationAdministration::query()->whereKey($posted->administration_id)
+                            ->where('client_id', $entry->client_id)->where('client_medication_id', $entry->client_medication_id)
+                            ->where('administered_by', $entry->given_by)->where('client_request_uuid', $entry->request_uuid)->exists(), 409);
+
                     return ['success' => true, 'administration_id' => (int) $posted->administration_id, 'duplicate' => true];
                 }
                 $lockedPreview = $this->reconciliationPreview($decision->performer, $downtime, $entry, $decision->medication);
@@ -259,8 +274,9 @@ final class PaperEntryService
                     return ['success' => false, 'error' => $result['error'] ?? 'The normal recording checks did not permit this entry. Signed paper evidence is kept.'];
                 }
                 MedicationPaperPosting::query()->create([
-                    'paper_entry_id' => $entry->id, 'administration_id' => $result['administration']->id, 'posted_by' => $actor->id,
+                    'paper_entry_id' => $entry->id, 'administration_id' => $result['administration']->id, 'posted_by' => $decision->performer->id,
                 ]);
+                $this->writer->recordBreakGlassUse($decision, $entry);
                 $this->events->record($downtime, 'paper_reconciled', $decision->performer, $entry, ['administration_id' => (int) $result['administration']->id]);
 
                 return ['success' => true, 'administration_id' => (int) $result['administration']->id];
@@ -268,14 +284,14 @@ final class PaperEntryService
         }, 5);
     }
 
-    public function reconciliationPreview(User $actor, MedicationDowntime $downtime, MedicationPaperEntry $entry, ?ClientMedication $order = null): array
+    public function reconciliationPreview(User $actor, MedicationDowntime $downtime, MedicationPaperEntry $entry, ?ClientMedication $order = null, bool $lockRequirements = true): array
     {
         $order ??= $this->access->order($actor, $downtime, (int) $entry->client_medication_id);
         $confirmations = $entry->confirmations()->get()->keyBy('kind');
         $state = PaperReconciliationRules::state($entry->posting()->exists(), $confirmations->has('giver'), (bool) ($entry->snapshot['second_person_required'] ?? false), $confirmations->has('witness'));
         $conflicts = $this->conflicts($order, $entry->scheduled_for, $entry->given_at, $entry->dose_identity, (int) $entry->id);
         $unavailable = $this->writer->availability($entry, $order, $actor);
-        $facts = [$entry->request_fingerprint, $state, $conflicts, $unavailable, self::orderFingerprint($order), $this->requirementsFingerprint($order)];
+        $facts = [$entry->request_fingerprint, $state, $conflicts, $unavailable, self::orderFingerprint($order), $this->requirementsFingerprint($order, $lockRequirements)];
 
         return [
             'state' => $state, 'conflicts' => $conflicts, 'unavailable' => $unavailable,
@@ -352,15 +368,20 @@ final class PaperEntryService
 
     private function lockOrder(User $actor, MedicationDowntime $downtime, int $id): array
     {
-        $visible = $this->access->order($actor, $downtime, $id);
-        $client = Client::query()->whereKey($visible->client_id)->lockForUpdate()->firstOrFail();
-        abort_unless((int) $client->site_id === (int) $downtime->site_id, 404);
-
-        $order = ClientMedication::query()->whereKey($id)->where('client_id', $client->id)->lockForUpdate()->firstOrFail()->setRelation('client', $client);
+        $order = $this->lockOrderParents($actor, $downtime, $id);
         $current = $this->access->lockActor($actor, (int) $downtime->site_id);
         $this->access->assertOrderReadable($current, $order);
 
         return [$order, $current];
+    }
+
+    private function lockOrderParents(User $actor, MedicationDowntime $downtime, int $id): ClientMedication
+    {
+        $visible = $this->access->order($actor, $downtime, $id);
+        $client = Client::query()->whereKey($visible->client_id)->lockForUpdate()->firstOrFail();
+        abort_unless((int) $client->site_id === (int) $downtime->site_id, 404);
+
+        return ClientMedication::query()->whereKey($id)->where('client_id', $client->id)->lockForUpdate()->firstOrFail()->setRelation('client', $client);
     }
 
     private function instant(string $value): CarbonImmutable

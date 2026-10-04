@@ -6,7 +6,6 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Http\Controllers\Concerns\SanitizesCsvOutput;
 use App\Models\Client;
 use App\Models\ClientMedication;
-use App\Services\Medication\Followups\MedicationFollowupService;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
 use App\Models\MedicationCompetencyAssessment;
@@ -17,12 +16,13 @@ use App\Models\Role;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\Followups\MedicationFollowupService;
+use Database\Factories\UserFactory;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Tests\TestCase;
-use Database\Factories\UserFactory;
 
 /**
  * Round-3 governance/export audit (2026-07-02): correction two-person rule,
@@ -183,7 +183,7 @@ class MedicationGovernanceAuditTest extends TestCase
                 ...$payload,
                 'witnessed_by' => $goodWitness->id,
             ])
-            ->assertOk()
+            ->assertRedirect('/emar/controlled')
             ->assertSessionHasNoErrors();
         $this->assertSame('9.00', $stock->refresh()->on_hand);
         $this->assertDatabaseCount('client_controlled_drug_entries', 1);

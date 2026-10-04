@@ -1,5 +1,37 @@
 import type { DoseTarget } from '@/components/emar/record-dose/types';
 export type FollowupRef = { id: number; name: string };
+export type LegacyEffectCheck = {
+    source_key: string;
+    administration_id: number;
+    client: FollowupRef;
+    site: FollowupRef;
+    medication: FollowupRef;
+    owner: FollowupRef | null;
+    due_at: string | null;
+    given_at: string | null;
+    can_prepare: boolean;
+    prepare_url?: string;
+    url?: string;
+    record_url: string;
+};
+export type LegacyEffectChecks = {
+    total: number;
+    overdue: number;
+    unscheduled: number;
+    filtered_total: number;
+    data: LegacyEffectCheck[];
+    has_more: boolean;
+};
+export type OutstandingMedicationWorkData = {
+    followups?: MedicationFollowup[];
+    legacy_effect_checks?: LegacyEffectChecks;
+    followup_counts?: {
+        open: number;
+        effect: number;
+        overdue: number;
+        unscheduled: number;
+    };
+};
 export type MedicationFollowup = {
     id: number;
     type: string;

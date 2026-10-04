@@ -11,6 +11,7 @@ use App\Domain\Clinical\Models\ClinicalProtocol;
 use App\Domain\Clinical\Models\ClinicalProtocolSchedule;
 use App\Models\Client;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -35,16 +36,20 @@ class HealthClinicalTest extends TestCase
 
         $this->seed(RbacSeeder::class);
 
-        $this->client = Client::factory()->create();
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $this->client = Client::factory()->create(['site_id' => $site->id]);
         $this->clinicalLead = $this->makeRoleUser('clinical_lead');
         $this->supportWorker = $this->makeRoleUser('support_worker');
         $this->unauthorizedUser = User::factory()->create(['approved_at' => now()]);
+        // Capability denial is tested at the same approved Site as the readers.
+        ensureCanonicalHrStaffProfile($this->unauthorizedUser, $site);
     }
 
     public function test_dashboard_renders_for_authorized_user(): void
     {
         ClinicalObservation::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->client->site_id,
             'observation_type' => ObservationType::Vitals,
             'recorded_by' => $this->clinicalLead->id,
         ]);
@@ -85,6 +90,7 @@ class HealthClinicalTest extends TestCase
     {
         ClinicalObservation::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->client->site_id,
             'observation_type' => ObservationType::Weight,
             'recorded_by' => $this->clinicalLead->id,
         ]);
@@ -105,6 +111,7 @@ class HealthClinicalTest extends TestCase
     {
         ClinicalEvent::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->client->site_id,
             'reported_by' => $this->clinicalLead->id,
             'event_type' => ClinicalEventType::Fall,
         ]);
@@ -137,7 +144,7 @@ class HealthClinicalTest extends TestCase
     public function test_client_summary_renders(): void
     {
         $this->actingAs($this->clinicalLead)
-            ->get('/health-clinical/clients/' . $this->client->id . '/summary')
+            ->get('/health-clinical/clients/'.$this->client->id.'/summary')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('health-clinical/ClientSummary')
@@ -157,6 +164,8 @@ class HealthClinicalTest extends TestCase
         if ($role) {
             $user->roles()->syncWithoutDetaching([$role->id]);
         }
+
+        ensureCanonicalHrStaffProfile($user, $this->client->site);
 
         return $user;
     }

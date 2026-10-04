@@ -232,6 +232,13 @@ export function HandoverDetailDialog({
     }, [open, handover?.id]);
     const [snapshot, setSnapshot] = useState<ShiftMedSnapshot | null>(null);
     const [snapLoading, setSnapLoading] = useState(false);
+    const [snapshotRevision, setSnapshotRevision] = useState(0);
+    useEffect(() => {
+        if (!open || !medicationSnapshotUrl) return;
+        const refresh = () => setSnapshotRevision((revision) => revision + 1);
+        window.addEventListener('focus', refresh);
+        return () => window.removeEventListener('focus', refresh);
+    }, [open, medicationSnapshotUrl]);
     const shiftId = handover?.outgoing_shift?.id ?? null;
 
     useEffect(() => {
@@ -255,7 +262,7 @@ export function HandoverDetailDialog({
         return () => {
             cancelled = true;
         };
-    }, [open, medicationSnapshotUrl, shiftId]);
+    }, [open, medicationSnapshotUrl, shiftId, snapshotRevision]);
 
     if (!handover) return null;
     const h = handover;
@@ -396,6 +403,11 @@ export function HandoverDetailDialog({
                                 snapshot={snapshot}
                                 loading={snapLoading}
                                 hasShift={!!h.outgoing_shift}
+                                onRetry={() =>
+                                    setSnapshotRevision(
+                                        (revision) => revision + 1,
+                                    )
+                                }
                             />
                         ) : null}
 

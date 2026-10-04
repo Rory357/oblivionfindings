@@ -1,11 +1,9 @@
 <?php
 
 return [
-    // The person medication record at /emar/mar?client_id=… (eMAR P02):
-    // "legacy" keeps today's MAR chart page; "p02" serves the rebuilt record.
-    // It switches to p02 when the record reaches today's page (the Chart,
-    // P02-4) and the switch is then removed.
-    'person_record' => env('EMAR_PERSON_RECORD', 'legacy'),
+    // The completed person record and MAR/medicine/as-needed hubs are the default.
+    // An explicit "legacy" override retains the earlier pages for rollout recovery.
+    'person_record' => env('EMAR_PERSON_RECORD', 'p02'),
 
     // P06 release gate: enable only after every stock writer and P07 ledger
     // adapter are integrated. This is not a clinical policy setting.

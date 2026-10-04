@@ -2,7 +2,10 @@ import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import { AdministrationFollowupDialog } from '@/components/emar/followups/administration-followup-dialog';
 import { MedicationFollowupDialog } from '@/components/emar/followups/followup-dialog';
 import { MedicationFollowupList } from '@/components/emar/followups/followup-list';
-import type { MedicationFollowup } from '@/components/emar/followups/types';
+import type {
+    LegacyEffectChecks as LegacyChecks,
+    MedicationFollowup,
+} from '@/components/emar/followups/types';
 import { RecordDoseDialog } from '@/components/emar/record-dose/record-dose-dialog';
 import type { DoseTarget } from '@/components/emar/record-dose/types';
 import {
@@ -23,26 +26,6 @@ import { Head, router, usePage } from '@inertiajs/react';
 import { ClipboardList, History, ShieldCheck } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
-type LegacyEffectCheck = {
-    source_key: string;
-    administration_id: number;
-    client: { id: number; name: string };
-    site: { id: number; name: string };
-    medication: { id: number; name: string };
-    owner: { id: number; name: string } | null;
-    due_at: string | null;
-    given_at: string | null;
-    can_prepare: boolean;
-    record_url: string;
-};
-type LegacyChecks = {
-    total: number;
-    overdue: number;
-    unscheduled: number;
-    filtered_total: number;
-    data: LegacyEffectCheck[];
-    has_more: boolean;
-};
 type Props = {
     selected_followup_id?: number | null;
     legacy_effect_checks?: LegacyChecks;

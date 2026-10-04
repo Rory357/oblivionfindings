@@ -11,7 +11,8 @@ export type DayLoad =
 /**
  * One person's medication day from the server (the Fleet profile pattern:
  * the tab loads its own records). Null date = today. A newer request wins;
- * a failed one keeps the last good day on screen behind the error.
+ * Transient failures keep the last good day behind the error. An access-loss
+ * response clears private records immediately, including on a focus refresh.
  */
 export function useMedicationDay(clientId: number, date: string | null) {
     const [state, setState] = useState<{ clientId: number; load: DayLoad }>({
@@ -40,14 +41,19 @@ export function useMedicationDay(clientId: number, date: string | null) {
                     load: { status: 'ready', data: response.data },
                 });
             }
-        } catch {
+        } catch (error) {
+            const accessLost =
+                axios.isAxiosError(error) &&
+                [401, 403, 404].includes(error.response?.status ?? 0);
             if (request === latest.current) {
                 setState((prev) => ({
                     clientId,
                     load: {
                         status: 'error',
                         data:
-                            prev.clientId === clientId ? prev.load.data : null,
+                            !accessLost && prev.clientId === clientId
+                                ? prev.load.data
+                                : null,
                     },
                 }));
             }
@@ -61,6 +67,11 @@ export function useMedicationDay(clientId: number, date: string | null) {
         void fetchDay();
         return invalidate;
     }, [fetchDay, invalidate]);
+    useEffect(() => {
+        const refresh = () => void fetchDay();
+        window.addEventListener('focus', refresh);
+        return () => window.removeEventListener('focus', refresh);
+    }, [fetchDay]);
 
     const load: DayLoad =
         state.clientId === clientId

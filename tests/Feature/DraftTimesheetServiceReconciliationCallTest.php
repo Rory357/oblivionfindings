@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\AttendanceService;
 use App\Models\Client;
 use App\Models\Role;
@@ -10,9 +11,10 @@ use App\Models\ShiftTask;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Operations\TimesheetReconciliationService;
+use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->worker = User::factory()->create([
         'role' => 'support_worker',
@@ -27,6 +29,14 @@ beforeEach(function () {
 
 test('normal attendance clock out reconciles the draft timesheet exactly once', function () {
     $site = Site::factory()->create();
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->worker->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
     $client = Client::factory()->create(['site_id' => $site->id]);
     $serviceContext = ServiceContext::factory()->create();
     $shift = Shift::query()->create([

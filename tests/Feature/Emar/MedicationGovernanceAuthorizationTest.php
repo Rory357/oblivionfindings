@@ -43,6 +43,8 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Keep the explicit fallback contract; public defaults are covered separately.
+        config(['medications.person_record' => 'legacy']);
         $this->seed(RbacSeeder::class);
     }
 

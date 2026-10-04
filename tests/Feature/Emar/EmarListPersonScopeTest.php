@@ -46,6 +46,8 @@ class EmarListPersonScopeTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Keep the explicit fallback contract; public defaults are covered separately.
+        config(['medications.person_record' => 'legacy']);
 
         $this->seed(RbacSeeder::class);
         $this->site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
@@ -179,8 +181,12 @@ class EmarListPersonScopeTest extends TestCase
             ])->id;
         }
 
-        $this->actingAs($this->worker)->get(route('emar.destructions'))
-            ->assertRedirect('/emar/controlled?view=destructions');
+        $disposalPage = $this->actingAs($this->worker)->get(route('emar.destructions'))->assertOk();
+        $this->assertSame($this->visibleIds(), $this->sortedIds($disposalPage->inertiaProps('medications'), 'client_id'));
+        $this->assertSame(
+            collect($destructionIds)->only($this->visibleIds())->sort()->values()->all(),
+            $this->sortedIds($disposalPage->inertiaProps('destructions'), 'id'),
+        );
         $page = $this->actingAs($this->worker)->get(route('emar.controlled', ['view' => 'destructions']))->assertOk();
         $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('product.medicines'), 'client_id'));
         $this->assertSame(
@@ -238,6 +244,7 @@ class EmarListPersonScopeTest extends TestCase
 
         $page = $this->actingAs($this->worker)->get(route('emar.medications'))->assertOk();
         $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('medications'), 'client_id'));
+        $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('clients'), 'id'));
 
         // A named person passes the same per-person gate (P02): a resident the
         // worker may not open is not found, like any other record.
@@ -250,6 +257,7 @@ class EmarListPersonScopeTest extends TestCase
 
         $lead = $this->actingAs($this->lead())->get(route('emar.medications'))->assertOk();
         $this->assertSame($this->allIds(), $this->sortedIds($lead->inertiaProps('medications'), 'client_id'));
+        $this->assertSame($this->allIds(), $this->sortedIds($lead->inertiaProps('clients'), 'id'));
     }
 
     public function test_a_medicines_details_follow_the_per_person_gate(): void

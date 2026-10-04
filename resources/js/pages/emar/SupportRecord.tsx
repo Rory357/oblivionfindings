@@ -54,7 +54,7 @@ export default function SupportRecord({
     staff,
     agreement_history,
 }: Props) {
-    const recordUrl = `/emar/mar?client_id=${support.client_id}&section=support`;
+    const recordUrl = `/emar/mar?client_id=${support.client_id}&tab=support`;
     const breadcrumbs = useEmarRecordBreadcrumbs({
         title: support.client_name,
         href: recordUrl,

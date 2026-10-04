@@ -1,3 +1,4 @@
+import type { OutstandingMedicationWorkData } from '@/components/emar/followups/types';
 import type {
     ClientInfo,
     CompetencyNotice,
@@ -47,7 +48,7 @@ export interface DayAllergyEntry {
     source: string;
 }
 
-export interface MedicationDay {
+export interface MedicationDay extends OutstandingMedicationWorkData {
     date: string;
     today: string;
     tomorrow: string;

@@ -48,7 +48,7 @@ use App\Services\Medication\CompetencyPolicySettings;
 use App\Services\Medication\Controlled\ControlledRegisterService;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Medication\Followups\LegacyEffectFollowupAdapter;
-use App\Services\Medication\Followups\MedicationFollowupService;
+use App\Services\Medication\Followups\MedicationFollowupProjection;
 use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationLegacyOrderBridge;
@@ -1245,8 +1245,8 @@ class EmarController extends Controller
     // ─── MAR Charts ────────────────────────────────────────
     public function mar(Request $request)
     {
-        // The rebuilt person record (P02) serves a named person once the
-        // switch is on; until the Chart lands (P02-4) today's page stays.
+        // The completed record serves a named person; the default bare route
+        // lists permitted charts. An explicit legacy override keeps the earlier page.
         if (config('medications.person_record') === 'p02' && $request->filled('client_id')) {
             return app(PersonMedicationRecordController::class)->show($request, $request->integer('client_id'));
         }
@@ -2547,7 +2547,9 @@ class EmarController extends Controller
 
         return Inertia::render('emar/Medications', [
             'medications' => $rows,
-            'clients' => $this->governanceScope->clientPicker($accessibleSiteIds),
+            'clients' => $this->governanceScope->clientPicker($accessibleSiteIds)
+                ->whereIn('id', $readableClientIds)
+                ->values(),
             'staff' => $this->governanceScope->staffPicker($accessibleSiteIds),
             'sites' => $sites->map(fn (Site $site) => $site->only(['id', 'name']))->values(),
             'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
@@ -6800,7 +6802,7 @@ class EmarController extends Controller
                     $shift,
                     $auth->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
                 ),
-                'followups' => app(MedicationFollowupService::class)->forClient($auth, (int) $shift->client_id),
+                ...app(MedicationFollowupProjection::class)->forClient($auth, (int) $shift->client_id),
             ],
         ]);
     }

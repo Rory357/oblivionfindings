@@ -3,10 +3,60 @@ import axios from 'axios';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useMedicationDay } from './use-medication-day';
 
-vi.mock('axios', () => ({ default: { get: vi.fn() } }));
+vi.mock('axios', () => ({
+    default: {
+        get: vi.fn(),
+        isAxiosError: (error: unknown) =>
+            !!error && typeof error === 'object' && 'isAxiosError' in error,
+    },
+}));
 afterEach(() => vi.resetAllMocks());
 
 describe('medication day person boundary', () => {
+    it.each([401, 403, 404])(
+        'removes cached private records after a focus refresh loses access (%s)',
+        async (status) => {
+            vi.mocked(axios.get)
+                .mockResolvedValueOnce({
+                    data: {
+                        date: '2026-10-04',
+                        followups: [{ label: 'Private medication check' }],
+                    },
+                })
+                .mockRejectedValueOnce({
+                    isAxiosError: true,
+                    response: { status },
+                });
+            const hook = renderHook(() => useMedicationDay(1, null));
+            await waitFor(() =>
+                expect(hook.result.current.load.status).toBe('ready'),
+            );
+            act(() => window.dispatchEvent(new Event('focus')));
+            await waitFor(() =>
+                expect(hook.result.current.load.status).toBe('error'),
+            );
+            expect(hook.result.current.load.data).toBeNull();
+            hook.unmount();
+        },
+    );
+
+    it('retains the same person’s last records behind a transient failure warning', async () => {
+        vi.mocked(axios.get)
+            .mockResolvedValueOnce({ data: { date: '2026-10-04' } })
+            .mockRejectedValueOnce({
+                isAxiosError: true,
+                response: { status: 503 },
+            });
+        const hook = renderHook(() => useMedicationDay(1, null));
+        await waitFor(() =>
+            expect(hook.result.current.load.status).toBe('ready'),
+        );
+        await act(async () => hook.result.current.reload());
+        expect(hook.result.current.load.status).toBe('error');
+        expect(hook.result.current.load.data?.date).toBe('2026-10-04');
+        hook.unmount();
+    });
+
     it('clears the previous person immediately and ignores their delayed response', async () => {
         let finishOld: (value: unknown) => void = () => undefined;
         vi.mocked(axios.get)

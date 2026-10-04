@@ -7,17 +7,17 @@ use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
-use App\Models\MedicationPrnEffectiveness;
 use App\Models\MedicationFollowup;
-use Carbon\CarbonImmutable;
-use Illuminate\Support\Str;
+use App\Models\MedicationPrnEffectiveness;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -30,6 +30,13 @@ use Tests\TestCase;
 class PrnRecordsHistoryTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Keep the explicit fallback contract; public defaults are covered separately.
+        config(['medications.person_record' => 'legacy']);
+    }
 
     public function test_history_is_paginated_and_carries_detail_fields(): void
     {

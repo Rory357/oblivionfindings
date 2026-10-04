@@ -34,6 +34,8 @@ class MarChartPersonScopeTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Keep the explicit fallback contract; public defaults are covered separately.
+        config(['medications.person_record' => 'legacy']);
 
         $this->seed(RbacSeeder::class);
         $this->site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
@@ -300,8 +302,7 @@ class MarChartPersonScopeTest extends TestCase
         string $name,
         bool $controlled = false,
         ?bool $witnessRequired = null,
-    ): ClientMedication
-    {
+    ): ClientMedication {
         // Entered at the start of the day: a dose due before an order's entry is not owed.
         $now = Carbon::getTestNow();
         Carbon::setTestNow(Carbon::now('Pacific/Auckland')->startOfDay()->utc());

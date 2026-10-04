@@ -1109,7 +1109,7 @@ export function ConfirmationDialog({
                     </DialogTitle>
                     <DialogDescription>
                         {kind === 'reconcile'
-                            ? 'The normal recording checks run again. This can post a clinical eMAR record.'
+                            ? 'Post this signed paper outcome to eMAR. The original outcome time is preserved and recording checks run again. Stock will not change.'
                             : 'Your confirmation is appended to the evidence. It does not post the dose.'}
                     </DialogDescription>
                 </DialogHeader>

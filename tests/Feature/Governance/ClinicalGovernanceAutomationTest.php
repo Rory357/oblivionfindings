@@ -10,6 +10,7 @@ use App\Models\Client;
 use App\Models\MedicationError;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Carbon\Carbon;
 use Database\Seeders\ClinicalPermissionsSeeder;
@@ -41,7 +42,8 @@ class ClinicalGovernanceAutomationTest extends TestCase
         $this->beforeApplicationDestroyed(fn () => Carbon::setTestNow());
 
         $admin = $this->createAdminUser();
-        $client = Client::factory()->create();
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $client = Client::factory()->create(['site_id' => $site->id]);
         $reporter = User::factory()->create();
 
         ClinicalGovernanceIndicator::create([

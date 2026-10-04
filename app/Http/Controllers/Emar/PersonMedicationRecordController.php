@@ -43,8 +43,8 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  * reader without controlled-medicine access sees controlled medicines as
  * redacted, counted rows inside the record (MedicationConcealment).
  *
- * Served at /emar/mar?client_id=… while config('medications.person_record')
- * is "p02"; until the Chart lands (P02-4) today's MAR page stays the default.
+ * The default record at /emar/mar?client_id=…. An explicit
+ * EMAR_PERSON_RECORD=legacy override retains the earlier MAR page.
  */
 class PersonMedicationRecordController extends Controller
 {

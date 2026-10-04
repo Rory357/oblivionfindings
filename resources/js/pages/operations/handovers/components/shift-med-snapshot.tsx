@@ -3,15 +3,14 @@
  * lens). Fed by GET /emar/handovers/shift-medications?shift_id=… — see
  * app/Services/Emar/ShiftMedicationSnapshotService. Operations never wires the
  * snapshot URL, so this is eMAR-only in practice. Semantic tokens throughout. */
+import { OutstandingMedicationWork } from '@/components/emar/followups/outstanding-work';
+import type { OutstandingMedicationWorkData } from '@/components/emar/followups/types';
+import { Button } from '@/components/ui/button';
 import { AlertTriangle, Loader2, Pill } from 'lucide-react';
-import { Link } from '@inertiajs/react';
-import { FollowupStatus } from '@/components/emar/followups/followup-list';
-import type { MedicationFollowup } from '@/components/emar/followups/types';
-import { formatDateTime } from '@/lib/datetime';
 
 import { cn } from '@/lib/utils';
 
-export type ShiftMedSnapshot = {
+export type ShiftMedSnapshot = OutstandingMedicationWorkData & {
     window: { start: string; end: string };
     counts: {
         due: number;
@@ -26,7 +25,6 @@ export type ShiftMedSnapshot = {
     due: { name: string; time: string; state: string; controlled: boolean }[];
     alerts: { kind: string; tone: string; message: string }[];
     generated_at: string;
-    followups?: MedicationFollowup[];
 };
 
 function ShiftMedStat({
@@ -67,12 +65,16 @@ export function ShiftMedSummary({
     loading,
     hasShift,
     note,
+    onRetry,
+    showControlled = true,
     noShiftHint = 'No outgoing shift linked — nothing to chart.',
 }: {
     snapshot: ShiftMedSnapshot | null;
     loading: boolean;
     hasShift: boolean;
     note?: string;
+    onRetry?: () => void;
+    showControlled?: boolean;
     noShiftHint?: string;
 }) {
     return (
@@ -96,62 +98,24 @@ export function ShiftMedSummary({
                     Loading the shift's medication state…
                 </div>
             ) : !snapshot ? (
-                <div className="text-[12.5px] text-muted-foreground">
-                    No medication data for this shift's window.
+                <div role="alert" className="space-y-2 text-sm">
+                    <p className="text-status-warning">
+                        Medication information is unavailable. Check the MAR
+                        before relying on this handover.
+                    </p>
+                    {onRetry && (
+                        <Button
+                            variant="outline"
+                            className="frontline-tap"
+                            onClick={onRetry}
+                        >
+                            Retry medication information
+                        </Button>
+                    )}
                 </div>
             ) : (
                 <div className="space-y-2.5">
-                    {!!snapshot.followups?.length && (
-                        <section
-                            aria-label="Medication work to carry over"
-                            className="space-y-3"
-                        >
-                            <p className="font-medium">Still to follow up</p>
-                            <p className="text-subtle">
-                                Acknowledging this handover carries eligible
-                                work to the incoming worker. Each follow-up
-                                stays open until its own action is recorded.
-                            </p>
-                            <ul className="divide-y divide-border">
-                                {snapshot.followups.map((row) => (
-                                    <li
-                                        key={row.id}
-                                        className="flex flex-wrap items-start justify-between gap-3 py-3"
-                                    >
-                                        <div className="min-w-0 space-y-1">
-                                            <Link
-                                                href={row.url}
-                                                className="frontline-tap inline-flex items-center font-medium text-primary underline"
-                                            >
-                                                {row.label} ·{' '}
-                                                {row.medication?.name ??
-                                                    'Handover'}
-                                            </Link>
-                                            <p>
-                                                {formatDateTime(
-                                                    row.due_at,
-                                                    'Time not set',
-                                                )}
-                                            </p>
-                                            <p className="text-caption">
-                                                Owner:{' '}
-                                                {row.owner?.name ??
-                                                    (row.lead
-                                                        ? 'House lead'
-                                                        : 'Unassigned')}
-                                                {row.original_owner &&
-                                                row.original_owner.id !==
-                                                    row.owner?.id
-                                                    ? ` · Originally ${row.original_owner.name}`
-                                                    : ''}
-                                            </p>
-                                        </div>
-                                        <FollowupStatus row={row} />
-                                    </li>
-                                ))}
-                            </ul>
-                        </section>
-                    )}
+                    <OutstandingMedicationWork work={snapshot} handover />
                     <div className="grid grid-cols-4 gap-1.5">
                         <ShiftMedStat label="Due" value={snapshot.counts.due} />
                         <ShiftMedStat
@@ -173,7 +137,7 @@ export function ShiftMedSummary({
                             value={snapshot.counts.prn_given}
                         />
                         <ShiftMedStat
-                            label="Reviews due"
+                            label="Effect checks from shift"
                             value={snapshot.counts.reviews_outstanding}
                             tone="warning"
                         />
@@ -182,11 +146,13 @@ export function ShiftMedSummary({
                             value={snapshot.counts.omissions}
                             tone="critical"
                         />
-                        <ShiftMedStat
-                            label="CD due"
-                            value={snapshot.counts.cd_due}
-                            tone="warning"
-                        />
+                        {showControlled && (
+                            <ShiftMedStat
+                                label="CD due"
+                                value={snapshot.counts.cd_due}
+                                tone="warning"
+                            />
+                        )}
                     </div>
                     {note ? (
                         <div className="text-[11.5px] text-muted-foreground">

@@ -26,6 +26,13 @@ class MarChartBoardPayloadTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Keep the explicit fallback contract; public defaults are covered separately.
+        config(['medications.person_record' => 'legacy']);
+    }
+
     protected function tearDown(): void
     {
         Carbon::setTestNow();

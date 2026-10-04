@@ -143,7 +143,10 @@ export function AppHeader({
                         <SheetTrigger asChild>
                             <button
                                 type="button"
-                                className={cn(INK_ICON_BUTTON, 'md:hidden')}
+                                className={cn(
+                                    INK_ICON_BUTTON,
+                                    'frontline-tap md:hidden',
+                                )}
                             >
                                 <Menu className="size-5" />
                                 <span className="sr-only">Toggle menu</span>

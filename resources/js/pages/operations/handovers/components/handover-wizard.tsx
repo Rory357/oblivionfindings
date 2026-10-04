@@ -354,6 +354,14 @@ export function HandoverWizard({
     // eMAR lens: live medication picture for the selected outgoing shift's window.
     const [snapshot, setSnapshot] = useState<ShiftMedSnapshot | null>(null);
     const [snapLoading, setSnapLoading] = useState(false);
+    const [snapshotRevision, setSnapshotRevision] = useState(0);
+    useEffect(() => setSnapshotRevision(0), [open, f.outgoing_shift]);
+    useEffect(() => {
+        if (!open || !medicationFocus) return;
+        const refresh = () => setSnapshotRevision((revision) => revision + 1);
+        window.addEventListener('focus', refresh);
+        return () => window.removeEventListener('focus', refresh);
+    }, [open, medicationFocus]);
     const [editLockState, setEditLockState] =
         useState<EditLockState>('not_needed');
     const [editLockHolder, setEditLockHolder] = useState<string | null>(null);
@@ -437,7 +445,7 @@ export function HandoverWizard({
                 const snap: ShiftMedSnapshot | null =
                     res.data?.snapshot ?? null;
                 setSnapshot(snap);
-                if (snap && snap.due.length > 0) {
+                if (snap && snap.due.length > 0 && snapshotRevision === 0) {
                     setF((p) =>
                         p.medications.length === 0
                             ? {
@@ -460,7 +468,7 @@ export function HandoverWizard({
         return () => {
             cancelled = true;
         };
-    }, [open, medicationFocus, f.outgoing_shift, basePath]);
+    }, [open, medicationFocus, f.outgoing_shift, basePath, snapshotRevision]);
 
     // eMAR lens: take a presence edit-lock while editing an existing draft. Only
     // release it if this wizard instance actually acquired it; a failed/blocked
@@ -1236,23 +1244,30 @@ export function HandoverWizard({
                             title="What must the next shift action?"
                             blurb="Add discrete items — they appear as checklists for the incoming worker."
                         />
+                        {medicationFocus && (
+                            <ShiftMedSummary
+                                snapshot={snapshot}
+                                loading={snapLoading}
+                                hasShift={!!f.outgoing_shift}
+                                showControlled={canViewControlled}
+                                onRetry={() =>
+                                    setSnapshotRevision(
+                                        (revision) => revision + 1,
+                                    )
+                                }
+                                noShiftHint="Select the outgoing shift to load its live medication picture."
+                                note={
+                                    canViewControlled &&
+                                    snapshot &&
+                                    snapshot.due.length > 0
+                                        ? 'Due meds were pre-filled into the list below — edit or remove as needed.'
+                                        : undefined
+                                }
+                            />
+                        )}
                         <div className="grid gap-4 lg:grid-cols-2">
                             {canViewControlled ? (
                                 <div className="space-y-2">
-                                    {medicationFocus && (
-                                        <ShiftMedSummary
-                                            snapshot={snapshot}
-                                            loading={snapLoading}
-                                            hasShift={!!f.outgoing_shift}
-                                            noShiftHint="Select the outgoing shift to load its live medication picture."
-                                            note={
-                                                snapshot &&
-                                                snapshot.due.length > 0
-                                                    ? 'Due meds were pre-filled into the list below — edit or remove as needed.'
-                                                    : undefined
-                                            }
-                                        />
-                                    )}
                                     {medicationFocus && canGovernControlled && (
                                         <div className="rounded-xl border border-border bg-card p-3">
                                             <div className="mb-1.5 flex items-center gap-2 text-[13px] font-semibold">

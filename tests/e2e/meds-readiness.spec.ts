@@ -75,6 +75,9 @@ async function chooseCheckTime(page: Page, label: string) {
 }
 
 async function selectRounds(page: Page) {
+    await expect(
+        page.getByRole('tablist', { name: 'Views', exact: true }),
+    ).toBeVisible();
     const tab = page.getByRole('tab', { name: /^Rounds/ });
     if (await tab.isVisible()) await tab.click();
     else {
@@ -91,7 +94,9 @@ async function openPrnSheetFor(page: Page, medicationName: string) {
         .getByRole('option', { name: new RegExp(medicationName) })
         .click();
     await expect(
-        page.getByRole('heading', { name: 'Safety checks', exact: true }),
+        page
+            .getByRole('dialog')
+            .getByText('Step 1 of 3 · Safety checks', { exact: true }),
     ).toBeVisible();
     await page.getByRole('button', { name: /^Continue/ }).click();
 }
@@ -328,7 +333,9 @@ test.describe('meds readiness workflows', () => {
         if (await start.isVisible()) await start.click();
         await page.getByRole('button', { name: /^Record next:/ }).click();
         await expect(
-            page.getByRole('heading', { name: 'Safety checks', exact: true }),
+            page
+                .getByRole('dialog')
+                .getByText('Step 1 of 3 · Safety checks', { exact: true }),
         ).toBeVisible();
         await page.getByRole('button', { name: /^Continue/ }).click();
         await expect(
@@ -427,11 +434,18 @@ test.describe('meds readiness workflows', () => {
         const dialog = page.getByRole('dialog', { name: /Record dose/i });
         await expect(dialog).toBeVisible();
         await expect(
-            dialog.getByRole('heading', { name: 'Safety checks' }),
+            dialog.getByText('Step 1 of 3 · Safety checks', { exact: true }),
         ).toBeVisible();
         await expect(
-            dialog.getByText('The five rights', { exact: true }),
+            dialog.getByRole('region', { name: 'Person', exact: true }),
         ).toBeVisible();
+        await expect(
+            dialog.getByRole('region', { name: 'Medicine', exact: true }),
+        ).toContainText('PW Meds Morning Tablets');
+        await expect(
+            dialog.getByText(/No allergies recorded for PW Meds/),
+        ).toBeVisible();
+        await expect(dialog.getByText(/Give with water/)).toBeVisible();
 
         expectNoUnexpectedConsoleErrors(consoleErrors);
     });

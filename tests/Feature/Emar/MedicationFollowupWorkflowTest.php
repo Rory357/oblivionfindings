@@ -31,6 +31,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
 
 class MedicationFollowupWorkflowTest extends TestCase
@@ -227,6 +228,90 @@ class MedicationFollowupWorkflowTest extends TestCase
         $this->assertSame($before, MedicationFollowup::query()->orderBy('id')->get()->map->getRawOriginal()->all());
         $this->assertSame($historyCount, DB::table('medication_followup_events')->count());
         $this->assertSame($eventCount, MedicationEvent::query()->count());
+        $this->assertDatabaseCount('medication_prn_effectiveness', 0);
+    }
+
+    public function test_older_effect_work_has_worker_person_handover_and_task_parity_before_preparation_and_after_completion(): void
+    {
+        $this->grant($this->worker, ['handovers.viewAny']);
+        $unscheduled = $this->legacyEffect();
+        $overdue = $this->legacyEffect(['effect_check_due_at' => now()->subHour()]);
+        [$preparedDose, $prepared] = $this->effect();
+        $expected = [$unscheduled->id, $overdue->id, $preparedDose->id];
+        $this->assertEffectWorkAcrossSurfaces($expected);
+        $this->getJson('/emar/clients/'.$this->client->id.'/day')->assertOk()
+            ->assertJsonPath('followup_counts', ['open' => 3, 'effect' => 3, 'overdue' => 1, 'unscheduled' => 1])
+            ->assertJsonPath('legacy_effect_checks.total', 2);
+        $this->assertDatabaseCount('medication_followups', 1);
+        $this->assertDatabaseCount('medication_prn_effectiveness', 0);
+
+        foreach ([$unscheduled, $overdue] as $dose) {
+            $response = $this->postJson('/medication-followups/administrations/'.$dose->id.'/prepare')->assertOk();
+            $row = MedicationFollowup::query()->findOrFail($response->json('id'));
+            // Preparing changes only the representation; it never adds a task
+            // alongside the source or fabricates a dose deadline or outcome.
+            $this->assertEffectWorkAcrossSurfaces($expected);
+            if ($dose->id === $unscheduled->id) {
+                $this->assertNull($row->due_at);
+            }
+            $this->postFollowup($row, ['action' => 'effect', 'outcome' => 'effective'])->assertOk();
+            $expected = array_values(array_diff($expected, [$dose->id]));
+            $this->assertEffectWorkAcrossSurfaces($expected);
+        }
+        $this->postFollowup($prepared, ['action' => 'effect', 'outcome' => 'effective'])->assertOk();
+        $this->assertEffectWorkAcrossSurfaces([]);
+        $this->assertDatabaseCount('client_medication_administrations', 3);
+        $this->assertDatabaseCount('medication_prn_effectiveness', 3);
+        $this->assertDatabaseCount('medication_followups', 3);
+    }
+
+    public function test_person_and_handover_live_work_is_bounded_without_losing_older_or_unscheduled_counts(): void
+    {
+        $this->grant($this->worker, ['handovers.viewAny']);
+        for ($index = 0; $index < 26; $index++) {
+            $this->legacyEffect(['administered_at' => now()->subMonths(2)]);
+        }
+        $person = $this->actingAs($this->worker)->getJson('/emar/clients/'.$this->client->id.'/day?date=2026-09-01')->assertOk()
+            ->assertJsonPath('followup_counts.effect', 26)->assertJsonPath('followup_counts.unscheduled', 26)
+            ->assertJsonPath('legacy_effect_checks.total', 26)->assertJsonCount(25, 'legacy_effect_checks.data')
+            ->assertJsonPath('legacy_effect_checks.has_more', true);
+        $handover = $this->getJson('/emar/handovers/shift-medications?shift_id='.$this->shift->id)->assertOk();
+        $this->assertSame($person->json('followup_counts'), $handover->json('snapshot.followup_counts'));
+        $this->assertSame($person->json('legacy_effect_checks'), $handover->json('snapshot.legacy_effect_checks'));
+        foreach ($person->json('legacy_effect_checks.data') as $row) {
+            $this->assertNull($row['due_at']);
+            $this->assertSame($this->worker->id, $row['owner']['id']);
+        }
+        $this->assertDatabaseCount('medication_followups', 0);
+        $this->assertDatabaseCount('medication_followup_events', 0);
+        $this->assertDatabaseCount('medication_prn_effectiveness', 0);
+    }
+
+    public function test_person_handover_projection_preserves_read_only_controlled_canonical_and_site_boundaries(): void
+    {
+        $this->grant($this->worker, ['handovers.viewAny']);
+        $ordinary = $this->legacyEffect();
+        $this->legacyEffect([], ['controlled_drug' => true]);
+        $this->legacyEffect(['administered_at' => now()->addHour()]);
+        $foreign = Client::factory()->create(['site_id' => Site::factory()->create(['is_active' => true])->id, 'status' => 'active']);
+        $this->legacyEffect(['client_id' => $foreign->id], ['client_id' => $foreign->id]);
+        $mismatch = $this->legacyEffect();
+        DB::table('client_medication_administrations')->where('id', $mismatch->id)->update(['client_id' => $foreign->id]);
+        $this->deny($this->worker, ['medications.administer.record', 'medications.controlled.view', 'medications.controlled.record']);
+
+        foreach ([['/emar/clients/'.$this->client->id.'/day', ''], ['/emar/handovers/shift-medications?shift_id='.$this->shift->id, 'snapshot.']] as [$url, $prefix]) {
+            $this->actingAs($this->worker)->getJson($url)->assertOk()
+                ->assertJsonPath($prefix.'followup_counts.effect', 1)
+                ->assertJsonPath($prefix.'legacy_effect_checks.total', 1)
+                ->assertJsonPath($prefix.'legacy_effect_checks.data.0.administration_id', $ordinary->id)
+                ->assertJsonPath($prefix.'legacy_effect_checks.data.0.can_prepare', false);
+        }
+        $this->getJson('/emar/clients/'.$foreign->id.'/day')->assertNotFound();
+        $foreignShift = Shift::factory()->create(['client_id' => $foreign->id, 'site_id' => $foreign->site_id, 'user_id' => $this->worker->id]);
+        $this->getJson('/emar/handovers/shift-medications?shift_id='.$foreignShift->id)->assertNotFound();
+        $this->postJson('/medication-followups/administrations/'.$ordinary->id.'/prepare')->assertForbidden();
+        $this->assertDatabaseCount('medication_followups', 0);
+        $this->assertDatabaseCount('medication_followup_events', 0);
         $this->assertDatabaseCount('medication_prn_effectiveness', 0);
     }
 
@@ -877,6 +962,47 @@ class MedicationFollowupWorkflowTest extends TestCase
         } catch (\LogicException $e) {
             $this->assertStringContainsString('append-only', $e->getMessage());
         }
+    }
+
+    /** Verify the real consumer reads agree and leave all clinical evidence unchanged. */
+    private function assertEffectWorkAcrossSurfaces(array $expected): void
+    {
+        sort($expected);
+        $dosesBefore = ClientMedicationAdministration::query()->orderBy('id')->get()->map->getRawOriginal()->all();
+        $workBefore = MedicationFollowup::query()->orderBy('id')->get()->map->getRawOriginal()->all();
+        $effectsBefore = MedicationPrnEffectiveness::query()->orderBy('id')->get()->map->getRawOriginal()->all();
+        $historyCount = DB::table('medication_followup_events')->count();
+        $auditCount = MedicationEvent::query()->count();
+        $this->actingAs($this->worker)->get('/meds/today')->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('prn_follow_ups', function ($rows) use ($expected): bool {
+                $ids = collect($rows)->pluck('administration_id')->sort()->values()->all();
+
+                return $ids === $expected;
+            }));
+        foreach ([['/emar/clients/'.$this->client->id.'/day', ''], ['/emar/handovers/shift-medications?shift_id='.$this->shift->id, 'snapshot.']] as [$url, $prefix]) {
+            $response = $this->getJson($url)->assertOk()->assertJsonPath($prefix.'followup_counts.effect', count($expected));
+            $ids = collect($response->json($prefix.'followups'))->where('type', 'effect')->pluck('administration_id')
+                ->merge(collect($response->json($prefix.'legacy_effect_checks.data'))->pluck('administration_id'))
+                ->sort()->values()->all();
+            $this->assertSame($expected, $ids);
+        }
+        $legacy = (new LegacyMedicationEffectProvider)->authorizedTasks($this->worker);
+        $canonical = (new MedicationFollowupProvider)->authorizedTasks($this->worker);
+        $ids = collect($legacy)->map(fn ($task) => (int) str_replace('medication-effect-source-', '', $task->id))
+            ->merge(collect($canonical)->map(fn ($task) => MedicationFollowup::query()->findOrFail((int) str_replace('medication-followup-', '', $task->id))->administration_id))
+            ->sort()->values()->all();
+        $this->assertSame($expected, $ids);
+        foreach ($legacy as $task) {
+            $this->getJson('/tasks/detail?source=medication-effect-source&id='.str_replace('medication-effect-source-', '', $task->id))->assertOk();
+        }
+        foreach ($canonical as $task) {
+            $this->getJson('/tasks/detail?source=medication-followup&id='.str_replace('medication-followup-', '', $task->id))->assertOk();
+        }
+        $this->assertSame($dosesBefore, ClientMedicationAdministration::query()->orderBy('id')->get()->map->getRawOriginal()->all());
+        $this->assertSame($workBefore, MedicationFollowup::query()->orderBy('id')->get()->map->getRawOriginal()->all());
+        $this->assertSame($effectsBefore, MedicationPrnEffectiveness::query()->orderBy('id')->get()->map->getRawOriginal()->all());
+        $this->assertSame($historyCount, DB::table('medication_followup_events')->count());
+        $this->assertSame($auditCount, MedicationEvent::query()->count());
     }
 
     private function work(): MedicationFollowupService
