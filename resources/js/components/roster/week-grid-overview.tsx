@@ -116,7 +116,7 @@ export default function WeekGridOverview({
                                 'flex min-h-32 flex-col gap-2 rounded-md border bg-background/60 p-2',
                                 isToday &&
                                     'border-primary/60 bg-primary/5 ring-1 ring-primary/30',
-                                isPast && 'opacity-70',
+                                isPast && 'bg-muted/40',
                             )}
                         >
                             <div className="flex items-baseline justify-between">
