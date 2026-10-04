@@ -531,6 +531,8 @@ class MedicationControlledApiConcealmentTest extends TestCase
         $actor = $this->userWithPermissions([
             'medications.view',
             'reports.viewAny',
+            'medications.reports.view',
+            'medications.reports.export',
         ], $site);
 
         foreach ([
@@ -545,8 +547,8 @@ class MedicationControlledApiConcealmentTest extends TestCase
                 ['date_from' => '2026-08-28', 'date_to' => '2026-08-27'],
                 'date_to',
             ],
-            ['api.medications.reports.export', ['type' => 'unknown'], 'type'],
-            ['api.medications.reports.export', ['date_to' => 'not-a-date'], 'date_to'],
+            ['api.medications.reports.export', ['type' => 'unknown', 'purpose' => 'care'], 'type'],
+            ['api.medications.reports.export', ['date_to' => 'not-a-date', 'purpose' => 'care'], 'date_to'],
         ] as [$routeName, $query, $field]) {
             $this->actingAs($actor)
                 ->getJson(route($routeName, $query))

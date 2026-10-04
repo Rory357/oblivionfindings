@@ -15,11 +15,11 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\EnhancedMarService;
+use Database\Factories\UserFactory;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
-use Database\Factories\UserFactory;
 
 /**
  * Regression coverage for the 2026-07 eMAR integrity audit:
@@ -125,7 +125,7 @@ class MedicationIntegrityAuditTest extends TestCase
                 $witness2,
                 4,
             ))
-            ->assertOk()
+            ->assertRedirect('/emar/destructions')
             ->assertSessionHasNoErrors();
 
         $this->assertSame(6.0, (float) $medication->stock->fresh()->on_hand);
