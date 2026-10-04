@@ -32,21 +32,29 @@ import {
 } from '../errors/_shared';
 
 export type ClientOption = Person & { site: string | null };
-export function ReportErrorModal({
-    open,
-    onClose,
-    clients,
-    initialClientId,
-    initialMedicationId,
-    initialOccurredAt,
-}: {
+type ReportErrorModalProps = {
     open: boolean;
     onClose: () => void;
     clients: ClientOption[];
     initialClientId?: number | null;
     initialMedicationId?: number | null;
     initialOccurredAt?: string | null;
-}) {
+};
+
+export function ReportErrorModal(props: ReportErrorModalProps) {
+    // Oversight pages keep this wrapper mounted. Each explicitly opened report
+    // needs fresh context; discarded details must not reappear on the next open.
+    return props.open ? <ReportErrorForm {...props} /> : null;
+}
+
+function ReportErrorForm({
+    open,
+    onClose,
+    clients,
+    initialClientId,
+    initialMedicationId,
+    initialOccurredAt,
+}: ReportErrorModalProps) {
     const [step, setStep] = useState(0);
     const [saving, setSaving] = useState(false);
     const [client, setClient] = useState<number | null>(

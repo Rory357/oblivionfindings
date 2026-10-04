@@ -65,4 +65,45 @@ describe('medication error draft recovery', () => {
             screen.queryByRole('dialog', { name: 'Discard your changes?' }),
         ).not.toBeInTheDocument();
     });
+
+    it('starts a fresh report after explicit discard when the parent keeps the wrapper mounted', async () => {
+        const onClose = vi.fn();
+        const props = { open: true, onClose, clients: [] };
+        const { rerender } = render(<ReportErrorModal {...props} />);
+        fireEvent.change(
+            screen.getByRole('textbox', { name: 'What happened?' }),
+            {
+                target: {
+                    value: 'This discarded account must not be submitted later.',
+                },
+            },
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        fireEvent.click(
+            await screen.findByRole('button', { name: 'Discard changes' }),
+        );
+        expect(onClose).toHaveBeenCalledOnce();
+
+        rerender(<ReportErrorModal {...props} open={false} />);
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        rerender(
+            <ReportErrorModal
+                {...props}
+                initialOccurredAt="2026-10-06T00:00:00Z"
+            />,
+        );
+        expect(
+            screen.getByRole('textbox', { name: 'What happened?' }),
+        ).toHaveValue('');
+        expect(
+            screen.getByRole('button', {
+                name: 'When it happened date: 6 Oct 2026',
+            }),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(onClose).toHaveBeenCalledTimes(2);
+        expect(
+            screen.queryByRole('dialog', { name: 'Discard your changes?' }),
+        ).not.toBeInTheDocument();
+    });
 });
