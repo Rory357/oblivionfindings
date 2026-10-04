@@ -82,8 +82,15 @@ async function selectRounds(page: Page) {
     if (await tab.isVisible()) await tab.click();
     else {
         await page.getByRole('button', { name: /More views/ }).click();
-        await page.getByRole('menuitem', { name: /^Rounds/ }).click();
+        await page
+            .getByRole('dialog')
+            .getByRole('button', { name: 'Rounds', exact: true })
+            .click();
     }
+    await expect(page.getByRole('tab', { name: /^Rounds/ })).toHaveAttribute(
+        'aria-selected',
+        'true',
+    );
 }
 
 async function openPrnSheetFor(page: Page, medicationName: string) {
@@ -132,9 +139,13 @@ async function openGuidedRound(page: Page) {
         })
         .first()
         .click();
-    // The canonical desktop round workspace opens its safety-gated guided
-    // dialog through the rounds query rather than the retired standalone page.
-    await page.waitForURL(/\/emar\/rounds\?.*guided=\d+/);
+    // Frontline workers stay on their own board when entering a round.
+    await page.waitForURL(
+        (url) =>
+            url.pathname === '/meds/today' &&
+            url.searchParams.get('view') === 'rounds' &&
+            /^\d+$/.test(url.searchParams.get('round') ?? ''),
+    );
     await expect(
         page.getByRole('heading', {
             name: /Guided round · PW Meds Readiness Round/i,
@@ -243,6 +254,18 @@ test.describe('meds readiness workflows', () => {
             }),
         ).toBeEnabled();
         await selectRounds(page);
+        const roundDoses = page.getByRole('list', {
+            name: 'PW Meds Readiness Round doses',
+            exact: true,
+        });
+        await expect(roundDoses.getByRole('listitem')).toHaveCount(3);
+        for (const medicine of [
+            'PW Meds Morning Tablets',
+            'PW Meds Vitamin D',
+            'PW Meds Eye Drops',
+        ]) {
+            await expect(roundDoses).toContainText(medicine);
+        }
         await expect(
             page
                 .getByRole('link', {
@@ -371,7 +394,7 @@ test.describe('meds readiness workflows', () => {
         ).toBeEnabled();
 
         await page.getByRole('button', { name: /Finish round/i }).click();
-        await expect(page.getByText('Completed').first()).toBeVisible({
+        await expect(page.getByText('Complete', { exact: true })).toBeVisible({
             timeout: 15_000,
         });
 
@@ -470,14 +493,12 @@ test.describe('meds readiness workflows', () => {
             page.getByText(/Choose who is witnessing/).first(),
         ).toBeVisible();
         await page
-            .getByRole('combobox', { name: 'Witnessed by', exact: true })
+            .getByRole('combobox', { name: /^Witnessed by\s*\*?$/ })
             .click();
         await page
             .getByRole('option', { name: /Medication Demo Witness/ })
             .click();
-        await page
-            .getByLabel('Witness’s 6-digit PIN', { exact: true })
-            .fill('593027');
+        await page.getByLabel(/^Witness’s 6-digit PIN\s*\*?$/).fill('593027');
         await page.getByRole('button', { name: /^Continue/ }).click();
         await expect(
             page.getByRole('button', { name: 'Record outcome', exact: true }),

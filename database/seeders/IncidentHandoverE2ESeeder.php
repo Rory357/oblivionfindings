@@ -11,6 +11,7 @@ use App\Models\HsEvent;
 use App\Models\MedicationError;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Shift as ClinicalShift;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -32,6 +33,8 @@ final class IncidentHandoverE2ESeeder extends Seeder
     public const ACTION_OWNER_EMAIL = 'incident-e2e-action-owner@demo.test';
 
     public const SHIFT_NAME = '[INCIDENT-HANDOVER-E2E] Fresh Control Room shift';
+
+    public const MEDICATION_SHIFT_NOTES = '[INCIDENT-HANDOVER-E2E] Synthetic medication error reporting cover';
 
     public const REQUIRED_ALERT_REFERENCES = [
         'CR-E2E-HANDOVER-01',
@@ -103,15 +106,16 @@ final class IncidentHandoverE2ESeeder extends Seeder
             'hazards.view',
             'hazards.manage',
         ]);
-        $this->grant($owner, ['hazards.view', 'hazards.manage', 'healthSafety.viewAllSites']);
+        $this->grant($owner, ['hazards.view', 'hazards.manage', 'healthSafety.viewAllSites', 'healthSafety.events.close']);
         $this->grant($actionOwner, ['hazards.view', 'hazards.manage']);
         $this->grant($verifier, ['hazards.view', 'hazards.manage', 'healthSafety.viewAllSites']);
 
         $this->assertNoUnrelatedActiveShift();
-        $client->supportWorkers()->syncWithoutDetaching([$worker->id]);
+        $client->supportWorkers()->syncWithoutDetaching([$worker->id, $operator->id]);
         $this->clearPriorJourneys($client);
         $this->retirePriorFixtureShifts();
         $shift = $this->freshShift($operator, $incoming);
+        $this->medicationReportingShift($operator, $client, $site);
         $requiredAlerts = $this->requiredAlerts($site, $client, $operator);
 
         $manifest = [
@@ -284,6 +288,30 @@ final class IncidentHandoverE2ESeeder extends Seeder
             'shift_lead_user_id' => $operator->id,
             'team_members' => [$operator->id, $incoming->id],
             'open_alerts_at_start' => 0,
+        ]);
+    }
+
+    private function medicationReportingShift(User $operator, Client $client, Site $site): void
+    {
+        // Control Room duty is separate from the canonical clinical cover
+        // required to report a medication error. This synthetic cover names
+        // only the intended reporter and fixture person/Site; it records no dose.
+        ClinicalShift::query()->updateOrCreate([
+            'user_id' => $operator->id,
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'notes' => self::MEDICATION_SHIFT_NOTES,
+        ], [
+            'service_context_id' => $client->service_context_id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(4),
+            'actual_starts_at' => now()->subHour(),
+            'actual_ends_at' => null,
+            'started_by' => $operator->id,
+            'completed_by' => null,
+            'status' => 'in_progress',
+            'shift_type' => 'day',
+            'created_by' => $operator->id,
         ]);
     }
 

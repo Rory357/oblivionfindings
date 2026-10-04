@@ -16,14 +16,14 @@ const viewports = [
 ] as const;
 
 test.describe('My Day responsive safety controls', () => {
-    test('keeps safety actions and care access reachable without horizontal overflow', async ({
-        page,
-    }) => {
-        const consoleErrors = collectConsoleErrors(page);
-        // The medication fixture has one assigned person and a covering shift.
-        await loginAsMedsDemoWorker(page);
+    for (const viewport of viewports) {
+        test(`keeps safety actions and care access reachable at ${viewport.width}px`, async ({
+            page,
+        }) => {
+            const consoleErrors = collectConsoleErrors(page);
+            // The medication fixture has one assigned person and a covering shift.
+            await loginAsMedsDemoWorker(page);
 
-        for (const viewport of viewports) {
             await page.setViewportSize(viewport);
             await page.goto('/my-day');
             const title = page.getByRole('heading', {
@@ -134,13 +134,38 @@ test.describe('My Day responsive safety controls', () => {
             }
 
             await notifications.click();
-            await expect(
-                page.getByRole('menu', { name: 'Notifications', exact: true }),
-            ).toBeVisible();
+            const notificationMenu = page.getByRole('menu', {
+                name: 'Notifications',
+                exact: true,
+            });
+            await expect(notificationMenu).toBeVisible();
+            const menuBox = await notificationMenu.boundingBox();
+            expect(menuBox).not.toBeNull();
+            expect(menuBox!.x).toBeGreaterThanOrEqual(0);
+            expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(
+                viewport.width,
+            );
+            if (viewport.width < 768) {
+                for (const action of [
+                    notificationMenu.getByRole('button', {
+                        name: 'Mark all notifications read',
+                        exact: true,
+                    }),
+                    notificationMenu.getByRole('link', {
+                        name: 'View All Notifications',
+                        exact: true,
+                    }),
+                ]) {
+                    const box = await action.boundingBox();
+                    expect(box).not.toBeNull();
+                    expect(box!.height).toBeGreaterThanOrEqual(44);
+                }
+            }
             await page.keyboard.press('Escape');
+            await expect(notificationMenu).toBeHidden();
             await expect(notifications).toBeFocused();
-        }
 
-        expectNoConsoleErrors(consoleErrors);
-    });
+            expectNoConsoleErrors(consoleErrors);
+        });
+    }
 });

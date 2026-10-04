@@ -10,7 +10,6 @@ use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
-use App\Models\MedicationPrnEffectiveness;
 use App\Models\MedicationRefusalFollowup;
 use App\Models\MedicationRound;
 use App\Models\Shift;
@@ -20,20 +19,19 @@ use App\Services\Emar\MedsBoardPayloadService;
 use App\Services\EnhancedMarService;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
-use App\Services\MedicationScanVerificationService;
 use App\Services\Medication\Alerts\OnCallResolver;
 use App\Services\Medication\Audit\MedicationEventData;
 use App\Services\Medication\Audit\MedicationEventRecorder;
-use App\Services\Medication\Followups\MedicationFollowupService;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
-use App\Services\Medication\Recording\DoseRecordingRequirements;
-use App\Services\Medication\StaffEligibilityRegister;
 use App\Services\Medication\Followups\LegacyEffectFollowupAdapter;
 use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
-use App\Services\Medication\Recording\RecordingContract;
+use App\Services\Medication\Recording\DoseRecordingRequirements;
 use App\Services\Medication\Recording\PrnEffectCheckQueue;
+use App\Services\Medication\Recording\RecordingContract;
+use App\Services\Medication\StaffEligibilityRegister;
+use App\Services\MedicationScanVerificationService;
 use App\Services\Timeline\TimelineEmitter;
 use App\Services\UserSiteAccessService;
 use App\Support\Medication\MedicationStockQuantity;
@@ -152,8 +150,8 @@ class WorkerMedsController extends Controller
         $dueLater = array_values(array_filter($medsDue, fn ($m) => $m['status'] === 'upcoming'));
         $overdue = array_values(array_filter($medsDue, fn ($m) => $m['status'] === 'overdue'));
 
-        $activeRound = $isToday ? $this->activeRound($user, $now) : null;
-        $rounds = $this->roundsForDate($user, $date);
+        $activeRound = $isToday ? $this->activeRound($user, $now, $assignedClientIds) : null;
+        $rounds = $this->roundsForDate($user, $date, $assignedClientIds);
         $upcomingRounds = array_values(array_filter(
             $rounds,
             fn ($r) => in_array($r['status'], ['pending', 'in_progress'], true),
@@ -1139,7 +1137,6 @@ class WorkerMedsController extends Controller
         ]);
     }
 
-
     /**
      * Stock pressure for the assigned clients' active medications: low stock,
      * expiring within 30 days, or already expired. Always anchored to today —
@@ -1314,7 +1311,7 @@ class WorkerMedsController extends Controller
      * The single round the worker should walk right now, matching the
      * `/my-day` banner exactly (same service, same precedence).
      */
-    private function activeRound(User $user, Carbon $now): ?array
+    private function activeRound(User $user, Carbon $now, array $clientIds): ?array
     {
         if (! $user->canDo('medications.administer.record')) {
             return null;
@@ -1329,7 +1326,7 @@ class WorkerMedsController extends Controller
         }
 
         try {
-            $round = MedicationRound::query()
+            $rounds = MedicationRound::query()
                 ->whereDate('round_date', $now->toDateString())
                 ->whereIn('site_id', $siteIds)
                 ->where(function ($q) use ($user) {
@@ -1339,32 +1336,36 @@ class WorkerMedsController extends Controller
                 ->whereIn('status', ['in_progress', 'pending'])
                 ->orderByRaw("CASE status WHEN 'in_progress' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END")
                 ->orderBy('scheduled_time')
-                ->first();
+                ->get();
 
-            if (! $round) {
-                return null;
+            foreach ($rounds as $round) {
+                $items = $this->guidedRoundService->items(
+                    $round,
+                    $user->canDo('medications.controlled.view'),
+                    $clientIds,
+                );
+                $progress = $this->guidedRoundService->summarise($items);
+
+                if ($progress['total'] === 0) {
+                    continue;
+                }
+
+                return [
+                    'id' => $round->id,
+                    'name' => $round->name,
+                    'status' => $round->status,
+                    'scheduled_time' => $round->scheduled_time,
+                    'scheduled_at' => $round->scheduledAt()?->toIso8601String(),
+                    'dose_keys' => $this->roundDoseKeys($items),
+                    'given' => $progress['given'],
+                    'total' => $progress['total'],
+                    'completed' => $progress['completed'],
+                    'percent' => $progress['percent'],
+                    'url' => route('meds.round.show', $round),
+                ];
             }
 
-            $progress = $this->guidedRoundService->progress(
-                $round,
-                $user->canDo('medications.controlled.view'),
-            );
-
-            if ($progress['total'] === 0) {
-                return null;
-            }
-
-            return [
-                'id' => $round->id,
-                'name' => $round->name,
-                'status' => $round->status,
-                'scheduled_time' => $round->scheduled_time,
-                'given' => $progress['given'],
-                'total' => $progress['total'],
-                'completed' => $progress['completed'],
-                'percent' => $progress['percent'],
-                'url' => route('meds.round.show', $round),
-            ];
+            return null;
         } catch (\Throwable $e) {
             report($e);
 
@@ -1408,7 +1409,19 @@ class WorkerMedsController extends Controller
         }, ['pending', 'partial', 'in_progress', 'completed']);
     }
 
-    private function roundsForDate(User $user, Carbon $date): array
+    /**
+     * @param  list<array<string, mixed>>  $items
+     * @return list<string>
+     */
+    private function roundDoseKeys(array $items): array
+    {
+        return array_map(
+            fn (array $item): string => $item['medication_id'].':'.Carbon::parse($item['scheduled_for'])->utc()->format('YmdHi'),
+            $items,
+        );
+    }
+
+    private function roundsForDate(User $user, Carbon $date, array $clientIds): array
     {
         $siteIds = $this->siteAccess->accessibleSiteIds(
             $user,
@@ -1433,14 +1446,17 @@ class WorkerMedsController extends Controller
             $includeControlled = $user->canDo('medications.controlled.view');
 
             return $rounds
-                ->map(function (MedicationRound $round) use ($includeControlled) {
-                    $progress = $this->guidedRoundService->progress($round, $includeControlled);
+                ->map(function (MedicationRound $round) use ($includeControlled, $clientIds) {
+                    $items = $this->guidedRoundService->items($round, $includeControlled, $clientIds);
+                    $progress = $this->guidedRoundService->summarise($items);
 
                     return [
                         'id' => $round->id,
                         'name' => $round->name,
                         'status' => $round->status,
                         'scheduled_time' => $round->scheduled_time,
+                        'scheduled_at' => $round->scheduledAt()?->toIso8601String(),
+                        'dose_keys' => $this->roundDoseKeys($items),
                         'total' => $progress['total'],
                         'completed' => $progress['completed'],
                         'percent' => $progress['percent'],

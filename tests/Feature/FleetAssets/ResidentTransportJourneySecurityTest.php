@@ -25,6 +25,7 @@ use App\Models\User;
 use App\Services\Fleet\ResidentTransportJourneyService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\MedicationScanVerificationService;
+use Database\Factories\UserFactory;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -37,7 +38,6 @@ use RuntimeException;
 use Symfony\Component\Process\Process;
 use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
-use Database\Factories\UserFactory;
 
 class ResidentTransportJourneySecurityTest extends TestCase
 {
@@ -1066,6 +1066,14 @@ class ResidentTransportJourneySecurityTest extends TestCase
             ['password' => Hash::make('ineligible-secret')],
         );
         $this->shift($siteB, $clientB, $ineligibleWitness);
+        $areaIneligibleWitness = $this->siteUser(
+            $siteB,
+            ['medications.controlled.witness'],
+        );
+        $this->recordCompetency($areaIneligibleWitness);
+        MedicationCompetencyAssessment::query()->where('user_id', $areaIneligibleWitness->id)
+            ->sole()->update(['controlled_drugs' => false]);
+        $this->shift($siteB, $clientB, $areaIneligibleWitness);
         $eligibleWitness = $this->siteUser(
             $siteB,
             ['medications.controlled.witness'],
@@ -1103,6 +1111,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
             [$nonPresentWitness, 'not-present-secret'],
             [$outOfWindowWitness, 'out-of-window-secret'],
             [$ineligibleWitness, 'ineligible-secret'],
+            [$areaIneligibleWitness, UserFactory::TEST_WITNESS_PIN],
         ] as [$witness, $credential]) {
             $this->actingAs($globalActor)
                 ->postJson("/fleet-assets/transports/{$transportB->id}/pack-medication", [
@@ -1321,7 +1330,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
         );
         $medication = $this->medication($client, 'Legacy packing evidence medication', true);
         $log = $this->log($transport, $client, $medication, $actor, [
-            'witness_required' => false,
+            'witness_required' => true,
             'packed_witness_name' => 'Unverified historic label',
             'returned_to_house_at' => now(),
             'returned_by_user_id' => $actor->id,
@@ -2012,6 +2021,7 @@ PHP;
             'expiry_date' => now()->addYear()->toDateString(),
             'assessor_declared_at' => now()->subYear(),
             'staff_acknowledged_at' => now()->subYear()->addMinute(),
+            'controlled_drugs' => true,
             'can_witness_controlled' => true,
         ]);
     }

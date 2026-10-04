@@ -35,8 +35,10 @@ test.describe('global mobile navigation accessibility', () => {
         expect(
             await page
                 .locator('#main-content')
-                .evaluate((main) =>
-                    Boolean(main.closest('[aria-hidden="true"]')),
+                .evaluate(
+                    (main) =>
+                        main.hasAttribute('inert') ||
+                        Boolean(main.closest('[aria-hidden="true"]')),
                 ),
         ).toBe(true);
         expect(
@@ -93,8 +95,10 @@ test.describe('global mobile navigation accessibility', () => {
         expect(
             await page
                 .locator('#main-content')
-                .evaluate((main) =>
-                    Boolean(main.closest('[aria-hidden="true"]')),
+                .evaluate(
+                    (main) =>
+                        main.hasAttribute('inert') ||
+                        Boolean(main.closest('[aria-hidden="true"]')),
                 ),
         ).toBe(false);
 
@@ -131,8 +135,10 @@ test.describe('global mobile navigation accessibility', () => {
         expect(
             await page
                 .locator('#main-content')
-                .evaluate((main) =>
-                    Boolean(main.closest('[aria-hidden="true"]')),
+                .evaluate(
+                    (main) =>
+                        main.hasAttribute('inert') ||
+                        Boolean(main.closest('[aria-hidden="true"]')),
                 ),
         ).toBe(false);
 

@@ -103,9 +103,13 @@ test.describe('incident report recovery', () => {
 
         await page.getByRole('button', { name: 'Close' }).click();
         await expect(
-            page.getByText(
-                'Not saved yet. Keep this report open, reconnect, then retry.',
-            ),
+            page
+                .getByRole('alertdialog', {
+                    name: 'Keep this incident report?',
+                })
+                .getByText(
+                    'Not saved yet. Keep this report open, reconnect, then retry.',
+                ),
         ).toBeVisible();
         await page.getByRole('button', { name: 'Keep editing' }).click();
         await expect(
@@ -146,9 +150,13 @@ test.describe('incident report recovery', () => {
             .fill('Session expiry must not clear this report.');
         await page.getByRole('button', { name: 'Close' }).click();
         await expect(
-            page.getByText(
-                'Your session ended. Sign in again, then retry this draft before closing.',
-            ),
+            page
+                .getByRole('alertdialog', {
+                    name: 'Keep this incident report?',
+                })
+                .getByText(
+                    'Your session ended. Sign in again, then retry this draft before closing.',
+                ),
         ).toBeVisible();
         await page.getByRole('button', { name: 'Keep editing' }).click();
         await expect(

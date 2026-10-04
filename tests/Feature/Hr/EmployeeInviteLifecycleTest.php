@@ -2,6 +2,7 @@
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Notifications\EmployeeInviteNotification;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -63,17 +64,30 @@ test('an already active employee cannot be reinvited and no notification is sent
 
 test('an employee at a hidden Site cannot be reinvited', function () {
     Notification::fake();
+    // This actor is Site-scoped; central HR's explicit all-Sites permission
+    // would otherwise make the target's Site visible to the seeded HR role.
+    $allSitesPermission = Permission::query()->where('key', 'hr.employees.viewAllSites')->firstOrFail();
+    $this->hr->permissionOverrides()->syncWithoutDetaching([$allSitesPermission->id => ['allowed' => false]]);
+    $this->hr->refresh();
+    expect($this->hr->canDo('hr.employees.viewAllSites'))->toBeFalse()
+        ->and($this->hr->canDo('hr.employees.manage'))->toBeTrue();
+
     $employee = User::factory()->create(['approved_at' => null]);
     $profile = HrEmployeeProfile::factory()->create([
         'user_id' => $employee->id,
         'primary_site_id' => $this->hiddenSite->id,
     ]);
+    $beforeEmployee = $employee->refresh()->getRawOriginal();
+    $beforeProfile = $profile->refresh()->getRawOriginal();
 
     $this->actingAs($this->hr)
         ->post("/hr/people/{$profile->id}/invite")
         ->assertNotFound();
 
     Notification::assertNothingSent();
+    $this->assertDatabaseMissing(config('auth.passwords.users.table'), ['email' => $employee->email]);
+    expect($employee->refresh()->getRawOriginal())->toBe($beforeEmployee)
+        ->and($profile->refresh()->getRawOriginal())->toBe($beforeProfile);
 });
 
 test('employee invite is sent once only after an outer transaction commits and never after rollback', function () {

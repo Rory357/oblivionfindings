@@ -2832,6 +2832,7 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
     return (
         <SheetContent
             side="left"
+            aria-modal="true"
             overlayClassName="bg-black/50 md:hidden"
             closeButtonClassName="frontline-focus frontline-tap top-1.5 right-2.5 flex items-center justify-center rounded-md text-sidebar-foreground opacity-100 hover:bg-sidebar-accent hover:opacity-100 focus:ring-sidebar-ring [&_svg]:size-5"
             closeLabel="Close menu"

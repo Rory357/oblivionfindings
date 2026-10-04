@@ -50,7 +50,11 @@ function makeBatchOneNote(Client $client, User $author, array $attributes = []):
 function makeBatchOneClient(): Client
 {
     return Client::factory()->create([
-        'site_id' => Site::factory()->create()->id,
+        'site_id' => Site::factory()->create([
+            'is_active' => true,
+            'archived' => false,
+            'archived_at' => null,
+        ])->id,
     ]);
 }
 
@@ -77,6 +81,7 @@ it('shows only the current authors drafts in the profile and daily note endpoint
         'progress_notes.update',
         'progress_notes.review',
     ]);
+    assignBatchOneWorkerToSite($viewer, $client->site);
 
     $ownDraft = makeBatchOneNote($client, $viewer, [
         'subject' => 'Own private draft',
@@ -114,7 +119,7 @@ it('shows only the current authors drafts in the profile and daily note endpoint
 });
 
 it('keeps submitted private notes with their author and senior reviewers', function () {
-    $site = Site::factory()->create();
+    $site = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
     $client = Client::factory()->create(['site_id' => $site->id]);
     $author = User::factory()->create(['role' => 'support_worker']);
     $colleague = User::factory()->create(['role' => 'support_worker']);
@@ -136,6 +141,7 @@ it('keeps submitted private notes with their author and senior reviewers', funct
     ]);
     assignBatchOneWorkerToSite($author, $site);
     assignBatchOneWorkerToSite($colleague, $site);
+    assignBatchOneWorkerToSite($reviewer, $site);
     $client->supportWorkers()->attach([$author->id, $colleague->id]);
 
     $private = makeBatchOneNote($client, $author, [
@@ -175,6 +181,7 @@ it('lets an author resume and submit their own draft without granting submitted-
         'progress_notes.viewAny',
         'progress_notes.create',
     ]);
+    assignBatchOneWorkerToSite($author, $client->site);
     $draft = makeBatchOneNote($client, $author, [
         'subject' => 'Working draft',
         'body' => 'First draft text.',
@@ -223,6 +230,8 @@ it('keeps a colleagues draft private from update delete flag and review operatio
         'progress_notes.delete',
         'progress_notes.review',
     ]);
+    assignBatchOneWorkerToSite($manager, $client->site);
+    expect($manager->can('view', $client))->toBeTrue();
     $draft = makeBatchOneNote($client, $author, [
         'body' => 'Private author workspace.',
         'is_draft' => true,
@@ -259,6 +268,7 @@ it('does not allow submitted notes to move backwards into draft state', function
         'progress_notes.viewAny',
         'progress_notes.update',
     ]);
+    assignBatchOneWorkerToSite($manager, $client->site);
     $submitted = makeBatchOneNote($client, $manager);
 
     $this->actingAs($manager)
@@ -280,6 +290,7 @@ it('excludes drafts from review and follow-up projections', function () {
         'progress_notes.viewAny',
         'progress_notes.review',
     ]);
+    assignBatchOneWorkerToSite($reviewer, $client->site);
     $draft = makeBatchOneNote($client, $reviewer, [
         'subject' => 'Draft action source',
         'body' => 'Not part of the formal record yet.',
@@ -319,6 +330,7 @@ it('does not mutate unrelated client-note types through daily-note routes', func
         'progress_notes.delete',
         'progress_notes.review',
     ]);
+    assignBatchOneWorkerToSite($manager, $client->site);
     $unrelated = makeBatchOneNote($client, $manager, [
         'type' => 'clinical_summary',
         'body' => 'Owned by another client-note workflow.',

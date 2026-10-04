@@ -1,36 +1,21 @@
-/* Meds today › Rounds and Stock alerts (P01 C3). Both keep today's content
- * until their package redesigns them: the Rounds tab still opens today's
- * guided round (the walker arrives in C4), and Stock alerts is designed in
- * P06. Moved unchanged from the old Meds today page. */
+/* Worker round previews use the same scoped dose identities as the walker. */
 import { Link } from '@inertiajs/react';
 import { ArrowRight, CheckCircle2, Package, Pill } from 'lucide-react';
 
 import { ClientAvatar, StatusPill } from '@/components/meds/board-bits';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { formatTime } from '@/lib/datetime';
 
 import type { ClientInfo, RoundInfo, ScheduleRow, StockAlert } from './types';
-
-function bucketForTime(hhmm: string | null): string {
-    const hour = Number((hhmm ?? '').slice(0, 2));
-    if (Number.isNaN(hour)) return 'Morning';
-    if (hour < 11) return 'Morning';
-    if (hour < 14) return 'Midday';
-    if (hour < 17) return 'Afternoon';
-    if (hour < 21) return 'Evening';
-    return 'Night';
-}
-
-function clockLabel(hhmm?: string | null): string {
-    return (hhmm ?? '').slice(0, 5);
-}
-
-/* ------------------------------------------------------------------ */
-/*  Active round banner                                                */
-/* ------------------------------------------------------------------ */
-
 
 function StockAlertRow({
     alert,
@@ -92,7 +77,7 @@ export function RoundsTab({
             <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                     <Pill className="h-4 w-4 text-muted-foreground" />
-                    Medication rounds — today
+                    Medication rounds
                 </CardTitle>
                 <CardDescription>
                     Guided walk-throughs group doses by time and site so nothing
@@ -110,13 +95,14 @@ export function RoundsTab({
                     const isActive = r.status === 'in_progress';
                     const isDone = r.status === 'completed';
                     const verb = isActive ? 'Resume' : 'Start';
-                    const roundDoses = schedule.filter(
-                        (d) =>
-                            d.round_label === bucketForTime(r.scheduled_time),
+                    const doseKeys = new Set(r.dose_keys ?? []);
+                    const roundDoses = schedule.filter((d) =>
+                        doseKeys.has(d.key),
                     );
                     return (
-                        <div
+                        <section
                             key={r.id}
+                            aria-label={`${r.name} round`}
                             className={`rounded-xl border p-4 ${
                                 isActive
                                     ? 'border-status-success/40 bg-status-success-bg'
@@ -140,10 +126,10 @@ export function RoundsTab({
                                     )}
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-bold">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <h3 className="text-sm font-bold break-words">
                                             {r.name}
-                                        </span>
+                                        </h3>
                                         {isActive ? (
                                             <Badge
                                                 variant="outline"
@@ -162,16 +148,18 @@ export function RoundsTab({
                                         ) : null}
                                     </div>
                                     <div className="mt-0.5 text-xs text-muted-foreground">
-                                        Scheduled {clockLabel(r.scheduled_time)}{' '}
-                                        · {r.completed} of {r.total} done
+                                        Scheduled {formatTime(r.scheduled_at)} ·{' '}
+                                        {r.completed} of {r.total} done
                                     </div>
                                     <Progress
+                                        aria-label={`${r.name} progress`}
                                         value={r.percent}
                                         className="mt-2 h-1.5 max-w-sm"
                                     />
                                 </div>
                                 {!isDone && canRecord ? (
                                     <Button
+                                        className="frontline-tap max-w-full whitespace-normal"
                                         size="sm"
                                         variant={
                                             isActive ? 'default' : 'outline'
@@ -189,32 +177,38 @@ export function RoundsTab({
                                 ) : null}
                             </div>
                             {roundDoses.length > 0 ? (
-                                <div className="mt-3 flex flex-wrap gap-1.5">
+                                <ul
+                                    aria-label={`${r.name} doses`}
+                                    className="mt-3 flex flex-wrap gap-1.5"
+                                >
                                     {roundDoses.map((d) => (
-                                        <span
+                                        <li
                                             key={d.key}
-                                            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[12px]"
+                                            className="inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-xl border border-border bg-card px-2.5 py-1 text-xs"
                                         >
                                             <ClientAvatar
                                                 name={d.client_name}
                                                 clientId={d.client_id}
                                                 className="h-4 w-4 text-[7px]"
                                             />
-                                            {clientById.get(d.client_id)
-                                                ?.preferred ??
-                                                d.client_name.split(
-                                                    ' ',
-                                                )[0]}{' '}
-                                            · {d.time}
+                                            <span className="min-w-0 break-words">
+                                                {clientById.get(d.client_id)
+                                                    ?.preferred ??
+                                                    d.client_name.split(
+                                                        ' ',
+                                                    )[0]}{' '}
+                                                · {d.medication_name} ·{' '}
+                                                {formatTime(d.scheduled_for)}
+                                            </span>
                                             <StatusPill
                                                 status={d.status}
                                                 awayReason={d.away_reason}
                                             />
-                                        </span>
+                                        </li>
                                     ))}
-                                </div>
+                                </ul>
                             ) : null}
-                        </div>
+                        </section>
                     );
                 })}
             </CardContent>

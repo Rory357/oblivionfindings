@@ -293,6 +293,7 @@ describe('My Day audit wiring', () => {
                 name: 'Morning round',
                 status: 'in_progress',
                 scheduled_time: '09:00',
+                scheduled_at: '2026-10-04T09:00:00+13:00',
                 given: 4,
                 total: 6,
                 completed: 4,
@@ -306,7 +307,9 @@ describe('My Day audit wiring', () => {
         expect(
             screen.getByRole('link', { name: /resume morning round/i }),
         ).toHaveAttribute('href', '/meds/rounds/12');
-        expect(screen.getByText(/4\s+of\s+6\s+done/)).toBeVisible();
+        expect(
+            screen.getByText(/4\s+of\s+6\s+done\s+·\s+9:00 am/),
+        ).toBeVisible();
     });
 
     it('shows a due checklist read-only when this worker cannot run it', () => {

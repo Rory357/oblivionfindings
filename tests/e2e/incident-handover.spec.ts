@@ -416,6 +416,7 @@ echo json_encode(['id' => \\App\\Models\\HsCorrectiveAction::query()->where('hs_
             page,
             `/health-safety/events/${eventId}/corrective-actions/${actionId}/close`,
         );
+        await loginAsFixture(page, manifest.users.owner);
         await postLaravel(page, `/health-safety/events/${eventId}/close`, {
             closure_summary:
                 'WorkSafe acknowledged, investigation complete and corrective action independently verified.',

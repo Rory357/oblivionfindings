@@ -8,6 +8,7 @@ use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
+use App\Models\MedicationRound;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
@@ -15,6 +16,7 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\User;
+use App\Services\GuidedRoundService;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -446,6 +448,130 @@ class WorkerMedsTodayPayloadTest extends TestCase
                 ->where('has_shift_context', true)
                 ->where('clients.0.id', $client->id)
             );
+    }
+
+    public function test_round_summaries_and_keys_follow_board_people_site_and_exact_round_window(): void
+    {
+        $timezone = config('app.worker_timezone', 'Pacific/Auckland');
+        $now = Carbon::parse('2026-04-30 09:30:00', $timezone)->utc();
+        Carbon::setTestNow($now);
+        $this->seed(RbacSeeder::class);
+        $worker = $this->makeRoleUser('support_worker');
+        $this->grantPermissions($worker, ['medications.administer.record']);
+        $this->denyPermissions($worker, ['medications.controlled.view', 'medications.controlled.record', 'clinical.accessAllSites', 'sites.viewAll']);
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $secondSite = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $foreignSite = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $worker->id, 'primary_site_id' => $site->id, 'secondary_site_ids' => [$secondSite->id],
+            'start_date' => now()->subMonth(), 'end_date' => null, 'is_active' => true,
+        ]);
+        $context = ServiceContext::factory()->create(['site_id' => $site->id, 'is_active' => true]);
+        $client = Client::factory()->create(['site_id' => $site->id, 'service_context_id' => $context->id, 'status' => 'active']);
+        $hiddenClient = Client::factory()->create(['first_name' => 'CONCEALED', 'last_name' => 'Unassigned', 'site_id' => $site->id, 'service_context_id' => $context->id, 'status' => 'active']);
+        $secondClient = Client::factory()->create(['site_id' => $secondSite->id, 'status' => 'active']);
+        $foreignClient = Client::factory()->create(['first_name' => 'CONCEALED', 'last_name' => 'Foreign', 'site_id' => $foreignSite->id, 'status' => 'active']);
+        foreach ([$client, $secondClient, $foreignClient] as $person) {
+            $person->supportWorkers()->attach($worker->id);
+            Shift::factory()->create([
+                'user_id' => $worker->id, 'client_id' => $person->id, 'site_id' => $person->site_id,
+                'service_context_id' => $person->service_context_id, 'starts_at' => $now->copy()->subHour(),
+                'ends_at' => $now->copy()->addHours(4),
+                'actual_starts_at' => $person->is($client) ? $now->copy()->subHour() : null,
+                'status' => $person->is($client) ? 'in_progress' : 'scheduled',
+            ]);
+        }
+        $createOrder = function (Client $person, array $times, bool $controlled = false) use ($timezone): ClientMedication {
+            return Carbon::withTestNow(Carbon::parse('2026-04-30 00:00:00', $timezone)->utc(), fn () => ClientMedication::query()->create([
+                'client_id' => $person->id, 'name' => $controlled ? 'CONCEALED Controlled' : 'Round medicine '.$person->id,
+                'dosage' => '1 tablet', 'frequency' => 'Scheduled', 'dose_times' => $times, 'is_prn' => false,
+                'controlled_drug' => $controlled, 'active' => true, 'state' => 'active', 'approval_status' => 'verified',
+                'start_date' => '2026-04-01', 'end_date' => null,
+            ]));
+        };
+        $order = $createOrder($client, ['09:00', '10:00']);
+        $hiddenOrder = $createOrder($hiddenClient, ['08:00', '09:00']);
+        $secondOrder = $createOrder($secondClient, ['09:00']);
+        $foreignOrder = $createOrder($foreignClient, ['09:00']);
+        $controlledOrder = $createOrder($client, ['09:00'], true);
+        $dueAt = Carbon::parse('2026-04-30 09:00:00', $timezone);
+        ClientMedicationAdministration::query()->create([
+            'client_id' => $hiddenClient->id, 'client_medication_id' => $hiddenOrder->id, 'status' => 'given',
+            'scheduled_for' => $dueAt->copy()->utc(), 'administered_at' => $dueAt->copy()->utc(), 'administered_by' => $worker->id,
+        ]);
+        $createRound = fn (Site $roundSite, string $time, ?int $contextId = null, string $status = 'pending') => MedicationRound::query()->create([
+            'site_id' => $roundSite->id, 'service_context_id' => $contextId, 'name' => 'Round '.$roundSite->id.' '.$time,
+            'round_date' => '2026-04-30', 'scheduled_time' => $time, 'window_minutes' => 10,
+            'assigned_to' => $worker->id, 'status' => $status,
+            'started_by' => $status === 'in_progress' ? $worker->id : null,
+            'started_at' => $status === 'in_progress' ? $now : null,
+        ]);
+        $emptyForWorker = $createRound($site, '08:00', $context->id, 'in_progress');
+        // This earlier assigned round has an actual dose, but only for an
+        // unassigned person. It must not hide the next readable active round.
+        $this->assertSame(1, app(GuidedRoundService::class)->progress($emptyForWorker, false)['total']);
+        $this->assertSame(0, app(GuidedRoundService::class)->progress($emptyForWorker, false, [$client->id, $secondClient->id])['total']);
+        $morning = $createRound($site, '09:00', $context->id, 'in_progress');
+        $laterMorning = $createRound($site, '10:00', $context->id);
+        $secondSiteRound = $createRound($secondSite, '09:00');
+        $foreignRound = $createRound($foreignSite, '09:00');
+        // The stored round really has an unassigned person's recorded dose;
+        // viewer projection must narrow counts as well as named items.
+        $canonical = app(GuidedRoundService::class)->progress($morning, false);
+        $this->assertSame(2, $canonical['total']);
+        $this->assertSame(1, $canonical['completed']);
+        $keyAt = fn (ClientMedication $medication, string $time): string => $medication->id.':'.Carbon::parse('2026-04-30 '.$time, $timezone)->utc()->format('YmdHi');
+        $morningKey = $keyAt($order, '09:00');
+        $laterKey = $keyAt($order, '10:00');
+        $secondKey = $keyAt($secondOrder, '09:00');
+        $response = $this->actingAs($worker)->get('/meds/today?round='.$morning->id)->assertOk();
+        $rounds = collect($response->inertiaProps('rounds'))->keyBy('id');
+        $this->assertCount(3, $rounds);
+        $this->assertFalse($rounds->has($emptyForWorker->id));
+        $this->assertFalse($rounds->has($foreignRound->id));
+        foreach ([$morning->id => $morningKey, $laterMorning->id => $laterKey, $secondSiteRound->id => $secondKey] as $roundId => $key) {
+            $this->assertSame([$key], $rounds[$roundId]['dose_keys']);
+            $this->assertSame(1, $rounds[$roundId]['total']);
+            $this->assertSame(0, $rounds[$roundId]['completed']);
+            $this->assertSame(0, $rounds[$roundId]['percent']);
+        }
+        $this->assertSame($dueAt->toIso8601String(), $rounds[$morning->id]['scheduled_at']);
+        $this->assertSame($morning->id, $response->inertiaProps('active_round.id'));
+        $this->assertSame([$morningKey], $response->inertiaProps('active_round.dose_keys'));
+        $this->assertSame(1, $response->inertiaProps('active_round.total'));
+        $this->assertSame(0, $response->inertiaProps('active_round.completed'));
+        $this->assertSame(0, $response->inertiaProps('active_round.given'));
+        $this->assertSame($dueAt->toIso8601String(), $response->inertiaProps('active_round.scheduled_at'));
+        $this->assertSame(1, $response->inertiaProps('guidedRound.progress.total'));
+        $this->assertSame(0, $response->inertiaProps('guidedRound.progress.completed'));
+        $this->assertFalse($response->inertiaProps('guidedRound.can_complete'));
+        $this->assertSame([$client->id], collect($response->inertiaProps('guidedRound.items'))->pluck('client_id')->all());
+        $this->assertEqualsCanonicalizing([$morningKey, $laterKey, $secondKey], collect($response->inertiaProps('schedule'))->pluck('key')->all());
+        foreach ([$hiddenOrder, $foreignOrder, $controlledOrder] as $concealed) {
+            $this->assertNotContains($keyAt($concealed, '09:00'), $rounds->flatMap(fn (array $round) => $round['dose_keys'])->all());
+        }
+        $this->assertStringNotContainsString('CONCEALED Unassigned', $response->getContent());
+        $this->assertStringNotContainsString('CONCEALED Foreign', $response->getContent());
+        $this->assertStringNotContainsString('CONCEALED Controlled', $response->getContent());
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+
+        // Completed-round evidence is narrowed by the same current reader scope.
+        ClientMedicationAdministration::query()->create([
+            'client_id' => $client->id, 'client_medication_id' => $order->id, 'status' => 'given',
+            'medication_round_id' => $morning->id, 'scheduled_for' => $dueAt->copy()->utc(),
+            'administered_at' => $dueAt->copy()->utc(), 'administered_by' => $worker->id,
+        ]);
+        $morning->update(['status' => 'completed', 'completed_by' => $worker->id, 'completed_at' => $now]);
+        $completedResponse = $this->actingAs($worker->fresh())->get('/meds/today')->assertOk();
+        $completed = collect($completedResponse->inertiaProps('rounds'))->firstWhere('id', $morning->id);
+        $this->assertSame([$morningKey], $completed['dose_keys']);
+        $this->assertSame(1, $completed['total']);
+        $this->assertSame(1, $completed['completed']);
+        $this->assertSame(100, $completed['percent']);
+        $this->assertStringNotContainsString('CONCEALED Unassigned', $completedResponse->getContent());
+        $this->assertSame($secondSiteRound->id, $completedResponse->inertiaProps('active_round.id'));
+        $this->assertSame(1, $completedResponse->inertiaProps('active_round.total'));
+        $this->assertDatabaseCount('client_medication_administrations', 2);
     }
 
     protected function makeRoleUser(string $roleName): User

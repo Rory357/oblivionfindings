@@ -8,6 +8,9 @@ export interface RoundInfo {
     name: string;
     status: 'pending' | 'in_progress' | 'completed' | string;
     scheduled_time: string | null;
+    scheduled_at: string | null;
+    /** Exact scoped schedule-row identities from the canonical round. */
+    dose_keys: string[];
     total: number;
     completed: number;
     percent: number;

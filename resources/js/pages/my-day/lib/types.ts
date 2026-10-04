@@ -363,6 +363,7 @@ export interface MyDayActiveRound {
     name: string;
     status: 'pending' | 'in_progress' | string;
     scheduled_time?: string | null;
+    scheduled_at: string | null;
     given: number;
     total: number;
     completed: number;

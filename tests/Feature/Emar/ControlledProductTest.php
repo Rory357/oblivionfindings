@@ -31,6 +31,7 @@ use App\Services\Medication\Alerts\MedicationAlertSources;
 use App\Services\Medication\Controlled\ControlledCountStatus;
 use App\Services\Medication\Controlled\ControlledPolicy;
 use App\Services\Medication\Controlled\ControlledRegisterService;
+use App\Services\Medication\MedicationOrderLifecycleService;
 use Carbon\Carbon;
 use Database\Factories\UserFactory;
 use Database\Seeders\RbacSeeder;
@@ -1027,6 +1028,98 @@ class ControlledProductTest extends TestCase
         $this->assertDatabaseCount('client_controlled_drug_discrepancies', 1);
         $this->assertDatabaseCount('controlled_product_requests', 1);
         $this->assertDatabaseCount('client_incidents', 1);
+    }
+
+    public function test_canonical_ceased_zero_stock_denies_new_counts_without_effects(): void
+    {
+        $this->permissions($this->manager, ['medications.orders.manage' => true]);
+        $this->actingAs($this->manager->fresh());
+        $stopped = app(MedicationOrderLifecycleService::class)->discontinue(
+            $this->manager->fresh(), $this->medication, 'Synthetic canonical cessation', $this->client->id,
+        );
+        $this->assertSame('ceased', $stopped->state);
+        $this->assertFalse($stopped->active);
+        $this->assertNull($stopped->deleted_at);
+        $this->assertNull($stopped->superseded_by);
+        $this->stock->update(['on_hand' => 0]);
+        $medicineBefore = $stopped->fresh()->getRawOriginal();
+        $stockBefore = $this->stock->fresh()->getRawOriginal();
+        $evidenceCounts = [];
+        foreach (['client_controlled_drug_entries', 'client_controlled_drug_discrepancies',
+            'controlled_product_requests', 'client_incidents', 'medication_events', 'audit_logs'] as $table) {
+            $evidenceCounts[$table] = DB::table($table)->count();
+        }
+        $this->actingAs($this->recorder->fresh())->getJson('/emar/controlled/product')->assertOk()
+            ->assertJsonPath('medicines.0.can_count', false)
+            ->assertJsonPath('medicines.0.count.state', 'not_applicable');
+
+        foreach ([0, 5] as $attemptedBalance) {
+            $this->actionRequest('count', [
+                'actual_balance' => $attemptedBalance, 'recount_balance' => $attemptedBalance,
+                'notes' => 'Synthetic attempt to count an empty stopped order.',
+                'immediate_action_taken' => 'Synthetic no-effects regression.',
+            ])->assertNotFound();
+
+            $this->assertSame($stockBefore, $this->stock->fresh()->getRawOriginal());
+            $this->assertSame($medicineBefore, $stopped->fresh()->getRawOriginal());
+            foreach ($evidenceCounts as $table => $count) {
+                $this->assertDatabaseCount($table, $count);
+            }
+        }
+    }
+
+    public function test_canonical_ceased_positive_stock_count_to_zero_keeps_exact_replay(): void
+    {
+        $this->permissions($this->manager, ['medications.orders.manage' => true]);
+        $this->actingAs($this->manager->fresh());
+        $stopped = app(MedicationOrderLifecycleService::class)->discontinue(
+            $this->manager->fresh(), $this->medication, 'Synthetic canonical cessation', $this->client->id,
+        );
+        $this->assertNull($stopped->deleted_at);
+        $this->assertNull($stopped->superseded_by);
+        $medicineBefore = $stopped->fresh()->getRawOriginal();
+        $request = $this->input([
+            'actual_balance' => 0, 'recount_balance' => 0,
+            'notes' => 'Synthetic retained stock was missing on both counts.',
+            'immediate_action_taken' => 'Secured the cupboard and informed the house lead.',
+        ]);
+        $this->actingAs($this->recorder->fresh());
+        $service = app(ControlledRegisterService::class);
+        $result = $service->perform($this->recorder->fresh(), 'count', $request);
+        $entryBefore = ClientControlledDrugEntry::query()->sole()->getRawOriginal();
+        $stockBeforeReplay = $this->stock->fresh()->getRawOriginal();
+        $this->assertSame('0.00', $this->stock->fresh()->on_hand);
+        $this->assertSame($medicineBefore, $stopped->fresh()->getRawOriginal());
+        $eventCount = MedicationEvent::query()->count();
+        $auditCount = AuditLog::query()->count();
+
+        $this->assertEquals($result, $service->perform($this->recorder->fresh(), 'count', $request));
+        $this->assertTrue($service->lastRequestWasReplay());
+        $this->assertSame($stockBeforeReplay, $this->stock->fresh()->getRawOriginal());
+        $this->assertSame($entryBefore, ClientControlledDrugEntry::query()->sole()->getRawOriginal());
+        $this->assertDatabaseCount('client_controlled_drug_entries', 1);
+        $this->assertDatabaseCount('client_controlled_drug_discrepancies', 1);
+        $this->assertDatabaseCount('controlled_product_requests', 1);
+        $this->assertDatabaseCount('client_incidents', 1);
+        $this->assertDatabaseCount('medication_events', $eventCount);
+        $this->assertDatabaseCount('audit_logs', $auditCount);
+    }
+
+    public function test_active_zero_stock_still_accepts_a_witnessed_zero_count(): void
+    {
+        $this->stock->update(['on_hand' => 0]);
+        $this->assertTrue($this->medication->fresh()->isActive());
+
+        $result = $this->actionRequest('count', ['actual_balance' => 0])->assertOk()->json();
+        $this->assertDatabaseHas('client_controlled_drug_entries', [
+            'id' => $result['counted_entry_id'], 'entry_type' => 'balance_check',
+            'client_medication_id' => $this->medication->id, 'on_hand_before' => 0, 'on_hand_after' => 0,
+        ]);
+        $this->assertSame('0.00', $this->stock->fresh()->on_hand);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 1);
+        $this->assertDatabaseCount('client_controlled_drug_discrepancies', 0);
+        $this->assertDatabaseCount('controlled_product_requests', 1);
+        $this->assertDatabaseCount('client_incidents', 0);
     }
 
     public function test_count_alerts_reconcile_by_configured_policy_and_latest_actual_witnessed_time(): void

@@ -9,6 +9,7 @@ use App\Domain\Finance\Models\FinVendor;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Testing\TestResponse;
 
 /**
  * Payables list CSV exports (C3d). Each Accounts-Payable list tab streams a
@@ -27,7 +28,7 @@ function apExportUser(): User
     return $user;
 }
 
-function apStreamed(\Illuminate\Testing\TestResponse $response): string
+function apStreamed(TestResponse $response): string
 {
     ob_start();
     $response->sendContent();
@@ -47,30 +48,56 @@ function apCsvLines(string $csv): array
 
 // ── Bills ────────────────────────────────────────────────────────────────
 it('streams bills as CSV with a header and one row per bill', function () {
-    FinBill::factory()->count(3)->create(['organization_id' => 1, 'status' => 'approved']);
+    $site = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
+    $user = apExportUser();
+    ensureCanonicalHrStaffProfile($user, $site);
+    $bills = FinBill::factory()->count(3)->create([
+        'organization_id' => 1, 'site_id' => $site->id, 'status' => 'approved',
+    ]);
+    $foreignSite = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
+    $foreignBill = FinBill::factory()->create([
+        'site_id' => $foreignSite->id, 'status' => 'approved', 'bill_number' => 'BILL-FOREIGN-SITE',
+    ]);
 
-    $response = $this->actingAs(apExportUser())->get(route('finance.bills.export'));
+    $response = $this->actingAs($user)->get(route('finance.bills.export'));
 
     $response->assertOk();
     expect($response->headers->get('content-type'))->toContain('text/csv');
 
-    [$header, $count] = apCsvLines(apStreamed($response));
+    $csv = apStreamed($response);
+    [$header, $count] = apCsvLines($csv);
     expect($header)->toContain('Bill #')
-        ->and($count)->toBe(4); // header + 3 bills
+        ->and($count)->toBe(4) // header + 3 bills
+        ->and($csv)->not->toContain($foreignBill->bill_number);
+    foreach ($bills as $bill) {
+        expect($csv)->toContain($bill->bill_number);
+    }
 });
 
 it('honours the status filter in the bills export', function () {
-    FinBill::factory()->create(['organization_id' => 1, 'status' => 'paid', 'bill_number' => 'BILL-PAID-1']);
-    FinBill::factory()->create(['organization_id' => 1, 'status' => 'draft', 'bill_number' => 'BILL-DRAFT-1']);
+    $site = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
+    $user = apExportUser();
+    ensureCanonicalHrStaffProfile($user, $site);
+    FinBill::factory()->create(['organization_id' => 1, 'site_id' => $site->id, 'status' => 'paid', 'bill_number' => 'BILL-PAID-1']);
+    FinBill::factory()->create(['organization_id' => 1, 'site_id' => $site->id, 'status' => 'draft', 'bill_number' => 'BILL-DRAFT-1']);
+    $foreignSite = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
+    FinBill::factory()->create(['site_id' => $foreignSite->id, 'status' => 'paid', 'bill_number' => 'BILL-FOREIGN-PAID']);
 
-    $csv = apStreamed($this->actingAs(apExportUser())->get(route('finance.bills.export', ['status' => 'paid'])));
+    $response = $this->actingAs($user)->get(route('finance.bills.export', ['status' => 'paid']))->assertOk();
+    $csv = apStreamed($response);
+    [$header, $count] = apCsvLines($csv);
 
     expect($csv)->toContain('BILL-PAID-1')
-        ->and($csv)->not->toContain('BILL-DRAFT-1');
+        ->and($csv)->not->toContain('BILL-DRAFT-1')
+        ->and($csv)->not->toContain('BILL-FOREIGN-PAID')
+        ->and($header)->toContain('Bill #')
+        ->and($count)->toBe(2); // header + the scoped paid bill
 });
 
 it('403s the bills export without finance.ap.view', function () {
+    $site = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
     $user = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    ensureCanonicalHrStaffProfile($user, $site);
 
     $this->actingAs($user)->get(route('finance.bills.export'))->assertForbidden();
 });

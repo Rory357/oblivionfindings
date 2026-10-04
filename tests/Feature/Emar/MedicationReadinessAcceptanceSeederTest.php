@@ -6,6 +6,7 @@ use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationCompetencyAssessment;
+use App\Models\MedicationDoseScheduleVersion;
 use App\Models\MedicationDoseSlot;
 use App\Models\MedicationDowntime;
 use App\Models\MedicationDowntimeDose;
@@ -15,6 +16,7 @@ use App\Models\MedicationIdempotencyResult;
 use App\Models\MedicationOrderRevision;
 use App\Models\MedicationOrderVersion;
 use App\Models\MedicationPaperEntry;
+use App\Models\MedicationRound;
 use App\Models\User;
 use App\Models\UserWitnessPin;
 use App\Services\Medication\DoseTimingSettings;
@@ -323,4 +325,102 @@ test('synthetic schedule setup rejects late day and incompatible early window be
     app()->forgetScopedInstances();
     expect(fn () => $this->seed(MedicationReadinessAcceptanceSeeder::class))->toThrow(LogicException::class)
         ->and(MedicationOrderRevision::query()->count())->toBe($before);
+});
+
+test('reset pipeline exposes the assigned round with exactly three independently checked current dose keys', function (): void {
+    $this->seed(MedicationReadinessAcceptanceSeeder::class);
+    $worker = User::query()->where('email', 'sw-meds@demo.test')->sole();
+    $client = Client::query()->where('first_name', 'Playwright')->where('last_name', 'Meds')->sole();
+    $round = MedicationRound::query()->where('name', 'PW Meds Readiness Round')
+        ->whereDate('round_date', now('Pacific/Auckland')->toDateString())->where('assigned_to', $worker->id)->sole();
+    $orders = ClientMedication::query()->where('client_id', $client->id)
+        ->whereIn('name', ['PW Meds Morning Tablets', 'PW Meds Vitamin D', 'PW Meds Eye Drops'])->get();
+    expect($orders)->toHaveCount(3)
+        ->and($round->site_id)->toBe($client->site_id)
+        ->and($round->service_context_id)->toBe($client->service_context_id)
+        ->and($round->status)->toBe('pending');
+    $expectedKeys = $orders->map(function (ClientMedication $order): string {
+        $revision = MedicationOrderRevision::query()->where('client_medication_id', $order->id)->canonicalVersion()
+            ->where('status', 'checked')->whereHas('version', fn ($versions) => $versions->where('version_number', $order->version))->sole();
+        $dueAt = Carbon::parse('2026-10-04 '.$order->dose_times[0], 'Pacific/Auckland');
+        expect($order->approval_status)->toBe('verified')
+            ->and($revision->entered_by)->not->toBe($revision->checked_by)
+            ->and($revision->files()->where('purpose', 'source')->exists())->toBeTrue()
+            ->and($revision->checked_at->lt($dueAt))->toBeTrue()
+            ->and($dueAt->gt(now()))->toBeTrue();
+
+        return $order->id.':'.$dueAt->utc()->format('YmdHi');
+    })->sort()->values()->all();
+    $response = $this->actingAs($worker)->get('/meds/today?view=rounds&round='.$round->id)->assertOk();
+    $visibleRound = collect($response->inertiaProps('rounds'))->sole();
+    expect($visibleRound['id'])->toBe($round->id)
+        ->and($visibleRound['total'])->toBe(3)
+        ->and($visibleRound['completed'])->toBe(0)
+        ->and($visibleRound['dose_keys'])->toHaveCount(3)
+        ->and(collect($visibleRound['dose_keys'])->sort()->values()->all())->toBe($expectedKeys)
+        ->and($visibleRound['scheduled_at'])->toBe(Carbon::parse('2026-10-04 '.$round->scheduled_time, 'Pacific/Auckland')->toIso8601String())
+        ->and($response->inertiaProps('active_round.id'))->toBe($round->id)
+        ->and($response->inertiaProps('active_round.total'))->toBe(3)
+        ->and(collect($response->inertiaProps('active_round.dose_keys'))->sort()->values()->all())->toBe($expectedKeys)
+        ->and(collect($response->inertiaProps('schedule'))->pluck('key')->sort()->values()->all())->toBe($expectedKeys)
+        ->and($response->inertiaProps('guidedRound.progress.total'))->toBe(3)
+        ->and($response->inertiaProps('guidedRound.progress.completed'))->toBe(0)
+        ->and($response->inertiaProps('guidedRound.items'))->toHaveCount(3);
+    $this->assertDatabaseCount('client_medication_administrations', 0);
+});
+
+test('first typed publication after a later base reset preserves history and exposes three recordable round doses', function (): void {
+    // Global setup seeded the base orders at 09:30. The first browser case
+    // repeats that base reset later, before its first typed source is checked.
+    Carbon::setTestNow(Carbon::parse('2026-10-04 10:00:00', 'Pacific/Auckland')->utc());
+    $this->seed(FrontlineLifecycleDemoSeeder::class);
+    $resetAt = now()->copy();
+    $client = Client::query()->where('first_name', 'Playwright')->where('last_name', 'Meds')->sole();
+    $worker = User::query()->where('email', 'sw-meds@demo.test')->sole();
+    $orders = ClientMedication::query()->where('client_id', $client->id)
+        ->whereIn('name', ['PW Meds Morning Tablets', 'PW Meds Vitamin D', 'PW Meds Eye Drops'])->get();
+    $orderIds = $orders->pluck('id')->all();
+    $createdAt = $orders->mapWithKeys(fn (ClientMedication $order): array => [$order->id => $order->getRawOriginal('created_at')])->all();
+    $history = MedicationDoseScheduleVersion::query()->whereIn('client_medication_id', $orderIds)->orderBy('id')->get();
+    $historyBefore = $history->map(fn ($version): array => $version->getRawOriginal())->all();
+    $sourceVersions = MedicationOrderVersion::query()->whereIn('client_medication_id', $orderIds)->orderBy('id')->get();
+    $sourceBefore = $sourceVersions->map(fn ($version): array => $version->getRawOriginal())->all();
+    expect($orders)->toHaveCount(3)
+        ->and($history->whereNull('verified_at')->filter(fn ($version): bool => $version->changed_at->gte($resetAt))->pluck('client_medication_id')->unique()->count())->toBe(3);
+
+    $this->seed(MedicationReadinessAcceptanceSeeder::class);
+    expect($history->map(fn ($version): array => $version->fresh()->getRawOriginal())->all())->toBe($historyBefore)
+        ->and($sourceVersions->map(fn ($version): array => $version->fresh()->getRawOriginal())->all())->toBe($sourceBefore);
+    $expectedKeys = $orders->map(function (ClientMedication $original) use ($createdAt, $resetAt): string {
+        $order = $original->fresh();
+        $revision = MedicationOrderRevision::query()->where('client_medication_id', $order->id)->canonicalVersion()
+            ->where('status', 'checked')->whereHas('version', fn ($versions) => $versions->where('version_number', $order->version))->sole();
+        $dueAt = Carbon::parse('2026-10-04 '.$order->dose_times[0], 'Pacific/Auckland');
+        expect($order->approval_status)->toBe('verified')
+            ->and($order->getRawOriginal('created_at'))->toBe($createdAt[$order->id])
+            ->and($revision->entered_by)->not->toBe($revision->checked_by)
+            ->and($revision->files()->where('purpose', 'source')->exists())->toBeTrue()
+            ->and($revision->created_at->gte($resetAt))->toBeTrue()
+            ->and($revision->checked_at->gte($resetAt))->toBeTrue()
+            ->and($dueAt->gt($revision->checked_at))->toBeTrue();
+
+        return $order->id.':'.$dueAt->utc()->format('YmdHi');
+    })->sort()->values()->all();
+    $round = MedicationRound::query()->where('name', 'PW Meds Readiness Round')
+        ->whereDate('round_date', '2026-10-04')->where('assigned_to', $worker->id)->sole();
+    $response = $this->actingAs($worker)->get('/meds/today?view=rounds&round='.$round->id)->assertOk();
+    $schedule = collect($response->inertiaProps('schedule'));
+    $visibleRound = collect($response->inertiaProps('rounds'))->sole();
+    expect($schedule)->toHaveCount(3)
+        ->and($schedule->pluck('state')->unique()->all())->toBe(['due'])
+        ->and($schedule->pluck('key')->sort()->values()->all())->toBe($expectedKeys)
+        ->and($visibleRound['id'])->toBe($round->id)
+        ->and($visibleRound['total'])->toBe(3)
+        ->and($visibleRound['completed'])->toBe(0)
+        ->and(collect($visibleRound['dose_keys'])->sort()->values()->all())->toBe($expectedKeys)
+        ->and($response->inertiaProps('active_round.id'))->toBe($round->id)
+        ->and($response->inertiaProps('active_round.total'))->toBe(3)
+        ->and($response->inertiaProps('guidedRound.progress.total'))->toBe(3)
+        ->and($response->inertiaProps('guidedRound.progress.waiting'))->toBe(0);
+    $this->assertDatabaseCount('client_medication_administrations', 0);
 });

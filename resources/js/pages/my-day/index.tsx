@@ -1348,8 +1348,8 @@ function ShiftChecklistRow({
 
 function ActiveRoundBanner({ round }: { round: MyDayActiveRound }) {
     const verb = round.status === 'in_progress' ? 'Resume' : 'Start';
-    const scheduled = round.scheduled_time
-        ? round.scheduled_time.slice(0, 5)
+    const scheduled = round.scheduled_at
+        ? formatTime(round.scheduled_at)
         : null;
 
     return (

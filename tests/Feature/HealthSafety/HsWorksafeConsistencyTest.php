@@ -4,13 +4,16 @@ namespace Tests\Feature\HealthSafety;
 
 use App\Domain\Governance\Models\NotifiableIncident;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\HsEvent;
+use App\Models\HsInvestigation;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\HealthSafety\HsEventClosureService;
 use App\Services\HealthSafety\HsEventService;
 use App\Services\Incidents\IncidentJourneyService;
 use Database\Seeders\RbacSeeder;
@@ -364,7 +367,7 @@ class HsWorksafeConsistencyTest extends TestCase
         $this->assertSame($incidentSite->id, $incident->site_id);
     }
 
-    public function test_closed_pending_work_and_the_incident_time_site_use_the_same_worksafe_population(): void
+    public function test_pending_work_cannot_be_hidden_by_closure_and_uses_the_incident_time_site_population(): void
     {
         $incidentSite = Site::factory()->create();
         $newClientSite = Site::factory()->create();
@@ -375,9 +378,63 @@ class HsWorksafeConsistencyTest extends TestCase
             HsEvent::WORKSAFE_PENDING,
             HsEvent::WORKSAFE_ACKNOWLEDGED,
         );
-        $event->updateQuietly(['status' => HsEvent::STATUS_CLOSED]);
+        $closureActor = $this->siteBoundUser($incidentSite, ['hazards.manage', 'healthSafety.events.close']);
+        $event->update([
+            'owner_user_id' => $closureActor->id,
+            'handover_status' => HsEvent::HANDOVER_ACCEPTED,
+            'accepted_by_user_id' => $closureActor->id,
+            'accepted_at' => now(),
+        ]);
+        $auditsBeforeFailedClose = AuditLog::query()->count();
+        try {
+            app(HsEventClosureService::class)->closeEvent(
+                $event,
+                'Pending WorkSafe work must remain visible.',
+                $closureActor,
+            );
+            $this->fail('An event with unresolved WorkSafe work must not close.');
+        } catch (\DomainException $exception) {
+            $this->assertStringContainsString('Record the WorkSafe notification', $exception->getMessage());
+        }
+        $this->assertSame(HsEvent::STATUS_OPEN, $event->fresh()->status);
+        $this->assertSame(HsEvent::WORKSAFE_PENDING, $event->fresh()->worksafe_status);
+        $this->assertNull($event->fresh()->closed_at);
+        $this->assertNull($event->fresh()->closed_by);
+        $this->assertSame($auditsBeforeFailedClose, AuditLog::query()->count());
+
+        $completed = $this->notifiableJourney(
+            $incidentSite,
+            $reporter,
+            HsEvent::WORKSAFE_ACKNOWLEDGED,
+            HsEvent::WORKSAFE_PENDING,
+        );
+        $completed->update([
+            'owner_user_id' => $closureActor->id,
+            'handover_status' => HsEvent::HANDOVER_ACCEPTED,
+            'accepted_by_user_id' => $closureActor->id,
+            'accepted_at' => now(),
+            'worksafe_method' => 'online',
+        ]);
+        HsInvestigation::factory()->completed()->create([
+            'hs_event_id' => $completed->id,
+            'recommendations' => [],
+        ]);
+        app(HsEventService::class)->recordSitePreservationDecision(
+            $completed,
+            false,
+            'HS-CONSISTENCY-CLOSE-01: applicability reviewed as not required.',
+            $closureActor,
+        );
+        $closed = app(HsEventClosureService::class)->closeEvent(
+            $completed,
+            'WorkSafe obligations and investigation completed.',
+            $closureActor,
+        );
+        $this->assertSame(HsEvent::STATUS_CLOSED, $closed->status);
+        $this->assertSame(HsEvent::WORKSAFE_ACKNOWLEDGED, $closed->worksafe_status);
         $incident = $event->clientIncident()->firstOrFail();
         $incident->client()->update(['site_id' => $newClientSite->id]);
+        $completed->clientIncident()->firstOrFail()->client()->update(['site_id' => $newClientSite->id]);
         $viewer = $this->admin();
 
         $this->actingAs($viewer)
@@ -394,8 +451,11 @@ class HsWorksafeConsistencyTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->where('backbone.events.worksafe_pending', 1)
                 ->where('backbone.events.incident_worksafe_pending', 1)
-                ->has('worklists.notifiable_events', 1)
+                ->has('worklists.notifiable_events', 2)
                 ->where('worklists.notifiable_events.0.event_reference', $event->reference_number)
+                ->where('worklists.notifiable_events.0.status', HsEvent::WORKSAFE_PENDING)
+                ->where('worklists.notifiable_events.1.event_reference', $completed->reference_number)
+                ->where('worklists.notifiable_events.1.status', HsEvent::WORKSAFE_ACKNOWLEDGED)
             );
 
         $this->actingAs($viewer)
@@ -403,6 +463,15 @@ class HsWorksafeConsistencyTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('hero.attention.worksafe_due', 1)
+            );
+
+        $this->actingAs($viewer)
+            ->get("/health-safety?site={$newClientSite->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('backbone.events.worksafe_pending', 0)
+                ->where('backbone.events.incident_worksafe_pending', 0)
+                ->has('worklists.notifiable_events', 0)
             );
     }
 

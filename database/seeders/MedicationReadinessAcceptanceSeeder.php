@@ -7,6 +7,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\MedicationCompetencyAssessment;
+use App\Models\MedicationDoseScheduleVersion;
 use App\Models\Permission;
 use App\Models\Shift;
 use App\Models\User;
@@ -111,9 +112,17 @@ class MedicationReadinessAcceptanceSeeder extends Seeder
                 ]);
             };
             // Only the first typed source for this explicitly historical
-            // synthetic order is checked before its first due dose. Existing
-            // checked history and later changes retain their actual chronology.
+            // synthetic order may precede its first due dose. A later base
+            // reset already recorded in the schedule history must precede the
+            // actual check too, or it would remain a newer waiting change.
+            $laterScheduleEvidence = MedicationDoseScheduleVersion::query()
+                ->where('client_medication_id', $order->id)
+                ->where(fn ($versions) => $versions->where('changed_at', '>', $firstCheckedAt)
+                    ->orWhere('verified_at', '>', $firstCheckedAt)
+                    ->orWhere('rejected_at', '>', $firstCheckedAt))
+                ->exists();
             if (! $order->versions()->whereNotNull('entry_request_key')->exists()
+                && ! $laterScheduleEvidence
                 && $order->created_at?->lte($firstCheckedAt)
                 && $enterer->approved_at?->lte($firstCheckedAt) && $checker->approved_at?->lte($firstCheckedAt)) {
                 Carbon::withTestNow($firstCheckedAt, $publish);

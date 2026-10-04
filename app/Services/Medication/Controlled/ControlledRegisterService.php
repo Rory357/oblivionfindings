@@ -126,7 +126,7 @@ final class ControlledRegisterService
                     }
                     // A new historical count needs retained stock; a recorded recount
                     // remains replayable when that recount cleared the stock to zero.
-                    if ($action === 'count' && ($medication->deleted_at !== null || $medication->superseded_by !== null)) {
+                    if ($action === 'count' && ! $medication->isActive()) {
                         abort_unless($stock !== null && Quantity::greaterThan($stock->on_hand, 0), 404);
                     }
                     if (in_array($action, self::STOCK_ACTIONS, true)) {
