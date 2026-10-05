@@ -1,5 +1,8 @@
 import ConfirmDialog from '@/components/confirm-dialog';
-import { DateTimeField } from '@/components/fleet-assets/maintenance/date-time-field';
+import {
+    DateTimeField,
+    localDateTimeLabel,
+} from '@/components/fleet-assets/maintenance/date-time-field';
 import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -544,21 +547,15 @@ export function DeclareDowntimeDialog({
                                     />
                                     <ReviewRow
                                         label="Started"
-                                        value={
-                                            form.data.started_at.replace(
-                                                'T',
-                                                ' · ',
-                                            ) || 'Not provided'
-                                        }
+                                        value={localDateTimeLabel(
+                                            form.data.started_at,
+                                        )}
                                     />
                                     <ReviewRow
                                         label="Ended"
-                                        value={
-                                            form.data.ended_at.replace(
-                                                'T',
-                                                ' · ',
-                                            ) || 'Not provided'
-                                        }
+                                        value={localDateTimeLabel(
+                                            form.data.ended_at,
+                                        )}
                                     />
                                     <ReviewRow
                                         label="What happened"
@@ -1084,10 +1081,12 @@ export function PaperEntryDialog({
                                     <ReviewRow
                                         label="Actual NZ time"
                                         value={
-                                            form.data.given_at.replace(
-                                                'T',
-                                                ' · ',
-                                            ) + clockOffset
+                                            localDateTimeLabel(
+                                                form.data.given_at,
+                                            ) +
+                                            (clockOffset
+                                                ? ` (UTC${clockOffset})`
+                                                : '')
                                         }
                                     />
                                     <ReviewRow

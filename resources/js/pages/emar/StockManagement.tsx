@@ -9,6 +9,7 @@ import {
     EmarMeters,
     EmarViewFilter,
 } from '@/components/emar/workspace-navigation';
+import { compactMenu, type MenuItem } from '@/components/lists/entity-menu';
 import {
     PageHeader,
     PageHeaderFilterButton,
@@ -64,7 +65,6 @@ import {
     Plus,
     ShieldCheck,
     ShoppingCart,
-    Snowflake,
     Truck,
     User,
     X,
@@ -77,6 +77,7 @@ import {
     type MouseEvent as ReactMouseEvent,
 } from 'react';
 import { toast } from 'sonner';
+import { StockInventoryTable } from './stock/_inventory-table';
 
 type ControlledRegisterRow = {
     id: number;
@@ -169,14 +170,6 @@ const fmtDate = (iso: string | null) =>
               month: 'short',
           })
         : '—';
-const initials = (name: string) =>
-    name
-        .split(' ')
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((p) => p[0])
-        .join('')
-        .toUpperCase() || '?';
 
 export default function StockManagement({
     can_record_controlled: canRecordControlled,
@@ -317,66 +310,36 @@ export default function StockManagement({
         });
     };
 
-    // Header tag colours for the row context menu — semantic tokens (CSS vars).
-    const ctxTagStyle = (s: StockRow) => {
-        if (s.is_expired)
-            return {
-                tag: 'Expired',
-                tagBg: 'var(--status-critical-bg)',
-                tagColor: 'var(--status-critical)',
-            };
-        if (s.is_low)
-            return {
-                tag: 'Low',
-                tagBg: 'var(--status-warning-bg)',
-                tagColor: 'var(--status-warning)',
-            };
-        if (s.is_expiring_soon)
-            return {
-                tag: 'Expiring',
-                tagBg: 'var(--status-warning-bg)',
-                tagColor: 'var(--status-warning)',
-            };
-        return {
-            tag: 'OK',
-            tagBg: 'var(--status-success-bg)',
-            tagColor: 'var(--status-success)',
-        };
-    };
-
-    const openStockCtx = (e: ReactMouseEvent, s: StockRow) => {
-        e.preventDefault();
+    const stockActionsFor = (s: StockRow): MenuItem[] => {
         const order = openOrderFor(s.medication_id);
         const canGovernBalance = !s.controlled || canRecordControlled;
         const orderRow = openOrders.find(
             (candidate) => candidate.medication_id === s.medication_id,
         );
-        const items: ShiftCtxItem[] = [
+        const items: MenuItem[] = [
             {
-                icon: <Eye className="h-3.5 w-3.5" />,
+                icon: Eye,
                 label: 'View details',
-                sub: `${s.medication_name ?? 'Stock'} · ${s.on_hand} ${s.unit}`,
-                tone: 'primary',
                 onClick: () => setModal({ type: 'detail', item: s }),
             },
             ...(canGovernBalance
                 ? [
                       {
-                          icon: <Pencil className="h-3.5 w-3.5" />,
+                          icon: Pencil,
                           label: 'Adjust stock',
                           onClick: () => setModal({ type: 'adjust', item: s }),
-                      } satisfies ShiftCtxItem,
+                      } satisfies MenuItem,
                       {
-                          icon: <ClipboardCheck className="h-3.5 w-3.5" />,
+                          icon: ClipboardCheck,
                           label: s.controlled
                               ? 'Run CD balance check'
                               : 'Run count',
                           onClick: () => runCount(s),
-                      } satisfies ShiftCtxItem,
+                      } satisfies MenuItem,
                   ]
                 : []),
             {
-                icon: <ShoppingCart className="h-3.5 w-3.5" />,
+                icon: ShoppingCart,
                 label: 'Order more',
                 onClick: () =>
                     setModal({
@@ -388,7 +351,7 @@ export default function StockManagement({
             ...(order && canGovernBalance
                 ? [
                       {
-                          icon: <Truck className="h-3.5 w-3.5" />,
+                          icon: Truck,
                           label: 'Receive against order',
                           onClick: () => {
                               const action = orderRow
@@ -418,54 +381,44 @@ export default function StockManagement({
                                   medId: s.medication_id,
                               });
                           },
-                      } satisfies ShiftCtxItem,
+                      } satisfies MenuItem,
                   ]
                 : []),
-            { sep: true },
+            { separator: true },
             ...(s.client_id
                 ? [
                       {
-                          icon: <User className="h-3.5 w-3.5" />,
-                          label: 'View client',
+                          icon: User,
+                          label: 'View person',
                           onClick: () =>
                               router.visit(
                                   `/operations/clients/${s.client_id}?tab=mar`,
                               ),
-                      } satisfies ShiftCtxItem,
+                      } satisfies MenuItem,
                   ]
                 : []),
             ...(s.mar_url
                 ? [
                       {
-                          icon: <FileText className="h-3.5 w-3.5" />,
+                          icon: FileText,
                           label: 'Open on MAR',
                           onClick: () => router.visit(s.mar_url!),
-                      } satisfies ShiftCtxItem,
+                      } satisfies MenuItem,
                   ]
                 : []),
             ...(s.is_expired && canGovernBalance
                 ? [
-                      { sep: true } satisfies ShiftCtxItem,
+                      { separator: true } satisfies MenuItem,
                       {
-                          icon: <AlertOctagon className="h-3.5 w-3.5" />,
-                          label: 'Mark expired / quarantine',
-                          sub: 'Adjust out & record reason',
-                          tone: 'critical',
+                          icon: AlertOctagon,
+                          label: 'Quarantine / record stock adjustment',
+                          danger: true,
                           onClick: () => setModal({ type: 'adjust', item: s }),
-                      } satisfies ShiftCtxItem,
+                      } satisfies MenuItem,
                   ]
                 : []),
         ];
-        const t = ctxTagStyle(s);
-        setCtx({
-            x: e.clientX,
-            y: e.clientY,
-            tag: t.tag,
-            tagBg: t.tagBg,
-            tagColor: t.tagColor,
-            meta: `${s.client_name} · ${s.medication_name ?? '—'} · ${s.on_hand} ${s.unit}`,
-            items,
-        });
+        return compactMenu(items);
     };
 
     const openCdCtx = (e: ReactMouseEvent, r: ControlledRegisterRow) => {
@@ -596,7 +549,7 @@ export default function StockManagement({
             if (chip === 'cold_chain' && !s.requires_cold_chain) return false;
             if (
                 q &&
-                !`${s.medication_name ?? ''} ${s.client_name} ${s.batch_number ?? ''}`
+                !`${s.medication_name ?? ''} ${s.client_name} ${s.site_name ?? ''} ${s.batch_number ?? ''}`
                     .toLowerCase()
                     .includes(q)
             )
@@ -622,32 +575,6 @@ export default function StockManagement({
                 .includes(query),
         );
     }, [controlledRegister, search]);
-
-    const byClient = useMemo(() => {
-        const groups = new Map<
-            number,
-            {
-                client_id: number;
-                client_name: string;
-                site_name: string | null;
-                rows: StockRow[];
-            }
-        >();
-        filtered.forEach((s) => {
-            const key = s.client_id ?? 0;
-            if (!groups.has(key))
-                groups.set(key, {
-                    client_id: key,
-                    client_name: s.client_name || 'Unknown',
-                    site_name: s.site_name,
-                    rows: [],
-                });
-            groups.get(key)!.rows.push(s);
-        });
-        return [...groups.values()].sort((a, b) =>
-            a.client_name.localeCompare(b.client_name),
-        );
-    }, [filtered]);
 
     const advance = async (order: OrderRow) => {
         const packItem = stockItems.find(
@@ -1020,7 +947,7 @@ export default function StockManagement({
                 )}
 
                 {['all', 'low', 'expiring', 'expired'].includes(activeTab) &&
-                    (byClient.length === 0 ? (
+                    (filtered.length === 0 ? (
                         <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed bg-card px-5 py-12 text-center">
                             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
                                 <Package className="h-6 w-6" />
@@ -1073,140 +1000,20 @@ export default function StockManagement({
                             </div>
                         </div>
                     ) : (
-                        <div className="flex flex-col gap-4">
-                            {byClient.map((g) => (
-                                <div
-                                    key={g.client_id}
-                                    className="overflow-hidden rounded-2xl border bg-card shadow-sm"
-                                >
-                                    <div className="flex items-center justify-between gap-3 border-b bg-muted/40 px-4 py-3">
-                                        {g.client_id ? (
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    router.visit(
-                                                        `/operations/clients/${g.client_id}?tab=mar`,
-                                                    )
-                                                }
-                                                className="group flex items-center gap-3 rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                                                title={`Open ${g.client_name}'s care profile`}
-                                            >
-                                                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                                                    {initials(g.client_name)}
-                                                </span>
-                                                <div>
-                                                    <div className="text-sm font-semibold group-hover:underline">
-                                                        {g.client_name}
-                                                    </div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {[
-                                                            g.site_name,
-                                                            `${g.rows.length} item${g.rows.length === 1 ? '' : 's'}`,
-                                                        ]
-                                                            .filter(Boolean)
-                                                            .join(' · ')}
-                                                    </div>
-                                                </div>
-                                            </button>
-                                        ) : (
-                                            <div className="flex items-center gap-3">
-                                                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                                                    {initials(g.client_name)}
-                                                </span>
-                                                <div>
-                                                    <div className="text-sm font-semibold">
-                                                        {g.client_name}
-                                                    </div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {[
-                                                            g.site_name,
-                                                            `${g.rows.length} item${g.rows.length === 1 ? '' : 's'}`,
-                                                        ]
-                                                            .filter(Boolean)
-                                                            .join(' · ')}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() =>
-                                                setModal({
-                                                    type: 'order',
-                                                    clientId: g.client_id,
-                                                })
-                                            }
-                                        >
-                                            <ShoppingCart className="h-3.5 w-3.5" />
-                                            Order
-                                        </Button>
-                                    </div>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full min-w-[760px] text-sm">
-                                            <thead>
-                                                <tr className="bg-muted/50 text-left text-[11px] tracking-wide text-muted-foreground uppercase">
-                                                    <th className="px-4 py-2.5">
-                                                        Medication
-                                                    </th>
-                                                    <th className="px-4 py-2.5">
-                                                        Batch · expiry
-                                                    </th>
-                                                    <th className="px-4 py-2.5">
-                                                        On hand
-                                                    </th>
-                                                    <th className="px-4 py-2.5">
-                                                        Reorder at
-                                                    </th>
-                                                    <th className="px-4 py-2.5">
-                                                        Status
-                                                    </th>
-                                                    <th className="px-4 py-2.5 text-right">
-                                                        Actions
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {g.rows.map((s) => (
-                                                    <StockRowView
-                                                        key={s.id}
-                                                        s={s}
-                                                        onView={() =>
-                                                            setModal({
-                                                                type: 'detail',
-                                                                item: s,
-                                                            })
-                                                        }
-                                                        onCount={
-                                                            !s.controlled ||
-                                                            canRecordControlled
-                                                                ? () =>
-                                                                      runCount(
-                                                                          s,
-                                                                      )
-                                                                : undefined
-                                                        }
-                                                        onAdjust={
-                                                            !s.controlled ||
-                                                            canRecordControlled
-                                                                ? () =>
-                                                                      setModal({
-                                                                          type: 'adjust',
-                                                                          item: s,
-                                                                      })
-                                                                : undefined
-                                                        }
-                                                        onCtx={(e) =>
-                                                            openStockCtx(e, s)
-                                                        }
-                                                    />
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                        <StockInventoryTable
+                            key={[
+                                activeTab,
+                                chip,
+                                search,
+                                siteFilter,
+                                clientFilter,
+                            ].join(':')}
+                            rows={filtered}
+                            actionsFor={stockActionsFor}
+                            onOpen={(item) =>
+                                setModal({ type: 'detail', item })
+                            }
+                        />
                     ))}
 
                 {canViewControlled && activeTab === 'controlled' && (
@@ -1534,156 +1341,6 @@ export default function StockManagement({
 
             {ctx && <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />}
         </AppLayout>
-    );
-}
-
-function StockRowView({
-    s,
-    onView,
-    onCount,
-    onAdjust,
-    onCtx,
-}: {
-    s: StockRow;
-    onView: () => void;
-    onCount?: () => void;
-    onAdjust?: () => void;
-    onCtx: (e: ReactMouseEvent) => void;
-}) {
-    const reorder = s.reorder_level ?? 0;
-    const ratio =
-        reorder > 0
-            ? Math.min(100, ((s.on_hand ?? 0) / (reorder * 2)) * 100)
-            : 100;
-    const barTone = s.is_low
-        ? 'bg-status-critical'
-        : (s.on_hand ?? 0) <= reorder * 1.4
-          ? 'bg-status-warning'
-          : 'bg-status-success';
-    const statusPill = s.is_expired
-        ? {
-              label: 'Expired',
-              cls: 'bg-status-critical-bg text-status-critical',
-          }
-        : s.is_low
-          ? {
-                label: 'Reorder now',
-                cls: 'bg-status-warning-bg text-status-warning',
-            }
-          : s.is_expiring_soon
-            ? {
-                  label: 'Expiring',
-                  cls: 'bg-status-warning-bg text-status-warning',
-              }
-            : {
-                  label: 'In stock',
-                  cls: 'bg-status-success-bg text-status-success',
-              };
-    const expiryTone = s.is_expired
-        ? 'text-status-critical'
-        : s.is_expiring_soon
-          ? 'text-status-warning'
-          : 'text-muted-foreground';
-    return (
-        <tr
-            onClick={onView}
-            onContextMenu={onCtx}
-            onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onView();
-                }
-            }}
-            tabIndex={0}
-            role="button"
-            aria-label={`View ${s.medication_name ?? 'stock item'} details for ${s.client_name}`}
-            className="cursor-pointer border-b transition-colors last:border-b-0 hover:bg-muted/40 focus:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset"
-        >
-            <td className="px-4 py-3">
-                <div className="flex items-center gap-1.5 font-medium">
-                    {s.medication_name}
-                    {s.controlled && (
-                        <span className="rounded-full bg-status-critical-bg px-1.5 py-0.5 text-[10px] font-semibold text-status-critical">
-                            CD
-                        </span>
-                    )}
-                    {s.requires_cold_chain && (
-                        <Snowflake
-                            className="h-3.5 w-3.5 text-status-info"
-                            aria-label="Cold chain"
-                        />
-                    )}
-                </div>
-                {s.medication_dose && (
-                    <div className="text-xs text-muted-foreground">
-                        {s.medication_dose}
-                    </div>
-                )}
-            </td>
-            <td className="px-4 py-3">
-                <div className="font-mono text-xs">{s.batch_number ?? '—'}</div>
-                {s.expiry_date && (
-                    <div className={`text-xs ${expiryTone}`}>
-                        {new Date(s.expiry_date).toLocaleDateString('en-NZ')}
-                        {s.is_expiring_soon && !s.is_expired ? ' · FEFO' : ''}
-                    </div>
-                )}
-            </td>
-            <td className="px-4 py-3">
-                <div
-                    className={`font-mono tabular-nums ${s.is_low ? 'font-semibold text-status-critical' : ''}`}
-                >
-                    {s.on_hand === null ? 'Unknown' : s.on_hand}{' '}
-                    {s.on_hand === null ? '' : s.unit}
-                </div>
-                <div className="mt-1 h-1.5 w-24 overflow-hidden rounded-full bg-muted">
-                    <div
-                        className={`h-full rounded-full ${barTone}`}
-                        style={{ width: `${ratio}%` }}
-                    />
-                </div>
-            </td>
-            <td className="px-4 py-3 font-mono text-muted-foreground tabular-nums">
-                {s.reorder_level ?? '—'}
-            </td>
-            <td className="px-4 py-3">
-                <span
-                    className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusPill.cls}`}
-                >
-                    {statusPill.label}
-                </span>
-            </td>
-            <td className="px-4 py-3">
-                <div className="flex items-center justify-end gap-1">
-                    {onCount ? (
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onCount();
-                            }}
-                            title="Record count"
-                        >
-                            <ClipboardCheck className="h-3.5 w-3.5" />
-                        </Button>
-                    ) : null}
-                    {onAdjust ? (
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onAdjust();
-                            }}
-                            title="Adjust / edit"
-                        >
-                            <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                    ) : null}
-                </div>
-            </td>
-        </tr>
     );
 }
 
