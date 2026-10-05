@@ -1,6 +1,16 @@
 # eMAR implementation and verification status
 
-## Final CI fixture verification — 6 October 2026
+## NZ date and desktop acceptance follow-up — 6 October 2026
+
+The dedicated medication release job at `fbb30210b47a881d3eb4fc90d98a3cc45d236d3c` passes **383 tests / 5,509 assertions**. Screenshot comparisons and both Governance and IT desktop sizes pass. Broader CI exposed two test fixtures that mixed UTC and New Zealand dates around midnight, plus a desktop assignment test that checked the old page before its save and redirected read finished. These are test corrections; production authorization, payroll safeguards and assignment behavior remain unchanged.
+
+Both complete date-test files now pass **36 cases / 232 assertions**, exit zero, in **345.35 seconds**. Payroll cases derive each entry date from its own clock-in, cover daytime and summer/winter overnight intervals, and retain overlap, impossible-break and mismatched-date denials without record changes. The site-access fixture creates future/ended employment against the worker's New Zealand day and retains every invalid-staff denial with and without broad report permission. Fixed employment starts keep the pinned regression dates independent of the calendar year. All 5,147 source, two tested-file and 11 previously accepted hashes remained unchanged. Exact disposable schema `oblivion_findings_codex_test_packpaper_417908` and its owned processes are absent, with zero tables or connections. Evidence SHA256: `9DA79CCC90202079425E4F4A026B32269E549122C191832A73047F345BF32561`.
+
+The failed desktop run completed **117 passed / one failed / two skipped**. Its saved trace shows the candidate, status and unchanged-URL assertions passing on stale props while the assignment request was still running. The corrected single journey waits for the exact assignment POST and its linked redirected GET, checks fresh person/status/error props, then checks the visible assignment and exact audit event. Its 60-second journey budget leaves the shared 10-second UI assertion limit unchanged. Independent review, formatting, lint and one-test discovery pass. Runtime acceptance remains required in the existing disposable CI browser job; no unguarded local reseed was run.
+
+Complete fresh CI on the follow-up remains the release gate. Prior passing checks belong to their named commits; unexecuted tails of failed groups are not counted as passes. See [PR #16](https://github.com/Rory357/oblivionfindings/pull/16) for current checks. The desktop build remains `app-BFgqevF3.js`; no frontend product or production data changed in this follow-up. Production rollout boundaries below remain in place.
+
+## Prior CI fixture verification — 6 October 2026
 
 CI for `047dd7ce43031ee6b674912ae24da6ae02d63031` completed with **15 passing checks and three failed broad feature groups**. The dedicated medication release job passed **383 tests / 5,509 assertions**; all six desktop/visual checks, quality, foundation, database bootstrap and five feature groups passed. The passing roster group includes the complete HTTP journey and new direct/queued current-staff boundaries. Current checks are available on [PR #16](https://github.com/Rory357/oblivionfindings/pull/16); results below belong to their named commits and frozen files.
 

@@ -13,6 +13,7 @@ use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -37,9 +38,10 @@ beforeEach(function (): void {
         'approved_at' => now(),
     ]);
 
-    ensureCanonicalHrStaffProfile($this->manager, $this->site);
+    ensureCanonicalHrStaffProfile($this->manager, $this->site, ['start_date' => '2025-01-01']);
     ensureCanonicalHrStaffProfile($this->worker, $this->site, [
         'manager_user_id' => $this->manager->id,
+        'start_date' => '2025-01-01',
     ]);
 
     $this->serviceContext = ServiceContext::factory()->create(['site_id' => $this->site->id]);
@@ -534,14 +536,15 @@ test('worker intervals use half-open overlap semantics for creation and edit', f
 });
 
 test('orphan recovery counts persisted nonvoided statuses and refuses duplicate rows', function () {
+    $clockIn = now()->subHours(2);
     $rows = collect(['active', 'submitted'])->map(fn (string $status) => HrTimeEntry::factory()->create([
         'user_id' => $this->worker->id,
         'site_id' => $this->site->id,
         'client_id' => $this->client->id,
         'attendance_session_id' => null,
         'shift_id' => null,
-        'entry_date' => now(config('app.worker_timezone'))->toDateString(),
-        'clock_in' => now()->subHours(2),
+        'entry_date' => $clockIn->copy()->timezone(config('app.worker_timezone'))->toDateString(),
+        'clock_in' => $clockIn,
         'clock_out' => null,
         'status' => $status,
     ]));
@@ -558,66 +561,122 @@ test('orphan recovery counts persisted nonvoided statuses and refuses duplicate 
     }
 });
 
-test('orphan recovery rejects an impossible break without changing the entry', function () {
-    $entry = HrTimeEntry::factory()->create([
-        'user_id' => $this->worker->id,
-        'site_id' => $this->site->id,
-        'client_id' => $this->client->id,
-        'attendance_session_id' => null,
-        'shift_id' => null,
-        'entry_date' => now(config('app.worker_timezone'))->toDateString(),
-        'clock_in' => now()->subMinutes(30),
-        'clock_out' => null,
-        'status' => 'active',
-    ]);
-    $before = $entry->fresh()->getRawOriginal();
-    $timesheetsBefore = Timesheet::query()->count();
+test('orphan recovery rejects an impossible break without changing the entry', function (string $clockOutUtc) {
+    $this->travelTo(Carbon::parse($clockOutUtc, 'UTC'));
+    try {
+        $clockOut = now()->startOfMinute();
+        $clockIn = $clockOut->copy()->subMinutes(30);
+        $entry = HrTimeEntry::factory()->create([
+            'user_id' => $this->worker->id,
+            'site_id' => $this->site->id,
+            'client_id' => $this->client->id,
+            'attendance_session_id' => null,
+            'shift_id' => null,
+            'entry_date' => $clockIn->copy()->timezone(config('app.worker_timezone'))->toDateString(),
+            'clock_in' => $clockIn,
+            'clock_out' => null,
+            'status' => 'active',
+        ]);
+        $before = $entry->fresh()->getRawOriginal();
+        $timesheetsBefore = Timesheet::query()->count();
 
-    expect(fn () => app(TimeTrackingService::class)->closeOpenEntries(
-        $this->worker,
-        now(),
-        60,
-    ))->toThrow(LogicException::class, 'must be less than the session duration');
+        expect(fn () => app(TimeTrackingService::class)->closeOpenEntries(
+            $this->worker,
+            $clockOut,
+            60,
+        ))->toThrow(LogicException::class, 'must be less than the session duration');
 
-    expect($entry->fresh()->getRawOriginal())->toBe($before)
-        ->and(Timesheet::query()->count())->toBe($timesheetsBefore);
-});
+        expect($entry->fresh()->getRawOriginal())->toBe($before)
+            ->and(Timesheet::query()->count())->toBe($timesheetsBefore);
+    } finally {
+        $this->travelBack();
+    }
+})->with([
+    'NZ daytime' => ['2026-10-05T22:15:00Z'],
+    'NZ midnight crossing' => ['2026-10-05T11:15:00Z'],
+]);
 
-test('orphan recovery rejects overlap with a submitted interval without changing either row', function () {
-    $clockOut = now()->startOfMinute();
-    $entry = HrTimeEntry::factory()->create([
-        'user_id' => $this->worker->id,
-        'site_id' => $this->site->id,
-        'client_id' => $this->client->id,
-        'attendance_session_id' => null,
-        'shift_id' => null,
-        'entry_date' => $clockOut->copy()->timezone(config('app.worker_timezone'))->toDateString(),
-        'clock_in' => $clockOut->copy()->subHours(2),
-        'clock_out' => null,
-        'status' => 'active',
-    ]);
-    $overlap = HrTimeEntry::factory()->create([
-        'user_id' => $this->worker->id,
-        'site_id' => $this->site->id,
-        'client_id' => $this->client->id,
-        'attendance_session_id' => null,
-        'shift_id' => null,
-        'entry_date' => $entry->entry_date,
-        'clock_in' => $clockOut->copy()->subMinutes(90),
-        'clock_out' => $clockOut->copy()->subMinutes(60),
-        'status' => 'submitted',
-    ]);
-    $entryBefore = $entry->fresh()->getRawOriginal();
-    $overlapBefore = $overlap->fresh()->getRawOriginal();
+test('orphan recovery rejects overlap with a submitted interval without changing either row', function (string $clockOutUtc) {
+    $this->travelTo(Carbon::parse($clockOutUtc, 'UTC'));
+    try {
+        $clockOut = now()->startOfMinute();
+        $clockIn = $clockOut->copy()->subHours(2);
+        $overlapClockIn = $clockOut->copy()->subMinutes(90);
+        $entry = HrTimeEntry::factory()->create([
+            'user_id' => $this->worker->id,
+            'site_id' => $this->site->id,
+            'client_id' => $this->client->id,
+            'attendance_session_id' => null,
+            'shift_id' => null,
+            'entry_date' => $clockIn->copy()->timezone(config('app.worker_timezone'))->toDateString(),
+            'clock_in' => $clockIn,
+            'clock_out' => null,
+            'status' => 'active',
+        ]);
+        $overlap = HrTimeEntry::factory()->create([
+            'user_id' => $this->worker->id,
+            'site_id' => $this->site->id,
+            'client_id' => $this->client->id,
+            'attendance_session_id' => null,
+            'shift_id' => null,
+            'entry_date' => $overlapClockIn->copy()->timezone(config('app.worker_timezone'))->toDateString(),
+            'clock_in' => $overlapClockIn,
+            'clock_out' => $clockOut->copy()->subMinutes(60),
+            'status' => 'submitted',
+        ]);
+        $entryBefore = $entry->fresh()->getRawOriginal();
+        $overlapBefore = $overlap->fresh()->getRawOriginal();
+        $timesheetsBefore = Timesheet::query()->count();
 
-    expect(fn () => app(TimeTrackingService::class)->closeOpenEntries(
-        $this->worker,
-        $clockOut,
-        10,
-    ))->toThrow(LogicException::class, 'overlapping time entry');
+        expect(fn () => app(TimeTrackingService::class)->closeOpenEntries(
+            $this->worker,
+            $clockOut,
+            10,
+        ))->toThrow(LogicException::class, 'overlapping time entry');
 
-    expect($entry->fresh()->getRawOriginal())->toBe($entryBefore)
-        ->and($overlap->fresh()->getRawOriginal())->toBe($overlapBefore);
+        expect($entry->fresh()->getRawOriginal())->toBe($entryBefore)
+            ->and($overlap->fresh()->getRawOriginal())->toBe($overlapBefore)
+            ->and(Timesheet::query()->count())->toBe($timesheetsBefore);
+    } finally {
+        $this->travelBack();
+    }
+})->with([
+    'NZ daytime' => ['2026-10-05T22:30:00Z'],
+    'NZ summer overnight' => ['2026-10-05T12:30:00Z'],
+    'NZ winter overnight' => ['2026-07-01T13:30:00Z'],
+]);
+
+test('orphan recovery conceals a date that differs from the worker-local clock-in day without changing evidence', function () {
+    $this->travelTo(Carbon::parse('2026-10-05T12:30:00Z', 'UTC'));
+    try {
+        $clockOut = now()->startOfMinute();
+        $clockIn = $clockOut->copy()->subHours(2);
+        $entry = HrTimeEntry::factory()->create([
+            'user_id' => $this->worker->id,
+            'site_id' => $this->site->id,
+            'client_id' => $this->client->id,
+            'attendance_session_id' => null,
+            'shift_id' => null,
+            'entry_date' => $clockOut->copy()->timezone(config('app.worker_timezone'))->toDateString(),
+            'clock_in' => $clockIn,
+            'clock_out' => null,
+            'status' => 'active',
+        ]);
+        expect($entry->entry_date->toDateString())->not->toBe($clockIn->copy()->timezone(config('app.worker_timezone'))->toDateString());
+        $before = $entry->fresh()->getRawOriginal();
+        $timesheetsBefore = Timesheet::query()->count();
+
+        expect(fn () => app(TimeTrackingService::class)->closeOpenEntries(
+            $this->worker,
+            $clockOut,
+            10,
+        ))->toThrow(NotFoundHttpException::class);
+
+        expect($entry->fresh()->getRawOriginal())->toBe($before)
+            ->and(Timesheet::query()->count())->toBe($timesheetsBefore);
+    } finally {
+        $this->travelBack();
+    }
 });
 
 test('attendance backfill is idempotent and ignores its own locked projection in overlap checks', function () {

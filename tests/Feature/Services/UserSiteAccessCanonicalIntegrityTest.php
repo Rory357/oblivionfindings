@@ -116,50 +116,59 @@ class UserSiteAccessCanonicalIntegrityTest extends TestCase
 
     public function test_timesheet_query_matches_direct_linked_worker_eligibility_even_with_broad_reader_permission(): void
     {
-        $site = Site::factory()->create();
-        $otherSite = Site::factory()->create();
-        $viewer = $this->currentSiteUser($site, permissions: ['reports.viewAny']);
-        $client = $this->clientAt($site);
-        $primaryWorker = $this->currentSiteUser($site);
-        $secondaryWorker = $this->currentSiteUser($otherSite, profileOverrides: [
-            'secondary_site_ids' => [$site->id],
-        ]);
-        $primary = $this->timesheetFor($this->shiftAt($site, $client, $primaryWorker), $client, $primaryWorker, $site);
-        $secondary = $this->timesheetFor($this->shiftAt(null, $client, $secondaryWorker), $client, $secondaryWorker, $site);
-        $invalid = [];
+        config(['app.worker_timezone' => 'Pacific/Auckland']);
+        $this->travelTo(Carbon::parse('2026-10-05 12:30:00', 'UTC'));
+        try {
+            $workerToday = now(config('app.worker_timezone'))->startOfDay();
+            $this->assertSame('2026-10-05', now()->toDateString());
+            $this->assertSame('2026-10-06', $workerToday->toDateString());
+            $site = Site::factory()->create();
+            $otherSite = Site::factory()->create();
+            $viewer = $this->currentSiteUser($site, permissions: ['reports.viewAny']);
+            $client = $this->clientAt($site);
+            $primaryWorker = $this->currentSiteUser($site);
+            $secondaryWorker = $this->currentSiteUser($otherSite, profileOverrides: [
+                'secondary_site_ids' => [$site->id],
+            ]);
+            $primary = $this->timesheetFor($this->shiftAt($site, $client, $primaryWorker), $client, $primaryWorker, $site);
+            $secondary = $this->timesheetFor($this->shiftAt(null, $client, $secondaryWorker), $client, $secondaryWorker, $site);
+            $invalid = [];
 
-        foreach (['wrong_site', 'inactive', 'ended', 'not_started', 'deleted_profile', 'unapproved', 'portal_role'] as $reason) {
-            $worker = $this->currentSiteUser($site);
-            $timesheet = $this->timesheetFor($this->shiftAt($site, $client, $worker), $client, $worker, $site);
-            $profile = $worker->hrEmployeeProfile;
-            match ($reason) {
-                'wrong_site' => $profile->update(['primary_site_id' => $otherSite->id]),
-                'inactive' => $profile->update(['is_active' => false]),
-                'ended' => $profile->update(['end_date' => now()->subDay()->toDateString()]),
-                'not_started' => $profile->update(['start_date' => now()->addDay()->toDateString()]),
-                'deleted_profile' => $profile->delete(),
-                'unapproved' => $worker->forceFill(['approved_at' => null])->save(),
-                'portal_role' => $worker->forceFill(['role' => 'client'])->save(),
-            };
-            $invalid[$reason] = $timesheet;
-        }
-
-        $service = app(UserSiteAccessService::class);
-        $bypass = ['reports.viewAny'];
-        foreach ([[], $bypass] as $permissions) {
-            $query = Timesheet::query()->whereIn('id', [
-                $primary->id,
-                $secondary->id,
-                ...array_map(fn (Timesheet $timesheet): int => $timesheet->id, $invalid),
-            ])->orderBy('id');
-            $service->applyTimesheetScope($query, $viewer, $permissions);
-
-            $this->assertSame([$primary->id, $secondary->id], $query->pluck('id')->all());
-            $service->assertCanAccessTimesheet($viewer, $primary, $permissions);
-            $service->assertCanAccessTimesheet($viewer, $secondary, $permissions);
-            foreach ($invalid as $timesheet) {
-                $this->assertAccessDenied(fn () => $service->assertCanAccessTimesheet($viewer, $timesheet, $permissions));
+            foreach (['wrong_site', 'inactive', 'ended', 'not_started', 'deleted_profile', 'unapproved', 'portal_role'] as $reason) {
+                $worker = $this->currentSiteUser($site);
+                $timesheet = $this->timesheetFor($this->shiftAt($site, $client, $worker), $client, $worker, $site);
+                $profile = $worker->hrEmployeeProfile;
+                match ($reason) {
+                    'wrong_site' => $profile->update(['primary_site_id' => $otherSite->id]),
+                    'inactive' => $profile->update(['is_active' => false]),
+                    'ended' => $profile->update(['end_date' => $workerToday->copy()->subDay()->toDateString()]),
+                    'not_started' => $profile->update(['start_date' => $workerToday->copy()->addDay()->toDateString()]),
+                    'deleted_profile' => $profile->delete(),
+                    'unapproved' => $worker->forceFill(['approved_at' => null])->save(),
+                    'portal_role' => $worker->forceFill(['role' => 'client'])->save(),
+                };
+                $invalid[$reason] = $timesheet;
             }
+
+            $service = app(UserSiteAccessService::class);
+            $bypass = ['reports.viewAny'];
+            foreach ([[], $bypass] as $permissions) {
+                $query = Timesheet::query()->whereIn('id', [
+                    $primary->id,
+                    $secondary->id,
+                    ...array_map(fn (Timesheet $timesheet): int => $timesheet->id, $invalid),
+                ])->orderBy('id');
+                $service->applyTimesheetScope($query, $viewer, $permissions);
+
+                $this->assertSame([$primary->id, $secondary->id], $query->pluck('id')->all());
+                $service->assertCanAccessTimesheet($viewer, $primary, $permissions);
+                $service->assertCanAccessTimesheet($viewer, $secondary, $permissions);
+                foreach ($invalid as $timesheet) {
+                    $this->assertAccessDenied(fn () => $service->assertCanAccessTimesheet($viewer, $timesheet, $permissions));
+                }
+            }
+        } finally {
+            $this->travelBack();
         }
     }
 
