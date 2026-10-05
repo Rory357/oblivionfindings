@@ -7,6 +7,7 @@ use Carbon\CarbonImmutable;
 use Faker\Factory;
 use Faker\Generator;
 use Illuminate\Container\Container;
+use Illuminate\Support\Env;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -113,6 +114,81 @@ final class FrozenVisualRuntimeTest extends TestCase
         } catch (InvalidArgumentException) {
             self::assertFalse(Carbon::hasTestNow());
             self::assertFalse(CarbonImmutable::hasTestNow());
+        }
+    }
+
+    public function test_getenv_only_ci_context_wins_over_environment_file_fallback_and_matches_laravel(): void
+    {
+        $this->withHttpEnvironment($this->visualEnvironment(), function (string $directory): void {
+            FrozenVisualRuntime::loadEnvironment($directory);
+            $options = FrozenVisualRuntime::configureFromEnvironment();
+            self::assertSame('testing', $options['environment']);
+            self::assertSame('mysql', $options['connection']);
+            self::assertSame(FrozenVisualRuntime::DATABASE, $options['database']);
+            self::assertSame($options['database'], Env::get('DB_DATABASE'));
+            self::assertSame($options['connection'], Env::get('DB_CONNECTION'));
+            self::assertSame('2026-10-05T00:00:00+00:00', Carbon::now('UTC')->toIso8601String());
+        });
+    }
+
+    #[DataProvider('unsafeInheritedContexts')]
+    public function test_environment_file_cannot_disguise_an_unsafe_inherited_http_context(string $key, string $value, string $message): void
+    {
+        $this->withHttpEnvironment([$key => $value, ...array_diff_key($this->visualEnvironment(), [$key => true])], function (string $directory) use ($message): void {
+            FrozenVisualRuntime::loadEnvironment($directory);
+            try {
+                FrozenVisualRuntime::configureFromEnvironment();
+                self::fail('Unsafe inherited HTTP context was disguised by .env.');
+            } catch (InvalidArgumentException $exception) {
+                self::assertStringContainsString($message, $exception->getMessage());
+                self::assertFalse(Carbon::hasTestNow());
+                self::assertFalse(CarbonImmutable::hasTestNow());
+            }
+        }, true);
+    }
+
+    public static function unsafeInheritedContexts(): iterable
+    {
+        yield 'production process' => ['APP_ENV', 'production', 'local or testing'];
+        yield 'shared process database' => ['DB_DATABASE', 'oblivion_findings', 'dedicated disposable'];
+        yield 'different process connection' => ['DB_CONNECTION', 'sqlite', 'dedicated disposable'];
+        yield 'process URL override' => ['DB_URL', 'mysql://example.invalid/shared', 'database URL override'];
+    }
+
+    private function visualEnvironment(): array
+    {
+        return ['APP_ENV' => 'testing', 'DB_CONNECTION' => 'mysql', 'DB_DATABASE' => FrozenVisualRuntime::DATABASE,
+            'DB_URL' => '', 'VISUAL_FROZEN_NOW' => '2026-10-05T00:00:00Z', 'VISUAL_RANDOM_SEED' => '20261005'];
+    }
+
+    /** Pure cli-server environment simulation; no Laravel app or database is booted. */
+    private function withHttpEnvironment(array $values, callable $assertions, bool $safeFile = false): void
+    {
+        $beforeEnv = $_ENV;
+        $beforeServer = $_SERVER;
+        $beforeProcess = [];
+        $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'emar-frozen-visual-'.bin2hex(random_bytes(8));
+        mkdir($directory);
+        $fallback = $safeFile ? $this->visualEnvironment() : ['APP_ENV' => 'local', 'DB_CONNECTION' => 'sqlite', 'DB_DATABASE' => 'oblivion_findings',
+            'DB_URL' => '', 'VISUAL_FROZEN_NOW' => '2026-10-05T00:00:00Z', 'VISUAL_RANDOM_SEED' => '20261005'];
+        file_put_contents($directory.DIRECTORY_SEPARATOR.'.env', implode("\n", array_map(fn ($key, $value) => $key.'='.$value, array_keys($fallback), $fallback))."\n");
+        try {
+            foreach ($values as $key => $value) {
+                $beforeProcess[$key] = getenv($key);
+                unset($_ENV[$key], $_SERVER[$key]);
+                putenv($key.'='.$value);
+            }
+            Env::enablePutenv();
+            $assertions($directory);
+        } finally {
+            $_ENV = $beforeEnv;
+            $_SERVER = $beforeServer;
+            foreach ($beforeProcess as $key => $value) {
+                putenv($value === false ? $key : $key.'='.$value);
+            }
+            Env::enablePutenv();
+            unlink($directory.DIRECTORY_SEPARATOR.'.env');
+            rmdir($directory);
         }
     }
 

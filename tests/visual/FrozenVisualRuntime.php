@@ -6,9 +6,11 @@ use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use DateTimeImmutable;
 use DateTimeInterface;
+use Dotenv\Dotenv;
 use Faker\Generator;
 use Faker\Provider\DateTime;
 use Illuminate\Contracts\Container\Container;
+use Illuminate\Support\Env;
 use InvalidArgumentException;
 
 final class FrozenVisualRuntime
@@ -47,13 +49,20 @@ final class FrozenVisualRuntime
         mt_srand($seed);
     }
 
+    public static function loadEnvironment(string $root): void
+    {
+        // Match Laravel bootstrap, including inherited getenv-only values in
+        // PHP's built-in HTTP server. .env may not shadow the CI database guard.
+        Dotenv::create(Env::getRepository(), $root)->safeLoad();
+    }
+
     /**
      * @return array{environment: string, connection: string, database: string, instant: string, seed: int}
      */
     public static function configureFromEnvironment(): array
     {
         $read = static function (string $key): string {
-            $value = $_ENV[$key] ?? $_SERVER[$key] ?? getenv($key);
+            $value = Env::get($key);
 
             return is_string($value) ? $value : '';
         };

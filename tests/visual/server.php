@@ -1,6 +1,5 @@
 <?php
 
-use Dotenv\Dotenv;
 use Illuminate\Http\Request;
 use Tests\Visual\FrozenVisualRuntime;
 
@@ -13,7 +12,7 @@ require __DIR__.'/FrozenVisualRuntime.php';
 if (is_file($root.'/bootstrap/cache/config.php')) {
     throw new LogicException('Frozen visual runtime requires uncached disposable test configuration.');
 }
-Dotenv::createImmutable($root)->safeLoad();
+FrozenVisualRuntime::loadEnvironment($root);
 $options = FrozenVisualRuntime::configureFromEnvironment();
 
 $uri = urldecode(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
