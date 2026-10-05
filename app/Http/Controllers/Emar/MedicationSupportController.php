@@ -221,7 +221,14 @@ final class MedicationSupportController extends Controller
             }, 5);
         } catch (\Throwable $error) {
             if ($stored) {
-                Storage::disk('private')->delete($stored);
+                // After-commit callbacks may fail after the attachment has become canonical evidence.
+                try {
+                    if (! MedicationSupportAgreement::query()->where('attachment_path', $stored)->exists()) {
+                        Storage::disk('private')->delete($stored);
+                    }
+                } catch (\Throwable $cleanupFailure) {
+                    report($cleanupFailure); // Preserve bytes if their persisted ownership cannot be verified.
+                }
             }
             throw $error;
         }

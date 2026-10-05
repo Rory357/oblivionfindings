@@ -349,8 +349,10 @@ final class MedicationOrdersController extends Controller
     public function authoriseCovert(Request $request, int $medication)
     {
         $paths = [];
+        $usedPaths = [];
         try {
-            $this->orders->forOfficeMedication($request->user(), $medication, function (Client $client, ClientMedication $order, User $actor) use ($request, &$paths) {
+            $this->orders->forOfficeMedication($request->user(), $medication, function (Client $client, ClientMedication $order, User $actor) use ($request, &$paths, &$usedPaths) {
+                $usedPaths = [];
                 $this->access->assertReadable($actor, $client);
                 $this->orders->assertControlled($actor, $order);
                 $this->orders->assertOpen($order);
@@ -396,6 +398,7 @@ final class MedicationOrdersController extends Controller
                     throw new \RuntimeException('The prescriber’s authorisation could not be stored.');
                 }
                 $paths[] = $path;
+                $usedPaths[] = $path;
                 MedicationOrderFile::query()->create(['medication_covert_authorisation_id' => $authorisation->id, 'purpose' => 'gp_authorisation',
                     'file_name' => $file->getClientOriginalName(), 'file_path' => $path, 'file_size' => $file->getSize(), 'mime_type' => $file->getMimeType(),
                     'sha256' => hash_file('sha256', $file->getRealPath()), 'uploaded_by' => $actor->id, 'created_at' => now()]);
@@ -405,11 +408,16 @@ final class MedicationOrdersController extends Controller
                 $this->orders->action($actor, $order, 'covert_authorised', ['authorisation_id' => $authorisation->id]);
             });
         } catch (\Throwable $exception) {
-            foreach ($paths as $path) {
-                Storage::disk('local')->delete($path);
+            try {
+                $retained = MedicationOrderFile::query()->whereIn('file_path', $paths)->pluck('file_path')->all();
+                Storage::disk('local')->delete(array_values(array_diff(array_unique($paths), $retained)));
+            } catch (\Throwable $cleanupFailure) {
+                report($cleanupFailure);
             }
             throw $exception;
         }
+
+        Storage::disk('local')->delete(array_values(array_diff(array_unique($paths), $usedPaths)));
 
         return back()->with('success', 'Covert authorisation and source saved. Earlier authorisations are kept.');
     }

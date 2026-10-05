@@ -31,6 +31,7 @@ use App\Services\Medication\Support\SupportTime;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Database\DatabaseTransactionsManager;
 use Illuminate\Database\DeadlockException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -42,6 +43,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use Mockery;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
@@ -656,6 +658,68 @@ class MedicationSupportWorkflowTest extends TestCase
         $this->assertSame($files, $disk->allFiles());
         $this->assertSame([$agreement->attachment_path], $paths);
         $this->assertSame('Keep this existing file.', $disk->get('unrelated.txt'));
+    }
+
+    public static function agreementOwnershipLookup(): array
+    {
+        return ['canonical reference readable' => [false], 'ownership lookup unavailable' => [true]];
+    }
+
+    #[DataProvider('agreementOwnershipLookup')]
+    public function test_after_commit_failure_preserves_the_canonical_signed_agreement_attachment(bool $failLookup): void
+    {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+        $assessment = $this->assess('self_managed');
+        $paths = [];
+        $disk = $this->spyPrivateWrites($paths);
+        $lookupReady = false;
+        $lookupFailed = false;
+        $realRecorder = app(MedicationEventRecorder::class);
+        $recorder = Mockery::mock(MedicationEventRecorder::class);
+        $recorder->shouldReceive('appendMany')->once()->andReturnUsing(function (array $events) use ($realRecorder, &$lookupReady): array {
+            $saved = $realRecorder->appendMany($events);
+            DB::afterCommit(function () use (&$lookupReady): void {
+                $this->assertSame(0, DB::transactionLevel());
+                $this->assertFalse(DB::connection()->getPdo()->inTransaction());
+                $lookupReady = true;
+                throw new \RuntimeException('Synthetic after-commit failure');
+            });
+
+            return $saved;
+        });
+        $this->app->instance(MedicationEventRecorder::class, $recorder);
+        $uuid = (string) Str::uuid();
+        DB::connection()->beforeExecuting(function (string $query) use ($failLookup, &$lookupReady, &$lookupFailed): void {
+            if ($failLookup && $lookupReady && str_contains($query, 'medication_support_agreements') && str_contains($query, 'attachment_path')) {
+                $lookupReady = false;
+                $lookupFailed = true;
+                throw new \RuntimeException('Synthetic ownership lookup failure');
+            }
+        });
+        DB::commit();
+        $this->assertSame(0, DB::transactionLevel());
+        $manager = new DatabaseTransactionsManager;
+        $this->app->instance('db.transactions', $manager);
+        DB::connection()->setTransactionManager($manager);
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($this->actor)->post('/emar/self-admin/'.$assessment->id.'/agreement', $this->signedAgreementPayload($uuid));
+            $this->fail('The after-commit failure was not surfaced.');
+        } catch (\RuntimeException $error) {
+            $this->assertSame('Synthetic after-commit failure', $error->getMessage());
+        }
+        $this->assertSame(0, DB::transactionLevel());
+        $this->assertSame($failLookup, $lookupFailed);
+        $agreement = MedicationSupportAgreement::query()->sole();
+        $this->assertSame([$agreement->attachment_path], $paths);
+        $this->assertSame($this->actor->id, $agreement->recorded_by);
+        $this->assertSame($assessment->id, $agreement->assessment_id);
+        $this->assertSame($agreement->id, $assessment->fresh()->support_agreement_id);
+        $this->assertSame('self_managed', app(MedicationSupport::class)->mode($this->medicine));
+        $this->assertSame($agreement->id, MedicationIdempotencyResult::query()->sole()->response_payload['agreement_id']);
+        $this->assertSame(1, DB::table('medication_events')->where('kind', 'support.agreement_recorded')->count());
+        $this->assertSame("%PDF-1.4\nSynthetic support agreement.\n", $disk->get($agreement->attachment_path));
+        $this->assertEqualsCanonicalizing(['unrelated.txt', $agreement->attachment_path], $disk->allFiles());
     }
 
     public function test_exhausted_agreement_retries_remove_only_the_once_staged_attachment(): void

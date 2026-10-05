@@ -215,25 +215,7 @@ class ReportsController extends Controller
 
     private function excludeMedicationAuditFamilies(Builder $query): void
     {
-        $query->where(function (Builder $nonMedication): void {
-            $nonMedication->whereNull('auditable_type')
-                ->orWhere(function (Builder $typed): void {
-                    $typed->where('auditable_type', 'not like', '%Medication%')
-                        ->where('auditable_type', 'not like', '%ControlledDrug%');
-                });
-        })->where(function (Builder $nonMedicationAction): void {
-            $nonMedicationAction->whereNull('action')
-                ->orWhere(function (Builder $action): void {
-                    $action->where('action', 'not like', 'medication%')
-                        ->where('action', 'not like', 'meds.%')
-                        ->where('action', 'not like', 'emar.%')
-                        ->where('action', 'not like', 'clientmedication%')
-                        ->where('action', 'not like', 'clientcontrolleddrug%')
-                        ->where('action', 'not like', 'controlled_drug%')
-                        ->where('action', 'not like', 'cd.%')
-                        ->where('action', 'not like', 'cd\_%');
-                });
-        });
+        $query->withoutMedicationEvidence();
     }
 
     /**

@@ -58,7 +58,7 @@ class PruneTimelineAndAuditLogs extends Command
         // P09: medication evidence has its own reviewed retention policy.
         // Never apply the generic two-year audit cleanup to these records.
         $auditQuery = AuditLog::query()->where('created_at', '<', $auditCutoff)
-            ->where(fn ($query) => $query->whereNull('action')->orWhere(fn ($action) => $action->where('action', 'not like', 'medications.%')->where('action', 'not like', 'emar.%')));
+            ->withoutMedicationEvidence();
         $timelineQuery = TimelineEvent::query()
             ->where('occurred_at', '<', $timelineCutoff)
             ->where(function ($q) {

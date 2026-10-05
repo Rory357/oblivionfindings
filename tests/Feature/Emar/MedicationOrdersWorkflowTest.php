@@ -11,6 +11,7 @@ use App\Models\MedicationCovertAuthorisation;
 use App\Models\MedicationEvent;
 use App\Models\MedicationFollowup;
 use App\Models\MedicationOrderAction;
+use App\Models\MedicationOrderFile;
 use App\Models\MedicationOrderRevision;
 use App\Models\MedicationReconciliation;
 use App\Models\MedicationReview;
@@ -29,11 +30,18 @@ use App\Services\Medication\MedicationOrderWorkflow;
 use Carbon\Carbon;
 use Database\Factories\UserFactory;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Database\DatabaseTransactionsManager;
+use Illuminate\Database\DeadlockException;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+use Mockery;
+use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class MedicationOrdersWorkflowTest extends TestCase
@@ -293,7 +301,7 @@ class MedicationOrdersWorkflowTest extends TestCase
 
     public function test_audit_failure_rolls_back_order_workflow_and_cleans_uploaded_source(): void
     {
-        $recorder = \Mockery::mock(MedicationEventRecorder::class);
+        $recorder = Mockery::mock(MedicationEventRecorder::class);
         $recorder->shouldReceive('appendMany')->andThrow(new RuntimeException('Audit failure'));
         $this->app->instance(MedicationEventRecorder::class, $recorder);
         try {
@@ -614,6 +622,384 @@ class MedicationOrdersWorkflowTest extends TestCase
         $this->assertFalse($auth->isExpired());
         Carbon::setTestNow(Carbon::parse('2027-01-04 00:00', 'Pacific/Auckland')->utc());
         $this->assertTrue($auth->isExpired());
+    }
+
+    public static function uploadJourneys(): array
+    {
+        return ['new order' => ['entry'], 'agreed recommendation outer transaction' => ['recommendation'],
+            'phone written confirmation' => ['written'], 'covert authorisation' => ['covert']];
+    }
+
+    public static function replayableUploadJourneys(): array
+    {
+        return ['new order' => ['entry'], 'covert authorisation' => ['covert']];
+    }
+
+    #[DataProvider('uploadJourneys')]
+    public function test_upload_retry_keeps_only_the_final_canonical_file_and_ordinary_replay_does_not_write(string $journey): void
+    {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+        [$url, $input] = $this->uploadJourney($journey);
+        $paths = [];
+        $disk = $this->spyOrderUploads($paths, 2);
+        $realRecorder = app(MedicationEventRecorder::class);
+        $attempts = 0;
+        $recorder = Mockery::mock(MedicationEventRecorder::class);
+        $recorder->shouldReceive('appendMany')->twice()->andReturnUsing(function (array $events) use ($realRecorder, &$attempts): array {
+            if (++$attempts === 1) {
+                throw $this->uploadDeadlock();
+            }
+
+            return $realRecorder->appendMany($events);
+        });
+        $this->app->instance(MedicationEventRecorder::class, $recorder);
+        $this->commitUploadFixtures();
+
+        $this->actingAs($this->enterer)->post($url, $input)->assertRedirect()->assertSessionHasNoErrors();
+        $file = $this->assertCanonicalUpload($journey, $disk);
+        $this->assertSame(2, $attempts);
+        $this->assertCount(2, $paths);
+        $this->assertSame($paths[1], $file->file_path);
+        if ($journey === 'written') {
+            $this->assertSame($paths[0], $paths[1], 'A retained revision reuses its same upload path.');
+        } else {
+            $this->assertNotSame($paths[0], $paths[1], 'New records have distinct IDs after rollback.');
+            $this->assertFalse($disk->exists($paths[0]));
+        }
+        $this->assertEqualsCanonicalizing(['unrelated.txt', $file->file_path], $disk->allFiles());
+        $before = $this->uploadSnapshot();
+        $files = $disk->allFiles();
+        if ($journey === 'written') {
+            $this->actingAs($this->enterer)->postJson($url, $input)->assertUnprocessable()->assertJsonValidationErrors('order');
+        } else {
+            $this->actingAs($this->enterer)->post($url, $input)->assertRedirect()->assertSessionHasNoErrors();
+            $changed = $input;
+            if ($journey === 'covert') {
+                $changed['legal_basis'] = 'Different evidence with the same request key.';
+            } else {
+                $changed['prescription']['dosage'] = '30 mg';
+            }
+            $this->actingAs($this->enterer)->postJson($url, $changed)->assertUnprocessable();
+        }
+        $this->assertSame($before, $this->uploadSnapshot());
+        $this->assertSame($files, $disk->allFiles());
+        $this->assertCount(2, $paths);
+    }
+
+    #[DataProvider('uploadJourneys')]
+    public function test_exhausted_upload_retries_delete_only_request_owned_paths_and_leave_no_database_drift(string $journey): void
+    {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+        [$url, $input] = $this->uploadJourney($journey);
+        $paths = [];
+        $disk = $this->spyOrderUploads($paths, 5);
+        $attempts = 0;
+        $recorder = Mockery::mock(MedicationEventRecorder::class);
+        $recorder->shouldReceive('appendMany')->times(5)->andReturnUsing(function () use (&$attempts): void {
+            $attempts++;
+            throw $this->uploadDeadlock();
+        });
+        $this->app->instance(MedicationEventRecorder::class, $recorder);
+        $before = $this->uploadSnapshot();
+        $this->commitUploadFixtures();
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($this->enterer)->post($url, $input);
+            $this->fail('The fifth deadlock must terminate the upload transaction.');
+        } catch (QueryException|DeadlockException $error) {
+            $this->assertStringContainsString('1213 Deadlock found', $error->getMessage());
+        }
+        $this->assertSame(5, $attempts);
+        $this->assertCount(5, $paths);
+        $this->assertCount($journey === 'written' ? 1 : 5, array_unique($paths));
+        foreach ($paths as $path) {
+            $this->assertFalse($disk->exists($path));
+        }
+        $this->assertSame(['unrelated.txt'], $disk->allFiles());
+        $this->assertSame('Keep existing bytes.', $disk->get('unrelated.txt'));
+        $this->assertSame($before, $this->uploadSnapshot());
+    }
+
+    #[DataProvider('replayableUploadJourneys')]
+    public function test_retry_replay_removes_its_unused_upload_and_preserves_the_competing_canonical_file(string $journey): void
+    {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+        [$url, $input] = $this->uploadJourney($journey);
+        $paths = [];
+        $disk = $this->spyOrderUploads($paths, 2);
+        $realRecorder = app(MedicationEventRecorder::class);
+        $attempts = 0;
+        $winnerCommitted = false;
+        $recorder = Mockery::mock(MedicationEventRecorder::class);
+        $recorder->shouldReceive('appendMany')->twice()->andReturnUsing(function (array $events) use ($realRecorder, &$attempts): array {
+            if (++$attempts === 1) {
+                throw $this->uploadDeadlock();
+            }
+
+            return $realRecorder->appendMany($events);
+        });
+        $this->app->instance(MedicationEventRecorder::class, $recorder);
+        DB::connection()->beforeStartingTransaction(function ($connection) use ($url, $input, &$attempts, &$winnerCommitted): void {
+            if ($connection->transactionLevel() === 0 && $attempts === 1 && ! $winnerCommitted) {
+                $winnerCommitted = true;
+                $this->actingAs($this->enterer)->post($url, $input)->assertRedirect()->assertSessionHasNoErrors();
+                $this->assertSame(0, $connection->transactionLevel());
+            }
+        });
+        $this->commitUploadFixtures();
+
+        $this->actingAs($this->enterer)->post($url, $input)->assertRedirect()->assertSessionHasNoErrors();
+        $file = $this->assertCanonicalUpload($journey, $disk);
+        $this->assertTrue($winnerCommitted);
+        $this->assertSame(2, $attempts);
+        $this->assertCount(2, $paths);
+        $this->assertNotSame($paths[0], $paths[1]);
+        $this->assertSame($paths[1], $file->file_path);
+        $this->assertFalse($disk->exists($paths[0]));
+        $this->assertEqualsCanonicalizing(['unrelated.txt', $file->file_path], $disk->allFiles());
+    }
+
+    #[DataProvider('replayableUploadJourneys')]
+    public function test_upload_retry_rechecks_current_permission_and_cleans_rolled_back_evidence(string $journey): void
+    {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+        [$url, $input] = $this->uploadJourney($journey);
+        $paths = [];
+        $disk = $this->spyOrderUploads($paths, 1);
+        $attempts = 0;
+        $revoked = false;
+        $recorder = Mockery::mock(MedicationEventRecorder::class);
+        $recorder->shouldReceive('appendMany')->once()->andReturnUsing(function () use (&$attempts): void {
+            $attempts++;
+            throw $this->uploadDeadlock();
+        });
+        $this->app->instance(MedicationEventRecorder::class, $recorder);
+        DB::connection()->beforeStartingTransaction(function ($connection) use (&$attempts, &$revoked): void {
+            if ($connection->transactionLevel() === 0 && $attempts === 1 && ! $revoked) {
+                $revoked = true;
+                $permission = Permission::query()->where('key', 'medications.orders.manage')->sole();
+                $this->enterer->permissionOverrides()->updateExistingPivot($permission->id, ['allowed' => false]);
+                $this->enterer->unsetRelation('permissionOverrides');
+            }
+        });
+        $before = $this->uploadSnapshot();
+        $this->commitUploadFixtures();
+
+        $this->actingAs($this->enterer)->post($url, $input)->assertForbidden();
+        $this->assertTrue($revoked);
+        $this->assertSame(1, $attempts);
+        $this->assertCount(1, $paths);
+        $this->assertFalse($disk->exists($paths[0]));
+        $this->assertSame(['unrelated.txt'], $disk->allFiles());
+        $this->assertSame($before, $this->uploadSnapshot());
+    }
+
+    #[DataProvider('uploadJourneys')]
+    public function test_after_commit_failure_retains_canonical_upload_and_committed_clinical_evidence(string $journey): void
+    {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+        [$url, $input] = $this->uploadJourney($journey);
+        $paths = [];
+        $disk = $this->spyOrderUploads($paths, 1);
+        $realRecorder = app(MedicationEventRecorder::class);
+        $recorder = Mockery::mock(MedicationEventRecorder::class);
+        $recorder->shouldReceive('appendMany')->once()->andReturnUsing(function (array $events) use ($realRecorder): array {
+            $saved = $realRecorder->appendMany($events);
+            DB::afterCommit(function (): void {
+                $this->assertSame(0, DB::transactionLevel());
+                $this->assertFalse(DB::connection()->getPdo()->inTransaction());
+                throw new RuntimeException('Synthetic after-commit failure');
+            });
+
+            return $saved;
+        });
+        $this->app->instance(MedicationEventRecorder::class, $recorder);
+        $this->commitUploadFixtures();
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($this->enterer)->post($url, $input);
+            $this->fail('The after-commit failure must be surfaced.');
+        } catch (RuntimeException $error) {
+            $this->assertSame('Synthetic after-commit failure', $error->getMessage());
+        }
+        $this->assertSame(0, DB::transactionLevel());
+        $file = $this->assertCanonicalUpload($journey, $disk);
+        $this->assertSame([$file->file_path], $paths);
+        $this->assertEqualsCanonicalizing(['unrelated.txt', $file->file_path], $disk->allFiles());
+    }
+
+    #[DataProvider('replayableUploadJourneys')]
+    public function test_failed_post_commit_reference_lookup_preserves_bytes_and_rethrows_the_original_error(string $journey): void
+    {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+        [$url, $input] = $this->uploadJourney($journey);
+        $paths = [];
+        $disk = $this->spyOrderUploads($paths, 1);
+        $realRecorder = app(MedicationEventRecorder::class);
+        $failLookup = false;
+        $lookupFailed = false;
+        $recorder = Mockery::mock(MedicationEventRecorder::class);
+        $recorder->shouldReceive('appendMany')->once()->andReturnUsing(function (array $events) use ($realRecorder, &$failLookup): array {
+            $saved = $realRecorder->appendMany($events);
+            DB::afterCommit(function () use (&$failLookup): void {
+                $this->assertSame(0, DB::transactionLevel());
+                $this->assertFalse(DB::connection()->getPdo()->inTransaction());
+                $failLookup = true;
+                throw new RuntimeException('Synthetic after-commit failure');
+            });
+
+            return $saved;
+        });
+        $this->app->instance(MedicationEventRecorder::class, $recorder);
+        DB::connection()->beforeExecuting(function (string $query) use (&$failLookup, &$lookupFailed): void {
+            if ($failLookup && str_contains($query, 'medication_order_files') && str_contains($query, 'file_path')) {
+                $failLookup = false;
+                $lookupFailed = true;
+                throw new RuntimeException('Synthetic ownership lookup failure');
+            }
+        });
+        $this->commitUploadFixtures();
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($this->enterer)->post($url, $input);
+            $this->fail('The original after-commit failure must be surfaced.');
+        } catch (RuntimeException $error) {
+            $this->assertSame('Synthetic after-commit failure', $error->getMessage());
+        }
+        $this->assertTrue($lookupFailed);
+        $file = $this->assertCanonicalUpload($journey, $disk);
+        $this->assertSame([$file->file_path], $paths);
+        $this->assertEqualsCanonicalizing(['unrelated.txt', $file->file_path], $disk->allFiles());
+    }
+
+    private function commitUploadFixtures(): void
+    {
+        DB::commit();
+        $this->assertSame(0, DB::transactionLevel());
+        // Test transactions otherwise dispatch after-commit callbacks at an inner commit.
+        $manager = new DatabaseTransactionsManager;
+        $this->app->instance('db.transactions', $manager);
+        DB::connection()->setTransactionManager($manager);
+    }
+
+    private function uploadJourney(string $journey): array
+    {
+        if ($journey === 'written') {
+            $input = $this->entryInput();
+            $input['source'] = [...$input['source'], 'type' => 'phone', 'read_back_confirmed' => true,
+                'witness_id' => $this->checker->id, 'witness_pin' => UserFactory::TEST_WITNESS_PIN];
+            $this->actingAs($this->enterer)->post('/emar/orders', $input)->assertRedirect()->assertSessionHasNoErrors();
+            $revision = MedicationOrderRevision::query()->sole();
+
+            return ['/emar/order-revisions/'.$revision->id.'/written-confirmation', ['method' => 'signed_prescription',
+                'received_at' => now()->subMinute()->toIso8601String(), 'matches' => true, 'file' => $this->uploadFile()]];
+        }
+        if ($journey === 'covert') {
+            $order = $this->order();
+
+            return ['/emar/orders/'.$order->id.'/covert', ['capacity_lacking' => true, 'capacity_assessor' => 'Assessor Test',
+                'capacity_date' => '2026-10-03', 'capacity_record' => 'Source assessment', 'consulted_name' => 'Guardian Test',
+                'consulted_role' => 'Welfare guardian', 'consulted_record' => 'Source consultation', 'pharmacist_name' => 'Pharmacist Test',
+                'pharmacist_advice' => 'Documented advice', 'authorised_by_name' => 'Dr Test', 'authorised_date' => '2026-10-03',
+                'legal_basis' => 'Recorded legal source', 'administration_method' => 'Method from signed authorisation',
+                'review_date' => '2027-01-03', 'request_key' => 'covert-upload-retry', 'gp_file' => $this->uploadFile()]];
+        }
+        $order = $journey === 'recommendation' ? $this->order() : null;
+        $input = $this->entryInput($order, $order ? ['dosage' => '20 mg'] : []);
+        $input['source_file'] = $this->uploadFile();
+        if ($order) {
+            $input['review_item'] = $this->recommendation($order, 'change')->id;
+        }
+
+        return ['/emar/orders', $input];
+    }
+
+    private function uploadFile(): UploadedFile
+    {
+        $file = UploadedFile::fake()->createWithContent('prescriber.pdf', "%PDF-1.4\nSynthetic prescriber evidence.\n");
+        $file->mimeTypeToReport = 'application/pdf';
+
+        return $file;
+    }
+
+    private function spyOrderUploads(array &$paths, int $writes)
+    {
+        $disk = Storage::disk('local');
+        $disk->put('unrelated.txt', 'Keep existing bytes.');
+        $spy = Mockery::mock($disk);
+        $spy->shouldReceive('putFileAs')->times($writes)->andReturnUsing(function (...$args) use ($disk, &$paths) {
+            $path = $disk->putFileAs(...$args);
+            $paths[] = $path;
+
+            return $path;
+        });
+        Storage::getFacadeRoot()->set('local', $spy);
+
+        return $disk;
+    }
+
+    private function uploadDeadlock(): QueryException
+    {
+        return new QueryException('mysql', 'select 1', [], new \PDOException(
+            'SQLSTATE[40001]: Serialization failure: 1213 Deadlock found when trying to get lock', 40001,
+        ));
+    }
+
+    private function assertCanonicalUpload(string $journey, $disk): MedicationOrderFile
+    {
+        $file = MedicationOrderFile::query()->sole();
+        $content = "%PDF-1.4\nSynthetic prescriber evidence.\n";
+        $this->assertSame($this->enterer->id, $file->uploaded_by);
+        $this->assertSame(hash('sha256', $content), $file->sha256);
+        $this->assertSame($content, $disk->get($file->file_path));
+        $action = match ($journey) {
+            'written' => 'written_confirmed', 'covert' => 'covert_authorised', default => 'entered'
+        };
+        $this->assertSame(1, MedicationOrderAction::query()->where('action', $action)->count());
+        $this->assertSame(1, MedicationEvent::query()->where('kind', 'order.'.$action)->count());
+        if ($journey === 'covert') {
+            $authorisation = MedicationCovertAuthorisation::query()->sole();
+            $this->assertSame($authorisation->id, $file->medication_covert_authorisation_id);
+            $this->assertSame($this->client->id, $authorisation->client_id);
+            $this->assertSame($this->enterer->id, $authorisation->recorded_by);
+            $this->assertSame('active', $authorisation->status);
+            $this->assertStringStartsWith('medication-covert/'.$authorisation->id.'/', $file->file_path);
+            $this->assertNull(MedicationFollowup::query()->where('source_key', 'covert-review:'.$authorisation->id)->sole()->completed_at);
+        } else {
+            $revision = MedicationOrderRevision::query()->findOrFail($file->medication_order_revision_id);
+            $this->assertSame($this->client->id, $revision->client_id);
+            $this->assertSame($this->enterer->id, $revision->entered_by);
+            $this->assertStringStartsWith('medication-orders/'.$revision->id.'/', $file->file_path);
+            $this->assertSame('pending', $revision->status);
+            if ($journey === 'written') {
+                $this->assertSame($file->id, $revision->written_confirmation['file_id']);
+                $this->assertNotNull(MedicationFollowup::query()->where('source_key', 'phone-written-confirmation:'.$revision->id)->sole()->completed_at);
+            } else {
+                $this->assertSame('source', $file->purpose);
+                $this->assertNull(MedicationFollowup::query()->where('source_key', 'order-check:'.$revision->id)->sole()->completed_at);
+                if ($journey === 'recommendation') {
+                    $this->assertSame($revision->medication_order_version_id, MedicationReviewItem::query()->sole()->linked_order_version_id);
+                    $this->assertSame('10 mg', $revision->medication->dosage);
+                } else {
+                    $this->assertFalse($revision->medication->isAdministrable());
+                }
+            }
+        }
+
+        return $file;
+    }
+
+    private function uploadSnapshot(): array
+    {
+        $snapshot = [];
+        foreach (['client_medications', 'medication_order_versions', 'medication_order_revisions', 'medication_order_files',
+            'medication_order_actions', 'medication_covert_authorisations', 'medication_reviews', 'medication_review_items',
+            'medication_review_events', 'medication_followups', 'medication_followup_events', 'medication_events', 'audit_logs'] as $table) {
+            $snapshot[$table] = DB::table($table)->orderBy('id')->get()->map(fn ($row) => (array) $row)->all();
+        }
+        $snapshot['medication_event_heads'] = DB::table('medication_event_heads')->orderBy('site_id')->get()->map(fn ($row) => (array) $row)->all();
+
+        return $snapshot;
     }
 
     private function assertNzReconciliationTimes(string $date, string $lastUtc, string $nextUtc): void

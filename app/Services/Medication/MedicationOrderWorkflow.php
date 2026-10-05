@@ -45,20 +45,23 @@ final class MedicationOrderWorkflow
 
     public function enterFromRecommendation(User $actor, int $clientId, ?int $medicationId, int $itemId, array $input, ?UploadedFile $file): MedicationOrderRevision
     {
-        return DB::transaction(function () use ($actor, $clientId, $medicationId, $itemId, $input, $file) {
-            $client = Client::query()->whereKey($clientId)->lockForUpdate()->firstOrFail();
-            $this->access->assertReadable($actor, $client);
-            $item = app(MedicationReviewOrderAdapter::class)->lockRecommendation($actor, $client, $itemId, $input['request_key'] ?? null);
-            if ($item->outcome === 'stop' || ($item->outcome === 'change' && (int) $medicationId !== (int) $item->client_medication_id)
-                || (in_array($item->outcome, ['swap', 'start'], true) && $medicationId !== null)) {
-                $this->invalid('review_item', 'Use the recommended medicine change, stop or separate replacement order.');
-            }
-            if ($item->client_medication_id !== null) {
-                ClientMedication::query()->whereKey($item->client_medication_id)->where('client_id', $client->id)->lockForUpdate()->firstOrFail();
-            }
+        return $this->withUploadedFiles(function (array &$paths, array &$usedPaths) use ($actor, $clientId, $medicationId, $itemId, $input, $file) {
+            return DB::transaction(function () use ($actor, $clientId, $medicationId, $itemId, $input, $file, &$paths, &$usedPaths) {
+                $usedPaths = [];
+                $client = Client::query()->whereKey($clientId)->lockForUpdate()->firstOrFail();
+                $this->access->assertReadable($actor, $client);
+                $item = app(MedicationReviewOrderAdapter::class)->lockRecommendation($actor, $client, $itemId, $input['request_key'] ?? null);
+                if ($item->outcome === 'stop' || ($item->outcome === 'change' && (int) $medicationId !== (int) $item->client_medication_id)
+                    || (in_array($item->outcome, ['swap', 'start'], true) && $medicationId !== null)) {
+                    $this->invalid('review_item', 'Use the recommended medicine change, stop or separate replacement order.');
+                }
+                if ($item->client_medication_id !== null) {
+                    ClientMedication::query()->whereKey($item->client_medication_id)->where('client_id', $client->id)->lockForUpdate()->firstOrFail();
+                }
 
-            return $this->enter($actor, $clientId, $medicationId, $input, $file, $item);
-        }, 5);
+                return $this->enterWithUploads($actor, $clientId, $medicationId, $input, $file, $item, $paths, $usedPaths);
+            }, 5);
+        });
     }
 
     public function stopFromRecommendation(User $actor, int $medicationId, int $itemId, array $input): void
@@ -86,103 +89,101 @@ final class MedicationOrderWorkflow
 
     public function enter(User $actor, int $clientId, ?int $medicationId, array $input, ?UploadedFile $file = null, ?MedicationReviewItem $recommendation = null): MedicationOrderRevision
     {
-        $paths = [];
-        try {
-            $callback = function (Client $client, ?ClientMedication $medication, User $actor, Collection $users) use ($input, $file, $recommendation, &$paths): MedicationOrderRevision {
-                $this->access->assertReadable($actor, $client);
-                if ($medication !== null) {
-                    $this->assertControlled($actor, $medication);
-                    $this->assertOpen($medication);
-                }
-                $source = $this->validateSource($actor, $client, $input, $users, $file);
-                $payload = $this->validatePrescription($input['prescription'] ?? [], $medication);
-                $inspection = $this->allergies->inspect($client, $payload['name']);
-                $source['allergy_matches'] = $inspection['matches'];
-                $source['class_matching'] = $inspection['class_matching'];
-                $this->assertControlled($actor, (bool) ($payload['controlled_drug'] ?? false));
-                if ($medication !== null && ((bool) $payload['controlled_drug'] !== (bool) $medication->controlled_drug
-                    || OrderAllergyMatcher::normalise($payload['name']) !== OrderAllergyMatcher::normalise($medication->name))) {
-                    $this->invalid('prescription.name', 'A different medicine is a new order. Stop the previous order separately. Controlled classification cannot change.');
-                }
-                $key = Validator::make($input, ['request_key' => 'required|string|max:100|regex:/^[A-Za-z0-9][A-Za-z0-9._:-]*$/'])->validate()['request_key'];
-                $sourceForHash = $source;
-                unset($sourceForHash['read_back_at']);
-                $hash = hash('sha256', json_encode([$client->id, $medication?->id, $actor->id, $payload, $sourceForHash, $recommendation?->id, $input['stop_reason'] ?? null], JSON_THROW_ON_ERROR));
-                $replay = MedicationOrderVersion::query()->where('entry_request_key', $key)->first();
-                if ($replay !== null) {
-                    if (! hash_equals((string) $replay->entry_payload_sha256, $hash)) {
-                        $this->invalid('request_key', 'This saved request belongs to different order details. Reload before saving.');
-                    }
+        return $this->withUploadedFiles(fn (array &$paths, array &$usedPaths) => $this->enterWithUploads($actor, $clientId, $medicationId, $input, $file, $recommendation, $paths, $usedPaths));
+    }
 
-                    return MedicationOrderRevision::query()->where('medication_order_version_id', $replay->id)->firstOrFail();
-                }
-                if ($medication === null) {
-                    if ($recommendation?->outcome === 'swap') {
-                        $stopReason = Validator::make($input, ['stop_reason' => 'required|string|max:255', 'confirm_swap' => 'required|accepted'])->validate()['stop_reason'];
-                        $old = ClientMedication::query()->whereKey($recommendation->client_medication_id)->where('client_id', $client->id)->firstOrFail();
-                        $this->assertControlled($actor, $old);
-                        if (OrderAllergyMatcher::normalise($old->name) === OrderAllergyMatcher::normalise($payload['name'])) {
-                            $this->invalid('prescription.name', 'A swap uses a separate replacement medicine. Use a change for the same medicine.');
-                        }
-                        $ended = app(MedicationOrderLifecycleService::class)->discontinue($actor, $old, $stopReason, submittedClientId: $client->id, requestKey: 'review-swap:'.$recommendation->id.':'.hash('sha256', $key));
-                        app(MedicationReviewOrderAdapter::class)->linkStoppedVersion($actor, $recommendation, $ended->versions()->where('version_number', $ended->version)->where('client_id', $client->id)->firstOrFail());
-                        $this->action($actor, $ended, 'stopped', ['version' => $ended->version, 'reason' => $stopReason, 'review_item_id' => $recommendation->id]);
-                    }
-                    $medication = ClientMedication::query()->create(array_merge($payload, [
-                        'client_id' => $client->id, 'created_by' => $actor->id,
-                        'active' => true, 'state' => 'active', 'version' => 1,
-                    ]));
-                    $number = 1;
-                } else {
-                    if ((int) ($input['expected_version'] ?? 0) !== (int) $medication->version) {
-                        $this->invalid('expected_version', 'This order changed while you were working. Reload and compare the latest version.');
-                    }
-                    $pending = MedicationOrderRevision::query()->where('client_medication_id', $medication->id)
-                        ->where('status', 'pending')->lockForUpdate()->exists();
-                    if ($pending) {
-                        $this->invalid('order', 'A version is already waiting to be checked. Check it or send it back first.');
-                    }
-                    if ($medication->approval_status === 'verified' && $this->samePrescription($payload, $this->payload($medication))) {
-                        $this->invalid('prescription', 'Nothing changed. The checked order is still in use.');
-                    }
-                    $this->snapshotExisting($medication, $actor);
-                    $number = max((int) $medication->version, (int) $medication->versions()->max('version_number')) + 1;
-                }
-                $version = $this->snapshot($medication, $payload, $number, $actor->id, $source, $input['change_reason'] ?? 'New order', $key, $hash);
-                if ($recommendation !== null) {
-                    app(MedicationReviewOrderAdapter::class)->linkVersion($actor, $recommendation, $version);
-                }
-                $revision = MedicationOrderRevision::query()->create([
-                    'client_medication_id' => $medication->id, 'client_id' => $client->id,
-                    'medication_order_version_id' => $version->id, 'base_version' => $medication->version,
-                    'entered_by' => $actor->id, 'read_back_witness_id' => $source['read_back_witness_id'] ?? null,
-                    'written_due_at' => $source['type'] === 'written' ? null : self::nextDayDeadline(),
-                ]);
-                if ($file !== null) {
-                    $this->attach($revision, $file, 'source', $actor, $paths);
-                }
-                $this->action($actor, $medication, 'entered', ['version' => $number], $revision);
-                $this->requestFollowup('order-check', $revision, $client, $medication, null);
-                if ($revision->written_due_at !== null) {
-                    $this->requestFollowup('phone-written-confirmation', $revision, $client, $medication, $revision->written_due_at);
-                }
-
-                return $revision;
-            };
-            $witnessIds = array_filter([(int) ($input['source']['witness_id'] ?? 0)]);
-
-            return $medicationId === null
-                ? $this->forClient($actor, $clientId, 'medications.orders.manage',
-                    fn (Client $client, User $locked, Collection $users) => $callback($client, null, $locked, $users),
-                    authorizationUserIds: $witnessIds)
-                : $this->forMedication($actor, $medicationId, 'medications.orders.manage', $callback,
-                    expectedClientId: $clientId, authorizationUserIds: $witnessIds);
-        } catch (\Throwable $exception) {
-            foreach ($paths as $path) {
-                Storage::disk('local')->delete($path);
+    private function enterWithUploads(User $actor, int $clientId, ?int $medicationId, array $input, ?UploadedFile $file, ?MedicationReviewItem $recommendation, array &$paths, array &$usedPaths): MedicationOrderRevision
+    {
+        $callback = function (Client $client, ?ClientMedication $medication, User $actor, Collection $users) use ($input, $file, $recommendation, &$paths, &$usedPaths): MedicationOrderRevision {
+            $usedPaths = [];
+            $this->access->assertReadable($actor, $client);
+            if ($medication !== null) {
+                $this->assertControlled($actor, $medication);
+                $this->assertOpen($medication);
             }
-            throw $exception;
-        }
+            $source = $this->validateSource($actor, $client, $input, $users, $file);
+            $payload = $this->validatePrescription($input['prescription'] ?? [], $medication);
+            $inspection = $this->allergies->inspect($client, $payload['name']);
+            $source['allergy_matches'] = $inspection['matches'];
+            $source['class_matching'] = $inspection['class_matching'];
+            $this->assertControlled($actor, (bool) ($payload['controlled_drug'] ?? false));
+            if ($medication !== null && ((bool) $payload['controlled_drug'] !== (bool) $medication->controlled_drug
+                || OrderAllergyMatcher::normalise($payload['name']) !== OrderAllergyMatcher::normalise($medication->name))) {
+                $this->invalid('prescription.name', 'A different medicine is a new order. Stop the previous order separately. Controlled classification cannot change.');
+            }
+            $key = Validator::make($input, ['request_key' => 'required|string|max:100|regex:/^[A-Za-z0-9][A-Za-z0-9._:-]*$/'])->validate()['request_key'];
+            $sourceForHash = $source;
+            unset($sourceForHash['read_back_at']);
+            $hash = hash('sha256', json_encode([$client->id, $medication?->id, $actor->id, $payload, $sourceForHash, $recommendation?->id, $input['stop_reason'] ?? null], JSON_THROW_ON_ERROR));
+            $replay = MedicationOrderVersion::query()->where('entry_request_key', $key)->first();
+            if ($replay !== null) {
+                if (! hash_equals((string) $replay->entry_payload_sha256, $hash)) {
+                    $this->invalid('request_key', 'This saved request belongs to different order details. Reload before saving.');
+                }
+
+                return MedicationOrderRevision::query()->where('medication_order_version_id', $replay->id)->firstOrFail();
+            }
+            if ($medication === null) {
+                if ($recommendation?->outcome === 'swap') {
+                    $stopReason = Validator::make($input, ['stop_reason' => 'required|string|max:255', 'confirm_swap' => 'required|accepted'])->validate()['stop_reason'];
+                    $old = ClientMedication::query()->whereKey($recommendation->client_medication_id)->where('client_id', $client->id)->firstOrFail();
+                    $this->assertControlled($actor, $old);
+                    if (OrderAllergyMatcher::normalise($old->name) === OrderAllergyMatcher::normalise($payload['name'])) {
+                        $this->invalid('prescription.name', 'A swap uses a separate replacement medicine. Use a change for the same medicine.');
+                    }
+                    $ended = app(MedicationOrderLifecycleService::class)->discontinue($actor, $old, $stopReason, submittedClientId: $client->id, requestKey: 'review-swap:'.$recommendation->id.':'.hash('sha256', $key));
+                    app(MedicationReviewOrderAdapter::class)->linkStoppedVersion($actor, $recommendation, $ended->versions()->where('version_number', $ended->version)->where('client_id', $client->id)->firstOrFail());
+                    $this->action($actor, $ended, 'stopped', ['version' => $ended->version, 'reason' => $stopReason, 'review_item_id' => $recommendation->id]);
+                }
+                $medication = ClientMedication::query()->create(array_merge($payload, [
+                    'client_id' => $client->id, 'created_by' => $actor->id,
+                    'active' => true, 'state' => 'active', 'version' => 1,
+                ]));
+                $number = 1;
+            } else {
+                if ((int) ($input['expected_version'] ?? 0) !== (int) $medication->version) {
+                    $this->invalid('expected_version', 'This order changed while you were working. Reload and compare the latest version.');
+                }
+                $pending = MedicationOrderRevision::query()->where('client_medication_id', $medication->id)
+                    ->where('status', 'pending')->lockForUpdate()->exists();
+                if ($pending) {
+                    $this->invalid('order', 'A version is already waiting to be checked. Check it or send it back first.');
+                }
+                if ($medication->approval_status === 'verified' && $this->samePrescription($payload, $this->payload($medication))) {
+                    $this->invalid('prescription', 'Nothing changed. The checked order is still in use.');
+                }
+                $this->snapshotExisting($medication, $actor);
+                $number = max((int) $medication->version, (int) $medication->versions()->max('version_number')) + 1;
+            }
+            $version = $this->snapshot($medication, $payload, $number, $actor->id, $source, $input['change_reason'] ?? 'New order', $key, $hash);
+            if ($recommendation !== null) {
+                app(MedicationReviewOrderAdapter::class)->linkVersion($actor, $recommendation, $version);
+            }
+            $revision = MedicationOrderRevision::query()->create([
+                'client_medication_id' => $medication->id, 'client_id' => $client->id,
+                'medication_order_version_id' => $version->id, 'base_version' => $medication->version,
+                'entered_by' => $actor->id, 'read_back_witness_id' => $source['read_back_witness_id'] ?? null,
+                'written_due_at' => $source['type'] === 'written' ? null : self::nextDayDeadline(),
+            ]);
+            if ($file !== null) {
+                $this->attach($revision, $file, 'source', $actor, $paths, $usedPaths);
+            }
+            $this->action($actor, $medication, 'entered', ['version' => $number], $revision);
+            $this->requestFollowup('order-check', $revision, $client, $medication, null);
+            if ($revision->written_due_at !== null) {
+                $this->requestFollowup('phone-written-confirmation', $revision, $client, $medication, $revision->written_due_at);
+            }
+
+            return $revision;
+        };
+        $witnessIds = array_filter([(int) ($input['source']['witness_id'] ?? 0)]);
+
+        return $medicationId === null
+            ? $this->forClient($actor, $clientId, 'medications.orders.manage',
+                fn (Client $client, User $locked, Collection $users) => $callback($client, null, $locked, $users),
+                authorizationUserIds: $witnessIds)
+            : $this->forMedication($actor, $medicationId, 'medications.orders.manage', $callback,
+                expectedClientId: $clientId, authorizationUserIds: $witnessIds);
     }
 
     public function check(User $actor, int $revisionId, array $input): MedicationOrderRevision
@@ -295,9 +296,10 @@ final class MedicationOrderWorkflow
     public function confirmWritten(User $actor, int $id, array $input, UploadedFile $file): MedicationOrderRevision
     {
         $input = $this->normaliseInstant($input, 'received_at');
-        $paths = [];
-        try {
-            return $this->withRevision($actor, $id, 'medications.orders.manage', function ($client, $medication, $revision, $actor) use ($input, $file, &$paths) {
+
+        return $this->withUploadedFiles(function (array &$paths, array &$usedPaths) use ($actor, $id, $input, $file) {
+            return $this->withRevision($actor, $id, 'medications.orders.manage', function ($client, $medication, $revision, $actor) use ($input, $file, &$paths, &$usedPaths) {
+                $usedPaths = [];
                 if ($revision->written_due_at === null || $revision->written_confirmation !== null) {
                     $this->invalid('order', 'Written confirmation is not pending.');
                 }
@@ -305,19 +307,14 @@ final class MedicationOrderWorkflow
                     'method' => 'required|in:signed_prescription,email,e_prescription',
                     'received_at' => 'required|date|before_or_equal:now', 'matches' => 'required|accepted',
                 ])->validate();
-                $saved = $this->attach($revision, $file, 'written_confirmation', $actor, $paths);
+                $saved = $this->attach($revision, $file, 'written_confirmation', $actor, $paths, $usedPaths);
                 $evidence += ['file_id' => $saved->id, 'recorded_by' => $actor->id, 'recorded_at' => now()->toIso8601String()];
                 $revision->forceFill(['written_confirmation' => $evidence])->save();
                 $this->action($actor, $medication, 'written_confirmed', $evidence, $revision);
 
                 return $revision;
             });
-        } catch (\Throwable $exception) {
-            foreach ($paths as $path) {
-                Storage::disk('local')->delete($path);
-            }
-            throw $exception;
-        }
+        });
     }
 
     public function withRevision(User $actor, int $id, string $capability, \Closure $callback): mixed
@@ -616,7 +613,29 @@ final class MedicationOrderWorkflow
         return $normalise(array_merge($b, $a)) == $normalise($b);
     }
 
-    private function attach(MedicationOrderRevision $revision, UploadedFile $file, string $purpose, User $actor, array &$paths): MedicationOrderFile
+    /** Retain only this request's uploads used by its final transaction attempt. */
+    private function withUploadedFiles(\Closure $callback): mixed
+    {
+        $paths = [];
+        $usedPaths = [];
+        try {
+            $result = $callback($paths, $usedPaths);
+        } catch (\Throwable $exception) {
+            // An after-commit callback can throw after canonical evidence persists.
+            try {
+                $retained = MedicationOrderFile::query()->whereIn('file_path', $paths)->pluck('file_path')->all();
+                Storage::disk('local')->delete(array_values(array_diff(array_unique($paths), $retained)));
+            } catch (\Throwable $cleanupFailure) {
+                report($cleanupFailure); // Preserve bytes if their ownership cannot be verified.
+            }
+            throw $exception;
+        }
+        Storage::disk('local')->delete(array_values(array_diff(array_unique($paths), $usedPaths)));
+
+        return $result;
+    }
+
+    private function attach(MedicationOrderRevision $revision, UploadedFile $file, string $purpose, User $actor, array &$paths, array &$usedPaths): MedicationOrderFile
     {
         Validator::make(['file' => $file], ['file' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240'])->validate();
         $path = $file->store('medication-orders/'.$revision->id, 'local');
@@ -624,6 +643,7 @@ final class MedicationOrderWorkflow
             throw new \RuntimeException('The prescription file could not be saved.');
         }
         $paths[] = $path;
+        $usedPaths[] = $path;
 
         return MedicationOrderFile::query()->create([
             'medication_order_revision_id' => $revision->id, 'purpose' => $purpose,

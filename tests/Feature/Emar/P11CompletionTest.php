@@ -5,6 +5,9 @@ use App\Models\AppSetting;
 use App\Models\AuditLog;
 use App\Models\BreakGlassPolicy;
 use App\Models\Client;
+use App\Models\ClientControlledDrugEntry;
+use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationAlert;
 use App\Models\MedicationAlertEvent;
 use App\Models\MedicationAlertRecipient;
@@ -17,6 +20,8 @@ use App\Services\Medication\Alerts\MedicationBellOrder;
 use App\Services\Medication\Alerts\OnCallResolver;
 use App\Services\Medication\Settings\EmergencyAccessPolicySettings;
 use App\Services\Medication\Settings\MedicationSettingsRegistry;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -110,6 +115,90 @@ it('retains recently closed and unattended alerts beyond the audit cutoff and dr
     $this->artisan('oblivion:prune-retention', ['--audit-years' => 2])->assertSuccessful();
     expect(MedicationAlert::whereKey($expired->id)->exists())->toBeFalse()->and(MedicationAlertEvent::whereKey($event->id)->exists())->toBeFalse()
         ->and(MedicationAlert::whereKey($open->id)->exists())->toBeTrue()->and(MedicationAlert::whereKey($recentlyClosed->id)->exists())->toBeTrue();
+});
+
+it('preserves every canonical medication audit family and type while counting and pruning ordinary expired rows', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-10-06T00:00:00Z'));
+
+    try {
+        $old = now()->subYears(4);
+        $protected = collect();
+        foreach (['medications.orders.updated', 'emar.dose.recorded', 'meds.administer', 'medication_order.checked',
+            'medication_reconciliation.completed', 'clientmedication.updated', 'clientmedicationadministration.created',
+            'clientcontrolleddrugentry.created', 'controlled_drug.check_recorded', 'cd.check_recorded', 'cd_check_recorded'] as $action) {
+            foreach ([null, Client::class] as $type) {
+                $protected->push(AuditLog::query()->forceCreate([
+                    'action' => $action, 'auditable_type' => $type, 'meta' => ['fixture' => 'Synthetic medication audit retention'],
+                    'created_at' => $old, 'updated_at' => $old,
+                ]));
+            }
+        }
+        foreach ([ClientMedication::class, ClientMedicationAdministration::class, ClientControlledDrugEntry::class,
+            'Medication', 'ControlledDrugRecord'] as $type) {
+            $protected->push(AuditLog::query()->forceCreate([
+                'action' => 'updated', 'auditable_type' => $type, 'meta' => ['fixture' => 'Synthetic typed medication audit'],
+                'created_at' => $old, 'updated_at' => $old,
+            ]));
+        }
+        $ordinary = collect();
+        foreach ([['profile.updated', User::class], ['settings.updated', null], ['', null], ['cdx.updated', null]] as [$action, $type]) {
+            $ordinary->push(AuditLog::query()->forceCreate([
+                'action' => $action, 'auditable_type' => $type, 'created_at' => $old, 'updated_at' => $old,
+            ]));
+        }
+        $boundary = AuditLog::query()->forceCreate([
+            'action' => 'profile.updated', 'auditable_type' => User::class,
+            'created_at' => now()->subYears(2), 'updated_at' => now()->subYears(2),
+        ]);
+        $recent = AuditLog::query()->forceCreate([
+            'action' => 'settings.updated', 'auditable_type' => null, 'created_at' => now()->subDay(), 'updated_at' => now()->subDay(),
+        ]);
+        $snapshot = fn () => AuditLog::query()->orderBy('id')->get()->map->getRawOriginal()->all();
+        $before = $snapshot();
+        $retainedIds = $protected->pluck('id')->push($boundary->id, $recent->id)->sort()->values()->all();
+        $retainedBefore = AuditLog::query()->whereIn('id', $retainedIds)->orderBy('id')->get()->map->getRawOriginal()->all();
+
+        $this->artisan('oblivion:prune-retention', ['--audit-years' => 2, '--timeline-years' => 5, '--dry-run' => true])
+            ->expectsOutput('Audit logs older than 2 years: 4')
+            ->expectsOutput('Dry run — no rows deleted.')
+            ->assertSuccessful();
+        expect($snapshot())->toBe($before);
+
+        $this->artisan('oblivion:prune-retention', ['--audit-years' => 2, '--timeline-years' => 5])
+            ->expectsOutput('Audit logs older than 2 years: 4')
+            ->expectsOutput('Pruned 4 audit log row(s) and 0 timeline event row(s).')
+            ->assertSuccessful();
+        expect(AuditLog::query()->whereIn('id', $ordinary->pluck('id'))->count())->toBe(0)
+            ->and(AuditLog::query()->orderBy('id')->pluck('id')->all())->toBe($retainedIds)
+            ->and($snapshot())->toBe($retainedBefore);
+
+        $this->artisan('oblivion:prune-retention', ['--audit-years' => 2, '--timeline-years' => 5])
+            ->expectsOutput('Audit logs older than 2 years: 0')
+            ->expectsOutput('Pruned 0 audit log row(s) and 0 timeline event row(s).')
+            ->assertSuccessful();
+        expect($snapshot())->toBe($retainedBefore);
+    } finally {
+        $this->travelBack();
+    }
+});
+
+it('keeps the medication audit boundary null-safe for action and auditable type independently', function () {
+    // The persisted schema requires an action; derived rows exercise nullable legacy inputs without changing it.
+    $rows = [
+        [1, null, null], [2, null, User::class], [3, 'profile.updated', null],
+        [4, null, ClientMedication::class], [5, null, ClientControlledDrugEntry::class], [6, 'meds.administer', null],
+        [7, 'profile.updated', ClientMedication::class], [8, 'clientmedication.updated', null],
+        [9, null, 'ControlledDrugRecord'], [10, null, 'Medication'], [11, 'cd_check_recorded', null], [12, 'cdx.updated', null],
+    ];
+    $source = DB::query()->selectRaw('? AS id, ? AS action, ? AS auditable_type', $rows[0]);
+    foreach (array_slice($rows, 1) as $row) {
+        $source->unionAll(DB::query()->selectRaw('? AS id, ? AS action, ? AS auditable_type', $row));
+    }
+
+    $eligible = AuditLog::query()->fromSub($source, 'audit_logs')->withoutMedicationEvidence()
+        ->orderBy('id')->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+    expect($eligible)->toBe([1, 2, 3, 12])->and(AuditLog::query()->count())->toBe(0);
 });
 
 it('saves emergency policy into the existing runtime row with structured history and a loosening confirmation', function () {
