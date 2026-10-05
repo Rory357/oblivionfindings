@@ -492,7 +492,7 @@ export function ReviewCard({
                     <button
                         type="button"
                         onClick={onEdit}
-                        className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary hover:underline"
+                        className="inline-flex min-h-[44px] items-center gap-1 rounded-md px-2 text-[13px] font-semibold text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                     >
                         <Pencil className="h-3 w-3" /> Edit
                     </button>

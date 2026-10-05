@@ -16,9 +16,13 @@ use App\Services\ShiftHandoverService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Throwable;
 
 class AttendanceController extends Controller
 {
@@ -37,6 +41,7 @@ class AttendanceController extends Controller
         $request->validate([
             'week' => ['nullable', 'date'],
             'user_id' => ['nullable', 'integer'],
+            'page' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $canManageAny = $auth->canDo('timesheets.manageAny');
@@ -78,15 +83,18 @@ class AttendanceController extends Controller
         $workerNow = Carbon::now($tz);
         $todayStartUtc = $workerNow->copy()->startOfDay()->utc();
         $tomorrowStartUtc = $workerNow->copy()->addDay()->startOfDay()->utc();
-        $currentWeekStartUtc = $workerNow->copy()->startOfWeek(Carbon::MONDAY)->utc();
-        $nextWeekStartUtc = $workerNow->copy()->startOfWeek(Carbon::MONDAY)->addWeek()->utc();
+        $selectedWeekStartUtc = $weekStart->copy()->utc();
+        $selectedWeekEndUtc = $weekStart->copy()->addWeek()->utc();
 
-        $sessions = $scopeTargetAttendance(HrAttendanceSession::query()
-            ->with(['timesheet:id,attendance_session_id,status']))
-            ->whereBetween('clock_in_at', [$weekStart->copy()->utc(), $weekEnd->copy()->utc()])
-            ->orderByDesc('clock_in_at')
-            ->limit(100)
-            ->get()
+        $selectedSessions = $scopeTargetAttendance(HrAttendanceSession::query())
+            ->where('clock_in_at', '>=', $selectedWeekStartUtc)
+            ->where('clock_in_at', '<', $selectedWeekEndUtc);
+        $selectedTotal = (clone $selectedSessions)->count();
+        $selectedClosed = (clone $selectedSessions)->where('status', 'closed')->count();
+        $selectedOpen = (clone $selectedSessions)->open()->count();
+        $sessionPage = (clone $selectedSessions)->with(['timesheet:id,attendance_session_id,status'])
+            ->orderByDesc('clock_in_at')->orderByDesc('id')->paginate(100)->withQueryString();
+        $sessions = $sessionPage->getCollection()
             ->map(fn (HrAttendanceSession $session) => [
                 'id' => $session->id,
                 'clock_in_at' => optional($session->clock_in_at)->toIso8601String(),
@@ -127,15 +135,14 @@ class AttendanceController extends Controller
             : collect();
 
         $todayHours = $scopeTargetAttendance(HrAttendanceSession::query())
+            ->where('status', 'closed')
             ->where('clock_in_at', '>=', $todayStartUtc)
             ->where('clock_in_at', '<', $tomorrowStartUtc)
-            ->get()
+            ->select(['id', 'clock_in_at', 'clock_out_at', 'break_minutes'])->lazyById(100)
             ->sum(fn (HrAttendanceSession $session) => $session->worked_hours);
 
-        $weekHours = $scopeTargetAttendance(HrAttendanceSession::query())
-            ->where('clock_in_at', '>=', $currentWeekStartUtc)
-            ->where('clock_in_at', '<', $nextWeekStartUtc)
-            ->get()
+        $weekHours = (clone $selectedSessions)->where('status', 'closed')
+            ->select(['id', 'clock_in_at', 'clock_out_at', 'break_minutes'])->lazyById(100)
             ->sum(fn (HrAttendanceSession $session) => $session->worked_hours);
 
         // Managers get a live "who is on the clock now" board for canonical
@@ -143,6 +150,8 @@ class AttendanceController extends Controller
         // as likely missed clock-outs.
         $staleCutoff = now()->subHours(16);
         $onClockNow = collect();
+        $onClockTotal = null;
+        $staleTotal = null;
         if ($canManageAny) {
             $onClockNowQuery = HrAttendanceSession::query()
                 ->with(['user:id,name', 'shift:id,client_id,location,ends_at'])
@@ -152,9 +161,10 @@ class AttendanceController extends Controller
                 $auth,
                 UserSiteAccessService::ATTENDANCE_SITE_BYPASS_PERMISSIONS,
             );
-            $onClockNow = $onClockNowQuery
-                ->open()
-                ->latest('clock_in_at')
+            $onClockNowQuery->open();
+            $onClockTotal = (clone $onClockNowQuery)->count();
+            $staleTotal = (clone $onClockNowQuery)->where('clock_in_at', '<', $staleCutoff)->count();
+            $onClockNow = $onClockNowQuery->latest('clock_in_at')
                 ->limit(50)
                 ->get()
                 ->map(fn (HrAttendanceSession $session) => [
@@ -177,7 +187,7 @@ class AttendanceController extends Controller
         // signed-in user, as does the `incoming` treatment only when viewing
         // yourself.
         $canAccessHandovers = $this->handoverService->canAccessWorkflow($auth);
-        $handovers = $canAccessHandovers
+        $handoverQuery = $canAccessHandovers
             ? ShiftHandover::query()
                 ->tap(fn ($query) => $this->siteAccess->applyHandoverScope(
                     $query,
@@ -192,7 +202,10 @@ class AttendanceController extends Controller
                         ->orWhereHas('incomingShift', fn ($shift) => $shift->where('user_id', $targetUserId));
                 })
                 ->with($this->handoverPresenter->mapEagerLoads())
-                ->orderByDesc('created_at')
+            : null;
+        $handoverTotal = $handoverQuery ? (clone $handoverQuery)->count() : null;
+        $handovers = $handoverQuery
+            ? $handoverQuery->orderByDesc('created_at')
                 ->limit(50)
                 ->get()
                 ->map(function (ShiftHandover $handover) use ($auth, $targetUserId) {
@@ -212,7 +225,41 @@ class AttendanceController extends Controller
 
         return Inertia::render('attendance/index', [
             'sessions' => $sessions,
+            'sessionPagination' => [
+                'current_page' => $sessionPage->currentPage(), 'last_page' => $sessionPage->lastPage(),
+                'per_page' => $sessionPage->perPage(), 'total' => $sessionPage->total(),
+                'from' => $sessionPage->firstItem(), 'to' => $sessionPage->lastItem(),
+                'links' => $sessionPage->linkCollection()->all(),
+            ],
             'totalSessions' => $totalSessions,
+            'summary' => [
+                'user_id' => $targetUserId, 'sessions_total' => $selectedTotal,
+                'closed_sessions' => $selectedClosed, 'open_sessions' => $selectedOpen,
+                'closed_hours' => round((float) $weekHours, 2),
+                'on_clock_now_total' => $onClockTotal, 'stale_on_clock_total' => $staleTotal,
+            ],
+            'evidence' => [
+                'state' => $selectedTotal === 0 ? 'no_records' : 'recorded',
+                'basis' => 'closed_sessions_clocked_in_during_selected_week',
+                'scope' => 'viewed_person_with_existing_attendance_access',
+                'period_start' => $selectedWeekStartUtc->toIso8601String(),
+                'period_end_exclusive' => $selectedWeekEndUtc->toIso8601String(),
+                'timezone' => $tz, 'checked_at' => now()->toIso8601String(),
+                'today' => $workerNow->toDateString(),
+                'today_period_start' => $todayStartUtc->toIso8601String(),
+                'today_period_end_exclusive' => $tomorrowStartUtc->toIso8601String(),
+                'total_sessions_basis' => 'all_recorded_sessions_for_viewed_person',
+                'on_clock_basis' => $canManageAny ? 'current_open_sessions_in_permitted_sites' : 'restricted',
+                'handovers_basis' => $canAccessHandovers ? 'all_recorded_submitted_or_acknowledged_handovers_for_viewed_person' : 'restricted',
+            ],
+            'lists' => [
+                'sessions' => ['total' => $selectedTotal, 'shown' => $sessions->count(), 'limit' => 100,
+                    'truncated' => $selectedTotal > $sessions->count()],
+                'onClockNow' => ['total' => $onClockTotal, 'shown' => $onClockNow->count(), 'limit' => 50,
+                    'truncated' => $onClockTotal !== null && $onClockTotal > $onClockNow->count()],
+                'handovers' => ['total' => $handoverTotal, 'shown' => $handovers->count(), 'limit' => 50,
+                    'truncated' => $handoverTotal !== null && $handoverTotal > $handovers->count()],
+            ],
             'openSession' => $openSession ? [
                 'id' => $openSession->id,
                 'clock_in_at' => optional($openSession->clock_in_at)->toIso8601String(),
@@ -291,6 +338,7 @@ class AttendanceController extends Controller
      */
     public function correctSession(Request $request, $session)
     {
+        $request->session()->forget('attendance_result');
         $auth = $request->user();
         abort_unless(
             $auth && ($auth->canDo('timesheets.manageAny') || $this->canClock($auth)),
@@ -311,6 +359,7 @@ class AttendanceController extends Controller
             'reason' => ['required', 'string', 'max:1000', 'not_regex:/^\s*$/'],
         ]);
 
+        $receiptCanCommit = $this->isOutsideTransaction();
         try {
             $corrected = $this->attendanceService->correctSession(
                 $auth,
@@ -326,17 +375,18 @@ class AttendanceController extends Controller
         $ownSession = (int) $corrected->user_id === (int) $auth->id;
         $name = $ownSession ? 'Session' : "Session for {$corrected->user?->name}";
         if ($corrected->timesheetSyncOutcome()->wasSynced() && $corrected->timesheet) {
-            return redirect()->back()->with('success', "{$name} corrected. Timesheet #{$corrected->timesheet->id} recalculated.");
+            return $this->attendanceSuccess("{$name} corrected. Timesheet #{$corrected->timesheet->id} recalculated.", 'correct', $corrected, $receiptCanCommit);
         }
         if ($corrected->timesheetSyncOutcome() === AttendanceTimesheetSyncOutcome::SkippedFollowUp) {
-            return redirect()->back()->with('success', "{$name} corrected. Payroll follow-up is required; no Timesheet was changed.");
+            return $this->attendanceSuccess("{$name} corrected. Payroll follow-up is required; no Timesheet was changed.", 'correct', $corrected, $receiptCanCommit);
         }
 
-        return redirect()->back()->with('success', "{$name} corrected. The reason was recorded in the audit log.");
+        return $this->attendanceSuccess("{$name} corrected. The reason was recorded in the audit log.", 'correct', $corrected, $receiptCanCommit);
     }
 
     public function clockIn(Request $request)
     {
+        $request->session()->forget('attendance_result');
         $auth = $request->user();
         abort_unless($this->canClock($auth), 403);
 
@@ -355,17 +405,19 @@ class AttendanceController extends Controller
         ]);
         $data['shift_id'] = $shift?->id;
 
+        $receiptCanCommit = $this->isOutsideTransaction();
         try {
             $session = $this->attendanceService->clockIn($auth, $data);
         } catch (\LogicException $exception) {
             return redirect()->back()->withErrors(['clock_in' => $exception->getMessage()]);
         }
 
-        return redirect()->back()->with('success', 'Clocked in successfully.');
+        return $this->attendanceSuccess('Clocked in successfully.', 'clock_in', $session, $receiptCanCommit);
     }
 
     public function clockOut(Request $request)
     {
+        $request->session()->forget('attendance_result');
         $auth = $request->user();
         abort_unless($this->canClock($auth), 403);
 
@@ -401,6 +453,7 @@ class AttendanceController extends Controller
         ]);
         $data['session_id'] = $session?->id;
 
+        $receiptCanCommit = $this->isOutsideTransaction();
         try {
             $closed = $this->attendanceService->clockOut($auth, $session, $data);
         } catch (AttendanceClockOutBlockedException $exception) {
@@ -425,13 +478,13 @@ class AttendanceController extends Controller
         }
 
         if ($closed->timesheetSyncOutcome()->wasSynced() && $closed->timesheet) {
-            return redirect()->back()->with('success', "Clocked out. Draft timesheet #{$closed->timesheet->id} synced.");
+            return $this->attendanceSuccess("Clocked out. Draft timesheet #{$closed->timesheet->id} synced.", 'clock_out', $closed, $receiptCanCommit);
         }
         if ($closed->timesheetSyncOutcome() === AttendanceTimesheetSyncOutcome::SkippedFollowUp) {
-            return redirect()->back()->with('success', 'Clocked out. Payroll follow-up is required; no Timesheet was changed.');
+            return $this->attendanceSuccess('Clocked out. Payroll follow-up is required; no Timesheet was changed.', 'clock_out', $closed, $receiptCanCommit);
         }
 
-        return redirect()->back()->with('success', 'Clocked out successfully.');
+        return $this->attendanceSuccess('Clocked out successfully.', 'clock_out', $closed, $receiptCanCommit);
     }
 
     /**
@@ -440,6 +493,7 @@ class AttendanceController extends Controller
      */
     public function endSession(Request $request, HrAttendanceSession $session)
     {
+        $request->session()->forget('attendance_result');
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('timesheets.manageAny'), 403);
 
@@ -453,6 +507,7 @@ class AttendanceController extends Controller
             return redirect()->back()->with('info', 'This session was already closed.');
         }
 
+        $receiptCanCommit = $this->isOutsideTransaction();
         try {
             $closed = $this->attendanceService->adminEndSession($auth, $session, trim($data['reason']));
         } catch (\LogicException $exception) {
@@ -461,13 +516,70 @@ class AttendanceController extends Controller
 
         $name = $closed->user?->name ?? 'staff member';
         if ($closed->timesheetSyncOutcome()->wasSynced() && $closed->timesheet) {
-            return redirect()->back()->with('success', "Session ended for {$name}. Draft timesheet #{$closed->timesheet->id} synced.");
+            return $this->attendanceSuccess("Session ended for {$name}. Draft timesheet #{$closed->timesheet->id} synced.", 'end_session', $closed, $receiptCanCommit);
         }
         if ($closed->timesheetSyncOutcome() === AttendanceTimesheetSyncOutcome::SkippedFollowUp) {
-            return redirect()->back()->with('success', "Session ended for {$name}. Payroll follow-up is required; no Timesheet was changed.");
+            return $this->attendanceSuccess("Session ended for {$name}. Payroll follow-up is required; no Timesheet was changed.", 'end_session', $closed, $receiptCanCommit);
         }
 
-        return redirect()->back()->with('success', "Session ended for {$name}.");
+        return $this->attendanceSuccess("Session ended for {$name}.", 'end_session', $closed, $receiptCanCommit);
+    }
+
+    private function isOutsideTransaction(): bool
+    {
+        $connection = DB::connection();
+
+        return $connection->transactionLevel() === 0 && ! $connection->getPdo()->inTransaction();
+    }
+
+    private function attendanceSuccess(string $message, string $action, HrAttendanceSession $session, bool $receiptCanCommit): RedirectResponse
+    {
+        $response = redirect()->back()->with('success', $message);
+
+        try {
+            // A nested transaction or a testing callback is not a physical root
+            // commit. Project only the writer's returned evidence, never reload.
+            if (! $receiptCanCommit || ! $this->isOutsideTransaction()) {
+                return $response;
+            }
+            if (! in_array($session->status, ['open', 'closed'], true) || ! $session->clock_in_at
+                || ($action === 'clock_out' && $session->handoverOutcome() === null)) {
+                return $response;
+            }
+
+            $synced = $session->timesheetSyncOutcome()->wasSynced();
+            $timesheet = $synced && $session->relationLoaded('timesheet') ? $session->getRelation('timesheet') : null;
+            if ($synced && ! $timesheet) {
+                return $response;
+            }
+
+            return $response->with('attendance_result', [
+                'action' => $action,
+                'session_id' => (int) $session->id,
+                'shift_id' => $session->shift_id === null ? null : (int) $session->shift_id,
+                'session_status' => $session->status,
+                'clock_in_at' => $session->clock_in_at->toIso8601String(),
+                'clock_out_at' => $session->clock_out_at?->toIso8601String(),
+                'break_minutes' => (int) $session->break_minutes,
+                'worked_hours' => $session->clock_out_at ? $session->worked_hours : null,
+                'timesheet_sync_outcome' => $session->timesheetSyncOutcome()->value,
+                'timesheet_id' => $synced ? (int) $timesheet->id : null,
+                'timesheet_status' => $synced ? $timesheet->status : null,
+                'handover_outcome' => $session->handoverOutcome()?->value,
+            ]);
+        } catch (Throwable $exception) {
+            // Receipt delivery must not turn a committed command into a failed
+            // attendance response, including when the logging channel fails.
+            try {
+                Log::warning('Committed attendance result could not be presented', [
+                    'action' => $action, 'session_id' => (int) $session->id, 'exception_class' => $exception::class,
+                ]);
+            } catch (Throwable) {
+                // The existing successful mutation response remains truthful.
+            }
+
+            return $response;
+        }
     }
 
     public function startBreak(Request $request)

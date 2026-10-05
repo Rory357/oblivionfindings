@@ -23,6 +23,7 @@ export function TimePicker({
   onChange,
   invalid,
   describedBy,
+  timezone = 'Pacific/Auckland',
 }: {
   id: string;
   label: string;
@@ -30,6 +31,7 @@ export function TimePicker({
   onChange: (value: string) => void;
   invalid?: boolean;
   describedBy?: string;
+  timezone?: string;
 }) {
   const [open, setOpen] = useState(false);
   const pickerTrigger = useRef<HTMLButtonElement>(null);
@@ -131,7 +133,7 @@ export function TimePicker({
         <div className="time-picker-heading">
           <div>
             <strong>{label}</strong>
-            <small>Pacific/Auckland</small>
+            <small>{timezone}</small>
           </div>
           <span className="time-picker-mode-label">
             {manual ? "Type a time" : "Select a time"}

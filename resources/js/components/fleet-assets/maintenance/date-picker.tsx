@@ -20,6 +20,7 @@ export function DatePicker({
     invalid,
     describedBy,
     allowClear = false,
+    timeZone = 'Pacific/Auckland',
     trigger,
 }: {
     id: string;
@@ -29,6 +30,7 @@ export function DatePicker({
     invalid?: boolean;
     describedBy?: string;
     allowClear?: boolean;
+    timeZone?: string;
     trigger?: React.ReactNode;
 }) {
     const [open, setOpen] = useState(false);
@@ -89,7 +91,7 @@ export function DatePicker({
                 <div className="time-picker-heading">
                     <div>
                         <strong>{label}</strong>
-                        <small>Pacific/Auckland · one date</small>
+                        <small>{timeZone} · one date</small>
                     </div>
                     <CalendarDays className="size-4 text-primary" />
                 </div>

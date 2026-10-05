@@ -2,6 +2,7 @@
 
 namespace App\Domain\Hr\Services;
 
+use App\Domain\Hr\Enums\AttendanceHandoverOutcome;
 use App\Domain\Hr\Enums\AttendanceTimesheetSyncOutcome;
 use App\Domain\Hr\Exceptions\AttendanceClockOutBlockedException;
 use App\Domain\Hr\Models\HrAttendanceBreakEvent;
@@ -283,7 +284,7 @@ class AttendanceService
                 ->first(['id', 'user_id', 'shift_id']);
             abort_unless($sessionSnapshot instanceof HrAttendanceSession, 404);
             abort_unless((int) $sessionSnapshot->user_id === (int) $user->id, 404);
-            $this->saveHandoverFromClockOut(
+            $handoverOutcome = $this->saveHandoverFromClockOut(
                 $sessionSnapshot,
                 $user,
                 $data['handover'] ?? null,
@@ -445,7 +446,8 @@ class AttendanceService
             }
 
             return ($session->fresh(['shift.client', 'timesheet']) ?? $session)
-                ->markTimesheetSyncOutcome($timesheetSyncOutcome);
+                ->markTimesheetSyncOutcome($timesheetSyncOutcome)
+                ->markHandoverOutcome($handoverOutcome);
         });
 
         // Safety overlay: end any lone-worker monitoring tied to this shift now
@@ -1888,14 +1890,17 @@ class AttendanceService
         User $user,
         mixed $handover,
         array $additionalParticipantUserIds = [],
-    ): void {
-        if (! is_array($handover) || $handover === [] || ! $session->shift_id) {
-            return;
+    ): ?AttendanceHandoverOutcome {
+        if (! $session->shift_id) {
+            return AttendanceHandoverOutcome::NoShift;
+        }
+        if (! is_array($handover) || $handover === []) {
+            return AttendanceHandoverOutcome::NoPayload;
         }
 
         $shift = $session->shift ?: Shift::query()->find($session->shift_id);
         if (! $shift) {
-            return;
+            return null;
         }
 
         $alreadySubmitted = ShiftHandover::query()
@@ -1908,7 +1913,7 @@ class AttendanceService
             ->exists();
 
         if ($alreadySubmitted) {
-            return;
+            return AttendanceHandoverOutcome::ExistingSubmittedOrAcknowledged;
         }
 
         $notes = trim((string) ($handover['handover_notes'] ?? ''));
@@ -1967,12 +1972,20 @@ class AttendanceService
                 ]];
         }
 
-        app(ShiftHandoverService::class)->save(
+        $saved = app(ShiftHandoverService::class)->save(
             $shift,
             $user,
             $payload,
             $additionalParticipantUserIds,
         );
+
+        // The canonical writer can retain a submission that won the race after
+        // the preflight above. Capture its actual outcome without another read.
+        return match ($saved['action'] ?? null) {
+            'draft_saved' => AttendanceHandoverOutcome::DraftSaved,
+            'submitted' => AttendanceHandoverOutcome::ExistingSubmittedOrAcknowledged,
+            default => null,
+        };
     }
 
     protected function countUnsignedMedicationDoses(Shift $shift): int

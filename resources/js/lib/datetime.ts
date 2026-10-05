@@ -112,10 +112,13 @@ function toDate(value: DateInput): Date | null {
     return Number.isNaN(d.getTime()) ? null : d;
 }
 
-function dateParts(value: Date): Record<string, string> {
+function dateParts(
+    value: Date,
+    timeZone = WORKER_TIMEZONE,
+): Record<string, string> {
     return Object.fromEntries(
         new Intl.DateTimeFormat(WORKER_LOCALE, {
-            timeZone: WORKER_TIMEZONE,
+            timeZone,
             year: 'numeric',
             month: '2-digit',
             day: '2-digit',
@@ -125,11 +128,14 @@ function dateParts(value: Date): Record<string, string> {
     );
 }
 
-/** "2026-07-13" — the Auckland calendar date for an HTML date input. */
-export function toDateInput(value: DateInput): string {
+/** "2026-07-13" — the worker calendar date for an HTML date input. */
+export function toDateInput(
+    value: DateInput,
+    timeZone = WORKER_TIMEZONE,
+): string {
     const date = toDate(value);
     if (!date) return '';
-    const parts = dateParts(date);
+    const parts = dateParts(date, timeZone);
     return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
@@ -237,6 +243,24 @@ export function formatDateTimeLong(
     const d = toDate(value);
     if (!d) return fallback;
     return `${formatDateLong(d)}, ${formatTime(d)}`;
+}
+
+/** Full record timestamp in its explicitly labelled work or pattern timezone. */
+export function formatDateTimeInZone(
+    value: DateInput,
+    timeZone: string = WORKER_TIMEZONE,
+    fallback: string = DEFAULT_FALLBACK,
+): string {
+    const date = toDate(value);
+    if (!date) return fallback;
+    return new Intl.DateTimeFormat(WORKER_LOCALE, {
+        timeZone,
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+    }).format(date);
 }
 
 /**

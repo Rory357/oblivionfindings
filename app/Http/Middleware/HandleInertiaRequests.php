@@ -292,6 +292,7 @@ class HandleInertiaRequests extends Middleware
 
             // Flash messages for global toasts
             'flash' => [
+                'attendance_result' => fn () => $request->session()->get('attendance_result'),
                 // Many controllers use 'status' (starter-kit convention). Treat it as success.
                 'success' => session('success') ?? session('status'),
                 'error' => session('error'),

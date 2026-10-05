@@ -1,17 +1,22 @@
-/* Attendance — rostering-treatment hero (live eyebrow, badges/stats, actions
- * in the hero, footer week stepper + staff filter), tabbed working surface
- * (Sessions / On the clock / Handovers) on the shared rostering TabStrip, and
+/* Attendance — shared page header and connected Sessions / On the clock / Handovers views, with
  * right-click context menus on every list row. Clock workflows are multi-step
  * wizards on the shared wizard shell; the Handover wizard and ReasonDialog are
  * the existing shared components, not duplicates. */
 import { AddClientDialog } from '@/components/clients/add-client-dialog';
-import { PageHero, type PageHeroBadge } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderRail,
+    PageHeaderStatusChip,
+} from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import { ReasonDialog } from '@/components/reason-dialog';
 import {
     ShiftContextMenu,
-    TabStrip,
     WeekPicker,
     addDaysWP,
     startOfWeek,
@@ -23,6 +28,7 @@ import {
 import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Select,
     SelectContent,
@@ -37,10 +43,11 @@ import {
 } from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/app-layout';
 import {
-    WORKER_TIMEZONE,
-    formatDate,
+    formatDateOnly,
     formatDateTime,
+    formatDateTimeInZone,
     formatTime,
+    toDateInput,
 } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem, type SharedData } from '@/types';
@@ -52,7 +59,6 @@ import {
     CalendarRange,
     Check,
     CheckCircle2,
-    ChevronDown,
     ChevronLeft,
     ChevronRight,
     Coffee,
@@ -72,6 +78,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { openHoursInPeriod } from './components/period-hours';
 
 import { HandoverDetailDialog } from '@/pages/operations/handovers/components/handover-detail-dialog';
 import { HandoverWizard } from '@/pages/operations/handovers/components/handover-wizard';
@@ -104,7 +111,40 @@ type AttendanceHandover = Handover & {
 
 type Props = {
     sessions: Session[];
+    sessionPagination?: {
+        current_page: number;
+        last_page: number;
+        total: number;
+        links: { url: string | null; label: string; active: boolean }[];
+    };
     totalSessions: number;
+    summary: {
+        user_id: number;
+        sessions_total: number;
+        closed_sessions: number;
+        open_sessions: number;
+        closed_hours: number;
+        on_clock_now_total: number | null;
+        stale_on_clock_total: number | null;
+    };
+    evidence: {
+        period_start: string;
+        period_end_exclusive: string;
+        timezone: string;
+        checked_at: string;
+        today: string;
+        today_period_start: string;
+        today_period_end_exclusive: string;
+    };
+    lists: Record<
+        'sessions' | 'onClockNow' | 'handovers',
+        {
+            total: number | null;
+            shown: number;
+            limit: number;
+            truncated: boolean;
+        }
+    >;
     openSession: OpenSession | null;
     activeShift: {
         id: number;
@@ -128,6 +168,7 @@ type Props = {
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
     { title: 'Attendance', href: '/attendance' },
 ];
 
@@ -718,6 +759,10 @@ function HandoversList({
 export default function AttendanceIndex({
     sessions,
     totalSessions,
+    sessionPagination,
+    summary,
+    evidence,
+    lists,
     openSession,
     eligibleShifts,
     staff,
@@ -733,7 +778,6 @@ export default function AttendanceIndex({
     catalogue,
 }: Props) {
     const { auth } = usePage<SharedData>().props;
-    const firstName = (auth?.user?.name ?? '').split(' ')[0] || 'there';
 
     const [now, setNow] = useState(() => new Date());
     const [tab, setTab] = useState('sessions');
@@ -777,14 +821,15 @@ export default function AttendanceIndex({
         () =>
             filters.week
                 ? startOfWeek(parseYmd(filters.week))
-                : startOfWeek(new Date()),
-        [filters.week],
+                : startOfWeek(parseYmd(toDateInput(now))),
+        [filters.week, now],
     );
     const isCurrentWeek =
-        weekStartDate.getTime() === startOfWeek(new Date()).getTime();
+        weekStartDate.getTime() ===
+        startOfWeek(parseYmd(toDateInput(now))).getTime();
 
     const visitParams = (weekStart: Date, userId: number | null) => ({
-        ...(toYMD(weekStart) !== toYMD(startOfWeek(new Date()))
+        ...(toYMD(weekStart) !== toYMD(startOfWeek(parseYmd(toDateInput(now))))
             ? { week: toYMD(weekStart) }
             : {}),
         ...(canManageAny && userId ? { user_id: userId } : {}),
@@ -795,7 +840,23 @@ export default function AttendanceIndex({
             preserveState: true,
             preserveScroll: true,
             replace: true,
-            only: ['sessions', 'filters'],
+            only: [
+                'sessions',
+                'sessionPagination',
+                'filters',
+                'summary',
+                'evidence',
+                'lists',
+                'weekHours',
+                'todayHours',
+                'openSession',
+                'onClockNow',
+                'handovers',
+                'eligibleShifts',
+                'canManageAny',
+                'canClock',
+                'canCreateHandovers',
+            ],
         });
     };
 
@@ -837,7 +898,27 @@ export default function AttendanceIndex({
           )
         : 0;
     const ownStale = !!openSession && openElapsedMs > STALE_MS;
-    const liveExtraH = openSession ? openElapsedMs / 3_600_000 : 0;
+    const todayOpenHours = openHoursInPeriod(
+        openSession,
+        evidence?.today_period_start,
+        evidence?.today_period_end_exclusive,
+        now,
+    );
+    const weekOpenHours = openHoursInPeriod(
+        openSession,
+        evidence?.period_start,
+        evidence?.period_end_exclusive,
+        now,
+    );
+    const selectedPeriod = `${formatDateOnly(toYMD(weekStartDate))} → ${formatDateOnly(toYMD(addDaysWP(weekStartDate, 6)))}`;
+    const activeList =
+        lists?.[
+            tab === 'onclock'
+                ? 'onClockNow'
+                : tab === 'handovers'
+                  ? 'handovers'
+                  : 'sessions'
+        ];
 
     const eligible = openSession ? [] : eligibleShifts;
     const staleRows = onClockNow.filter((r) => r.is_stale);
@@ -1081,14 +1162,13 @@ export default function AttendanceIndex({
         ]);
 
     /* ── hero content ── */
-    const heroDate = now.toLocaleDateString('en-NZ', {
-        timeZone: WORKER_TIMEZONE,
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-    });
-
-    const heroBadges: PageHeroBadge[] = [
+    const heroBadges: {
+        icon?: typeof Timer;
+        label: string;
+        tone?: 'default' | 'success' | 'warning' | 'critical' | 'info';
+        dot?: boolean;
+        onClick?: () => void;
+    }[] = [
         openSession
             ? {
                   icon: CheckCircle2,
@@ -1137,7 +1217,7 @@ export default function AttendanceIndex({
             ? [
                   {
                       icon: Link2,
-                      label: `Synced to timesheet #${openSession.timesheet_id}`,
+                      label: `Linked timesheet #${openSession.timesheet_id}`,
                       tone: 'default' as const,
                   },
               ]
@@ -1169,7 +1249,7 @@ export default function AttendanceIndex({
             label: 'Sessions',
             icon: Timer,
             tone: 'primary',
-            badge: sessions.length,
+            badge: summary?.sessions_total ?? sessions.length,
         },
         ...(canManageAny
             ? [
@@ -1180,7 +1260,7 @@ export default function AttendanceIndex({
                       tone: (staleRows.length > 0
                           ? 'warning'
                           : 'success') as RosterTabItem['tone'],
-                      badge: onClockNow.length,
+                      badge: summary?.on_clock_now_total ?? onClockNow.length,
                   },
               ]
             : []),
@@ -1202,84 +1282,15 @@ export default function AttendanceIndex({
             <Head title="Attendance" />
 
             <PageShell>
-                <PageHero
-                    category="ops"
+                <PageHeader
+                    variant="profile"
                     icon={Timer}
                     title={
-                        <span>
-                            <span className="mb-2 flex items-center gap-2 text-[10.5px] font-semibold tracking-wider text-primary-foreground/80 uppercase">
-                                <span
-                                    aria-hidden="true"
-                                    className="relative inline-flex h-2 w-2"
-                                >
-                                    <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-status-success/70" />
-                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success ring-2 ring-status-success/30" />
-                                </span>
-                                Live attendance · synced to timesheets
-                            </span>
-                            <span className="block">
-                                <span className="font-normal text-primary-foreground/80">
-                                    {viewedStaff
-                                        ? `${viewedStaff.name}'s attendance —`
-                                        : `Kia ora ${firstName}, your attendance —`}
-                                </span>{' '}
-                                <span className="border-b-2 border-primary-foreground/40 pb-0.5">
-                                    {heroDate}
-                                </span>
-                            </span>
-                        </span>
+                        viewedStaff
+                            ? `${viewedStaff.name} · Attendance`
+                            : 'My attendance'
                     }
-                    description={
-                        openSession ? (
-                            <span>
-                                Clocked in since{' '}
-                                {formatTime(openSession.clock_in_at)}
-                                {openSession.shift_id
-                                    ? ` on shift #${openSession.shift_id}`
-                                    : ''}
-                                . {(todayHours + liveExtraH).toFixed(1)}h logged
-                                today across {totalSessions} session
-                                {totalSessions === 1 ? '' : 's'} on record.
-                            </span>
-                        ) : (
-                            <span>
-                                Not on the clock. {todayHours.toFixed(1)}h
-                                logged today, {eligible.length} eligible shift
-                                {eligible.length === 1 ? '' : 's'} in the
-                                clock-in window, and {totalSessions} session
-                                {totalSessions === 1 ? '' : 's'} on record.
-                            </span>
-                        )
-                    }
-                    meta={[
-                        { icon: CalendarDays, label: formatDate(now) },
-                        {
-                            icon: Timer,
-                            label: `${totalSessions} session${totalSessions === 1 ? '' : 's'} on record`,
-                        },
-                        { icon: Link2, label: 'Sessions sync to timesheets' },
-                    ]}
-                    badges={heroBadges}
-                    stats={[
-                        {
-                            label: 'Today',
-                            value: `${(todayHours + liveExtraH).toFixed(1)}h`,
-                        },
-                        {
-                            label: 'This week',
-                            value: `${(weekHours + liveExtraH).toFixed(1)}h`,
-                        },
-                        {
-                            label: 'On the clock',
-                            value: openSession ? 'Yes' : 'No',
-                            tone: openSession ? 'success' : undefined,
-                        },
-                        {
-                            label: 'Eligible',
-                            value: eligible.length,
-                            tone: eligible.length > 0 ? 'info' : undefined,
-                        },
-                    ]}
+                    subline={`${selectedPeriod} · Clock sessions, breaks and recorded timesheet links`}
                     actions={
                         viewedStaff || !canClock ? null : (
                             <>
@@ -1294,10 +1305,7 @@ export default function AttendanceIndex({
                                         >
                                             Clock out
                                         </PageHeaderPrimaryButton>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
+                                        <PageHeaderGlassButton
                                             onClick={
                                                 onBreak ? endBreak : startBreak
                                             }
@@ -1311,12 +1319,9 @@ export default function AttendanceIndex({
                                             {onBreak
                                                 ? 'End break'
                                                 : 'Start break'}
-                                        </Button>
+                                        </PageHeaderGlassButton>
                                         {canCreateHandovers ? (
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
+                                            <PageHeaderGlassButton
                                                 onClick={() =>
                                                     openHandoverWizard()
                                                 }
@@ -1324,7 +1329,7 @@ export default function AttendanceIndex({
                                             >
                                                 <ArrowLeftRight className="mr-1 h-4 w-4" />
                                                 Handover
-                                            </Button>
+                                            </PageHeaderGlassButton>
                                         ) : null}
                                     </>
                                 ) : (
@@ -1336,9 +1341,7 @@ export default function AttendanceIndex({
                                         Clock in
                                     </PageHeaderPrimaryButton>
                                 )}
-                                <Button
-                                    size="icon"
-                                    variant="outline"
+                                <PageHeaderGlassButton
                                     aria-label="Fix a missed clock-out"
                                     title={
                                         fixCandidates.length
@@ -1346,107 +1349,265 @@ export default function AttendanceIndex({
                                             : 'No open sessions to correct'
                                     }
                                     disabled={!fixCandidates.length}
-                                    className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
                                     onClick={() =>
                                         setFixSessions(fixCandidates)
                                     }
                                     data-test="attendance-fix-clock-out"
                                 >
                                     <Wrench className="h-4 w-4" />
-                                </Button>
+                                </PageHeaderGlassButton>
                             </>
                         )
                     }
-                    footer={
-                        <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                                {/* eslint-disable-next-line no-restricted-syntax -- segmented week-stepper on dark hero; not a shadcn Button. */}
-                                <button
-                                    type="button"
-                                    className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20"
+                    meters={
+                        <>
+                            <PageHeaderMeterBlock
+                                label="Hours today"
+                                onClick={() => setTab('sessions')}
+                                ariaLabel="View attendance sessions"
+                            >
+                                <PageHeaderMeterBig>
+                                    {todayHours.toFixed(1)} hr
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    Closed sessions starting{' '}
+                                    {formatDateOnly(
+                                        evidence?.today ?? toDateInput(now),
+                                    )}
+                                    {openSession
+                                        ? todayOpenHours === null
+                                            ? ' · Open time needs review'
+                                            : ` · ${todayOpenHours.toFixed(1)} hr open estimate`
+                                        : ''}
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Selected week"
+                                onClick={() => setTab('sessions')}
+                                ariaLabel="View weekly sessions"
+                            >
+                                <PageHeaderMeterBig>
+                                    {weekHours.toFixed(1)} hr
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    Closed sessions by clock-in date
+                                    {openSession
+                                        ? weekOpenHours === null
+                                            ? ' · Open time needs review'
+                                            : ` · ${weekOpenHours.toFixed(1)} hr open estimate`
+                                        : ''}
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Clock status"
+                                onClick={() => setTab('sessions')}
+                                ariaLabel="View clock session"
+                            >
+                                <PageHeaderMeterBig>
+                                    {openSession
+                                        ? onBreak
+                                            ? 'On break'
+                                            : 'Clocked in'
+                                        : 'Not clocked in'}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    {openSession
+                                        ? `Since ${formatTime(openSession.clock_in_at)}`
+                                        : 'No open session recorded'}
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Clock-in choices"
+                                onClick={() => {
+                                    if (
+                                        !viewedStaff &&
+                                        canClock &&
+                                        !openSession
+                                    )
+                                        setClockInOpen(true);
+                                    else setTab('sessions');
+                                }}
+                                ariaLabel="Review shifts in the clock-in window"
+                            >
+                                <PageHeaderMeterBig>
+                                    {eligible.length}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    Current clock-in choices
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                        </>
+                    }
+                    filters={
+                        <div className="flex w-full flex-wrap items-center justify-between gap-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <PageHeaderGlassButton
+                                    icon={ChevronLeft}
                                     onClick={() =>
                                         goWeek(addDaysWP(weekStartDate, -7))
                                     }
+                                    aria-label="Previous week"
                                 >
-                                    <ChevronLeft className="h-3.5 w-3.5" />
                                     {prevLab}
-                                </button>
-                                {/* eslint-disable-next-line no-restricted-syntax -- segmented week-stepper on dark hero; not a shadcn Button. */}
-                                <button
+                                </PageHeaderGlassButton>
+                                <PageHeaderGlassButton
                                     ref={weekBtnRef}
-                                    type="button"
-                                    className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/35 bg-primary-foreground/20 px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-primary-foreground hover:bg-primary-foreground/30"
-                                    onClick={() => setPickerOpen((v) => !v)}
+                                    icon={CalendarRange}
+                                    onClick={() => setPickerOpen(!pickerOpen)}
                                     aria-haspopup="dialog"
                                     aria-expanded={pickerOpen}
                                 >
-                                    <CalendarRange className="h-3.5 w-3.5" />
-                                    {curLab} · {weekCompactRange(weekStartDate)}
+                                    {curLab} · {weekCompactRange(weekStartDate)}{' '}
+                                    {weekStartDate.getFullYear()}
                                     {isCurrentWeek ? ' · this week' : ''}
-                                    <ChevronDown className="h-3 w-3" />
-                                </button>
-                                {/* eslint-disable-next-line no-restricted-syntax -- segmented week-stepper on dark hero; not a shadcn Button. */}
-                                <button
-                                    type="button"
-                                    className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20"
+                                </PageHeaderGlassButton>
+                                <PageHeaderGlassButton
+                                    icon={ChevronRight}
                                     onClick={() =>
                                         goWeek(addDaysWP(weekStartDate, 7))
                                     }
+                                    aria-label="Next week"
                                 >
                                     {nextLab}
-                                    <ChevronRight className="h-3.5 w-3.5" />
-                                </button>
+                                </PageHeaderGlassButton>
                             </div>
                             {canManageAny ? (
-                                <div className="flex items-center justify-end gap-2">
-                                    <Select
-                                        value={
-                                            viewedStaff
-                                                ? String(viewedStaff.id)
-                                                : ANY
-                                        }
-                                        onValueChange={(v) =>
-                                            viewStaff(
-                                                v === ANY ? null : Number(v),
-                                            )
-                                        }
+                                <Select
+                                    value={
+                                        viewedStaff
+                                            ? String(viewedStaff.id)
+                                            : ANY
+                                    }
+                                    onValueChange={(value) =>
+                                        viewStaff(
+                                            value === ANY
+                                                ? null
+                                                : Number(value),
+                                        )
+                                    }
+                                >
+                                    <SelectTrigger
+                                        aria-label="Whose sessions"
+                                        className="w-48"
                                     >
-                                        <SelectTrigger className="h-8 w-48 border-primary-foreground/30 bg-primary-foreground/10 text-xs text-primary-foreground shadow-none hover:bg-primary-foreground/20 [&_[data-slot=select-value]]:text-primary-foreground">
-                                            <SelectValue placeholder="My sessions" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value={ANY}>
-                                                My sessions
+                                        <SelectValue placeholder="My sessions" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={ANY}>
+                                            My sessions
+                                        </SelectItem>
+                                        {staff.map((member) => (
+                                            <SelectItem
+                                                key={member.id}
+                                                value={String(member.id)}
+                                            >
+                                                {member.name}
                                             </SelectItem>
-                                            {staff.map((member) => (
-                                                <SelectItem
-                                                    key={member.id}
-                                                    value={String(member.id)}
-                                                >
-                                                    {member.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             ) : null}
+                            <div className="flex w-full flex-wrap gap-2">
+                                {heroBadges.map((badge, index) =>
+                                    badge.onClick ? (
+                                        <PageHeaderGlassButton
+                                            key={index}
+                                            icon={badge.icon}
+                                            onClick={badge.onClick}
+                                        >
+                                            {badge.label}
+                                        </PageHeaderGlassButton>
+                                    ) : (
+                                        <PageHeaderStatusChip
+                                            key={index}
+                                            variant={
+                                                badge.tone === 'default'
+                                                    ? 'neutral'
+                                                    : (badge.tone ?? 'neutral')
+                                            }
+                                        >
+                                            {badge.label}
+                                        </PageHeaderStatusChip>
+                                    ),
+                                )}
+                            </div>
                         </div>
+                    }
+                    rail={
+                        <PageHeaderRail
+                            items={tabItems.map((item) => ({
+                                key: item.id,
+                                label: item.label,
+                                icon: item.icon,
+                                badge: item.badge,
+                            }))}
+                            value={tab}
+                            onSelect={setTab}
+                            ariaLabel="Attendance views"
+                        />
                     }
                 />
 
-                {/* Tabbed working surface — rostering TabStrip contract. */}
-                <TabStrip
-                    value={tab}
-                    onChange={setTab}
-                    ariaLabel="Attendance views"
-                    items={tabItems}
-                />
+                <div className="text-caption flex flex-wrap items-center justify-between gap-2 text-muted-foreground">
+                    <p>
+                        {tab === 'sessions'
+                            ? `${selectedPeriod} · ${totalSessions} recorded sessions across all dates`
+                            : tab === 'onclock'
+                              ? 'Current open sessions at permitted sites'
+                              : 'Recorded handovers for this person across all dates'}
+                        {evidence
+                            ? ` · Updated ${formatDateTimeInZone(evidence.checked_at, evidence.timezone)}`
+                            : ''}
+                    </p>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => router.reload()}
+                    >
+                        Refresh records
+                    </Button>
+                    {openSession && tab === 'sessions' ? (
+                        <p className="w-full">
+                            Open estimate today (
+                            {formatDateOnly(
+                                evidence?.today ?? toDateInput(now),
+                            )}
+                            ):{' '}
+                            {todayOpenHours === null
+                                ? 'needs review'
+                                : `${todayOpenHours.toFixed(1)} hr`}{' '}
+                            · Selected week:{' '}
+                            {weekOpenHours === null
+                                ? 'needs review'
+                                : `${weekOpenHours.toFixed(1)} hr`}
+                            . Estimates cover only time inside each period,
+                            excluding recorded breaks. Closed hours keep the
+                            session’s clock-in date.
+                        </p>
+                    ) : null}
+                    {activeList?.truncated ? (
+                        <p role="status" className="w-full text-status-warning">
+                            {activeList.shown} of {activeList.total} records
+                            loaded. The totals include all permitted records;
+                            {tab === 'sessions'
+                                ? 'Use the page controls to review more.'
+                                : `Only the most recent ${activeList.limit} records appear here.`}
+                        </p>
+                    ) : null}
+                </div>
 
+                {tab === 'sessions' && sessionPagination ? (
+                    <LaravelPagination
+                        links={sessionPagination.links}
+                        lastPage={sessionPagination.last_page}
+                        className="flex-wrap"
+                    />
+                ) : null}
                 {tab === 'sessions' ? (
                     <SessionsCard
                         sessions={sessions}
                         weekLabelText={curLab}
-                        weekRangeText={`${weekCompactRange(weekStartDate)}${viewedStaff ? ` · ${viewedStaff.name}` : ''}`}
+                        weekRangeText={`${selectedPeriod}${viewedStaff ? ` · ${viewedStaff.name}` : ''}`}
                         onContext={sessionCtx}
                     />
                 ) : null}
@@ -1480,16 +1641,19 @@ export default function AttendanceIndex({
 
             {/* ── workflows (wizards + dialogs) ── */}
             <ClockInWizard
+                timezone={evidence?.timezone}
                 open={clockInOpen}
                 onClose={() => setClockInOpen(false)}
                 shifts={eligible}
             />
             <ClockOutWizard
+                timezone={evidence?.timezone}
                 open={clockOutOpen}
                 onClose={() => setClockOutOpen(false)}
                 session={openSession}
             />
             <FixClockOutWizard
+                timezone={evidence?.timezone}
                 open={fixSessions !== null}
                 onClose={() => setFixSessions(null)}
                 sessions={fixSessions ?? []}

@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Role;
 use App\Models\ServiceContext;
@@ -27,9 +28,14 @@ beforeEach(function () {
 
 function attendanceTaskUpdateOpenSessionFor(User $worker): array
 {
-    $site = Site::factory()->create();
-    $client = Client::factory()->create(['site_id' => $site->id]);
-    $serviceContext = ServiceContext::factory()->create();
+    $site = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
+    $serviceContext = ServiceContext::factory()->create(['site_id' => $site->id, 'is_active' => true]);
+    $client = Client::factory()->create(['site_id' => $site->id, 'service_context_id' => $serviceContext->id]);
+    HrEmployeeProfile::factory()->create(['user_id' => $worker->id, 'primary_site_id' => $site->id,
+        'secondary_site_ids' => [], 'is_active' => true,
+        'start_date' => now(config('app.worker_timezone', 'Pacific/Auckland'))->subMonth()->toDateString(),
+        'end_date' => null, 'created_by' => $worker->id, 'updated_by' => $worker->id]);
+    $client->supportWorkers()->syncWithoutDetaching([$worker->id]);
     $shift = Shift::query()->create([
         'site_id' => $site->id,
         'client_id' => $client->id,
@@ -60,7 +66,7 @@ function attendanceTaskUpdateOpenSessionFor(User $worker): array
         'created_by' => $worker->id,
     ]);
 
-    return [$session, $shift, $task];
+    return [$session, $shift, $task->fresh()];
 }
 
 test('clock out applies embedded task updates before blocker evaluation', function () {
@@ -71,7 +77,7 @@ test('clock out applies embedded task updates before blocker evaluation', functi
             'session_id' => $session->id,
             'break_minutes' => 0,
             'task_updates' => [
-                ['id' => $task->id, 'is_completed' => true],
+                ['id' => $task->id, 'is_completed' => true, 'expected_version' => $task->version],
             ],
             'handover' => [
                 'meds_completed' => true,
@@ -87,11 +93,11 @@ test('clock out applies embedded task updates before blocker evaluation', functi
 
     expect(ShiftHandover::query()
         ->where('outgoing_shift_id', $shift->id)
-        ->where('status', 'submitted')
-        ->exists())->toBeTrue();
+        ->sole()->status)->toBe('draft');
+    expect(ShiftHandover::query()->where('outgoing_shift_id', $shift->id)->sole()->submitted_at)->toBeNull();
 });
 
-test('clock out with stale task updates returns a clean error with no partial close', function () {
+test('clock out conceals a foreign shift task with no partial close', function () {
     [$session, $shift, $task] = attendanceTaskUpdateOpenSessionFor($this->worker);
 
     $otherShift = Shift::query()->create([
@@ -126,9 +132,31 @@ test('clock out with stale task updates returns a clean error with no partial cl
                 'follow_up_needed' => false,
             ],
         ])
-        ->assertSessionHasErrors(['task_updates']);
+        ->assertNotFound();
 
     expect($session->fresh()->status)->toBe('open')
         ->and($task->fresh()->is_completed)->toBeFalse()
+        ->and(ShiftHandover::query()->where('outgoing_shift_id', $shift->id)->exists())->toBeFalse();
+});
+
+test('clock out with stale task updates returns a clean error with no partial close', function () {
+    [$session, $shift, $task] = attendanceTaskUpdateOpenSessionFor($this->worker);
+    $before = $task->getRawOriginal();
+    $this->actingAs($this->worker)
+        ->post('/attendance/clock-out', [
+            'session_id' => $session->id,
+            'break_minutes' => 0,
+            'task_updates' => [
+                ['id' => $task->id, 'is_completed' => true, 'expected_version' => $task->version + 1],
+            ],
+            'handover' => [
+                'meds_completed' => true, 'shift_rating' => 'calm',
+                'handover_notes' => 'This stale task handover should not persist.', 'follow_up_needed' => false,
+            ],
+        ])
+        ->assertSessionHasErrors(['task_updates']);
+
+    expect($session->fresh()->status)->toBe('open')
+        ->and($task->fresh()->getRawOriginal())->toBe($before)
         ->and(ShiftHandover::query()->where('outgoing_shift_id', $shift->id)->exists())->toBeFalse();
 });

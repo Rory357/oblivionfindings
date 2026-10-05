@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
     formatDateForFilename,
     formatDateOnly,
+    formatDateTimeInZone,
     formatMonthYear,
     toDateInput,
     toDatetimeLocal,
@@ -38,5 +39,20 @@ describe('NZ date input and filename boundaries', () => {
         expect(toDateInput('not-a-date')).toBe('');
         expect(formatDateForFilename('not-a-date')).toBe('unknown-date');
         expect(formatMonthYear(null)).toBe('—');
+    });
+});
+
+describe('explicit pattern timezones', () => {
+    it('keeps overnight endpoints and their dates in the declared zone', () => {
+        expect(
+            formatDateTimeInZone('2026-10-12T09:00:00Z', 'Pacific/Auckland'),
+        ).toBe('12 Oct 2026, 10:00 pm');
+        expect(
+            formatDateTimeInZone('2026-10-12T17:00:00Z', 'Pacific/Auckland'),
+        ).toBe('13 Oct 2026, 6:00 am');
+        expect(formatDateTimeInZone('2026-10-12T09:00:00Z', 'UTC')).toBe(
+            '12 Oct 2026, 9:00 am',
+        );
+        expect(formatDateTimeInZone(null, 'UTC')).toBe('—');
     });
 });
