@@ -16,6 +16,7 @@ use App\Models\SafeguardingConcern;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\HealthSafety\HsEventClosureService;
+use App\Services\HealthSafety\HsEventService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -151,14 +152,42 @@ class SafeguardingCrossModuleTest extends TestCase
             'owner_user_id' => $user->id,
             'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
             'investigation_required' => false,
-            'worksafe_notifiable' => false,
-            'worksafe_decided_at' => now(),
-            'worksafe_decided_by_user_id' => $user->id,
-            'worksafe_decision_reason' => 'Assessed as not meeting the WorkSafe notification threshold.',
-            'worksafe_decision_source' => 'manual',
             'worksafe_status' => null,
         ])->save();
         $this->actingAs($user);
+        $this->assertFalse($hsEvent->fresh()->hasSignedWorksafeDecision());
+
+        try {
+            app(HsEventClosureService::class)->closeEvent(
+                $hsEvent->fresh(),
+                'H&S safeguarding work completed.',
+                $user,
+            );
+            $this->fail('H&S closure must require a signed WorkSafe decision.');
+        } catch (\DomainException $exception) {
+            $this->assertSame(
+                'Record the WorkSafe notifiability decision before closing this event.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertSame(HsEvent::STATUS_OPEN, $hsEvent->fresh()->status);
+        $this->assertNull($hsEvent->fresh()->closed_at);
+        $this->assertSame('monitoring', $concern->fresh()->status);
+        $this->assertDatabaseCount('safeguarding_terminal_transitions', 0);
+        $this->assertDatabaseMissing('audit_logs', [
+            'action' => 'healthSafety.event.closed',
+            'auditable_type' => $hsEvent->getMorphClass(),
+            'auditable_id' => $hsEvent->id,
+        ]);
+
+        $hsEvent = app(HsEventService::class)->recordWorksafeDecision(
+            $hsEvent->fresh(),
+            false,
+            'Assessed as not meeting the WorkSafe notification threshold.',
+            $user,
+        );
+        $this->assertTrue($hsEvent->hasSignedWorksafeDecision());
         $hsEvent = app(HsEventClosureService::class)->closeEvent(
             $hsEvent->fresh(),
             'H&S safeguarding work completed.',

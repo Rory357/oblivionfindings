@@ -293,11 +293,12 @@ class SiteProfilePayloadTest extends TestCase
         ServiceContext::factory()->count(3)->create(['site_id' => $this->site->id]);
 
         // Isolate the profile query budget from the global sidebar task badge.
-        // Production caches that cross-module aggregation for five minutes.
-        Cache::put("tasks.nav.{$this->admin->id}", [
+        // Match the middleware's complete task-navigation projection and 90-second TTL.
+        Cache::put("user:{$this->admin->id}:task-nav:v1", [
             'view' => true,
             'badge' => 0,
-        ], now()->addMinutes(5));
+            'badgeDegraded' => false,
+        ], 90);
 
         DB::enableQueryLog();
         $this->actingAs($this->admin)

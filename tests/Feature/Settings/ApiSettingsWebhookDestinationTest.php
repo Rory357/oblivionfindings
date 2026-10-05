@@ -136,7 +136,7 @@ it('re-authorizes a stored destination before sending a test request', function 
     $this->actingAs(apiSettingsWebhookAdmin())
         ->postJson(route('settings.api.webhooks.test', $id))
         ->assertUnprocessable()
-        ->assertJsonPath('message', 'Webhook test failed.')
+        ->assertJsonPath('message', 'Webhook destination is not approved.')
         ->assertJsonValidationErrors('url');
 
     $records = AppSetting::query()->where('key', 'settings.api.webhooks')->value('value');
@@ -145,10 +145,33 @@ it('re-authorizes a stored destination before sending a test request', function 
     Http::assertNothingSent();
 });
 
+it('rejects a destination that becomes private after preflight but before transport', function () {
+    $id = persistApiSettingsWebhook('https://rebind.example.test/webhook');
+    $resolver = bindApiSettingsWebhookDnsResolver([
+        'rebind.example.test' => [
+            ['93.184.216.34'],
+            ['127.0.0.1'],
+        ],
+    ]);
+    Http::fake();
+
+    $this->actingAs(apiSettingsWebhookAdmin())
+        ->postJson(route('settings.api.webhooks.test', $id))
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'Webhook test failed.')
+        ->assertJsonValidationErrors('url');
+
+    $records = AppSetting::query()->where('key', 'settings.api.webhooks')->value('value');
+    expect($records[0]['last_delivery'])->toBeNull()
+        ->and($resolver->calls)->toBe(['rebind.example.test' => 2]);
+    Http::assertNothingSent();
+});
+
 it('pins an approved destination and re-authorizes a same-host redirect', function () {
     $id = persistApiSettingsWebhook('https://hooks.example.test/start');
     $resolver = bindApiSettingsWebhookDnsResolver([
         'hooks.example.test' => [
+            ['93.184.216.34'],
             ['93.184.216.34'],
             ['93.184.216.34'],
         ],
@@ -167,13 +190,18 @@ it('pins an approved destination and re-authorizes a same-host redirect', functi
         && $request->url() === 'https://hooks.example.test/start');
     Http::assertSent(fn ($request) => $request->method() === 'POST'
         && $request->url() === 'https://hooks.example.test/finish');
-    expect($resolver->calls)->toBe(['hooks.example.test' => 2]);
+    $records = AppSetting::query()->where('key', 'settings.api.webhooks')->value('value');
+    expect($records[0]['last_delivery'])->not->toBeNull()
+        ->and($resolver->calls)->toBe(['hooks.example.test' => 3]);
 });
 
 it('fails closed before following a cross-host redirect', function () {
     $id = persistApiSettingsWebhook('https://hooks.example.test/start');
     $resolver = bindApiSettingsWebhookDnsResolver([
-        'hooks.example.test' => ['93.184.216.34'],
+        'hooks.example.test' => [
+            ['93.184.216.34'],
+            ['93.184.216.34'],
+        ],
     ]);
     Http::fake([
         'https://hooks.example.test/*' => Http::response('', 307, [
@@ -187,7 +215,9 @@ it('fails closed before following a cross-host redirect', function () {
         ->assertJsonPath('message', 'Webhook test failed.');
 
     Http::assertSentCount(1);
-    expect($resolver->calls)->toBe(['hooks.example.test' => 1]);
+    $records = AppSetting::query()->where('key', 'settings.api.webhooks')->value('value');
+    expect($records[0]['last_delivery'])->toBeNull()
+        ->and($resolver->calls)->toBe(['hooks.example.test' => 2]);
 });
 
 it('rejects loopback localhost even if it matches app.url', function () {
