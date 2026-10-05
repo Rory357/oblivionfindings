@@ -337,10 +337,17 @@ $author = \\App\\Models\\User::query()->where('email', 'admin@demo.test')->first
         await expect(
             page.getByRole('alertdialog', { name: 'Discard draft?' }),
         ).toBeVisible();
+        const discardResponse = page.waitForResponse(
+            (response) =>
+                /\/operations\/clients\/\d+\/daily-notes\/\d+$/.test(
+                    new URL(response.url()).pathname,
+                ) && response.request().method() === 'DELETE',
+        );
         await page
             .getByRole('alertdialog', { name: 'Discard draft?' })
             .getByRole('button', { name: 'Discard draft' })
             .click();
+        expect((await discardResponse).status()).toBe(303);
         await expect(page.getByTestId('client-daily-note-dialog')).toBeHidden();
         await expect(
             page.getByRole('button', { name: 'Resume draft' }),

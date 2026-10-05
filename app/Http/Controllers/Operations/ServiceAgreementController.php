@@ -134,7 +134,7 @@ class ServiceAgreementController extends Controller
             'daily_rate' => ['nullable', 'numeric', 'min:0'],
             'terms' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
-            'status' => ['nullable', 'string', 'in:draft,active,expired,cancelled'],
+            'status' => ['nullable', 'string', 'in:draft,expired,cancelled'],
             // NZ Funding Details
             'funding_type' => ['nullable', 'string', 'max:100'],
             'service_level' => ['nullable', 'string', 'max:100'],
@@ -344,15 +344,28 @@ class ServiceAgreementController extends Controller
             'funder_contact_phone' => ['nullable', 'string', 'max:50'],
         ]);
 
-        if (array_key_exists('client_id', $data)) {
-            $this->siteAccess->assertCanAccessClientId(
-                $auth,
-                (int) $data['client_id'],
-                ['reports.viewAny'],
-            );
-        }
+        $agreement = DB::transaction(function () use ($auth, $data, $agreement) {
+            $agreement = $this->accessibleAgreements($auth)->lockForUpdate()->findOrFail($agreement->getKey());
+            if (array_key_exists('client_id', $data)) {
+                $this->siteAccess->assertCanAccessClientId(
+                    $auth,
+                    (int) $data['client_id'],
+                    ['reports.viewAny'],
+                );
+            }
 
-        $agreement->update($data);
+            if (($data['status'] ?? null) === 'active') {
+                abort_unless($agreement->status === 'active', 422,
+                    'Use independent approval or the approved agreement resume workflow to become active.');
+                // An ordinary edit can retain an active status, but cannot activate
+                // a row whose current lifecycle state changed while the form was open.
+                unset($data['status']);
+            }
+
+            $agreement->update($data);
+
+            return $agreement;
+        });
 
         return redirect()->route('operations.service_agreements.show', $agreement)
             ->with('success', 'Service agreement updated.');
@@ -372,6 +385,12 @@ class ServiceAgreementController extends Controller
         $agreement = DB::transaction(function () use ($auth, $data, $serviceAgreement) {
             $agreement = $this->accessibleAgreements($auth)->lockForUpdate()->findOrFail($serviceAgreement);
             $fromStatus = $agreement->status;
+            if ($data['status'] === 'active') {
+                abort_if($fromStatus === 'pending_approval', 422, 'Pending service agreements must use independent approval before becoming active.');
+                abort_unless(in_array($fromStatus, ['suspended', 'under_review'], true)
+                    && $this->hasIndependentApproval($agreement), 422,
+                    'Only an independently approved service agreement can return to active.');
+            }
 
             // Record status change
             ServiceAgreementStatusChange::create([
@@ -382,10 +401,6 @@ class ServiceAgreementController extends Controller
                 'reason' => $data['reason'] ?? null,
                 'notes' => $data['notes'] ?? null,
             ]);
-
-            if ($data['status'] === 'active' && ! in_array($fromStatus, ['pending_approval', 'suspended', 'under_review'], true)) {
-                abort(422, 'Draft service agreements must be submitted and independently approved before becoming active.');
-            }
 
             // Update agreement
             $updates = ['status' => $data['status']];
@@ -449,6 +464,8 @@ class ServiceAgreementController extends Controller
         $agreement = DB::transaction(function () use ($auth, $request, $serviceAgreement) {
             $agreement = $this->accessibleAgreements($auth)->lockForUpdate()->findOrFail($serviceAgreement);
             abort_unless($agreement->status === 'pending_approval', 422, 'Only agreements pending approval can be approved.');
+            abort_unless($agreement->submitted_for_approval_by !== null && $agreement->submitted_for_approval_at !== null,
+                422, 'Service agreements must retain their original submission before independent approval.');
             abort_if(
                 $agreement->submitted_for_approval_by && (int) $agreement->submitted_for_approval_by === (int) $auth->id,
                 403,
@@ -651,6 +668,16 @@ class ServiceAgreementController extends Controller
         $rateModel->delete();
 
         return redirect()->back()->with('success', 'Rate deleted.');
+    }
+
+    private function hasIndependentApproval(ServiceAgreement $agreement): bool
+    {
+        return $agreement->submitted_for_approval_by !== null
+            && $agreement->submitted_for_approval_at !== null
+            && $agreement->approved_by !== null
+            && $agreement->approved_at !== null
+            && (int) $agreement->approved_by !== (int) $agreement->submitted_for_approval_by
+            && $agreement->approved_at->gte($agreement->submitted_for_approval_at);
     }
 
     private function accessibleAgreements(User $user): Builder

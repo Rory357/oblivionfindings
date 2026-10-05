@@ -19,7 +19,32 @@ it('keeps PHP and browser CI in bounded crash safe shards', function () {
         ->not->toContain('run: ./vendor/bin/pest', 'coverage: xdebug');
 
     expect(substr_count($testsWorkflow, 'suite: feature'))->toBe(8)
-        ->and(substr_count($testsWorkflow, 'shard_index:'))->toBe(9);
+        ->and(substr_count($testsWorkflow, 'shard_index:'))->toBe(10);
+
+    $tests = Yaml::parse($testsWorkflow);
+    $phpJob = $tests['jobs']['ci'] ?? [];
+    $phpSteps = collect($phpJob['steps'] ?? []);
+    $shards = $phpSteps->firstWhere('name', 'Crash-safe tests (${{ matrix.suite }} ${{ matrix.shard_index }}/${{ matrix.shard_count }})');
+    $release = $phpSteps->firstWhere('name', 'Pack stock and historical recovery release gates');
+    $expectedMatrix = [
+        ['suite' => 'foundation', 'shard_index' => 0, 'shard_count' => 1, 'batch_size' => 30],
+        ['suite' => 'emar-release', 'shard_index' => 0, 'shard_count' => 1, 'batch_size' => 1],
+    ];
+    foreach (range(0, 7) as $index) {
+        $expectedMatrix[] = ['suite' => 'feature', 'shard_index' => $index, 'shard_count' => 8, 'batch_size' => 12];
+    }
+
+    $phpunit = simplexml_load_file($root.'/phpunit.xml');
+    expect($phpJob['timeout-minutes'] ?? null)->toBe(180)
+        ->and($phpJob['strategy']['fail-fast'] ?? null)->toBeFalse()
+        ->and($phpJob['strategy']['matrix']['include'] ?? null)->toBe($expectedMatrix)
+        ->and($shards['if'] ?? null)->toBe("matrix.suite != 'emar-release'")
+        ->and($release['if'] ?? null)->toBe("matrix.suite == 'emar-release'")
+        ->and($release['run'] ?? '')->toStartWith('php vendor/bin/pest ')
+        ->toContain('tests/Feature/Emar/PackLedgerIntegrationTest.php')
+        ->toContain('tests/Feature/Emar/MedicationHistoricalRecoveryTest.php')
+        ->toContain('--log-junit storage/logs/emar-release-gates.xml')
+        ->and((string) $phpunit->xpath('/phpunit/php/ini[@name="memory_limit"]')[0]['value'])->toBe('1024M');
 
     expect($runner)
         ->toContain("'tests/Unit', 'tests/Integration', 'tests/Architecture'")

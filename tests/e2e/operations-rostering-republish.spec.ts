@@ -84,7 +84,14 @@ test.describe('operations rostering — republish flow', () => {
         await expect(page.getByText(/Changed/i).first()).toBeVisible();
         await expect(page.getByText(/Rostering/i).first()).toBeVisible();
 
+        const republishResponse = page.waitForResponse(
+            (response) =>
+                /\/operations\/rostering\/periods\/\d+\/republish$/.test(
+                    new URL(response.url()).pathname,
+                ) && response.request().method() === 'POST',
+        );
         await page.getByRole('button', { name: /Re-publish/i }).click();
+        expect((await republishResponse).status()).toBe(302);
         await expect(page).toHaveURL(/\/operations\/rostering(?:\?|$)/);
         await expect(publishPanel).toContainText(/published/i);
         await expect(publishPanel).not.toContainText(/changed after publish/i);

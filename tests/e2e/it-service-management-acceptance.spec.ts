@@ -520,7 +520,22 @@ test.describe('IT & Support end-to-end acceptance', () => {
                 `Delivery failed for ${manifest.emailTicket.reference}`,
             ),
         ).toBeVisible();
-        await expect(page.getByText('Mailbox rejected')).toBeVisible();
+        const failedDelivery = page
+            .getByRole('region', { name: 'Email delivery', exact: true })
+            .getByRole('article')
+            .filter({
+                hasText: `Delivery failed for ${manifest.emailTicket.reference}`,
+            });
+        await expect(
+            failedDelivery.getByText(
+                'Provider bounced: The provider rejected delivery. Review the recipient address before retrying.',
+                { exact: true },
+            ),
+        ).toBeVisible();
+        await expect(
+            failedDelivery.getByRole('button', { name: 'Retry delivery' }),
+        ).toBeVisible();
+        await expect(page.getByText('Mailbox rejected')).toHaveCount(0);
 
         await expectNoPageOverflow(page);
         expectNoConsoleErrors(errors);

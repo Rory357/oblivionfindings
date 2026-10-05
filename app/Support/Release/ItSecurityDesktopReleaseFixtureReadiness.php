@@ -794,7 +794,7 @@ final class ItSecurityDesktopReleaseFixtureReadiness
             && ConsentValidationService::isValidResidentLocationConsent($consent, $client)
             && $type->name === self::TRACKING_CONSENT_TYPE_NAME
             && $consent->decision_purpose === $type->purpose
-            && $assignment->tracking_purpose === 'Client personal safety tracking'
+            && $assignment->tracking_purpose === $consent->decision_purpose
             && $assignment->authority_basis === 'assignment_linked_client_consent'
             && $consentAssignments->count() === 1
             && (int) $consentAssignments->sole()->id === (int) $assignment->id
@@ -824,6 +824,11 @@ final class ItSecurityDesktopReleaseFixtureReadiness
             && $event->occurred_at !== null
             && $device->last_seen_at->equalTo($event->occurred_at)
             && $event->occurred_at->gte(now()->subDays($retentionDays))
+            && $assignment?->assigned_at !== null && $assignment?->collection_started_at !== null
+            && $assignment?->consent?->given_at !== null
+            && $event->occurred_at->gte($assignment->assigned_at)
+            && $event->occurred_at->gte($assignment->collection_started_at)
+            && $event->occurred_at->gte($assignment->consent->given_at)
             && $event->occurred_at->lte(now())
             && $event->received_at?->equalTo($event->occurred_at) === true
             && (int) $event->site_id === (int) $client->site_id

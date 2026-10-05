@@ -198,7 +198,7 @@ class QualificationMatchController extends Controller
         return StaffQualificationRequirement::query()
             ->whereHas('client', fn (Builder $clientQuery) => $clientQuery->whereIn('site_id', $siteIds))
             ->where(function (Builder $context): void {
-                $context->whereNull('service_context_id')
+                $context->whereNull($context->qualifyColumn('service_context_id'))
                     ->orWhereHas('serviceContext', function (Builder $serviceContext): void {
                         $serviceContext->whereNull('site_id')
                             ->orWhereExists(function ($clients): void {

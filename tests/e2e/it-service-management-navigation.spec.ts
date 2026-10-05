@@ -14,6 +14,9 @@ test.describe('IT & Support service management navigation', () => {
     test('keeps setup and service-delivery workspaces understandable on desktop', async ({
         page,
     }) => {
+        // This journey includes sign-in, setup panels, two wizards and a final
+        // service-desk navigation. Keep individual assertions bounded at 10s.
+        test.setTimeout(60_000);
         const errors = collectConsoleErrors(page);
 
         await page.goto('/it/setup');
@@ -156,6 +159,7 @@ test.describe('IT & Support service management navigation', () => {
         await sidebar
             .getByRole('link', { name: 'Service desk', exact: true })
             .click();
+        await expect(page).toHaveURL(/\/it(?:\?.*)?$/);
         await page.getByRole('tab', { name: /Service catalogue/ }).click();
 
         await expect(page).toHaveURL(/\/it\?.*tab=catalog/);

@@ -15,7 +15,9 @@ final class CsvCell
         if (in_array($first, ["\t", "\r", "\n"], true)) {
             return "'".$value;
         }
-        if (! is_numeric($trimmed) && in_array($first, ['=', '+', '-', '@'], true)) {
+        // Only unpadded numeric cells bypass the formula-prefix guard.
+        $plainNumber = $value === trim($value, " \t\r\n\v\f") && is_numeric($value);
+        if (! $plainNumber && in_array($first, ['=', '+', '-', '@'], true)) {
             return "'".$value;
         }
 

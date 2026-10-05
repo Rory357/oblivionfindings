@@ -138,6 +138,12 @@ class OperationalReportsTest extends TestCase
         $this->assertSame('-42.5', ReportExporter::csvCell(-42.5));
         $this->assertSame("'=2+3", ReportExporter::csvCell('=2+3'));
         $this->assertSame("' -42.5", ReportExporter::csvCell(' -42.5'));
+        foreach (['-42.50', '+641234', '-4.25e1'] as $number) {
+            $this->assertSame($number, ReportExporter::csvCell($number));
+        }
+        foreach (['-42.5 ', ' -1+2', "\t-42.5", "\n=2+3", " \r@SUM(A1)"] as $text) {
+            $this->assertSame("'".$text, ReportExporter::csvCell($text));
+        }
         $this->assertSame('0', ReportExporter::csvCell(0));
         $this->assertSame('', ReportExporter::csvCell(null));
         $this->assertNull(app(ReportFormula::class)->calculate('m1 / m2', ['m1' => 10, 'm2' => 0]));

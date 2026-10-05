@@ -68,6 +68,9 @@ async function openPublishDiff(page: Page) {
 }
 
 test.describe('operations rostering a11y smoke', () => {
+    // Seeded sign-in and governed redirects share one CI PHP worker. Reserve
+    // time for the full axe scan; keep its checks and assertion limits intact.
+    test.setTimeout(60_000);
     test.skip(!rosteringFlagsEnabled, rosteringFlagSkipReason);
     test.beforeEach(() => {
         resetRosteringReadinessFixtures();

@@ -170,7 +170,8 @@ class MedicationHistoricalRecoveryTest extends TestCase
         $this->assertSame('tablets', $entry->stock_evidence['unit']);
         $factsBefore = $entry->getRawOriginal();
         $this->settle($entry, closingQuantity: 99);
-        $this->postPaper($entry);
+        $preview = $this->actingAs($this->giver)->getJson($this->url($entry).'/reconciliation')->assertOk()->assertJsonPath('can_reconcile', true)->json();
+        $this->actingAs($this->giver)->post($this->url($entry).'/reconcile', ['preview_token' => $preview['preview_token'], 'accountable_confirmation' => true])->assertRedirect()->assertSessionHasNoErrors();
         $admin = ClientMedicationAdministration::sole();
         $this->assertSame('0.25', $admin->quantity_given);
         $this->assertSame('0.25 mg', $admin->dose_given);
@@ -181,7 +182,7 @@ class MedicationHistoricalRecoveryTest extends TestCase
         $this->assertSame('99.00', $this->stock->fresh()->on_hand);
         $this->assertSame('99.00', $this->lot->fresh()->quantity_remaining);
         $counts = [MedicationEvent::count(), DB::table('medication_idempotency_results')->count()];
-        $this->postPaper($entry);
+        $this->actingAs($this->giver)->post($this->url($entry).'/reconcile', ['preview_token' => $preview['preview_token'], 'accountable_confirmation' => true])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseCount('client_medication_administrations', 1);
         $this->assertDatabaseCount('medication_paper_postings', 1);
         $this->assertDatabaseCount('medication_stock_movements', 1);
@@ -720,7 +721,7 @@ class MedicationHistoricalRecoveryTest extends TestCase
     public function test_later_shorter_application_policy_does_not_rewrite_a_legitimate_retained_grant(): void
     {
         $grant = $this->expiredGrant();
-        $retainedPolicy = $grant->policy_snapshot;
+        $retainedPolicy = $grant->fresh()->policy_snapshot;
         $this->assertGreaterThanOrEqual(60, $retainedPolicy['max_minutes']);
         BreakGlassPolicy::updateApplicationPolicy(['default_minutes' => 30, 'max_minutes' => 30]);
         $this->assertSame(30, BreakGlassPolicy::current()->snapshot()['max_minutes']);

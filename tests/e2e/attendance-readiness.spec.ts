@@ -41,6 +41,9 @@ test.describe('attendance readiness workflows', () => {
     test('frontline worker can clock out cleanly with one atomic request', async ({
         page,
     }, testInfo) => {
+        // Allow the persisted clock-out and redirected My Day load to finish
+        // after fixture setup and sign-in on CI's single PHP worker.
+        test.setTimeout(60_000);
         const consoleErrors = collectConsoleErrors(page);
 
         await loginAsClockOutCleanWorker(page, testInfo);

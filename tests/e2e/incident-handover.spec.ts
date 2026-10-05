@@ -297,6 +297,21 @@ test.describe('desktop incident handover journeys', () => {
         );
         await postLaravel(
             page,
+            `/health-safety/events/${eventId}/worksafe/decision`,
+            {
+                notifiable: true,
+                reason: 'Synthetic review confirms the reported hospital admission meets the notification threshold.',
+                source: 'manual',
+            },
+        );
+        expect(
+            scalar<{ signed: boolean; decidedBy: number }>(`
+$event = \\App\\Models\\HsEvent::query()->findOrFail(${eventId});
+echo json_encode(['signed' => $event->hasSignedWorksafeDecision(), 'decidedBy' => $event->worksafe_decided_by_user_id], JSON_THROW_ON_ERROR);
+`),
+        ).toEqual({ signed: true, decidedBy: manifest.users.owner.id });
+        await postLaravel(
+            page,
             `/health-safety/events/${eventId}/worksafe/notify`,
             {
                 notified_at: new Date().toISOString(),
@@ -305,6 +320,12 @@ test.describe('desktop incident handover journeys', () => {
                 site_preserved: true,
             },
         );
+        expect(
+            scalar<{ notified: string; preservation: string }>(`
+$event = \\App\\Models\\HsEvent::query()->findOrFail(${eventId});
+echo json_encode(['notified' => $event->worksafe_status, 'preservation' => $event->worksafe_site_preservation_status], JSON_THROW_ON_ERROR);
+`),
+        ).toEqual({ notified: 'notified', preservation: 'active' });
         await postLaravel(
             page,
             `/health-safety/events/${eventId}/worksafe/acknowledge`,
