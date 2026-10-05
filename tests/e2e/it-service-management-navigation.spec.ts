@@ -80,7 +80,10 @@ test.describe('IT & Support service management navigation', () => {
         await expect(
             templateDialog.getByText('Evidence required'),
         ).toBeVisible();
-        await templateDialog.getByRole('button', { name: 'Cancel' }).click();
+        await templateDialog
+            .getByRole('button', { name: 'Close', exact: true })
+            .click();
+        await expect(templateDialog).toBeHidden();
         await page.getByRole('tab', { name: 'API', exact: true }).click();
         await expect(
             page.getByRole('heading', { name: 'API identities', level: 2 }),

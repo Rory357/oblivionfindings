@@ -90,7 +90,9 @@ test.describe('incident report recovery', () => {
         });
         await openScopedIncidentReport(page, manifest);
 
-        await expect(page.getByText('Not saved yet')).toBeVisible();
+        await expect(
+            page.getByText('Not saved yet', { exact: true }),
+        ).toBeVisible();
         await expect(
             page.getByText(
                 'Not saved yet. Keep this report open, reconnect, then retry.',

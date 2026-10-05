@@ -89,6 +89,9 @@ jobs:
         run: |
           cp .env.example .env
           php artisan key:generate
+          # Governed command journeys exercise the real signer. This key is
+          # private to this disposable job and is never printed or uploaded.
+          php -r '$keys = json_encode(["visual-ci" => base64_encode(random_bytes(SODIUM_CRYPTO_AUTH_KEYBYTES))], JSON_THROW_ON_ERROR); file_put_contents(".env", "\nMONITORING_SIGNING_KEY_ID=visual-ci\nMONITORING_SIGNING_KEYS=" . chr(39) . $keys . chr(39) . "\n", FILE_APPEND);'
 
       - name: Grant testUser global privileges
         run: |
@@ -96,6 +99,9 @@ jobs:
 
       - name: Run Fresh Migrations And Seeders
         env:
+          APP_ENV: ${{ matrix.project == 'chromium-desktop-visual' && 'testing' || 'local' }}
+          VISUAL_FROZEN_NOW: ${{ matrix.project == 'chromium-desktop-visual' && '2026-10-05T00:00:00Z' || '' }}
+          VISUAL_RANDOM_SEED: ${{ matrix.project == 'chromium-desktop-visual' && '20261005' || '' }}
           APP_URL: http://127.0.0.1:4173
           DB_CONNECTION: mysql
           DB_HOST: 127.0.0.1
@@ -108,11 +114,20 @@ jobs:
           MAIL_MAILER: array
           QUEUE_CONNECTION: sync
           SESSION_DRIVER: file
-        run: php artisan migrate:fresh --seed --force
+        run: |
+          if [[ "${{ matrix.project }}" == chromium-desktop-visual ]]; then
+            php tests/visual/artisan.php migrate:fresh --seed --force
+          else
+            php artisan migrate:fresh --seed --force
+          fi
 
       - name: Visual Regression (${{ matrix.project }})
         timeout-minutes: 50
         env:
+          APP_ENV: ${{ matrix.project == 'chromium-desktop-visual' && 'testing' || 'local' }}
+          VISUAL_FROZEN_NOW: ${{ matrix.project == 'chromium-desktop-visual' && '2026-10-05T00:00:00Z' || '' }}
+          VISUAL_RANDOM_SEED: ${{ matrix.project == 'chromium-desktop-visual' && '20261005' || '' }}
+          PLAYWRIGHT_SKIP_RESEED: ${{ matrix.project == 'chromium-desktop-visual' && 'true' || 'false' }}
           APP_URL: http://127.0.0.1:4173
           DB_CONNECTION: mysql
           DB_HOST: 127.0.0.1

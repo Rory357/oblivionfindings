@@ -316,7 +316,14 @@ $author = \\App\\Models\\User::query()->where('email', 'admin@demo.test')->first
         await page
             .getByTestId('daily-note-body')
             .fill('Updated detail ready for the next worker.');
+        const saveDraftResponse = page.waitForResponse(
+            (response) =>
+                /\/operations\/clients\/\d+\/daily-notes\/\d+$/.test(
+                    new URL(response.url()).pathname,
+                ) && response.request().method() === 'PUT',
+        );
         await page.getByRole('button', { name: 'Save Draft' }).click();
+        expect((await saveDraftResponse).status()).toBe(303);
         await expect(page.getByTestId('client-daily-note-dialog')).toBeHidden();
         await expect(
             page.getByText('Updated pool visit').first(),

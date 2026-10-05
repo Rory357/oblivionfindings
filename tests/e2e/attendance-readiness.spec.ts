@@ -56,7 +56,13 @@ test.describe('attendance readiness workflows', () => {
             }),
         ).toBeVisible();
 
+        const clockOutResponse = page.waitForResponse(
+            (response) =>
+                new URL(response.url()).pathname === '/attendance/clock-out' &&
+                response.request().method() === 'POST',
+        );
         await page.getByTestId('end-shift-submit').click();
+        expect((await clockOutResponse).status()).toBe(302);
 
         await expect(
             page.getByRole('button', { name: 'Clock in', exact: true }),

@@ -488,11 +488,15 @@ test.describe('IT & Support end-to-end acceptance', () => {
                 level: 1,
             }),
         ).toBeVisible();
+        await page
+            .getByRole('button', { name: 'Lifecycle', exact: true })
+            .click();
         for (const lifecycle of ['Joiner', 'Mover', 'Leaver']) {
             await expect(
                 page.getByText(lifecycle, { exact: true }),
             ).toBeVisible();
         }
+        await page.keyboard.press('Escape');
 
         await page.goto('/it/setup');
         await page.getByRole('tab', { name: 'API', exact: true }).click();

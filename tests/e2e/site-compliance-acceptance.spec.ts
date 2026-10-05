@@ -71,7 +71,7 @@ test('Site Compliance and feedback expose usable desktop management dialogs', as
     await expect(page.getByText('No compliance checks found.')).toBeVisible();
 
     const addCertification = page.getByRole('button', {
-        name: 'Add Certification',
+        name: 'Add certification',
         exact: true,
     });
     await expect(addCertification).toHaveCount(1);
@@ -87,7 +87,7 @@ test('Site Compliance and feedback expose usable desktop management dialogs', as
     await expect(certificationDialog).toHaveCount(0);
 
     const scheduleCheck = page.getByRole('button', {
-        name: 'Schedule Check',
+        name: 'Schedule check',
         exact: true,
     });
     await expect(scheduleCheck).toHaveCount(1);

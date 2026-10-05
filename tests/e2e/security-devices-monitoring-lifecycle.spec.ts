@@ -94,9 +94,15 @@ test.describe('Security & Devices native monitor lifecycle', () => {
             'Replaced by an approved definition',
         );
         await page.getByRole('button', { name: 'Deactivate monitor' }).click();
-        await expect(page.getByText(updatedName)).toHaveCount(0, {
+        await expect(deactivate).toBeHidden({ timeout: 30_000 });
+        await expect(
+            updatedRow.getByText('Paused', { exact: true }),
+        ).toBeVisible({
             timeout: 30_000,
         });
+        await expect(
+            updatedRow.getByRole('button', { name: 'Deactivate', exact: true }),
+        ).toHaveCount(0);
 
         expectNoConsoleErrors(errors);
     });

@@ -417,6 +417,20 @@ echo json_encode(['id' => \\App\\Models\\HsCorrectiveAction::query()->where('hs_
             `/health-safety/events/${eventId}/corrective-actions/${actionId}/close`,
         );
         await loginAsFixture(page, manifest.users.owner);
+        await postLaravel(
+            page,
+            `/health-safety/events/${eventId}/worksafe/site-preservation/release`,
+            {
+                released_at: new Date().toISOString(),
+                evidence_reference:
+                    'WS-E2E-9401: synthetic WorkSafe release recorded.',
+            },
+        );
+        expect(
+            scalar<{ state: string }>(`
+echo json_encode(['state' => \\App\\Models\\HsEvent::query()->findOrFail(${eventId})->worksafe_site_preservation_status], JSON_THROW_ON_ERROR);
+`).state,
+        ).toBe('released');
         await postLaravel(page, `/health-safety/events/${eventId}/close`, {
             closure_summary:
                 'WorkSafe acknowledged, investigation complete and corrective action independently verified.',
