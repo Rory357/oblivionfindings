@@ -25,6 +25,7 @@ use App\Services\Medication\ControlledMedicationTransportWitnessService;
 use App\Services\Medication\Followups\MedicationFollowupService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
+use App\Services\Medication\Stock\MedicationStockService;
 use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Support\Medication\MedicationStockQuantity as Quantity;
@@ -126,6 +127,9 @@ final class ControlledRegisterService
                     }
                     // A new historical count needs retained stock; a recorded recount
                     // remains replayable when that recount cleared the stock to zero.
+                    if ($action === 'destruction') {
+                        abort_unless(app(MedicationStockService::class)->canDestroyRetainedSupply($medication, $stock, lock: true), 404);
+                    }
                     if ($action === 'count' && ! $medication->isActive()) {
                         abort_unless($stock !== null && Quantity::greaterThan($stock->on_hand, 0), 404);
                     }
@@ -165,7 +169,7 @@ final class ControlledRegisterService
                 },
                 authorizationUserIds: array_values(array_filter([(int) $actor->id, (int) ($input['witnessed_by'] ?? 0), (int) ($input['second_witness_id'] ?? 0), (int) ($input['witness_id'] ?? 0)])),
                 authorizationEffectiveAt: now(),
-                // Historical maintenance cannot create a dose or stock movement; only a witnessed count of retained positive stock is allowed.
+                // Historical maintenance retains its original evidence; new ceased-order disposal requires actual retained packs above.
                 currentOnly: ! in_array($action, ['count', 'void', 'resolve', 'loss_note', 'loss_notify', 'loss_close', 'destruction_receipt', 'destruction_void', 'class_review', 'override_signoff'], true),
             );
         } catch (\Throwable $exception) {
@@ -244,8 +248,8 @@ final class ControlledRegisterService
             'first_count' => $first, 'recount' => Quantity::equals($first, $expected) ? null : $actual,
             'count_due_at' => $this->policy->countStatus($medication, now(), $stock->last_counted_at)['due_at'] ?? null,
             'notes' => $input['notes'] ?? null,
-        ]);
-        $stock->update(['last_counted_at' => now()]);
+        ], $input);
+        $stock->forceFill(['last_counted_at' => now()])->saveFromPackLedger();
         $discrepancy = null;
         if ($differs) {
             $discrepancy = ClientControlledDrugDiscrepancy::create([
@@ -275,7 +279,7 @@ final class ControlledRegisterService
         }
         $type = $input['movement_type'] ?? (($input['direction'] ?? '') === 'in' ? 'coming_back' : 'going_out');
         $this->choice($type, ['going_out', 'coming_back', 'breakage', 'spillage'], 'movement_type');
-        $quantity = $this->positive($input, 'quantity');
+        $quantity = $type === 'coming_back' ? $this->nonnegative($input, 'quantity') : $this->positive($input, 'quantity');
         $after = $type === 'coming_back' ? Quantity::add($stock->on_hand, $quantity) : Quantity::subtract($stock->on_hand, $quantity);
         if (! Quantity::equals($this->nonnegative($input, 'actual_balance'), $after)) {
             throw ValidationException::withMessages(['actual_balance' => 'The counted balance does not match. Count again before saving this movement.']);
@@ -283,7 +287,7 @@ final class ControlledRegisterService
         if (in_array($type, ['breakage', 'spillage'], true)) {
             $this->requiredText($input, 'notes');
         }
-        $entry = $this->write($actor, $medication, $stock, $witness, $type === 'coming_back' ? 'transfer_in' : 'transfer_out', $quantity, $after, str_replace('_', ' ', $type), ['notes' => $input['notes'] ?? null]);
+        $entry = $this->write($actor, $medication, $stock, $witness, $type === 'coming_back' ? 'transfer_in' : 'transfer_out', $quantity, $after, str_replace('_', ' ', $type), ['notes' => $input['notes'] ?? null], $input);
 
         return ['message' => 'Witnessed movement saved.', 'entry_id' => $entry->id];
     }
@@ -299,13 +303,23 @@ final class ControlledRegisterService
             throw ValidationException::withMessages(['target_id' => 'Administration, waste and destruction entries remain as evidence. Correct the clinical record through its correction workflow and reconcile physical stock through a new witnessed count.']);
         }
         abort_if(ClientControlledDrugEntry::query()->where('reverses_entry_id', $original->id)->exists(), 409, 'This entry was already voided.');
+        $packService = app(MedicationStockService::class);
+        $correctionLines = null;
+        if ($stock->lots_started_at !== null && isset($input['correction_quantity'])) {
+            $correctionLines = $packService->validateCorrectionLines($stock, $input['correction_pack_lines'] ?? [], $input['correction_quantity']);
+        }
         $delta = Quantity::subtract($original->on_hand_after, $original->on_hand_before);
-        $reversal = $this->write($actor, $medication, $stock, $witness, 'reversal', Quantity::absoluteDifference($original->on_hand_after, $original->on_hand_before), Quantity::subtract($stock->on_hand, $delta), $reason, ['reverses_entry_id' => $original->id]);
+        $reversal = $this->write($actor, $medication, $stock, $witness, 'reversal', Quantity::absoluteDifference($original->on_hand_after, $original->on_hand_before), Quantity::subtract($stock->on_hand, $delta), $reason, ['reverses_entry_id' => $original->id], $input);
         if (isset($input['correction_quantity'])) {
             $quantity = $this->positive($input, 'correction_quantity');
             $this->choice($input['correction_direction'] ?? '', ['in', 'out'], 'correction_direction');
             $after = $input['correction_direction'] === 'in' ? Quantity::add($stock->on_hand, $quantity) : Quantity::subtract($stock->on_hand, $quantity);
-            $this->write($actor, $medication, $stock, $witness, 'correction', $quantity, $after, $reason, ['source_type' => 'entry_correction', 'source_id' => $original->id]);
+            $correctionInput = $input;
+            if ($correctionLines !== null) {
+                // Only our preceding retained reversal can advance these locked revisions.
+                $correctionInput['pack_lines'] = $packService->revisedCorrectionLines($stock, $correctionLines);
+            }
+            $this->write($actor, $medication, $stock, $witness, 'correction', $quantity, $after, $reason, ['source_type' => 'entry_correction', 'source_id' => $original->id], $correctionInput);
         }
         $this->event($actor, $medication, 'entry', $original->id, 'void', ['reason' => $reason, 'reversal_id' => $reversal->id, 'witnessed_by' => $witness->id]);
 
@@ -328,14 +342,14 @@ final class ControlledRegisterService
             if (! Quantity::equals($actual, $target)) {
                 throw ValidationException::withMessages(['actual_balance' => 'This recount does not reconcile the original difference and subsequent register movements.']);
             }
-            $this->write($actor, $medication, $stock, $witness, 'reconciliation', Quantity::absoluteDifference($actual, $stock->on_hand), $actual, $notes, ['source_type' => 'discrepancy', 'source_id' => $d->id]);
+            $this->write($actor, $medication, $stock, $witness, 'reconciliation', Quantity::absoluteDifference($actual, $stock->on_hand), $actual, $notes, ['source_type' => 'discrepancy', 'source_id' => $d->id], $input);
         } elseif ($outcome === 'found') {
             $quantity = $this->positive($input, 'quantity');
             if (! Quantity::greaterThan($d->on_hand_before, $d->on_hand_after)
                 || ! Quantity::equals($quantity, Quantity::absoluteDifference($d->on_hand_before, $d->on_hand_after))) {
                 throw ValidationException::withMessages(['quantity' => 'The found quantity must reconcile this discrepancy’s recorded shortfall.']);
             }
-            $this->write($actor, $medication, $stock, $witness, 'reconciliation', $quantity, Quantity::add($stock->on_hand, $quantity), $notes, ['source_type' => 'discrepancy', 'source_id' => $d->id]);
+            $this->write($actor, $medication, $stock, $witness, 'reconciliation', $quantity, Quantity::add($stock->on_hand, $quantity), $notes, ['source_type' => 'discrepancy', 'source_id' => $d->id], $input);
         } elseif ($outcome === 'recording') {
             $target = Quantity::subtract($stock->on_hand, $d->difference);
             $void = $input;
@@ -350,7 +364,7 @@ final class ControlledRegisterService
                 throw ValidationException::withMessages(['outcome' => 'This discrepancy is not a stock shortfall.']);
             }
             $quantity = Quantity::absoluteDifference($d->on_hand_before, $d->on_hand_after);
-            $lossEntry = $this->write($actor, $medication, $stock, $witness, 'loss', $quantity, $stock->on_hand, $notes, ['source_type' => 'discrepancy', 'source_id' => $d->id]);
+            $lossEntry = $this->write($actor, $medication, $stock, $witness, 'loss', $quantity, $stock->on_hand, $notes, ['source_type' => 'discrepancy', 'source_id' => $d->id], $input);
             $this->createLoss($actor, $medication, $quantity, $notes, $this->requiredText($input, 'immediate_action_taken'), $lossEntry->id, (bool) ($input['suspected_theft'] ?? false));
         }
         $d->update(['status' => $outcome === 'escalate' ? 'under_review' : 'closed', 'resolution_outcome' => $outcome,
@@ -372,7 +386,7 @@ final class ControlledRegisterService
         $quantity = $this->positive($input, 'quantity');
         $notes = $this->requiredText($input, 'notes');
         $immediate = $this->requiredText($input, 'immediate_action_taken');
-        $entry = $this->write($actor, $medication, $stock, $witness, 'loss', $quantity, Quantity::subtract($stock->on_hand, $quantity), $notes);
+        $entry = $this->write($actor, $medication, $stock, $witness, 'loss', $quantity, Quantity::subtract($stock->on_hand, $quantity), $notes, [], $input);
         $loss = $this->createLoss($actor, $medication, $quantity, $notes, $immediate, $entry->id, (bool) ($input['suspected_theft'] ?? false));
         $loss->update(['accountable_officer_name' => $input['accountable_officer_name'] ?? null]);
         if (isset($input['discovered_at'])) {
@@ -457,7 +471,7 @@ final class ControlledRegisterService
             abort_unless($second instanceof User, 422);
         }
         $quantity = $this->positive($input, 'quantity');
-        $entry = $this->write($actor, $medication, $stock, $witness, 'disposal', $quantity, Quantity::subtract($stock->on_hand, $quantity), $input['reason'], ['second_witness_id' => $second?->id, 'notes' => $input['notes'] ?? null]);
+        $entry = $this->write($actor, $medication, $stock, $witness, 'disposal', $quantity, Quantity::subtract($stock->on_hand, $quantity), $input['reason'], ['second_witness_id' => $second?->id, 'notes' => $input['notes'] ?? null], $input, false);
         $destruction = MedicationDestruction::create([
             'client_id' => $medication->client_id, 'client_medication_id' => $medication->id, 'site_id' => $medication->client->site_id,
             'medication_name' => $medication->name, 'form' => $medication->form, 'strength' => $medication->dosage,
@@ -468,6 +482,7 @@ final class ControlledRegisterService
             'witness_1_id' => $witness->id, 'witness_2_id' => $second?->id, 'destroyed_at' => now(),
             'notes' => $input['notes'] ?? null, 'register_entry_id' => $entry->id,
         ]);
+        app(MedicationStockService::class)->controlledTransition($stock, $actor, $entry, [...$input, 'destruction_id' => $destruction->id]);
         if (isset($input['photo_upload'])) {
             // A transaction retry reuses this request's path, rather than leaving an orphan from the failed attempt.
             $name = $actor->id.'-'.$input['client_request_uuid'].'.'.$input['photo_upload']->extension();
@@ -606,10 +621,16 @@ final class ControlledRegisterService
         return ['message' => 'Witness override update saved.', 'target_id' => $row->id];
     }
 
-    private function write(User $actor, ClientMedication $medication, ClientMedicationStock $stock, User $witness, string $type, string $quantity, string $after, string $reason, array $extra = []): ClientControlledDrugEntry
+    private function write(User $actor, ClientMedication $medication, ClientMedicationStock $stock, User $witness, string $type, string $quantity, string $after, string $reason, array $extra = [], array $packInput = [], bool $settlePacks = true): ClientControlledDrugEntry
     {
         if (! Quantity::lessThanOrEqual('0', $after)) {
             throw ValidationException::withMessages(['quantity' => 'This movement would leave a negative balance. Review the register.']);
+        }
+        try {
+            $quantity = Quantity::normalizeMovement($quantity);
+            $after = Quantity::normalizeMovement($after);
+        } catch (\InvalidArgumentException $error) {
+            throw ValidationException::withMessages(['quantity' => $error->getMessage()]);
         }
         $entry = ClientControlledDrugEntry::create([
             'client_id' => $medication->client_id, 'client_medication_id' => $medication->id,
@@ -617,7 +638,10 @@ final class ControlledRegisterService
             'unit' => $stock->unit, 'on_hand_before' => $stock->on_hand, 'on_hand_after' => $after,
             'reason' => $reason, 'recorded_by' => $actor->id, 'witnessed_by' => $witness->id, 'recorded_at' => now(), ...$extra,
         ]);
-        $stock->update(['on_hand' => $after]);
+        $stock->forceFill(['on_hand' => $after])->saveFromPackLedger();
+        if ($settlePacks && $type !== 'receipt') {
+            app(MedicationStockService::class)->controlledTransition($stock, $actor, $entry, $packInput);
+        }
         AuditLogger::logOrFail('medications.controlled.entry.record', $entry, ['actor_id' => $actor->id, 'witnessed_by' => $witness->id, 'source' => 'P07', 'witness_method' => WitnessPinService::METHOD, 'on_hand_after' => $after]);
 
         return $entry;
@@ -677,7 +701,11 @@ final class ControlledRegisterService
         if (! isset($input[$key]) || ! is_numeric($input[$key])) {
             throw ValidationException::withMessages([$key => 'Enter the counted quantity.']);
         }
-        $value = Quantity::normalizeMovement($input[$key]);
+        try {
+            $value = Quantity::normalizeMovement($input[$key]);
+        } catch (\InvalidArgumentException $error) {
+            throw ValidationException::withMessages([$key => $error->getMessage()]);
+        }
         if (! Quantity::lessThanOrEqual('0', $value)) {
             throw ValidationException::withMessages([$key => 'Enter zero or more.']);
         }

@@ -21,11 +21,14 @@ import {
 export function EmarHubRail({
     counts,
     alerts,
+    scope,
 }: {
     /** Optional per-view counters, keyed by view key. */
     counts?: Partial<Record<string, number>>;
     /** Per-view counters in the critical pair (shown only when above 0). */
     alerts?: Partial<Record<string, number>>;
+    /** Current picker values, including a selection whose request is still loading. */
+    scope?: { site_id: number | null; client_id: number | null };
 }) {
     const page = usePage<{ auth?: { can?: EmarNavigationPermissions } }>();
     const match = emarHubForUrl(page.url);
@@ -47,8 +50,17 @@ export function EmarHubRail({
             value={match.view.key}
             onSelect={(key) => {
                 const target = items.find((item) => item.key === key);
-                if (target && key !== match.view.key)
-                    router.visit(emarScopedHref(target.href, page.url));
+                if (target && key !== match.view.key) {
+                    const context = new URL(page.url, 'https://emar.invalid');
+                    if (scope) {
+                        for (const [name, value] of Object.entries(scope)) {
+                            if (value !== null)
+                                context.searchParams.set(name, String(value));
+                            else context.searchParams.delete(name);
+                        }
+                    }
+                    router.visit(emarScopedHref(target.href, context.href));
+                }
             }}
             items={items.map((item) => {
                 const alert = alerts?.[item.key];

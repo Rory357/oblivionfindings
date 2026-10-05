@@ -381,6 +381,13 @@ export const EMAR_HUBS: EmarHub[] = [
                 visible: all(view, stockUpdate),
             },
             {
+                key: 'packs',
+                label: 'Packs & counts',
+                href: '/emar/stock/packs',
+                icon: Package,
+                visible: all(view, stockUpdate),
+            },
+            {
                 key: 'discrepancies',
                 label: 'Discrepancies',
                 href: '/emar/controlled?view=discrepancies',

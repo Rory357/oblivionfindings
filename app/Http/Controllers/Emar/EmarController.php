@@ -59,6 +59,7 @@ use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Medication\RoundTemplateCatalogue;
 use App\Services\Medication\Settings\MedicationSettingsStore;
+use App\Services\Medication\Stock\MedicationStockService;
 use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationIncidentIntegrationService;
@@ -6342,6 +6343,10 @@ class EmarController extends Controller
             'medication_name' => 'required|string|max:255',
             'form' => 'nullable|string|max:255',
             'strength' => 'nullable|string|max:255',
+            'pack_lines' => ['nullable', 'array', 'max:100'],
+            'pack_lines.*.lot_id' => ['required', 'integer', 'min:1'],
+            'pack_lines.*.revision' => ['required', 'integer', 'min:0'],
+            'pack_lines.*.quantity' => ['required', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0.01', MedicationStockQuantity::DECIMAL_10_2_MAX_RULE],
             'quantity' => ['required', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0.01', MedicationStockQuantity::DECIMAL_10_2_MAX_RULE],
             'unit' => 'required|string|max:50',
             'batch_number' => 'nullable|string|max:255',
@@ -6549,6 +6554,7 @@ class EmarController extends Controller
             $payload['destroyed_by'] = $actor->id;
             $payload['destroyed_at'] = now();
             unset(
+                $payload['pack_lines'],
                 $payload['witness_1_credential'],
                 $payload['witness_2_credential'],
                 $payload['denaturing_confirmed'],
@@ -6569,8 +6575,8 @@ class EmarController extends Controller
                 ]);
             }
 
-            $stock->rejectScalarWrite('quantity');
-            $before = MedicationStockQuantity::normalize($stock->on_hand ?? 0);
+            $packTracked = $stock->lots_started_at !== null;
+            $before = $packTracked ? app(MedicationStockService::class)->physicalQuantity($stock) : MedicationStockQuantity::normalize($stock->on_hand ?? 0);
             $qty = $payload['quantity'];
 
             if (MedicationStockQuantity::greaterThan($qty, $before)) {
@@ -6585,9 +6591,16 @@ class EmarController extends Controller
             $destruction = MedicationDestruction::create($payload);
             $registerEntry = null;
 
-            $stock->on_hand = $after;
-            $stock->last_counted_at = now();
-            $stock->save();
+            if ($packTracked) {
+                abort_if($medication->controlled_drug, 422, 'Use the canonical witnessed controlled pack destruction.');
+                app(MedicationStockService::class)->removeForDestruction($stock, $actor, $destruction,
+                    $validated['pack_lines'] ?? [], $validated['client_request_uuid'] ?? (string) Str::uuid());
+                $after = $stock->availableQuantity();
+            } else {
+                $stock->on_hand = $after;
+                $stock->last_counted_at = now();
+                $stock->save();
+            }
 
             if (! empty($payload['is_controlled_drug'])) {
                 $registerEntry = ClientControlledDrugEntry::create([
@@ -7205,6 +7218,15 @@ class EmarController extends Controller
             ) use ($request, $actor) {
                 $validated = $request->validate([
                     'client_medication_id' => 'required|integer|min:1',
+                    'packs' => ['nullable', 'array', 'min:1', 'max:25'],
+                    'packs.*.quantity' => ['required', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0.01', MedicationStockQuantity::DECIMAL_10_2_MAX_RULE],
+                    'packs.*.batch_number' => ['nullable', 'string', 'max:100'],
+                    'packs.*.batch_not_printed' => ['required', 'boolean'],
+                    'packs.*.expiry_month' => ['nullable', 'string', 'max:7'],
+                    'packs.*.expiry_not_printed' => ['required', 'boolean'],
+                    'packs.*.short_expiry_reason' => ['nullable', 'string', 'max:2000'],
+                    'delivery_outcome' => ['nullable', 'in:still_to_come,closed_short'],
+                    'closure_reason' => ['nullable', 'string', 'max:2000'],
                     'quantity_received' => ['required', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0.01', MedicationStockQuantity::DECIMAL_10_2_MAX_RULE],
                     'on_hand_before' => ['required', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0', MedicationStockQuantity::DECIMAL_12_2_MAX_RULE],
                     'on_hand_after' => ['required', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0', MedicationStockQuantity::DECIMAL_12_2_MAX_RULE],
@@ -7231,6 +7253,9 @@ class EmarController extends Controller
                     'client_medication_id' => (int) $medication->id,
                     'pharmacy_order_id' => (int) $lockedOrder->id,
                     'quantity_received' => $quantityReceived,
+                    'packs' => $validated['packs'] ?? null,
+                    'delivery_outcome' => $validated['delivery_outcome'] ?? null,
+                    'closure_reason' => $validated['closure_reason'] ?? null,
                     'on_hand_before' => $onHandBefore,
                     'on_hand_after' => $onHandAfter,
                     'witnessed_by' => (int) $validated['witnessed_by'],
@@ -7320,26 +7345,17 @@ class EmarController extends Controller
                     'witnessed_by' => $witness->id,
                 ]);
 
-                $this->mergeDeliveredBatch(
-                    $stock,
-                    $lockedOrder->batch_number,
-                    $lockedOrder->batch_expiry,
-                    $authoritativeBefore,
-                );
-                $stock->forceFill([
-                    'on_hand' => $expectedAfter,
-                    'supplier_name' => $lockedOrder->pharmacy_name,
-                    'last_counted_at' => now(),
-                ])->save();
-
-                $lockedOrder->forceFill([
-                    'status' => 'delivered',
-                    'delivered_at' => now(),
-                    'received_by' => $actor->id,
-                    'quantity_received' => $quantityReceived,
-                    'delivery_notes' => $validated['delivery_notes'] ?? null,
-                ])->save();
-
+                if ($stock->lots_started_at !== null) {
+                    $stock->forceFill(['on_hand' => $expectedAfter, 'supplier_name' => $lockedOrder->pharmacy_name])->saveFromPackLedger();
+                    app(MedicationStockService::class)->controlledDeliveryAfterRegister($stock, $lockedActor,
+                        [...$validated, 'request_uuid' => $validated['client_request_uuid'], 'packs' => $validated['packs'] ?? [],
+                            'source' => 'pharmacy', 'source_reference' => 'Pharmacy order '.$lockedOrder->id], $entry, $lockedOrder);
+                } else {
+                    $this->mergeDeliveredBatch($stock, $lockedOrder->batch_number, $lockedOrder->batch_expiry, $authoritativeBefore);
+                    $stock->forceFill(['on_hand' => $expectedAfter, 'supplier_name' => $lockedOrder->pharmacy_name, 'last_counted_at' => now()])->save();
+                    $lockedOrder->forceFill(['status' => 'delivered', 'delivered_at' => now(), 'received_by' => $actor->id,
+                        'quantity_received' => $quantityReceived, 'delivery_notes' => $validated['delivery_notes'] ?? null])->save();
+                }
                 AuditLogger::logOrFail('medications.controlled.pharmacy_delivery.receive', $entry, [
                     'actor_id' => $actor->id,
                     'client_id' => $client->id,
@@ -7347,6 +7363,9 @@ class EmarController extends Controller
                     'pharmacy_order_id' => $lockedOrder->id,
                     'stock_id' => $stock->id,
                     'quantity_received' => $quantityReceived,
+                    'packs' => $validated['packs'] ?? null,
+                    'delivery_outcome' => $validated['delivery_outcome'] ?? null,
+                    'closure_reason' => $validated['closure_reason'] ?? null,
                     'on_hand_before' => $authoritativeBefore,
                     'on_hand_after' => $expectedAfter,
                     'witnessed_by' => $witness->id,

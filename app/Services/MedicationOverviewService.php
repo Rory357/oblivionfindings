@@ -768,17 +768,17 @@ class MedicationOverviewService
                 ->whereIn('client_id', $this->allowedClientIds())
                 ->when(! $this->includeControlled, fn ($query) => $query->where('controlled_drug', false)),
         )
-            ->where(function ($q) {
-                $q->whereColumn('on_hand', '<=', 'reorder_level')
-                    ->orWhere('expiry_date', '<=', $this->workerNow()->addDays(30)->toDateString());
-            })
+            ->where(fn ($q) => $q->where(fn ($low) => $low->lowStock())
+                ->orWhere(fn ($expired) => $expired->expired())->orWhere(fn ($soon) => $soon->expiringSoon()))
             ->with('medication:id,client_id,name,controlled_drug', 'medication.client:id,first_name,last_name')
             ->limit(12)
             ->get()
             ->map(function ($stock) {
-                $expiryDate = $stock->expiry_date?->toDateString();
-                $expired = $expiryDate !== null && $expiryDate < $this->workerNow()->toDateString();
-                $expiring = $expiryDate !== null && ! $expired && $expiryDate <= $this->workerNow()->addDays(30)->toDateString();
+                $expiredPack = $stock->packExpiries(true)->sortBy('date')->first();
+                $expiringPack = $stock->packExpiries(false)->sortBy('date')->first();
+                $expiry = ($expiredPack ?? $expiringPack)['date'] ?? null;
+                $expired = $expiredPack !== null;
+                $expiring = ! $expired && $expiringPack !== null;
 
                 return [
                     'id' => 'stock-'.$stock->id,
@@ -791,11 +791,11 @@ class MedicationOverviewService
                     'is_controlled' => (bool) $stock->medication?->controlled_drug,
                     'title' => ($stock->medication->name ?? 'Stock').' — '.($expired ? 'expired stock' : ($expiring ? 'expiring soon' : 'low stock')),
                     'status' => $expired ? 'Expired' : ($expiring ? 'Expiring' : 'Low stock'),
-                    'summary' => 'On hand '.MedicationStockQuantity::display($stock->on_hand ?? 0).($stock->unit ? ' '.$stock->unit : '')
-                        .($stock->expiry_date ? ' · expires '.$stock->expiry_date->format('j M') : ''),
+                    'summary' => 'On hand '.MedicationStockQuantity::display($stock->usableQuantity() ?? 0).($stock->unit ? ' '.$stock->unit : '')
+                        .($expiry ? ' · expires '.$expiry->format('j M') : ''),
                     'action' => 'Order',
                     'action_type' => 'stock',
-                    'opened_at' => optional($stock->expiry_date)->toIso8601String(),
+                    'opened_at' => $expiry?->toIso8601String(),
                 ];
             });
     }

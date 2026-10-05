@@ -12,7 +12,7 @@ class MedicationStockMovement extends Model
 
     protected function casts(): array
     {
-        return ['quantity' => 'decimal:2', 'balance_before' => 'decimal:2', 'balance_after' => 'decimal:2', 'recorded_at' => 'datetime'];
+        return ['quantity' => 'decimal:2', 'balance_before' => 'decimal:2', 'balance_after' => 'decimal:2', 'recorded_at' => 'datetime', 'evidence' => 'array'];
     }
 
     protected static function booted(): void
@@ -29,6 +29,11 @@ class MedicationStockMovement extends Model
     public function recordedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recorded_by');
+    }
+
+    public function reversal()
+    {
+        return $this->hasOne(self::class, 'reverses_movement_id');
     }
 
     public function returns()

@@ -16,6 +16,9 @@ use App\Models\User;
 use App\Services\MarScheduleService;
 use App\Services\Medication\DoseSlots\DoseSlotGenerator;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
+use App\Services\Medication\Downtime\HistoricalPaperContext;
+use App\Services\Medication\Downtime\PaperAdministrationWriter;
+use App\Services\Medication\Downtime\ReviewedPaperAuthority;
 use App\Services\MedicationRuleService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
@@ -57,6 +60,8 @@ class MedicationScopeDecisionService
         Closure $callback,
         ?Closure $scopedInputResolver = null,
         array $authorizationUserIds = [],
+        ?ReviewedPaperAuthority $reviewedPaper = null,
+        ?HistoricalPaperContext $historicalPaper = null,
     ): mixed {
         return DB::transaction(function () use (
             $performer,
@@ -69,6 +74,8 @@ class MedicationScopeDecisionService
             $callback,
             $scopedInputResolver,
             $authorizationUserIds,
+            $reviewedPaper,
+            $historicalPaper,
         ) {
             abort_unless($performer->canDo('medications.administer.record'), 403);
 
@@ -158,6 +165,10 @@ class MedicationScopeDecisionService
                 }
             }
             $this->notFoundUnless($actionAt->lessThanOrEqualTo(now()->addMinute()));
+            if ($historicalPaper !== null) {
+                $historicalPaper->assertBinding($client, $medication, (int) $performer->id, app(PaperAdministrationWriter::class)->canonicalData($historicalPaper->entry));
+                abort_unless($historicalPaper->entry->given_at->equalTo($actionAt) && $submittedRound === null && $scopedInputResolver === null, 409);
+            }
 
             // Freeze every performer/witness presence Shift as one ascending
             // set before resolving the selected performer Shift and before the
@@ -176,6 +187,7 @@ class MedicationScopeDecisionService
                 $this->clientSiteId($client),
                 $actionAt,
                 $submittedShiftId !== null ? [$submittedShiftId] : [],
+                historical: $historicalPaper !== null,
             );
 
             if ($roundSnapshot === null) {
@@ -187,12 +199,9 @@ class MedicationScopeDecisionService
             }
             $this->assertMedicationIsActiveFor($medication, $scheduledFor ?? $actionAt);
 
-            [$shift, $breakGlass] = $this->resolveClientAuthority(
-                $performer,
-                $client,
-                $actionAt,
-                $submittedShiftId,
-            );
+            [$shift, $breakGlass] = $reviewedPaper === null ? $this->resolveClientAuthority(
+                $performer, $client, $actionAt, $submittedShiftId,
+            ) : [null, null];
 
             // EnhancedMar re-enters this exact rule-set lock inside the same
             // transaction. Freeze the complete current set before the outer
@@ -210,6 +219,12 @@ class MedicationScopeDecisionService
                 $authorizationUserIds,
                 $lockedPresenceShifts,
             );
+
+            if ($reviewedPaper !== null) {
+                abort_unless($submittedRound === null && $submittedShiftId === null && $scopedInputResolver === null, 409);
+                $users = $this->medicationGovernance->lockControlledWitnessUsers([(int) $performer->id, ...$authorizationUserIds]);
+                $reviewedPaper->assertCurrent($client, $medication, $performer, $actionAt, $users);
+            }
 
             // Round lifecycle mutations use User/Profile -> Site -> Round. The
             // administration path must preserve that prefix: freeze identity

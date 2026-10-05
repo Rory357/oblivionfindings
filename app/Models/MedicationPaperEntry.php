@@ -14,7 +14,7 @@ class MedicationPaperEntry extends Model
 
     protected $guarded = ['id'];
 
-    protected $casts = ['snapshot' => 'array', 'observations' => 'array', 'given_at' => 'immutable_datetime', 'scheduled_for' => 'immutable_datetime'];
+    protected $casts = ['snapshot' => 'array', 'observations' => 'array', 'clinical_facts' => 'array', 'stock_evidence' => 'array', 'given_at' => 'immutable_datetime', 'scheduled_for' => 'immutable_datetime'];
 
     public function confirmations(): HasMany
     {

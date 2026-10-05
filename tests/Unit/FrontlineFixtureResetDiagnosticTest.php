@@ -58,6 +58,19 @@ final class FrontlineFixtureResetDiagnosticTest extends TestCase
         )['reason']);
     }
 
+    public function test_clock_identity_failure_has_a_stable_safe_reason_without_private_context(): void
+    {
+        $diagnostic = FrontlineFixtureResetDiagnostic::describe(new LogicException(
+            'Attendance-backed time-entry clock-in provenance conflicts. private-person clock details',
+        ));
+        self::assertSame([
+            'ok' => false,
+            'exception_class' => LogicException::class,
+            'reason' => 'attendance_clock_identity_conflict',
+        ], $diagnostic);
+        self::assertStringNotContainsString('private-person', json_encode($diagnostic, JSON_THROW_ON_ERROR));
+    }
+
     #[DataProvider('databaseContexts')]
     public function test_database_guard_accepts_only_dedicated_disposable_contexts(
         string $environment, string $connection, string $database, string $url, bool $allowed,

@@ -21,8 +21,9 @@ use App\Services\Medication\Controlled\ControlledDoseOverrideService;
 use App\Services\Medication\DoseSlots\DoseOrderTimelineFactory;
 use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
+use App\Services\Medication\Downtime\HistoricalPaperContext;
 use App\Services\Medication\Downtime\PaperAdministrationWriter;
-use App\Services\Medication\Downtime\PaperEntryService;
+use App\Services\Medication\Downtime\PaperReconciliationRules;
 use App\Services\Medication\Followups\MedicationFollowupService;
 use App\Services\Medication\ForgottenWitnessPinService;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
@@ -30,9 +31,11 @@ use App\Services\Medication\MedicationCompetencyRestrictionRules;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationSecondPersonService;
+use App\Services\Medication\Recording\LiveRecordingContext;
 use App\Services\Medication\Recording\RecordingContract;
 use App\Services\Medication\Recording\RecordingContractEnforcer;
 use App\Services\Medication\Stock\MedicationStockService;
+use App\Services\Medication\Stock\TransitStockContext;
 use App\Services\Medication\WitnessPinService;
 use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
@@ -673,7 +676,7 @@ class EnhancedMarService
     }
 
     /**
-     * Post an explicitly confirmed historical non-given paper outcome through
+     * Post an explicitly confirmed historical paper outcome through
      * the same recorder. This typed internal entry point accepts no submitted
      * stock, clinical readings, witness credentials or historical bypass flag.
      */
@@ -683,44 +686,41 @@ class EnhancedMarService
             || $decision->lockedPresenceEffectiveAt === null || $decision->client === null || $decision->medication === null) {
             throw new \LogicException('Historical paper outcomes require the canonical locked administration decision.');
         }
-        $entry = MedicationPaperEntry::query()->whereKey($submittedEntry->id)->lockForUpdate()->firstOrFail();
+        $context = HistoricalPaperContext::fromEntry((int) $submittedEntry->id);
+        $entry = $context->entry;
         $order = $decision->medication;
-        abort_unless((int) $entry->client_id === (int) $decision->client->id
-            && (int) $entry->client_medication_id === (int) $order->id
-            && (int) $order->client_id === (int) $decision->client->id
-            && (int) $entry->given_by === (int) $decision->performer->id, 404);
-        abort_unless(in_array($entry->outcome, ['refused', 'withheld'], true)
-            && ! $order->controlled_drug && ! ($entry->snapshot['controlled'] ?? false)
-            && ! $order->is_prn && $entry->witness_id === null && ! ($entry->snapshot['second_person_required'] ?? false)
-            && $entry->scheduled_for !== null && filled($entry->notes)
+        abort_unless((int) $entry->given_by === (int) $decision->performer->id
             && $entry->given_at->equalTo($decision->lockedPresenceEffectiveAt)
-            && $order->isAdministrable() && $order->active && $order->superseded_by === null
-            && PaperEntryService::orderFingerprint($order) === ($entry->snapshot['order_fingerprint'] ?? null), 422);
-        $target = MedicationDowntimeDose::query()->whereKey($entry->downtime_dose_id)
-            ->where('downtime_id', $entry->downtime_id)->where('client_id', $entry->client_id)
-            ->where('client_medication_id', $entry->client_medication_id)->first();
-        abort_unless($target !== null && $target->dose_slot_id !== null
-            && $entry->dose_identity === 'slot:'.$target->dose_slot_id
-            && $target->scheduled_for->equalTo($entry->scheduled_for)
-            && ($target->snapshot['order_fingerprint'] ?? null) === ($entry->snapshot['order_fingerprint'] ?? null), 422);
-        abort_unless($entry->confirmations()->where('kind', 'giver')->where('confirmed_by', $decision->performer->id)
-            ->whereNotNull('confirmed_at')->lockForUpdate()->exists(), 422);
-
+            && $order->isAdministrable() && $order->active && $order->superseded_by === null, 422);
+        if (! $order->is_prn) {
+            $target = MedicationDowntimeDose::query()->whereKey($entry->downtime_dose_id)
+                ->where('downtime_id', $entry->downtime_id)->where('client_id', $entry->client_id)
+                ->where('client_medication_id', $entry->client_medication_id)->first();
+            abort_unless($target !== null && $target->dose_slot_id !== null && $entry->scheduled_for !== null
+                && $entry->dose_identity === 'slot:'.$target->dose_slot_id
+                && $target->scheduled_for->equalTo($entry->scheduled_for)
+                && ($target->snapshot['order_fingerprint'] ?? null) === ($entry->snapshot['order_fingerprint'] ?? null), 422);
+        } else {
+            abort_unless($entry->scheduled_for === null && $entry->downtime_dose_id === null
+                && $entry->outcome === 'given'
+                && $entry->dose_identity === PaperReconciliationRules::identity((int) $order->id, null, $entry->given_at), 422);
+        }
+        $data = app(PaperAdministrationWriter::class)->canonicalData($entry);
+        $context->assertBinding($decision->client, $order, (int) $decision->performer->id, $data);
         $result = $this->recordAdministration(
-            $decision->client, $order, app(PaperAdministrationWriter::class)->canonicalData($entry),
-            (int) $decision->performer->id, $decision->shiftId(),
+            $decision->client, $order, $data, (int) $decision->performer->id, $decision->shiftId(),
             prelockedPresenceShifts: $decision->lockedPresenceShifts,
             prelockedPresenceEffectiveAt: $decision->lockedPresenceEffectiveAt,
+            historicalPaper: $context,
         );
         if ($result['success'] ?? false) {
             $administration = $result['administration'];
-            // A different existing clinical outcome is a conflict, never an
-            // inferred reconciliation or a link to somebody else's record.
             abort_unless($administration->client_request_uuid === $entry->request_uuid
                 && (int) $administration->administered_by === (int) $entry->given_by
                 && $administration->status === $entry->outcome
                 && $administration->administered_at->equalTo($entry->given_at)
-                && $administration->scheduled_for?->equalTo($entry->scheduled_for), 409);
+                && ($entry->scheduled_for === null ? $administration->scheduled_for === null
+                    : $administration->scheduled_for?->equalTo($entry->scheduled_for)), 409);
         }
 
         return $result;
@@ -739,7 +739,16 @@ class EnhancedMarService
         bool $recoveringReplayRace = false,
         ?Collection $prelockedPresenceShifts = null,
         ?CarbonInterface $prelockedPresenceEffectiveAt = null,
+        ?HistoricalPaperContext $historicalPaper = null,
+        ?TransitStockContext $transitStock = null,
     ): array {
+        $receivedAt = now($this->scheduleService->workerTimezone());
+        if ($historicalPaper !== null && $transitStock !== null) {
+            throw new \LogicException('Paper recovery and transit custody are distinct recording contexts.');
+        }
+        if ($historicalPaper !== null) {
+            $historicalPaper->assertBinding($client, $medication, $userId, $data);
+        }
         if (($prelockedPresenceShifts === null) !== ($prelockedPresenceEffectiveAt === null)) {
             throw new \LogicException(
                 'Prelocked controlled-medication presence requires both Shifts and one effective time.',
@@ -799,6 +808,17 @@ class EnhancedMarService
                     'error' => 'The amount given must use no more than two decimal places.',
                     'error_field' => 'quantity_given',
                 ];
+            }
+        }
+
+        if (array_key_exists('quantity_wasted', $data) && $data['quantity_wasted'] !== null) {
+            try {
+                $data['quantity_wasted'] = MedicationStockQuantity::normalizeMovement($data['quantity_wasted']);
+                if (MedicationStockQuantity::greaterThan(0, $data['quantity_wasted'])) {
+                    throw new \InvalidArgumentException;
+                }
+            } catch (\InvalidArgumentException) {
+                return ['success' => false, 'error_field' => 'quantity_wasted', 'error' => 'Actual waste must be zero or more and use no more than two decimal places.'];
             }
         }
 
@@ -905,7 +925,7 @@ class EnhancedMarService
             );
 
         try {
-            $result = DB::transaction(function () use ($client, $medication, $data, $userId, $shiftId, $scheduledFor, $adminAt, $windowCheck, $clientRequestUuid, $requestFingerprint, $includeControlled, $prelockedPresenceShifts, $requiresCosigner) {
+            $result = DB::transaction(function () use ($client, $medication, $data, $userId, $shiftId, $scheduledFor, $adminAt, $windowCheck, $clientRequestUuid, $requestFingerprint, $includeControlled, $prelockedPresenceShifts, $requiresCosigner, $historicalPaper, $transitStock, $receivedAt) {
                 $client = Client::query()->whereKey($client->id)->lockForUpdate()->firstOrFail();
 
                 // Medication governance lock order is parent-first everywhere:
@@ -1011,6 +1031,9 @@ class EnhancedMarService
                     $currentAdminRules,
                     $requiresCosigner,
                 );
+                if ($historicalPaper?->entry->witness_id !== null && $secondPersonKind === null) {
+                    $secondPersonKind = RecordingContract::SECOND_RULE;
+                }
                 $requiresWitness = $secondPersonKind !== null;
                 $authorizationUserIds = [$userId];
                 if ($requiresWitness && is_numeric($data['witnessed_by'] ?? null)) {
@@ -1040,6 +1063,9 @@ class EnhancedMarService
                 );
                 $doseOverride = app(ControlledDoseOverrideService::class)->forAdministration($lockedActor, $client, $medication, $data, $adminAt, $lockedPresenceShifts);
                 $secondPersonKind = $this->recordingContract->secondPersonKind($data, $medication, $currentAdminRules, $requiresCosigner, $doseOverride !== null);
+                if ($historicalPaper?->entry->witness_id !== null && $secondPersonKind === null) {
+                    $secondPersonKind = RecordingContract::SECOND_RULE;
+                }
                 if (is_array($data['safety_override'] ?? null)
                     && ! $lockedActor->canDo('medications.administer.override_safety')) {
                     return [
@@ -1125,7 +1151,10 @@ class EnhancedMarService
                         'witnessed_by' => 'Choose the eligible colleague who was there, or use the separate nobody-on-shift option.',
                     ]);
                 }
-                if ($forgottenPin) {
+                if ($historicalPaper !== null) {
+                    $historicalPaper->assertBinding($client, $medication, $userId, $data);
+                    $witnessValidation = $historicalPaper->witnessValidation($lockedActor, (int) $client->site_id, $secondPersonKind, $lockedAuthorizationUsers, $lockedPresenceShifts, $adminAt);
+                } elseif ($forgottenPin) {
                     $witnessValidation = $this->forgottenPins->prepare(
                         $lockedActor, $client, $medication, $secondPersonKind,
                         (int) ($data['witnessed_by'] ?? 0), $adminAt,
@@ -1149,6 +1178,8 @@ class EnhancedMarService
                 if (! ($witnessValidation['success'] ?? false)) {
                     return $witnessValidation;
                 }
+                $paperStockEvidence = $historicalPaper !== null && ($data['status'] ?? null) === 'given'
+                    ? $historicalPaper->stockEvidence() : null;
 
                 // A durable replay is still a medication administration by the
                 // current actor. Recheck and lock their current competency after
@@ -1165,6 +1196,14 @@ class EnhancedMarService
                 );
                 if ($competencyValidation !== null) {
                     return $competencyValidation;
+                }
+                if ($historicalPaper !== null) {
+                    $currentCompetency = $this->validateAdministratorCompetency(
+                        $client, $data, $lockedActor, now(), true, $medication, $witnessValidation['witnessed_by'] ?? null,
+                    );
+                    if ($currentCompetency !== null) {
+                        return $currentCompetency;
+                    }
                 }
 
                 // Resolve a durable replay only after the canonical target,
@@ -1214,6 +1253,26 @@ class EnhancedMarService
                     }
                 }
 
+                // Exact retained replay has resolved above. A connected form may
+                // retain its server-issued review time while checks are completed;
+                // an offline or earlier paper dose must never guess today's FEFO.
+                if (($data['status'] ?? null) === 'given' && $historicalPaper === null && $transitStock === null) {
+                    $pastStock = $medication->stock()->lockForUpdate()->first();
+                    if ($pastStock?->lots_started_at !== null) {
+                        if ((bool) ($data['queued_offline'] ?? false) || filled($data['captured_offline_at'] ?? null)) {
+                            return ['success' => false, 'error_field' => 'administered_at',
+                                'error' => 'This medicine uses exact pack records. Keep the signed actual dose and pack evidence for reviewed paper recovery; a queued dose cannot guess packs from current stock.'];
+                        }
+                        $token = $data['live_recording_context'] ?? null;
+                        $earlier = filled($data['administered_at'] ?? null) && $adminAt->copy()->startOfMinute()->lt($receivedAt->copy()->startOfMinute());
+                        if ($token !== null || $earlier) {
+                            $contextError = LiveRecordingContext::validate($token, $lockedActor, $medication, $pastStock, $adminAt, $receivedAt);
+                            if ($contextError !== null) {
+                                return $contextError;
+                            }
+                        }
+                    }
+                }
                 // The medication row serializes safety evaluation and record
                 // creation for the same order. Recompute after acquiring the
                 // lock so a stale client check or concurrent PRN dose cannot be
@@ -1359,8 +1418,34 @@ class EnhancedMarService
                     }
                 }
 
-                // Lock stock record if it exists
-                if ($medication->controlled_drug) {
+                $historicalStock = $historicalPaper !== null && ($data['status'] ?? null) === 'given'
+                    ? app(MedicationStockService::class)->validateHistoricalEvidence($medication, $paperStockEvidence, true) : null;
+
+                if ($transitStock !== null && ($data['status'] ?? null) === 'given') {
+                    $transitPosition = $medication->stock()->lockForUpdate()->firstOrFail();
+                    if ($medication->controlled_drug) {
+                        $use = $this->recordingContract->controlledStockUse($data, $medication, $transitPosition->unit, requireExplicitWaste: true);
+                        if (($use['success'] ?? null) === false) {
+                            return $use;
+                        }
+                        $data['quantity_administered'] = $use['removed'];
+                        $data['quantity_wasted'] = $use['wasted'];
+                    } elseif ($transitPosition->lots_started_at !== null) {
+                        $comparable = $this->recordingContract->stockQuantity($data, $medication, $transitPosition->unit);
+                        $quantity = $data['quantity_administered'] ?? null;
+                        $wasted = $data['quantity_wasted'] ?? null;
+                        if ($quantity === null || $wasted === null || ! MedicationStockQuantity::greaterThan($quantity, $wasted)
+                            || ($comparable !== null && ! MedicationStockQuantity::equals($quantity, MedicationStockQuantity::add($comparable, $wasted)))) {
+                            return ['success' => false, 'error_field' => 'quantity_administered', 'error' => 'Enter actual transit removal and waste, including zero. In the same stock unit, removed must equal given plus waste; no conversion is assumed.'];
+                        }
+                        if (MedicationStockQuantity::greaterThan($wasted, 0) && blank($data['waste_reason'] ?? null)) {
+                            return ['success' => false, 'error_field' => 'waste_reason', 'error' => 'Retain the reason for the actual transit waste.'];
+                        }
+                    }
+                }
+
+                // Live stock checks retain their current-balance semantics.
+                if ($medication->controlled_drug && $historicalStock === null && $transitStock === null) {
                     $medication->load(['stock' => function ($q) {
                         $q->lockForUpdate();
                     }]);
@@ -1381,7 +1466,7 @@ class EnhancedMarService
                         // the stock's unit; otherwise it must be entered. P0-2:
                         // less or more is always entered, and anything taken but
                         // not given is the dose's witnessed waste.
-                        $stockUse = $this->recordingContract->controlledStockUse($data, $medication, $stock->unit);
+                        $stockUse = $this->recordingContract->controlledStockUse($data, $medication, $stock->unit, requireExplicitWaste: $stock->lots_started_at !== null);
                         if (($stockUse['success'] ?? null) === false) {
                             return $stockUse;
                         }
@@ -1416,7 +1501,7 @@ class EnhancedMarService
                 // including when the rollout flag is subsequently disabled.
                 // Unstarted legacy stock is not migrated by a clinical dose.
                 $ordinaryStockQuantity = null;
-                if (! $medication->controlled_drug && ($data['status'] ?? null) === 'given') {
+                if (! $medication->controlled_drug && ($data['status'] ?? null) === 'given' && $historicalStock === null && $transitStock === null) {
                     $ordinaryStock = $medication->stock()->lockForUpdate()->first();
                     if ($ordinaryStock?->lots_started_at !== null) {
                         if (blank($ordinaryStock->unit)) {
@@ -1478,7 +1563,8 @@ class EnhancedMarService
                 $admin->amount_reason = $recordedGiven && ($data['amount_mode'] ?? null) === RecordingContract::AMOUNT_LESS
                     ? ($data['amount_reason'] ?? null)
                     : null;
-                $admin->quantity_given = $this->recordingContract->quantityGiven($data, $medication);
+                $admin->quantity_given = $historicalPaper !== null && $recordedGiven
+                    ? $data['quantity_given'] : $this->recordingContract->quantityGiven($data, $medication);
                 $admin->witness_override_id = $doseOverride?->id;
                 $admin->second_person_kind = $secondPersonKind ?? ($doseOverride !== null ? RecordingContract::SECOND_WITNESS : null);
                 $admin->second_person_status = match (true) {
@@ -1524,10 +1610,17 @@ class EnhancedMarService
 
                 $admin->save();
 
-                if ($ordinaryStockQuantity !== null) {
+                if ($transitStock !== null && $admin->status === 'given') {
+                    $admin->setRelation('medication', $medication);
+                    app(MedicationStockService::class)->transitDose($admin, $lockedActor, $data['quantity_administered'], $transitStock->log,
+                        $lockedAuthorizationUsers->get((int) $admin->witnessed_by), $data['quantity_wasted'] ?? '0.00', $transitStock->packLines);
+                } elseif ($historicalStock !== null && ! $medication->controlled_drug) {
+                    $admin->setRelation('medication', $medication);
+                    app(MedicationStockService::class)->historicalDose($admin, $lockedActor, $historicalStock);
+                } elseif ($ordinaryStockQuantity !== null) {
                     $admin->setRelation('medication', $medication);
                     app(MedicationStockService::class)
-                        ->ordinaryDose($admin, $lockedActor, $ordinaryStockQuantity);
+                        ->ordinaryDose($admin, $lockedActor, $ordinaryStockQuantity, $data['quantity_wasted'] ?? '0.00', $data['waste_reason'] ?? null);
                 }
 
                 $secondPersonNomination = null;
@@ -1553,19 +1646,27 @@ class EnhancedMarService
                 // new second clinical record with a medication name in notes.
 
                 // Handle controlled drug register entry
-                if ($medication->controlled_drug && $admin->status === 'given') {
-                    $this->recordControlledDrugEntry(
-                        $medication,
-                        $admin,
-                        $userId,
-                        $admin->witnessed_by,
-                        $data['quantity_administered'],
-                        $clientRequestUuid,
-                        $data['captured_offline_at'] ?? null,
-                        $data['origin_device_id'] ?? null,
-                        (bool) ($data['queued_offline'] ?? false),
-                        $data['quantity_wasted'] ?? null,
-                    );
+                if ($medication->controlled_drug && $admin->status === 'given' && $transitStock === null) {
+                    $admin->setRelation('medication', $medication);
+                    if ($historicalStock !== null) {
+                        $entries = app(MedicationStockService::class)->controlledHistoricalEntries($admin, $lockedActor, $historicalStock, $lockedAuthorizationUsers->get((int) $admin->witnessed_by));
+                        app(MedicationStockService::class)->historicalDose($admin, $lockedActor, $historicalStock, $entries);
+                    } else {
+                        $entries = $this->recordControlledDrugEntry(
+                            $medication,
+                            $admin,
+                            $userId,
+                            $admin->witnessed_by,
+                            $data['quantity_administered'],
+                            $clientRequestUuid,
+                            $data['captured_offline_at'] ?? null,
+                            $data['origin_device_id'] ?? null,
+                            (bool) ($data['queued_offline'] ?? false),
+                            $data['quantity_wasted'] ?? null,
+                            $data['waste_reason'] ?? null,
+                        );
+                        app(MedicationStockService::class)->controlledDoseAfterRegister($admin, $lockedActor, $entries['administered'], $entries['waste'], evidence: ['pack_lines' => $data['pack_lines'] ?? []]);
+                    }
                 }
 
                 // P01: the refusal follow-up a re-offer closes, the follow-up
@@ -1656,6 +1757,8 @@ class EnhancedMarService
                     true,
                     $prelockedPresenceShifts,
                     $prelockedPresenceEffectiveAt,
+                    $historicalPaper,
+                    $transitStock,
                 );
             }
 
@@ -1989,6 +2092,7 @@ class EnhancedMarService
             $data['client_request_uuid'],
             $data['witness_credential'],
             $data['scope_authorized'],
+            $data['live_recording_context'],
             $data['shift_id'],
         );
 
@@ -2049,7 +2153,7 @@ class EnhancedMarService
             }
         }
 
-        if (in_array($key, ['quantity_administered', 'quantity_given'], true) && is_numeric($value)) {
+        if (in_array($key, ['quantity_administered', 'quantity_given', 'quantity_wasted'], true) && is_numeric($value)) {
             try {
                 return MedicationStockQuantity::normalizeMovement($value);
             } catch (\InvalidArgumentException) {
@@ -2505,7 +2609,8 @@ class EnhancedMarService
         mixed $originDeviceId = null,
         bool $queuedOffline = false,
         int|float|string|null $wasted = null,
-    ): void {
+        ?string $wasteReason = null,
+    ): array {
         // NF-18: a register entry records exactly what was taken — never an
         // assumed single unit.
         $quantity = MedicationStockQuantity::normalizeMovement($quantity);
@@ -2545,7 +2650,7 @@ class EnhancedMarService
         $after = MedicationStockQuantity::subtract($before, $quantity);
         $stock->on_hand = $after;
         $stock->last_counted_at = now();
-        $stock->save();
+        $stock->saveFromPackLedger();
 
         $provenance = [
             'actor_id' => $recordedBy,
@@ -2587,8 +2692,8 @@ class EnhancedMarService
             'on_hand_after' => $afterDose,
         ]);
 
-        if ($wasted === null) {
-            return;
+        if ($wasted === null || ! MedicationStockQuantity::greaterThan($wasted, 0)) {
+            return ['administered' => $entry, 'waste' => null];
         }
 
         $reasonLabel = RecordingContract::AMOUNT_REASONS[(string) $admin->amount_reason] ?? null;
@@ -2603,7 +2708,7 @@ class EnhancedMarService
             'unit' => $stock?->unit,
             'on_hand_before' => $afterDose,
             'on_hand_after' => $after,
-            'reason' => 'Wasted at a dose — taken from the stock but not given'.($reasonLabel !== null ? ' ('.$reasonLabel.')' : '').'.',
+            'reason' => filled($wasteReason) ? $wasteReason : 'Wasted at a dose — taken from the stock but not given'.($reasonLabel !== null ? ' ('.$reasonLabel.')' : '').'.',
             'notes' => $admin->notes,
             'recorded_at' => $admin->administered_at,
             'recorded_by' => $recordedBy,
@@ -2617,6 +2722,8 @@ class EnhancedMarService
             'on_hand_before' => $afterDose,
             'on_hand_after' => $after,
         ]);
+
+        return ['administered' => $entry, 'waste' => $waste];
     }
 
     /**

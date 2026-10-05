@@ -15,6 +15,14 @@ export type Snapshot = {
     controlled: boolean;
     second_person_required: boolean;
     observation_keys: string[];
+    dose_amount?: number | null;
+    dose_unit?: string | null;
+    observation_choices?: {
+        key: string;
+        label: string;
+        unit: string | null;
+        fields: string[];
+    }[];
 };
 export type Dose = {
     id: number;
@@ -38,8 +46,49 @@ export type PrnOrder = {
     dosage: string;
     second_person_required?: boolean;
     observation_keys?: string[];
+    dose_amount?: number | null;
+    dose_unit?: string | null;
+    observation_choices?: Snapshot['observation_choices'];
 };
 export type Staff = { id: number; name: string };
+export type PaperClinicalFacts = {
+    quantity_given: string;
+    amount_mode: '' | 'as_ordered' | 'less' | 'more';
+    amount_reason: string;
+    late_reason: string;
+    prn_reason: string;
+    effect_check_due_at: string;
+    more_severity: string;
+    more_immediate_action: string;
+};
+export type PaperStockFacts = {
+    stock_id: number | null;
+    unit: string;
+    quantity_removed: string;
+    quantity_wasted: string;
+    waste_reason: string;
+    lines: { lot_id: number; quantity: string; quantity_wasted: string }[];
+};
+export type RecoveryStock = {
+    stock_id: number;
+    unit: string;
+    lots: {
+        id: number;
+        batch_number: string | null;
+        expiry_date: string | null;
+        state: string;
+        quantity_remaining: number;
+        revision: number;
+    }[];
+    unavailable?: string | null;
+    clinical_unavailable?: string | null;
+    can_record_settlement: boolean;
+    reviewed_counts: {
+        id: number;
+        label: string;
+        lines: { lot_id: number; revision: number; closing_quantity: number }[];
+    }[];
+};
 export type Conflict = { kind: string; message: string };
 export type Reconciliation = {
     state:
@@ -51,6 +100,36 @@ export type Reconciliation = {
     unavailable: string | null;
     can_reconcile: boolean;
     preview_token: string;
+    stock_evidence?: RecoveryStock | null;
+    missing_evidence?: string[];
+    missing_actual_fields?: { key: string; label: string }[];
+    stock_settlement?: {
+        id?: number;
+        request_uuid?: string;
+        evidence: {
+            settlement: 'deduct_now' | 'covered_by_count';
+            closing_count_id?: number | null;
+            lines: {
+                lot_id: number;
+                revision: number;
+                closing_quantity: number;
+            }[];
+        };
+        reviewed_by: { id: number; name: string };
+        reviewed_at: string;
+        fingerprint: string;
+    } | null;
+    stock_settlement_history?: NonNullable<
+        Reconciliation['stock_settlement']
+    >[];
+    recovery_authorization?: {
+        reviewer_id: number | null;
+        reviewer_name: string | null;
+        reviewed_at: string | null;
+        reason: string | null;
+        can_authorize: boolean;
+        unavailable: string | null;
+    } | null;
 };
 export type PaperEntry = {
     id: number;
@@ -66,6 +145,8 @@ export type PaperEntry = {
     can_confirm_giver: boolean;
     can_confirm_witness: boolean;
     reconciliation: Reconciliation;
+    clinical_facts?: PaperClinicalFacts | null;
+    stock_evidence?: PaperStockFacts | null;
 };
 export type CollectionPreview = {
     preview_token: string;

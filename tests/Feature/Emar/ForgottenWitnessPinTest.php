@@ -463,6 +463,46 @@ class ForgottenWitnessPinTest extends TestCase
     }
 
     /** @return array<string, mixed> */
+    public function test_actual_named_confirmation_consumer_resolves_and_replays_one_followup(): void
+    {
+        [$dose, $confirmation, $witness] = $this->nominate();
+        $url = '/meds/confirmations/'.$confirmation->id;
+        $this->actingAs($this->worker)->getJson($url)->assertNotFound();
+        $this->actingAs($witness)->getJson($url)->assertOk()->assertHeader('Cache-Control', 'no-store, private')
+            ->assertJsonPath('id', $confirmation->id)->assertJsonPath('person_name', $this->client->full_name)
+            ->assertJsonPath('medication_name', $dose->medication->name)->assertJsonPath('status', 'pending');
+        $this->actingAs($witness)->postJson($url, ['was_there' => true])->assertOk()->assertJson(['status' => 'confirmed', 'replayed' => false]);
+        $this->actingAs($witness)->postJson($url, ['was_there' => true])->assertOk()->assertJson(['status' => 'confirmed', 'replayed' => true]);
+        $this->actingAs($witness)->postJson($url, ['was_there' => false])->assertUnprocessable()->assertJsonValidationErrors('was_there');
+        $this->assertSame($witness->id, $dose->fresh()->witnessed_by);
+        $this->assertSame('verified', $dose->fresh()->second_person_status);
+        $this->assertSame('done', MedicationFollowup::where('source_key', 'confirm:'.$confirmation->id)->sole()->state);
+        $this->assertSame(1, MedicationEvent::where('kind', 'second_person.confirmed')->count());
+    }
+
+    public function test_actual_consumer_dispute_and_exact_deadline_never_fabricate_a_witness(): void
+    {
+        [$dose,$confirmation,$witness] = $this->nominate();
+        $this->actingAs($witness)->postJson('/meds/confirmations/'.$confirmation->id, ['was_there' => false])->assertOk()->assertJsonPath('status', 'disputed');
+        $this->assertNull($dose->fresh()->witnessed_by);
+        $this->assertTrue($dose->fresh()->review_required);
+        $this->assertSame('done', MedicationFollowup::where('source_key', 'confirm:'.$confirmation->id)->sole()->state);
+    }
+
+    public function test_expiry_command_closes_due_nomination_before_any_late_http_answer(): void
+    {
+        [$dose,$confirmation,$witness] = $this->nominate();
+        Carbon::setTestNow($confirmation->due_at->copy()->utc());
+        $this->artisan('emar:expire-second-person-confirmations')->assertExitCode(0);
+        $this->assertSame('expired', $confirmation->fresh()->status);
+        $this->assertSame('expired', $dose->fresh()->second_person_status);
+        $this->assertNull($dose->fresh()->witnessed_by);
+        $this->assertSame('done', MedicationFollowup::where('source_key', 'confirm:'.$confirmation->id)->sole()->state);
+        $this->actingAs($witness)->postJson('/meds/confirmations/'.$confirmation->id, ['was_there' => true])->assertOk()->assertJson(['status' => 'expired', 'replayed' => true]);
+        $this->artisan('emar:expire-second-person-confirmations')->assertExitCode(0);
+        $this->assertSame(1, MedicationEvent::where('kind', 'second_person.expired')->count());
+    }
+
     private function fallback(User $witness, array $extra = []): array
     {
         return [

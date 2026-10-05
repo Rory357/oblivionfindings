@@ -7,6 +7,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\MedicationCompetencyAssessment;
 use App\Models\Shift;
 use App\Models\User;
+use App\Services\Medication\Downtime\HistoricalSecondPersonPresence;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -45,8 +46,8 @@ final class MedicationSecondPersonService
      * Use the governing command's sorted Shift/User locks. Never acquire a
      * second, differently ordered witness set after authorization has begun.
      *
-     * @param Collection<int, User> $lockedUsers
-     * @param Collection<int, Shift> $lockedPresenceShifts
+     * @param  Collection<int, User>  $lockedUsers
+     * @param  Collection<int, Shift>  $lockedPresenceShifts
      * @return array<string, mixed> Immutable basis for this confirmation.
      */
     public function authenticate(
@@ -59,6 +60,35 @@ final class MedicationSecondPersonService
         Collection $lockedPresenceShifts,
         string $witnessErrorKey = 'witnessed_by',
         string $credentialErrorKey = 'witness_credential',
+    ): array {
+        $evidence = $this->attestEligibility($actor, $siteId, $witnessId, $at, $lockedUsers, $lockedPresenceShifts, $witnessErrorKey);
+        $witness = $evidence['witness'];
+        $recorder = $lockedUsers->get((int) $actor->id);
+
+        $this->pins->verify($witness, $credential, $credentialErrorKey, [
+            'site_id' => $siteId,
+            'surface' => $credentialErrorKey,
+            'actor_id' => (int) $recorder->id,
+        ]);
+
+        return [
+            'witness' => $witness,
+            'witnessed_at' => Carbon::instance($at)->copy(),
+            'method' => WitnessPinService::METHOD,
+            ...array_diff_key($evidence, ['witness' => 1]),
+        ];
+    }
+
+    /** Recheck retained own-login paper signatures without treating them as reusable credentials. */
+    public function attestEligibility(
+        User $actor,
+        int $siteId,
+        int $witnessId,
+        CarbonInterface $at,
+        Collection $lockedUsers,
+        Collection $lockedPresenceShifts,
+        string $witnessErrorKey = 'witnessed_by',
+        bool $historical = false,
     ): array {
         if (DB::transactionLevel() < 1) {
             throw new LogicException('Medication second-person checks require the governing transaction.');
@@ -77,21 +107,10 @@ final class MedicationSecondPersonService
             $lockedUsers, [(int) $recorder->id, $witnessId], $siteId,
         );
         $witness->setRelation('hrEmployeeProfile', $profiles->get($witnessId));
-        $qualification = $this->qualification($witness, $siteId, $at, true, $lockedPresenceShifts);
+        $qualification = $this->qualification($witness, $siteId, $at, true, $lockedPresenceShifts, $historical);
         abort_unless($qualification, 404);
 
-        $this->pins->verify($witness, $credential, $credentialErrorKey, [
-            'site_id' => $siteId,
-            'surface' => $credentialErrorKey,
-            'actor_id' => (int) $recorder->id,
-        ]);
-
-        return [
-            'witness' => $witness,
-            'witnessed_at' => Carbon::instance($at)->copy(),
-            'method' => WitnessPinService::METHOD,
-            ...$qualification,
-        ];
+        return ['witness' => $witness, ...$qualification];
     }
 
     /** @return array<string, mixed>|null */
@@ -101,6 +120,7 @@ final class MedicationSecondPersonService
         CarbonInterface $at,
         bool $lock,
         ?Collection $lockedPresenceShifts = null,
+        bool $historical = false,
     ): ?array {
         if ($user->approved_at === null || in_array($user->role, ['client', 'next_of_kin'], true)
             || $user->hasRole('client', 'next_of_kin') || ! $user->canDo('medications.administer.record')) {
@@ -131,6 +151,7 @@ final class MedicationSecondPersonService
             $assessment ??= $currentAssessment;
         }
         $presence = $this->presenceAtSite($user, $siteId, $at, $lock, $lockedPresenceShifts);
+        $presence ??= $historical ? HistoricalSecondPersonPresence::fromLocked($user, $siteId, $at, $lockedPresenceShifts) : null;
         if ($presence === null) {
             return null;
         }

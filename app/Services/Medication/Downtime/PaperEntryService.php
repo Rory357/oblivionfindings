@@ -12,16 +12,24 @@ use App\Models\MedicationDowntimeResolution;
 use App\Models\MedicationPaperConfirmation;
 use App\Models\MedicationPaperEntry;
 use App\Models\MedicationPaperPosting;
+use App\Models\MedicationPaperRecoveryAuthorization;
+use App\Models\MedicationPaperStockEvidence;
 use App\Models\User;
 use App\Services\Medication\ControlledMedicationTransportWitnessService;
 use App\Services\Medication\MarLinkService;
+use App\Services\Medication\MedicationCompetencyRestrictionRules;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationScopeDecision;
+use App\Services\Medication\MedicationSecondPersonService;
 use App\Services\Medication\Recording\DoseRecordingRequirements;
+use App\Services\Medication\Stock\MedicationStockService;
 use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationRuleService;
 use App\Services\UserSiteAccessService;
+use App\Support\Medication\MedicationStockQuantity;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 final class PaperEntryService
@@ -66,7 +74,8 @@ final class PaperEntryService
 
         return [
             'person' => $order->client->full_name, 'medicine' => $order->name,
-            'dosage' => $order->dosage, 'route' => $order->route,
+            'dosage' => $order->dosage, 'route' => $order->route, 'dose_amount' => $order->dose_amount, 'dose_unit' => $order->dose_unit,
+            'is_prn' => (bool) $order->is_prn,
             'controlled' => (bool) $order->controlled_drug,
             'second_person_required' => $outcome === 'given' && ($order->requiresWitness() || $rule['requires_countersign']),
             'observation_keys' => $outcome === 'given' ? $rule['required_observations'] : [],
@@ -106,6 +115,21 @@ final class PaperEntryService
         if ($target !== null && ($target->snapshot['order_fingerprint'] ?? '') !== $snapshot['order_fingerprint']) {
             $errors[] = 'The order changed after this downtime was listed. The clinical lead must resolve the historical order before entry.';
         }
+        $clinical = $data['clinical_facts'] ?? [];
+        $physical = $data['stock_evidence'] ?? [];
+        if ($data['outcome'] === 'given' && ($clinical !== [] || $physical !== [])) {
+            $actual = PaperDoseFacts::complete($clinical, $physical)
+                ? PaperDoseFacts::normalize($order, $clinical, $physical, $at)
+                : PaperDoseFacts::retain($order, $clinical, $physical);
+            $clinical = $actual['clinical'];
+            $physical = $actual['physical'];
+            if ($order->is_prn && PaperDoseFacts::complete($clinical, $physical) && blank($clinical['prn_reason'] ?? null)) {
+                $errors[] = 'Retain the reason the as-needed dose was given.';
+            }
+            $snapshot['second_person_required'] = $snapshot['second_person_required']
+                || ($clinical['amount_mode'] ?? null) === 'less'
+                || app(MedicationCompetencyRestrictionRules::class)->requiresCosigner($giver, (int) $downtime->site_id, $at);
+        }
         $witnessId = filled($data['witness_id'] ?? null) ? (int) $data['witness_id'] : null;
         // Naming a second person always creates accountable confirmation work.
         // A voluntary attestation is not silently discarded when no rule demands it.
@@ -136,6 +160,7 @@ final class PaperEntryService
             'outcome' => $data['outcome'], 'dose_on_paper' => $data['dose_on_paper'] ?? null,
             'notes' => $data['notes'] ?? null, 'observations' => $data['observations'] ?? [],
             'snapshot' => $snapshot, 'dose_identity' => $identity,
+            'clinical_facts' => $clinical ?: null, 'stock_evidence' => $physical ?: null,
         ];
         $hash = hash_hmac('sha256', PaperReconciliationRules::fingerprint([$facts, $conflicts, $errors]), (string) config('app.key'));
 
@@ -200,7 +225,15 @@ final class PaperEntryService
     public function confirm(User $actor, MedicationDowntime $downtime, MedicationPaperEntry $entry, string $kind, ?string $pin): void
     {
         DB::transaction(function () use ($actor, $downtime, $entry, $kind, $pin): void {
-            [$order, $actor] = $this->lockOrder($actor, $downtime, (int) $entry->client_medication_id);
+            $order = $this->lockOrderParents($actor, $downtime, (int) $entry->client_medication_id);
+            $governance = app(MedicationGovernanceScopeService::class);
+            $userIds = [(int) $entry->given_by, (int) $entry->witness_id, (int) $actor->id];
+            $shifts = $governance->lockControlledWitnessPresenceShifts($userIds, (int) $downtime->site_id, $entry->given_at, historical: true);
+            $this->rules->requirementsFor($order, true);
+            $users = $governance->lockControlledWitnessUsers($userIds);
+            $governance->lockCurrentStaffProfilesAtSite($users, $userIds, (int) $downtime->site_id);
+            $governance->lockCurrentMedicationSite((int) $downtime->site_id);
+            $actor = $this->access->lockActor($users->get((int) $actor->id), (int) $downtime->site_id);
             $entry = MedicationPaperEntry::query()->whereKey($entry->id)->lockForUpdate()->firstOrFail();
             $this->access->entry($actor, $downtime, (int) $entry->id);
             abort_unless((int) $actor->id === (int) ($kind === 'giver' ? $entry->given_by : $entry->witness_id), 404);
@@ -212,8 +245,12 @@ final class PaperEntryService
                 abort_unless($actor->canDo('medications.administer.record'), 403);
             } else {
                 // Existing qualification policy at the dose's actual time; the PIN proves today's accountable attestation.
-                abort_unless($this->witnesses->eligibleWitnessesForSite((int) $downtime->site_id, $entry->given_at, (int) $entry->given_by)->contains('id', $actor->id), 422,
-                    'Historical witness eligibility could not be established. Ask the clinical lead to review; this dose is not posted.');
+                $giver = $users->get((int) $entry->given_by);
+                if ($order->controlled_drug || ($entry->snapshot['controlled'] ?? false)) {
+                    $this->witnesses->attestEligibility($giver, (int) $downtime->site_id, (int) $actor->id, $entry->given_at, lockedUsers: $users, lockedPresenceShifts: $shifts, historical: true);
+                } else {
+                    app(MedicationSecondPersonService::class)->attestEligibility($giver, (int) $downtime->site_id, (int) $actor->id, $entry->given_at, $users, $shifts, historical: true);
+                }
                 $this->pins->verify($actor, $pin, 'witness_pin', ['site_id' => (int) $downtime->site_id, 'surface' => 'paper_confirmation'], ownPin: true);
             }
             MedicationPaperConfirmation::query()->create([
@@ -260,6 +297,9 @@ final class PaperEntryService
                             ->where('client_id', $entry->client_id)->where('client_medication_id', $entry->client_medication_id)
                             ->where('administered_by', $entry->given_by)->where('client_request_uuid', $entry->request_uuid)->exists(), 409);
 
+                    $replay = $this->writer->postAuthorized($entry, $decision);
+                    abort_unless(($replay['success'] ?? false) && (int) $replay['administration']->id === (int) $posted->administration_id, 409);
+
                     return ['success' => true, 'administration_id' => (int) $posted->administration_id, 'duplicate' => true];
                 }
                 $lockedPreview = $this->reconciliationPreview($decision->performer, $downtime, $entry, $decision->medication);
@@ -291,13 +331,121 @@ final class PaperEntryService
         $state = PaperReconciliationRules::state($entry->posting()->exists(), $confirmations->has('giver'), (bool) ($entry->snapshot['second_person_required'] ?? false), $confirmations->has('witness'));
         $conflicts = $this->conflicts($order, $entry->scheduled_for, $entry->given_at, $entry->dose_identity, (int) $entry->id);
         $unavailable = $this->writer->availability($entry, $order, $actor);
-        $facts = [$entry->request_fingerprint, $state, $conflicts, $unavailable, self::orderFingerprint($order), $this->requirementsFingerprint($order, $lockRequirements)];
+        $settlement = MedicationPaperStockEvidence::where('paper_entry_id', $entry->id)->latest('id')->first();
+        $authorization = MedicationPaperRecoveryAuthorization::where('paper_entry_id', $entry->id)->first();
+        $facts = [$entry->request_fingerprint, $state, $conflicts, $unavailable, self::orderFingerprint($order), $this->requirementsFingerprint($order, $lockRequirements), $settlement?->id, $settlement?->reviewed_by, $settlement?->fingerprint, $authorization?->fingerprint];
 
         return [
             'state' => $state, 'conflicts' => $conflicts, 'unavailable' => $unavailable,
+            'missing_evidence' => array_values(array_filter([
+                $entry->outcome === 'given' && array_filter(array_keys(PaperDoseFacts::missing($entry->clinical_facts ?? [], $entry->stock_evidence ?? [])), fn ($key) => str_starts_with($key, 'clinical_facts.')) ? 'clinical_facts' : null,
+                $entry->outcome === 'given' && array_filter(array_keys(PaperDoseFacts::missing($entry->clinical_facts ?? [], $entry->stock_evidence ?? [])), fn ($key) => str_starts_with($key, 'stock_evidence.')) ? 'physical_facts' : null,
+                $entry->outcome === 'given' && ! $settlement ? 'stock_settlement' : null,
+                ($entry->snapshot['second_person_required'] ?? false) && ! $confirmations->has('witness') ? 'own_witness_confirmation' : null,
+            ])),
+            'missing_actual_fields' => $entry->outcome === 'given' ? collect(PaperDoseFacts::missing($entry->clinical_facts ?? [], $entry->stock_evidence ?? []))->map(fn ($label, $key) => ['key' => $key, 'label' => $label])->values()->all() : [],
+            'stock_evidence' => $this->recoveryStock($actor, $downtime, (int) $order->id, $entry),
+            'stock_settlement' => $settlement ? ['id' => (int) $settlement->id, 'request_uuid' => $settlement->request_uuid, 'evidence' => $settlement->evidence, 'reviewed_by' => ['id' => (int) $settlement->reviewed_by, 'name' => User::find($settlement->reviewed_by)?->name],
+                'reviewed_at' => $settlement->created_at->toIso8601String(), 'fingerprint' => $settlement->fingerprint] : null,
+            'stock_settlement_history' => MedicationPaperStockEvidence::where('paper_entry_id', $entry->id)->latest('id')->get()->map(fn ($review) => [
+                'id' => (int) $review->id, 'request_uuid' => $review->request_uuid, 'evidence' => $review->evidence,
+                'reviewed_by' => ['id' => (int) $review->reviewed_by, 'name' => User::find($review->reviewed_by)?->name],
+                'reviewed_at' => $review->created_at->toIso8601String(), 'fingerprint' => $review->fingerprint])->all(),
+            'recovery_authorization' => ['reviewer_id' => $authorization?->reviewed_by, 'reviewer_name' => $authorization ? User::find($authorization->reviewed_by)?->name : null,
+                'reviewed_at' => $authorization?->created_at->toIso8601String(), 'reason' => $authorization?->reason,
+                'can_authorize' => ! $authorization && ! $entry->posting()->exists() && $this->access->manages($actor) && $actor->canDo('medications.administer.record')
+                    && (int) $actor->id !== (int) $entry->given_by && (! $order->controlled_drug || $actor->canDo('medications.controlled.record')) && $confirmations->has('giver') && ReviewedPaperAuthority::historicalGrant($entry) !== null,
+                'unavailable' => ReviewedPaperAuthority::historicalGrant($entry) === null ? 'No retained server grant proves authority at the actual paper time.' : null],
             'can_reconcile' => $state === 'ready_to_reconcile' && $conflicts === [] && $unavailable === null,
             'preview_token' => hash_hmac('sha256', PaperReconciliationRules::fingerprint($facts), (string) config('app.key')),
         ];
+    }
+
+    /** Minimal scoped evidence collection; this grants no general stock browsing. */
+    public function recoveryStock(User $actor, MedicationDowntime $downtime, int $orderId, ?MedicationPaperEntry $entry = null): array
+    {
+        $order = $this->access->order($actor, $downtime, $orderId);
+        if (! $this->access->manages($actor)) {
+            abort_unless($entry && (int) $entry->client_medication_id === $orderId, 404);
+            $this->access->entry($actor, $downtime, (int) $entry->id);
+        }
+        $options = app(MedicationStockService::class)->recoveryOptions($order, $entry);
+
+        return [...$options, 'dose_amount' => $order->dose_amount, 'dose_unit' => $order->dose_unit,
+            'clinical_unavailable' => blank($order->dose_unit) ? 'The order has no structured clinical unit. Keep the signed paper for clinical review.' : null,
+            'can_record_settlement' => $this->access->manages($actor) && $actor->canDo('medications.stock.update')
+                && (! $order->controlled_drug || $actor->canDo('medications.controlled.record'))
+                && ($entry === null || ! $entry->posting()->exists()),
+            'unavailable' => empty($options['lots']) ? 'Exact pack tracking must be established by an authorized physical count before settlement.' : null];
+    }
+
+    public function settleStock(User $actor, MedicationDowntime $downtime, MedicationPaperEntry $submitted, array $data): MedicationPaperStockEvidence
+    {
+        abort_unless(filter_var($data['accountable_confirmation'] ?? false, FILTER_VALIDATE_BOOL)
+            && Str::isUuid($data['request_uuid'] ?? ''), 422);
+
+        return DB::transaction(function () use ($actor, $downtime, $submitted, $data) {
+            [$order, $actor] = $this->lockOrder($actor, $downtime, (int) $submitted->client_medication_id);
+            abort_unless($this->access->manages($actor) && $actor->canDo('medications.stock.update')
+                && (! $order->controlled_drug || $actor->canDo('medications.controlled.record')), 403);
+            $entry = MedicationPaperEntry::whereKey($submitted->id)->lockForUpdate()->firstOrFail();
+            $this->access->entry($actor, $downtime, (int) $entry->id);
+            abort_unless($entry->outcome === 'given' && PaperDoseFacts::complete($entry->clinical_facts ?? [], $entry->stock_evidence ?? []), 422, 'Retain complete actual clinical and physical facts before settlement; unknown waste is not zero.');
+            $actual = $entry->stock_evidence;
+            $reviews = collect($data['lines'])->keyBy('lot_id');
+            abort_unless(count($data['lines']) === $reviews->count() && $reviews->count() === count($actual['lines']), 422);
+            $lines = collect($actual['lines'])->map(function ($line) use ($reviews) {
+                $review = $reviews->get($line['lot_id']);
+                abort_unless($review, 422);
+
+                return [...$line, 'revision' => (int) $review['revision'], 'closing_quantity' => MedicationStockQuantity::normalize($review['closing_quantity'])];
+            })->all();
+            $evidence = [...$actual, 'settlement' => $data['settlement'], 'closing_count_id' => $data['closing_count_id'] ?? null,
+                'lines' => $lines, 'paper_entry_id' => (int) $entry->id, 'occurred_at' => $entry->given_at->toIso8601String()];
+            $fingerprint = PaperReconciliationRules::fingerprint($evidence);
+            if ($existing = MedicationPaperStockEvidence::where('request_uuid', $data['request_uuid'])->lockForUpdate()->first()) {
+                abort_unless((int) $existing->paper_entry_id === (int) $entry->id && (int) $existing->reviewed_by === (int) $actor->id, 404);
+                abort_unless(hash_equals($existing->fingerprint, $fingerprint), 409);
+
+                return $existing;
+            }
+            abort_if($entry->posting()->exists(), 422, 'This paper dose is already posted; its consumed stock review is retained.');
+            $evidence = app(MedicationStockService::class)->validateHistoricalEvidence($order, $evidence, true);
+            $row = MedicationPaperStockEvidence::create(['paper_entry_id' => $entry->id, 'reviewed_by' => $actor->id, 'request_uuid' => $data['request_uuid'],
+                'evidence' => $evidence, 'fingerprint' => PaperReconciliationRules::fingerprint($evidence)]);
+            $this->events->record($downtime, 'stock_settlement_reviewed', $actor, $entry, ['settlement_id' => (int) $row->id, 'settlement' => $evidence['settlement'], 'closing_count_id' => $evidence['closing_count_id']]);
+
+            return $row;
+        }, 5);
+    }
+
+    public function authorizeRecovery(User $actor, MedicationDowntime $downtime, MedicationPaperEntry $submitted, array $data): MedicationPaperRecoveryAuthorization
+    {
+        abort_unless(filter_var($data['accountable_confirmation'] ?? false, FILTER_VALIDATE_BOOL) && filled($data['reason'] ?? null), 422);
+
+        return DB::transaction(function () use ($actor, $downtime, $submitted, $data) {
+            [$order, $actor] = $this->lockOrder($actor, $downtime, (int) $submitted->client_medication_id);
+            $entry = MedicationPaperEntry::whereKey($submitted->id)->lockForUpdate()->firstOrFail();
+            $this->access->entry($actor, $downtime, (int) $entry->id);
+            abort_unless($actor->isApproved() && $this->access->manages($actor) && $actor->canDo('medications.administer.record')
+                && (int) $actor->id !== (int) $entry->given_by && (! $order->controlled_drug || $actor->canDo('medications.controlled.record')), 403);
+            abort_unless(! $entry->posting()->exists() && $entry->confirmations()->where('kind', 'giver')->where('confirmed_by', $entry->given_by)->whereNotNull('confirmed_at')->exists(), 422);
+            $grant = ReviewedPaperAuthority::historicalGrant($entry, lock: true);
+            abort_unless($grant, 422, 'No retained server grant proves authority at the actual paper time. Keep the signed evidence for clinical review.');
+            $evidence = ['entry_hash' => ReviewedPaperAuthority::entryHash($entry), 'grant_id' => (int) $grant->id,
+                'grant_created_at' => $grant->created_at->toIso8601String(), 'grant_expires_at' => $grant->expires_at->toIso8601String(),
+                'giver_confirmation_id' => (int) $entry->confirmations()->where('kind', 'giver')->value('id')];
+            $fingerprint = PaperReconciliationRules::fingerprint($evidence);
+            if ($existing = MedicationPaperRecoveryAuthorization::where('paper_entry_id', $entry->id)->first()) {
+                abort_unless((int) $existing->reviewed_by === (int) $actor->id && $existing->reason === $data['reason'] && hash_equals($existing->fingerprint, $fingerprint), 409);
+
+                return $existing;
+            }
+            $proof = MedicationPaperRecoveryAuthorization::create(['paper_entry_id' => $entry->id, 'reviewed_by' => $actor->id, 'reason' => $data['reason'], 'evidence' => $evidence, 'fingerprint' => $fingerprint]);
+            $this->events->record($downtime, 'historical_authority_reviewed', $actor, $entry, ['authorization_id' => (int) $proof->id, 'reviewer_id' => (int) $actor->id, 'reason' => $data['reason'], 'historical_grant_id' => (int) $grant->id]);
+
+            return $proof;
+        }, 5);
     }
 
     /** Existing evidence is offered for explicit review, never an inferred paper outcome. */

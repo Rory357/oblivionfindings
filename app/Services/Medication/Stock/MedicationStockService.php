@@ -2,6 +2,7 @@
 
 namespace App\Services\Medication\Stock;
 
+use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
@@ -11,11 +12,13 @@ use App\Models\MedicationStockLot;
 use App\Models\MedicationStockMovement;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Medication\Alerts\MedicationAlertSources;
 use App\Support\Medication\MedicationStockQuantity as Qty;
 use App\Support\Medication\PharmacySupplyRules;
 use App\Support\Medication\StockLotRules;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use LogicException;
@@ -27,6 +30,10 @@ use LogicException;
  */
 final class MedicationStockService
 {
+    use HistoricalPackEvidence;
+    use IntegratesPackEvidence;
+    use TransitPackEvidence;
+
     public function today(): string
     {
         return StockAvailability::today();
@@ -69,6 +76,7 @@ final class MedicationStockService
             $this->movement($lot, $actor, $operationUuid, 'opening', $stock->on_hand, '0.00', $stock->on_hand, 'Recorded balance carried forward; not a new receipt.');
         }
         $stock->forceFill(['lots_started_at' => now()])->saveFromPackLedger();
+        $this->stockChangedAfterCommit();
         AuditLogger::logOrFail('medications.stock.lots_started', $stock, ['actor_id' => $actor->id, 'recorded_balance' => $stock->on_hand]);
     }
 
@@ -126,6 +134,7 @@ final class MedicationStockService
                 'actor_id' => $actor->id, 'reason' => $data['closure_reason'], 'request_uuid' => $data['request_uuid'],
             ]);
         }
+
         return ['lot_id' => $lotIds[0], 'lot_ids' => $lotIds, 'quantity_received' => $total];
     }
 
@@ -199,60 +208,18 @@ final class MedicationStockService
      * write, within their existing governing transaction. Never increments
      * the authoritative controlled balance. Witness policy stays with P07.
      */
-    public function controlledReceiptAfterRegister(ClientMedicationStock $stock, User $actor, array $data, \App\Models\ClientControlledDrugEntry $entry, bool $witnessPolicySatisfied, ?MedicationPharmacyOrder $order = null): MedicationStockLot
+    public function controlledReceiptAfterRegister(ClientMedicationStock $stock, User $actor, array $data, ClientControlledDrugEntry $entry, bool $witnessPolicySatisfied, ?MedicationPharmacyOrder $order = null): MedicationStockLot
     {
-        $this->requireLots($stock);
-        $med = $stock->medication;
-        $quantity = Qty::normalize($data['quantity']);
-        if (! $med->controlled_drug || ! $witnessPolicySatisfied || ! $entry->exists || $entry->entry_type !== 'receipt'
-            || (int) $entry->client_id !== (int) $med->client_id || (int) $entry->client_medication_id !== (int) $med->id
-            || (int) $entry->recorded_by !== (int) $actor->id || $entry->unit !== $stock->unit
-            || ! Qty::greaterThan($quantity, 0) || ! Qty::equals($entry->quantity, $quantity)) {
-            throw ValidationException::withMessages(['quantity' => 'The controlled receipt does not match its witnessed register entry.']);
+        if (! $witnessPolicySatisfied) {
+            throw ValidationException::withMessages(['quantity' => 'The controlled receipt needs its governing witness policy.']);
         }
-        $existing = MedicationStockLot::where('controlled_entry_id', $entry->id)->first();
-        if ($existing) {
-            abort_unless((int) $existing->client_medication_stock_id === (int) $stock->id
-                && Qty::equals($existing->quantity_received, $quantity), 404);
-            return $existing;
-        }
-        $lots = $this->lots($stock);
-        $physicalBefore = $lots->reduce(fn (string $sum, $lot): string => Qty::add($sum, $lot->quantity_remaining), '0.00');
-        if (! $med->controlled_drug || ! $witnessPolicySatisfied || ! $entry->exists || $entry->entry_type !== 'receipt'
-            || (int) $entry->client_id !== (int) $med->client_id || (int) $entry->client_medication_id !== (int) $med->id
-            || (int) $entry->recorded_by !== (int) $actor->id || $entry->unit !== $stock->unit
-            || ! Qty::greaterThan($quantity, 0) || ! Qty::equals($entry->quantity, $quantity)
-            || ! Qty::equals($entry->on_hand_before, $physicalBefore)
-            || ! Qty::equals($entry->on_hand_after, Qty::add($physicalBefore, $quantity))
-            || ! Qty::equals($stock->on_hand, $entry->on_hand_after)) {
-            throw ValidationException::withMessages(['quantity' => 'The controlled receipt does not match its witnessed register entry and stock balance.']);
-        }
-        if ($order && ((int) $order->client_id !== (int) $med->client_id || (int) $order->client_medication_id !== (int) $med->id
-            || (int) $entry->pharmacy_order_id !== (int) $order->id)) {
-            abort(404);
-        }
-        $expiry = $this->receiptExpiry($data);
-        $batch = trim((string) ($data['batch_number'] ?? ''));
-        if (($batch === '') !== (bool) ($data['batch_not_printed'] ?? false)) {
-            throw ValidationException::withMessages(['batch_number' => 'Enter the batch or choose Not printed on the pack.']);
-        }
-        $lot = MedicationStockLot::create([
-            'client_medication_stock_id' => $stock->id, 'controlled_entry_id' => $entry->id,
-            'batch_number' => $batch === '' ? null : $batch, 'batch_not_printed' => (bool) ($data['batch_not_printed'] ?? false),
-            'expiry_date' => $expiry, 'expiry_not_printed' => (bool) ($data['expiry_not_printed'] ?? false),
-            'quantity_received' => $quantity, 'quantity_remaining' => $quantity,
-            'source' => $order ? 'pharmacy_order' : $data['source'], 'source_reference' => $data['source_reference'] ?? null,
-            'pharmacy_order_id' => $order?->id, 'received_by' => $actor->id, 'received_at' => now(),
-            'short_expiry_reason' => $data['short_expiry_reason'] ?? null, 'notes' => $data['notes'] ?? null,
-        ]);
-        $this->movement($lot, $actor, $data['request_uuid'], 'controlled_receipt', $quantity, '0.00', $quantity,
-            'Received against witnessed register entry '.$entry->id.'.', $data['notes'] ?? null);
-        AuditLogger::logOrFail('medications.stock.controlled_pack_linked', $lot, ['actor_id' => $actor->id, 'controlled_entry_id' => $entry->id]);
-        return $lot;
+        $result = $this->controlledDeliveryAfterRegister($stock, $actor, $data, $entry, $order);
+
+        return MedicationStockLot::findOrFail($result['lot_id']);
     }
 
     /** P01 contract: call once, inside the administration transaction, after its duplicate guards. */
-    public function ordinaryDose(ClientMedicationAdministration $administration, User $actor, int|float|string $quantityInStockUnit): void
+    public function ordinaryDose(ClientMedicationAdministration $administration, User $actor, int|float|string $quantityInStockUnit, int|float|string $quantityWasted = 0, ?string $wasteReason = null): void
     {
         $this->assertTransaction();
         $medication = $administration->medication;
@@ -265,15 +232,32 @@ final class MedicationStockService
             return;
         }
         try {
-            $allocation = StockLotRules::allocate($this->lots($stock)->toArray(), $quantityInStockUnit, $this->today());
+            $wasted = Qty::normalize($quantityWasted);
+            if (Qty::greaterThan(0, $wasted) || (Qty::greaterThan($wasted, 0) && blank($wasteReason))) {
+                throw new InvalidArgumentException('Enter the actual nonnegative stock waste and its reason.');
+            }
+            $lockedLots = $this->lots($stock)->keyBy('id');
+            $allocation = StockLotRules::allocate($lockedLots->values()->toArray(), Qty::add($quantityInStockUnit, $wasted), $this->today());
         } catch (InvalidArgumentException $error) {
             throw ValidationException::withMessages(['quantity_administered' => $error->getMessage()]);
         }
-        $operation = (string) \Illuminate\Support\Str::uuid();
+        $operations = ['given' => (string) Str::uuid(), 'waste' => (string) Str::uuid()];
+        $givenRemaining = Qty::normalize($quantityInStockUnit);
         foreach ($allocation as $line) {
-            $lot = MedicationStockLot::findOrFail($line['lot_id']);
+            // Reuse the current locking-read model. An ordinary read here can
+            // return an older MVCC revision after another stock writer commits.
+            $lot = $lockedLots->get($line['lot_id']);
+            $given = Qty::greaterThan($line['quantity'], $givenRemaining) ? $givenRemaining : $line['quantity'];
+            $waste = Qty::subtract($line['quantity'], $given);
+            $afterGiven = Qty::subtract($line['before'], $given);
             $lot->forceFill(['quantity_remaining' => $line['after'], 'revision' => $lot->revision + 1])->save();
-            $this->movement($lot, $actor, $operation, 'given', $line['quantity'], $line['before'], $line['after'], 'Given from stock.', administrationId: $administration->id);
+            if (Qty::greaterThan($given, 0)) {
+                $this->movement($lot, $actor, $operations['given'], 'given', $given, $line['before'], $afterGiven, 'Given from stock.', administrationId: $administration->id);
+            }
+            if (Qty::greaterThan($waste, 0)) {
+                $this->movement($lot, $actor, $operations['waste'], 'waste', $waste, $afterGiven, $line['after'], $wasteReason, administrationId: $administration->id);
+            }
+            $givenRemaining = Qty::subtract($givenRemaining, $given);
         }
         $this->refreshBalance($stock);
     }
@@ -347,7 +331,8 @@ final class MedicationStockService
         if ($stock->medication->controlled_drug) {
             throw ValidationException::withMessages(['lines' => 'Controlled counts keep their witnessed register process.']);
         }
-        $lots = $this->lots($stock)->filter(fn ($lot) => Qty::greaterThan($lot->quantity_remaining, 0));
+        $coveringPaper = ! empty($data['covered_paper_entry_ids']);
+        $lots = $this->lots($stock)->filter(fn ($lot) => $coveringPaper || Qty::greaterThan($lot->quantity_remaining, 0));
         if ($lots->isEmpty() && ! ($data['confirm_empty'] ?? false)) {
             throw ValidationException::withMessages(['confirm_empty' => 'Confirm that you physically checked and there are no packs to count.']);
         }
@@ -374,7 +359,7 @@ final class MedicationStockService
         $record = MedicationStockCountRecord::create([
             'client_medication_stock_id' => $stock->id, 'request_uuid' => $data['request_uuid'],
             'lines' => $lines, 'reason' => $data['reason'] ?? null, 'counted_by' => $actor->id,
-            'counted_at' => now(), 'state' => $different ? 'needs_review' : 'counted',
+            'counted_at' => now(), 'state' => $different ? 'needs_review' : 'counted', ...$this->countCoverage($stock, $data, now()),
         ]);
         // Counts with a difference wait for review; they never silently rewrite supply.
         if (! $different) {
@@ -396,7 +381,7 @@ final class MedicationStockService
         }
         $lots = $this->lots($stock)->keyBy('id');
         $countedIds = collect($record->lines)->pluck('lot_id')->sort()->values()->all();
-        $remainingIds = $lots->filter(fn ($lot) => Qty::greaterThan($lot->quantity_remaining, 0))->pluck('id')->sort()->values()->all();
+        $remainingIds = $lots->filter(fn ($lot) => ! empty($record->covered_paper_entry_ids) || Qty::greaterThan($lot->quantity_remaining, 0))->pluck('id')->sort()->values()->all();
         if ($countedIds !== $remainingIds) {
             throw ValidationException::withMessages(['reason' => 'The packs changed after this count. Count again before changing the balance.']);
         }
@@ -434,6 +419,7 @@ final class MedicationStockService
             'batch_number' => $first?->batch_number,
             'expiry_date' => $first?->expiry_date,
         ])->saveFromPackLedger();
+        $this->stockChangedAfterCommit();
     }
 
     private function receiptExpiry(array $data): ?string
@@ -497,6 +483,12 @@ final class MedicationStockService
         if (! $medication->active || $medication->state !== 'active' || $medication->superseded_by !== null) {
             throw ValidationException::withMessages(['client_medication_id' => 'This medicine is no longer active. Check the current order before receiving.']);
         }
+    }
+
+    public function stockChangedAfterCommit(): void
+    {
+        $this->assertTransaction();
+        DB::afterCommit(fn () => app(MedicationAlertSources::class)->stockChanged());
     }
 
     private function assertTransaction(): void

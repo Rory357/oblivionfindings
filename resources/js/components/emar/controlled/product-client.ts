@@ -102,9 +102,19 @@ export async function recordControlledAction(
             Object.entries(fields).forEach(([key, value]) => {
                 if (value instanceof File) form.append(key, value);
                 else if (Array.isArray(value))
-                    value.forEach((item) =>
-                        form.append(key + '[]', String(item)),
-                    );
+                    value.forEach((item, index) => {
+                        if (typeof item === 'object' && item !== null) {
+                            Object.entries(item).forEach(
+                                ([field, fieldValue]) => {
+                                    if (fieldValue !== undefined)
+                                        form.append(
+                                            `${key}[${index}][${field}]`,
+                                            String(fieldValue),
+                                        );
+                                },
+                            );
+                        } else form.append(key + '[]', String(item));
+                    });
                 else
                     form.append(
                         key,

@@ -10,6 +10,7 @@ use App\Domain\SecurityDevices\Presenters\TrackingWorkspacePresenter;
 use App\Models\AuditLog;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
+use App\Models\ConsentTypeVersion;
 use App\Models\Integration\IntegrationEvent;
 use App\Models\ItAttachment;
 use App\Models\ItCatalogItem;
@@ -17,14 +18,17 @@ use App\Models\ItCatalogSubmission;
 use App\Models\ItEmailDelivery;
 use App\Models\ItSecurityDesktopReleaseFixturePack;
 use App\Models\ItTicket;
+use App\Models\ItTicketApproval;
 use App\Models\ItTicketComment;
 use App\Models\ItTicketEvent;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ConsentValidationService;
 use App\Support\Release\ItSecurityDesktopReleaseFixtureManager;
 use App\Support\Release\ItSecurityDesktopReleaseFixtureReadiness;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
+use Database\Seeders\StandardConsentTypesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -36,6 +40,7 @@ uses(RefreshDatabase::class);
 beforeEach(function (): void {
     $this->seed(RbacSeeder::class);
     $this->seed(SecurityDevicesPermissionsSeeder::class);
+    $this->seed(StandardConsentTypesSeeder::class);
     Storage::fake('private');
     config()->set('it.desktop_release_fixtures.actor_password', 'release-only-password');
     config()->set('it.desktop_release_fixtures.reviewer_totp_secret', 'JBSWY3DPEHPK3PXP');
@@ -47,6 +52,33 @@ it('prepares one complete pack reuses it idempotently and removes only owned rec
     $secondRevision = str_repeat('b', 40);
     $unrelatedSite = Site::factory()->create(['name' => 'Unrelated retained Site']);
     $unrelatedUser = User::factory()->create(['email' => 'unrelated-retained@example.test']);
+    $catalogueType = ConsentType::query()->where('name', ItSecurityDesktopReleaseFixtureReadiness::TRACKING_CONSENT_TYPE_NAME)->sole();
+    $catalogueVersion = ConsentTypeVersion::query()->create([
+        'consent_type_id' => $catalogueType->id,
+        'version' => $catalogueType->version,
+        'description' => $catalogueType->description,
+        'purpose' => $catalogueType->purpose,
+        'legal_basis' => $catalogueType->legal_basis,
+        'changes_summary' => ['source' => 'retained_catalogue'],
+        'effective_from' => now()->subDay(),
+        'created_by' => $unrelatedUser->id,
+    ]);
+    $catalogueSnapshot = $catalogueType->fresh()->getRawOriginal();
+    $versionSnapshot = $catalogueVersion->fresh()->getRawOriginal();
+    $foreignTicket = ItTicket::factory()->create([
+        'title' => 'RELEASE V10 Alpha Switch Connectivity Incident',
+        'site_id' => $unrelatedSite->id,
+        'requester_user_id' => $unrelatedUser->id,
+    ]);
+    $foreignApproval = ItTicketApproval::query()->create([
+        'it_ticket_id' => $foreignTicket->id,
+        'requested_by' => $unrelatedUser->id,
+        'approver_id' => $unrelatedUser->id,
+        'status' => 'approved',
+        'reason' => 'Independent release acceptance approval.',
+        'decided_at' => now(),
+    ]);
+    $foreignApprovalSnapshot = $foreignApproval->fresh()->getRawOriginal();
 
     $plan = $manager->plan('prepare', $firstRevision);
     $created = $manager->execute('prepare', $firstRevision);
@@ -96,6 +128,20 @@ it('prepares one complete pack reuses it idempotently and removes only owned rec
         ->and(app(ItSecurityDesktopReleaseFixtureReadiness::class)->assess()['state'])->toBe('ready')
         ->and(MonitoringIncidentEvidenceSnapshot::query()->count())->toBe(1);
 
+    $consentType = ConsentType::query()->where('name', ItSecurityDesktopReleaseFixtureReadiness::TRACKING_CONSENT_TYPE_NAME)->sole();
+    $consentVersion = ConsentTypeVersion::query()->where('consent_type_id', $consentType->id)->sole();
+    $consent = ClientConsent::query()->where('consent_type_id', $consentType->id)->sole();
+    expect($consentType->version)->toBe(1)
+        ->and($consentVersion->version)->toBe($consentType->version)
+        ->and($consentVersion->purpose)->toBe($consentType->purpose)
+        ->and((int) $consent->consent_type_version_id)->toBe($consentVersion->id)
+        ->and($consent->decision_purpose)->toBe($consentVersion->purpose)
+        ->and($consentVersion->id)->toBe($catalogueVersion->id)
+        ->and($catalogueType->fresh()->getRawOriginal())->toBe($catalogueSnapshot)
+        ->and($catalogueVersion->fresh()->getRawOriginal())->toBe($versionSnapshot)
+        ->and(collect($pack->manifest['records'])->whereIn('type', ['consent_type', 'consent_type_version']))->toBeEmpty()
+        ->and(ConsentValidationService::isValidResidentLocationConsent($consent))->toBeTrue();
+
     $hiddenSiteActor = User::query()
         ->where('email', 'release-v10-denied@acceptance.invalid')
         ->sole();
@@ -140,7 +186,11 @@ it('prepares one complete pack reuses it idempotently and removes only owned rec
         ->and(IntegrationEvent::query()->whereKey($unrelatedEvent->id)->exists())->toBeTrue()
         ->and(Device::query()->whereKey($unrelatedDevice->id)->exists())->toBeTrue()
         ->and(Site::query()->whereKey($unrelatedSite->id)->exists())->toBeTrue()
-        ->and(User::query()->whereKey($unrelatedUser->id)->exists())->toBeTrue();
+        ->and(User::query()->whereKey($unrelatedUser->id)->exists())->toBeTrue()
+        ->and($catalogueType->fresh()->getRawOriginal())->toBe($catalogueSnapshot)
+        ->and($catalogueVersion->fresh()->getRawOriginal())->toBe($versionSnapshot)
+        ->and($foreignApproval->fresh()->getRawOriginal())->toBe($foreignApprovalSnapshot)
+        ->and(ItTicketApproval::query()->where('it_ticket_id', $foreignTicket->id)->count())->toBe(1);
     Storage::disk('private')->assertMissing('it-security-release-fixtures/v10/release-network-evidence.txt');
 });
 
@@ -290,7 +340,7 @@ it('withdraws and resets only the owned personal tracking consent baseline', fun
     $manager->execute('prepare', $revision);
 
     $consent = ClientConsent::query()
-        ->whereHas('consentType', fn ($query) => $query->where('name', 'RELEASE V10 Client Location Tracking'))
+        ->whereHas('consentType', fn ($query) => $query->where('name', ItSecurityDesktopReleaseFixtureReadiness::TRACKING_CONSENT_TYPE_NAME))
         ->sole();
     $assignment = DeviceAssignment::query()->where('consent_id', $consent->id)->sole();
     $device = Device::query()->where('name', 'RELEASE V10 Alpha Personal Tracker')->sole();
@@ -396,7 +446,7 @@ it('withdraws and resets only the owned personal tracking consent baseline', fun
         ->and(AuditLog::query()->where('action', 'tracking.collection.stopped')->exists())->toBeTrue()
         ->and(AuditLog::query()->where('action', 'tracking.consent.withdrawal_enforced')->exists())->toBeTrue()
         ->and(AuditLog::query()->where('action', 'tracking.collection.resumed')->exists())->toBeTrue()
-        ->and(ConsentType::query()->where('name', 'RELEASE V10 Client Location Tracking')->count())->toBe(1)
+        ->and(ConsentType::query()->where('name', ItSecurityDesktopReleaseFixtureReadiness::TRACKING_CONSENT_TYPE_NAME)->count())->toBe(1)
         ->and($commandDoors->every(fn (Device $door): bool => $door->last_seen_at?->gt(now()->subMinute()) === true))->toBeTrue()
         ->and(app(ItSecurityDesktopReleaseFixtureReadiness::class)->assess()['state'])->toBe('ready');
     $this->actingAs($viewer)
@@ -411,7 +461,7 @@ it('refuses withdrawal and reset when the owned consent is shared with a non man
     $manager->execute('prepare', $revision);
 
     $consent = ClientConsent::query()
-        ->whereHas('consentType', fn ($query) => $query->where('name', 'RELEASE V10 Client Location Tracking'))
+        ->whereHas('consentType', fn ($query) => $query->where('name', ItSecurityDesktopReleaseFixtureReadiness::TRACKING_CONSENT_TYPE_NAME))
         ->sole();
     $fixtureAssignment = DeviceAssignment::query()->where('consent_id', $consent->id)->sole();
     $fixtureDevice = Device::query()->where('name', 'RELEASE V10 Alpha Personal Tracker')->sole();
@@ -794,4 +844,105 @@ it('rechecks retained D16 evidence under the cleanup lock before deleting any ow
         ->and(ItSecurityDesktopReleaseFixturePack::query()->count())->toBe(1)
         ->and(Device::query()->whereKey($doorId)->exists())->toBeTrue()
         ->and(ItCatalogItem::query()->whereKey($catalogueId)->exists())->toBeTrue();
+});
+
+it('refuses cleanup of changed or additional approval evidence without touching the owned graph', function (string $drift): void {
+    $manager = app(ItSecurityDesktopReleaseFixtureManager::class);
+    $revision = str_repeat('8', 40);
+    expect($manager->execute('prepare', $revision)['state'])->toBe('ready');
+    $pack = ItSecurityDesktopReleaseFixturePack::query()->sole();
+    $record = collect($pack->manifest['records'])->where('type', 'it_ticket_approval')->sole();
+    $approval = ItTicketApproval::query()->findOrFail($record['id']);
+    expect(fn () => $approval->delete())->toThrow(LogicException::class, 'Approval generations must be preserved.');
+    if ($drift === 'changed') {
+        DB::table($approval->getTable())->where('id', $approval->id)->update(['decision_reason' => 'Additional retained decision evidence.']);
+    } else {
+        ItTicketApproval::query()->create([
+            'it_ticket_id' => $approval->it_ticket_id,
+            'requested_by' => $approval->requested_by,
+            'approver_id' => $approval->approver_id,
+            'status' => 'pending',
+            'reason' => 'An additional approval generation must survive.',
+        ]);
+    }
+    $snapshot = static function () use ($pack): array {
+        return [
+            'pack' => $pack->fresh()->getRawOriginal(),
+            'approvals' => ItTicketApproval::query()->orderBy('id')->get()->map->getRawOriginal()->all(),
+            'tickets' => ItTicket::query()->orderBy('id')->get()->map->getRawOriginal()->all(),
+            'users' => User::query()->orderBy('id')->get()->map->getRawOriginal()->all(),
+            'sites' => Site::withTrashed()->orderBy('id')->get()->map->getRawOriginal()->all(),
+            'devices' => Device::withTrashed()->orderBy('id')->get()->map->getRawOriginal()->all(),
+            'consents' => ClientConsent::withTrashed()->orderBy('id')->get()->map->getRawOriginal()->all(),
+            'audits' => AuditLog::query()->count(),
+            'file' => Storage::disk('private')->get('it-security-release-fixtures/v10/release-network-evidence.txt'),
+        ];
+    };
+    $before = $snapshot();
+    foreach (['plan', 'execute'] as $method) {
+        expect($manager->{$method}('cleanup', $revision))->toMatchArray([
+            'state' => 'failed',
+            'gap_codes' => ['release_fixture_approval_baseline_changed_or_shared'],
+            'fixture_mutation_applied' => false,
+        ]);
+    }
+    expect($snapshot())->toBe($before);
+})->with(['changed', 'additional']);
+
+it('retains a shared canonical catalogue snapshot created for the exact fixture consent', function (): void {
+    $manager = app(ItSecurityDesktopReleaseFixtureManager::class);
+    $revision = str_repeat('7', 40);
+    $type = ConsentType::query()->where('name', ItSecurityDesktopReleaseFixtureReadiness::TRACKING_CONSENT_TYPE_NAME)->sole();
+    $before = $type->getRawOriginal();
+    expect(ConsentTypeVersion::query()->where('consent_type_id', $type->id)->exists())->toBeFalse()
+        ->and($manager->execute('prepare', $revision)['state'])->toBe('ready');
+    $version = ConsentTypeVersion::query()->where('consent_type_id', $type->id)->sole();
+    $versionBefore = $version->getRawOriginal();
+    $pack = ItSecurityDesktopReleaseFixturePack::query()->sole();
+    expect(collect($pack->manifest['records'])->whereIn('type', ['consent_type', 'consent_type_version']))->toBeEmpty()
+        ->and($version->purpose)->toBe($type->purpose)
+        ->and($version->legal_basis)->toBe($type->legal_basis)
+        ->and($version->created_by)->toBeNull()
+        ->and($manager->execute('cleanup', $revision)['state'])->toBe('ready')
+        ->and($type->fresh()->getRawOriginal())->toBe($before)
+        ->and($version->fresh()->getRawOriginal())->toBe($versionBefore);
+});
+
+it('keeps a valid custom tracking purpose outside resident location authority', function (): void {
+    $manager = app(ItSecurityDesktopReleaseFixtureManager::class);
+    expect($manager->execute('prepare', str_repeat('6', 40))['state'])->toBe('ready');
+    $consent = ClientConsent::query()->sole();
+    $customType = ConsentType::query()->create([
+        'name' => 'RELEASE custom specialist tracking purpose',
+        'version' => 1,
+        'category' => 'optional',
+        'purpose' => 'Specialist tracking workspace only.',
+        'legal_basis' => 'Identified self decision for the synthetic acceptance person.',
+        'active' => true,
+    ]);
+    $version = ConsentTypeVersion::query()->create([
+        'consent_type_id' => $customType->id,
+        'version' => 1,
+        'purpose' => $customType->purpose,
+        'legal_basis' => $customType->legal_basis,
+        'effective_from' => now()->subMinute(),
+    ]);
+    $consent->update([
+        'consent_type_id' => $customType->id,
+        'consent_type_version_id' => $version->id,
+        'decision_purpose' => $version->purpose,
+        'decision_evidence' => array_replace($consent->decision_evidence, [
+            'consent_type_id' => $customType->id,
+            'consent_type_version_id' => $version->id,
+            'consent_type_purpose' => $version->purpose,
+        ]),
+    ]);
+    $consent->refresh();
+    $viewer = User::query()->where('email', 'release-v10-control-room@acceptance.invalid')->sole();
+    $device = Device::query()->where('name', 'RELEASE V10 Alpha Personal Tracker')->sole();
+    $before = [$consent->getRawOriginal(), $device->getRawOriginal(), AuditLog::query()->count()];
+    expect(ConsentValidationService::isValidTrackingConsent($consent))->toBeTrue()
+        ->and(ConsentValidationService::isValidResidentLocationConsent($consent))->toBeFalse();
+    $this->actingAs($viewer)->getJson("/operations/clients/{$consent->client_id}/location/history")->assertForbidden();
+    expect([$consent->fresh()->getRawOriginal(), $device->fresh()->getRawOriginal(), AuditLog::query()->count()])->toBe($before);
 });

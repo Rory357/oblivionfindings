@@ -101,6 +101,15 @@ final class RecordingContract
     public static function rules(): array
     {
         return [
+            'pack_lines' => ['nullable', 'array', 'max:100'],
+            'pack_lines.*' => ['array:lot_id,revision,quantity,quantity_wasted'],
+            'pack_lines.*.lot_id' => ['required', 'integer', 'min:1'],
+            'pack_lines.*.revision' => ['required', 'integer', 'min:0'],
+            'pack_lines.*.quantity' => ['required', 'numeric', 'decimal:0,2', 'min:0.01', 'max:99999999.99'],
+            'pack_lines.*.quantity_wasted' => ['required', 'numeric', 'decimal:0,2', 'min:0', 'max:99999999.99'],
+            'live_recording_context' => ['nullable', 'string', 'max:4096'],
+            'quantity_wasted' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:99999999.99'],
+            'waste_reason' => ['nullable', 'string', 'max:4000'],
             'late_reason' => ['nullable', 'string', Rule::in(array_keys(self::LATE_REASONS))],
             'amount_mode' => ['nullable', 'string', Rule::in(self::AMOUNT_MODES)],
             'amount_reason' => ['nullable', 'string', Rule::in(array_keys(self::AMOUNT_REASONS))],

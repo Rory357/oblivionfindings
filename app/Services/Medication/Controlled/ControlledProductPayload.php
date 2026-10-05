@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Services\Medication\ControlledMedicationTransportWitnessService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
+use App\Services\Medication\Stock\MedicationStockService;
 use App\Services\Medication\WitnessPinService;
 use App\Support\Medication\MedicationStockQuantity as Quantity;
 use Carbon\CarbonImmutable;
@@ -142,16 +143,18 @@ final class ControlledProductPayload
                 $canRecord = $record && in_array((int) $m->client->site_id, $presentSites, true) && (($m->deleted_at === null && $m->superseded_by === null));
 
                 return ['id' => $m->id, 'client_id' => $m->client_id, 'client_name' => $m->client->full_name, 'site_id' => $m->client->site_id, 'site_name' => $m->client->site?->name ?? '',
+                    'pack_stock' => app(MedicationStockService::class)->packOptions($m),
                     'name' => $m->name, 'unit' => $m->stock?->unit ?? '', 'balance' => $m->stock?->on_hand === null ? null : Quantity::toFloat($m->stock->on_hand),
                     'entry_version' => $latest[$m->id] ?? null, 'nz_class' => $m->nz_controlled_class, 'class_review_required' => $m->controlled_class_reviewed_at === null,
                     'can_count' => $record && in_array((int) $m->client->site_id, $presentSites, true) && $this->policy->countRequired($m),
+                    'can_destroy' => $canRecord && app(MedicationStockService::class)->canDestroyRetainedSupply($m, $m->stock),
                     'can_record' => $canRecord, 'record_reason' => $canRecord ? null : 'Record access and a clocked-in shift at this house are needed.',
                     'count' => ['state' => $status, 'cadence' => $state['cadence'], 'next_at' => $state['next_change_at'], 'title' => match ($state['status']) {
                         'due' => $state['cadence'] === 'week' ? 'Due now — weekly count' : 'Due now — shift-change count', 'overdue' => $state['cadence'] === 'week' ? 'Weekly count overdue' : 'Shift-change count overdue', 'complete' => 'Counted', 'upcoming' => $state['cadence'] === 'week' ? 'Next weekly count' : 'Next shift-change count', 'schedule_unavailable' => $state['cadence'] === 'week' ? 'Weekly count day and time not configured' : 'Roster timing not configured', 'not_applicable' => 'No stock count required', default => 'Not configured'
                     },
                         'due_at' => $state['due_at'], 'overdue_at' => $state['overdue_at'], 'last_at' => $count?->recorded_at?->toIso8601String(), 'last_entry_id' => $count?->id]];
             })->values(),
-            'entries' => $entries->map(fn ($e): array => ['id' => $e->id, 'client_medication_id' => $e->client_medication_id, 'entry_type' => $e->entry_type, 'quantity' => $e->quantity === null ? null : Quantity::toFloat($e->quantity),
+            'entries' => $entries->map(fn ($e): array => ['id' => $e->id, 'client_medication_id' => $e->client_medication_id, 'entry_type' => $e->entry_type, 'stock_balance_scope' => $e->stock_balance_scope, 'transit_log_id' => $e->transit_log_id, 'quantity' => $e->quantity === null ? null : Quantity::toFloat($e->quantity),
                 'on_hand_before' => $e->on_hand_before === null ? null : Quantity::toFloat($e->on_hand_before), 'on_hand_after' => $e->on_hand_after === null ? null : Quantity::toFloat($e->on_hand_after), 'recorded_at' => $e->recorded_at?->toIso8601String(),
                 'recorded_by_name' => $e->recordedBy?->name, 'witnessed_by_name' => $e->witnessedBy?->name, 'second_witness_name' => $names[$e->second_witness_id] ?? null,
                 'notes' => $e->notes, 'voided_at' => $reversals->get($e->id)?->recorded_at?->toIso8601String(), 'void_reason' => $reversals->get($e->id)?->reason,

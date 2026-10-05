@@ -1,7 +1,10 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\Services\ItEmailDeliveryService;
+use App\Jobs\DispatchItTicketNotifications;
 use App\Models\Asset;
+use App\Models\ItEmailDelivery;
 use App\Models\ItQueue;
 use App\Models\ItService;
 use App\Models\ItTicket;
@@ -10,6 +13,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Notifications\It\TicketCreatedNotification;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Notification;
 
 function triageUser(string $role): User
@@ -51,9 +55,10 @@ function assignTriageUserToSite(User $user, Site $site): void
 
 test('an agent logs a ticket on behalf of a colleague with full triage', function () {
     Notification::fake();
-    $colleague = User::factory()->create();
+    Bus::fake([DispatchItTicketNotifications::class]);
+    $colleague = triageUser('support_worker');
     $assignee = triageUser('hr');
-    $watcher = User::factory()->create();
+    $watcher = triageUser('hr');
     foreach ([$colleague, $assignee, $watcher] as $user) {
         assignTriageUserToSite($user, $this->site);
     }
@@ -82,9 +87,10 @@ test('an agent logs a ticket on behalf of a colleague with full triage', functio
         'site_id' => $this->site->id,
         'requester_user_id' => $colleague->id,
         'assigned_to_user_id' => $assignee->id,
+        'routing_reason' => 'The approved local technician owns this equipment repair.',
         'asset_id' => $asset->id,
         'watchers' => [$watcher->id],
-    ])->assertRedirect();
+    ])->assertRedirect()->assertSessionHasNoErrors();
 
     $ticket = ItTicket::query()->firstWhere('title', 'Hoist controller unresponsive');
     expect((int) $ticket->requester_user_id)->toBe($colleague->id);
@@ -97,10 +103,25 @@ test('an agent logs a ticket on behalf of a colleague with full triage', functio
     expect($ticket->status)->toBe('in_progress');
     expect($ticket->source)->toBe('agent');
     expect($ticket->watchers()->whereKey($watcher->id)->exists())->toBeTrue();
+    expect($ticket->routing_override['reason'])->toBe('The approved local technician owns this equipment repair.');
 
     $created = $ticket->events()->where('type', 'created')->first();
     expect($created->payload['on_behalf_of'] ?? null)->toBe($colleague->id);
 
+    // Intake persists intent; the governed drain rechecks current receipt access.
+    $receipt = ItEmailDelivery::query()->where('it_ticket_id', $ticket->id)
+        ->where('notification_type', 'ticket_created')->where('audience', 'receipt')->sole();
+    expect($colleague->canDo('it.request'))->toBeTrue()
+        ->and((int) $receipt->recipient_user_id)->toBe($colleague->id)
+        ->and($receipt->status)->toBe('queued')
+        ->and($receipt->dispatch_requested_at)->not->toBeNull()
+        ->and(ItEmailDelivery::query()->where('it_ticket_id', $ticket->id)
+            ->where('recipient_user_id', $this->hr->id)->exists())->toBeFalse();
+    Bus::assertDispatchedAfterResponse(DispatchItTicketNotifications::class,
+        fn (DispatchItTicketNotifications $job): bool => $job->ticketId === (int) $ticket->id);
+    Notification::assertNothingSent();
+    expect(app(ItEmailDeliveryService::class)->dispatchPending(ticketId: $ticket->id))->toBe(1);
+    expect($receipt->fresh()->dispatch_finished_at)->not->toBeNull();
     // The receipt goes to the requester (the colleague), never the acting agent.
     Notification::assertSentTo($colleague, TicketCreatedNotification::class);
     Notification::assertNotSentTo($this->hr, TicketCreatedNotification::class);

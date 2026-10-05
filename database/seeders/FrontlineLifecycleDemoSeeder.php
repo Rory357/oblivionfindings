@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrTimeEntry;
 use App\Domain\Hr\Services\AttendanceService;
 use App\Models\Client;
 use App\Models\ClientControlledDrugEntry;
@@ -954,14 +955,14 @@ class FrontlineLifecycleDemoSeeder extends Seeder
         ServiceContext $serviceContext,
         Shift $incomingHandoverShift,
     ): void {
-        $startsAt = Carbon::now()->subHours(2)->startOfMinute();
+        [$notes, $startsAt] = $this->activeCleanFixtureGeneration($worker, $admin, $client, $serviceContext);
         $endsAt = Carbon::now()->addHours(6)->startOfMinute();
         $shift = $this->upsertPlaywrightShift(
             $worker,
             $admin,
             $client,
             $serviceContext,
-            'PW:active-clean:'.$worker->email,
+            $notes,
             $startsAt,
             $endsAt,
             'in_progress',
@@ -1000,6 +1001,71 @@ class FrontlineLifecycleDemoSeeder extends Seeder
             'client_mood' => 'calm',
             'submit' => true,
         ]);
+    }
+
+    /** @return array{0: string, 1: Carbon} */
+    private function activeCleanFixtureGeneration(User $worker, User $admin, Client $client, ServiceContext $serviceContext): array
+    {
+        $base = 'PW:active-clean:'.$worker->email;
+        $notes = $base;
+        $startsAt = Carbon::now()->subHours(2)->startOfMinute();
+        $parentId = null;
+        while (true) {
+            // Follow only exact deterministic identities, never a broad PW prefix.
+            $matches = Shift::query()->where('notes', $notes)->get();
+            if ($matches->isEmpty()) {
+                return [$notes, $startsAt];
+            }
+            $shift = $matches->count() === 1 ? $matches->first() : null;
+            if ($shift === null || ($parentId !== null && (int) $shift->id <= $parentId)
+                || (int) $shift->user_id !== (int) $worker->id
+                || (int) $shift->client_id !== (int) $client->id
+                || (int) $shift->site_id !== (int) $client->site_id
+                || (int) $shift->service_context_id !== (int) $serviceContext->id
+                || (int) $shift->created_by !== (int) $admin->id) {
+                throw new \LogicException('The active clean attendance fixture has conflicting canonical identity.');
+            }
+            $sessions = HrAttendanceSession::query()->where('shift_id', $shift->id)->get();
+            $session = $sessions->count() === 1 ? $sessions->first() : null;
+            $timesheets = Timesheet::query()->where('shift_id', $shift->id)->get();
+            $entries = HrTimeEntry::query()->where('shift_id', $shift->id)->get();
+            if ($sessions->count() > 1 || ($session === null && ($timesheets->isNotEmpty() || $entries->isNotEmpty()))
+                || ($session !== null && ((int) $session->user_id !== (int) $worker->id
+                    || (int) $session->site_id !== (int) $client->site_id
+                    || (int) $session->created_by !== (int) $worker->id || $session->source !== 'playwright'
+                    || $session->clock_in_at === null || ! in_array($session->status, ['open', 'closed'], true)))
+                || $timesheets->count() > 1 || $entries->count() > 1
+                || $timesheets->contains(fn (Timesheet $row): bool => (int) $row->user_id !== (int) $worker->id || (int) $row->client_id !== (int) $client->id
+                    || (int) $row->shift_site_id !== (int) $client->site_id
+                    || (int) $row->attendance_session_id !== (int) $session?->id)
+                || $entries->contains(fn (HrTimeEntry $row): bool => (int) $row->user_id !== (int) $worker->id || (int) $row->client_id !== (int) $client->id
+                    || (int) $row->site_id !== (int) $client->site_id
+                    || (int) $row->attendance_session_id !== (int) $session?->id
+                    || $row->source_type !== 'attendance' || (int) $row->source_id !== (int) $session?->id)) {
+                throw new \LogicException('The active clean attendance fixture has conflicting canonical identity.');
+            }
+            if ($session === null) {
+                return [$notes, $startsAt];
+            }
+            if ($session->status === 'open') {
+                if ($session->clock_out_at !== null || $timesheets->isNotEmpty() || $entries->isNotEmpty()) {
+                    throw new \LogicException('The active clean attendance fixture has conflicting canonical identity.');
+                }
+
+                return [$notes, $session->clock_in_at->copy()];
+            }
+            if ($session->clock_out_at === null || $session->clock_out_at->lt($session->clock_in_at)
+                || $session->clock_out_at->gt(Carbon::now())) {
+                throw new \LogicException('The active clean attendance fixture has conflicting canonical identity.');
+            }
+            // Closed Shift/session/Timesheet/time-entry evidence is never reopened
+            // or rewritten. New attendance starts at its half-open end boundary.
+            if ($session->clock_out_at->gt($startsAt)) {
+                $startsAt = $session->clock_out_at->copy();
+            }
+            $parentId = (int) $shift->id;
+            $notes = $base.':after-'.$parentId;
+        }
     }
 
     private function seedClockInCandidate(User $worker, User $admin, Client $client, ServiceContext $serviceContext): void
@@ -1161,15 +1227,41 @@ class FrontlineLifecycleDemoSeeder extends Seeder
             ->where('user_id', $worker->id)
             ->whereHas('shift', fn ($shift) => $shift->where('notes', 'PW:submitted-approval:'.$worker->email))
             ->first();
+        if ($existingTimesheet !== null) {
+            $existingTimesheet->loadMissing(['shift', 'attendanceSession']);
+            $existingShift = $existingTimesheet->shift;
+            $existingSession = $existingTimesheet->attendanceSession;
+            if ($existingShift === null || $existingSession === null
+                || (int) $existingShift->user_id !== (int) $worker->id
+                || (int) $existingShift->client_id !== (int) $client->id
+                || (int) $existingShift->site_id !== (int) $client->site_id
+                || (int) $existingShift->service_context_id !== (int) $serviceContext->id
+                || (int) $existingTimesheet->client_id !== (int) $client->id
+                || (int) $existingTimesheet->shift_site_id !== (int) $client->site_id
+                || (int) $existingSession->user_id !== (int) $worker->id
+                || (int) $existingSession->shift_id !== (int) $existingShift->id
+                || (int) $existingSession->site_id !== (int) $client->site_id
+                || $existingSession->source !== 'playwright'
+                || $existingSession->status !== 'closed'
+                || $existingTimesheet->starts_at === null || $existingTimesheet->ends_at === null
+                || $existingTimesheet->work_date === null
+                || $existingSession->clock_in_at?->equalTo($existingTimesheet->starts_at) !== true
+                || $existingSession->clock_out_at?->equalTo($existingTimesheet->ends_at) !== true) {
+                throw new \LogicException('The submitted attendance fixture has conflicting canonical identity.');
+            }
+        }
         if ($existingTimesheet?->is_protected_from_changes) {
             // A fixture reset must not undo a real approval or alter retained
             // payroll evidence. The pending sibling fixture remains available.
             return;
         }
 
-        $workDate = Carbon::now()->subDays($worker->email === 'sw2@demo.test' ? 3 : 4)->startOfDay();
-        $startsAt = $workDate->copy()->setTime(8, 0);
-        $endsAt = $workDate->copy()->setTime(16, 0);
+        // A captured attendance session and its canonical time entry retain
+        // their original clock identity, including a reset across UTC midnight.
+        $workDate = $existingTimesheet?->work_date?->copy()->startOfDay()
+            ?? Carbon::now()->subDays($worker->email === 'sw2@demo.test' ? 3 : 4)->startOfDay();
+        $startsAt = $existingTimesheet?->starts_at?->copy() ?? $workDate->copy()->setTime(8, 0);
+        $endsAt = $existingTimesheet?->ends_at?->copy() ?? $workDate->copy()->setTime(16, 0);
         $shift = $this->upsertPlaywrightShift(
             $worker,
             $admin,

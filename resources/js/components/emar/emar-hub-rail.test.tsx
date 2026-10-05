@@ -157,4 +157,29 @@ describe('EmarHubRail', () => {
         });
         expect(header?.contains(tablist)).toBe(true);
     });
+
+    it('opens pack counts from stock without losing the selected house', () => {
+        at('/emar/stock?site_id=2&view=orders', coordinator);
+        render(<EmarHubRail />);
+        fireEvent.click(screen.getByRole('tab', { name: 'Packs & counts' }));
+        expect(fixture.visit).toHaveBeenCalledWith(
+            '/emar/stock/packs?site_id=2',
+        );
+    });
+
+    it('keeps a just-selected person when opening packs before the filter response returns', () => {
+        at('/emar/stock?site_id=2&client_id=3&view=orders', coordinator);
+        render(<EmarHubRail scope={{ site_id: 2, client_id: 7 }} />);
+        fireEvent.click(screen.getByRole('tab', { name: 'Packs & counts' }));
+        expect(fixture.visit).toHaveBeenCalledWith(
+            '/emar/stock/packs?site_id=2&client_id=7',
+        );
+    });
+
+    it('does not restore cleared person or house filters from an earlier response', () => {
+        at('/emar/stock?site_id=2&client_id=3', coordinator);
+        render(<EmarHubRail scope={{ site_id: null, client_id: null }} />);
+        fireEvent.click(screen.getByRole('tab', { name: 'Packs & counts' }));
+        expect(fixture.visit).toHaveBeenCalledWith('/emar/stock/packs');
+    });
 });

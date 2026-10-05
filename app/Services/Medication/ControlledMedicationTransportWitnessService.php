@@ -9,6 +9,7 @@ use App\Models\Shift;
 use App\Models\User;
 use App\Services\AuthorizationEvidenceLockService;
 use App\Services\Fleet\ResidentTransportJourneyScope;
+use App\Services\Medication\Downtime\HistoricalSecondPersonPresence;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Closure;
@@ -135,6 +136,7 @@ final class ControlledMedicationTransportWitnessService
         string $witnessErrorKey = 'witnessed_by',
         ?Collection $lockedUsers = null,
         ?Collection $lockedPresenceShifts = null,
+        bool $historical = false,
     ): array {
         if (DB::transactionLevel() < 1) {
             throw new LogicException('Second-person eligibility must be attested in the governing transaction.');
@@ -176,6 +178,7 @@ final class ControlledMedicationTransportWitnessService
             true,
             now(),
             $lockedPresenceShifts,
+            $historical,
         );
         abort_unless($qualification, 404);
 
@@ -201,6 +204,7 @@ final class ControlledMedicationTransportWitnessService
         bool $lockForUpdate,
         ?CarbonInterface $currentEmploymentAt = null,
         ?Collection $lockedPresenceShifts = null,
+        bool $historical = false,
     ): ?array {
         if (
             $witness->approved_at === null
@@ -250,6 +254,7 @@ final class ControlledMedicationTransportWitnessService
             $lockForUpdate,
             $lockedPresenceShifts,
         );
+        $presence ??= $historical ? HistoricalSecondPersonPresence::fromLocked($witness, $siteId, $effectiveAt, $lockedPresenceShifts) : null;
         if ($presence === null) {
             return null;
         }
@@ -429,6 +434,7 @@ final class ControlledMedicationTransportWitnessService
         int $siteId,
         CarbonInterface $effectiveAt,
         array $additionalShiftIds = [],
+        bool $historical = false,
     ): Collection {
         if (DB::transactionLevel() < 1) {
             throw new LogicException('Controlled-medication presence Shifts must be locked in the governing transaction.');
@@ -454,7 +460,7 @@ final class ControlledMedicationTransportWitnessService
 
         return Shift::query()
             ->with('client:id,site_id')
-            ->where(function (Builder $candidates) use ($ids, $siteId, $storageMoment, $explicitShiftIds): void {
+            ->where(function (Builder $candidates) use ($ids, $siteId, $storageMoment, $explicitShiftIds, $historical): void {
                 if ($explicitShiftIds->isNotEmpty()) {
                     $candidates->whereIn('id', $explicitShiftIds->all());
                 }
@@ -462,6 +468,14 @@ final class ControlledMedicationTransportWitnessService
                     $method = $explicitShiftIds->isNotEmpty() ? 'orWhere' : 'where';
                     $candidates->{$method}(function (Builder $eligible) use ($ids, $siteId, $storageMoment): void {
                         $this->applyPresenceShiftScope($eligible, $ids->all(), $siteId, $storageMoment);
+                    });
+                }
+                if ($historical && $ids->isNotEmpty()) {
+                    $candidates->orWhere(function (Builder $past) use ($ids, $siteId, $storageMoment): void {
+                        $past->whereIn('user_id', $ids->all())->where('status', 'completed')
+                            ->where('actual_starts_at', '<=', $storageMoment)->where('actual_ends_at', '>=', $storageMoment)
+                            ->where(fn (Builder $site) => $site->where('site_id', $siteId)
+                                ->orWhere(fn (Builder $derived) => $derived->whereNull('site_id')->whereHas('client', fn (Builder $client) => $client->where('site_id', $siteId))));
                     });
                 }
             })

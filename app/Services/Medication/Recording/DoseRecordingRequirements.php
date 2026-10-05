@@ -25,6 +25,7 @@ use App\Services\Medication\MedicationSafetyPolicySettings;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Medication\MedicationSecondPersonService;
 use App\Services\Medication\Settings\MedicineRuleWording;
+use App\Services\Medication\Stock\MedicationStockService;
 use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationRuleService;
 use App\Services\MedicationSafetyService;
@@ -297,6 +298,7 @@ final class DoseRecordingRequirements
         $covert = $this->covertFor($order);
         $due = $dueAt !== null ? $this->dueFor($order, $dueAt, $now) : null;
         $orderFacts = $this->orderFacts($order);
+        $stockStarted = $order->stock()->whereNotNull('lots_started_at')->exists();
 
         $result = [
             'kind' => $order->is_prn ? 'prn' : 'scheduled',
@@ -305,11 +307,12 @@ final class DoseRecordingRequirements
             'block_all' => null,
             'block_given' => $blockGiven,
             'competency' => $competency,
+            'stock_tracking' => ['lots_started' => $stockStarted, 'offline_given_allowed' => ! $order->controlled_drug && ! $stockStarted],
             'witness_override' => $doseOverride === null ? null : ['id' => (int) $doseOverride->id, 'expires_at' => $doseOverride->expires_at->toIso8601String(), 'followup_due_at' => $doseOverride->followup_due_at->toIso8601String()],
             'second_person' => [
                 'kind' => $kind,
-                // PIN-2 stays off until its own-login consumer and expiry job
-                // are integrated; the recorder never advertises a dead flow.
+                // PIN-2 remains disabled for this delivery. The own-login
+                // consumer and expiry job retain their stricter qualification policy.
                 'forgotten_pin_allowed' => app(ForgottenWitnessPinService::class)->available()
                     && ! $order->controlled_drug
                     && in_array($kind, [RecordingContract::SECOND_RULE, RecordingContract::SECOND_AMOUNT, RecordingContract::SECOND_COSIGNER], true),
@@ -344,6 +347,7 @@ final class DoseRecordingRequirements
         $result['not_simple'] = $this->notSimple($order, $result);
 
         if ($detail) {
+            $result['stock_packs'] = $order->controlled_drug ? app(MedicationStockService::class)->packOptions($order) : null;
             $result['person'] = $this->personFacts($client);
             $result['who_can_give'] = $this->whoCanGive($viewer, $siteId, $now, $candidates, $cache);
             $result['house_lead'] = $cache->houseLead[$siteId] ??= $this->houseLead($siteId, $now);
@@ -358,6 +362,7 @@ final class DoseRecordingRequirements
                 'more_severities' => RecordingContract::MORE_SEVERITIES,
             ];
             $result['checked_at'] = $now->toIso8601String();
+            $result['live_recording_context'] = LiveRecordingContext::issue($viewer, $order, $now);
         }
 
         return $result;

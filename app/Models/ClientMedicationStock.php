@@ -3,10 +3,15 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Services\Medication\Stock\StockAvailability;
 use App\Support\Medication\MedicationStockQuantity;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ClientMedicationStock extends Model
 {
@@ -20,11 +25,11 @@ class ClientMedicationStock extends Model
     protected static function booted(): void
     {
         static::saving(function (self $stock): void {
-            if ($stock->writingPackEvidence || ! $stock->exists || $stock->getRawOriginal('lots_started_at') === null
-                || app(\App\Services\Medication\Stock\StockAvailability::class)->controlled($stock)) {
-                return;
-            }
-            if ($stock->isDirty(['on_hand', 'unit', 'batch_number', 'expiry_date', 'last_counted_at', 'lots_started_at'])) {
+            // Once packs exist, ordinary AND controlled scalar changes must
+            // come from the governed pack/register adapter, never a legacy form.
+            $started = $stock->exists && $stock->getRawOriginal('lots_started_at') !== null;
+            if ($started && ! $stock->writingPackEvidence
+                && $stock->isDirty(['on_hand', 'unit', 'batch_number', 'expiry_date', 'last_counted_at', 'lots_started_at'])) {
                 $stock->rejectScalarWrite('on_hand');
             }
         });
@@ -32,13 +37,12 @@ class ClientMedicationStock extends Model
 
     public function rejectScalarWrite(string $field = 'quantity'): void
     {
-        if ($this->lots_started_at === null || app(\App\Services\Medication\Stock\StockAvailability::class)->controlled($this)) {
-            return;
+        if ($this->lots_started_at !== null) {
+            throw ValidationException::withMessages([
+                $field => 'This medicine uses pack records. Receive, count or remove the actual packs in Stock & controlled drugs. Your entries have not been applied.',
+                'stock_workflow_url' => $this->packWorkflowUrl(),
+            ]);
         }
-        throw \Illuminate\Validation\ValidationException::withMessages([
-            $field => 'This medicine uses pack records. Receive, count or remove the actual packs in Stock & controlled drugs. Your entries have not been applied.',
-            'stock_workflow_url' => $this->packWorkflowUrl(),
-        ]);
     }
 
     public function packWorkflowUrl(): string
@@ -49,7 +53,7 @@ class ClientMedicationStock extends Model
     /** Internal ledger write after canonical stock/lot locks and validation. */
     public function saveFromPackLedger(): bool
     {
-        if (\Illuminate\Support\Facades\DB::transactionLevel() < 1) {
+        if (DB::transactionLevel() < 1) {
             throw new \LogicException('Pack evidence must be saved in the governing stock transaction.');
         }
         $this->writingPackEvidence = true;
@@ -62,24 +66,29 @@ class ClientMedicationStock extends Model
 
     public function availableQuantity(): ?string
     {
-        return app(\App\Services\Medication\Stock\StockAvailability::class)->quantity($this);
+        return app(StockAvailability::class)->quantity($this);
     }
 
-    public function currentExpiryDate(): ?\Carbon\CarbonInterface
+    public function usableQuantity(): ?string
+    {
+        return app(StockAvailability::class)->usableQuantity($this);
+    }
+
+    public function currentExpiryDate(): ?CarbonInterface
     {
         return $this->lots_started_at === null ? $this->expiry_date
-            : app(\App\Services\Medication\Stock\StockAvailability::class)->nextUsablePack($this)?->expiry_date;
+            : app(StockAvailability::class)->nextUsablePack($this)?->expiry_date;
     }
 
     public function currentBatchNumber(): ?string
     {
         return $this->lots_started_at === null ? $this->batch_number
-            : app(\App\Services\Medication\Stock\StockAvailability::class)->nextUsablePack($this)?->batch_number;
+            : app(StockAvailability::class)->nextUsablePack($this)?->batch_number;
     }
 
-    public function packExpiries(bool $expired, int $days = 30): \Illuminate\Support\Collection
+    public function packExpiries(bool $expired, int $days = 30): Collection
     {
-        return app(\App\Services\Medication\Stock\StockAvailability::class)->expiries($this, $expired, $days);
+        return app(StockAvailability::class)->expiries($this, $expired, $days);
     }
 
     public function getAvailableOnHandAttribute(): ?string
@@ -132,7 +141,7 @@ class ClientMedicationStock extends Model
      */
     public function scopeExpiringSoon(Builder $query, int $days = 30): Builder
     {
-        return \App\Services\Medication\Stock\StockAvailability::expiryScope($query, false, $days);
+        return StockAvailability::expiryScope($query, false, $days);
     }
 
     /**
@@ -140,7 +149,7 @@ class ClientMedicationStock extends Model
      */
     public function scopeExpired(Builder $query): Builder
     {
-        return \App\Services\Medication\Stock\StockAvailability::expiryScope($query, true);
+        return StockAvailability::expiryScope($query, true);
     }
 
     /**
@@ -148,7 +157,7 @@ class ClientMedicationStock extends Model
      */
     public function scopeLowStock(Builder $query): Builder
     {
-        return $query->whereNotNull('reorder_level')->whereRaw('('.\App\Services\Medication\Stock\StockAvailability::quantitySql().') <= client_medication_stocks.reorder_level', [\App\Services\Medication\Stock\StockAvailability::today()]);
+        return $query->whereNotNull('reorder_level')->whereRaw('('.StockAvailability::usableQuantitySql().') <= client_medication_stocks.reorder_level', [StockAvailability::today()]);
     }
 
     // ─── Helper Methods ─────────────────────────────────────
@@ -175,8 +184,8 @@ class ClientMedicationStock extends Model
     public function isLowStock(): bool
     {
         return $this->reorder_level !== null
-            && $this->availableQuantity() !== null
-            && MedicationStockQuantity::lessThanOrEqual($this->availableQuantity(), $this->reorder_level);
+            && $this->usableQuantity() !== null
+            && MedicationStockQuantity::lessThanOrEqual($this->usableQuantity(), $this->reorder_level);
     }
 
     /**

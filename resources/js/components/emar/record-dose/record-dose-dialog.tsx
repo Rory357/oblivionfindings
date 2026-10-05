@@ -12,6 +12,12 @@ import ConfirmDialog from '@/components/confirm-dialog';
 import { DateTimeField } from '@/components/fleet-assets/maintenance/date-time-field';
 import InputError from '@/components/input-error';
 import MedicationScanVerificationPanel from '@/components/medications/MedicationScanVerificationPanel';
+import {
+    StockPackFields,
+    StockPackReview,
+    validateStockPackLines,
+    type StockPackLine,
+} from '@/components/medications/stock-pack-fields';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -156,6 +162,7 @@ interface FormState {
     obs: Record<string, string>;
     second: SecondState;
     stockQuantity: string;
+    packLines: StockPackLine[];
     /** Controlled medicines: what's left in the stock after this dose (Q-C2a, counted). */
     cdBalance: string;
     packChecked: boolean;
@@ -509,6 +516,7 @@ function RecordDoseForm({
         obs: {},
         second: { id: null, pin: '' },
         stockQuantity: '',
+        packLines: [],
         cdBalance: '',
         packChecked: false,
     }));
@@ -763,6 +771,46 @@ function RecordDoseForm({
             )
                 e.cdBalance =
                     'Count what’s left in the stock after this dose and enter it.';
+            if (controlledGiven && req.stock_packs?.lots_started) {
+                const packError = validateStockPackLines(
+                    req.stock_packs,
+                    f.packLines,
+                );
+                if (packError) e.packLines = packError;
+                else if (
+                    Math.round(
+                        f.packLines.reduce(
+                            (sum, line) => sum + Number(line.quantity),
+                            0,
+                        ) * 100,
+                    ) !== Math.round(takenFromStock * 100)
+                )
+                    e.packLines =
+                        'The pack amounts must add up to the amount taken from stock.';
+                else if (
+                    f.packLines.some(
+                        (line) =>
+                            line.quantity_wasted == null ||
+                            line.quantity_wasted.trim() === '' ||
+                            !Number.isFinite(Number(line.quantity_wasted)) ||
+                            Number(line.quantity_wasted) < 0 ||
+                            Number(line.quantity_wasted) >
+                                Number(line.quantity),
+                    )
+                )
+                    e.packLines =
+                        'Enter waste for every pack, including 0 if none was wasted.';
+                else if (
+                    Math.round(
+                        f.packLines.reduce(
+                            (sum, line) => sum + Number(line.quantity_wasted),
+                            0,
+                        ) * 100,
+                    ) !== Math.round(wasted * 100)
+                )
+                    e.packLines =
+                        'The pack waste amounts must match the total wasted for this dose.';
+            }
         }
         return e;
     }
@@ -780,6 +828,7 @@ function RecordDoseForm({
         'severity',
         'immediate',
         'stockQuantity',
+        'packLines',
         'cdBalance',
         'checkBy',
         'note',
@@ -815,11 +864,15 @@ function RecordDoseForm({
                   ? f.reason
                   : null;
         const base: Record<string, unknown> = {
+            live_recording_context: req.live_recording_context ?? undefined,
             client_medication_id: req.order.id,
             administered_at: givenLike ? `${f.when}:00` : `${nowLocal}:00`,
             notes: f.note.trim() || null,
             medication_round_id: roundId,
             shift_id: shiftContext?.shiftId,
+            ...(controlledGiven && req.stock_packs?.lots_started
+                ? { pack_lines: f.packLines }
+                : {}),
             ...(givenLike && shiftContext?.scanVerification
                 ? toMedicationScanPayload(scanCapture)
                 : {}),
@@ -929,7 +982,14 @@ function RecordDoseForm({
                     action: isPrn ? 'prn' : 'administration',
                     // A witness PIN is checked live; it is never stored on the device.
                     allowQueueWhenOffline:
-                        !needsPin && !body.witness_override_id,
+                        !needsPin &&
+                        !body.witness_override_id &&
+                        !(
+                            givenLike &&
+                            (req.stock_tracking?.offline_given_allowed ===
+                                false ||
+                                req.stock_packs?.lots_started)
+                        ),
                     queuedMessage: `Saved on this device — ${med} for ${p} isn’t on the chart yet. It will send when you reconnect. Don’t record it again.`,
                 },
             );
@@ -1045,6 +1105,7 @@ function RecordDoseForm({
         effect_check_due_at: 'checkBy',
         administered_at: 'when',
         quantity_administered: 'stockQuantity',
+        pack_lines: 'packLines',
         cd_balance: 'cdBalance',
         amount_mode: 'amount',
         blood_glucose_level: 'obs-blood_glucose_level',
@@ -1081,7 +1142,9 @@ function RecordDoseForm({
             if (key) fieldErrors[key] = body.error ?? 'Check this field.';
         } else if (body?.errors) {
             for (const [field, messages] of Object.entries(body.errors)) {
-                const key = OUTCOME_FIELDS[field];
+                const key = field.startsWith('pack_lines.')
+                    ? 'packLines'
+                    : OUTCOME_FIELDS[field];
                 if (key)
                     fieldErrors[key] = Array.isArray(messages)
                         ? messages[0]
@@ -1575,6 +1638,18 @@ function RecordDoseForm({
 
             {givenLike ? (
                 <div className="space-y-4">
+                    {(req.stock_tracking?.lots_started ||
+                        req.stock_packs?.lots_started) && (
+                        <Notice
+                            tone="warning"
+                            title="Connection needed for pack stock"
+                        >
+                            Save while connected so the packs can be checked. If
+                            this dose was recorded on paper while offline, use
+                            paper recovery so the actual packs and stock count
+                            can be reviewed.
+                        </Notice>
+                    )}
                     {req.witness_override && !f.second.id ? (
                         <Notice
                             tone="warning"
@@ -1756,6 +1831,32 @@ function RecordDoseForm({
                                     </Field>
                                 ) : null}
                             </div>
+                            {controlledGiven &&
+                                req.stock_packs?.lots_started && (
+                                    <div
+                                        data-field="packLines"
+                                        className="space-y-2"
+                                    >
+                                        <StockPackFields
+                                            stock={{
+                                                ...req.stock_packs,
+                                                lots: req.stock_packs.lots.filter(
+                                                    (lot) =>
+                                                        lot.usable !== false,
+                                                ),
+                                            }}
+                                            value={f.packLines}
+                                            onChange={(packLines) =>
+                                                set({ packLines })
+                                            }
+                                            waste
+                                            idPrefix="rd-pack"
+                                        />
+                                        <InputError
+                                            message={errors.packLines}
+                                        />
+                                    </div>
+                                )}
                             {wasted > 0 ? (
                                 <Notice
                                     tone="warning"
@@ -2007,6 +2108,12 @@ function RecordDoseForm({
                     label="Time"
                     value={`${localLabel(givenLike ? f.when : nowLocal)} ${nzZone()}`}
                 />
+                {controlledGiven && req.stock_packs?.lots_started && (
+                    <StockPackReview
+                        stock={req.stock_packs}
+                        lines={f.packLines}
+                    />
+                )}
                 {outsideWindow ? (
                     <ReviewRow
                         label="Outside the window"

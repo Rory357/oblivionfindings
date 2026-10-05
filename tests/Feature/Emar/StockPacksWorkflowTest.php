@@ -5,25 +5,37 @@ namespace Tests\Feature\Emar;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
-use App\Models\ClientMedicationStock;
 use App\Models\ClientMedicationAdministration;
+use App\Models\ClientMedicationStock;
 use App\Models\MedicationEvent;
 use App\Models\MedicationFollowup;
 use App\Models\MedicationPharmacyOrder;
+use App\Models\MedicationScheduledStockCount;
 use App\Models\MedicationStockCountRecord;
 use App\Models\MedicationStockLot;
 use App\Models\MedicationStockMovement;
 use App\Models\MedicationStockPhoto;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\Audit\MedicationEventData;
+use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\Stock\MedicationStockService;
+use App\Services\MedicationScanVerificationService;
+use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class StockPacksWorkflowTest extends TestCase
@@ -35,8 +47,8 @@ class StockPacksWorkflowTest extends TestCase
         config(['medications.stock_lots_enabled' => true]);
         $this->seed(RbacSeeder::class);
         $actor = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
-        $actor->roles()->syncWithoutDetaching([\App\Models\Role::where('name', 'admin')->firstOrFail()->id]);
-        $permissions = \App\Models\Permission::whereIn('key', ['medications.view', 'medications.stock.update'])
+        $actor->roles()->syncWithoutDetaching([Role::where('name', 'admin')->firstOrFail()->id]);
+        $permissions = Permission::whereIn('key', ['medications.view', 'medications.stock.update'])
             ->pluck('id')->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])->all();
         $actor->permissionOverrides()->syncWithoutDetaching($permissions);
         $site = Site::factory()->create(['is_active' => true]);
@@ -51,6 +63,7 @@ class StockPacksWorkflowTest extends TestCase
                 app(MedicationStockService::class)->startLots($stock, $actor, (string) Str::uuid());
             });
         }
+
         return compact('actor', 'site', 'client', 'med', 'stock');
     }
 
@@ -66,10 +79,97 @@ class StockPacksWorkflowTest extends TestCase
     {
         $base = $this->receipt($medicationId);
         $fields = ['quantity', 'batch_number', 'batch_not_printed', 'expiry_month', 'expiry_not_printed', 'short_expiry_reason'];
-        $label = \Illuminate\Support\Arr::only($base, $fields);
-        return [...\Illuminate\Support\Arr::except($base, $fields),
+        $label = Arr::only($base, $fields);
+
+        return [...Arr::except($base, $fields),
             'packs' => array_map(fn ($quantity, $index) => [...$label, 'quantity' => $quantity, 'batch_number' => 'SYNTHETIC-'.$index],
                 $quantities, array_keys($quantities))];
+    }
+
+    public function test_selected_person_scopes_every_pack_view_and_metric_with_full_authorized_house_available(): void
+    {
+        [$actor, $site, $people] = $this->personReadFixture();
+        $before = $this->stockReadSnapshot();
+        $this->actingAs($actor)->get('/emar/stock/packs')->assertInertia(fn ($page) => $page
+            ->where('filters.client_id', null)->where('selected_client', null)
+            ->where('items.total', 2)->where('orders.total', 2)->where('counts.total', 2)->where('movements.total', 2)
+            ->where('metrics.tracked', 2)->where('metrics.orders', 2)->where('metrics.counts', 2));
+        foreach ($people as $person) {
+            foreach (['stock', 'orders', 'counts', 'expiring', 'removals', 'movements'] as $view) {
+                $this->get('/emar/stock/packs?'.http_build_query(['client_id' => $person['client']->id, 'site_id' => $site->id, 'view' => $view]))
+                    ->assertInertia(fn ($page) => $page
+                        ->where('filters.client_id', $person['client']->id)->where('filters.site_id', $site->id)->where('filters.view', $view)
+                        ->where('selected_client', ['id' => $person['client']->id, 'name' => $person['client']->full_name])
+                        ->where('items.total', $view === 'expiring' ? 0 : 1)
+                        ->where('orders.total', 1)->where('orders.data.0.id', $person['order']->id)
+                        ->where('counts.total', 1)->where('counts.data.0.id', $person['count_id'])
+                        ->where('movements.total', $view === 'removals' ? 0 : 1)
+                        ->where('metrics.tracked', 1)->where('metrics.orders', 1)->where('metrics.counts', 1)
+                        ->where('pharmacies', [$person['order']->pharmacy_name]));
+            }
+        }
+        $this->assertSame($before, $this->stockReadSnapshot());
+    }
+
+    public function test_selected_person_rejects_malformed_hidden_and_mismatched_focused_stock_records_without_effects(): void
+    {
+        [$actor, $site, $people] = $this->personReadFixture();
+        $foreignSite = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
+        $foreign = Client::factory()->create(['site_id' => $foreignSite->id, 'status' => 'active']);
+        $before = $this->stockReadSnapshot();
+        $this->actingAs($actor);
+        foreach (['', '0', '-1', '1e0', 'invalid', '92233720368547758080', $foreign->id] as $id) {
+            $this->get('/emar/stock/packs?'.http_build_query(['client_id' => $id]))->assertNotFound();
+        }
+        $this->get('/emar/stock/packs?'.http_build_query(['client_id' => $people[0]['client']->id, 'site_id' => $foreignSite->id]))->assertNotFound();
+        $this->get('/emar/stock/packs?'.http_build_query(['client_id' => $people[0]['client']->id, 'medication_id' => $people[1]['med']->id]))->assertNotFound();
+        $this->get('/emar/stock/packs?'.http_build_query(['client_id' => $people[0]['client']->id, 'count_id' => $people[1]['count_id']]))->assertNotFound();
+        $this->get('/emar/stock/packs?'.http_build_query(['client_id' => $people[0]['client']->id, 'count_id' => $people[0]['count_id']]))
+            ->assertInertia(fn ($page) => $page->where('focused_count.id', $people[0]['count_id']));
+        $this->assertSame($before, $this->stockReadSnapshot());
+    }
+
+    private function personReadFixture(): array
+    {
+        extract($this->fixture());
+        $denials = Permission::whereIn('key', ['clinical.accessAllSites', 'sites.viewAll'])->get();
+        $this->assertCount(2, $denials);
+        $actor->permissionOverrides()->syncWithoutDetaching($denials->mapWithKeys(fn ($p) => [$p->id => ['allowed' => false]])->all());
+        Cache::flush();
+        $actor = $actor->fresh();
+        $this->assertFalse($actor->canDo('clinical.accessAllSites'));
+        $this->assertFalse($actor->canDo('sites.viewAll'));
+        $other = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        $otherMed = ClientMedication::create(['client_id' => $other->id, 'name' => 'Synthetic other person supply', 'dosage' => '1 tablet',
+            'frequency' => 'PRN', 'is_prn' => true, 'controlled_drug' => false, 'active' => true, 'state' => 'active', 'approval_status' => 'verified']);
+        $otherStock = ClientMedicationStock::create(['client_medication_id' => $otherMed->id, 'on_hand' => '10.00', 'unit' => 'tablets']);
+        DB::transaction(fn () => app(MedicationStockService::class)->startLots($otherStock, $actor, (string) Str::uuid()));
+        $people = [];
+        foreach ([[$client, $med, $stock], [$other, $otherMed, $otherStock]] as [$person, $medicine, $supply]) {
+            $order = MedicationPharmacyOrder::create(['client_id' => $person->id, 'client_medication_id' => $medicine->id,
+                'pharmacy_name' => 'Synthetic person pharmacy '.$person->id, 'quantity_ordered' => 5, 'quantity_received' => 0,
+                'status' => 'dispensed', 'ordered_by' => $actor->id]);
+            $lot = MedicationStockLot::where('client_medication_stock_id', $supply->id)->sole();
+            $countId = $this->actingAs($actor)->postJson('/emar/stock/packs/commands', [
+                'action' => 'count', 'client_medication_id' => $medicine->id, 'request_uuid' => (string) Str::uuid(),
+                'lines' => [['lot_id' => $lot->id, 'revision' => $lot->revision, 'quantity' => '9.00']],
+                'reason' => 'Synthetic person-specific count awaiting review',
+            ])->assertOk()->json('count_id');
+            $people[] = ['client' => $person, 'med' => $medicine, 'order' => $order, 'count_id' => $countId];
+        }
+
+        return [$actor, $site, $people];
+    }
+
+    private function stockReadSnapshot(): array
+    {
+        $records = [];
+        foreach (['client_medication_stocks', 'medication_stock_lots', 'medication_pharmacy_orders', 'medication_stock_count_records',
+            'medication_stock_movements', 'medication_events', 'audit_logs', 'medication_idempotency_results'] as $table) {
+            $records[$table] = DB::table($table)->orderBy('id')->get()->map(fn ($row) => (array) $row)->all();
+        }
+
+        return $records;
     }
 
     public function test_pack_initialization_requires_a_known_unit_before_any_stock_evidence_is_written(): void
@@ -170,9 +270,9 @@ class StockPacksWorkflowTest extends TestCase
 
     public function test_receipt_on_last_printed_day_requires_short_expiry_reason_then_remains_usable(): void
     {
-        $clock = \Carbon\CarbonImmutable::parse('2026-10-31 09:00:00', 'Pacific/Auckland')->utc();
-        \Carbon\Carbon::setTestNow($clock);
-        \Carbon\CarbonImmutable::setTestNow($clock);
+        $clock = CarbonImmutable::parse('2026-10-31 09:00:00', 'Pacific/Auckland')->utc();
+        Carbon::setTestNow($clock);
+        CarbonImmutable::setTestNow($clock);
         try {
             extract($this->fixture());
             $data = [...$this->receipt($med->id), 'expiry_month' => '10/2026'];
@@ -181,11 +281,13 @@ class StockPacksWorkflowTest extends TestCase
             $this->postJson('/emar/stock/packs/commands', $data)->assertOk();
             $this->assertSame('14.25', $stock->fresh()->availableQuantity());
             $nextDay = $clock->addDay();
-            \Carbon\Carbon::setTestNow($nextDay); \Carbon\CarbonImmutable::setTestNow($nextDay);
+            Carbon::setTestNow($nextDay);
+            CarbonImmutable::setTestNow($nextDay);
             $this->assertSame('10.00', $stock->fresh()->availableQuantity());
             $this->assertSame('14.25', $stock->fresh()->on_hand);
         } finally {
-            \Carbon\Carbon::setTestNow(); \Carbon\CarbonImmutable::setTestNow();
+            Carbon::setTestNow();
+            CarbonImmutable::setTestNow();
         }
     }
 
@@ -251,7 +353,7 @@ class StockPacksWorkflowTest extends TestCase
         $lot = MedicationStockLot::where('client_medication_stock_id', $stock->id)->sole();
         $this->actingAs($actor)->postJson('/emar/stock/receive', [
             'client_medication_id' => $med->id, 'quantity' => '2.00',
-            'scan_verified' => true, 'scan_code' => app(\App\Services\MedicationScanVerificationService::class)->internalCode($client, $med),
+            'scan_verified' => true, 'scan_code' => app(MedicationScanVerificationService::class)->internalCode($client, $med),
         ])->assertUnprocessable()->assertJsonValidationErrors('quantity')
             ->assertJsonPath('errors.stock_workflow_url.0', $stock->packWorkflowUrl());
         $this->postJson('/emar/stock/adjust', [
@@ -286,7 +388,7 @@ class StockPacksWorkflowTest extends TestCase
     public function test_started_pack_scheduled_count_rejects_scalar_completion_before_marking_count_done(): void
     {
         extract($this->fixture());
-        $count = \App\Models\MedicationScheduledStockCount::create(['client_id' => $client->id,
+        $count = MedicationScheduledStockCount::create(['client_id' => $client->id,
             'client_medication_id' => $med->id, 'scheduled_date' => now()->toDateString(),
             'expected_quantity' => '10.00', 'status' => 'pending']);
         $this->actingAs($actor, 'sanctum')->postJson('/api/medications/clients/'.$client->id.'/scheduled-counts/'.$count->id.'/complete', [
@@ -318,7 +420,7 @@ class StockPacksWorkflowTest extends TestCase
         config(['medications.stock_lots_enabled' => false]);
         $this->actingAs($actor)->postJson('/emar/stock/receive', [
             'client_medication_id' => $med->id, 'quantity' => '2.25', 'client_request_uuid' => (string) Str::uuid(),
-            'scan_verified' => true, 'scan_code' => app(\App\Services\MedicationScanVerificationService::class)->internalCode($client, $med),
+            'scan_verified' => true, 'scan_code' => app(MedicationScanVerificationService::class)->internalCode($client, $med),
         ])->assertOk();
         $this->assertSame('12.25', $stock->fresh()->on_hand);
         $this->assertNull($stock->fresh()->lots_started_at);
@@ -493,7 +595,7 @@ class StockPacksWorkflowTest extends TestCase
 
     public function test_simultaneous_dose_and_movement_wait_for_stock_mutex_and_preserve_both_changes(): void
     {
-        $this->beforeApplicationDestroyed(\Tests\Support\CommittedFixtureCleanup::capture()->restore(...));
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         extract($this->fixture());
         $administration = ClientMedicationAdministration::create([
             'client_id' => $client->id, 'client_medication_id' => $med->id, 'administered_by' => $actor->id,
@@ -551,7 +653,69 @@ class StockPacksWorkflowTest extends TestCase
         }
     }
 
-    private function stockWorker(string $kind, int $stockId, int $lotId, int $administrationId, int $actorId, string $ready, string $attempted, string $go): \Symfony\Component\Process\Process
+    public function test_dose_reuses_current_locked_pack_revision_after_a_committed_movement_and_old_snapshot(): void
+    {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+        extract($this->fixture());
+        $administration = ClientMedicationAdministration::create([
+            'client_id' => $client->id, 'client_medication_id' => $med->id, 'administered_by' => $actor->id,
+            'administered_at' => now(), 'status' => 'given', 'dose_given' => '1 tablet',
+        ]);
+        $lot = MedicationStockLot::where('client_medication_stock_id', $stock->id)->sole();
+        $initialRevision = $lot->revision;
+        $connection = DB::connection();
+        $this->assertSame('mysql', $connection->getDriverName());
+        $token = (string) Str::uuid();
+        $go = sys_get_temp_dir().DIRECTORY_SEPARATOR.'p06-old-snapshot-go-'.$token;
+        $ready = sys_get_temp_dir().DIRECTORY_SEPARATOR.'p06-old-snapshot-ready-'.$token;
+        $attempted = sys_get_temp_dir().DIRECTORY_SEPARATOR.'p06-old-snapshot-attempt-'.$token;
+        $process = null;
+        $connection->commit();
+        try {
+            $connection->beginTransaction();
+            $old = MedicationStockLot::findOrFail($lot->id);
+            $this->assertSame('10.00', $old->quantity_remaining);
+            $this->assertSame($initialRevision, $old->revision);
+            $process = $this->stockWorker('movement', $stock->id, $lot->id, $administration->id, $actor->id, $ready, $attempted, $go);
+            $this->waitForWorkerFiles([$ready]);
+            file_put_contents($go, 'go');
+            $this->waitForWorkerFiles([$attempted]);
+            $process->wait();
+            $this->assertTrue($process->isSuccessful(), trim($process->getErrorOutput()));
+            $this->assertSame(['success' => true], json_decode(trim($process->getOutput()), true, flags: JSON_THROW_ON_ERROR));
+            // The physical writer committed on a separate connection, while
+            // this publisher still demonstrably retains the old read snapshot.
+            $this->assertSame('10.00', MedicationStockLot::findOrFail($lot->id)->quantity_remaining);
+            $this->assertSame($initialRevision, MedicationStockLot::findOrFail($lot->id)->revision);
+            app(MedicationStockService::class)->ordinaryDose($administration, $actor, '1.00');
+            $connection->commit();
+            $this->assertSame('8.00', $stock->fresh()->on_hand);
+            $this->assertSame('8.00', $lot->fresh()->quantity_remaining);
+            $this->assertSame($initialRevision + 2, $lot->fresh()->revision);
+            $given = MedicationStockMovement::where('kind', 'given')->sole();
+            $damaged = MedicationStockMovement::where('kind', 'damaged')->sole();
+            $this->assertSame('9.00', $given->balance_before);
+            $this->assertSame('8.00', $given->balance_after);
+            $this->assertSame('10.00', $damaged->balance_before);
+            $this->assertSame('9.00', $damaged->balance_after);
+            $this->assertSame($administration->id, $given->administration_id);
+        } finally {
+            while ($connection->transactionLevel() > 0) {
+                $connection->rollBack();
+            }
+            if ($process?->isRunning()) {
+                $process->stop(1);
+            }
+            foreach ([$go, $ready, $attempted] as $path) {
+                if (is_file($path)) {
+                    unlink($path);
+                }
+            }
+            $connection->beginTransaction();
+        }
+    }
+
+    private function stockWorker(string $kind, int $stockId, int $lotId, int $administrationId, int $actorId, string $ready, string $attempted, string $go): Process
     {
         $worker = <<<'PHP'
 require $argv[1].'/vendor/autoload.php';
@@ -582,7 +746,7 @@ Illuminate\Support\Facades\DB::transaction(function () use ($app, $argv, $stock,
 }, 5);
 echo json_encode(['success' => true], JSON_THROW_ON_ERROR);
 PHP;
-        $process = new \Symfony\Component\Process\Process([
+        $process = new Process([
             PHP_BINARY, '-r', $worker, base_path(), $kind, (string) $stockId, (string) $lotId,
             (string) $administrationId, (string) $actorId, $ready, $attempted, $go,
         ], base_path(), [
@@ -591,6 +755,7 @@ PHP;
         ]);
         $process->setTimeout(30);
         $process->start();
+
         return $process;
     }
 
@@ -607,9 +772,9 @@ PHP;
 
     public function test_expiry_crossing_without_a_write_keeps_stock_row_meter_and_filter_consistent(): void
     {
-        $clock = \Carbon\CarbonImmutable::parse('2026-10-03 23:59:00', 'Pacific/Auckland')->utc();
-        \Carbon\Carbon::setTestNow($clock);
-        \Carbon\CarbonImmutable::setTestNow($clock);
+        $clock = CarbonImmutable::parse('2026-10-03 23:59:00', 'Pacific/Auckland')->utc();
+        Carbon::setTestNow($clock);
+        CarbonImmutable::setTestNow($clock);
         try {
             extract($this->fixture('2026-10-03'));
             $controlled = $med->replicate()->forceFill(['name' => 'Synthetic controlled medicine', 'controlled_drug' => true]);
@@ -628,21 +793,21 @@ PHP;
             $this->get('/emar/stock/packs', $this->inertiaPartialHeaders('emar/stock/StockHub', 'focused_count,metrics,items'))->assertOk()->assertJsonPath('props.metrics.out', 0);
 
             $nextDay = $clock->addMinutes(2);
-            \Carbon\Carbon::setTestNow($nextDay);
-            \Carbon\CarbonImmutable::setTestNow($nextDay);
+            Carbon::setTestNow($nextDay);
+            CarbonImmutable::setTestNow($nextDay);
             $this->getJson('/emar/stock/packs/medicine/'.$med->id)->assertOk()->assertJsonPath('on_hand', 0);
-            $this->getJson('/emar/stock/packs/medicine/'.$controlled->id)->assertOk()->assertJsonPath('on_hand', 10);
+            $this->getJson('/emar/stock/packs/medicine/'.$controlled->id)->assertOk()->assertJsonPath('on_hand', 10)->assertJsonPath('physical_on_hand', '10.00')->assertJsonPath('usable_on_hand', '0.00');
             $this->getJson('/emar/stock/packs/medicine/'.$unknown->id)->assertOk()->assertJsonPath('on_hand', null);
             $this->get('/emar/stock/packs?show=out', $this->inertiaPartialHeaders('emar/stock/StockHub', 'focused_count,metrics,items'))->assertOk()
-                ->assertJsonPath('props.metrics.out', 1)->assertJsonPath('props.items.total', 1)
-                ->assertJsonPath('props.items.data.0.id', $med->id)->assertJsonPath('props.items.data.0.on_hand', 0);
+                ->assertJsonPath('props.metrics.out', 2)->assertJsonPath('props.items.total', 2)
+                ->assertJson(fn ($json) => $json->where('props.items.data', fn ($rows) => collect($rows)->pluck('id')->sort()->values()->all() === collect([$med->id, $controlled->id])->sort()->values()->all())->etc());
             $this->assertSame('10.00', $stock->fresh()->on_hand);
             $this->assertSame('10.00', $lot->fresh()->quantity_remaining);
             $this->assertSame($revision, $lot->fresh()->revision);
             $this->assertSame($countedAt->toIso8601String(), $stock->fresh()->last_counted_at->toIso8601String());
         } finally {
-            \Carbon\Carbon::setTestNow();
-            \Carbon\CarbonImmutable::setTestNow();
+            Carbon::setTestNow();
+            CarbonImmutable::setTestNow();
         }
     }
 
@@ -656,7 +821,8 @@ PHP;
         ])->assertOk()->json('count_id');
         $review = ['action' => 'count_review', 'client_medication_id' => $med->id, 'count_id' => $countId,
             'request_uuid' => (string) Str::uuid(), 'reason' => 'Synthetic verified count'];
-        $this->app->instance(\App\Services\Medication\Audit\MedicationEventRecorder::class, new class {
+        $this->app->instance(MedicationEventRecorder::class, new class
+        {
             public function appendMany(array $events): never
             {
                 throw new \RuntimeException('Synthetic audit storage failure');
@@ -674,7 +840,7 @@ PHP;
         $this->assertSame('needs_review', MedicationStockCountRecord::findOrFail($countId)->state);
         $this->assertNull(MedicationFollowup::where('source_key', 'stock-discrepancy:'.$countId)->sole()->completed_at);
         $this->assertSame(0, MedicationStockMovement::where('kind', 'count_correction')->count());
-        $this->app->forgetInstance(\App\Services\Medication\Audit\MedicationEventRecorder::class);
+        $this->app->forgetInstance(MedicationEventRecorder::class);
         $this->postJson('/emar/stock/packs/commands', $review)->assertOk();
         $this->assertSame('9.00', $stock->fresh()->on_hand);
     }
@@ -684,8 +850,9 @@ PHP;
         extract($this->fixture());
         Storage::fake('private');
         $lot = MedicationStockLot::firstOrFail();
-        $this->app->instance(\App\Services\Medication\Audit\MedicationEventRecorder::class, new class {
-            public function append(\App\Services\Medication\Audit\MedicationEventData $event): never
+        $this->app->instance(MedicationEventRecorder::class, new class
+        {
+            public function append(MedicationEventData $event): never
             {
                 throw new \RuntimeException('Synthetic photo audit failure');
             }

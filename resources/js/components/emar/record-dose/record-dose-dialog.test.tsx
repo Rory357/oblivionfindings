@@ -471,6 +471,114 @@ describe('RecordDoseDialog (P01)', () => {
         ).toBeInTheDocument();
     });
 
+    it('keeps a tracked ordinary dose online and forwards its live review context', async () => {
+        submitMock.mockResolvedValue({
+            status: 'processed',
+            data: { administration: { id: 14 } },
+        });
+        open(
+            requirements({
+                stock_tracking: {
+                    lots_started: true,
+                    offline_given_allowed: false,
+                },
+                live_recording_context: 'signed-live-context',
+            }),
+        );
+        await screen.findByText('Losartan 50mg');
+        fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+        fireEvent.click(await screen.findByRole('button', { name: /^Given/ }));
+        expect(
+            screen.getByText('Connection needed for pack stock'),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+        fireEvent.click(
+            await screen.findByRole('button', { name: /^Record outcome$/i }),
+        );
+        await waitFor(() => expect(submitMock).toHaveBeenCalledOnce());
+        expect(submitMock.mock.calls[0][1]).toMatchObject({
+            live_recording_context: 'signed-live-context',
+        });
+        expect(submitMock.mock.calls[0][2]).toMatchObject({
+            allowQueueWhenOffline: false,
+        });
+    });
+
+    it('requires actual controlled pack quantities and explicit waste before submitting exact revisions', async () => {
+        submitMock.mockResolvedValue({
+            status: 'processed',
+            data: { administration: { id: 12 } },
+        });
+        const req = controlled('tablets');
+        req.stock_packs = {
+            stock_id: 3,
+            unit: 'tablets',
+            lots_started: true,
+            lots: [
+                {
+                    id: 7,
+                    batch_number: 'ACTUAL',
+                    expiry_date: null,
+                    state: 'open',
+                    quantity_remaining: 10,
+                    revision: 4,
+                    usable: true,
+                },
+            ],
+        };
+        open(req);
+        await screen.findByText('Clonazepam 0.5mg');
+        fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+        fireEvent.click(await screen.findByRole('button', { name: /^Given/ }));
+        fireEvent.click(
+            screen.getByRole('combobox', {
+                name: /Who is witnessing|Choose a colleague|Witness/i,
+            }),
+        );
+        fireEvent.click(
+            await screen.findByRole('option', { name: /Mere Kahu/ }),
+        );
+        fireEvent.change(screen.getByLabelText(/Witness’s 6-digit PIN/), {
+            target: { value: '123456' },
+        });
+        fireEvent.change(
+            screen.getByLabelText(/Balance left after this dose/),
+            { target: { value: '8' } },
+        );
+        fireEvent.pointerDown(
+            screen.getByRole('combobox', { name: 'Add a pack' }),
+            { button: 0, ctrlKey: false, pointerType: 'mouse' },
+        );
+        fireEvent.click(screen.getByRole('option', { name: /Batch ACTUAL/ }));
+        expect(screen.getByLabelText('Amount (tablets)')).toHaveValue(null);
+        expect(screen.getByLabelText('Wasted (tablets)')).toHaveValue(null);
+        fireEvent.change(screen.getByLabelText('Amount (tablets)'), {
+            target: { value: '2' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+        expect(submitMock).not.toHaveBeenCalled();
+        expect(
+            screen.queryByRole('button', { name: /^Record outcome$/i }),
+        ).not.toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText('Wasted (tablets)'), {
+            target: { value: '0' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+        fireEvent.click(
+            await screen.findByRole('button', { name: /^Record outcome$/i }),
+        );
+        await waitFor(() => expect(submitMock).toHaveBeenCalledOnce());
+        expect(submitMock.mock.calls[0][1]).toMatchObject({
+            pack_lines: [
+                { lot_id: 7, revision: 4, quantity: '2', quantity_wasted: '0' },
+            ],
+            witnessed_by: 5,
+        });
+        expect(submitMock.mock.calls[0][2]).toMatchObject({
+            allowQueueWhenOffline: false,
+        });
+    });
+
     it('doesn’t offer less than ordered on a controlled medicine counted in other units', async () => {
         open(controlled('mL', { dose_unit: 'mg', dose_amount: 5 }));
         await screen.findByText('Clonazepam 0.5mg');

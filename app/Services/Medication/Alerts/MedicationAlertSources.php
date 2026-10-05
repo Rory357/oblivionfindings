@@ -19,6 +19,7 @@ use App\Services\Medication\Controlled\ControlledCountStatus;
 use App\Services\Medication\MedicationErrorSummary;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\RefusalEscalationPolicy;
+use App\Services\Medication\Stock\StockAvailability;
 use App\Support\Medication\MedicationStockQuantity;
 use App\Support\WorkerClock;
 use Carbon\CarbonInterface;
@@ -135,7 +136,7 @@ class MedicationAlertSources
     {
         $this->safely('stock', function (): void {
             $low = ClientMedicationStock::query()
-                ->whereColumn('on_hand', '<=', 'reorder_level')
+                ->lowStock()
                 ->where('reorder_level', '>', 0)
                 ->with('medication.client.site:id,name')
                 ->get()
@@ -150,7 +151,7 @@ class MedicationAlertSources
                         '%s for %s is below its reorder level (%s left). %s.',
                         $medicine,
                         $person,
-                        MedicationStockQuantity::display($stock->on_hand ?? 0),
+                        MedicationStockQuantity::display($stock->usableQuantity() ?? 0),
                         $house,
                     ),
                     fn (string $house): string => "A medicine at {$house} is running low.",
@@ -177,65 +178,55 @@ class MedicationAlertSources
         $this->safely('expiry', function () use ($expiringSoon): void {
             $keys = [];
             foreach ($expiringSoon as $stock) {
-                if ($stock->expiry_date === null || $stock->medication?->client?->site_id === null) {
+                if ($stock->medication?->client?->site_id === null) {
                     continue;
                 }
-                $key = 'expiry:'.$stock->id.':'.$stock->expiry_date->toDateString();
-                $keys[] = $key;
-                $days = WorkerClock::daysUntil($stock->expiry_date);
-                $this->alerts->raise(MedicationAlertCatalogue::EXPIRY, $this->stockSubject(
-                    $stock,
-                    $key,
-                    'Stock expiring',
-                    fn (string $medicine, string $person, string $house): string => sprintf(
-                        '%s for %s expires on %s. %s.',
-                        $medicine,
-                        $person,
-                        $stock->expiry_date->format('j M Y'),
-                        $house,
-                    ),
-                    fn (string $house): string => "A medicine at {$house} expires soon.",
-                    $days <= 7 ? 'critical' : 'warning',
-                ));
+                foreach ($stock->packExpiries(false) as $pack) {
+                    $key = $pack['lot_id'] === null ? 'expiry:'.$stock->id.':'.$pack['date']->toDateString() : 'expiry:pack:'.$pack['lot_id'];
+                    $keys[] = $key;
+                    $date = $pack['date']->format('j M Y');
+                    $days = WorkerClock::daysUntil($pack['date']);
+                    $this->alerts->raise(MedicationAlertCatalogue::EXPIRY, $this->stockSubject($stock, $key, 'Stock expiring',
+                        fn ($medicine, $person, $house) => "{$medicine} for {$person} expires on {$date}. {$house}.",
+                        fn ($house) => "A medicine at {$house} expires soon.", $days <= 7 ? 'critical' : 'warning'));
+                }
             }
             $this->alerts->reconcile(MedicationAlertCatalogue::EXPIRY, $keys, 'Removed or replaced');
         });
-
         $this->safely('outOfStock', function () use ($expired): void {
             $keys = [];
             foreach ($expired as $stock) {
-                if ($stock->expiry_date === null || $stock->medication?->client?->site_id === null) {
+                if ($stock->medication?->client?->site_id === null) {
                     continue;
                 }
-                $key = 'expired:'.$stock->id.':'.$stock->expiry_date->toDateString();
-                $keys[] = $key;
-                $this->alerts->raise(MedicationAlertCatalogue::OUT_OF_STOCK, $this->stockSubject(
-                    $stock,
-                    $key,
-                    'Expired stock',
-                    fn (string $medicine, string $person, string $house): string => sprintf(
-                        '%s for %s expired on %s. %s.',
-                        $medicine,
-                        $person,
-                        $stock->expiry_date->format('j M Y'),
-                        $house,
-                    ),
-                    fn (string $house): string => "A medicine at {$house} has expired stock.",
-                    'critical',
-                ));
+                foreach ($stock->packExpiries(true) as $pack) {
+                    $key = $pack['lot_id'] === null ? 'expired:'.$stock->id.':'.$pack['date']->toDateString() : 'expired:pack:'.$pack['lot_id'];
+                    $keys[] = $key;
+                    $date = $pack['date']->format('j M Y');
+                    $this->alerts->raise(MedicationAlertCatalogue::OUT_OF_STOCK, $this->stockSubject($stock, $key, 'Expired stock',
+                        fn ($medicine, $person, $house) => "{$medicine} for {$person} expired on {$date}. {$house}.",
+                        fn ($house) => "A medicine at {$house} has expired stock.", 'critical'));
+                }
             }
-            $out = ClientMedicationStock::query()
-                ->whereNotNull('on_hand')
-                ->where('on_hand', '<=', 0)
-                ->whereHas('medication', fn ($orders) => $orders->active())
-                ->with('medication.client.site:id,name')
-                ->get()
-                ->filter(fn (ClientMedicationStock $stock): bool => $stock->medication?->client?->site_id !== null);
+            $out = ClientMedicationStock::query()->whereHas('medication', fn ($q) => $q->active())
+                ->whereRaw('('.StockAvailability::usableQuantitySql().') <= 0', [StockAvailability::today()])
+                ->with(['medication.client.site:id,name', 'lots'])->get()
+                ->filter(fn ($stock) => $stock->medication?->client?->site_id !== null);
             foreach ($out as $stock) {
                 $keys[] = $this->raiseOutOfStock($stock);
             }
             $this->alerts->reconcile(MedicationAlertCatalogue::OUT_OF_STOCK, $keys, 'Restocked or removed');
         });
+    }
+
+    /** Committed stock changes use the same independent pack subjects as the daily expiry passage. */
+    public function stockChanged(): void
+    {
+        $this->lowStock();
+        $this->stockCheck(
+            ClientMedicationStock::expiringSoon()->with(['medication.client.site', 'lots'])->get(),
+            ClientMedicationStock::expired()->with(['medication.client.site', 'lots'])->get(),
+        );
     }
 
     /** Competency renewals due: within the renewal reminder (Staff & PINs), not yet renewed. */
@@ -531,8 +522,8 @@ class MedicationAlertSources
             $keys = [];
             foreach ($orders as $order) {
                 $stock = $order->stock;
-                if (! $stock instanceof ClientMedicationStock || $stock->on_hand === null
-                    || ! MedicationStockQuantity::lessThanOrEqual($stock->on_hand, 0)) {
+                if (! $stock instanceof ClientMedicationStock || $stock->usableQuantity() === null
+                    || ! MedicationStockQuantity::lessThanOrEqual($stock->usableQuantity(), 0)) {
                     continue;
                 }
                 $order->setRelation('client', $client);

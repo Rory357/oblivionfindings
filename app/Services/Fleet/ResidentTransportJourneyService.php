@@ -25,6 +25,9 @@ use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\Recording\RecordingContract;
+use App\Services\Medication\Stock\MedicationStockService;
+use App\Services\Medication\Stock\TransitStockContext;
 use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\MedicationRuleService;
@@ -37,6 +40,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -530,8 +534,10 @@ class ResidentTransportJourneyService
             abort_unless($allLogs === (clone $scopedLogsQuery)->count(), 409, 'Medication custody records do not match this journey.');
 
             $unresolved = (clone $scopedLogsQuery)
-                ->whereNull('administered_at')
-                ->whereNull('returned_to_house_at')
+                ->where(fn ($q) => $q->where(fn ($legacy) => $legacy->whereNull('administered_at')->whereNull('returned_to_house_at'))
+                    ->orWhereExists(fn ($packs) => $packs->selectRaw('1')->from('medication_stock_transit_allocations')
+                        ->whereColumn('medication_stock_transit_allocations.transit_log_id', 'fleet_medication_transit_logs.id')
+                        ->whereRaw('quantity_out > quantity_used + quantity_returned + quantity_missing')))
                 ->lockForUpdate()
                 ->count();
             if ($unresolved > 0) {
@@ -653,6 +659,7 @@ class ResidentTransportJourneyService
             'medication_id' => $data['medication_id'] ?? null,
             'medication_order_version_id' => $data['medication_order_version_id'] ?? null,
             'attestation_state' => $attestationState,
+            'pack_lines' => $data['pack_lines'] ?? [],
             'witnessed_by_user_id' => $data['witnessed_by_user_id'] ?? null,
             'attestation_reason_hash' => hash('sha256', (string) ($data['attestation_reason'] ?? '')),
             'notes_hash' => hash('sha256', (string) ($data['notes'] ?? '')),
@@ -703,6 +710,7 @@ class ResidentTransportJourneyService
                         : null,
                     'replayed' => true,
                     'attestation_state' => $attestationState,
+                    'pack_lines' => $data['pack_lines'] ?? [],
                 ];
             }
 
@@ -726,6 +734,7 @@ class ResidentTransportJourneyService
                     'log' => null,
                     'replayed' => false,
                     'attestation_state' => $attestationState,
+                    'pack_lines' => $data['pack_lines'] ?? [],
                 ];
             }
 
@@ -939,6 +948,12 @@ class ResidentTransportJourneyService
             'log_id' => $logId,
             'witnessed_by_user_id' => $data['witnessed_by_user_id'] ?? null,
             'quantity_administered' => $data['quantity_administered'] ?? null,
+            'quantity_unit' => $data['quantity_unit'] ?? null,
+            'pack_lines' => $data['pack_lines'] ?? [],
+            'clinical_facts' => Arr::only($data, RecordingContract::fields()),
+            'immediate_action_taken' => $data['immediate_action_taken'] ?? null,
+            'return_lines' => $data['return_lines'] ?? [],
+            'reconciliation_reason' => $data['reconciliation_reason'] ?? null,
             'notes_hash' => hash('sha256', (string) ($data['notes'] ?? '')),
             'scan_code_hash' => hash('sha256', (string) ($data['scan_code'] ?? '')),
             ...$this->normalizedOfflineProvenanceForFingerprint($data),
@@ -978,8 +993,9 @@ class ResidentTransportJourneyService
                     $lockedPresenceShifts,
                 );
             }
-            $requiresWitness = $action === 'medication_administered'
-                && $this->requiresAdministrationWitness($log, $medication, true);
+            $packTracked = DB::table('medication_stock_transit_allocations')->where('transit_log_id', $log->id)->exists();
+            $requiresWitness = ($action === 'medication_administered' && $this->requiresAdministrationWitness($log, $medication, true))
+                || ($action === 'medication_returned' && $packTracked && $medication->controlled_drug);
             $lockedUsers = $this->lockCurrentFleetMedicationUsers(
                 $actor,
                 (int) $resident->site_id,
@@ -1034,7 +1050,7 @@ class ResidentTransportJourneyService
             if (! $replayedEvent) {
                 abort_unless($transport->status === 'in_progress', 409, 'Medication custody can only be resolved during an active journey.');
             }
-            if (! $replayedEvent && ($log->administered_at || $log->returned_to_house_at)) {
+            if (! $replayedEvent && ($log->returned_to_house_at || ($log->administered_at && ($action !== 'medication_returned' || ! $packTracked)))) {
                 throw new ConflictHttpException('This medication custody record has already been resolved.');
             }
 
@@ -1108,11 +1124,13 @@ class ResidentTransportJourneyService
                             ...($doseSlot['late'] ? ['reason' => self::TRANSPORT_LATE_REASON] : []),
                         ] : []),
                         'dose_given' => $medication->dosage ?: $medication->name,
+                        ...Arr::only($data, RecordingContract::fields()),
                         'notes' => $data['notes'] ?? null,
                         'client_request_uuid' => $requestUuid,
                         'witnessed_by' => $witness?->id,
                         'witness_credential' => $data['witness_credential'] ?? null,
                         'quantity_administered' => $data['quantity_administered'],
+                        'quantity_unit' => $data['quantity_unit'] ?? null,
                         'captured_offline_at' => $data['captured_offline_at'] ?? null,
                         'origin_device_id' => $data['origin_device_id'] ?? null,
                         'queued_offline' => (bool) ($data['queued_offline'] ?? false),
@@ -1122,6 +1140,7 @@ class ResidentTransportJourneyService
                     $actor->canDo('medications.controlled.view'),
                     prelockedPresenceShifts: $this->lockedPresenceShifts($actor),
                     prelockedPresenceEffectiveAt: $this->lockedPresenceEffectiveAt($actor),
+                    transitStock: $packTracked ? TransitStockContext::fromLog($log, $data['quantity_unit'] ?? null, $data['pack_lines'] ?? []) : null,
                 );
                 if (! ($emarResult['success'] ?? false)) {
                     if (($emarResult['status'] ?? null) === 403) {
@@ -1157,6 +1176,15 @@ class ResidentTransportJourneyService
                     'notes' => $data['notes'] ?? $log->notes,
                 ])->save();
             } else {
+                if ($requiresWitness) {
+                    $this->validateFleetWitnessInput($data);
+                    $witnessAttestation = $this->transportWitnesses->authenticate($actor, (int) $resident->site_id,
+                        (int) $data['witnessed_by_user_id'], (string) $data['witness_credential'], $actionAt,
+                        witnessErrorKey: 'witnessed_by_user_id', lockedUsers: $lockedUsers,
+                        lockedPresenceShifts: $this->lockedPresenceShifts($actor));
+                    $witness = $witnessAttestation['witness'];
+                }
+                app(MedicationStockService::class)->returnTransit($log, $actor, $data, $witness);
                 $log->forceFill([
                     'returned_to_house_at' => $actionAt,
                     'returned_by_user_id' => $actor->id,
@@ -1174,6 +1202,7 @@ class ResidentTransportJourneyService
                     'request_hash' => $requestHash,
                     ...($action === 'medication_administered' ? [
                         'quantity_administered' => $data['quantity_administered'],
+                        'quantity_unit' => $data['quantity_unit'] ?? null,
                     ] : []),
                     'scan_source' => $scanAudit['scan_source'],
                     'scan_match_source' => $scanAudit['scan_match_source'],
@@ -1206,19 +1235,23 @@ class ResidentTransportJourneyService
                 'request_uuid' => $requestUuid,
                 ...($action === 'medication_administered' ? [
                     'quantity_administered' => $data['quantity_administered'],
+                    'quantity_unit' => $data['quantity_unit'] ?? null,
                 ] : []),
                 'scan_source' => $scanAudit['scan_source'],
                 'scan_match_source' => $scanAudit['scan_match_source'],
                 'entered_code_suffix' => $scanAudit['scan_code_suffix'],
                 ...$this->offlineProvenance($data),
             ]);
-            $this->incidents->resolveTransitException(
-                $log,
-                $action === 'medication_administered'
-                    ? 'Medication administered during transit.'
-                    : 'Medication returned from transit.',
-                $actor->id,
-            );
+            if (! $packTracked || app(MedicationStockService::class)->transitReconciled($log)) {
+                $this->incidents->resolveTransitException(
+                    $log,
+                    $action === 'medication_administered'
+                        ? 'Medication administered during transit.'
+                        : 'Medication returned from transit.',
+                    $actor->id,
+                );
+
+            }
 
             return ['log' => $log, 'replayed' => false];
         }, 3);
@@ -1599,6 +1632,7 @@ class ResidentTransportJourneyService
             'request_uuid' => $requestUuid,
             'attestation_event_id' => $event->id,
             'attestation_state' => $attestationState,
+            'pack_lines' => $data['pack_lines'] ?? [],
             'witness_user_id' => $witness?->id,
             'attestation_reason' => $reason,
             ...$this->offlineProvenance($payload),
@@ -1625,6 +1659,7 @@ class ResidentTransportJourneyService
             'client_id' => $resident->id,
             'medication_id' => $medication->id,
             'medication_order_version_id' => $orderVersion?->id,
+            'pack_lines' => $payload['pack_lines'] ?? [],
             'parent_request_uuid' => $parentRequestUuid,
             'attestation_state' => $payload['attestation_state'] ?? null,
             'witnessed_by_user_id' => $payload['witnessed_by_user_id'] ?? null,
@@ -1678,6 +1713,7 @@ class ResidentTransportJourneyService
             'packed_at' => $this->medicationCustodyActionAt($transport, $payload),
             'notes' => $payload['notes'] ?? null,
         ]);
+        app(MedicationStockService::class)->packTransit($log, $actor, $payload, $witness);
         $transport->forceFill(['version' => ((int) $transport->version) + 1])->save();
 
         $scanAudit = $prepared['scan_audit'];

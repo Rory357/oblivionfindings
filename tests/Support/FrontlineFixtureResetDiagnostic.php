@@ -51,6 +51,12 @@ final class FrontlineFixtureResetDiagnostic
         }
         foreach ([
             'Attendance sessions for the same staff member cannot overlap.' => 'overlapping_attendance',
+            'Attendance-backed time-entry clock-in provenance conflicts.' => 'attendance_clock_identity_conflict',
+            'This worker already has an overlapping time entry.' => 'overlapping_time_entry',
+            'The linked timesheet has already been approved' => 'protected_attendance_timesheet',
+            'An approved time entry cannot be changed through attendance.' => 'protected_attendance_entry',
+            'The submitted attendance fixture has conflicting canonical identity.' => 'attendance_fixture_identity_conflict',
+            'The active clean attendance fixture has conflicting canonical identity.' => 'attendance_fixture_identity_conflict',
             'Approved or payroll-linked timesheets are immutable.' => 'immutable_timesheet',
             'Medication browser fixture reset cannot erase ' => 'retained_medication_evidence',
             'Frontline fixture diagnostic requires an exact disposable' => 'unsafe_database_context',
@@ -58,6 +64,16 @@ final class FrontlineFixtureResetDiagnostic
             if (str_contains($exception->getMessage(), $text)) {
                 $result['reason'] = $reason;
                 break;
+            }
+        }
+
+        if ($exception instanceof \LogicException) {
+            $file = basename(str_replace('\\', '/', $exception->getFile()));
+            if (in_array($file, [
+                'FrontlineLifecycleDemoSeeder.php', 'AttendanceTimeEntryProjector.php',
+                'AttendanceService.php', 'ShiftHandoverService.php', 'Timesheet.php',
+            ], true)) {
+                $result['source'] = ['file' => $file, 'line' => $exception->getLine()];
             }
         }
 

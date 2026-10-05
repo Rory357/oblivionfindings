@@ -17,6 +17,8 @@ Route::middleware('auth')->prefix('emar/downtime')->name('emar.downtime.')->grou
     Route::get('/{downtime}/sheets/{sheet}', [MedicationDowntimeController::class, 'sheet'])->whereNumber(['downtime', 'sheet'])->name('sheet');
     Route::post('/{downtime}/paper/preview', [MedicationPaperEntryController::class, 'preview'])->whereNumber('downtime')->name('paper.preview');
     Route::post('/{downtime}/paper', [MedicationPaperEntryController::class, 'store'])->whereNumber('downtime')->name('paper.store');
+    Route::post('/{downtime}/paper/{entry}/stock-evidence', [MedicationPaperEntryController::class, 'stockEvidence'])->whereNumber(['downtime', 'entry'])->name('paper.stock-evidence');
+    Route::post('/{downtime}/paper/{entry}/recovery-authorization', [MedicationPaperEntryController::class, 'recoveryAuthorization'])->whereNumber(['downtime', 'entry'])->name('paper.recovery-authorization');
     Route::post('/{downtime}/paper/{entry}/confirm', [MedicationPaperEntryController::class, 'confirm'])->whereNumber(['downtime', 'entry'])->name('paper.confirm');
     Route::get('/{downtime}/paper/{entry}/reconciliation', [MedicationPaperEntryController::class, 'reconciliationPreview'])->whereNumber(['downtime', 'entry'])->name('paper.reconciliation');
     Route::post('/{downtime}/paper/{entry}/reconcile', [MedicationPaperEntryController::class, 'reconcile'])->whereNumber(['downtime', 'entry'])->name('paper.reconcile');

@@ -1,4 +1,10 @@
 import ConfirmDialog from '@/components/confirm-dialog';
+import {
+    StockPackFields,
+    StockPackReview,
+    validateStockPackLines,
+    type StockPackLine,
+} from '@/components/medications/stock-pack-fields';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
@@ -238,6 +244,20 @@ export function ActionDialog({
             (initialMedicineId ? [initialMedicineId] : []),
     );
     const [witness, setWitness] = useState(emptyWitness);
+    const [packLines, setPackLines] = useState<StockPackLine[]>([]);
+    const [correctionPackLines, setCorrectionPackLines] = useState<
+        StockPackLine[]
+    >([]);
+    const needsPackLines =
+        !!medicine?.pack_stock?.lots_started &&
+        (['movement', 'loss_report', 'destruction'].includes(action) ||
+            (action === 'resolve' &&
+                ['found', 'recount'].includes(values.outcome)));
+    const needsCorrectionPacks =
+        !!medicine?.pack_stock?.lots_started &&
+        flags.correct &&
+        (action === 'void' ||
+            (action === 'resolve' && values.outcome === 'recording'));
     const [secondWitness, setSecondWitness] = useState(emptyWitness);
     const [photo, setPhoto] = useState<File | null>(null);
     const [step, setStep] = useState(0);
@@ -411,6 +431,66 @@ export function ActionDialog({
                 'Enter the Medicines Control reference.',
             );
         if (section === 'details') {
+            if (needsPackLines && medicine?.pack_stock) {
+                const packError = validateStockPackLines(
+                    medicine.pack_stock,
+                    packLines,
+                    action === 'resolve' && values.outcome === 'recount',
+                    action === 'movement' && values.direction === 'in',
+                );
+                if (packError) result.pack_lines = packError;
+                else if (
+                    Math.round(
+                        packLines.reduce(
+                            (sum, line) => sum + Number(line.quantity),
+                            0,
+                        ) * 100,
+                    ) !==
+                    Math.round(
+                        Number(
+                            action === 'resolve' && values.outcome === 'recount'
+                                ? values.recount_balance
+                                : values.quantity,
+                        ) * 100,
+                    )
+                )
+                    result.pack_lines =
+                        'The pack amounts must add up to the total amount for this action.';
+                if (
+                    action === 'movement' &&
+                    values.direction === 'in' &&
+                    packLines.some(
+                        (line) =>
+                            !medicine.pack_stock?.outward?.some(
+                                (entry) =>
+                                    entry.id === line.return_of_id &&
+                                    entry.lot_id === line.lot_id,
+                            ) ||
+                            !line.used_away?.trim() ||
+                            !Number.isFinite(Number(line.used_away)) ||
+                            Number(line.used_away) < 0,
+                    )
+                )
+                    result.pack_lines =
+                        'Link each returned pack to its outward record and enter the amount used away, including 0.';
+            }
+            if (needsCorrectionPacks && medicine?.pack_stock) {
+                const error = validateStockPackLines(
+                    medicine.pack_stock,
+                    correctionPackLines,
+                );
+                if (error) result.correction_pack_lines = error;
+                else if (
+                    Math.round(
+                        correctionPackLines.reduce(
+                            (sum, line) => sum + Number(line.quantity),
+                            0,
+                        ) * 100,
+                    ) !== Math.round(Number(values.correction_quantity) * 100)
+                )
+                    result.correction_pack_lines =
+                        'The pack amounts must match the correcting amount.';
+            }
             if (needsWitness && medicine?.balance === null)
                 result.client_medication_id =
                     'Balance not configured. Record a witnessed receipt before changing or counting this stock.';
@@ -419,13 +499,28 @@ export function ActionDialog({
                 (!medicine ||
                     (!(action === 'count'
                         ? (medicine.can_count ?? medicine.can_record)
-                        : medicine.can_record) &&
+                        : action === 'destruction'
+                          ? (medicine.can_destroy ?? medicine.can_record)
+                          : medicine.can_record) &&
                         action !== 'class_review'))
             )
                 result.client_medication_id =
                     'Choose a permitted medicine you can record.';
-            if (['movement', 'loss_report', 'destruction'].includes(action))
-                positive('quantity', result);
+            if (['movement', 'loss_report', 'destruction'].includes(action)) {
+                if (
+                    action === 'movement' &&
+                    values.direction === 'in' &&
+                    needsPackLines
+                ) {
+                    if (
+                        !values.quantity?.trim() ||
+                        !Number.isFinite(Number(values.quantity)) ||
+                        Number(values.quantity) < 0
+                    )
+                        result.quantity =
+                            'Enter the amount returned, including 0 if all was used away.';
+                } else positive('quantity', result);
+            }
             if (
                 [
                     'void',
@@ -655,9 +750,8 @@ export function ActionDialog({
         setSaving(true);
         setMessage('');
         setConfirm(false);
-        const request =
-            retryRequest.current ??
-            buildControlledActionValues({
+        const request = retryRequest.current ?? {
+            ...buildControlledActionValues({
                 action,
                 medicine,
                 targetId: spec.targetId,
@@ -668,7 +762,12 @@ export function ActionDialog({
                 secondWitness,
                 needsWitness,
                 photo,
-            });
+            }),
+            ...(needsPackLines ? { pack_lines: packLines } : {}),
+            ...(needsCorrectionPacks
+                ? { correction_pack_lines: correctionPackLines }
+                : {}),
+        };
         retryRequest.current = request;
         try {
             const result = await act(action, request, uuid.current);
@@ -781,7 +880,9 @@ export function ActionDialog({
                 value={medicineId}
                 onChange={(id) => {
                     setMedicineId(id);
+                    setPackLines([]);
                     setSnapshot(medicineFor(payload, Number(id)));
+                    setCorrectionPackLines([]);
                     setWitness(emptyWitness());
                     setSecondWitness(emptyWitness());
                 }}
@@ -792,7 +893,9 @@ export function ActionDialog({
                     disabled:
                         !(action === 'count'
                             ? (record.can_count ?? record.can_record)
-                            : record.can_record) && action !== 'class_review'
+                            : action === 'destruction'
+                              ? (record.can_destroy ?? record.can_record)
+                              : record.can_record) && action !== 'class_review'
                             ? (record.record_reason ??
                               'You cannot record at this house')
                             : null,
@@ -1593,6 +1696,18 @@ export function ActionDialog({
                         />
                     </>
                 ) : null}
+                {needsPackLines && medicine?.pack_stock && (
+                    <StockPackReview
+                        stock={medicine.pack_stock}
+                        lines={packLines}
+                    />
+                )}
+                {needsCorrectionPacks && medicine?.pack_stock && (
+                    <StockPackReview
+                        stock={medicine.pack_stock}
+                        lines={correctionPackLines}
+                    />
+                )}
             </ReviewCard>
             {needsWitness ? (
                 <ReviewCard
@@ -1778,6 +1893,72 @@ export function ActionDialog({
                             <>
                                 {medicineSelection}
                                 {details}
+                                {needsPackLines && medicine?.pack_stock && (
+                                    <div
+                                        data-field="pack_lines"
+                                        className="space-y-2"
+                                    >
+                                        <StockPackFields
+                                            stock={medicine.pack_stock}
+                                            value={packLines}
+                                            count={
+                                                action === 'resolve' &&
+                                                values.outcome === 'recount'
+                                            }
+                                            onChange={(value) => {
+                                                setPackLines(value);
+                                                setErrors({});
+                                            }}
+                                            disabled={saving || uncertain}
+                                            returns={
+                                                action === 'movement' &&
+                                                values.direction === 'in'
+                                            }
+                                            idPrefix="controlled-action-pack"
+                                        />
+                                        {errors.pack_lines && (
+                                            <p
+                                                role="alert"
+                                                className="text-status-critical"
+                                            >
+                                                {errors.pack_lines}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+                                {needsCorrectionPacks &&
+                                    medicine?.pack_stock && (
+                                        <div
+                                            data-field="correction_pack_lines"
+                                            className="space-y-2"
+                                        >
+                                            <h3 className="text-section-title">
+                                                Correcting entry packs
+                                            </h3>
+                                            <StockPackFields
+                                                stock={medicine.pack_stock}
+                                                value={correctionPackLines}
+                                                onChange={(value) => {
+                                                    setCorrectionPackLines(
+                                                        value,
+                                                    );
+                                                    setErrors({});
+                                                }}
+                                                disabled={saving || uncertain}
+                                                idPrefix="controlled-correction-pack"
+                                            />
+                                            {errors.correction_pack_lines && (
+                                                <p
+                                                    role="alert"
+                                                    className="text-status-critical"
+                                                >
+                                                    {
+                                                        errors.correction_pack_lines
+                                                    }
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
                             </>
                         )}
                         {errors.notifications ? (

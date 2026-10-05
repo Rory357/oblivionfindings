@@ -574,6 +574,18 @@ export default function MedicationTransitIndex({
                                                             {statusBadge(
                                                                 log.status,
                                                             )}
+                                                            {log.stock_reconciliation_status ===
+                                                                'shortfall' && (
+                                                                <p className="text-status-critical">
+                                                                    Missing
+                                                                    stock —
+                                                                    follow-up
+                                                                    needed
+                                                                    {log.stock_reconciliation_reason
+                                                                        ? ` · ${log.stock_reconciliation_reason}`
+                                                                        : ''}
+                                                                </p>
+                                                            )}
                                                             {log.administered_at && (
                                                                 <div className="text-xs text-muted-foreground">
                                                                     Administered{' '}
@@ -725,6 +737,7 @@ export default function MedicationTransitIndex({
                     />
                     <ReturnTransportMedicationWizard
                         log={returningLog}
+                        witnesses={safeWitnesses}
                         onClose={closeReturnDialog}
                         onCompleted={(queued) => {
                             if (!queued) {

@@ -1,3 +1,7 @@
+import type {
+    PackStockContext,
+    StockPackLine,
+} from '@/components/medications/stock-pack-fields';
 import type { WitnessPinStatus } from '@/lib/witness-pin';
 
 export type ControlledAction =
@@ -26,6 +30,7 @@ export type ResolutionOutcome =
     | 'loss'
     | 'escalate';
 export interface ControlledMedicine {
+    pack_stock?: PackStockContext | null;
     id: number;
     client_id: number;
     client_name: string;
@@ -38,6 +43,7 @@ export interface ControlledMedicine {
     nz_class: 'A' | 'B' | 'C' | null;
     class_review_required: boolean;
     can_record: boolean;
+    can_destroy?: boolean;
     can_count?: boolean;
     record_reason?: string | null;
     count: {
@@ -266,7 +272,7 @@ export interface ControlledProductPayload {
 }
 export type ControlledActionValues = Record<
     string,
-    string | number | boolean | null | number[] | File
+    string | number | boolean | null | number[] | StockPackLine[] | File
 >;
 export interface ControlledActionResult {
     message?: string;

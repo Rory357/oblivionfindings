@@ -67,7 +67,7 @@ final class ItSecurityDesktopReleaseFixtureManager
 
     private const string TRACKING_HISTORY_GAP = 'release_fixture_tracking_history_baseline_mismatch';
 
-    /** @var list<array{type: string, id: int}> */
+    /** @var list<array{type: string, id: int, baseline_sha256?: string}> */
     private array $records = [];
 
     /** @var array<string, class-string<Model>> */
@@ -182,6 +182,7 @@ final class ItSecurityDesktopReleaseFixtureManager
             : [
                 ...$this->packGaps($pack, requireReadiness: false),
                 ...$this->retainedD16EvidenceGaps($pack),
+                ...$this->approvalBaselineGaps($pack),
             ];
 
         return $this->report(
@@ -374,6 +375,10 @@ final class ItSecurityDesktopReleaseFixtureManager
             }
             if ($this->retainedD16EvidenceGaps($pack) !== []) {
                 throw new DomainException('release_fixture_retained_d16_evidence_requires_pack_archive');
+            }
+
+            if ($this->approvalBaselineGaps($pack, lock: true) !== []) {
+                throw new DomainException('release_fixture_approval_baseline_changed_or_shared');
             }
 
             $this->deleteD01JourneyRecords($pack);
@@ -613,29 +618,17 @@ final class ItSecurityDesktopReleaseFixtureManager
             ]));
         }
 
-        $trackingConsentType = $this->own('consent_type', ConsentType::query()->create([
-            'name' => 'RELEASE V10 Client Location Tracking',
-            'category' => 'optional',
-            'description' => 'Non-production desktop release fixture consent only.',
-            'purpose' => 'Client personal safety tracking',
-            'legal_basis' => 'Approved non-production release acceptance.',
-            'is_mandatory' => false,
-            'requires_capacity_assessment' => false,
-            'allows_withdrawal' => true,
-            'validity_period_days' => 365,
-            'renewal_required' => false,
-            'active' => true,
-        ]));
-        $trackingConsentTypeVersion = $this->own('consent_type_version', ConsentTypeVersion::query()->create([
+        [$trackingConsentType, $trackingConsentTypeVersion] = $this->trackingConsentCatalogue(lock: true);
+        $trackingConsentTypeVersion ??= ConsentTypeVersion::query()->create([
             'consent_type_id' => $trackingConsentType->id,
             'version' => $trackingConsentType->version,
             'description' => $trackingConsentType->description,
             'purpose' => $trackingConsentType->purpose,
             'legal_basis' => $trackingConsentType->legal_basis,
-            'changes_summary' => ['source' => 'owned_non_production_release_fixture'],
+            'changes_summary' => ['source' => 'canonical_tracking_catalogue_snapshot'],
             'effective_from' => now(),
-            'created_by' => $manager->id,
-        ]));
+            'created_by' => null,
+        ]);
         $trackingConsentAt = now()->startOfSecond();
         $trackingConsentExpiresAt = $trackingConsentAt->copy()->addYear();
         $consents = [
@@ -1125,7 +1118,37 @@ final class ItSecurityDesktopReleaseFixtureManager
             $gaps[] = 'release_fixture_required_permissions_missing';
         }
 
+        try {
+            $this->trackingConsentCatalogue();
+        } catch (DomainException) {
+            $gaps[] = 'release_fixture_tracking_catalogue_missing_or_mismatched';
+        }
+
         return $this->sortedGaps($gaps);
+    }
+
+    /** @return array{0: ConsentType, 1: ?ConsentTypeVersion} */
+    private function trackingConsentCatalogue(bool $lock = false): array
+    {
+        $query = ConsentType::query()
+            ->where('name', ItSecurityDesktopReleaseFixtureReadiness::TRACKING_CONSENT_TYPE_NAME);
+        $types = ($lock ? $query->lockForUpdate() : $query)->get();
+        $type = $types->count() === 1 ? $types->first() : null;
+        if (! $type instanceof ConsentType || ! $type->active || (int) $type->version < 1
+            || trim((string) $type->purpose) === '' || trim((string) $type->legal_basis) === '') {
+            throw new DomainException('release_fixture_tracking_catalogue_missing_or_mismatched');
+        }
+        $query = ConsentTypeVersion::query()->where('consent_type_id', $type->id)->where('version', $type->version);
+        $versions = ($lock ? $query->lockForUpdate() : $query)->get();
+        $version = $versions->first();
+        if ($versions->count() > 1 || ($version !== null
+            && ($version->purpose !== $type->purpose || $version->legal_basis !== $type->legal_basis
+                || $version->effective_from === null || $version->effective_from->gt(now())
+                || ($version->effective_to !== null && $version->effective_to->lte(now()))))) {
+            throw new DomainException('release_fixture_tracking_catalogue_missing_or_mismatched');
+        }
+
+        return [$type, $version];
     }
 
     /** @return list<string> */
@@ -1143,8 +1166,6 @@ final class ItSecurityDesktopReleaseFixtureManager
             || User::query()->whereIn('name', array_keys(ItSecurityDesktopReleaseFixtureReadiness::STAFF))->exists()
             || Site::withTrashed()->whereIn('name', ItSecurityDesktopReleaseFixtureReadiness::SITES)->exists()
             || Client::withTrashed()->where('first_name', 'RELEASE V10 Client')->whereIn('last_name', ['Alpha', 'Hidden'])->exists()
-            || ConsentType::withTrashed()->where('name', 'RELEASE V10 Client Location Tracking')->exists()
-            || ClientConsent::withTrashed()->whereHas('consentType', fn ($query) => $query->withTrashed()->where('name', 'RELEASE V10 Client Location Tracking'))->exists()
             || Asset::query()->whereIn('name', ['RELEASE V10 Alpha Vehicle', 'RELEASE V10 Alpha Asset'])->exists()
             || FinFixedAsset::withTrashed()->where('asset_name', 'RELEASE V10 Alpha Financial Record')->exists()
             || Device::withTrashed()->whereIn('name', array_keys(ItSecurityDesktopReleaseFixtureReadiness::DEVICES))->exists()
@@ -1188,7 +1209,7 @@ final class ItSecurityDesktopReleaseFixtureManager
     }
 
     /**
-     * Resolve only the exact mutable D10 records named in the signed fixture
+     * Resolve only the exact mutable D10 records named in the integrity-checked fixture
      * manifest. This deliberately has no command, audit, or batch path.
      *
      * @return array{0: ClientConsent, 1: DeviceAssignment, 2: User, 3: Device, 4: IntegrationEvent, 5: Client}
@@ -1217,8 +1238,8 @@ final class ItSecurityDesktopReleaseFixtureManager
             ->whereIn('id', $recordIds('user'))
             ->where('email', 'release-v10-control-room@acceptance.invalid'));
         $consentType = $one(ConsentType::query()
-            ->whereIn('id', $recordIds('consent_type'))
-            ->where('name', 'RELEASE V10 Client Location Tracking'));
+            ->where('name', ItSecurityDesktopReleaseFixtureReadiness::TRACKING_CONSENT_TYPE_NAME)
+            ->where('active', true));
         $client = $one(Client::query()
             ->whereIn('id', $recordIds('client'))
             ->where('first_name', 'RELEASE V10 Client')
@@ -1276,7 +1297,11 @@ final class ItSecurityDesktopReleaseFixtureManager
             || (int) $assignment->device_id !== (int) $device->id
             || $device->domain !== 'tracking'
             || $device->category !== 'personal_tracker'
-            || $consentType->purpose !== 'Client personal safety tracking'
+            || $consent->consentTypeVersion === null
+            || (int) $consent->consentTypeVersion->consent_type_id !== (int) $consentType->id
+            || (int) $consent->consentTypeVersion->version !== (int) $consentType->version
+            || $consent->decision_purpose !== $consentType->purpose
+            || $consent->consentTypeVersion->purpose !== $consentType->purpose
             || $activeConsentAssignments->count() !== 1
             || (int) $activeConsentAssignments->sole()->id !== (int) $assignment->id) {
             throw new DomainException(self::TRACKING_SCOPE_GAP);
@@ -1436,6 +1461,53 @@ final class ItSecurityDesktopReleaseFixtureManager
     }
 
     /** @return list<string> */
+    private function approvalBaselineGaps(ItSecurityDesktopReleaseFixturePack $pack, bool $lock = false): array
+    {
+        if (! is_array($pack->manifest) || ! $this->manifestShapeValid($pack->manifest)) {
+            return [];
+        }
+        $records = collect($pack->manifest['records']);
+        $ownedIds = fn (string $type): array => $records->where('type', $type)->pluck('id')->all();
+        $approvalRecords = $records->where('type', 'it_ticket_approval');
+        $one = static function ($query) use ($lock): ?Model {
+            $matches = ($lock ? $query->lockForUpdate() : $query)->get();
+
+            return $matches->count() === 1 ? $matches->first() : null;
+        };
+        $manager = $one(User::query()->whereIn('id', $ownedIds('user'))
+            ->where('email', 'release-v10-it-manager@acceptance.invalid'));
+        $reviewer = $one(User::query()->whereIn('id', $ownedIds('user'))
+            ->where('email', 'release-v10-it-reviewer@acceptance.invalid'));
+        $site = $one(Site::query()->whereIn('id', $ownedIds('site'))->where('name', 'RELEASE V10 Site Alpha'));
+        $ticket = $one(ItTicket::query()->whereIn('id', $ownedIds('it_ticket'))
+            ->where('title', 'RELEASE V10 Alpha Switch Connectivity Incident')
+            ->where('description', 'Canonical monitoring incident for desktop release acceptance.')
+            ->where('source', 'system')->where('work_type', 'incident'));
+        if ($approvalRecords->count() !== 1 || ! $manager instanceof User || ! $reviewer instanceof User
+            || ! $site instanceof Site || ! $ticket instanceof ItTicket
+            || (int) $ticket->site_id !== (int) $site->id
+            || (int) $ticket->assigned_to_user_id !== (int) $manager->id
+            || (int) $ticket->owner_user_id !== (int) $manager->id || $ticket->is_organisation_wide) {
+            return ['release_fixture_approval_baseline_changed_or_shared'];
+        }
+        $record = $approvalRecords->sole();
+        // Lock every generation, including additions outside the prepare-time manifest.
+        $query = ItTicketApproval::query()->where('it_ticket_id', $ticket->id);
+        $approvals = ($lock ? $query->lockForUpdate() : $query)->get();
+        $approval = $approvals->count() === 1 ? $approvals->first() : null;
+        if (! $approval instanceof ItTicketApproval || (int) $approval->id !== $record['id']
+            || (int) $approval->requested_by !== (int) $manager->id
+            || (int) $approval->approver_id !== (int) $reviewer->id || $approval->status !== 'approved'
+            || $approval->getRawOriginal('reason') !== 'Independent release acceptance approval.'
+            || $approval->decided_at === null
+            || ! hash_equals($record['baseline_sha256'], $this->manifestHash($approval->getRawOriginal()))) {
+            return ['release_fixture_approval_baseline_changed_or_shared'];
+        }
+
+        return [];
+    }
+
+    /** @return list<string> */
     private function retainedD16EvidenceGaps(ItSecurityDesktopReleaseFixturePack $pack): array
     {
         $deviceIds = collect((array) data_get($pack->manifest, 'records', []))
@@ -1544,13 +1616,19 @@ final class ItSecurityDesktopReleaseFixtureManager
         $seen = [];
         foreach ($manifest['records'] as $record) {
             if (! is_array($record)
-                || array_diff_key($record, ['type' => true, 'id' => true]) !== []
+                || array_diff_key($record, ['type' => true, 'id' => true, 'baseline_sha256' => true]) !== []
                 || array_diff_key(['type' => true, 'id' => true], $record) !== []
                 || ! is_string($record['type'])
                 || (! isset(self::RECORD_MODELS[$record['type']])
                     && ! in_array($record['type'], ['it_ticket_watcher', 'monitoring_incident_evidence_snapshot'], true))
                 || ! is_int($record['id'])
                 || $record['id'] < 1) {
+                return false;
+            }
+            if (($record['type'] === 'it_ticket_approval'
+                && (! is_string($record['baseline_sha256'] ?? null)
+                    || preg_match('/\A[a-f0-9]{64}\z/', $record['baseline_sha256']) !== 1))
+                || ($record['type'] !== 'it_ticket_approval' && array_key_exists('baseline_sha256', $record))) {
                 return false;
             }
             $key = $record['type'].':'.$record['id'];
@@ -1563,7 +1641,7 @@ final class ItSecurityDesktopReleaseFixtureManager
         return $manifest['records'] !== [];
     }
 
-    /** @param array{type: string, id: int} $record */
+    /** @param array{type: string, id: int, baseline_sha256?: string} $record */
     private function ownedRecordExists(array $record): bool
     {
         return match ($record['type']) {
@@ -1573,7 +1651,7 @@ final class ItSecurityDesktopReleaseFixtureManager
         };
     }
 
-    /** @param array{type: string, id: int} $record */
+    /** @param array{type: string, id: int, baseline_sha256?: string} $record */
     private function deleteOwnedRecord(array $record): void
     {
         if ($record['type'] === 'it_ticket_watcher') {
@@ -1591,6 +1669,16 @@ final class ItSecurityDesktopReleaseFixtureManager
         $model = $this->modelQuery($class)->whereKey($record['id'])->first();
         if (! $model) {
             throw new DomainException('An owned release fixture record disappeared during cleanup.');
+        }
+        if ($model instanceof ItTicketApproval) {
+            if (! hash_equals($record['baseline_sha256'], $this->manifestHash($model->getRawOriginal()))) {
+                throw new DomainException('release_fixture_approval_baseline_changed_or_shared');
+            }
+            // Only the locked, unchanged synthetic baseline is removable. Normal
+            // approval deletion and every additional generation remain protected.
+            DB::table($model->getTable())->where('id', $model->id)->delete();
+
+            return;
         }
         if ($model instanceof User) {
             $model->roles()->detach();
@@ -1718,7 +1806,7 @@ final class ItSecurityDesktopReleaseFixtureManager
         }
     }
 
-    /** @return array{schema_version: int, records: list<array{type: string, id: int}>, files: list<array{path: string, sha256: string}>} */
+    /** @return array{schema_version: int, records: list<array{type: string, id: int, baseline_sha256?: string}>, files: list<array{path: string, sha256: string}>} */
     private function manifest(): array
     {
         return [
@@ -1762,7 +1850,11 @@ final class ItSecurityDesktopReleaseFixtureManager
      */
     private function own(string $type, Model $model): Model
     {
-        $this->records[] = ['type' => $type, 'id' => (int) $model->getKey()];
+        $record = ['type' => $type, 'id' => (int) $model->getKey()];
+        if ($model instanceof ItTicketApproval) {
+            $record['baseline_sha256'] = $this->manifestHash($model->refresh()->getRawOriginal());
+        }
+        $this->records[] = $record;
 
         return $model;
     }

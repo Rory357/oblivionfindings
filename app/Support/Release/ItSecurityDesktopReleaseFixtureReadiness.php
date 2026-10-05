@@ -40,6 +40,8 @@ final class ItSecurityDesktopReleaseFixtureReadiness
 
     public const string EVIDENCE_CLASS = 'it_security_desktop_release_fixture_readiness_v1';
 
+    public const string TRACKING_CONSENT_TYPE_NAME = 'Personal Tracker (Wandering Risk)';
+
     public const float TRACKING_LATITUDE = 0.0001;
 
     public const float TRACKING_LONGITUDE = 0.0001;
@@ -789,9 +791,9 @@ final class ItSecurityDesktopReleaseFixtureReadiness
             && $assignment->assignable_type === 'client'
             && $consent instanceof ClientConsent
             && $type instanceof ConsentType
-            && ConsentValidationService::isValidTrackingConsent($consent, $client)
-            && $type->name === 'RELEASE V10 Client Location Tracking'
-            && $type->purpose === 'Client personal safety tracking'
+            && ConsentValidationService::isValidResidentLocationConsent($consent, $client)
+            && $type->name === self::TRACKING_CONSENT_TYPE_NAME
+            && $consent->decision_purpose === $type->purpose
             && $assignment->tracking_purpose === 'Client personal safety tracking'
             && $assignment->authority_basis === 'assignment_linked_client_consent'
             && $consentAssignments->count() === 1

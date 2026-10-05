@@ -1,4 +1,10 @@
 import ConfirmDialog from '@/components/confirm-dialog';
+import {
+    StockPackFields,
+    StockPackReview,
+    validateStockPackLines,
+    type StockPackLine,
+} from '@/components/medications/stock-pack-fields';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -9,6 +15,7 @@ import {
     WizardStepPane,
     WizardSuccessPane,
 } from '@/components/wizard/shell';
+import { formatDateTime } from '@/lib/datetime';
 import {
     Check,
     ClipboardCheck,
@@ -17,6 +24,13 @@ import {
     Users,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
+import {
+    CountCoverageFields,
+    coverageError,
+    coverageInstant,
+    emptyCountCoverage,
+    type CountCoverage,
+} from './count-coverage';
 import { ControlledApiError, type ControlledWorkspace } from './product-client';
 import type {
     ControlledActionValues,
@@ -114,6 +128,10 @@ export function CountDialog({
         medicines.map((medicine) => ({ ...medicine })),
     );
     const [lines, setLines] = useState<Record<number, CountLine>>({});
+    const [packLines, setPackLines] = useState<Record<number, StockPackLine[]>>(
+        {},
+    );
+    const [coverage, setCoverage] = useState<Record<number, CountCoverage>>({});
     const [witness, setWitness] = useState(emptyWitness);
     const [step, setStep] = useState(0);
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -132,7 +150,17 @@ export function CountDialog({
     const dirty =
         Object.values(lines).some(
             (line) => line.first !== '' || line.notes !== '',
-        ) || !!witness.id;
+        ) ||
+        !!witness.id ||
+        Object.values(packLines).some((rows) =>
+            rows.some((row) => row.quantity !== ''),
+        ) ||
+        Object.values(coverage).some(
+            (review) =>
+                review.entries.length > 0 ||
+                review.start !== '' ||
+                review.end !== '',
+        );
     const lineFor = (id: number) => lines[id] ?? blankLine();
     const edit = (id: number, patch: Partial<CountLine>) => {
         setLines((previous) => ({
@@ -173,13 +201,45 @@ export function CountDialog({
             {},
             ...snapshots
                 .filter((medicine) => !(medicine.id in saved))
-                .map((medicine) =>
-                    validateCountLine(
+                .map((medicine) => {
+                    const errors = validateCountLine(
                         lineFor(medicine.id),
                         medicine.balance,
                         String(medicine.id),
-                    ),
-                ),
+                    );
+                    const invalidCoverage = coverageError(
+                        coverage[medicine.id] ?? emptyCountCoverage(),
+                    );
+                    if (invalidCoverage)
+                        errors[`${medicine.id}_coverage`] = invalidCoverage;
+                    if (medicine.pack_stock?.lots_started) {
+                        const packs = packLines[medicine.id] ?? [];
+                        const packError = validateStockPackLines(
+                            medicine.pack_stock,
+                            packs,
+                            true,
+                        );
+                        if (packError)
+                            errors[`${medicine.id}_pack_lines`] = packError;
+                        else if (
+                            Math.round(
+                                packs.reduce(
+                                    (sum, row) => sum + Number(row.quantity),
+                                    0,
+                                ) * 100,
+                            ) !==
+                            Math.round(
+                                countLineResult(
+                                    lineFor(medicine.id),
+                                    medicine.balance,
+                                ).actual * 100,
+                            )
+                        )
+                            errors[`${medicine.id}_pack_lines`] =
+                                'The final pack counts must add up to the physical count above.';
+                    }
+                    return errors;
+                }),
         );
     const next = () => {
         const nextErrors =
@@ -225,6 +285,23 @@ export function CountDialog({
                     immediate_action_taken: line.immediate.trim(),
                     witnessed_by: Number(witness.id),
                     witness_credential: witness.pin,
+                    ...(medicine.pack_stock?.lots_started
+                        ? { pack_lines: packLines[medicine.id] }
+                        : {}),
+                    ...(coverage[medicine.id]?.entries.length
+                        ? {
+                              covered_paper_entry_ids:
+                                  coverage[medicine.id].entries,
+                              coverage_start: coverageInstant(
+                                  coverage[medicine.id].start,
+                                  coverage[medicine.id].startOffset,
+                              ),
+                              coverage_end: coverageInstant(
+                                  coverage[medicine.id].end,
+                                  coverage[medicine.id].endOffset,
+                              ),
+                          }
+                        : {}),
                 };
                 retryRequests.current[medicine.id] = request;
                 const receipt = await act(
@@ -291,6 +368,14 @@ export function CountDialog({
                             [updated.id]: blankLine(),
                         }));
                         delete uuids.current[updated.id];
+                        setPackLines((previous) => ({
+                            ...previous,
+                            [updated.id]: [],
+                        }));
+                        setCoverage((previous) => ({
+                            ...previous,
+                            [updated.id]: emptyCountCoverage(),
+                        }));
                         setMessage(
                             `The register changed while you were counting. Count ${updated.name} again against the current balance of ${quantity(updated.balance, updated.unit)}. ${Object.keys(recorded).length ? 'Already saved counts stay recorded.' : 'Nothing was saved.'}`,
                         );
@@ -512,6 +597,107 @@ export function CountDialog({
                                                             />
                                                         </>
                                                     ) : null}
+                                                    {medicine.pack_stock
+                                                        ?.lots_started && (
+                                                        <div
+                                                            data-field={`${prefix}_pack_lines`}
+                                                            className="space-y-2"
+                                                        >
+                                                            <StockPackFields
+                                                                stock={
+                                                                    medicine.pack_stock
+                                                                }
+                                                                value={
+                                                                    packLines[
+                                                                        medicine
+                                                                            .id
+                                                                    ] ?? []
+                                                                }
+                                                                onChange={(
+                                                                    value,
+                                                                ) => {
+                                                                    setPackLines(
+                                                                        (
+                                                                            current,
+                                                                        ) => ({
+                                                                            ...current,
+                                                                            [medicine.id]:
+                                                                                value,
+                                                                        }),
+                                                                    );
+                                                                    setErrors(
+                                                                        {},
+                                                                    );
+                                                                }}
+                                                                count
+                                                                idPrefix={`count-pack-${medicine.id}`}
+                                                            />
+                                                            {errors[
+                                                                `${prefix}_pack_lines`
+                                                            ] && (
+                                                                <p
+                                                                    role="alert"
+                                                                    className="text-status-critical"
+                                                                >
+                                                                    {
+                                                                        errors[
+                                                                            `${prefix}_pack_lines`
+                                                                        ]
+                                                                    }
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                    {medicine.pack_stock
+                                                        ?.lots_started && (
+                                                        <div
+                                                            data-field={`${prefix}_coverage`}
+                                                        >
+                                                            <CountCoverageFields
+                                                                stock={
+                                                                    medicine.pack_stock
+                                                                }
+                                                                value={
+                                                                    coverage[
+                                                                        medicine
+                                                                            .id
+                                                                    ] ??
+                                                                    emptyCountCoverage()
+                                                                }
+                                                                onChange={(
+                                                                    value,
+                                                                ) => {
+                                                                    setCoverage(
+                                                                        (
+                                                                            current,
+                                                                        ) => ({
+                                                                            ...current,
+                                                                            [medicine.id]:
+                                                                                value,
+                                                                        }),
+                                                                    );
+                                                                    setErrors(
+                                                                        {},
+                                                                    );
+                                                                }}
+                                                                id={`count-coverage-${medicine.id}`}
+                                                            />
+                                                            {errors[
+                                                                `${prefix}_coverage`
+                                                            ] && (
+                                                                <p
+                                                                    role="alert"
+                                                                    className="text-status-critical"
+                                                                >
+                                                                    {
+                                                                        errors[
+                                                                            `${prefix}_coverage`
+                                                                        ]
+                                                                    }
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                     {result.discrepancy ? (
                                                         <>
                                                             <Field
@@ -623,6 +809,61 @@ export function CountDialog({
                                                                   ? 'Discrepancy starts when recorded'
                                                                   : 'Matches'}
                                                         </p>
+                                                        {medicine.pack_stock
+                                                            ?.lots_started && (
+                                                            <StockPackReview
+                                                                stock={
+                                                                    medicine.pack_stock
+                                                                }
+                                                                lines={
+                                                                    packLines[
+                                                                        medicine
+                                                                            .id
+                                                                    ] ?? []
+                                                                }
+                                                            />
+                                                        )}
+                                                        {coverage[medicine.id]
+                                                            ?.entries.length ? (
+                                                            <p className="text-caption">
+                                                                Covers paper
+                                                                entries{' '}
+                                                                {coverage[
+                                                                    medicine.id
+                                                                ].entries.join(
+                                                                    ', ',
+                                                                )}{' '}
+                                                                from{' '}
+                                                                {formatDateTime(
+                                                                    coverageInstant(
+                                                                        coverage[
+                                                                            medicine
+                                                                                .id
+                                                                        ].start,
+                                                                        coverage[
+                                                                            medicine
+                                                                                .id
+                                                                        ]
+                                                                            .startOffset,
+                                                                    ),
+                                                                )}{' '}
+                                                                to{' '}
+                                                                {formatDateTime(
+                                                                    coverageInstant(
+                                                                        coverage[
+                                                                            medicine
+                                                                                .id
+                                                                        ].end,
+                                                                        coverage[
+                                                                            medicine
+                                                                                .id
+                                                                        ]
+                                                                            .endOffset,
+                                                                    ),
+                                                                )}
+                                                                .
+                                                            </p>
+                                                        ) : null}
                                                         {result.needsRecount ? (
                                                             <p className="text-caption">
                                                                 First count{' '}

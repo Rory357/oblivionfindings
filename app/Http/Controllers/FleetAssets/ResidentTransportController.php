@@ -16,6 +16,8 @@ use App\Models\User;
 use App\Services\Fleet\ResidentTransportJourneyScope;
 use App\Services\Fleet\ResidentTransportJourneyService;
 use App\Services\Medication\ControlledMedicationTransportWitnessService;
+use App\Services\Medication\Recording\RecordingContract;
+use App\Services\Medication\Stock\MedicationStockService;
 use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationScanVerificationService;
 use App\Support\Medication\MedicationStockQuantity;
@@ -371,6 +373,7 @@ class ResidentTransportController extends Controller
                     'dose_times' => $medication->dose_times,
                     'route' => $medication->route,
                     'instructions' => $medication->instructions,
+                    'pack_stock' => (! $medication->controlled_drug || $actor->canDo('medications.controlled.view')) ? app(MedicationStockService::class)->packOptions($medication) : null,
                     'scan_verification' => $this->buildMedicationScanPayload($selectedClient, $medication),
                 ]);
 
@@ -427,6 +430,10 @@ class ResidentTransportController extends Controller
             ...$medicationEnvelopeRules,
             'medications' => ['nullable', 'array'],
             'medications.*.medication_id' => ['required', 'integer'],
+            'medications.*.pack_lines' => ['nullable', 'array', 'max:100'],
+            'medications.*.pack_lines.*.lot_id' => ['required', 'integer', 'min:1'],
+            'medications.*.pack_lines.*.revision' => ['required', 'integer', 'min:0'],
+            'medications.*.pack_lines.*.quantity' => ['required', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0.01'],
             'medications.*.medication_order_version_id' => ['nullable', 'integer'],
             'medications.*.medication_name' => ['required', 'string', 'max:255'],
             'medications.*.is_controlled_drug' => ['required', 'boolean'],
@@ -561,6 +568,7 @@ class ResidentTransportController extends Controller
                     'dose_times' => $medication->dose_times,
                     'route' => $medication->route,
                     'instructions' => $medication->instructions,
+                    'pack_stock' => (! $medication->controlled_drug || $request->user()->canDo('medications.controlled.view')) ? app(MedicationStockService::class)->packOptions($medication) : null,
                     'scan_verification' => $this->buildMedicationScanPayload($transportClient, $medication),
                 ])
                 ->values()
@@ -591,6 +599,11 @@ class ResidentTransportController extends Controller
                         'name' => trim(($log->client->first_name ?? '').' '.($log->client->last_name ?? '')),
                     ] : null,
                     'medication_id' => $log->medication_id,
+                    'pack_stock' => (! $log->is_controlled_drug && ! $log->medication?->controlled_drug) || $request->user()->canDo('medications.controlled.view') ? app(MedicationStockService::class)->transitOptions($log) : null,
+                    'dose_amount' => (! $log->is_controlled_drug && ! $log->medication?->controlled_drug) || $request->user()->canDo('medications.controlled.view') ? $log->medication?->dose_amount : null,
+                    'dose_unit' => (! $log->is_controlled_drug && ! $log->medication?->controlled_drug) || $request->user()->canDo('medications.controlled.view') ? $log->medication?->dose_unit : null,
+                    'stock_reconciliation_status' => $log->stock_reconciliation_status,
+                    'stock_reconciliation_reason' => $log->stock_reconciliation_reason, 'stock_loss_report_id' => $log->stock_loss_report_id,
                     'medication_name' => $log->medication_name,
                     'is_controlled_drug' => $log->is_controlled_drug,
                     'witness_required' => $log->witness_required,
@@ -751,8 +764,10 @@ class ResidentTransportController extends Controller
             $unresolvedQuery = FleetMedicationTransitLog::query()->where('transport_id', $transport->id);
             $this->journeyScope->applyMedicationTransitScope($unresolvedQuery, $request->user());
             $unresolvedMeds = $unresolvedQuery
-                ->whereNull('administered_at')
-                ->whereNull('returned_to_house_at')
+                ->where(fn ($q) => $q->where(fn ($legacy) => $legacy->whereNull('administered_at')->whereNull('returned_to_house_at'))
+                    ->orWhereExists(fn ($packs) => $packs->selectRaw('1')->from('medication_stock_transit_allocations')
+                        ->whereColumn('medication_stock_transit_allocations.transit_log_id', 'fleet_medication_transit_logs.id')
+                        ->whereRaw('quantity_out > quantity_used + quantity_returned + quantity_missing')))
                 ->count();
 
             if ($unresolvedMeds > 0) {
@@ -899,7 +914,11 @@ class ResidentTransportController extends Controller
         if ($request->filled('status')) {
             $status = $request->input('status');
             if ($status === 'packed') {
-                $query->whereNull('administered_at')->whereNull('returned_to_house_at');
+                $query->where(fn ($q) => $q->where(fn ($legacy) => $legacy->whereNull('administered_at')->whereNull('returned_to_house_at'))
+                    ->orWhere('stock_reconciliation_status', 'shortfall')
+                    ->orWhereExists(fn ($packs) => $packs->selectRaw('1')->from('medication_stock_transit_allocations')
+                        ->whereColumn('medication_stock_transit_allocations.transit_log_id', 'fleet_medication_transit_logs.id')
+                        ->whereRaw('quantity_out > quantity_used + quantity_returned + quantity_missing')));
             } elseif ($status === 'administered') {
                 $query->whereNotNull('administered_at')->whereNull('returned_to_house_at');
             } elseif ($status === 'returned') {
@@ -942,15 +961,13 @@ class ResidentTransportController extends Controller
         $statsQuery = FleetMedicationTransitLog::query();
         $this->journeyScope->applyMedicationTransitScope($statsQuery, $request->user());
         $totalPackedToday = (clone $statsQuery)->where('packed_at', '>=', $today)->count();
-        $controlledDrugsOut = (clone $statsQuery)
-            ->where('is_controlled_drug', true)
-            ->whereNull('administered_at')
-            ->whereNull('returned_to_house_at')
-            ->count();
-        $awaitingReturn = (clone $statsQuery)
-            ->whereNull('administered_at')
-            ->whereNull('returned_to_house_at')
-            ->count();
+        $outstandingStock = fn ($q) => $q->where(fn ($legacy) => $legacy->whereNull('administered_at')->whereNull('returned_to_house_at'))
+            ->orWhere('stock_reconciliation_status', 'shortfall')
+            ->orWhereExists(fn ($packs) => $packs->selectRaw('1')->from('medication_stock_transit_allocations')
+                ->whereColumn('medication_stock_transit_allocations.transit_log_id', 'fleet_medication_transit_logs.id')
+                ->whereRaw('quantity_out > quantity_used + quantity_returned + quantity_missing'));
+        $controlledDrugsOut = (clone $statsQuery)->where('is_controlled_drug', true)->where($outstandingStock)->count();
+        $awaitingReturn = (clone $statsQuery)->where($outstandingStock)->count();
 
         $clients = [];
         if (SchemaCache::hasTable('clients')) {
@@ -999,6 +1016,11 @@ class ResidentTransportController extends Controller
                         'name' => trim(($log->client->first_name ?? '').' '.($log->client->last_name ?? '')),
                     ] : null,
                     'medication_id' => $log->medication_id,
+                    'pack_stock' => (! $log->is_controlled_drug && ! $log->medication?->controlled_drug) || $request->user()->canDo('medications.controlled.view') ? app(MedicationStockService::class)->transitOptions($log) : null,
+                    'dose_amount' => (! $log->is_controlled_drug && ! $log->medication?->controlled_drug) || $request->user()->canDo('medications.controlled.view') ? $log->medication?->dose_amount : null,
+                    'dose_unit' => (! $log->is_controlled_drug && ! $log->medication?->controlled_drug) || $request->user()->canDo('medications.controlled.view') ? $log->medication?->dose_unit : null,
+                    'stock_reconciliation_status' => $log->stock_reconciliation_status,
+                    'stock_reconciliation_reason' => $log->stock_reconciliation_reason, 'stock_loss_report_id' => $log->stock_loss_report_id,
                     'medication_name' => $log->medication_name,
                     'is_controlled_drug' => $log->is_controlled_drug,
                     'witness_required' => $log->witness_required,
@@ -1065,6 +1087,10 @@ class ResidentTransportController extends Controller
         $data = $request->validate([
             'client_id' => ['required', 'integer'],
             'medication_id' => ['required', 'integer'],
+            'pack_lines' => ['nullable', 'array', 'max:100'],
+            'pack_lines.*.lot_id' => ['required', 'integer', 'min:1'],
+            'pack_lines.*.revision' => ['required', 'integer', 'min:0'],
+            'pack_lines.*.quantity' => ['required', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0.01', MedicationStockQuantity::DECIMAL_12_2_MAX_RULE],
             'medication_order_version_id' => ['nullable', 'integer'],
             'medication_name' => ['required', 'string', 'max:255'],
             'is_controlled_drug' => ['required', 'boolean'],
@@ -1095,6 +1121,11 @@ class ResidentTransportController extends Controller
                 'transport_id' => $log->transport_id,
                 'client_id' => $log->client_id,
                 'medication_id' => $log->medication_id,
+                'pack_stock' => (! $log->is_controlled_drug && ! $log->medication?->controlled_drug) || $request->user()->canDo('medications.controlled.view') ? app(MedicationStockService::class)->transitOptions($log) : null,
+                'dose_amount' => (! $log->is_controlled_drug && ! $log->medication?->controlled_drug) || $request->user()->canDo('medications.controlled.view') ? $log->medication?->dose_amount : null,
+                'dose_unit' => (! $log->is_controlled_drug && ! $log->medication?->controlled_drug) || $request->user()->canDo('medications.controlled.view') ? $log->medication?->dose_unit : null,
+                'stock_reconciliation_status' => $log->stock_reconciliation_status,
+                'stock_reconciliation_reason' => $log->stock_reconciliation_reason, 'stock_loss_report_id' => $log->stock_loss_report_id,
                 'medication_name' => $log->medication_name,
                 'status' => $log->status,
                 'packed_at' => $log->packed_at?->toIso8601String(),
@@ -1168,12 +1199,20 @@ class ResidentTransportController extends Controller
                 'min:0.01',
                 MedicationStockQuantity::DECIMAL_10_2_MAX_RULE,
             ],
+            'pack_lines' => ['nullable', 'array', 'max:100'],
+            'pack_lines.*' => ['array:lot_id,revision,quantity,quantity_wasted'],
+            'pack_lines.*.lot_id' => ['required', 'integer', 'min:1'],
+            'pack_lines.*.revision' => ['required', 'integer', 'min:0'],
+            'pack_lines.*.quantity' => ['required', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0.01', MedicationStockQuantity::DECIMAL_12_2_MAX_RULE],
+            'pack_lines.*.quantity_wasted' => ['required', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0', MedicationStockQuantity::DECIMAL_12_2_MAX_RULE],
+            'quantity_unit' => ['nullable', 'string', 'max:50'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'scan_code' => ['nullable', 'string', 'max:255'],
             'scan_source' => ['nullable', 'string', 'in:manual,scanner'],
             'scan_verified' => ['nullable', 'boolean'],
             'scan_match_source' => ['nullable', 'string', 'max:50'],
             ...$this->medicationOfflineSubmissionRules($request),
+            ...RecordingContract::rules(),
         ];
 
         $data = $request->validate($rules);
@@ -1192,6 +1231,9 @@ class ResidentTransportController extends Controller
                 'status' => $log->status,
                 'administered_at' => $log->administered_at?->toIso8601String(),
                 'returned_to_house_at' => $log->returned_to_house_at?->toIso8601String(),
+                'stock_reconciliation_status' => $log->stock_reconciliation_status,
+                'stock_reconciliation_reason' => $log->stock_reconciliation_reason,
+                'stock_loss_report_id' => $log->stock_loss_report_id,
                 'witnessed_by_user_id' => $log->witnessed_by_user_id,
             ],
         ];
@@ -1212,6 +1254,14 @@ class ResidentTransportController extends Controller
 
         $data = $request->validate([
             'notes' => ['nullable', 'string', 'max:2000'],
+            'return_lines' => ['nullable', 'array', 'max:100'],
+            'return_lines.*.lot_id' => ['required', 'integer', 'min:1'],
+            'return_lines.*.quantity' => ['required', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0', MedicationStockQuantity::DECIMAL_12_2_MAX_RULE],
+            'return_lines.*.missing' => ['nullable', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0', MedicationStockQuantity::DECIMAL_12_2_MAX_RULE],
+            'reconciliation_reason' => ['nullable', 'string', 'max:2000'],
+            'immediate_action_taken' => ['nullable', 'string', 'max:2000'],
+            'witnessed_by_user_id' => ['nullable', 'integer', 'min:1'],
+            'witness_credential' => ['nullable', 'string', 'max:255'],
             'scan_code' => ['nullable', 'string', 'max:255'],
             'scan_source' => ['nullable', 'string', 'in:manual,scanner'],
             'scan_verified' => ['nullable', 'boolean'],
@@ -1233,6 +1283,9 @@ class ResidentTransportController extends Controller
                 'status' => $log->status,
                 'administered_at' => $log->administered_at?->toIso8601String(),
                 'returned_to_house_at' => $log->returned_to_house_at?->toIso8601String(),
+                'stock_reconciliation_status' => $log->stock_reconciliation_status,
+                'stock_reconciliation_reason' => $log->stock_reconciliation_reason,
+                'stock_loss_report_id' => $log->stock_loss_report_id,
             ],
         ];
 

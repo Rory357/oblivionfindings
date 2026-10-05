@@ -2,6 +2,7 @@
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\CarePlan;
+use App\Models\CarePlanSignOff;
 use App\Models\Client;
 use App\Models\ClientOnboardingWorkflow;
 use App\Models\ConsentType;
@@ -15,6 +16,7 @@ use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\TimelineEventComment;
 use App\Models\User;
+use App\Services\Operations\CarePlanAttestationService;
 use Tests\Support\AuthoritativeConsentFixture;
 
 function grantClientProfileDailyWorkspacePermissions(User $user, array $permissionKeys): void
@@ -587,11 +589,42 @@ it('completes a review by archiving the prior version and retaining review notes
         'recorded_by' => $manager->id,
     ]);
 
+    // A staff-entered legacy signatory label does not attest the current plan.
     $this->actingAs($manager)
         ->post("/operations/care-plans/{$review->id}/complete-review", [
             'review_notes' => 'Whānau confirmed the updated communication approach.',
         ])
-        ->assertRedirect();
+        ->assertRedirect()
+        ->assertSessionHasErrors('sign_offs');
+    expect($active->fresh()->status)->toBe('active')
+        ->and($review->fresh()->status)->toBe('review');
+
+    $this->actingAs($manager)
+        ->post("/operations/care-plans/{$review->id}/sign-offs", [
+            'attestation_state' => CarePlanSignOff::STATE_WITNESSED,
+            'party_role' => 'client',
+            'signer_client_id' => $client->id,
+            'agreed_on' => today()->toDateString(),
+            'method' => 'in_person',
+            'witness_declaration' => '1',
+            'evidence_type' => 'witness_statement',
+            'evidence_reference' => 'review-witness-record-'.$review->id,
+            'acknowledgement' => 'The identified client communicated their response in the witnessed meeting.',
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+    $attestation = $review->signOffs()->where('attestation_state', CarePlanSignOff::STATE_WITNESSED)->sole();
+    expect($attestation->gate_satisfying)->toBeTrue()
+        ->and($attestation->plan_version)->toBe((int) $review->version)
+        ->and($attestation->plan_version_digest)
+        ->toBe(app(CarePlanAttestationService::class)->currentDigest($review->fresh()));
+
+    $this->actingAs($manager)
+        ->post("/operations/care-plans/{$review->id}/complete-review", [
+            'review_notes' => 'Whānau confirmed the updated communication approach.',
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
 
     expect($active->fresh()->status)->toBe('archived')
         ->and($review->fresh()->status)->toBe('active')

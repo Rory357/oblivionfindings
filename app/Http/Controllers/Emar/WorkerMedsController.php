@@ -1218,39 +1218,37 @@ class WorkerMedsController extends Controller
                     ->whereIn('client_id', $clientIds)
                     ->active()
                     ->when(! $includeControlled, fn ($medications) => $medications->where('controlled_drug', false)))
-                ->where(function ($query) {
-                    $query->where(function ($q) {
-                        $q->whereNotNull('reorder_level')->whereColumn('on_hand', '<=', 'reorder_level');
-                    })->orWhere(function ($q) {
-                        $q->whereNotNull('expiry_date')->where('expiry_date', '<=', Carbon::today()->addDays(30));
-                    });
-                })
+                ->where(fn ($query) => $query->where(fn ($q) => $q->lowStock())
+                    ->orWhere(fn ($q) => $q->expired())->orWhere(fn ($q) => $q->expiringSoon()))
                 ->with('medication.client:id,first_name,last_name')
                 ->orderBy('expiry_date')
                 ->limit(12)
                 ->get()
-                ->map(function (ClientMedicationStock $stock) use ($today) {
+                ->map(function (ClientMedicationStock $stock) {
                     $med = $stock->medication;
                     $clientName = $med?->client
                         ? trim($med->client->first_name.' '.$med->client->last_name)
                         : null;
 
-                    $expired = $stock->expiry_date && $stock->expiry_date->lte($today);
-                    $expiringSoon = ! $expired && $stock->expiry_date && $stock->expiry_date->lte($today->copy()->addDays(30));
+                    $expiredPack = $stock->packExpiries(true)->sortBy('date')->first();
+                    $expiringPack = $stock->packExpiries(false)->sortBy('date')->first();
+                    $expired = $expiredPack !== null;
+                    $expiringSoon = ! $expired && $expiringPack !== null;
+                    $available = $stock->usableQuantity();
                     $low = $stock->isLowStock();
 
                     if ($expired) {
                         $type = 'expired';
                         $tone = 'crit';
-                        $detail = 'Expired '.$stock->expiry_date->format('j M Y');
+                        $detail = 'Expired '.$expiredPack['date']->format('j M Y');
                     } elseif ($low) {
                         $type = 'stock_low';
-                        $tone = MedicationStockQuantity::lessThanOrEqual($stock->on_hand ?? 0, 0) ? 'crit' : 'warn';
-                        $detail = $stock->on_hand.' '.($stock->unit ?: 'units').' left · reorder at '.$stock->reorder_level;
+                        $tone = MedicationStockQuantity::lessThanOrEqual($available ?? 0, 0) ? 'crit' : 'warn';
+                        $detail = $available.' '.($stock->unit ?: 'units').' left · reorder at '.$stock->reorder_level;
                     } else {
                         $type = 'expiring_soon';
                         $tone = 'warn';
-                        $detail = 'Expires '.$stock->expiry_date->format('j M Y');
+                        $detail = 'Expires '.$expiringPack['date']->format('j M Y');
                     }
 
                     return [

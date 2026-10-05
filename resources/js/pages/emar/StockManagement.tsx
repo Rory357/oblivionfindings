@@ -802,7 +802,14 @@ export default function StockManagement({
                 <PageHeader
                     frontline
                     brandColour={brandColour}
-                    rail={<EmarHubRail />}
+                    rail={
+                        <EmarHubRail
+                            scope={{
+                                site_id: siteFilter,
+                                client_id: clientFilter,
+                            }}
+                        />
+                    }
                     icon={Package}
                     title="Stock & pharmacy"
                     titleChip={

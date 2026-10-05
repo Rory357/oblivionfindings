@@ -1,5 +1,9 @@
 # eMAR implementation and verification status
 
+## Pack stock and historical recovery — current release pass
+
+The [pack and paper release ledger](pack-paper-release-2026-10-05.md) records the integrated stock, transport and historical-dose recovery contracts and their current acceptance boundary. Both implementations are present; whole-file clinical acceptance and fresh CI are being completed. Full frontend acceptance passed 547 files / 3,661 tests, with additional final contract and navigation checks recorded in that ledger. Earlier blanket implementation holds below are historical checkpoints, not a description of the current code. Production remains unmigrated and disabled by default for stock packs until release verification is complete.
+
 ## Whole-module audit repairs — 5 October 2026
 
 The [whole-module repair ledger](whole-module-repairs-2026-10-05.md) supersedes prior asset and test counts. All eleven audit findings have repairs: PRN safety timing, linked controlled evidence, export and notification privacy, shift read authority, NZ round dates, person/house/day entry context, hero wrapping, Settings breadcrumbs and labelled modal fields. Additional repairs cover consistent NZ export clocks, stock-unit initialization and recoverable page-load failures.

@@ -24,11 +24,17 @@ final class StockAvailability
         return "CASE WHEN client_medication_stocks.lots_started_at IS NULL OR EXISTS (SELECT 1 FROM client_medications AS stock_medicine WHERE stock_medicine.id = client_medication_stocks.client_medication_id AND stock_medicine.controlled_drug = 1) THEN client_medication_stocks.on_hand ELSE (SELECT COALESCE(SUM(stock_pack.quantity_remaining), 0) FROM medication_stock_lots AS stock_pack WHERE stock_pack.client_medication_stock_id = client_medication_stocks.id AND stock_pack.state = 'open' AND stock_pack.quantity_remaining > 0 AND (stock_pack.expiry_date IS NULL OR stock_pack.expiry_date >= ?)) END";
     }
 
+    public static function usableQuantitySql(): string
+    {
+        return "CASE WHEN client_medication_stocks.lots_started_at IS NULL THEN client_medication_stocks.on_hand ELSE (SELECT COALESCE(SUM(stock_pack.quantity_remaining), 0) FROM medication_stock_lots AS stock_pack WHERE stock_pack.client_medication_stock_id = client_medication_stocks.id AND stock_pack.state = 'open' AND stock_pack.quantity_remaining > 0 AND (stock_pack.expiry_date IS NULL OR stock_pack.expiry_date >= ?)) END";
+    }
+
     public function controlled(ClientMedicationStock $stock): bool
     {
         if ($stock->relationLoaded('medication') && $stock->medication && array_key_exists('controlled_drug', $stock->medication->getAttributes())) {
             return (bool) $stock->medication->controlled_drug;
         }
+
         return (bool) ClientMedication::withTrashed()->whereKey($stock->client_medication_id)->value('controlled_drug');
     }
 
@@ -37,7 +43,13 @@ final class StockAvailability
         if ($stock->lots_started_at === null || $this->controlled($stock)) {
             return $stock->on_hand === null ? null : Qty::normalize($stock->on_hand);
         }
+
         return StockLotRules::onHand($this->packs($stock)->toArray(), self::today());
+    }
+
+    public function usableQuantity(ClientMedicationStock $stock): ?string
+    {
+        return $stock->lots_started_at === null ? $this->quantity($stock) : StockLotRules::onHand($this->packs($stock)->toArray(), self::today());
     }
 
     /** @return Collection<int, MedicationStockLot> */
@@ -66,9 +78,11 @@ final class StockAvailability
             if ($expired ? $date >= $today : ($date < $today || $date > $end)) {
                 return collect();
             }
+
             return collect([['key' => 'legacy:'.$stock->id.':'.$date, 'lot_id' => null,
                 'date' => CarbonImmutable::instance($stock->expiry_date), 'batch' => $stock->batch_number]]);
         }
+
         return $this->packs($stock)->filter(fn ($lot) => $lot->state === 'open' && Qty::greaterThan($lot->quantity_remaining, 0)
             && $lot->expiry_date !== null && ($expired ? $lot->expiry_date->toDateString() < $today
                 : ($lot->expiry_date->toDateString() >= $today && $lot->expiry_date->toDateString() <= $end)))
@@ -81,6 +95,7 @@ final class StockAvailability
         $today = self::today();
         $end = CarbonImmutable::parse($today)->addDays(max(0, $days))->toDateString();
         $dateFilter = fn ($q) => $expired ? $q->where('expiry_date', '<', $today) : $q->whereBetween('expiry_date', [$today, $end]);
+
         return $query->where(fn ($q) => $q
             ->where(fn ($legacy) => $legacy->whereNull('lots_started_at')->where('on_hand', '>', 0)->where($dateFilter))
             ->orWhere(fn ($started) => $started->whereNotNull('lots_started_at')->whereHas('lots',

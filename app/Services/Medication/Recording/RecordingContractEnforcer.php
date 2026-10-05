@@ -16,6 +16,7 @@ use App\Services\Medication\RefusalEscalationPolicy;
 use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Support\Medication\MedicationStockQuantity;
+use Brick\Math\BigDecimal;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Str;
@@ -254,7 +255,7 @@ final class RecordingContractEnforcer
      * @param  array<string, mixed>  $data  quantity_administered already normalised
      * @return array{removed: string, wasted: ?string}|array{success: false, error: string, error_field: string}
      */
-    public function controlledStockUse(array $data, ClientMedication $medication, ?string $stockUnit): array
+    public function controlledStockUse(array $data, ClientMedication $medication, ?string $stockUnit, bool $requireExplicitWaste = false): array
     {
         $mode = $data['amount_mode'] ?? null;
         $partial = in_array($mode, [RecordingContract::AMOUNT_LESS, RecordingContract::AMOUNT_MORE], true);
@@ -282,8 +283,19 @@ final class RecordingContractEnforcer
         }
 
         $given = $mode !== null && $comparable ? $this->stockQuantity($data, $medication, $stockUnit) : null;
+        $explicitWaste = ($data['quantity_wasted'] ?? null) !== null ? MedicationStockQuantity::normalizeMovement($data['quantity_wasted']) : null;
+        if ($explicitWaste !== null && (MedicationStockQuantity::greaterThan(0, $explicitWaste) || ! MedicationStockQuantity::greaterThan($removed, $explicitWaste))) {
+            return $this->error('quantity_wasted', 'Actual waste must be zero or more and less than the amount removed for a given dose.');
+        }
+        if ($explicitWaste !== null && MedicationStockQuantity::greaterThan($explicitWaste, 0) && blank($data['waste_reason'] ?? null)) {
+            return $this->error('waste_reason', 'Retain the reason for the actual witnessed waste.');
+        }
         if ($given === null) {
-            return ['removed' => $removed, 'wasted' => null];
+            if ($requireExplicitWaste && $explicitWaste === null) {
+                return $this->error('quantity_wasted', 'Enter the actual waste in the stock unit, including zero. The clinical and stock units cannot be converted here.');
+            }
+
+            return ['removed' => $removed, 'wasted' => $explicitWaste];
         }
         if (MedicationStockQuantity::greaterThan($given, $removed)) {
             return $this->error(
@@ -292,12 +304,12 @@ final class RecordingContractEnforcer
             );
         }
 
-        return [
-            'removed' => $removed,
-            'wasted' => MedicationStockQuantity::greaterThan($removed, $given)
-                ? MedicationStockQuantity::subtract($removed, $given)
-                : null,
-        ];
+        $wasted = MedicationStockQuantity::subtract($removed, $given);
+        if ($explicitWaste !== null && ! MedicationStockQuantity::equals($explicitWaste, $wasted)) {
+            return $this->error('quantity_wasted', 'The actual waste must equal what was removed but not given in the same stock unit.');
+        }
+
+        return ['removed' => $removed, 'wasted' => $explicitWaste ?? (MedicationStockQuantity::greaterThan($wasted, 0) ? $wasted : null)];
     }
 
     /** A stock-precision quantity, or null when it doesn't fit two decimals. */
@@ -478,6 +490,13 @@ final class RecordingContractEnforcer
         ];
     }
 
+    /** Compare the clinical amount exactly, independent of the stock unit or scale. */
+    public function matchesOrderedAmount(int|float|string $actual, ClientMedication $medication): bool
+    {
+        return $medication->dose_amount !== null
+            && BigDecimal::of((string) $actual)->isEqualTo(BigDecimal::of((string) $medication->dose_amount));
+    }
+
     public function orderedAmount(ClientMedication $medication): ?float
     {
         $amount = $this->decimal($medication->dose_amount);
@@ -491,6 +510,11 @@ final class RecordingContractEnforcer
         $unit = trim((string) $medication->dose_unit);
 
         return $unit === '' ? $number : $number.' '.$unit;
+    }
+
+    public function sameStockUnit(?string $doseUnit, ?string $stockUnit): bool
+    {
+        return $this->unitKey($doseUnit) !== null && $this->unitKey($doseUnit) === $this->unitKey($stockUnit);
     }
 
     private function unitKey(?string $unit): ?string

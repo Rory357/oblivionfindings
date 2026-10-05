@@ -62,7 +62,16 @@ export interface Observation {
 }
 
 export interface DoseRequirements {
-    witness_override?: { id: number; expires_at: string; followup_due_at: string } | null;
+    stock_tracking?: { lots_started: boolean; offline_given_allowed: boolean };
+    live_recording_context?: string | null;
+    stock_packs?:
+        | import('@/components/medications/stock-pack-fields').PackStockContext
+        | null;
+    witness_override?: {
+        id: number;
+        expires_at: string;
+        followup_due_at: string;
+    } | null;
     kind: 'scheduled' | 'prn';
     order: {
         id: number;

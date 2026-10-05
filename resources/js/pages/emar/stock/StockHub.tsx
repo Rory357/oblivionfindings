@@ -7,6 +7,7 @@ import { type MenuItem } from '@/components/lists/entity-menu';
 import {
     PageHeader,
     PageHeaderFilterSelect,
+    PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
@@ -34,6 +35,7 @@ import {
     Pill,
     ShieldCheck,
     Truck,
+    X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
@@ -43,6 +45,7 @@ import {
     NewSupplyOrder,
     SupplyOrderDialog,
 } from './_dialogs';
+import { ControlledOpeningDialog } from './_opening';
 import { PackPhotoDialog } from './_photo';
 import { ReceiveWizard } from './_receive';
 import { useStockCommand } from './_requests';
@@ -81,7 +84,11 @@ function State({ value }: { value: string }) {
         label: value.replaceAll('_', ' '),
         variant: 'neutral' as const,
     };
-    return <StatusBadge variant={state.variant}>{state.label}</StatusBadge>;
+    return (
+        <StatusBadge className="w-fit" variant={state.variant}>
+            {state.label}
+        </StatusBadge>
+    );
 }
 const moveLabels: Record<string, string> = {
     opening: 'Recorded balance',
@@ -114,6 +121,7 @@ type Props = {
         view: View;
         search: string;
         site_id: number | null;
+        client_id?: number | null;
         show?: string;
     };
     metrics: {
@@ -125,6 +133,7 @@ type Props = {
     };
     can: Capabilities;
     lots_enabled: boolean;
+    selected_client?: { id: number; name: string } | null;
     focused_count?: StockCount | null;
 };
 type Modal =
@@ -155,6 +164,7 @@ export default function StockHub({
     metrics,
     can,
     lots_enabled,
+    selected_client = null,
     focused_count = null,
 }: Props) {
     const [search, setSearch] = useState(filters.search);
@@ -177,7 +187,12 @@ export default function StockHub({
     const visit = (changes: Record<string, string | number | null>) =>
         router.get(
             '/emar/stock/packs',
-            { ...filters, search, ...changes },
+            Object.fromEntries(
+                Object.entries({ ...filters, search, ...changes }).filter(
+                    ([, value]) =>
+                        value !== null && value !== undefined && value !== '',
+                ),
+            ),
             { preserveState: true, preserveScroll: true },
         );
     const openItem = (
@@ -221,6 +236,20 @@ export default function StockHub({
                   },
               ]
             : []),
+        ...(can.receive_controlled && item.controlled
+            ? [
+                  {
+                      label: 'Receive a witnessed delivery',
+                      icon: Truck,
+                      onClick: () => openItem(item, 'receive'),
+                      disabled: !item.active
+                          ? 'This medicine is no longer active.'
+                          : !item.lots_started && item.stock_id !== null
+                            ? 'Pack tracking has not been set up.'
+                            : undefined,
+                  },
+              ]
+            : []),
         ...(can.manage && !item.controlled
             ? [
                   {
@@ -259,8 +288,7 @@ export default function StockHub({
             icon: Eye,
             onClick: () => orderOpen(order),
         },
-        ...(can.receive &&
-        !order.controlled &&
+        ...((order.controlled ? can.receive_controlled : can.receive) &&
         ['dispensed', 'part_received'].includes(order.status)
             ? [
                   {
@@ -331,14 +359,40 @@ export default function StockHub({
                     }
                     subline="Person-owned medicines, deliveries and counts"
                     actions={
-                        <PageHeaderSearch
-                            value={search}
-                            onChange={setSearch}
-                            placeholder="Search medicines or batches"
-                            onKeyDown={(event) =>
-                                event.key === 'Enter' && visit({})
-                            }
-                        />
+                        <>
+                            <PageHeaderSearch
+                                value={search}
+                                onChange={setSearch}
+                                placeholder="Search medicines or batches"
+                                onKeyDown={(event) =>
+                                    event.key === 'Enter' && visit({})
+                                }
+                            />
+                            <PageHeaderGlassButton
+                                onClick={() =>
+                                    router.visit(
+                                        `/emar/stock?${new URLSearchParams({
+                                            ...(filters.site_id
+                                                ? {
+                                                      site_id: String(
+                                                          filters.site_id,
+                                                      ),
+                                                  }
+                                                : {}),
+                                            ...(filters.client_id
+                                                ? {
+                                                      client_id: String(
+                                                          filters.client_id,
+                                                      ),
+                                                  }
+                                                : {}),
+                                        })}`,
+                                    )
+                                }
+                            >
+                                Stock overview
+                            </PageHeaderGlassButton>
+                        </>
                     }
                     meters={
                         <>
@@ -430,9 +484,28 @@ export default function StockHub({
                                             value === 'all'
                                                 ? null
                                                 : Number(value),
+                                        client_id: null,
+                                        medication_id: null,
                                     })
                                 }
                             />
+                            {selected_client && (
+                                <PageHeaderGlassButton
+                                    onClick={() =>
+                                        visit({
+                                            client_id: null,
+                                            medication_id: null,
+                                        })
+                                    }
+                                    title="Clear the selected person"
+                                >
+                                    {selected_client.name}
+                                    <X
+                                        className="size-3.5"
+                                        aria-hidden="true"
+                                    />
+                                </PageHeaderGlassButton>
+                            )}
                             {filters.view === 'stock' && (
                                 <PageHeaderFilterSelect
                                     label="Show"
@@ -476,14 +549,20 @@ export default function StockHub({
                         columns={[
                             {
                                 key: 'quantity',
-                                label: 'On hand',
+                                label: 'Stock available',
                                 width: '1fr',
                                 cell: (item) => (
-                                    <span>
-                                        {item.on_hand === null
+                                    <div>
+                                        {item.usable_on_hand == null
                                             ? 'Unknown'
-                                            : `${item.on_hand} ${item.unit ?? ''}`}
-                                    </span>
+                                            : `${item.usable_on_hand} ${item.unit ?? ''} usable`}
+                                        {item.physical_on_hand != null && (
+                                            <p className="text-caption">
+                                                {item.physical_on_hand}{' '}
+                                                physically held
+                                            </p>
+                                        )}
+                                    </div>
                                 ),
                             },
                             {
@@ -799,6 +878,17 @@ function ItemWorkspace({
         setSelectedOrder(null);
         setRetry(retry + 1);
     };
+    if (setupConfirm && item.controlled)
+        return (
+            <ControlledOpeningDialog
+                item={item}
+                onClose={() => setSetupConfirm(false)}
+                onSaved={() => {
+                    setRetry(retry + 1);
+                    onSaved();
+                }}
+            />
+        );
     if (action === 'photo')
         return <PackPhotoDialog item={item} onClose={back} onSaved={onSaved} />;
     if (action === 'order_detail' && selectedOrder)
@@ -928,13 +1018,21 @@ function ItemWorkspace({
                                 <ReviewRow
                                     label={
                                         item.controlled
-                                            ? 'Register balance'
-                                            : 'Usable on hand'
+                                            ? 'Physical register balance'
+                                            : 'Physically held'
                                     }
                                     value={
-                                        item.on_hand === null
+                                        item.physical_on_hand == null
                                             ? 'Unknown'
-                                            : `${item.on_hand} ${item.unit}`
+                                            : `${item.physical_on_hand} ${item.unit}`
+                                    }
+                                />
+                                <ReviewRow
+                                    label="Usable on hand"
+                                    value={
+                                        item.usable_on_hand == null
+                                            ? 'Unknown'
+                                            : `${item.usable_on_hand} ${item.unit}`
                                     }
                                 />
                                 <ReviewRow
@@ -982,7 +1080,33 @@ function ItemWorkspace({
                                         Use the checked recorded balance
                                     </Button>
                                 )}
+                            {!item.lots_started &&
+                                lotsEnabled &&
+                                item.controlled &&
+                                can.receive_controlled && (
+                                    <Button
+                                        disabled={
+                                            item.on_hand === null ||
+                                            !item.unit?.trim()
+                                        }
+                                        onClick={() => setSetupConfirm(true)}
+                                    >
+                                        Start witnessed pack tracking
+                                    </Button>
+                                )}
                             <div className="flex flex-wrap gap-2">
+                                {can.receive_controlled && item.controlled && (
+                                    <Button
+                                        disabled={
+                                            !item.active ||
+                                            (!item.lots_started &&
+                                                item.stock_id !== null)
+                                        }
+                                        onClick={() => setAction('receive')}
+                                    >
+                                        Receive a witnessed delivery
+                                    </Button>
+                                )}
                                 {can.receive && !item.controlled && (
                                     <>
                                         <Button

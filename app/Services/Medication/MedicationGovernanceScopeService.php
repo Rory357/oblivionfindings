@@ -1170,12 +1170,14 @@ final class MedicationGovernanceScopeService
         int $siteId,
         CarbonInterface $effectiveAt,
         array $additionalShiftIds = [],
+        bool $historical = false,
     ): Collection {
         return $this->controlledWitnesses->lockPresenceShiftsAtSite(
             $userIds,
             $siteId,
             $effectiveAt,
             $additionalShiftIds,
+            $historical,
         );
     }
 

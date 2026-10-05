@@ -35,8 +35,10 @@ import {
     ClipboardCheck,
     FileText,
     FolderOpen,
+    Package,
     Paperclip,
     Plus,
+    ShieldCheck,
 } from 'lucide-react';
 import { useState } from 'react';
 import {
@@ -45,7 +47,16 @@ import {
     PaperEntryDialog,
     RequestErrors,
 } from './_dialogs';
-import type { Dose, Downtime, PaperEntry, PrnOrder, Staff } from './types';
+import { PaperFactsReview, RecoveryAuthorizationDialog } from './_paper-review';
+import { StockSettlementDialog } from './_stock-settlement';
+import type {
+    Dose,
+    Downtime,
+    PaperEntry,
+    PrnOrder,
+    RecoveryStock,
+    Staff,
+} from './types';
 
 type Props = {
     downtime: Downtime;
@@ -53,6 +64,7 @@ type Props = {
     entries: PaperEntry[];
     prn_orders: PrnOrder[];
     staff: Staff[];
+    recovery_stock: Record<string, RecoveryStock>;
     actor_id: number;
     open_paper_entry: number | null;
     can_manage: boolean;
@@ -74,6 +86,7 @@ export default function DowntimeShow({
     entries,
     prn_orders,
     staff,
+    recovery_stock = {},
     actor_id,
     open_paper_entry,
     can_manage,
@@ -93,6 +106,10 @@ export default function DowntimeShow({
         kind: 'giver' | 'witness' | 'reconcile';
     } | null>(null);
     const [finish, setFinish] = useState(false);
+    const [stockReview, setStockReview] = useState<PaperEntry | null>(null);
+    const [authorityReview, setAuthorityReview] = useState<PaperEntry | null>(
+        null,
+    );
     const [finishing, setFinishing] = useState(false);
     const context = useEntityContextMenu<Dose>();
     const entryContext = useEntityContextMenu<PaperEntry>();
@@ -161,6 +178,24 @@ export default function DowntimeShow({
                       icon: ClipboardCheck,
                       onClick: () =>
                           setCommand({ entry, kind: 'reconcile' as const }),
+                  },
+              ]
+            : []),
+        ...(entry.reconciliation.stock_evidence?.can_record_settlement
+            ? [
+                  {
+                      label: 'Review paper stock',
+                      icon: Package,
+                      onClick: () => setStockReview(entry),
+                  },
+              ]
+            : []),
+        ...(entry.reconciliation.recovery_authorization?.can_authorize
+            ? [
+                  {
+                      label: 'Review historical authority',
+                      icon: ShieldCheck,
+                      onClick: () => setAuthorityReview(entry),
                   },
               ]
             : []),
@@ -634,6 +669,7 @@ export default function DowntimeShow({
                     dose={capture.dose}
                     prnOrders={prn_orders}
                     staff={staff}
+                    recoveryStock={recovery_stock}
                     actorId={actor_id}
                     onClose={() => setCapture(null)}
                 />
@@ -644,6 +680,20 @@ export default function DowntimeShow({
                     entry={command.entry}
                     kind={command.kind}
                     onClose={() => setCommand(null)}
+                />
+            )}
+            {stockReview && (
+                <StockSettlementDialog
+                    entry={stockReview}
+                    downtimeId={downtime.id}
+                    onClose={() => setStockReview(null)}
+                />
+            )}
+            {authorityReview && (
+                <RecoveryAuthorizationDialog
+                    entry={authorityReview}
+                    downtimeId={downtime.id}
+                    onClose={() => setAuthorityReview(null)}
                 />
             )}
             <Dialog
@@ -692,6 +742,136 @@ export default function DowntimeShow({
                             {selected.notes && (
                                 <p className="whitespace-pre-wrap">
                                     {selected.notes}
+                                </p>
+                            )}
+                            <PaperFactsReview
+                                clinical={selected.clinical_facts}
+                                stock={selected.stock_evidence}
+                                doseUnit={selected.snapshot.dose_unit}
+                            />
+                            {(!!selected.reconciliation.missing_evidence
+                                ?.length ||
+                                !!selected.reconciliation.missing_actual_fields
+                                    ?.length) && (
+                                <div className="space-y-2 rounded-lg border border-status-warning bg-status-warning-bg p-3 text-status-warning-foreground">
+                                    <p className="font-medium">
+                                        Evidence still needed
+                                    </p>
+                                    <ul className="list-disc space-y-1 pl-5">
+                                        {selected.reconciliation.missing_evidence?.map(
+                                            (reason) => (
+                                                <li key={reason}>
+                                                    {(
+                                                        {
+                                                            clinical_facts:
+                                                                'Actual clinical amount and checks from the signed paper.',
+                                                            physical_facts:
+                                                                'Actual packs, amounts removed and any waste from the signed paper.',
+                                                            stock_settlement:
+                                                                'A reviewed closing stock balance for this paper dose.',
+                                                            own_witness_confirmation:
+                                                                'The required second person must confirm with their own PIN.',
+                                                        } as Record<
+                                                            string,
+                                                            string
+                                                        >
+                                                    )[reason] ??
+                                                        reason.replaceAll(
+                                                            '_',
+                                                            ' ',
+                                                        )}
+                                                </li>
+                                            ),
+                                        )}
+                                        {selected.reconciliation.missing_actual_fields?.map(
+                                            (field) => (
+                                                <li key={field.key}>
+                                                    {field.label}
+                                                </li>
+                                            ),
+                                        )}
+                                    </ul>
+                                </div>
+                            )}
+                            {selected.reconciliation.stock_settlement && (
+                                <p className="text-subtle">
+                                    Stock reviewed by{' '}
+                                    {
+                                        selected.reconciliation.stock_settlement
+                                            .reviewed_by.name
+                                    }{' '}
+                                    ·{' '}
+                                    {formatDateTime(
+                                        selected.reconciliation.stock_settlement
+                                            .reviewed_at,
+                                    )}
+                                    .{' '}
+                                    {selected.reconciliation.stock_settlement
+                                        .evidence.settlement ===
+                                    'covered_by_count'
+                                        ? `Covered by reviewed count ${selected.reconciliation.stock_settlement.evidence.closing_count_id}.`
+                                        : selected.reconciliation.state ===
+                                            'entered_from_paper'
+                                          ? 'The retained removal was deducted once when this paper dose was posted.'
+                                          : 'The retained removal will be deducted once when this paper dose is posted.'}
+                                </p>
+                            )}
+                            {!!selected.reconciliation.stock_settlement_history
+                                ?.length && (
+                                <details className="rounded-lg border p-3">
+                                    <summary className="cursor-pointer font-medium">
+                                        Stock review history
+                                    </summary>
+                                    <ul className="text-subtle mt-3 space-y-3">
+                                        {selected.reconciliation.stock_settlement_history.map(
+                                            (review) => (
+                                                <li
+                                                    key={
+                                                        review.id ??
+                                                        review.fingerprint
+                                                    }
+                                                >
+                                                    {review.reviewed_by.name} ·{' '}
+                                                    {formatDateTime(
+                                                        review.reviewed_at,
+                                                    )}{' '}
+                                                    ·{' '}
+                                                    {review.evidence
+                                                        .settlement ===
+                                                    'covered_by_count'
+                                                        ? `Reviewed count ${review.evidence.closing_count_id}`
+                                                        : 'Reviewed removal from stock'}
+                                                    .{' '}
+                                                    {review.id ===
+                                                    selected.reconciliation
+                                                        .stock_settlement?.id
+                                                        ? 'Current review.'
+                                                        : 'Earlier review retained for the audit history.'}
+                                                </li>
+                                            ),
+                                        )}
+                                    </ul>
+                                </details>
+                            )}
+                            {selected.reconciliation.recovery_authorization
+                                ?.reviewed_at && (
+                                <p className="text-subtle">
+                                    Historical authority reviewed by{' '}
+                                    {
+                                        selected.reconciliation
+                                            .recovery_authorization
+                                            .reviewer_name
+                                    }{' '}
+                                    ·{' '}
+                                    {formatDateTime(
+                                        selected.reconciliation
+                                            .recovery_authorization.reviewed_at,
+                                    )}
+                                    .{' '}
+                                    {
+                                        selected.reconciliation
+                                            .recovery_authorization.reason
+                                    }
                                 </p>
                             )}
                             {selected.reconciliation.unavailable && (

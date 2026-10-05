@@ -200,6 +200,7 @@ describe('query/hash-aware route identity', () => {
         ['/emar/prescriptions?view=covert', 'orders', 'covert'],
         ['/emar/prescriptions/legacy', 'orders', 'prescriptions'],
         ['/emar/controlled?view=losses', 'stock', 'losses'],
+        ['/emar/stock/packs?site_id=2&view=counts', 'stock', 'packs'],
         ['/emar/controlled/loss-reports', 'stock', 'losses'],
         ['/emar/controlled?view=destructions', 'stock', 'destructions'],
         ['/medication-followups/42', 'safety', 'followups'],

@@ -42,12 +42,20 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import {
+    blankClinicalFacts,
+    blankStockFacts,
+    PaperClinicalFields,
+    PaperStockFields,
+} from './_paper-fields';
+import { PaperFactsReview } from './_paper-review';
 import type {
     CollectionPreview,
     Dose,
     PackPreview,
     PaperEntry,
     PrnOrder,
+    RecoveryStock,
     Site,
     Staff,
 } from './types';
@@ -603,12 +611,14 @@ export function PaperEntryDialog({
     dose,
     prnOrders,
     staff,
+    recoveryStock,
     onClose,
 }: {
     downtimeId: number;
     dose: Dose | null;
     prnOrders: PrnOrder[];
     staff: Staff[];
+    recoveryStock: Record<string, RecoveryStock>;
     actorId: number;
     onClose: () => void;
 }) {
@@ -627,10 +637,13 @@ export function PaperEntryDialog({
         dose_on_paper: '',
         notes: '',
         observations: {} as Record<string, string>,
+        clinical_facts: blankClinicalFacts(),
+        stock_evidence: blankStockFacts(),
         request_uuid: crypto.randomUUID(),
         preview_token: '',
         accountable_confirmation: false,
     });
+    const isGiven = form.data.outcome === 'given';
     const steps = [
         {
             key: 'facts',
@@ -638,6 +651,22 @@ export function PaperEntryDialog({
             blurb: 'Actual facts on paper',
             icon: FileText,
         },
+        ...(isGiven
+            ? [
+                  {
+                      key: 'clinical',
+                      label: 'Dose & checks',
+                      blurb: 'Amount and checks on paper',
+                      icon: ClipboardCheck,
+                  },
+                  {
+                      key: 'stock',
+                      label: 'Packs used',
+                      blurb: 'Physical stock evidence',
+                      icon: FileText,
+                  },
+              ]
+            : []),
         {
             key: 'review',
             label: 'Check paper entry',
@@ -645,6 +674,8 @@ export function PaperEntryDialog({
             icon: ClipboardCheck,
         },
     ];
+    const reviewIndex = steps.length - 1;
+    const activeStep = steps[step].key;
     const close = () => {
         if (form.processing || checking) return;
         if (form.isDirty) setDiscard(true);
@@ -665,7 +696,7 @@ export function PaperEntryDialog({
             );
             setPreview(response.data);
             form.setData('preview_token', response.data.preview_token);
-            setStep(1);
+            setStep(reviewIndex);
         } catch (error) {
             applyFormRequestErrors(
                 error,
@@ -682,6 +713,19 @@ export function PaperEntryDialog({
     );
     const knownReadings =
         dose?.snapshot.observation_keys ?? prn?.observation_keys ?? [];
+    const readingFields =
+        (dose?.snapshot.observation_choices ?? prn?.observation_choices)
+            ?.filter((choice) => knownReadings.includes(choice.key))
+            .flatMap((choice) =>
+                choice.fields.map((key) => ({
+                    key,
+                    label:
+                        observationFields[choice.key]?.find(
+                            (field) => field.key === key,
+                        )?.label ??
+                        `${choice.label}${choice.fields.length > 1 ? ` · ${key.replaceAll('_', ' ')}` : ''}${choice.unit ? ` (${choice.unit})` : ''}`,
+                })),
+            ) ?? knownReadings.flatMap((key) => observationFields[key] ?? []);
     return (
         <>
             <WizardShell
@@ -700,8 +744,9 @@ export function PaperEntryDialog({
                 steps={steps}
                 stepIndex={step}
                 onStepClick={(index) => {
-                    if (index === 0 && !form.processing && !checking) {
-                        setStep(0);
+                    if (index < step && !form.processing && !checking) {
+                        setStep(index);
+                        setPreview(null);
                         form.setData('accountable_confirmation', false);
                     }
                 }}
@@ -713,7 +758,8 @@ export function PaperEntryDialog({
                         onClick={
                             step
                                 ? () => {
-                                      setStep(0);
+                                      setStep(step - 1);
+                                      setPreview(null);
                                       form.setData(
                                           'accountable_confirmation',
                                           false,
@@ -722,7 +768,7 @@ export function PaperEntryDialog({
                                 : close
                         }
                     >
-                        {step ? 'Back to paper facts' : 'Cancel'}
+                        {step ? 'Back' : 'Cancel'}
                     </Button>
                 }
                 footerEnd={
@@ -731,12 +777,16 @@ export function PaperEntryDialog({
                         disabled={
                             form.processing ||
                             checking ||
-                            (step === 1 &&
+                            (step === reviewIndex &&
                                 (!preview?.can_submit ||
                                     !form.data.accountable_confirmation))
                         }
                         onClick={() => {
-                            if (step === 0) {
+                            if (step < reviewIndex - 1) {
+                                setStep(step + 1);
+                                return;
+                            }
+                            if (step === reviewIndex - 1) {
                                 void check();
                                 return;
                             }
@@ -754,14 +804,19 @@ export function PaperEntryDialog({
                         {(checking || form.processing) && (
                             <Loader2 className="size-4 animate-spin" />
                         )}
-                        {step === 0
-                            ? 'Preview paper entry'
-                            : 'Save paper facts'}
+                        {step < reviewIndex - 1
+                            ? 'Continue'
+                            : step === reviewIndex - 1
+                              ? 'Preview paper entry'
+                              : 'Save paper facts'}
                     </Button>
                 }
             >
                 <WizardStepPane key={steps[step].key}>
-                    <div className="space-y-5">
+                    <fieldset
+                        disabled={checking || form.processing}
+                        className="min-w-0 space-y-5"
+                    >
                         <RequestErrors errors={form.errors} />
                         {dose && (
                             <ReviewCard
@@ -799,6 +854,14 @@ export function PaperEntryDialog({
                                                 value,
                                             );
                                             form.setData('observations', {});
+                                            form.setData(
+                                                'clinical_facts',
+                                                blankClinicalFacts(),
+                                            );
+                                            form.setData(
+                                                'stock_evidence',
+                                                blankStockFacts(),
+                                            );
                                         }}
                                     />
                                 )}
@@ -815,9 +878,20 @@ export function PaperEntryDialog({
                                         label:
                                             key[0].toUpperCase() + key.slice(1),
                                     }))}
-                                    onChange={(value) =>
-                                        form.setData('outcome', value)
-                                    }
+                                    onChange={(value) => {
+                                        form.setData('outcome', value);
+                                        form.setData(
+                                            'clinical_facts',
+                                            blankClinicalFacts(),
+                                        );
+                                        form.setData(
+                                            'stock_evidence',
+                                            blankStockFacts(),
+                                        );
+                                        form.setData('observations', {});
+                                        form.setData('witness_id', '');
+                                        form.setData('dose_on_paper', '');
+                                    }}
                                 />
                                 <DateTimeField
                                     compact
@@ -863,6 +937,26 @@ export function PaperEntryDialog({
                                         form.setData('given_by', value)
                                     }
                                 />
+                                <div className="space-y-2">
+                                    <Label htmlFor="paper-note">
+                                        Note / reason written on paper
+                                    </Label>
+                                    <Textarea
+                                        id="paper-note"
+                                        value={form.data.notes}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'notes',
+                                                event.target.value,
+                                            )
+                                        }
+                                    />
+                                </div>
+                            </>
+                        )}
+                        {activeStep === 'clinical' && (
+                            <>
+                                {' '}
                                 {form.data.outcome === 'given' && (
                                     <>
                                         <div className="space-y-2">
@@ -908,66 +1002,77 @@ export function PaperEntryDialog({
                                                 )
                                             }
                                         />
-                                        {knownReadings
-                                            .flatMap(
-                                                (key) =>
-                                                    observationFields[key] ??
-                                                    [],
-                                            )
-                                            .map((field) => (
-                                                <div
-                                                    key={field.key}
-                                                    className="space-y-2"
-                                                >
-                                                    <Label htmlFor={field.key}>
-                                                        {field.label}
-                                                    </Label>
-                                                    <Input
-                                                        id={field.key}
-                                                        inputMode="decimal"
-                                                        value={
-                                                            form.data
-                                                                .observations[
-                                                                field.key
-                                                            ] ?? ''
-                                                        }
-                                                        onChange={(event) =>
-                                                            form.setData(
-                                                                'observations',
-                                                                {
-                                                                    ...form.data
-                                                                        .observations,
-                                                                    [field.key]:
-                                                                        event
-                                                                            .target
-                                                                            .value,
-                                                                },
-                                                            )
-                                                        }
-                                                    />
-                                                </div>
-                                            ))}
+                                        {readingFields.map((field) => (
+                                            <div
+                                                key={field.key}
+                                                className="space-y-2"
+                                            >
+                                                <Label htmlFor={field.key}>
+                                                    {field.label}
+                                                </Label>
+                                                <Input
+                                                    id={field.key}
+                                                    inputMode="decimal"
+                                                    value={
+                                                        form.data.observations[
+                                                            field.key
+                                                        ] ?? ''
+                                                    }
+                                                    onChange={(event) =>
+                                                        form.setData(
+                                                            'observations',
+                                                            {
+                                                                ...form.data
+                                                                    .observations,
+                                                                [field.key]:
+                                                                    event.target
+                                                                        .value,
+                                                            },
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                        ))}
                                     </>
                                 )}
-                                <div className="space-y-2">
-                                    <Label htmlFor="paper-note">
-                                        Note / reason written on paper
-                                    </Label>
-                                    <Textarea
-                                        id="paper-note"
-                                        value={form.data.notes}
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'notes',
-                                                event.target.value,
-                                            )
-                                        }
-                                    />
-                                </div>
+                                <PaperClinicalFields
+                                    value={form.data.clinical_facts}
+                                    onChange={(value) =>
+                                        form.setData('clinical_facts', value)
+                                    }
+                                    prn={!dose}
+                                    doseUnit={
+                                        dose?.snapshot.dose_unit ??
+                                        prn?.dose_unit
+                                    }
+                                />
                             </>
                         )}
-                        {step === 1 && preview && (
+                        {activeStep === 'stock' && (
+                            <PaperStockFields
+                                value={form.data.stock_evidence}
+                                onChange={(value) =>
+                                    form.setData('stock_evidence', value)
+                                }
+                                stock={
+                                    recoveryStock[
+                                        form.data.client_medication_id
+                                    ]
+                                }
+                            />
+                        )}
+                        {activeStep === 'review' && preview && (
                             <>
+                                {isGiven && (
+                                    <PaperFactsReview
+                                        clinical={form.data.clinical_facts}
+                                        stock={form.data.stock_evidence}
+                                        doseUnit={
+                                            dose?.snapshot.dose_unit ??
+                                            prn?.dose_unit
+                                        }
+                                    />
+                                )}
                                 <ReviewCard
                                     title="Actual facts entered"
                                     icon={ClipboardCheck}
@@ -1062,7 +1167,7 @@ export function PaperEntryDialog({
                                 </StatusBadge>
                             </>
                         )}
-                    </div>
+                    </fieldset>
                 </WizardStepPane>
             </WizardShell>
             <ConfirmDialog
@@ -1117,7 +1222,7 @@ export function ConfirmationDialog({
                     </DialogTitle>
                     <DialogDescription>
                         {kind === 'reconcile'
-                            ? 'Post this signed paper outcome to eMAR. The original outcome time is preserved and recording checks run again. Stock will not change.'
+                            ? 'Post this signed paper outcome to eMAR. The original outcome time is preserved and recording checks run again. Any stock change follows the recorded stock review.'
                             : 'Your confirmation is appended to the evidence. It does not post the dose.'}
                     </DialogDescription>
                 </DialogHeader>
@@ -1147,6 +1252,32 @@ export function ConfirmationDialog({
                             value={entry.dose_on_paper ?? 'Not given'}
                         />
                     </ReviewCard>
+                    <PaperFactsReview
+                        clinical={entry.clinical_facts}
+                        stock={entry.stock_evidence}
+                        doseUnit={entry.snapshot.dose_unit}
+                    />
+                    {entry.reconciliation.stock_settlement && (
+                        <ReviewCard
+                            title="Recorded stock review"
+                            icon={ClipboardCheck}
+                        >
+                            <ReviewRow
+                                label="Decision"
+                                value={
+                                    entry.reconciliation.stock_settlement
+                                        .evidence.settlement ===
+                                    'covered_by_count'
+                                        ? 'Already covered by a reviewed count — no second deduction'
+                                        : 'Deduct the paper removal once when applied'
+                                }
+                            />
+                            <ReviewRow
+                                label="Reviewed by"
+                                value={`${entry.reconciliation.stock_settlement.reviewed_by.name} · ${formatDateTime(entry.reconciliation.stock_settlement.reviewed_at)}`}
+                            />
+                        </ReviewCard>
+                    )}
                     {kind === 'witness' && (
                         <WitnessPinInput
                             label="Your own witness PIN"

@@ -5,10 +5,13 @@ namespace App\Services\Medication\Downtime;
 use App\Enums\Medication\NotGivenReason;
 use App\Models\ClientMedication;
 use App\Models\MedicationPaperEntry;
+use App\Models\MedicationPaperStockEvidence;
 use App\Models\User;
 use App\Services\EnhancedMarService;
+use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\Medication\Stock\MedicationStockService;
 use App\Services\MedicationRuleService;
 use Carbon\Carbon;
 use Closure;
@@ -26,44 +29,60 @@ class PaperAdministrationWriter
 
     public function availability(MedicationPaperEntry $entry, ClientMedication $order, User $actor): ?string
     {
-        if ($order->controlled_drug || ($entry->snapshot['controlled'] ?? false)) {
-            return 'Controlled paper reconciliation is not configured. A witnessed historical register writer and closing-count check are required. No register balance has changed.';
-        }
-        if (($entry->snapshot['second_person_required'] ?? false) || $entry->witness_id !== null) {
-            return 'Historical second-person reconciliation is not configured. The signed paper evidence is kept; no eMAR dose has been posted.';
-        }
         if ((int) $entry->given_by !== (int) $actor->id || ! $actor->canDo('medications.administer.record')) {
-            return 'The person who gave the dose must apply this entry using their own recording authority. Their paper confirmation alone does not post a dose.';
+            return 'The actual giver must apply this entry with their own current medication recording authority.';
+        }
+        if (($order->controlled_drug || ($entry->snapshot['controlled'] ?? false)) && ! $actor->canDo('medications.controlled.record')) {
+            return 'Current controlled-medicine recording authority is required.';
         }
         if (! $order->isAdministrable() || ! $order->active || $order->superseded_by !== null
-            || PaperEntryService::orderFingerprint($order) !== ($entry->snapshot['order_fingerprint'] ?? null)) {
-            return 'The order changed or is no longer recordable. Historical order reconciliation is not configured; ask the clinical lead to review the signed paper.';
+            || PaperEntryService::orderFingerprint($order) !== ($entry->snapshot['order_fingerprint'] ?? null)
+            || app(PaperEntryService::class)->requirementsFingerprint($order, false) !== ($entry->snapshot['requirements_fingerprint'] ?? null)) {
+            return 'The order or its clinical requirements changed. Ask the clinical lead to review the signed paper; no current order is substituted.';
         }
-        // Availability is a read-side projection. The canonical decision locks
-        // Shifts, then Rules, then Users before this is checked again for posting.
-        $currentRules = $this->rules->requirementsFor($order);
-        if ($entry->outcome === 'given' && ($order->requiresWitness() || $currentRules['requires_countersign'])) {
-            return 'This dose now needs a second person. Historical second-person reconciliation is not configured; no eMAR dose has been posted.';
-        }
-        if ($entry->outcome === 'given' && trim((string) $entry->dose_on_paper) !== trim((string) $order->dosage)) {
-            return 'The dose on paper differs from the order text. Use the approved exception-recording workflow with the clinical lead; no amount is assumed.';
-        }
-        if ($order->is_prn) {
-            return 'Historical as-needed reconciliation is not configured. Temporal safety checks alone do not establish historical recording authority or physical stock disposition; the signed paper evidence is kept and no eMAR dose has been posted.';
-        }
-        if (! in_array((int) $order->client_id, $this->scope->clientIdsWithCurrentAuthority($actor, [(int) $order->client_id], Carbon::instance($entry->given_at)), true)) {
-            return 'A covering assignment or usable emergency grant at the actual paper time could not be established. The signed paper evidence is kept; no eMAR dose has been posted.';
+        if (! in_array((int) $order->client_id, $this->scope->clientIdsWithCurrentAuthority($actor, [(int) $order->client_id], Carbon::instance($entry->given_at)), true)
+            && ! ReviewedPaperAuthority::available($entry, $actor)) {
+            return 'A covering assignment or usable emergency grant at the actual paper time could not be established. A separate authorized review must prove historical authority; expired access is never revived.';
         }
         if ($entry->outcome !== 'given') {
-            if (! in_array($entry->outcome, ['refused', 'withheld'], true) || blank($entry->notes)
-                || $entry->downtime_dose_id === null || $entry->scheduled_for === null) {
-                return 'A refused or withheld scheduled paper outcome needs its exact listed dose and the explanation written on the signed paper.';
+            if ($order->is_prn || ! in_array($entry->outcome, ['refused', 'withheld'], true) || blank($entry->notes)
+                || $entry->downtime_dose_id === null || $entry->scheduled_for === null || $entry->witness_id !== null) {
+                return 'A refused or withheld historical outcome needs the exact scheduled dose and its signed explanation, without a given-dose witness claim.';
             }
-
-            return null;
+        } else {
+            if (! PaperDoseFacts::complete($entry->clinical_facts ?? [], $entry->stock_evidence ?? [])) {
+                return 'Historical physical stock disposition and count coverage need complete signed actual facts: '.implode('; ', PaperDoseFacts::missing($entry->clinical_facts ?? [], $entry->stock_evidence ?? [])).'. Unknown waste is never zero. The incomplete evidence is retained for clinical review.';
+            }
+            $currentCompetency = app(MedicationAdministratorCompetencyPolicy::class)->evaluate($actor, (int) $order->client->site_id, now());
+            if (! $currentCompetency['allowed']) {
+                return 'Current medication competency does not permit this paper posting. '.$currentCompetency['message'];
+            }
+            $settlement = MedicationPaperStockEvidence::query()->where('paper_entry_id', $entry->id)->latest('id')->first();
+            if (! $settlement) {
+                return 'The exact physical settlement needs an authorized stock review: deduct the retained pack quantities now, or link an explicitly covering closing count.';
+            }
+            $reviewer = User::find($settlement->reviewed_by);
+            if (! $reviewer || ! $reviewer->isApproved() || ! app(DowntimeAccess::class)->manages($reviewer)
+                || ! $reviewer->canDo('medications.stock.update') || ($order->controlled_drug && ! $reviewer->canDo('medications.controlled.record'))) {
+                return 'The stock reviewer no longer has current authority. Keep the signed evidence and ask the clinical lead to review it.';
+            }
+            try {
+                app(DowntimeAccess::class)->downtime($reviewer, (int) $entry->downtime_id);
+                app(DowntimeAccess::class)->entry($reviewer, $entry->downtime, (int) $entry->id);
+                // Replay rechecks the current reviewer, but must not require the
+                // already-consumed pack revision to be physically deducted again.
+                if (! $entry->posting()->exists()) {
+                    app(MedicationStockService::class)->validateHistoricalEvidence($order,
+                        [...$settlement->evidence, 'paper_entry_id' => (int) $entry->id, 'occurred_at' => $entry->given_at->toIso8601String()]);
+                }
+            } catch (HttpExceptionInterface) {
+                return 'The stock reviewer no longer has current Site or person access. Keep the signed evidence for review.';
+            } catch (ValidationException $e) {
+                return implode(' ', array_merge(...array_values($e->errors())));
+            }
         }
 
-        return 'Historical physical stock disposition and count coverage have not been established by the shared recording adapter. The signed paper evidence is kept; no eMAR dose, current stock deduction or register movement has been made.';
+        return null;
     }
 
     /** Server-owned mapping of the selected paper outcome; never infer a refusal cause. */
@@ -86,13 +105,15 @@ class PaperAdministrationWriter
             'scheduled_for' => $entry->scheduled_for?->toIso8601String(),
             'administered_at' => $entry->given_at->toIso8601String(),
             'reason_code' => self::reasonCode($entry->outcome),
-            'reason' => $entry->notes,
+            'reason' => $entry->clinical_facts['prn_reason'] ?? $entry->notes,
             'notes' => trim((string) $entry->notes)."\nEntered from paper DT-".$entry->downtime_id
                 .'; paper entry '.$entry->id.'; actual giver '.$entry->given_by.'; entered by '.$entry->entered_by
                 .'; entered at '.$entry->created_at->toIso8601String(),
         ];
         if ($entry->outcome === 'given') {
-            $facts += ['dose_given' => $entry->dose_on_paper, 'amount_mode' => 'as_ordered', ...$entry->observations];
+            $facts += ['dose_given' => $entry->dose_on_paper, ...($entry->clinical_facts ?? []), ...$entry->observations,
+                'witnessed_by' => $entry->witness_id, 'quantity_administered' => ($entry->stock_evidence['quantity_removed'] ?? null),
+                'quantity_wasted' => ($entry->stock_evidence['quantity_wasted'] ?? null), 'waste_reason' => ($entry->stock_evidence['waste_reason'] ?? null)];
         }
 
         return $facts;
@@ -113,7 +134,9 @@ class PaperAdministrationWriter
                     $inside = true;
 
                     return $callback($decision);
-                });
+                }, authorizationUserIds: array_filter([$entry->witness_id, ReviewedPaperAuthority::reviewerId($entry), MedicationPaperStockEvidence::where('paper_entry_id', $entry->id)->latest('id')->value('reviewed_by')]),
+                reviewedPaper: ReviewedPaperAuthority::available($entry, $actor) ? ReviewedPaperAuthority::fromEntry($entry) : null,
+                historicalPaper: HistoricalPaperContext::fromEntry((int) $entry->id));
         } catch (HttpExceptionInterface|ValidationException $e) {
             // Only authority resolution failures become a safe hold. Writer,
             // domain and event failures must roll the complete transaction back.
@@ -137,14 +160,7 @@ class PaperAdministrationWriter
             return ['success' => false, 'error' => $reason];
         }
 
-        if (in_array($entry->outcome, ['refused', 'withheld'], true)) {
-            return app(EnhancedMarService::class)->recordHistoricalPaperOutcome($entry, $decision);
-        }
-
-        // P01/P06 must wire their canonical historical given recorder here after
-        // proving physical disposition/count coverage (or evidenced non-given
-        // reasons). Today's ordinary FEFO writer is not a historical adapter.
-        return ['success' => false, 'error' => 'The canonical historical paper recording adapter is not configured. Signed paper evidence is kept; no clinical or stock record has changed.'];
+        return app(EnhancedMarService::class)->recordHistoricalPaperOutcome($entry, $decision);
     }
 
     public function recordBreakGlassUse(MedicationScopeDecision $decision, MedicationPaperEntry $entry): void

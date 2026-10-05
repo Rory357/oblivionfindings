@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\Medication\Downtime\DowntimeAccess;
 use App\Services\Medication\Downtime\DowntimeService;
 use App\Services\Medication\Downtime\PaperEntryService;
+use App\Services\Medication\Recording\DoseRecordingRequirements;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -91,6 +92,7 @@ class MedicationDowntimeController extends Controller
         $prn = $manager ? ClientMedication::query()->whereIn('client_id', $clientIds)->where('is_prn', true)->where('active', true)
             ->when(! $canControlled, fn ($q) => $q->where('controlled_drug', false))->with('client')->get()->map(fn ($order) => [
                 'id' => (int) $order->id, 'person' => $order->client->full_name, 'medicine' => $order->name, 'dosage' => $order->dosage,
+                'dose_amount' => $order->dose_amount, 'dose_unit' => $order->dose_unit,
                 'observation_keys' => $this->paper->snapshot($order)['observation_keys'],
                 'second_person_required' => $this->paper->snapshot($order)['second_person_required'],
             ])->all() : [];
@@ -100,6 +102,9 @@ class MedicationDowntimeController extends Controller
         $enteredTargetIds = $row->entries()->whereNotNull('downtime_dose_id')->pluck('downtime_dose_id');
         $resolved = $row->resolutions()->get()->keyBy('downtime_dose_id');
         $enteredTargetIds = $enteredTargetIds->merge($resolved->keys());
+
+        $orderIds = $doses->pluck('client_medication_id')->merge(collect($prn)->pluck('id'))->merge($entries->pluck('client_medication_id'))->unique();
+        $recoveryStock = $orderIds->mapWithKeys(fn ($id) => [(int) $id => $this->paper->recoveryStock($actor, $row, (int) $id, $entries->firstWhere('client_medication_id', $id))])->all();
 
         return Inertia::render('emar/downtime/show', [
             'downtime' => [
@@ -119,12 +124,15 @@ class MedicationDowntimeController extends Controller
                 'given_by' => User::query()->find($entry->given_by)?->name, 'entered_by' => User::query()->find($entry->entered_by)?->name,
                 'witness' => $entry->witness_id ? User::query()->find($entry->witness_id)?->name : null,
                 'dose_on_paper' => $entry->dose_on_paper, 'notes' => $entry->notes,
+                'client_medication_id' => (int) $entry->client_medication_id, 'clinical_facts' => $entry->clinical_facts, 'stock_evidence' => $entry->stock_evidence, 'observations' => $entry->observations,
                 'can_confirm_giver' => (int) $entry->given_by === (int) $actor->id && ! $entry->confirmations->contains('kind', 'giver'),
                 'can_confirm_witness' => (int) $entry->witness_id === (int) $actor->id && ! $entry->confirmations->contains('kind', 'witness'),
                 'reconciliation' => $this->paper->reconciliationPreview($actor, $row, $entry),
             ])->values()->all(),
             'sheets' => $manager && $canControlled ? $row->sheets()->get()->map(fn ($sheet) => ['id' => (int) $sheet->id, 'mime_type' => $sheet->mime_type, 'url' => '/emar/downtime/'.$row->id.'/sheets/'.$sheet->id])->all() : [],
             'sheets_concealed' => ! ($manager && $canControlled) && $row->sheets()->exists(),
+            'recovery_stock' => $recoveryStock,
+            'observation_choices' => collect(DoseRecordingRequirements::OBSERVATIONS)->map(fn ($choice, $key) => ['key' => $key, ...$choice])->values()->all(),
             'prn_orders' => $prn, 'staff' => $staff, 'actor_id' => (int) $actor->id, 'can_manage' => $manager,
             'open_paper_entry' => $entries->contains('id', (int) $request->query('paper_entry')) ? (int) $request->query('paper_entry') : null,
             'can_finish' => $manager && $row->finished_at === null && ! $row->doses()->whereNotIn('id', $enteredTargetIds)->exists(),

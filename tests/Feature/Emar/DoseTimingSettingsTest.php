@@ -67,7 +67,7 @@ class DoseTimingSettingsTest extends TestCase
             ->assertRedirect('/emar/settings')
             ->assertSessionHas(
                 'medication_settings_saved',
-                '2 changes saved. From the next dose shown on Meds today, at every house — recording is never blocked.',
+                '2 changes saved. From the next dose shown on Meds today, at every house — giving outside the time window needs a reason.',
             );
 
         $this->assertSame(45, $schedule->windowBeforeMinutes());

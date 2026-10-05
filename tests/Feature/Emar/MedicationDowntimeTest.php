@@ -176,13 +176,16 @@ class MedicationDowntimeTest extends TestCase
 
     public function test_controlled_paper_evidence_does_not_rebalance_or_create_unsigned_movements(): void
     {
+        $this->lead->permissionOverrides()->syncWithoutDetaching([Permission::where('key', 'medications.controlled.record')->firstOrFail()->id => ['allowed' => false]]);
+        $this->lead->unsetRelation('permissionOverrides')->unsetRelation('roles');
+        $this->assertFalse($this->lead->canDo('medications.controlled.record'));
         ClientMedication::withoutEvents(fn () => $this->order->update(['controlled_drug' => true]));
         $downtime = $this->declare();
         $witness = $this->staff($this->site, 'support_worker', ['medications.view', 'medications.controlled.view', 'medications.controlled.witness']);
         $entry = $this->capture($downtime, ['witness_id' => $witness->id]);
         $preview = app(PaperEntryService::class)->reconciliationPreview($this->lead, $downtime, $entry);
         $this->assertSame('witness_to_confirm', $preview['state']);
-        $this->assertStringContainsString('not configured', $preview['unavailable']);
+        $this->assertStringContainsString('controlled-medicine recording authority', $preview['unavailable']);
         $this->assertFalse($preview['can_reconcile']);
         $this->assertDatabaseCount('client_controlled_drug_entries', 0);
         $this->assertDatabaseCount('medication_paper_postings', 0);
@@ -594,6 +597,11 @@ class MedicationDowntimeTest extends TestCase
     public function test_non_given_paper_adapter_retains_controlled_second_person_and_prn_holds(string $kind): void
     {
         $this->coveringAuthority();
+        if ($kind === 'controlled') {
+            $this->lead->permissionOverrides()->syncWithoutDetaching([Permission::where('key', 'medications.controlled.record')->firstOrFail()->id => ['allowed' => false]]);
+            $this->lead->unsetRelation('permissionOverrides')->unsetRelation('roles');
+            $this->assertFalse($this->lead->canDo('medications.controlled.record'));
+        }
         ClientMedication::withoutEvents(fn () => $this->order->update(match ($kind) {
             'controlled' => ['controlled_drug' => true],
             'prn' => ['is_prn' => true],
@@ -680,7 +688,8 @@ class MedicationDowntimeTest extends TestCase
         $this->assertSame($this->site->id, $pending[0]['site_id']);
         $preview = app(PaperEntryService::class)->reconciliationPreview($this->lead, $downtime, $entry);
         $this->assertSame('witness_to_confirm', $preview['state']);
-        $this->assertStringContainsString('Historical second-person', $preview['unavailable']);
+        $this->assertStringContainsString('covering assignment', $preview['unavailable']);
+        $this->assertContains('own_witness_confirmation', $preview['missing_evidence']);
     }
 
     public function test_synced_existing_dose_requires_reviewed_link_before_collection_can_finish(): void
@@ -889,7 +898,7 @@ class MedicationDowntimeTest extends TestCase
     public function test_giver_confirmation_rechecks_cached_account_approval_before_writing(): void
     {
         $this->assertGiverConfirmationDeniedAfterRevocation(
-            fn (User $giver) => DB::table('users')->where('id', $giver->id)->update(['approved_at' => null]), 403,
+            fn (User $giver) => DB::table('users')->where('id', $giver->id)->update(['approved_at' => null]), 404,
         );
     }
 

@@ -881,6 +881,18 @@ export default function TransportShow({
                                                                     {log.notes}
                                                                 </div>
                                                             )}
+                                                            {log.stock_reconciliation_status ===
+                                                                'shortfall' && (
+                                                                <p className="text-status-critical">
+                                                                    Missing
+                                                                    stock —
+                                                                    follow-up
+                                                                    needed
+                                                                    {log.stock_reconciliation_reason
+                                                                        ? ` · ${log.stock_reconciliation_reason}`
+                                                                        : ''}
+                                                                </p>
+                                                            )}
                                                         </div>
                                                         {(canManageMedicationTransit ||
                                                             canAdministerMedicationTransit) &&
@@ -1226,6 +1238,7 @@ export default function TransportShow({
                     />
                     <ReturnTransportMedicationWizard
                         log={returningLog}
+                        witnesses={safeWitnesses}
                         onClose={closeReturnDialog}
                         onCompleted={(queued) => {
                             if (!queued) refreshMedicationContext();

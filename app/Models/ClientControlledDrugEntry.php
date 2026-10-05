@@ -37,6 +37,9 @@ class ClientControlledDrugEntry extends Model
         'count_due_at',
         'source_type',
         'source_id',
+        'stock_balance_scope',
+        'transit_log_id',
+        'stock_count_record_id',
     ];
 
     protected $casts = [
@@ -79,7 +82,8 @@ class ClientControlledDrugEntry extends Model
     /** Clinical and physical-use evidence cannot be undone by a register-only reversal. */
     public function requiresGovernedReconciliation(): bool
     {
-        return $this->client_medication_administration_id !== null
+        return $this->transit_log_id !== null || ($this->stock_balance_scope ?? 'house') !== 'house'
+            || $this->client_medication_administration_id !== null
             || in_array($this->entry_type, ['administered', 'administration', 'disposal', 'waste'], true)
             || (bool) ($this->getAttribute('destructions_exists') ?? $this->destructions()->exists());
     }
