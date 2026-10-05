@@ -13,6 +13,7 @@ use App\Services\ShiftStaffEligibilityService;
 use App\Services\UserSiteAccessService;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -23,8 +24,7 @@ class RosterSuggestionService
         private readonly EligibilityScoringStrategy $strategy,
         private readonly ShiftStaffEligibilityService $eligibility,
         private readonly UserSiteAccessService $siteAccess,
-    ) {
-    }
+    ) {}
 
     public function generate(User $actor, CarbonInterface|string|null $week, int $siteId, int $limitPerShift = 3): RosterSuggestionRun
     {
@@ -157,8 +157,9 @@ class RosterSuggestionService
             'failure_message' => null,
         ])->save();
 
-        $weekStart = $run->week_start->copy()->startOfDay();
-        $weekEnd = $run->week_end->copy()->startOfDay();
+        $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        $weekStart = Carbon::parse($run->week_start->toDateString(), $timezone)->startOfDay();
+        $weekEnd = Carbon::parse($run->week_end->toDateString(), $timezone)->startOfDay();
         $limitPerShift = (int) ($run->parameters['limit_per_shift'] ?? 3);
 
         try {
@@ -223,8 +224,8 @@ class RosterSuggestionService
             ->where('site_id', $siteId)
             ->whereNull('user_id')
             ->where('status', '!=', 'cancelled')
-            ->where('starts_at', '<', $weekEnd)
-            ->where('ends_at', '>', $weekStart);
+            ->where('starts_at', '<', $weekEnd->copy()->utc())
+            ->where('ends_at', '>', $weekStart->copy()->utc());
     }
 
     private function failRun(RosterSuggestionRun $run, string $message): RosterSuggestionRun

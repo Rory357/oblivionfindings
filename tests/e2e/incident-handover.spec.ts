@@ -283,6 +283,9 @@ test.describe('desktop incident handover journeys', () => {
         const incidentId = incidentIdForRequest(requestUuid);
         let invariant = readIncidentJourney(incidentId);
         const eventId = invariant.health_safety!.id;
+        expect(invariant.alert).not.toBeNull();
+        const alertId = invariant.alert!.id;
+        expect(invariant.alert?.status).toBe('open');
         expect(invariant.counts.candidate_alerts).toBe(1);
         expect(invariant.health_safety?.worksafe_notifiable).toBe(true);
 
@@ -437,6 +440,24 @@ echo json_encode(['id' => \\App\\Models\\HsCorrectiveAction::query()->where('hs_
             page,
             `/health-safety/events/${eventId}/corrective-actions/${actionId}/close`,
         );
+        await loginAsFixture(page, manifest.users.operator);
+        await postLaravel(page, `/control-room/alerts/${alertId}/acknowledge`, {
+            notes: 'The immediate operational response has been acknowledged.',
+        });
+        expect(readIncidentJourney(incidentId).alert?.status).toBe('ack');
+        await postLaravel(page, `/control-room/alerts/${alertId}/triage`, {
+            notes: 'The immediate response is complete; H&S governance continues.',
+        });
+        expect(readIncidentJourney(incidentId).alert?.status).toBe('triaging');
+        await postLaravel(page, `/control-room/alerts/${alertId}/resolve`, {
+            resolution_notes:
+                'Immediate response complete; accepted H&S governance remains active.',
+            resolution_code: 'incident_logged',
+        });
+        invariant = readIncidentJourney(incidentId);
+        expect(invariant.alert?.id).toBe(alertId);
+        expect(invariant.alert?.status).toBe('resolved');
+        expect(invariant.health_safety?.status).toBe('monitoring');
         await loginAsFixture(page, manifest.users.owner);
         await postLaravel(
             page,
@@ -452,6 +473,13 @@ echo json_encode(['id' => \\App\\Models\\HsCorrectiveAction::query()->where('hs_
 echo json_encode(['state' => \\App\\Models\\HsEvent::query()->findOrFail(${eventId})->worksafe_site_preservation_status], JSON_THROW_ON_ERROR);
 `).state,
         ).toBe('released');
+        expect(
+            scalar<{ hard_blocker_keys: string[]; can_close: boolean }>(`
+$event = \\App\\Models\\HsEvent::query()->findOrFail(${eventId});
+$readiness = app(\\App\\Services\\HealthSafety\\HsEventClosureService::class)->readiness($event);
+echo json_encode(['hard_blocker_keys' => array_column($readiness->hardBlockers(), 'key'), 'can_close' => $readiness->ordinaryAllowed()], JSON_THROW_ON_ERROR);
+`),
+        ).toEqual({ hard_blocker_keys: [], can_close: true });
         await postLaravel(page, `/health-safety/events/${eventId}/close`, {
             closure_summary:
                 'WorkSafe acknowledged, investigation complete and corrective action independently verified.',

@@ -154,6 +154,8 @@ jobs:
           php vendor/bin/pest
           tests/Feature/Emar/PackLedgerIntegrationTest.php
           tests/Feature/Emar/StockPacksWorkflowTest.php
+          tests/Feature/Emar/StockManagementTest.php
+          tests/Feature/Emar/StockManagementPaginationTest.php
           tests/Feature/Emar/ControlledProductTest.php
           tests/Feature/FleetAssets/ResidentTransportMedicationTransitTest.php
           tests/Feature/FleetAssets/ResidentTransportJourneySecurityTest.php

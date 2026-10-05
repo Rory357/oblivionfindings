@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -36,6 +37,36 @@ function grantPermission(User $user, string $key): void
     $permission = Permission::query()->where('key', $key)->firstOrFail();
     $user->permissionOverrides()->syncWithoutDetaching([
         $permission->id => ['allowed' => true],
+    ]);
+}
+
+function siteNavAssignUserToSite(User $user, Site $site): void
+{
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+}
+
+function siteNavCreateHiddenRecords(): void
+{
+    $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+    SiteVendor::create([
+        'site_id' => $site->id,
+        'service_type' => 'electrician',
+        'company_name' => 'HIDDEN_VENDOR_SENTINEL',
+        'preferred_contact_method' => 'phone',
+        'is_active' => true,
+    ]);
+    SiteCredential::create([
+        'site_id' => $site->id,
+        'label' => 'HIDDEN_CREDENTIAL_SENTINEL',
+        'credential_type' => 'pin',
+        'encrypted_value' => Crypt::encryptString('hidden-fictional-secret'),
     ]);
 }
 
@@ -130,11 +161,13 @@ test('/vendors for a vendor-only user: sends vendors, empty credentials, can fla
 
     $user = siteNavUser('support_worker');
     grantPermission($user, 'vendors.view');
+    siteNavAssignUserToSite($user, $site);
+    siteNavCreateHiddenRecords();
 
     expect($user->canDo('vendors.view'))->toBeTrue();
     expect($user->canDo('credentials.view'))->toBeFalse();
 
-    $this->actingAs($user)
+    $response = $this->actingAs($user)
         ->get('/vendors')
         ->assertOk()
         ->assertInertia(fn ($page) => $page
@@ -147,6 +180,8 @@ test('/vendors for a vendor-only user: sends vendors, empty credentials, can fla
             ->has('serviceTypes', 1)
             ->has('credentialTypes', 0)
         );
+    expect($response->getContent())->not->toContain('HIDDEN_VENDOR_SENTINEL')
+        ->not->toContain('HIDDEN_CREDENTIAL_SENTINEL');
 });
 
 test('/vendors for a credential-only user: sends credentials, empty vendors, can flags reflect scope', function () {
@@ -167,11 +202,13 @@ test('/vendors for a credential-only user: sends credentials, empty vendors, can
 
     $user = siteNavUser('support_worker');
     grantPermission($user, 'credentials.view');
+    siteNavAssignUserToSite($user, $site);
+    siteNavCreateHiddenRecords();
 
     expect($user->canDo('vendors.view'))->toBeFalse();
     expect($user->canDo('credentials.view'))->toBeTrue();
 
-    $this->actingAs($user)
+    $response = $this->actingAs($user)
         ->get('/vendors')
         ->assertOk()
         ->assertInertia(fn ($page) => $page
@@ -185,6 +222,29 @@ test('/vendors for a credential-only user: sends credentials, empty vendors, can
             ->has('serviceTypes', 0)
             ->has('credentialTypes', 1)
         );
+    expect($response->getContent())->not->toContain('HIDDEN_VENDOR_SENTINEL')
+        ->not->toContain('HIDDEN_CREDENTIAL_SENTINEL');
+});
+
+test('/vendors permission grants do not expose records without a current Site assignment', function () {
+    siteNavCreateHiddenRecords();
+    $user = siteNavUser('support_worker');
+    grantPermission($user, 'vendors.view');
+    grantPermission($user, 'credentials.view');
+
+    $response = $this->actingAs($user)
+        ->get('/vendors')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('sites/vendors-credentials/global')
+            ->has('vendors', 0)
+            ->has('credentials', 0)
+            ->has('sites', 0)
+            ->where('can.vendors', true)
+            ->where('can.credentials', true)
+        );
+    expect($response->getContent())->not->toContain('HIDDEN_VENDOR_SENTINEL')
+        ->not->toContain('HIDDEN_CREDENTIAL_SENTINEL');
 });
 
 test('/vendors for a both-permission user: sends both sides populated', function () {

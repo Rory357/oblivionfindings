@@ -4,6 +4,7 @@ import {
     type MenuItem,
 } from '@/components/lists/entity-menu';
 import { EntityTable } from '@/components/lists/entity-table';
+import { ListCaption } from '@/components/lists/list-caption';
 import {
     PageHeader,
     PageHeaderFilterSelect,
@@ -409,7 +410,7 @@ export default function Orders(props: Props) {
     return (
         <AppLayout breadcrumbs={useEmarBreadcrumbs()}>
             <Head title="Medication orders" />
-            <div className="flex flex-col gap-5 [&_button]:min-w-[44px] [&_button:not(.frontline-hit)]:min-h-[44px] [&_input[type=search]]:min-h-[44px]">
+            <div className="flex flex-col gap-5">
                 <PageHeader
                     wrapTitle
                     icon={Pill}
@@ -427,7 +428,7 @@ export default function Orders(props: Props) {
                                 placeholder="Search medicine or person"
                             />
                             <div
-                                className="flex max-w-80 flex-col gap-2"
+                                className="flex max-w-64 flex-col items-end gap-1"
                                 title={entryUnavailableReason}
                             >
                                 <PageHeaderPrimaryButton
@@ -455,7 +456,7 @@ export default function Orders(props: Props) {
                                 {entryUnavailableReason && (
                                     <p
                                         id="order-entry-unavailable"
-                                        className="text-sm text-band-foreground/85"
+                                        className="text-[11.5px] leading-snug text-band-foreground/85"
                                     >
                                         {entryUnavailableReason}
                                     </p>
@@ -543,7 +544,7 @@ export default function Orders(props: Props) {
                         </>
                     }
                     filters={
-                        <div className="flex flex-wrap items-center gap-2 [&>div]:min-h-[44px]">
+                        <div className="flex flex-wrap items-center gap-2">
                             <PageHeaderFilterSelect
                                 label="All houses"
                                 value={props.filters.site_id ?? 'all'}
@@ -620,6 +621,25 @@ export default function Orders(props: Props) {
                 />
                 {(view === 'orders' || view === 'to_check') && (
                     <>
+                        <ListCaption
+                            title={
+                                view === 'to_check'
+                                    ? 'Orders to check'
+                                    : 'Medication orders'
+                            }
+                            caption={
+                                props.orders.data.length +
+                                ' of ' +
+                                props.orders.total +
+                                ' orders shown'
+                            }
+                            right={
+                                <LaravelPagination
+                                    links={props.orders.links}
+                                    lastPage={props.orders.last_page}
+                                />
+                            }
+                        />
                         {props.orders.data.length ? (
                             <EntityTable
                                 rows={props.orders.data}

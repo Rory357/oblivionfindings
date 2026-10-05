@@ -1,5 +1,3 @@
-/* eslint-disable no-restricted-syntax -- stock list/order/reconciliation surfaces are custom-layout
-   bordered tables and chip buttons (not Card/Button); all colours are semantic tokens. */
 import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import {
     StockDetailDialog,
@@ -9,6 +7,7 @@ import {
     EmarMeters,
     EmarViewFilter,
 } from '@/components/emar/workspace-navigation';
+import { EntityStatusChip } from '@/components/lists/entity-cells';
 import { compactMenu, type MenuItem } from '@/components/lists/entity-menu';
 import {
     PageHeader,
@@ -18,14 +17,10 @@ import {
     PageHeaderSearch,
     PageHeaderStatusChip,
 } from '@/components/page/page-header';
-import {
-    EntityFilter,
-    ShiftContextMenu,
-    type RosterTabItem,
-    type ShiftCtxItem,
-    type ShiftCtxState,
-} from '@/components/rostering';
+import { EntityFilter, type RosterTabItem } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
+import { ErrorState } from '@/components/ui/error-state';
+import { SkeletonTable } from '@/components/ui/skeleton-table';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { emarScopedHref } from '@/lib/emar-navigation';
@@ -55,7 +50,6 @@ import {
     AlertTriangle,
     Barcode,
     CalendarX2,
-    Check,
     ClipboardCheck,
     Clock,
     Eye,
@@ -69,54 +63,35 @@ import {
     User,
     X,
 } from 'lucide-react';
-import {
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-    type MouseEvent as ReactMouseEvent,
-} from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useStockFilters } from './stock/_filters';
+import {
+    controlledColumns,
+    pharmacyColumns,
+    PharmacyOrderDetail,
+    StockHubTable,
+} from './stock/_hub-tables';
+import {
+    PHARMACY_NEXT_LABEL as NEXT_LABEL,
+    type ControlledRegisterRow,
+    type PharmacyOrderRow as OrderRow,
+    type StockFilters,
+    type StockPagination,
+    type StockSummary,
+} from './stock/_hub-types';
 import { StockInventoryTable } from './stock/_inventory-table';
-
-type ControlledRegisterRow = {
-    id: number;
-    medication_id: number;
-    medication_name: string | null;
-    client_id: number | null;
-    client_name: string;
-    cd_class: string | null;
-    register_balance: number;
-    on_hand: number;
-    unit: string;
-    last_check_at: string | null;
-    last_check_witness: string | null;
-    discrepancy: number | null;
-};
-type OrderRow = {
-    id: number;
-    medication_id: number | null;
-    client_name: string;
-    medication_name: string | null;
-    controlled: boolean;
-    pharmacy_name: string | null;
-    order_type: string | null;
-    status: string;
-    quantity_ordered: number | null;
-    quantity_received: number | string | null;
-    ordered_at: string | null;
-    submitted_at: string | null;
-    confirmed_at: string | null;
-    dispensed_at: string | null;
-    delivered_at: string | null;
-    batch_number: string | null;
-    batch_expiry: string | null;
-};
+import { StockPagedList } from './stock/_pagination';
 
 type Props = {
     can_record_controlled: boolean;
     can_view_controlled: boolean;
     stockItems: StockRow[];
+    stockContext: StockRow[];
+    openOrdersByMedication: Record<number, OrderRow>;
+    filters: StockFilters;
+    pagination: StockPagination;
+    summary: StockSummary;
     lowStockCount: number;
     expiringCount: number;
     expiredCount: number;
@@ -132,6 +107,7 @@ type Props = {
 };
 
 type Modal =
+    | { type: 'order-detail'; order: OrderRow }
     | { type: 'order'; clientId?: number; medId?: number }
     | { type: 'receive'; medId?: number }
     | { type: 'controlled-delivery'; order: OrderRow; item: StockRow }
@@ -141,40 +117,17 @@ type Modal =
     | { type: 'detail'; item: StockRow }
     | null;
 
-const stockViewFromUrl = (url: string) => {
-    const view = new URLSearchParams(url.split('?')[1]).get('view');
-    return view &&
-        ['low', 'expiring', 'expired', 'controlled', 'orders'].includes(view)
-        ? view
-        : 'all';
-};
 const STALE_ORDER_DAYS = 7;
-const STAGES = ['draft', 'submitted', 'confirmed', 'dispensed', 'delivered'];
-const STAGE_LABELS = [
-    'Ordered',
-    'Submitted',
-    'Confirmed',
-    'Dispensed',
-    'Delivered',
-];
-const NEXT_LABEL: Record<string, string> = {
-    draft: 'Submit to pharmacy',
-    submitted: 'Mark confirmed',
-    confirmed: 'Mark dispensed',
-    dispensed: 'Receive stock',
-};
-const fmtDate = (iso: string | null) =>
-    iso
-        ? new Date(iso).toLocaleDateString('en-NZ', {
-              day: 'numeric',
-              month: 'short',
-          })
-        : '—';
 
 export default function StockManagement({
     can_record_controlled: canRecordControlled,
     can_view_controlled: canViewControlled,
     stockItems,
+    stockContext,
+    openOrdersByMedication,
+    filters: serverFilters,
+    pagination,
+    summary,
     lowStockCount,
     expiringCount,
     expiredCount,
@@ -186,43 +139,56 @@ export default function StockManagement({
     sites,
     active_site: activeSite,
     site_brand_colour: brandColour,
-    client_id: activeClientId,
 }: Props) {
     const breadcrumbs = useEmarBreadcrumbs();
     const { url: pageUrl } = usePage();
-    const [activeTab, setActiveTabState] = useState(() =>
-        stockViewFromUrl(pageUrl),
-    );
-    useEffect(() => {
-        setActiveTabState(stockViewFromUrl(pageUrl));
-    }, [pageUrl]);
-    const setActiveTab = (value: string) => {
-        setActiveTabState(value);
-        const url = new URL(pageUrl, window.location.origin);
-        if (value !== 'all') url.searchParams.set('view', value);
-        else url.searchParams.delete('view');
-        if (url.pathname + url.search !== pageUrl)
-            router.replace({
-                url: url.pathname + url.search,
-                preserveState: true,
-                preserveScroll: true,
-            });
-    };
-    const [search, setSearch] = useState('');
-    const [siteFilter, setSiteFilter] = useState<number | null>(
-        activeSite?.id ?? null,
-    );
-    const [clientFilter, setClientFilter] = useState<number | null>(
-        activeClientId ?? null,
-    );
-    const [chip, setChip] = useState<'all' | 'controlled' | 'cold_chain'>(
-        'all',
+    const {
+        filters,
+        busy: loading,
+        failed,
+        change,
+        retry,
+    } = useStockFilters(serverFilters);
+    const {
+        view: activeTab,
+        q: search,
+        chip,
+        site_id: siteFilter,
+        client_id: clientFilter,
+    } = filters;
+    const setActiveTab = (view: string) => change({ view });
+    const setSearch = (q: string) => change({ q }, 250);
+    const setChip = (value: StockFilters['chip']) => change({ chip: value });
+    const onSite = (site_id: number | null) => change({ site_id });
+    const onClient = (client_id: number | null) => change({ client_id });
+    const [advancing, setAdvancing] = useState<number | null>(null);
+    const advanceInFlight = useRef(false);
+    const loadStockContext = useCallback(
+        async (
+            medicationId: number,
+            signal: AbortSignal,
+        ): Promise<StockRow | null> => {
+            const params = new URLSearchParams();
+            if (siteFilter) params.set('site_id', String(siteFilter));
+            if (clientFilter) params.set('client_id', String(clientFilter));
+            const response = await fetch(
+                '/emar/stock/context/' + medicationId + '?' + params,
+                {
+                    headers: { Accept: 'application/json' },
+                    credentials: 'same-origin',
+                    signal,
+                },
+            );
+            if (!response.ok)
+                throw new Error('Stock details could not be loaded');
+            return (await response.json()).stock_item;
+        },
+        [siteFilter, clientFilter],
     );
     const [modal, setModal] = useState<Modal>(null);
     const orderAdvanceReplay = useRef(
         new Map<number, MedicationMutationReplayState>(),
     );
-    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [dismissed, setDismissed] = useState<string[]>([]);
 
     const controlledGovernedMedications = useMemo(
@@ -235,16 +201,8 @@ export default function StockManagement({
         [activeMedications, canRecordControlled],
     );
 
-    const openOrders = pharmacyOrders.filter((o) => o.status !== 'delivered');
-    const cdDiscrepancies = controlledRegister.filter(
-        (r) => r.discrepancy !== null && r.discrepancy !== 0,
-    ).length;
-    const staleOrderCutoff = Date.now() - STALE_ORDER_DAYS * 86_400_000;
-    const overdueOrders = openOrders.filter(
-        (o) =>
-            o.ordered_at != null &&
-            new Date(o.ordered_at).getTime() < staleOrderCutoff,
-    ).length;
+    const cdDiscrepancies = summary.controlled_discrepancies;
+    const overdueOrders = summary.overdue_orders;
 
     // Stacked, dismissible alert strip — every count is already computed above.
     const alerts = (
@@ -285,12 +243,12 @@ export default function StockManagement({
     ).filter((a) => a.count > 0 && !dismissed.includes(a.key));
 
     const stockByMed = useMemo(
-        () => new Map(stockItems.map((s) => [s.medication_id, s])),
-        [stockItems],
+        () => new Map(stockContext.map((s) => [s.medication_id, s])),
+        [stockContext],
     );
     const openOrderFor = (medId: number | null): OpenOrderSummary | null => {
         if (medId == null) return null;
-        const o = openOrders.find((ord) => ord.medication_id === medId);
+        const o = openOrdersByMedication[medId];
         return o
             ? {
                   status: o.status,
@@ -313,9 +271,7 @@ export default function StockManagement({
     const stockActionsFor = (s: StockRow): MenuItem[] => {
         const order = openOrderFor(s.medication_id);
         const canGovernBalance = !s.controlled || canRecordControlled;
-        const orderRow = openOrders.find(
-            (candidate) => candidate.medication_id === s.medication_id,
-        );
+        const orderRow = openOrdersByMedication[s.medication_id];
         const items: MenuItem[] = [
             {
                 icon: Eye,
@@ -421,163 +377,81 @@ export default function StockManagement({
         return compactMenu(items);
     };
 
-    const openCdCtx = (e: ReactMouseEvent, r: ControlledRegisterRow) => {
-        e.preventDefault();
-        const s = stockByMed.get(r.medication_id);
-        const reconciled = r.discrepancy === null || r.discrepancy === 0;
-        const items: ShiftCtxItem[] = [
-            ...(s
-                ? [
-                      {
-                          icon: <Eye className="h-3.5 w-3.5" />,
-                          label: 'View details',
-                          sub: `${r.medication_name ?? 'CD'} · ${r.register_balance} ${r.unit}`,
-                          tone: 'primary',
-                          onClick: () => setModal({ type: 'detail', item: s }),
-                      } satisfies ShiftCtxItem,
-                  ]
-                : []),
-            ...(canRecordControlled
-                ? [
-                      {
-                          icon: <ShieldCheck className="h-3.5 w-3.5" />,
-                          label: 'Record CD balance check',
-                          onClick: () =>
-                              setModal({
-                                  type: 'count',
-                                  medId: r.medication_id,
-                                  controlledOnly: true,
-                              }),
-                      } satisfies ShiftCtxItem,
-                  ]
-                : []),
-            ...(s && canRecordControlled
-                ? [
-                      {
-                          icon: <Pencil className="h-3.5 w-3.5" />,
-                          label: 'Adjust stock',
-                          onClick: () => setModal({ type: 'adjust', item: s }),
-                      } satisfies ShiftCtxItem,
-                  ]
-                : []),
-            ...(s
-                ? [
-                      {
-                          icon: <ShoppingCart className="h-3.5 w-3.5" />,
-                          label: 'Order more',
-                          onClick: () =>
-                              setModal({
-                                  type: 'order',
-                                  clientId: r.client_id ?? undefined,
-                                  medId: r.medication_id,
-                              }),
-                      } satisfies ShiftCtxItem,
-                  ]
-                : []),
-            { sep: true },
-            ...(r.client_id
-                ? [
-                      {
-                          icon: <User className="h-3.5 w-3.5" />,
-                          label: 'View client',
-                          onClick: () =>
-                              router.visit(
-                                  `/operations/clients/${r.client_id}?tab=mar`,
-                              ),
-                      } satisfies ShiftCtxItem,
-                  ]
-                : []),
-            ...(canViewControlled
-                ? [
-                      {
-                          icon: <FileText className="h-3.5 w-3.5" />,
-                          label: 'Open CD register',
-                          onClick: () =>
-                              router.visit(
-                                  emarScopedHref('/emar/controlled', pageUrl),
-                              ),
-                      } satisfies ShiftCtxItem,
-                  ]
-                : []),
-            ...(!reconciled && canViewControlled
-                ? [
-                      { sep: true } satisfies ShiftCtxItem,
-                      {
-                          icon: <AlertOctagon className="h-3.5 w-3.5" />,
-                          label: 'Investigate discrepancy',
-                          tone: 'critical',
-                          onClick: () =>
-                              router.visit(
-                                  emarScopedHref(
-                                      '/emar/controlled?view=discrepancies',
-                                      pageUrl,
-                                  ),
-                              ),
-                      } satisfies ShiftCtxItem,
-                  ]
-                : []),
-        ];
-        const tag = reconciled
-            ? {
-                  tag: 'CD OK',
-                  tagBg: 'var(--status-success-bg)',
-                  tagColor: 'var(--status-success)',
-              }
-            : {
-                  tag: 'CD discrepancy',
-                  tagBg: 'var(--status-critical-bg)',
-                  tagColor: 'var(--status-critical)',
-              };
-        setCtx({
-            x: e.clientX,
-            y: e.clientY,
-            tag: tag.tag,
-            tagBg: tag.tagBg,
-            tagColor: tag.tagColor,
-            meta: `${r.client_name} · ${r.medication_name ?? 'CD'} · ${r.register_balance} ${r.unit}`,
-            items,
-        });
+    const cdActionsFor = (row: ControlledRegisterRow): MenuItem[] => {
+        const stock = stockByMed.get(row.medication_id);
+        return compactMenu([
+            stock && {
+                icon: Eye,
+                label: 'View details',
+                onClick: () => setModal({ type: 'detail', item: stock }),
+            },
+            canRecordControlled && {
+                icon: ShieldCheck,
+                label: 'Record CD balance check',
+                onClick: () =>
+                    setModal({
+                        type: 'count',
+                        medId: row.medication_id,
+                        controlledOnly: true,
+                    }),
+            },
+            stock &&
+                canRecordControlled && {
+                    icon: Pencil,
+                    label: 'Adjust stock',
+                    onClick: () => setModal({ type: 'adjust', item: stock }),
+                },
+            stock && {
+                icon: ShoppingCart,
+                label: 'Order more',
+                onClick: () =>
+                    setModal({
+                        type: 'order',
+                        clientId: row.client_id ?? undefined,
+                        medId: row.medication_id,
+                    }),
+            },
+            { separator: true },
+            !!row.client_id && {
+                icon: User,
+                label: 'View person',
+                onClick: () =>
+                    router.visit(
+                        '/operations/clients/' + row.client_id + '?tab=mar',
+                    ),
+            },
+            {
+                icon: FileText,
+                label: 'Open CD register',
+                onClick: () =>
+                    router.visit(emarScopedHref('/emar/controlled', pageUrl)),
+            },
+            row.discrepancy !== null &&
+                row.discrepancy !== 0 && {
+                    icon: AlertOctagon,
+                    label: 'Investigate discrepancy',
+                    danger: true,
+                    onClick: () =>
+                        router.visit(
+                            emarScopedHref(
+                                '/emar/controlled?view=discrepancies',
+                                pageUrl,
+                            ),
+                        ),
+                },
+        ]);
     };
 
-    const filtered = useMemo(() => {
-        const q = search.trim().toLowerCase();
-        return stockItems.filter((s) => {
-            if (activeTab === 'low' && !s.is_low) return false;
-            if (activeTab === 'expiring' && !s.is_expiring_soon) return false;
-            if (activeTab === 'expired' && !s.is_expired) return false;
-            if (chip === 'controlled' && !s.controlled) return false;
-            if (chip === 'cold_chain' && !s.requires_cold_chain) return false;
-            if (
-                q &&
-                !`${s.medication_name ?? ''} ${s.client_name} ${s.site_name ?? ''} ${s.batch_number ?? ''}`
-                    .toLowerCase()
-                    .includes(q)
-            )
-                return false;
-            return true;
-        });
-    }, [stockItems, activeTab, chip, search]);
-
-    const filteredOrders = useMemo(() => {
-        const query = search.trim().toLowerCase();
-        return pharmacyOrders.filter((order) =>
-            `${order.medication_name ?? ''} ${order.client_name} ${order.pharmacy_name ?? ''} ${order.batch_number ?? ''}`
-                .toLowerCase()
-                .includes(query),
-        );
-    }, [pharmacyOrders, search]);
-
-    const filteredControlled = useMemo(() => {
-        const query = search.trim().toLowerCase();
-        return controlledRegister.filter((item) =>
-            `${item.medication_name ?? ''} ${item.client_name}`
-                .toLowerCase()
-                .includes(query),
-        );
-    }, [controlledRegister, search]);
-
     const advance = async (order: OrderRow) => {
-        const packItem = stockItems.find(
+        if (
+            advanceInFlight.current ||
+            !NEXT_LABEL[order.status] ||
+            (order.controlled &&
+                order.status === 'dispensed' &&
+                !canRecordControlled)
+        )
+            return;
+        const packItem = stockContext.find(
             (stock) =>
                 stock.medication_id === order.medication_id &&
                 !stock.controlled &&
@@ -593,7 +467,7 @@ export default function StockManagement({
             return;
         }
         if (action === 'controlled-delivery') {
-            const item = stockItems.find(
+            const item = stockContext.find(
                 (stock) => stock.medication_id === order.medication_id,
             );
             if (item && order.medication_id !== null) {
@@ -605,6 +479,8 @@ export default function StockManagement({
             return;
         }
 
+        advanceInFlight.current = true;
+        setAdvancing(order.id);
         const currentReplay =
             orderAdvanceReplay.current.get(order.id) ??
             createMedicationMutationReplayState();
@@ -632,46 +508,36 @@ export default function StockManagement({
             );
             if (emarMutationWasAccepted(result.status)) {
                 orderAdvanceReplay.current.delete(order.id);
-                router.reload({
-                    only: [
-                        'pharmacyOrders',
-                        'stockItems',
-                        'lowStockCount',
-                        'expiringCount',
-                        'expiredCount',
-                    ],
-                });
+                setModal(null);
+                router.reload();
             }
         } catch {
             toast.error('Could not advance the pharmacy order');
+        } finally {
+            advanceInFlight.current = false;
+            setAdvancing(null);
         }
     };
-    // Site + Client round-trip to the server (the board is server-filtered on
-    // those two only); search/chip/tab stay client-side over the loaded rows.
-    const reload = (over: {
-        site_id?: number | null;
-        client_id?: number | null;
-    }) => {
-        const site = over.site_id !== undefined ? over.site_id : siteFilter;
-        const client =
-            over.client_id !== undefined ? over.client_id : clientFilter;
-        const params: Record<string, string | number> = {};
-        if (activeTab !== 'all') params.view = activeTab;
-        if (site) params.site_id = site;
-        if (client) params.client_id = client;
-        router.get('/emar/stock', params, {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    };
-    const onSite = (id: number | null) => {
-        setSiteFilter(id);
-        reload({ site_id: id });
-    };
-    const onClient = (id: number | null) => {
-        setClientFilter(id);
-        reload({ client_id: id });
-    };
+    const orderActionsFor = (order: OrderRow): MenuItem[] =>
+        compactMenu([
+            {
+                icon: Eye,
+                label: 'View order',
+                onClick: () => setModal({ type: 'order-detail', order }),
+            },
+            !!NEXT_LABEL[order.status] &&
+                (order.status !== 'dispensed' ||
+                    !order.controlled ||
+                    canRecordControlled) && {
+                    icon: Truck,
+                    label: NEXT_LABEL[order.status],
+                    disabled:
+                        advancing !== null ? 'Saving this order' : undefined,
+                    onClick: () => {
+                        void advance(order);
+                    },
+                },
+        ]);
 
     const TABS: RosterTabItem[] = [
         {
@@ -679,7 +545,7 @@ export default function StockManagement({
             label: 'All stock',
             icon: Package,
             tone: 'primary',
-            badge: stockItems.length || undefined,
+            badge: summary.total_stock || undefined,
         },
         {
             id: 'low',
@@ -709,7 +575,7 @@ export default function StockManagement({
                       label: 'Controlled drugs',
                       icon: ShieldCheck,
                       tone: 'primary' as const,
-                      badge: controlledRegister.length || undefined,
+                      badge: summary.controlled || undefined,
                   },
               ]
             : []),
@@ -718,7 +584,7 @@ export default function StockManagement({
             label: 'Pharmacy orders',
             icon: ShoppingCart,
             tone: 'info',
-            badge: openOrders.length || undefined,
+            badge: summary.open_orders || undefined,
         },
     ];
 
@@ -750,7 +616,7 @@ export default function StockManagement({
                             items={[
                                 {
                                     label: 'Tracked',
-                                    value: stockItems.length,
+                                    value: summary.total_stock,
                                     caption: 'Items in the selected scope',
                                     onClick: () => setActiveTab('all'),
                                 },
@@ -772,7 +638,7 @@ export default function StockManagement({
                                 },
                                 {
                                     label: 'Pharmacy orders',
-                                    value: openOrders.length,
+                                    value: summary.open_orders,
                                     caption: 'Orders still open',
                                     onClick: () => setActiveTab('orders'),
                                 },
@@ -801,12 +667,14 @@ export default function StockManagement({
                             />
                             <PageHeaderPrimaryButton
                                 icon={Plus}
+                                disabled={loading || failed}
                                 onClick={() => setModal({ type: 'order' })}
                             >
                                 New pharmacy order
                             </PageHeaderPrimaryButton>
                             <PageHeaderGlassButton
                                 icon={Truck}
+                                disabled={loading || failed}
                                 onClick={() => setModal({ type: 'receive' })}
                             >
                                 Receive stock
@@ -857,6 +725,7 @@ export default function StockManagement({
                                         ))}
                                         <PageHeaderFilterButton
                                             icon={Barcode}
+                                            disabled={loading || failed}
                                             onClick={() =>
                                                 setModal({ type: 'count' })
                                             }
@@ -946,307 +815,131 @@ export default function StockManagement({
                     </div>
                 )}
 
-                {['all', 'low', 'expiring', 'expired'].includes(activeTab) &&
-                    (filtered.length === 0 ? (
-                        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed bg-card px-5 py-12 text-center">
-                            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                                <Package className="h-6 w-6" />
-                            </span>
-                            <div>
-                                <p className="text-sm font-medium">
-                                    No stock matches the current filters
-                                </p>
-                                <p className="mt-0.5 text-sm text-muted-foreground">
-                                    {stockItems.length > 0
-                                        ? 'Stock is already tracked here. Choose another view or clear your search to see it.'
-                                        : 'Receive a delivery or place a pharmacy order to start tracking stock here.'}
-                                </p>
-                            </div>
-                            <div className="flex flex-wrap items-center justify-center gap-2">
-                                {stockItems.length > 0 ? (
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => {
-                                            setSearch('');
-                                            setChip('all');
-                                            setActiveTab('all');
-                                        }}
-                                    >
-                                        Show all stock
-                                    </Button>
-                                ) : (
-                                    <>
-                                        <Button
-                                            size="sm"
-                                            onClick={() =>
-                                                setModal({ type: 'receive' })
-                                            }
-                                        >
-                                            <Truck className="h-3.5 w-3.5" />
-                                            Receive stock
-                                        </Button>
+                {failed ? (
+                    <ErrorState
+                        title="Stock could not be loaded"
+                        message="Your filters are kept. Try again."
+                        onRetry={retry}
+                    />
+                ) : loading ? (
+                    <div role="status" aria-label="Loading stock">
+                        <SkeletonTable rows={5} columns={6} />
+                    </div>
+                ) : (
+                    <StockPagedList
+                        title={
+                            activeTab === 'orders'
+                                ? 'Pharmacy orders'
+                                : activeTab === 'controlled'
+                                  ? 'Controlled stock'
+                                  : 'Stock'
+                        }
+                        page={pagination}
+                        onPage={(page) => change({ page })}
+                        onPageSize={(per_page) => change({ per_page })}
+                    >
+                        {['all', 'low', 'expiring', 'expired'].includes(
+                            activeTab,
+                        ) && (
+                            <StockInventoryTable
+                                rows={stockItems}
+                                actionsFor={stockActionsFor}
+                                onOpen={(item) =>
+                                    setModal({ type: 'detail', item })
+                                }
+                            />
+                        )}
+                        {canViewControlled && activeTab === 'controlled' && (
+                            <>
+                                <div className="flex items-center justify-between gap-4 text-sm text-muted-foreground">
+                                    <p>
+                                        Investigate any discrepancy with a
+                                        witness before the end of the shift.
+                                    </p>
+                                    {canRecordControlled && (
                                         <Button
                                             size="sm"
                                             variant="outline"
                                             onClick={() =>
-                                                setModal({ type: 'order' })
+                                                setModal({
+                                                    type: 'count',
+                                                    controlledOnly: true,
+                                                })
                                             }
                                         >
-                                            <Plus className="h-3.5 w-3.5" />
-                                            New order
+                                            <ShieldCheck className="size-3.5" />
+                                            Record CD balance check
                                         </Button>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    ) : (
-                        <StockInventoryTable
-                            key={[
-                                activeTab,
-                                chip,
-                                search,
-                                siteFilter,
-                                clientFilter,
-                            ].join(':')}
-                            rows={filtered}
-                            actionsFor={stockActionsFor}
-                            onOpen={(item) =>
-                                setModal({ type: 'detail', item })
-                            }
-                        />
-                    ))}
-
-                {canViewControlled && activeTab === 'controlled' && (
-                    <div className="flex flex-col gap-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-status-critical/30 bg-status-critical-bg/50 px-4 py-3">
-                            <span className="text-sm text-status-critical">
-                                Controlled-drug register — running-balance
-                                reconciliation. Any non-zero discrepancy must be
-                                investigated and witnessed before close of
-                                shift.
-                            </span>
-                            {canRecordControlled ? (
-                                <Button
-                                    size="sm"
-                                    onClick={() =>
-                                        setModal({
-                                            type: 'count',
-                                            controlledOnly: true,
-                                        })
-                                    }
-                                >
-                                    <ShieldCheck className="h-3.5 w-3.5" />
-                                    Record CD balance check
-                                </Button>
-                            ) : null}
-                        </div>
-                        <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-                            {filteredControlled.length === 0 ? (
-                                <div className="px-5 py-12 text-center text-sm text-muted-foreground">
-                                    {controlledRegister.length > 0
-                                        ? 'No controlled stock matches your search.'
-                                        : 'No controlled drugs in stock.'}
+                                    )}
                                 </div>
-                            ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full min-w-[760px] text-sm">
-                                        <thead>
-                                            <tr className="bg-muted text-left text-[11px] tracking-wide text-muted-foreground uppercase">
-                                                <th className="px-4 py-2.5">
-                                                    Medication
-                                                </th>
-                                                <th className="px-4 py-2.5">
-                                                    Client
-                                                </th>
-                                                <th className="px-4 py-2.5">
-                                                    Register balance
-                                                </th>
-                                                <th className="px-4 py-2.5">
-                                                    Last witnessed check
-                                                </th>
-                                                <th className="px-4 py-2.5">
-                                                    Reconciliation
-                                                </th>
-                                                <th className="px-4 py-2.5 text-right">
-                                                    Actions
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {filteredControlled.map((r) => {
-                                                const reconciled =
-                                                    r.discrepancy === null ||
-                                                    r.discrepancy === 0;
-                                                const detail = stockByMed.get(
-                                                    r.medication_id,
-                                                );
-                                                const openDetail = () =>
-                                                    detail &&
-                                                    setModal({
-                                                        type: 'detail',
-                                                        item: detail,
-                                                    });
-                                                return (
-                                                    <tr
-                                                        key={r.id}
-                                                        onClick={openDetail}
-                                                        onContextMenu={(e) =>
-                                                            openCdCtx(e, r)
-                                                        }
-                                                        onKeyDown={(e) => {
-                                                            if (
-                                                                detail &&
-                                                                (e.key ===
-                                                                    'Enter' ||
-                                                                    e.key ===
-                                                                        ' ')
-                                                            ) {
-                                                                e.preventDefault();
-                                                                openDetail();
-                                                            }
-                                                        }}
-                                                        tabIndex={
-                                                            detail
-                                                                ? 0
-                                                                : undefined
-                                                        }
-                                                        role={
-                                                            detail
-                                                                ? 'button'
-                                                                : undefined
-                                                        }
-                                                        aria-label={
-                                                            detail
-                                                                ? `View ${r.medication_name ?? 'controlled drug'} details for ${r.client_name}`
-                                                                : undefined
-                                                        }
-                                                        className={`border-b transition-colors last:border-b-0 ${detail ? 'cursor-pointer hover:bg-muted/40 focus:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset' : ''}`}
-                                                    >
-                                                        <td className="px-4 py-3 font-medium">
-                                                            {r.medication_name}
-                                                            {r.cd_class && (
-                                                                <span className="ml-2 rounded-full bg-status-critical-bg px-2 py-0.5 text-[10px] font-semibold text-status-critical">
-                                                                    Class{' '}
-                                                                    {r.cd_class}
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-muted-foreground">
-                                                            {r.client_name}
-                                                        </td>
-                                                        <td className="px-4 py-3 font-mono font-semibold tabular-nums">
-                                                            {r.register_balance}{' '}
-                                                            {r.unit}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-muted-foreground">
-                                                            {r.last_check_at
-                                                                ? `${fmtDate(r.last_check_at)}${r.last_check_witness ? ` · ${r.last_check_witness}` : ''}`
-                                                                : 'Never'}
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            {reconciled ? (
-                                                                <span className="rounded-full bg-status-success-bg px-2 py-0.5 text-[11px] font-semibold text-status-success">
-                                                                    Reconciled
-                                                                </span>
-                                                            ) : (
-                                                                <span className="rounded-full bg-status-critical-bg px-2 py-0.5 text-[11px] font-semibold text-status-critical">
-                                                                    Discrepancy{' '}
-                                                                    {r.discrepancy! >
-                                                                    0
-                                                                        ? '+'
-                                                                        : ''}
-                                                                    {
-                                                                        r.discrepancy
-                                                                    }
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-right">
-                                                            <div className="flex items-center justify-end gap-2">
-                                                                {canRecordControlled ? (
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="outline"
-                                                                        onClick={(
-                                                                            e,
-                                                                        ) => {
-                                                                            e.stopPropagation();
-                                                                            setModal(
-                                                                                {
-                                                                                    type: 'count',
-                                                                                    medId: r.medication_id,
-                                                                                    controlledOnly: true,
-                                                                                },
-                                                                            );
-                                                                        }}
-                                                                    >
-                                                                        Count
-                                                                    </Button>
-                                                                ) : null}
-                                                                {!reconciled &&
-                                                                    canViewControlled && (
-                                                                        <a
-                                                                            href="/emar/controlled"
-                                                                            onClick={(
-                                                                                e,
-                                                                            ) =>
-                                                                                e.stopPropagation()
-                                                                            }
-                                                                            className="text-xs font-medium text-status-critical underline"
-                                                                        >
-                                                                            Investigate
-                                                                        </a>
-                                                                    )}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === 'orders' && (
-                    <div className="flex flex-col gap-4">
-                        <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">
-                                Tracking {openOrders.length} open order
-                                {openOrders.length === 1 ? '' : 's'}.
-                            </span>
-                            <Button
-                                size="sm"
-                                onClick={() => setModal({ type: 'order' })}
-                            >
-                                <Plus className="h-3.5 w-3.5" />
-                                New pharmacy order
-                            </Button>
-                        </div>
-                        {filteredOrders.length === 0 ? (
-                            <div className="rounded-2xl border border-dashed bg-card px-5 py-12 text-center text-sm text-muted-foreground">
-                                {pharmacyOrders.length > 0
-                                    ? 'No pharmacy orders match your search.'
-                                    : 'No pharmacy orders.'}
-                            </div>
-                        ) : (
-                            filteredOrders.map((o) => (
-                                <OrderCard
-                                    key={o.id}
-                                    o={o}
-                                    onAdvance={
-                                        o.status !== 'dispensed' ||
-                                        !o.controlled ||
-                                        canRecordControlled
-                                            ? () => advance(o)
-                                            : undefined
+                                <StockHubTable
+                                    rows={controlledRegister}
+                                    identityLabel="Medication"
+                                    identityWidth="1.6fr"
+                                    minWidth={880}
+                                    identity={(row) => ({
+                                        icon: ShieldCheck,
+                                        name:
+                                            row.medication_name ??
+                                            'Medication not recorded',
+                                        extra: row.cd_class ? (
+                                            <EntityStatusChip variant="neutral">
+                                                Class {row.cd_class}
+                                            </EntityStatusChip>
+                                        ) : undefined,
+                                    })}
+                                    columns={controlledColumns}
+                                    actionsFor={cdActionsFor}
+                                    onOpen={(row) => {
+                                        const item = stockByMed.get(
+                                            row.medication_id,
+                                        );
+                                        if (item)
+                                            setModal({ type: 'detail', item });
+                                    }}
+                                    contextTitle={(row) =>
+                                        (row.medication_name ??
+                                            'Controlled stock') +
+                                        ' · ' +
+                                        row.client_name
                                     }
                                 />
-                            ))
+                            </>
                         )}
-                    </div>
+                        {activeTab === 'orders' && (
+                            <StockHubTable
+                                rows={pharmacyOrders}
+                                identityLabel="Medication"
+                                identityWidth="1.6fr"
+                                minWidth={880}
+                                identity={(row) => ({
+                                    icon: ShoppingCart,
+                                    name:
+                                        row.medication_name ??
+                                        'Medication not recorded',
+                                    subline:
+                                        'Order #' +
+                                        row.id +
+                                        (row.order_type
+                                            ? ' · ' + row.order_type
+                                            : ''),
+                                    extra: row.controlled ? (
+                                        <EntityStatusChip variant="neutral">
+                                            CD
+                                        </EntityStatusChip>
+                                    ) : undefined,
+                                })}
+                                columns={pharmacyColumns}
+                                actionsFor={orderActionsFor}
+                                onOpen={(order) =>
+                                    setModal({ type: 'order-detail', order })
+                                }
+                                contextTitle={(row) =>
+                                    'Order #' + row.id + ' · ' + row.client_name
+                                }
+                            />
+                        )}
+                    </StockPagedList>
                 )}
             </div>
 
@@ -1254,7 +947,8 @@ export default function StockManagement({
                 <NewPharmacyOrderDialog
                     clients={clients}
                     medications={activeMedications}
-                    stockItems={stockItems}
+                    stockItems={stockContext}
+                    loadStockContext={loadStockContext}
                     defaultClientId={modal.clientId}
                     defaultMedId={modal.medId}
                     onClose={() => setModal(null)}
@@ -1291,7 +985,8 @@ export default function StockManagement({
             {modal?.type === 'count' && (
                 <StockCountDialog
                     medications={controlledGovernedMedications}
-                    stockItems={stockItems}
+                    stockItems={stockContext}
+                    loadStockContext={loadStockContext}
                     witnesses={witnesses}
                     defaultMedId={modal.medId}
                     controlledOnly={modal.controlledOnly}
@@ -1339,107 +1034,22 @@ export default function StockManagement({
                 />
             )}
 
-            {ctx && <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />}
+            {modal?.type === 'order-detail' && (
+                <PharmacyOrderDetail
+                    order={modal.order}
+                    busy={advancing !== null}
+                    onClose={() => setModal(null)}
+                    onAdvance={
+                        modal.order.status !== 'dispensed' ||
+                        !modal.order.controlled ||
+                        canRecordControlled
+                            ? () => {
+                                  void advance(modal.order);
+                              }
+                            : undefined
+                    }
+                />
+            )}
         </AppLayout>
-    );
-}
-
-function OrderCard({ o, onAdvance }: { o: OrderRow; onAdvance?: () => void }) {
-    const stageIndex = Math.max(0, STAGES.indexOf(o.status));
-    const typeTone =
-        o.order_type === 'urgent'
-            ? 'bg-status-critical-bg text-status-critical'
-            : o.order_type === 'repeat'
-              ? 'bg-primary/10 text-primary'
-              : 'bg-muted text-muted-foreground';
-    const nextLabel = NEXT_LABEL[o.status];
-    const stageTimes = [
-        o.ordered_at,
-        o.submitted_at,
-        o.confirmed_at,
-        o.dispensed_at,
-        o.delivered_at,
-    ];
-    return (
-        <div className="rounded-2xl border bg-card p-4 shadow-sm">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <div className="flex items-center gap-2 font-semibold">
-                        {o.medication_name ?? '—'}
-                        {o.order_type && (
-                            <span
-                                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${typeTone}`}
-                            >
-                                {o.order_type}
-                            </span>
-                        )}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                        {o.client_name} · {o.pharmacy_name ?? 'pharmacy'} ·
-                        ordered {fmtDate(o.ordered_at)}
-                    </div>
-                </div>
-                <div className="text-right text-sm">
-                    <div className="font-mono font-semibold tabular-nums">
-                        {o.quantity_ordered ?? '—'} units
-                    </div>
-                    {o.status === 'delivered' &&
-                        o.quantity_received != null && (
-                            <div className="text-xs text-status-success">
-                                {o.quantity_received} received
-                            </div>
-                        )}
-                </div>
-            </div>
-            <div className="mt-4 flex items-center">
-                {STAGE_LABELS.map((label, i) => {
-                    const done = i < stageIndex;
-                    const current = i === stageIndex;
-                    return (
-                        <div
-                            key={label}
-                            className="flex flex-1 items-center last:flex-none"
-                        >
-                            <div className="flex flex-col items-center gap-1">
-                                <span
-                                    className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold ${done ? 'bg-primary-fill text-primary-fill-foreground' : current ? 'border-2 border-primary bg-card text-primary' : 'border border-border bg-card text-muted-foreground'}`}
-                                >
-                                    {done ? (
-                                        <Check className="h-3.5 w-3.5" />
-                                    ) : (
-                                        i + 1
-                                    )}
-                                </span>
-                                <span
-                                    className={`text-[10px] ${current ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}
-                                >
-                                    {label}
-                                </span>
-                                <span className="text-[9px] text-muted-foreground">
-                                    {fmtDate(stageTimes[i])}
-                                </span>
-                            </div>
-                            {i < STAGE_LABELS.length - 1 && (
-                                <div
-                                    className={`mx-1 h-0.5 flex-1 ${i < stageIndex ? 'bg-primary' : 'bg-border'}`}
-                                />
-                            )}
-                        </div>
-                    );
-                })}
-            </div>
-            {nextLabel && onAdvance ? (
-                <div className="mt-4 flex justify-end">
-                    <Button size="sm" onClick={onAdvance}>
-                        {o.status === 'dispensed' ? (
-                            <Truck className="h-3.5 w-3.5" />
-                        ) : (
-                            <Check className="h-3.5 w-3.5" />
-                        )}
-                        {nextLabel}
-                    </Button>
-                </div>
-            ) : null}
-        </div>
     );
 }

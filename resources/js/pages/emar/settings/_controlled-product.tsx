@@ -63,7 +63,7 @@ function PolicyChoice({
         <div
             role="group"
             aria-label={label}
-            className="[&_button]:min-h-11 [&_button]:focus-visible:ring-2 [&_button]:focus-visible:ring-ring"
+            className="[&_button]:focus-visible:ring-2 [&_button]:focus-visible:ring-ring"
         >
             <Choice
                 value={value}
@@ -373,7 +373,7 @@ export function ControlledProductSettings({
                                         >
                                             <SelectTrigger
                                                 id="cd-count-weekly-day"
-                                                className="min-h-11"
+                                                className="h-8"
                                                 aria-label="Weekly count day"
                                                 aria-invalid={
                                                     !!anchorError || undefined

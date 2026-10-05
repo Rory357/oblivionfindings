@@ -47,8 +47,9 @@ import {
     Snowflake,
     Truck,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useSelectedStock, type LoadStockContext } from './stock/_selection';
 
 import {
     addMedicationStockQuantities,
@@ -172,6 +173,12 @@ const refreshStock = () =>
             'expiredCount',
             'controlledRegister',
             'pharmacyOrders',
+            'stockContext',
+            'openOrdersByMedication',
+            'summary',
+            'pagination',
+            'pagers',
+            'filters',
         ],
     });
 
@@ -180,6 +187,7 @@ export function NewPharmacyOrderDialog({
     clients,
     medications,
     stockItems,
+    loadStockContext,
     defaultClientId,
     defaultMedId,
     onClose,
@@ -187,6 +195,7 @@ export function NewPharmacyOrderDialog({
     clients: ClientOpt[];
     medications: StockMed[];
     stockItems: StockRow[];
+    loadStockContext?: LoadStockContext;
     defaultClientId?: number | null;
     defaultMedId?: number | null;
     onClose: () => void;
@@ -215,15 +224,32 @@ export function NewPharmacyOrderDialog({
         (m) =>
             !form.data.client_id || m.client_id === Number(form.data.client_id),
     );
-    const position = stockFor(stockItems, form.data.client_medication_id);
+    const selection = useSelectedStock(
+        form.data.client_medication_id,
+        stockItems,
+        loadStockContext,
+    );
+    const position = selection.row;
+    const setOrderData = form.setData;
+    useEffect(() => {
+        if (position?.reorder_quantity)
+            setOrderData((current) =>
+                current.quantity_ordered
+                    ? current
+                    : {
+                          ...current,
+                          quantity_ordered: String(position.reorder_quantity),
+                      },
+            );
+    }, [position?.medication_id, position?.reorder_quantity, setOrderData]);
     const pickMed = (id: string) => {
         const row = stockFor(stockItems, id);
         form.setData((current) => ({
             ...current,
             client_medication_id: id,
-            quantity_ordered:
-                current.quantity_ordered ||
-                (row?.reorder_quantity ? String(row.reorder_quantity) : ''),
+            quantity_ordered: row?.reorder_quantity
+                ? String(row.reorder_quantity)
+                : '',
         }));
     };
     const submit = () =>
@@ -236,7 +262,10 @@ export function NewPharmacyOrderDialog({
             onError: () => toast.error('Please check the order details'),
         });
     const valid = [
-        !!form.data.client_id && !!form.data.client_medication_id,
+        !!form.data.client_id &&
+            !!form.data.client_medication_id &&
+            !selection.loading &&
+            !selection.failed,
         !!form.data.pharmacy_name && !!form.data.quantity_ordered,
         true,
         true,
@@ -350,6 +379,7 @@ export function NewPharmacyOrderDialog({
                                         ...current,
                                         client_id: v,
                                         client_medication_id: '',
+                                        quantity_ordered: '',
                                     }))
                                 }
                                 placeholder="Select client…"
@@ -368,11 +398,38 @@ export function NewPharmacyOrderDialog({
                             />
                         </Field>
                     </div>
+                    {selection.loading && (
+                        <p
+                            role="status"
+                            className="text-sm text-muted-foreground"
+                        >
+                            Loading current stock…
+                        </p>
+                    )}
+                    {selection.failed && (
+                        <div
+                            role="alert"
+                            className="flex items-center gap-3 text-sm"
+                        >
+                            Stock details could not be loaded.
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={selection.retry}
+                            >
+                                Try again
+                            </Button>
+                        </div>
+                    )}
                     {position && (
                         <div className="mt-4 rounded-lg border px-4">
                             <SummaryRow
                                 label="On hand"
-                                value={`${position.on_hand} ${position.unit}`}
+                                value={
+                                    position.on_hand === null
+                                        ? 'Unknown'
+                                        : `${position.on_hand} ${position.unit}`
+                                }
                             />
                             <SummaryRow
                                 label="Reorder level"
@@ -1540,6 +1597,7 @@ export function prepareControlledStockCountReplayState(
 export function StockCountDialog({
     medications,
     stockItems,
+    loadStockContext,
     witnesses,
     defaultMedId,
     controlledOnly,
@@ -1547,6 +1605,7 @@ export function StockCountDialog({
 }: {
     medications: StockMed[];
     stockItems: StockRow[];
+    loadStockContext?: LoadStockContext;
     witnesses: StaffOpt[];
     defaultMedId?: number | null;
     controlledOnly?: boolean;
@@ -1576,14 +1635,27 @@ export function StockCountDialog({
         medications.find(
             (m) => String(m.id) === form.data.client_medication_id,
         ) ?? null;
-    const row = stockFor(stockItems, form.data.client_medication_id);
+    const selection = useSelectedStock(
+        form.data.client_medication_id,
+        stockItems,
+        loadStockContext,
+    );
+    const row = selection.row;
     const isCd = !!med?.controlled;
-    const expected = row?.on_hand ?? 0;
+    const expected = row?.on_hand ?? null;
     const variance =
-        form.data.counted === '' ? null : Number(form.data.counted) - expected;
+        form.data.counted === '' || expected === null
+            ? null
+            : Number(form.data.counted) - expected;
 
     const submit = async () => {
-        if (busy) return;
+        if (
+            busy ||
+            selection.loading ||
+            selection.failed ||
+            (isCd && expected === null)
+        )
+            return;
         setBusy(true);
         form.clearErrors();
         if (isCd) {
@@ -1591,7 +1663,7 @@ export function StockCountDialog({
                 clientId: med!.client_id,
                 clientMedicationId: form.data.client_medication_id,
                 medicationName: med!.name,
-                expectedBalance: expected,
+                expectedBalance: expected!,
                 actualBalance: form.data.counted,
                 witnessedBy: form.data.witnessed_by,
                 witnessCredential: form.data.witness_credential,
@@ -1678,7 +1750,10 @@ export function StockCountDialog({
         }
     };
     const valid = [
-        !!form.data.client_medication_id,
+        !!form.data.client_medication_id &&
+            !selection.loading &&
+            !selection.failed &&
+            (!isCd || expected !== null),
         form.data.counted !== '',
         form.data.confirmed &&
             (!isCd ||
@@ -1801,17 +1876,66 @@ export function StockCountDialog({
                         <SelectInput
                             value={form.data.client_medication_id}
                             onChange={(v) =>
-                                form.setData('client_medication_id', v)
+                                form.setData((current) => ({
+                                    ...current,
+                                    client_medication_id: v,
+                                    counted: '',
+                                    note: '',
+                                    immediate_action_taken: '',
+                                    witnessed_by: '',
+                                    witness_credential: '',
+                                    confirmed: false,
+                                }))
                             }
                             placeholder="Select medication…"
                             options={medOptions(meds)}
                         />
                     </Field>
+                    {selection.loading && (
+                        <p
+                            role="status"
+                            className="text-sm text-muted-foreground"
+                        >
+                            Loading current stock…
+                        </p>
+                    )}
+                    {selection.failed && (
+                        <div
+                            role="alert"
+                            className="flex items-center gap-3 text-sm"
+                        >
+                            Stock details could not be loaded.
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={selection.retry}
+                            >
+                                Try again
+                            </Button>
+                        </div>
+                    )}
+                    {isCd &&
+                        !selection.loading &&
+                        !selection.failed &&
+                        expected === null && (
+                            <p
+                                role="alert"
+                                className="text-sm text-status-warning"
+                            >
+                                The register balance is unknown. Ask the
+                                medication lead to establish the controlled
+                                register balance before a witnessed check.
+                            </p>
+                        )}
                     {row && (
                         <div className="mt-4 rounded-lg border px-4">
                             <SummaryRow
                                 label="Register / expected balance"
-                                value={`${expected} ${row.unit}`}
+                                value={
+                                    expected === null
+                                        ? 'Unknown'
+                                        : `${expected} ${row.unit}`
+                                }
                             />
                             {isCd && (
                                 <SummaryRow

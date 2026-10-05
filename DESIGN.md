@@ -36,6 +36,13 @@ lucide-react icons, Recharts.
    must keep its drawn size — row kebabs, pagination, tier-2 tabs, the
    `Dialog`, `WizardShell` and `Sheet` ✕; the `Sheet` ✕ keeps a 16 px
    minimum inset so its 44 px target stays on screen).
+   **Desktop geometry:** keep the drawn dimensions of the shared header,
+   filter, pagination, switch and checkbox primitives. A larger hit area
+   must not enlarge their visible shapes. Never apply blanket descendant
+   `min-height` / `min-width` rules to page or dialog buttons: these also
+   catch switches and turn compact controls into oversized circles.
+   The current eMAR work is desktop web only; do not introduce phone
+   layouts or replace its compact desktop controls with touch-sized ones.
 6. **Safety colours are brand-independent.** Allergen/conflict/emergency
    surfaces use fixed `status-critical`/`status-warning` pairs, never
    brand-derived tints — an admin's brand hue must not be able to push a

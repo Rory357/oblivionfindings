@@ -8,6 +8,7 @@ use App\Models\RosterSuggestionRun;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ShiftStaffEligibilityService;
 use Database\Seeders\OperationsPermissionsSeeder;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Carbon;
@@ -69,7 +70,19 @@ it('drives suggest, accept and apply end to end over HTTP', function () {
     $response->assertRedirect(route('operations.rostering.suggestions.show', $run));
 
     $top = $run->suggestions()->where('shift_id', $shift->id)->orderBy('rank')->first();
-    expect($top)->not->toBeNull();
+    $diagnostic = '';
+    if ($top === null) {
+        $eligibility = app(ShiftStaffEligibilityService::class);
+        $diagnostic = json_encode([
+            'run_totals' => $run->totals,
+            'candidate_pool_ids' => $eligibility->candidatesFor($shift)->pluck('id')->all(),
+            'synthetic_candidate_blocks' => collect([$candidateA, $candidateB])->map(fn (User $candidate) => [
+                'candidate_id' => $candidate->id,
+                'blocking_reasons' => $eligibility->evaluate($shift, $candidate->fresh())->blocking_reasons,
+            ])->all(),
+        ], JSON_THROW_ON_ERROR);
+    }
+    $this->assertNotNull($top, $diagnostic);
 
     // 2. Accept the top suggestion.
     $this->actingAs($this->manager)

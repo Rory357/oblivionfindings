@@ -7,6 +7,7 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\SiteCredential;
 use App\Models\SiteCredentialAuditLog;
+use App\Models\SiteCredentialVersion;
 use App\Models\SiteVendor;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -33,7 +34,7 @@ function accessVaultCredential(Site $site, array $overrides = []): SiteCredentia
         'requires_reauth' => false,
         'is_shareable' => false,
         ...$overrides,
-    ]);
+    ])->fresh();
 }
 
 function accessVaultScopedManager(Site $site): User
@@ -110,20 +111,22 @@ test('inactive catalogue types cannot be assigned but remain valid on their exis
     ]);
 
     $this->actingAs($this->admin)
-        ->post("/sites/{$this->site->id}/credentials", [
+        ->postJson("/sites/{$this->site->id}/credentials", [
             'label' => 'Rejected legacy router',
             'credential_type' => 'legacy_router',
             'value' => 'secret',
         ])
-        ->assertSessionHasErrors(['credential_type']);
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['credential_type']);
 
     $this->actingAs($this->admin)
-        ->put("/sites/{$this->site->id}/credentials/{$existing->id}", [
+        ->putJson("/sites/{$this->site->id}/credentials/{$existing->id}", [
             'label' => 'Updated legacy router',
             'credential_type' => 'legacy_router',
             'value' => '',
+            'lock_version' => $existing->lock_version,
         ])
-        ->assertRedirect();
+        ->assertOk();
 
     expect($existing->fresh()->label)->toBe('Updated legacy router')
         ->and(SiteCredential::query()->where('label', 'Rejected legacy router')->exists())->toBeFalse();
@@ -131,36 +134,83 @@ test('inactive catalogue types cannot be assigned but remain valid on their exis
 
 test('invalid authenticator secrets are rejected before a credential is stored', function (): void {
     $this->actingAs($this->admin)
-        ->post("/sites/{$this->site->id}/credentials", [
+        ->postJson("/sites/{$this->site->id}/credentials", [
             'label' => 'Invalid authenticator',
             'credential_type' => 'password',
             'value' => 'secret',
             'totp_secret' => 'not-a-base32-secret!',
         ])
-        ->assertSessionHasErrors(['totp_secret']);
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['totp_secret']);
 
     expect(SiteCredential::query()->where('label', 'Invalid authenticator')->exists())->toBeFalse();
 });
 
-test('deleting a credential preserves Site and target audit provenance', function (): void {
+test('retiring a credential requires identity and evidence and retains Site and target audit provenance', function (): void {
     $credential = accessVaultCredential($this->site, ['label' => 'Retired router admin']);
+    $version = $credential->lock_version;
+    $ciphertext = $credential->encrypted_value;
+    $evidence = 'Router administrator access retired after the replacement was verified.';
 
     $this->actingAs($this->admin)
-        ->delete("/sites/{$this->site->id}/credentials/{$credential->id}")
-        ->assertRedirect();
+        ->deleteJson("/sites/{$this->site->id}/credentials/{$credential->id}", [
+            'password' => 'password',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['lock_version', 'evidence']);
 
-    $audit = SiteCredentialAuditLog::query()->where('action', 'delete')->firstOrFail();
-    expect($audit->credential_id)->toBeNull()
+    $this->actingAs($this->admin)
+        ->deleteJson("/sites/{$this->site->id}/credentials/{$credential->id}", [
+            'lock_version' => $version,
+            'evidence' => $evidence,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['verification_code']);
+
+    expect($credential->fresh()->retired_at)->toBeNull()
+        ->and($credential->fresh()->lock_version)->toBe($version)
+        ->and($credential->fresh()->encrypted_value)->toBe($ciphertext)
+        ->and(SiteCredentialAuditLog::query()->where('action', 'retire')->exists())->toBeFalse();
+
+    $this->actingAs($this->admin)
+        ->deleteJson("/sites/{$this->site->id}/credentials/{$credential->id}", [
+            'lock_version' => $version,
+            'evidence' => $evidence,
+            'password' => 'password',
+        ])
+        ->assertOk()
+        ->assertJson(['ok' => true]);
+
+    expect($credential->fresh()->retired_at)->not->toBeNull()
+        ->and($credential->fresh()->lock_version)->toBe($version + 1)
+        ->and($credential->fresh()->encrypted_value)->toBe($ciphertext)
+        ->and(Crypt::decryptString($credential->fresh()->encrypted_value))->toBe('keep-secret');
+
+    $audit = SiteCredentialAuditLog::query()->where('action', 'retire')->firstOrFail();
+    expect($audit->credential_id)->toBe($credential->id)
         ->and($audit->site_id)->toBe($this->site->id)
+        ->and($audit->user_id)->toBe($this->admin->id)
         ->and($audit->credential_label)->toBe('Retired router admin')
         ->and($audit->credential_type)->toBe('password');
 
-    $this->actingAs($this->admin)
+    $retained = SiteCredentialVersion::query()
+        ->where('credential_id', $credential->id)
+        ->where('version', $version + 1)
+        ->firstOrFail();
+    $snapshot = json_decode(Crypt::decryptString($retained->encrypted_snapshot), true, flags: JSON_THROW_ON_ERROR);
+    expect($retained->action)->toBe('retire')
+        ->and($retained->user_id)->toBe($this->admin->id)
+        ->and($snapshot['_evidence'])->toBe($evidence)
+        ->and($snapshot['site_id'])->toBe($this->site->id);
+
+    $feed = $this->actingAs($this->admin)
         ->getJson('/vendors/audit')
-        ->assertOk()
-        ->assertJsonPath('logs.0.target', 'Retired router admin')
-        ->assertJsonPath('logs.0.target_type', 'password')
-        ->assertJsonPath('logs.0.site_name', 'Vault Site');
+        ->assertOk();
+    $retirement = collect($feed->json('logs'))->firstWhere('action', 'retire');
+    expect($retirement)->not->toBeNull()
+        ->and($retirement['target'])->toBe('Retired router admin')
+        ->and($retirement['target_type'])->toBe('password')
+        ->and($retirement['site_name'])->toBe('Vault Site');
 });
 
 test('credential security activity requires reveal permission', function (): void {

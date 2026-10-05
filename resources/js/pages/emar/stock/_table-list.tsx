@@ -113,11 +113,7 @@ export function TableList<T extends { id: number }>({
                     description="No visible records match this view. Change the filters or open another stock view."
                 />
             )}
-            <LaravelPagination
-                className="[&_button]:min-h-11 [&_button]:min-w-11"
-                links={pager.links}
-                lastPage={pager.last_page}
-            />
+            <LaravelPagination links={pager.links} lastPage={pager.last_page} />
             {context && (
                 <EntityContextMenu
                     x={context.x}

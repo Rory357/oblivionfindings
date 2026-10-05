@@ -189,7 +189,12 @@ class DeviceControllerTest extends TestCase
             'secondary_site_ids' => [],
             'is_active' => true,
         ]);
-        $asset = Asset::factory()->forSite($selectedSite)->create();
+        $asset = Asset::factory()->forSite($selectedSite)->create([
+            'category' => 'Vehicle',
+            'status' => 'active',
+            'home_site_id' => $selectedSite->id,
+            'client_id' => null,
+        ]);
 
         foreach ([[$selected, $selectedSite], [$other, $otherSite]] as [$device, $site]) {
             DeviceAssignment::query()->create([
@@ -377,6 +382,15 @@ class DeviceControllerTest extends TestCase
 
     public function test_show_includes_permission_flags(): void
     {
+        $site = Site::factory()->create();
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->viewer->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
         $device = Device::factory()->create();
         DeviceAssignment::create([
             'device_id' => $device->id,

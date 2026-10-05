@@ -45,50 +45,6 @@ function item(id: number, overrides: Partial<StockRow> = {}): StockRow {
 const noActions = () => [];
 
 describe('Desktop stock inventory', () => {
-    it('bounds the list to ten rows and reaches every record through labelled pages', () => {
-        const rows = Array.from({ length: 23 }, (_, index) =>
-            item(index + 1),
-        ).reverse();
-        render(
-            <StockInventoryTable
-                rows={rows}
-                actionsFor={noActions}
-                onOpen={vi.fn()}
-            />,
-        );
-        expect(screen.getAllByRole('table')).toHaveLength(1);
-        expect(screen.getAllByRole('row')).toHaveLength(11);
-        expect(screen.getByRole('status')).toHaveTextContent(
-            '1–10 of 23 items',
-        );
-        expect(
-            screen.getAllByRole('button', { name: 'Previous stock page' })[0],
-        ).toBeDisabled();
-        expect(screen.queryByText('Medicine 11')).not.toBeInTheDocument();
-        fireEvent.click(
-            screen.getAllByRole('button', { name: 'Next stock page' })[0],
-        );
-        expect(screen.getByRole('status')).toHaveTextContent(
-            '11–20 of 23 items',
-        );
-        expect(screen.getByText('Medicine 11')).toBeVisible();
-        fireEvent.click(
-            screen.getAllByRole('button', { name: 'Next stock page' })[0],
-        );
-        expect(screen.getByRole('status')).toHaveTextContent(
-            '21–23 of 23 items',
-        );
-        expect(screen.getAllByRole('row')).toHaveLength(4);
-        expect(screen.getByText('Medicine 23')).toBeVisible();
-        expect(
-            screen.getAllByRole('button', { name: 'Next stock page' })[0],
-        ).toBeDisabled();
-        fireEvent.click(
-            screen.getAllByRole('button', { name: 'Previous stock page' })[0],
-        );
-        expect(screen.getByText('Medicine 11')).toBeVisible();
-    });
-
     it('opens the correct person-owned record by keyboard and through its action menu', () => {
         const rows = [item(1), item(2)];
         const open = vi.fn();
@@ -141,40 +97,5 @@ describe('Desktop stock inventory', () => {
         expect(screen.getByText('6 Oct 2026')).toBeVisible();
         expect(screen.getByText('CD')).toBeVisible();
         expect(screen.getByLabelText('Cold chain')).toBeVisible();
-    });
-
-    it('returns to a valid page when refreshed records shrink and resets on changed filters', () => {
-        const rows = Array.from({ length: 23 }, (_, index) => item(index + 1));
-        const props = { actionsFor: noActions, onOpen: vi.fn() };
-        const { rerender } = render(
-            <StockInventoryTable key="all" rows={rows} {...props} />,
-        );
-        fireEvent.click(
-            screen.getAllByRole('button', { name: 'Next stock page' })[0],
-        );
-        fireEvent.click(
-            screen.getAllByRole('button', { name: 'Next stock page' })[0],
-        );
-        rerender(
-            <StockInventoryTable
-                key="all"
-                rows={rows.slice(0, 12)}
-                {...props}
-            />,
-        );
-        expect(screen.getByRole('status')).toHaveTextContent(
-            '11–12 of 12 items',
-        );
-        rerender(
-            <StockInventoryTable
-                key="low"
-                rows={rows.slice(0, 11)}
-                {...props}
-            />,
-        );
-        expect(screen.getByRole('status')).toHaveTextContent(
-            '1–10 of 11 items',
-        );
-        expect(screen.getByText('Medicine 01')).toBeVisible();
     });
 });

@@ -93,7 +93,10 @@ class StockManagementTest extends TestCase
                 ->has('stockItems', 1)
                 ->where('stockItems.0.on_hand', 12)
                 ->has('controlledRegister', 1)
-                ->where('controlledRegister.0.register_balance', 12) // falls back to on-hand when no balance check
+                ->where('controlledRegister.0.register_balance', null)
+                ->where('controlledRegister.0.on_hand', 12)
+                ->where('controlledRegister.0.last_check_at', null)
+                ->where('controlledRegister.0.last_check_witness', null)
                 ->has('pharmacyOrders', 1)
                 ->where('pharmacyOrders.0.medication_id', $med->id)
                 ->where('pharmacyOrders.0.controlled', true)

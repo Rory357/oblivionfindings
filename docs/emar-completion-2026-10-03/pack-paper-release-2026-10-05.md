@@ -39,6 +39,6 @@ The dedicated CI medication lane covers the complete pack, historical recovery, 
 
 ## Release boundary
 
-Fresh whole-file clinical acceptance and fresh CI must pass before release. The two additive migrations have been applied only to the named synthetic preview and disposable tests. Stock-pack configuration remains off by default in production. No live stock balance is backfilled or inferred by this change. Forgotten-PIN recovery remains disabled under its separately retained approval hold.
+Fresh whole-file clinical acceptance and fresh CI must pass before release. The two additive migrations have been applied only to the named synthetic preview and disposable tests. Stock-pack configuration remains off by default in production. No live stock balance is backfilled or inferred by this change. Authenticated staff can reset their own witness PIN using their login password. The separate deferred second-person confirmation fallback remains disabled because its recording and status UI is incomplete; see the [stock completion ledger](stock-pagination-release-2026-10-05.md).
 
 Earlier reports in this folder describe older checkpoints. Their blanket descriptions of historical given/controlled/PRN recovery as unimplemented are superseded by the contracts above; they are not superseded by a claim that pending acceptance has passed.

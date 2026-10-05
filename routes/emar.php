@@ -1,26 +1,26 @@
 <?php
 
 use App\Http\Controllers\BreakGlassController;
-use App\Http\Controllers\Emar\AuditLogController;
-use App\Http\Controllers\Emar\CDLossReportController;
+use App\Http\Controllers\ClientAllergyRecordController;
 use App\Http\Controllers\Emar\ClientMedicationDayController;
-use App\Http\Controllers\Emar\ControlledProductController;
 use App\Http\Controllers\Emar\CompetencyExemptionController;
+use App\Http\Controllers\Emar\ControlledProductController;
 use App\Http\Controllers\Emar\DoseRequirementsController;
 use App\Http\Controllers\Emar\EmarController;
-use App\Http\Controllers\Emar\PersonMedicationRecordController;
-use App\Http\Controllers\Emar\PersonMedicationClinicalController;
 use App\Http\Controllers\Emar\EmarPdfController;
-use App\Http\Controllers\Emar\EmarReportController;
 use App\Http\Controllers\Emar\GuidedRoundController;
 use App\Http\Controllers\Emar\MedicationAuditEventController;
 use App\Http\Controllers\Emar\MedicationErrorController;
 use App\Http\Controllers\Emar\MedicationFollowupController;
-use App\Http\Controllers\Emar\MedicationReviewController;
 use App\Http\Controllers\Emar\MedicationOrdersController;
+use App\Http\Controllers\Emar\MedicationReportsController;
+use App\Http\Controllers\Emar\MedicationReviewController;
 use App\Http\Controllers\Emar\MedicationSecondPersonConfirmationController;
 use App\Http\Controllers\Emar\MedicationSettingsController;
 use App\Http\Controllers\Emar\MedicationSupportController;
+use App\Http\Controllers\Emar\PersonMedicationClinicalController;
+use App\Http\Controllers\Emar\PersonMedicationCorrectionController;
+use App\Http\Controllers\Emar\PersonMedicationRecordController;
 use App\Http\Controllers\Emar\RefusalFollowUpController;
 use App\Http\Controllers\Emar\StaffEligibilityController;
 use App\Http\Controllers\Emar\WorkerMedsController;
@@ -29,6 +29,7 @@ use App\Http\Controllers\MedicationAdministrationCorrectionController;
 use App\Http\Controllers\MedicationAuditController;
 use App\Http\Controllers\MedicationsController;
 use App\Http\Controllers\MedicationsReportController;
+use App\Http\Middleware\MedicationExportGuard;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -150,6 +151,13 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
             'permission:medications.stock.update',
         ])
         ->name('emar.stock');
+    Route::get('/stock/context/{medication}', [EmarController::class, 'stockMedicationContext'])
+        ->whereNumber('medication')
+        ->middleware([
+            'permission:medications.view',
+            'permission:medications.stock.update',
+        ])
+        ->name('emar.stock.context');
 
     // Prescriptions & Prescriber Orders
     Route::get('/prescriptions', [MedicationOrdersController::class, 'index'])
@@ -264,8 +272,8 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->name('emar.clients.day');
 
     Route::prefix('/clients/{client}/record')->whereNumber('client')->middleware('permission:medications.view')->group(function () {
-        Route::get('/allergies', [\App\Http\Controllers\ClientAllergyRecordController::class, 'show'])->name('emar.record.allergies');
-        Route::post('/allergies', [\App\Http\Controllers\ClientAllergyRecordController::class, 'update'])->name('emar.record.allergies.update');
+        Route::get('/allergies', [ClientAllergyRecordController::class, 'show'])->name('emar.record.allergies');
+        Route::post('/allergies', [ClientAllergyRecordController::class, 'update'])->name('emar.record.allergies.update');
         Route::get('/medicines', [PersonMedicationRecordController::class, 'medicines'])->name('emar.record.medicines');
         Route::get('/medicines/{medication}', [PersonMedicationRecordController::class, 'medicine'])->whereNumber('medication')->name('emar.record.medicine');
         Route::get('/support', [PersonMedicationRecordController::class, 'support'])->name('emar.record.support');
@@ -275,7 +283,7 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         Route::post('/clinical/{command}', [PersonMedicationClinicalController::class, 'store'])->name('emar.record.clinical.store');
         Route::get('/history', [PersonMedicationRecordController::class, 'history'])->name('emar.record.history');
         Route::get('/doses/{administration}', [PersonMedicationRecordController::class, 'dose'])->whereNumber('administration')->name('emar.record.dose');
-        Route::post('/doses/{administration}/corrections/{command}', [\App\Http\Controllers\Emar\PersonMedicationCorrectionController::class, 'store'])->whereNumber('administration')->name('emar.record.correction');
+        Route::post('/doses/{administration}/corrections/{command}', [PersonMedicationCorrectionController::class, 'store'])->whereNumber('administration')->name('emar.record.correction');
     });
 
     // Self-Administration Assessments
@@ -489,14 +497,14 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->name('emar.handovers.destroy');
 
     // Audit trail
-    Route::get('/audit', [\App\Http\Controllers\Emar\MedicationReportsController::class, 'redirect'])
+    Route::get('/audit', [MedicationReportsController::class, 'redirect'])
         ->middleware([
             'permission:medications.view',
             'permission:medications.audit.view',
         ])
         ->name('emar.audit');
     Route::get('/audit/export', [MedicationAuditController::class, 'exportCsv'])
-        ->middleware(\App\Http\Middleware\MedicationExportGuard::class.':audit')
+        ->middleware(MedicationExportGuard::class.':audit')
         ->middleware([
             'permission:medications.view',
             'permission:medications.audit.view',
@@ -566,10 +574,10 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     require __DIR__.'/emar-reporting.php';
     Route::middleware(['permission:medications.reports.view', 'permission:medications.reports.export'])->group(function () {
         Route::get('/reports/export-mar', [MedicationsReportController::class, 'exportMarCsv'])
-            ->middleware(\App\Http\Middleware\MedicationExportGuard::class.':doses')
+            ->middleware(MedicationExportGuard::class.':doses')
             ->name('emar.reports.export_mar');
         Route::get('/reports/export-controlled-discrepancies', [MedicationsReportController::class, 'exportDiscrepanciesCsv'])
-            ->middleware(\App\Http\Middleware\MedicationExportGuard::class.':controlled')
+            ->middleware(MedicationExportGuard::class.':controlled')
             ->middleware('permission:medications.controlled.view')
             ->name('emar.reports.export_discrepancies');
     });
@@ -639,12 +647,12 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
 
     // ─── PDF Exports ─────────────────────────────────────────
     Route::middleware(['permission:medications.reports.view', 'permission:medications.reports.export'])->group(function () {
-        Route::get('/pdf/mar-chart', [EmarPdfController::class, 'marChart'])->middleware(\App\Http\Middleware\MedicationExportGuard::class.':mar')->name('emar.pdf.mar');
+        Route::get('/pdf/mar-chart', [EmarPdfController::class, 'marChart'])->middleware(MedicationExportGuard::class.':mar')->name('emar.pdf.mar');
         Route::get('/pdf/controlled-register', [EmarPdfController::class, 'controlledDrugRegister'])
-            ->middleware(\App\Http\Middleware\MedicationExportGuard::class.':cd_register')
+            ->middleware(MedicationExportGuard::class.':cd_register')
             ->middleware('permission:medications.controlled.view')
             ->name('emar.pdf.cd_register');
-        Route::get('/pdf/round-sheet', [\App\Http\Controllers\Emar\MedicationReportsController::class, 'legacyRoundSheet'])->name('emar.pdf.round_sheet');
+        Route::get('/pdf/round-sheet', [MedicationReportsController::class, 'legacyRoundSheet'])->name('emar.pdf.round_sheet');
     });
 });
 

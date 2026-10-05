@@ -14,6 +14,7 @@ use App\Models\SafeguardingTerminalTransition;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\HealthSafety\HsEventClosureService;
+use App\Services\HealthSafety\HsEventService;
 use App\Services\Safeguarding\SafeguardingTerminalTransitionService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -335,14 +336,16 @@ class SafeguardingTerminalTransitionTest extends TestCase
             'owner_user_id' => $actor->id,
             'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
             'investigation_required' => false,
-            'worksafe_notifiable' => false,
-            'worksafe_decided_at' => now(),
-            'worksafe_decided_by_user_id' => $actor->id,
-            'worksafe_decision_reason' => 'Assessed as not meeting the WorkSafe notification threshold.',
-            'worksafe_decision_source' => 'manual',
             'worksafe_status' => null,
         ])->save();
         $this->actingAs($actor);
+        $event = app(HsEventService::class)->recordWorksafeDecision(
+            $event->fresh(),
+            false,
+            'Assessed as not meeting the WorkSafe notification threshold.',
+            $actor,
+        );
+        $this->assertTrue($event->hasSignedWorksafeDecision());
         $event = app(HsEventClosureService::class)->closeEvent(
             $event->fresh(),
             'Canonical H&S safeguarding work completed.',

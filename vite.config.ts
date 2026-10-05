@@ -61,6 +61,9 @@ export default defineConfig({
         fs: { allow: nodeModulesFsAllow(__dirname) },
     },
     build: {
+        // Keep immutable hashed assets for pages opened before a rebuild.
+        // Do not prune them during deploy: old tabs still import those URLs.
+        emptyOutDir: false,
         // NOTE: modulePreload must stay ON (the default). Disabling it made
         // the browser discover each page's ~100-500 chunks one at a time in
         // a serial waterfall instead of preloading them in parallel.
