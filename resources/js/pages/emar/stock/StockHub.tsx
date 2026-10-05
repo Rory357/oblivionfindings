@@ -1058,7 +1058,7 @@ function ItemWorkspace({
                                 <SettingsNotice role="note">
                                     {lotsEnabled
                                         ? 'The recorded stock balance has not been set up as packs yet. Check the recorded balance before carrying it forward.'
-                                        : 'Pack tracking is awaiting integration review. Existing balances and history are retained.'}
+                                        : 'Pack tracking is not turned on yet. You can still view recorded balances and history.'}
                                 </SettingsNotice>
                             )}
                             {Object.values(command.errors).map((message) => (
