@@ -436,7 +436,7 @@ export default function Destructions({
             <Head title="Medication Destruction Register" />
             <div className="flex flex-col gap-5">
                 <PageHeader
-                    frontline
+                    wrapTitle
                     mobileSummary={`${liveFiltered.length} disposal records`}
                     rail={<EmarHubRail />}
                     brandColour={brandColour}

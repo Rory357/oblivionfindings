@@ -362,7 +362,7 @@ export default function MarCharts(props: Props) {
                 <Head title="MAR Charts" />
                 <div className="flex flex-col gap-5">
                     <PageHeader
-                        frontline
+                        wrapTitle
                         rail={<EmarHubRail />}
                         icon={Pill}
                         title="MAR Charts"
@@ -470,7 +470,6 @@ export default function MarCharts(props: Props) {
             <Head title={`MAR · ${info.name}`} />
             <div className="flex flex-col gap-5">
                 <PageHeader
-                    frontline
                     wrapTitle
                     rail={<EmarHubRail />}
                     variant="profile"

@@ -213,7 +213,7 @@ export default function ControlledRegister({
     );
     const header = (
         <PageHeader
-            frontline
+            wrapTitle
             brandColour={payload?.site_brand_colour}
             icon={ShieldCheck}
             title="Controlled register"

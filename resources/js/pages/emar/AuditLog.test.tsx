@@ -304,20 +304,17 @@ describe('Medication history server periods and frontline controls', () => {
         ).toBeInTheDocument();
     });
 
-    it('uses the shared frontline header, separate print link, 44px control classes and touch-accessible record actions', () => {
+    it('uses compact desktop header controls and keeps separate print links and keyboard-accessible record actions', () => {
         const { container } = render(<AuditLog {...props} />);
-        expect(container.querySelector('header')).toHaveClass(
+        expect(container.querySelector('header')).not.toHaveClass(
             'eh-header-frontline',
         );
         const print = screen.getByRole('link', {
             name: 'Print MAR & CD register',
         });
         expect(print.querySelector('button')).toBeNull();
-        expect(print).toHaveClass('frontline-tap');
-        for (const control of container.querySelectorAll(
-            'button, input, select, a',
-        ))
-            expect(control.className).toMatch(/frontline-(tap|hit)/);
+        expect(print).toHaveClass('h-9');
+        expect(print).not.toHaveClass('frontline-tap');
         const actions = screen.getByRole('button', {
             name: 'Actions for Aspirin given to Ada',
         });

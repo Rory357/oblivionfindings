@@ -646,7 +646,7 @@ export default function PrnRecords(props: Props) {
             <Head title="PRN Records" />
             <div className="flex flex-col gap-5">
                 <PageHeader
-                    frontline
+                    wrapTitle
                     rail={<EmarHubRail />}
                     brandColour={brandColour}
                     icon={Pill}

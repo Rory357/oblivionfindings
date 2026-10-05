@@ -162,7 +162,6 @@ function AvailableRecord({
             <Head title={`${person.preferred} · Medication record`} />
             <div className="flex max-w-full min-w-0 flex-col gap-5">
                 <PageHeader
-                    frontline
                     variant="profile"
                     wrapTitle
                     mobileSummary={`${meters.medicines.count} medicines · ${person.house ?? 'Medication record'}`}

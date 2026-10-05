@@ -395,7 +395,7 @@ export default function Medications(props: Props) {
             <Head title="Medications Database" />
             <div className="flex flex-col gap-5">
                 <PageHeader
-                    frontline
+                    wrapTitle
                     rail={<EmarHubRail />}
                     brandColour={brandColour}
                     icon={Pill}

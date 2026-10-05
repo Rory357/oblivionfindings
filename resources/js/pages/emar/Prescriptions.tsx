@@ -638,7 +638,7 @@ export default function Prescriptions(props: Props) {
             <Head title="Prescriptions & Orders" />
             <div className="flex flex-col gap-5">
                 <PageHeader
-                    frontline
+                    wrapTitle
                     rail={<EmarHubRail />}
                     brandColour={brandColour}
                     icon={FileText}

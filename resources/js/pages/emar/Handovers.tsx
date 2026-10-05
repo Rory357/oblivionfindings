@@ -452,7 +452,7 @@ export default function Handovers({
             <Head title="Medication handovers" />
             <div className="flex flex-col gap-5">
                 <PageHeader
-                    frontline
+                    wrapTitle
                     rail={<EmarHubRail />}
                     brandColour={brandColour}
                     icon={ArrowLeftRight}

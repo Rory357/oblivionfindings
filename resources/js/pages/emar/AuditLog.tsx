@@ -520,7 +520,7 @@ export default function AuditLog({
             <Head title="Medication clinical history" />
             <div className="flex min-w-0 flex-col gap-5">
                 <PageHeader
-                    frontline
+                    wrapTitle
                     icon={History}
                     title="Medication history"
                     subline="Dose outcomes, medicine changes, stock and controlled-drug records."

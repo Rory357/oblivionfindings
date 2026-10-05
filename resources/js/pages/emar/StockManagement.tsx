@@ -800,7 +800,7 @@ export default function StockManagement({
             <Head title="Stock & pharmacy" />
             <div className="flex flex-col gap-5">
                 <PageHeader
-                    frontline
+                    wrapTitle
                     brandColour={brandColour}
                     rail={
                         <EmarHubRail
@@ -928,23 +928,23 @@ export default function StockManagement({
                                                 {label}
                                             </PageHeaderFilterButton>
                                         ))}
-                                        <PageHeaderGlassButton
+                                        <PageHeaderFilterButton
                                             icon={Barcode}
                                             onClick={() =>
                                                 setModal({ type: 'count' })
                                             }
                                         >
                                             Run stock count
-                                        </PageHeaderGlassButton>
+                                        </PageHeaderFilterButton>
                                     </div>
                                 )}
                             <div className="flex flex-wrap items-center gap-2">
                                 {search && (
-                                    <PageHeaderGlassButton
+                                    <PageHeaderFilterButton
                                         onClick={() => setSearch('')}
                                     >
                                         Clear search
-                                    </PageHeaderGlassButton>
+                                    </PageHeaderFilterButton>
                                 )}
                                 {sites.length > 0 && (
                                     <EntityFilter
@@ -954,7 +954,7 @@ export default function StockManagement({
                                         value={siteFilter}
                                         onChange={onSite}
                                         onDark
-                                        className="rounded-lg"
+                                        className="h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
                                     />
                                 )}
                                 <EntityFilter
@@ -967,7 +967,7 @@ export default function StockManagement({
                                     value={clientFilter}
                                     onChange={onClient}
                                     onDark
-                                    className="rounded-lg"
+                                    className="h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
                                 />
                             </div>
                         </div>

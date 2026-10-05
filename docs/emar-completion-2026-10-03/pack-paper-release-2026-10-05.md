@@ -16,6 +16,7 @@ This release pass integrates physical pack evidence with medication recording, c
 
 ## Verification ledger
 
+- Desktop header correction: removed the oversized frontline-control opt-in from all **15 affected headers across 14 eMAR/Meds today pages**, retaining title/action wrapping and the shared Rory controls. The stock filter row uses the compact filter components and matching house/person selectors. Existing header, Meds today, controlled-register and audit-history tests passed **4 files / 50 tests**; full TypeScript, changed-file lint and formatting passed. The rebuilt preview (`app-BPmsnXGb.js`, build **4m 9s**) shows compact controls without horizontal overflow; the house selector opens correctly and Packs & counts retains the selected person. See [corrected desktop header](emar-compact-header-desktop-20261005.jpg).
 - Full frontend suite: **547 files / 3,661 tests passed** before the final navigation addition.
 - Final recording, retry, settlement and transport selection: **4 files / 21 tests passed**.
 - Pack discovery and navigation: **2 files / 50 tests passed**, including house context and route identity.

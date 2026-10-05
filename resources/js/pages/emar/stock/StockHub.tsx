@@ -349,7 +349,7 @@ export default function StockHub({
             <Head title="Stock & controlled drugs" />
             <div className="grid min-w-0 grid-cols-1 gap-5">
                 <PageHeader
-                    frontline
+                    wrapTitle
                     title="Stock & controlled drugs"
                     icon={Package}
                     titleChip={

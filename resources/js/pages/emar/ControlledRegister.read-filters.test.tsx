@@ -198,19 +198,19 @@ describe('controlled register reader filters', () => {
         expect(replacedQuery().get('date')).toBe('2020-01-01');
     });
 
-    it('shows a labelled NZ history date, current-stock explanation and accessible frontline controls', () => {
+    it('shows a labelled NZ history date, current-stock explanation and compact desktop controls', () => {
         render(<ControlledRegister product={product} />);
         const date = screen.getByRole('button', {
             name: 'Register history NZ date: 1 Jan 2020',
         });
         expect(date).toHaveTextContent('1 Jan 2020');
-        expect(date).toHaveClass('frontline-tap');
+        expect(date).toHaveClass('h-[23px]');
         expect(
             screen.getByRole('button', { name: 'Ada Synthetic' }),
-        ).toHaveClass('frontline-tap');
+        ).not.toHaveClass('frontline-tap');
         expect(
             screen.getByRole('button', { name: 'All entry dates' }),
-        ).toHaveClass('frontline-tap');
+        ).toHaveClass('h-[23px]');
         expect(
             screen.getByText(
                 /Stock, count status and outstanding follow-up are current/,

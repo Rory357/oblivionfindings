@@ -468,7 +468,7 @@ export default function Rounds(props: Props) {
             <Head title="Medication Rounds" />
             <div className="flex flex-col gap-5">
                 <PageHeader
-                    frontline
+                    wrapTitle
                     brandColour={brandColour}
                     icon={Pill}
                     title="Medication rounds"

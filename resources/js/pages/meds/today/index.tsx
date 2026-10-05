@@ -790,7 +790,7 @@ export default function MedsToday(props: MedsTodayProps) {
     const clockedIn = props.clocked_in ?? true;
     const header = (
         <PageHeader
-            frontline
+            wrapTitle
             mobileSummary={`${due.length} due now · ${late.length} late`}
             icon={Pill}
             title="Meds today"
