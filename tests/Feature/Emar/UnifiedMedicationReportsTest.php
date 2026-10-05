@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Http\Middleware\MedicationExportGuard;
 use App\Models\AppSetting;
 use App\Models\Client;
@@ -7,6 +8,8 @@ use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
+use App\Models\MedicationCompetencyAssessment;
+use App\Models\MedicationCompetencyExemption;
 use App\Models\MedicationDoseSlot;
 use App\Models\MedicationError;
 use App\Models\MedicationErrorEntry;
@@ -20,7 +23,9 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\CompetencyAcknowledgement;
 use App\Services\Medication\Downtime\DowntimePackService;
+use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\Reporting\MedicationBuilderSource;
 use App\Services\Medication\Reporting\MedicationGovernanceReports;
 use App\Services\Medication\Reporting\MedicationPdfDataset;
@@ -28,6 +33,7 @@ use App\Services\Medication\Reporting\MedicationReportAccess;
 use App\Services\Medication\Reporting\MedicationReportDataset;
 use App\Services\Medication\Reporting\MedicationReportPeriod;
 use App\Services\Medication\Reporting\RecordsReportingSettings;
+use App\Services\Medication\StaffEligibilityRegister;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Database\Seeders\GovernancePermissionsSeeder;
@@ -59,6 +65,44 @@ function p09Medicine(Client $client, array $attributes = []): ClientMedication
 function p09ExportData(Site $site, string $type = 'doses'): array
 {
     return ['type' => $type, 'site_id' => $site->id, 'period' => 'custom', 'date_from' => '2026-09-29', 'date_to' => '2026-09-29', 'purpose' => 'audit'];
+}
+
+function p09CompetencyReader(Site $site): User
+{
+    $actor = p09Reader('auditor', $site);
+    $actor->permissionOverrides()->syncWithoutDetaching(Permission::whereIn('key', [
+        'medications.administer.record', 'clinical.accessAllSites', 'sites.viewAll',
+    ])->pluck('id')->mapWithKeys(fn ($id) => [$id => ['allowed' => false]])->all());
+
+    return $actor->fresh();
+}
+
+function p09CompetencyStaff(Site $site, string $name, bool $records = true, array $profile = [], array $attributes = []): User
+{
+    $user = User::factory()->create(array_replace(['name' => $name, 'role' => 'support_worker', 'approved_at' => now()], $attributes));
+    $user->permissionOverrides()->attach(Permission::where('key', 'medications.administer.record')->firstOrFail(), ['allowed' => $records]);
+    HrEmployeeProfile::factory()->create(array_replace([
+        'user_id' => $user->id, 'primary_site_id' => $site->id, 'secondary_site_ids' => [],
+        'position_role' => 'support_worker', 'employment_type' => 'full_time',
+        'is_active' => true, 'start_date' => '2025-01-01', 'end_date' => null,
+        'created_by' => $user->id, 'updated_by' => $user->id,
+    ], $profile));
+
+    return $user->fresh();
+}
+
+function p09CompetencyAssessment(User $user, User $assessor, array $attributes = []): MedicationCompetencyAssessment
+{
+    return MedicationCompetencyAssessment::query()->forceCreate(array_replace(
+        collect(array_keys(CompetencyAcknowledgement::AREAS))->mapWithKeys(fn ($key) => [$key => true])->all(),
+        [
+            'user_id' => $user->id, 'assessor_id' => $assessor->id, 'assessment_type' => 'annual',
+            'status' => 'passed', 'assessment_date' => '2026-08-29', 'expiry_date' => '2027-08-29',
+            'total_score' => 12, 'pass_threshold' => 10,
+            'assessor_declared_at' => now()->subDays(2), 'staff_acknowledged_at' => now()->subDay(),
+        ],
+        $attributes,
+    ))->fresh();
 }
 
 it('uses the new medication report grant rather than generic reporting access', function () {
@@ -347,4 +391,188 @@ it('uses a rounds own window and keeps Away separate without writing missed reco
     $round = MedicationRound::create(['site_id' => $this->site->id, 'name' => 'Synthetic morning', 'round_date' => '2026-09-29', 'scheduled_time' => '07:00', 'window_minutes' => 10, 'status' => 'pending']);
     $data = app(MedicationReportDataset::class)->read($actor, 'rounds', new MedicationReportPeriod('2026-09-29', '2026-09-29'), [$this->site->id]);
     expect($data['rows'])->toHaveCount(1)->and($data['rows'][0]['due'])->toBe(2)->and($data['rows'][0]['recorded'])->toBe(1)->and($data['rows'][0]['away'])->toBe(1)->and($data['rows'][0]['status'])->toBe('not_completed')->and($round->fresh()->status)->toBe('pending')->and(ClientMedicationAdministration::count())->toBe(0);
+});
+
+it('counts the canonical current staff population including unassessed and secondary house recorders', function () {
+    $actor = p09CompetencyReader($this->site);
+    $other = Site::factory()->create(['is_active' => true]);
+    $primary = p09CompetencyStaff($this->site, 'Primary current');
+    $primaryUnassessed = p09CompetencyStaff($this->site, 'Primary unassessed');
+    $secondaryUnassessed = p09CompetencyStaff($other, 'Secondary unassessed', profile: ['secondary_site_ids' => [(string) $this->site->id, $this->site->id]]);
+    $secondary = p09CompetencyStaff($other, 'Secondary current', profile: ['secondary_site_ids' => [$this->site->id]]);
+    $onFile = p09CompetencyStaff($this->site, 'Assessment without recording grant', records: false);
+    foreach ([$primary, $secondary, $onFile] as $staff) {
+        p09CompetencyAssessment($staff, $actor);
+    }
+    $denied = [
+        p09CompetencyStaff($other, 'Outside house'),
+        p09CompetencyStaff($this->site, 'Inactive profile', profile: ['is_active' => false]),
+        p09CompetencyStaff($this->site, 'Ended employment', profile: ['end_date' => '2026-09-28']),
+        p09CompetencyStaff($this->site, 'Future employment', profile: ['start_date' => '2026-09-30']),
+        p09CompetencyStaff($this->site, 'Unapproved account', attributes: ['approved_at' => null]),
+        p09CompetencyStaff($this->site, 'Deleted profile', profile: ['deleted_at' => now()]),
+        p09CompetencyStaff($this->site, 'Legacy portal account', attributes: ['role' => 'client']),
+    ];
+    $portal = p09CompetencyStaff($this->site, 'RBAC portal account');
+    $portal->roles()->attach(Role::where('name', 'client')->firstOrFail());
+    $denied[] = $portal;
+    $noProfile = User::factory()->create(['name' => 'Missing profile', 'role' => 'support_worker', 'approved_at' => now()]);
+    $noProfile->permissionOverrides()->attach(Permission::where('key', 'medications.administer.record')->firstOrFail(), ['allowed' => true]);
+    $denied[] = $noProfile;
+    foreach ($denied as $staff) {
+        p09CompetencyAssessment($staff, $actor);
+    }
+    p09CompetencyStaff($this->site, 'No recording grant or assessment', records: false);
+    $before = DB::table('medication_competency_assessments')->orderBy('id')->get()->map(fn ($row) => (array) $row)->all();
+
+    $data = app(MedicationReportDataset::class)->read($actor, 'competency', new MedicationReportPeriod('2026-09-29', '2026-09-29'), [$this->site->id]);
+    $expectedNames = collect([$primary, $primaryUnassessed, $secondaryUnassessed, $secondary, $onFile])->pluck('name')->sort()->values()->all();
+    expect(collect($data['rows'])->pluck('staff')->sort()->values()->all())->toBe($expectedNames)
+        ->and($data['totals'])->toBe(['staff' => 5, 'assessed' => 3, 'current' => 3, 'current_pct' => 60.0]);
+    foreach ([$primaryUnassessed, $secondaryUnassessed] as $staff) {
+        $row = collect($data['rows'])->firstWhere('staff', $staff->name);
+        expect($row['reference'])->toBe('staff:'.$staff->id)->and($row['status'])->toBe('unassessed')
+            ->and($row['assessment_status'])->toBeNull()->and($row['date'])->toBeNull()
+            ->and($row['expiry_date'])->toBeNull()->and($row['current'])->toBe(0);
+    }
+    expect(app(StaffEligibilityRegister::class)->rows([$this->site->id])->pluck('name')->sort()->values()->all())->toBe($expectedNames);
+    $this->actingAs($actor)->get('/emar/reports?report=competency&site_id='.$this->site->id)->assertOk()
+        ->assertInertia(fn ($page) => $page->where('data.totals.staff', 5)->where('data.totals.assessed', 3)
+            ->where('data.totals.current', 3)->where('data.totals.current_pct', 60)->has('page.data', 5));
+    expect(DB::table('medication_competency_assessments')->orderBy('id')->get()->map(fn ($row) => (array) $row)->all())->toBe($before);
+});
+
+it('does not report an unestablished or invalid assessment as current', function (array $attributes, string $state) {
+    $actor = p09CompetencyReader($this->site);
+    $worker = p09CompetencyStaff($this->site, 'Synthetic competency subject');
+    if (isset($attributes['self_assessed'])) {
+        unset($attributes['self_assessed']);
+        $attributes['assessor_id'] = $worker->id;
+    }
+    $assessment = p09CompetencyAssessment($worker, $actor, $attributes);
+    $before = $assessment->getRawOriginal();
+    $data = app(MedicationReportDataset::class)->read($actor, 'competency', new MedicationReportPeriod('2026-01-01', '2026-01-01'), [$this->site->id]);
+    expect($data['totals'])->toBe(['staff' => 1, 'assessed' => 1, 'current' => 0, 'current_pct' => 0.0])
+        ->and($data['rows'][0]['reference'])->toBe('assessment:'.$assessment->id)
+        ->and($data['rows'][0]['status'])->toBe($state)->and($data['rows'][0]['assessment_status'])->toBe($assessment->status)
+        ->and($data['rows'][0]['current'])->toBe(0)->and($assessment->fresh()->getRawOriginal())->toBe($before);
+})->with([
+    'self assessed' => [['self_assessed' => true], 'unassessed'],
+    'missing independent assessor' => [['assessor_id' => null], 'unassessed'],
+    'undeclared' => [['assessor_declared_at' => null], 'unassessed'],
+    'awaiting staff acknowledgement' => [['staff_acknowledged_at' => null], 'unassessed'],
+    'future assessor declaration' => [['assessor_declared_at' => '2026-09-29 00:01:00'], 'unassessed'],
+    'future staff acknowledgement' => [['staff_acknowledged_at' => '2026-09-29 00:01:00'], 'unassessed'],
+    'future clinical assessment date' => [['assessment_date' => '2026-09-30'], 'unassessed'],
+    'no finite expiry' => [['expiry_date' => null], 'missing_expiry'],
+    'expired clinical date' => [['expiry_date' => '2026-09-28'], 'expired'],
+    'independently established failure' => [['status' => 'failed'], 'failed'],
+]);
+
+it('reports the effective prior assessment while a replacement is unestablished', function (array $replacementAttributes, bool $current) {
+    $actor = p09CompetencyReader($this->site);
+    $worker = p09CompetencyStaff($this->site, 'Renewing subject');
+    $prior = p09CompetencyAssessment($worker, $actor);
+    $replacement = p09CompetencyAssessment($worker, $actor, array_replace(['assessment_date' => '2026-09-28'], $replacementAttributes));
+    $before = DB::table('medication_competency_assessments')->orderBy('id')->get()->map(fn ($row) => (array) $row)->all();
+    $data = app(MedicationReportDataset::class)->read($actor, 'competency', new MedicationReportPeriod('2026-09-29', '2026-09-29'), [$this->site->id]);
+    $effective = $current ? $prior : $replacement;
+    expect($data['totals'])->toBe(['staff' => 1, 'assessed' => 1, 'current' => $current ? 1 : 0, 'current_pct' => $current ? 100.0 : 0.0])
+        ->and($data['rows'][0]['reference'])->toBe('assessment:'.$effective->id)
+        ->and($data['rows'][0]['date'])->toBe($effective->assessment_date->toDateString())
+        ->and($data['rows'][0]['expiry_date'])->toBe($effective->expiry_date->toDateString())
+        ->and($data['rows'][0]['status'])->toBe($current ? 'valid' : 'failed')
+        ->and($data['rows'][0]['assessment_status'])->toBe($current ? 'passed' : 'failed')
+        ->and($data['rows'][0]['current'])->toBe($current ? 1 : 0);
+    expect(DB::table('medication_competency_assessments')->orderBy('id')->get()->map(fn ($row) => (array) $row)->all())->toBe($before);
+})->with([
+    'passed renewal awaiting acknowledgement' => [['staff_acknowledged_at' => null], true],
+    'failed replacement awaiting acknowledgement' => [['status' => 'failed', 'staff_acknowledged_at' => null], true],
+    'undeclared failed replacement' => [['status' => 'failed', 'assessor_declared_at' => null], true],
+    'replacement declaration is in the future' => [['assessor_declared_at' => '2026-09-29 00:01:00'], true],
+    'acknowledged failure supersedes the prior pass' => [['status' => 'failed'], false],
+]);
+
+it('uses the worker clinical date for current competency at UTC midnight boundaries', function (string $utcClock, string $state, int $current) {
+    $originalClock = Carbon::getTestNow();
+    Carbon::setTestNow(Carbon::parse($utcClock, 'UTC'));
+    try {
+        $actor = p09CompetencyReader($this->site);
+        $worker = p09CompetencyStaff($this->site, 'Clinical date subject');
+        $assessment = p09CompetencyAssessment($worker, $actor, [
+            'assessment_date' => '2026-09-28', 'expiry_date' => '2026-09-28',
+            'assessor_declared_at' => '2026-09-27 20:00:00', 'staff_acknowledged_at' => '2026-09-27 21:00:00',
+        ]);
+        $data = app(MedicationReportDataset::class)->read($actor, 'competency', new MedicationReportPeriod('2026-09-28', '2026-09-28'), [$this->site->id]);
+        expect($data['rows'][0]['status'])->toBe($state)->and($data['rows'][0]['current'])->toBe($current)
+            ->and($data['rows'][0]['expiry_date'])->toBe('2026-09-28')->and($data['rows'][0]['reference'])->toBe('assessment:'.$assessment->id)
+            ->and($data['totals']['current_pct'])->toBe($current ? 100.0 : 0.0);
+    } finally {
+        Carbon::setTestNow($originalClock);
+    }
+})->with([
+    'expiry clinical day still applies' => ['2026-09-28 10:30:00', 'valid', 1],
+    'UTC still yesterday but NZ expiry day has ended' => ['2026-09-28 12:30:00', 'expired', 0],
+]);
+
+it('keeps a real temporary house exemption separate from current assessment coverage', function () {
+    $actor = p09CompetencyReader($this->site);
+    $worker = p09CompetencyStaff($this->site, 'Temporarily exempt subject');
+    $exemption = MedicationCompetencyExemption::create([
+        'user_id' => $worker->id, 'site_id' => $this->site->id, 'scope' => MedicationCompetencyExemption::SCOPE_ADMINISTRATION,
+        'reason' => 'Synthetic assessor leave with renewal booked', 'approved_by' => $actor->id, 'approved_at' => now()->subHour(),
+        'starts_at' => now()->subHour(), 'expires_at' => now()->addDays(2),
+    ]);
+    $exemption->refresh();
+    $before = $exemption->getRawOriginal();
+    expect(app(MedicationAdministratorCompetencyPolicy::class)->evaluate($worker, $this->site->id, now())['state'])->toBe('exempt');
+    $data = app(MedicationReportDataset::class)->read($actor, 'competency', new MedicationReportPeriod('2026-01-01', '2026-01-01'), [$this->site->id]);
+    expect($data['totals'])->toBe(['staff' => 1, 'assessed' => 0, 'current' => 0, 'current_pct' => 0.0])
+        ->and($data['rows'][0]['reference'])->toBe('staff:'.$worker->id)->and($data['rows'][0]['status'])->toBe('unassessed')
+        ->and($data['rows'][0]['assessment_status'])->toBeNull()->and($data['rows'][0]['date'])->toBeNull()
+        ->and($data['rows'][0]['expiry_date'])->toBeNull()->and($data['rows'][0]['current'])->toBe(0)
+        ->and($data['notice'])->toContain('as at now', 'independent assessor declaration', 'staff acknowledgement', 'exemptions are not current assessments')
+        ->and($exemption->fresh()->getRawOriginal())->toBe($before)->and(MedicationCompetencyAssessment::count())->toBe(0);
+});
+
+it('returns no current rate when the canonical competency staff population is empty', function () {
+    $actor = p09CompetencyReader($this->site);
+    p09CompetencyStaff($this->site, 'No recording authority or assessment', records: false);
+    $data = app(MedicationReportDataset::class)->read($actor, 'competency', new MedicationReportPeriod('2026-09-29', '2026-09-29'), [$this->site->id]);
+    expect($data['rows'])->toBe([])->and($data['totals'])->toBe(['staff' => 0, 'assessed' => 0, 'current' => 0, 'current_pct' => null])
+        ->and(app(StaffEligibilityRegister::class)->rows([])->all())->toBe([]);
+});
+
+it('keeps competency report grants and house concealment boundaries with no mutation', function () {
+    $actor = p09CompetencyReader($this->site);
+    $other = Site::factory()->create(['is_active' => true]);
+    $local = p09CompetencyStaff($this->site, 'Visible current subject');
+    $foreign = p09CompetencyStaff($other, 'Concealed foreign subject');
+    p09CompetencyAssessment($local, $actor);
+    p09CompetencyAssessment($foreign, $actor);
+    $before = DB::table('medication_competency_assessments')->orderBy('id')->get()->map(fn ($row) => (array) $row)->all();
+    $beforeEvents = MedicationEvent::count();
+    $response = $this->actingAs($actor)->get('/emar/reports?report=competency&site_id='.$this->site->id)->assertOk();
+    expect(collect($response->inertiaProps('page.data'))->pluck('staff')->all())->toBe([$local->name]);
+    $this->get('/emar/reports?report=competency&site_id='.$other->id)->assertNotFound()->assertDontSee($foreign->name);
+    $this->get('/emar/reports?report=competency&site_id=999999999')->assertNotFound()->assertDontSee($foreign->name);
+    $actor->permissionOverrides()->syncWithoutDetaching([Permission::where('key', 'medications.reports.view')->firstOrFail()->id => ['allowed' => false]]);
+    $this->actingAs($actor->fresh())->get('/emar/reports?report=competency&site_id='.$this->site->id)->assertForbidden()->assertDontSee($local->name);
+    expect(DB::table('medication_competency_assessments')->orderBy('id')->get()->map(fn ($row) => (array) $row)->all())->toBe($before)
+        ->and(MedicationEvent::count())->toBe($beforeEvents);
+});
+
+it('opens canonical staff eligibility only when the report reader has medication read access', function () {
+    $actor = p09CompetencyReader($this->site);
+    $worker = p09CompetencyStaff($this->site, 'Eligibility link subject');
+    p09CompetencyAssessment($worker, $actor);
+    $url = '/emar/reports?report=competency&site_id='.$this->site->id;
+    $response = $this->actingAs($actor)->get($url)->assertOk();
+    $href = $response->inertiaProps('page.data.0.href');
+    expect($href)->toBe('/emar/safety/eligibility');
+    $this->get($href)->assertOk()->assertInertia(fn ($page) => $page->component('emar/StaffEligibility')
+        ->where('people', fn ($people) => collect($people)->contains(fn ($person) => $person['id'] === $worker->id)));
+    $actor->permissionOverrides()->syncWithoutDetaching([Permission::where('key', 'medications.view')->firstOrFail()->id => ['allowed' => false]]);
+    $this->actingAs($actor->fresh())->get($url)->assertOk()->assertInertia(fn ($page) => $page->where('page.data.0.href', null));
+    $this->get($href)->assertForbidden();
 });

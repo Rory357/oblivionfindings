@@ -19,7 +19,9 @@ use App\Models\User;
 use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\MarLinkService;
+use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\StaffEligibilityRegister;
 use App\Support\Medication\MedicationStockQuantity as Quantity;
 use App\Support\Medication\StockLotRules;
 use Carbon\CarbonImmutable;
@@ -34,7 +36,13 @@ final class MedicationReportDataset
 
     public const MAX_ROWS = 100000;
 
-    public function __construct(private readonly MedicationReportAccess $access, private readonly DoseSlotProjection $projection, private readonly MedicationGovernanceScopeService $scope) {}
+    public function __construct(
+        private readonly MedicationReportAccess $access,
+        private readonly DoseSlotProjection $projection,
+        private readonly MedicationGovernanceScopeService $scope,
+        private readonly StaffEligibilityRegister $staffEligibility,
+        private readonly MedicationAdministratorCompetencyPolicy $competency,
+    ) {}
 
     public function read(User $actor, string $report, MedicationReportPeriod $period, array $siteIds, ?int $clientId = null): array
     {
@@ -173,9 +181,34 @@ final class MedicationReportDataset
             $totals = ['lines' => $rows->count(), 'low' => $finance ? null : $rows->sum('low'), 'expiring' => $finance ? null : $rows->filter(fn ($r) => $r['expiry_date'] !== null && $r['expiry_date'] >= $now->timezone('Pacific/Auckland')->toDateString() && $r['expiry_date'] <= $now->timezone('Pacific/Auckland')->addDays(30)->toDateString())->count()];
             $notice = 'Stock is as at now. Value on hand is Not configured until stock has a recorded unit cost.';
         } else {
-            $records = MedicationCompetencyAssessment::query()->whereHas('user.hrEmployeeProfile', fn ($q) => $q->whereIn('primary_site_id', $siteIds)->where('is_active', true))->with('user:id,name')->orderByDesc('assessment_date')->orderByDesc('id')->get()->unique('user_id');
-            $rows = $records->map(fn ($a) => ['reference' => 'assessment:'.$a->id, 'staff' => $a->user?->name, 'status' => $a->status, 'date' => $a->assessment_date?->toDateString(), 'expiry_date' => $a->expiry_date?->toDateString(), 'current' => $a->status === 'passed' && $a->expiry_date?->gte($now->timezone('Pacific/Auckland')->startOfDay()) ? 1 : 0, 'href' => '/emar/settings#staff/competency'])->values();
-            $totals = ['assessed' => $rows->count(), 'current' => $rows->sum('current'), 'current_pct' => $rows->count() ? round($rows->sum('current') * 100 / $rows->count(), 1) : null];
+            $users = $this->staffEligibility->users($siteIds);
+            $rows = $users->map(function (User $user) use ($now, $actor): array {
+                // A temporary site exemption permits work but is not a current assessment.
+                $decision = $this->competency->evaluate($user, null, $now);
+                $assessment = $decision['assessment_id'] !== null
+                    ? $user->medicationCompetencyAssessments->firstWhere('id', $decision['assessment_id'])
+                    : $user->medicationCompetencyAssessments
+                        ->sortByDesc(fn (MedicationCompetencyAssessment $a): array => [$a->assessment_date?->toDateString() ?? '', $a->id])
+                        ->first();
+
+                return [
+                    'reference' => $assessment ? 'assessment:'.$assessment->id : 'staff:'.$user->id,
+                    'staff' => $user->name,
+                    'status' => $decision['state'],
+                    'assessment_status' => $assessment?->status,
+                    'date' => $assessment?->assessment_date?->toDateString(),
+                    'expiry_date' => $assessment?->expiry_date?->toDateString(),
+                    'current' => $decision['state'] === 'valid' ? 1 : 0,
+                    'href' => $actor->canDo('medications.view') ? '/emar/safety/eligibility' : null,
+                ];
+            })->values();
+            $totals = [
+                'staff' => $rows->count(),
+                'assessed' => $users->filter(fn (User $user): bool => $user->medicationCompetencyAssessments->isNotEmpty())->count(),
+                'current' => $rows->sum('current'),
+                'current_pct' => $rows->count() ? round($rows->sum('current') * 100 / $rows->count(), 1) : null,
+            ];
+            $notice = 'Competency is as at now. Current assessments require an independent assessor declaration and staff acknowledgement. Temporary house exemptions are not current assessments.';
         }
         $this->limit($rows->count());
 

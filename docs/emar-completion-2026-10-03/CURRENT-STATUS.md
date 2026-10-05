@@ -1,5 +1,15 @@
 # eMAR implementation and verification status
 
+## Competency reporting review follow-up — 6 October 2026
+
+Two final review findings exposed a report-only mismatch: staff with no assessment or a secondary-house assignment were omitted, and a latest assessment's status/expiry could disagree with the canonical competency decision. The report now shares Staff eligibility's current, approved staff population, distinguishes staff in scope from assessments on file, and calculates current coverage using the existing competency policy. Independent declaration, staff acknowledgement, New Zealand expiry dates and valid prior assessments are preserved; temporary house exemptions do not count as current assessments. The entry action opens Staff eligibility only within the existing medication-read permission boundary. Clinical recording policy, schema and permissions are unchanged.
+
+The complete reporting acceptance covers **52 distinct cases / 1,202 assertions**: Unified medication reports **43 / 496**, generic reporting **4 / 580**, and Staff eligibility **5 / 126**. The first run's two fixture errors are retained as failed evidence; the narrowly corrected complete Unified file passed separately. Its earlier partial 41 passes are not added to the final total. Both the 5,150-entry backend/harness snapshot and the four reviewed application/test/frontend files were held fixed during their accepted runs. The frontend labels passed TypeScript, scoped lint and formatting. Independent source review found no further issue.
+
+The owned test processes and disposable database were independently verified absent. Final acceptance evidence SHA256: `0E30757A0F03F0406543F0CDAE553A9B30C4FE54916B32630B79281D6149C25A`.
+
+The pushed predecessor `4872e445a844576c5fd0c47bdca7db400a09ca53` passed its medication release job **383 / 5,509** and desktop journey job **118 passed / two existing skips**. Those checks are attributed to that predecessor; the report correction requires fresh complete CI before merge. No production migration, backfill, feature activation or deployment is included. The rollout boundaries below remain in force.
+
 ## Final CI fixture acceptance — 6 October 2026
 
 Candidate `3c60d526ccc0fedc72e6414d6344b965fa4eba86` finished with 13 successful GitHub checks, three failed feature groups caused by test-fixture contracts, one feature group interrupted by runner shutdown, and one desktop job that never received a runner. It is not counted as a green candidate. Its medication release job passed 383 cases / 5,509 assertions, and desktop journeys passed 118 tests with two existing skips. All 20 previously unexecuted tail files ran and passed; complete medication order, support, emergency, settings and safeguarding files passed. The final candidate still requires fresh complete CI.

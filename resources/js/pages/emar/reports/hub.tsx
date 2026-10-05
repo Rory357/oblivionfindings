@@ -37,7 +37,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { StatusBadge } from '@/components/ui/status-badge';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTime } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
@@ -192,9 +192,10 @@ const meters: Record<string, [string, string, string?][]> = {
         ['expiring', 'Expiring in 30 days'],
     ],
     competency: [
-        ['assessed', 'Staff assessed'],
+        ['staff', 'Staff in scope'],
+        ['assessed', 'Assessment on file'],
         ['current', 'Current'],
-        ['current_pct', 'Current', 'No staff assessments in this scope'],
+        ['current_pct', 'Current rate', 'No staff in this scope'],
     ],
 };
 const auditFields: [string, string][] = [
@@ -213,7 +214,22 @@ function text(value: unknown): string {
 }
 function cell(row: Row, key: string) {
     const value = row[key];
-    if (key === 'status') return <StatusBadge status={text(value)} />;
+    if (key === 'status') {
+        const competency: Record<string, [string, StatusVariant]> = {
+            valid: ['Current', 'success'],
+            unassessed: ['Not current', 'warning'],
+            missing_expiry: ['No expiry recorded', 'warning'],
+            failed: ['Not passed', 'critical'],
+            expired: ['Expired', 'warning'],
+        };
+        const state =
+            'assessment_status' in row ? competency[text(value)] : undefined;
+        return state ? (
+            <StatusBadge variant={state[1]}>{state[0]}</StatusBadge>
+        ) : (
+            <StatusBadge status={text(value)} />
+        );
+    }
     if (key === 'date' || key.endsWith('_date'))
         return formatDateOnly(typeof value === 'string' ? value : null);
     if (key.endsWith('_at'))
@@ -361,7 +377,9 @@ export default function ReportsHub(props: Props) {
             label: audit
                 ? 'View event'
                 : typeof row.href === 'string'
-                  ? 'Open record'
+                  ? filters.report === 'competency'
+                      ? 'Open staff eligibility'
+                      : 'Open record'
                   : 'View details',
             icon: Eye,
             onClick: () => open(row),
