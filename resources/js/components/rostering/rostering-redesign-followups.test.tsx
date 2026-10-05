@@ -198,7 +198,11 @@ describe('rostering redesign follow-up wiring', () => {
             />,
         );
 
-        expect(screen.getByText('Declared today')).toBeVisible();
+        expect(screen.getByText('1 of 1 staff shown')).toBeVisible();
+        expect(screen.queryByText('Total staff')).not.toBeInTheDocument();
+        expect(screen.queryByText('Declared today')).not.toBeInTheDocument();
+        expect(screen.queryByText('Currently on leave')).not.toBeInTheDocument();
+        expect(screen.queryByText('No data')).not.toBeInTheDocument();
         expect(screen.getByText('Aroha King')).toBeVisible();
         // Edit no longer navigates — it opens an in-page dialog.
         expect(
