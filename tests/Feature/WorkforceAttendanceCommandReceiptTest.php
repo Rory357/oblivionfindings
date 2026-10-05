@@ -32,6 +32,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionMethod;
 use RuntimeException;
 use Tests\Support\CommittedFixtureCleanup;
+use Tests\Support\OwnedTestDatabase;
 use Tests\TestCase;
 
 /** Real root commits; session, handover and pay rules execute unchanged. */
@@ -454,7 +455,12 @@ class WorkforceAttendanceCommandReceiptTest extends TestCase
 
     private function commitFixtures(): void
     {
-        $this->assertMatchesRegularExpression('/^oblivion_workforce_[a-zA-Z0-9_]+_'.getmypid().'$/D', DB::connection()->getDatabaseName());
+        $connection = DB::connection();
+        $this->assertTrue(app()->environment('testing'));
+        $this->assertSame('mysql', $connection->getDriverName());
+        $this->assertSame(static::$isolatedMysqlDatabase, $connection->getDatabaseName());
+        $this->assertTrue(OwnedTestDatabase::isOwnedBy($connection->getDatabaseName(), getmypid()));
+        $this->assertSame($connection->getDatabaseName(), $connection->selectOne('SELECT DATABASE() AS selected_database')->selected_database);
         $this->assertSame(1, DB::connection()->transactionLevel());
         DB::commit();
         $this->fixturesCommitted = true;
