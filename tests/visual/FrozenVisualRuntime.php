@@ -12,10 +12,14 @@ use Faker\Provider\DateTime;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Support\Env;
 use InvalidArgumentException;
+use LogicException;
+use Symfony\Component\HttpFoundation\Response;
 
 final class FrozenVisualRuntime
 {
     public const DATABASE = 'oblivion_findings_visual';
+
+    private static ?int $configuredTimestamp = null;
 
     public static function configure(
         string $environment,
@@ -24,6 +28,7 @@ final class FrozenVisualRuntime
         string $instant,
         int $seed,
     ): void {
+        self::$configuredTimestamp = null;
         if (! in_array($environment, ['local', 'testing'], true)) {
             throw new InvalidArgumentException('Frozen visual runtime requires a local or testing environment.');
         }
@@ -47,6 +52,7 @@ final class FrozenVisualRuntime
         Carbon::setTestNow(Carbon::instance($frozen));
         CarbonImmutable::setTestNow($frozen);
         mt_srand($seed);
+        self::$configuredTimestamp = $frozen->getTimestamp();
     }
 
     public static function loadEnvironment(string $root): void
@@ -83,6 +89,27 @@ final class FrozenVisualRuntime
         self::configure(...$options);
 
         return $options;
+    }
+
+    /**
+     * Browsers expire transport cookies against real time, independently of the
+     * frozen application clock. Preserve each positive lifetime before sending.
+     */
+    public static function alignTransportCookieExpiry(Response $response, DateTimeImmutable $wallNow): void
+    {
+        $frozen = self::$configuredTimestamp;
+        if ($frozen === null || ! Carbon::hasTestNow() || ! CarbonImmutable::hasTestNow()
+            || Carbon::now('UTC')->getTimestamp() !== $frozen || CarbonImmutable::now('UTC')->getTimestamp() !== $frozen) {
+            throw new LogicException('Cookie transport adjustment requires the guarded frozen visual runtime.');
+        }
+        foreach ($response->headers->getCookies() as $cookie) {
+            $expires = $cookie->getExpiresTime();
+            // Session-only cookies and explicit deletion/expired cookies retain
+            // their original meaning. Cloning changes no value or security flag.
+            if ($expires > $frozen && $cookie->getValue() !== null && $cookie->getValue() !== '') {
+                $response->headers->setCookie($cookie->withExpires($wallNow->getTimestamp() + ($expires - $frozen)));
+            }
+        }
     }
 
     public static function seedFaker(Container $app, int $seed): void

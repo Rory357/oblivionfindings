@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Http\Request;
 use Tests\Visual\FrozenVisualRuntime;
 
@@ -27,4 +28,9 @@ if (file_exists($maintenance = $root.'/storage/framework/maintenance.php')) {
 $app = require $root.'/bootstrap/app.php';
 FrozenVisualRuntime::seedFaker($app, $options['seed']);
 
-$app->handleRequest(Request::capture());
+$request = Request::capture();
+$kernel = $app->make(Kernel::class);
+$response = $kernel->handle($request);
+FrozenVisualRuntime::alignTransportCookieExpiry($response, new DateTimeImmutable('now'));
+$response->send();
+$kernel->terminate($request, $response);

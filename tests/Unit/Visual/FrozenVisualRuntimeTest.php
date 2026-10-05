@@ -4,13 +4,17 @@ namespace Tests\Unit\Visual;
 
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use DateTimeImmutable;
 use Faker\Factory;
 use Faker\Generator;
 use Illuminate\Container\Container;
 use Illuminate\Support\Env;
 use InvalidArgumentException;
+use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\HttpFoundation\Cookie;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\Visual\FrozenVisualRuntime;
 
 require_once dirname(__DIR__, 2).'/visual/FrozenVisualRuntime.php';
@@ -62,7 +66,7 @@ final class FrozenVisualRuntimeTest extends TestCase
         self::assertSame(1791158400, $faker->dateTimeBetween('now', 'now')->getTimestamp());
         self::assertSame(1791158400, $faker->dateTimeInInterval('now', '+0 days')->getTimestamp());
         self::assertSame('2026-01-01', $faker->dateTimeBetween('first day of january this year', 'first day of january this year')->format('Y-m-d'));
-        $absolute = new \DateTimeImmutable('2026-06-01T13:00:00+13:00');
+        $absolute = new DateTimeImmutable('2026-06-01T13:00:00+13:00');
         self::assertSame($absolute->getTimestamp(), $faker->dateTimeBetween($absolute, $absolute)->getTimestamp());
         $faker->seed(20261005);
         $expectedDate = $faker->date('Y-m-d', Carbon::now('UTC'));
@@ -153,6 +157,99 @@ final class FrozenVisualRuntimeTest extends TestCase
         yield 'shared process database' => ['DB_DATABASE', 'oblivion_findings', 'dedicated disposable'];
         yield 'different process connection' => ['DB_CONNECTION', 'sqlite', 'dedicated disposable'];
         yield 'process URL override' => ['DB_URL', 'mysql://example.invalid/shared', 'database URL override'];
+    }
+
+    public static function transportWallClocks(): iterable
+    {
+        yield 'wall clock later than frozen application' => ['2026-10-05T02:05:00Z'];
+        yield 'wall clock earlier than frozen application' => ['2026-10-04T23:00:00Z'];
+    }
+
+    #[DataProvider('transportWallClocks')]
+    public function test_cookie_transport_preserves_exact_lifetime_values_and_security_flags(string $wall): void
+    {
+        FrozenVisualRuntime::configure('testing', 'mysql', FrozenVisualRuntime::DATABASE, '2026-10-05T00:00:00Z', 20261005);
+        $frozen = CarbonImmutable::now('UTC')->getTimestamp();
+        $session = new Cookie('visual-session', 'synthetic-session', $frozen + 3600, '/app', 'example.test', true, true, false, 'strict', true);
+        $token = new Cookie('XSRF-TOKEN', 'synthetic-token', $frozen + 3600, '/', null, false, false, false, 'lax');
+        $response = new Response('unchanged body', 302, ['Location' => '/my-day', 'Cache-Control' => 'private, no-store']);
+        $response->headers->setCookie($session);
+        $response->headers->setCookie($token);
+        $beforeHeaders = $response->headers->allPreserveCaseWithoutCookies();
+        $wallNow = new DateTimeImmutable($wall);
+
+        FrozenVisualRuntime::alignTransportCookieExpiry($response, $wallNow);
+
+        $cookies = collect($response->headers->getCookies())->keyBy(fn (Cookie $cookie) => $cookie->getName());
+        foreach ([$session, $token] as $original) {
+            $adjusted = $cookies->get($original->getName());
+            self::assertNotSame($original, $adjusted);
+            self::assertSame($wallNow->getTimestamp() + 3600, $adjusted->getExpiresTime());
+            foreach (['getValue', 'getPath', 'getDomain', 'isSecure', 'isHttpOnly', 'isRaw', 'getSameSite', 'isPartitioned'] as $method) {
+                self::assertSame($original->{$method}(), $adjusted->{$method}());
+            }
+            self::assertSame($frozen + 3600, $original->getExpiresTime());
+        }
+        self::assertSame($beforeHeaders, $response->headers->allPreserveCaseWithoutCookies());
+        self::assertSame('unchanged body', $response->getContent());
+        self::assertSame(302, $response->getStatusCode());
+        self::assertSame('2026-10-05T00:00:00+00:00', Carbon::now('UTC')->toIso8601String());
+        self::assertSame('2026-10-05T00:00:00+00:00', CarbonImmutable::now('UTC')->toIso8601String());
+    }
+
+    public function test_session_only_and_deletion_cookie_meanings_are_not_extended(): void
+    {
+        FrozenVisualRuntime::configure('testing', 'mysql', FrozenVisualRuntime::DATABASE, '2026-10-05T00:00:00Z', 20261005);
+        $frozen = CarbonImmutable::now('UTC')->getTimestamp();
+        $originals = [
+            new Cookie('session-only', 'synthetic', 0),
+            new Cookie('expired', 'synthetic', $frozen - 1),
+            new Cookie('deleted', '', $frozen + 3600),
+            new Cookie('null-value', null, $frozen + 3600),
+        ];
+        $response = new Response;
+        foreach ($originals as $cookie) {
+            $response->headers->setCookie($cookie);
+        }
+        FrozenVisualRuntime::alignTransportCookieExpiry($response, new DateTimeImmutable('2026-10-05T02:05:00Z'));
+        self::assertSame($originals, $response->headers->getCookies());
+    }
+
+    public function test_cookie_transport_rejects_an_unfrozen_runtime_without_changing_response(): void
+    {
+        $response = new Response;
+        $cookie = new Cookie('session', 'synthetic', time() + 3600);
+        $response->headers->setCookie($cookie);
+        try {
+            FrozenVisualRuntime::alignTransportCookieExpiry($response, new DateTimeImmutable('now'));
+            self::fail('Unfrozen cookie transport was accepted.');
+        } catch (LogicException $exception) {
+            self::assertStringContainsString('guarded frozen visual runtime', $exception->getMessage());
+            self::assertSame([$cookie], $response->headers->getCookies());
+            self::assertFalse(Carbon::hasTestNow());
+            self::assertFalse(CarbonImmutable::hasTestNow());
+        }
+    }
+
+    public function test_cookie_transport_rejects_a_clock_changed_after_guarded_configuration(): void
+    {
+        FrozenVisualRuntime::configure('testing', 'mysql', FrozenVisualRuntime::DATABASE, '2026-10-05T00:00:00Z', 20261005);
+        Carbon::setTestNow(Carbon::parse('2026-10-06T00:00:00Z'));
+        $this->expectException(LogicException::class);
+        FrozenVisualRuntime::alignTransportCookieExpiry(new Response, new DateTimeImmutable('now'));
+    }
+
+    public function test_sent_cookie_has_positive_wall_clock_max_age_with_old_frozen_time(): void
+    {
+        FrozenVisualRuntime::configure('testing', 'mysql', FrozenVisualRuntime::DATABASE, '2020-01-01T00:00:00Z', 20261005);
+        $response = new Response;
+        $response->headers->setCookie(new Cookie('session', 'synthetic', CarbonImmutable::now('UTC')->addHour()));
+        FrozenVisualRuntime::alignTransportCookieExpiry($response, new DateTimeImmutable('now'));
+        $cookie = $response->headers->getCookies()[0];
+        self::assertGreaterThanOrEqual(3599, $cookie->getMaxAge());
+        self::assertLessThanOrEqual(3600, $cookie->getMaxAge());
+        self::assertStringNotContainsString('Max-Age=0', (string) $cookie);
+        self::assertSame('2020-01-01T00:00:00+00:00', CarbonImmutable::now('UTC')->toIso8601String());
     }
 
     private function visualEnvironment(): array
