@@ -170,9 +170,12 @@ final class MedicationSupportController extends Controller
     public function agreement(Request $request, MedicationSelfAdminAssessment $assessment)
     {
         $stored = null;
+        $storedUsed = false;
         try {
-            return DB::transaction(function () use ($request, $assessment, &$stored) {
-                return $this->scope->forClient($request->user(), (int) $assessment->client_id, 'medications.orders.manage', function (Client $client, $actor, $lockedUsers) use ($request, $assessment, &$stored) {
+            $response = DB::transaction(function () use ($request, $assessment, &$stored, &$storedUsed) {
+                $storedUsed = false;
+
+                return $this->scope->forClient($request->user(), (int) $assessment->client_id, 'medications.orders.manage', function (Client $client, $actor, $lockedUsers) use ($request, $assessment, &$stored, &$storedUsed) {
                     $locked = MedicationSelfAdminAssessment::query()->where('client_id', $client->id)->whereKey($assessment->id)->lockForUpdate()->firstOrFail();
                     $this->access->assertReadable($actor, $client);
                     $data = $request->validate([
@@ -199,7 +202,10 @@ final class MedicationSupportController extends Controller
                         $data['witness_id'] = null;
                     }
                     if ($request->hasFile('attachment')) {
-                        $stored = $request->file('attachment')->store('medication-support/'.$client->id, 'private');
+                        // Storage survives rollback; every retry rechecks authority before reusing these bytes.
+                        if ($stored === null) {
+                            $stored = $request->file('attachment')->store('medication-support/'.$client->id, 'private');
+                        }
                         abort_unless(is_string($stored) && $stored !== '', 503, 'The signed form could not be stored. Your agreement has not been saved.');
                         $data['attachment_path'] = $stored;
                         $data['attachment_name'] = $request->file('attachment')->getClientOriginalName();
@@ -208,6 +214,7 @@ final class MedicationSupportController extends Controller
                     $agreement = $this->support->recordAgreement($client, $actor, $locked, $data);
                     $this->remember($binding, $data, ['agreement_id' => $agreement->id]);
                     $this->audit($client, $actor, 'support.agreement_recorded', 'support_agreement', $agreement->id, 'Medication support agreement recorded.', ['role' => $agreement->agreed_by_role, 'method' => $agreement->method]);
+                    $storedUsed = $stored !== null && $agreement->attachment_path === $stored;
 
                     return back()->with('success', 'Agreement recorded.');
                 }, authorizationUserIds: $request->input('method') === 'verbal' ? array_filter([$request->integer('witness_id')]) : []);
@@ -218,6 +225,12 @@ final class MedicationSupportController extends Controller
             }
             throw $error;
         }
+        // A competing request can win after rollback, so the successful retry may only replay its result.
+        if ($stored && ! $storedUsed) {
+            Storage::disk('private')->delete($stored);
+        }
+
+        return $response;
     }
 
     public function destroy(Request $request, MedicationSelfAdminAssessment $assessment)

@@ -10,6 +10,7 @@ use App\Models\MedicationDoseSlot;
 use App\Models\MedicationError;
 use App\Models\MedicationFollowup;
 use App\Models\MedicationFollowupEvent;
+use App\Models\MedicationIdempotencyResult;
 use App\Models\MedicationSelfAdminAssessment;
 use App\Models\MedicationSupportAgreement;
 use App\Models\MedicationSupportChange;
@@ -30,6 +31,8 @@ use App\Services\Medication\Support\SupportTime;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Database\DeadlockException;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -39,6 +42,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use Mockery;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 /** P03 policy regressions plus explicit real P08a batch integration and atomic rollback. */
@@ -112,6 +116,78 @@ class MedicationSupportWorkflowTest extends TestCase
             'ordering_responsibility' => 'person', 'person_responsibilities' => 'Takes the vitamin.',
             'staff_responsibilities' => 'Checks supply weekly.', 'confirm_loosening' => true,
         ])->assertSessionHasNoErrors()->assertRedirect();
+    }
+
+    private function mixedSupport(): array
+    {
+        $assessment = $this->assess('self_managed');
+        $this->agree($assessment);
+        $controlled = ClientMedication::factory()->create([
+            'client_id' => $this->person->id, 'name' => 'Concealed synthetic medicine', 'controlled_drug' => true,
+            'active' => true, 'state' => 'active', 'approval_status' => 'verified', 'start_date' => '2026-10-02', 'end_date' => null,
+        ]);
+        $this->actingAs($this->actor)->put('/emar/self-admin/'.$assessment->id, [
+            'med_scope' => [['med_id' => $controlled->id, 'scope' => 'assisted']], 'confirm_loosening' => true,
+        ])->assertSessionHasNoErrors()->assertRedirect();
+        $this->assertSame('self_managed', app(MedicationSupport::class)->mode($this->medicine));
+        $this->assertSame('assisted', app(MedicationSupport::class)->mode($controlled));
+
+        return [$assessment, $controlled];
+    }
+
+    private function denyPermission(string $key): void
+    {
+        $id = Permission::query()->where('key', $key)->sole()->id;
+        $this->actor->permissionOverrides()->syncWithoutDetaching([$id => ['allowed' => false]]);
+        $this->actor->unsetRelation('permissionOverrides')->unsetRelation('roles');
+    }
+
+    private function supportSnapshot(): array
+    {
+        $snapshot = [];
+        foreach (['client_medications', 'medication_self_admin_assessments', 'medication_support_agreements',
+            'medication_support_changes', 'medication_followups', 'medication_followup_events',
+            'medication_support_trigger_outbox', 'medication_idempotency_results', 'medication_events'] as $table) {
+            $snapshot[$table] = DB::table($table)->orderBy('id')->get()->map(fn ($row) => (array) $row)->all();
+        }
+        $snapshot['medication_event_heads'] = DB::table('medication_event_heads')->orderBy('site_id')->get()->map(fn ($row) => (array) $row)->all();
+
+        return $snapshot;
+    }
+
+    private function signedAgreementPayload(string $uuid): array
+    {
+        $file = UploadedFile::fake()->createWithContent('agreement.pdf', "%PDF-1.4\nSynthetic support agreement.\n");
+        $file->mimeTypeToReport = 'application/pdf';
+
+        return [
+            'client_request_uuid' => $uuid, 'agreed_by_role' => 'person', 'method' => 'signed', 'attachment' => $file,
+            'ordering_responsibility' => 'person', 'person_responsibilities' => 'Takes vitamin.',
+            'staff_responsibilities' => 'Checks supply.', 'confirm_loosening' => true,
+        ];
+    }
+
+    private function spyPrivateWrites(array &$paths, int $writes = 1)
+    {
+        $disk = Storage::fake('private');
+        $disk->put('unrelated.txt', 'Keep this existing file.');
+        $spy = Mockery::mock($disk);
+        $spy->shouldReceive('putFileAs')->times($writes)->andReturnUsing(function (...$args) use ($disk, &$paths) {
+            $path = $disk->putFileAs(...$args);
+            $paths[] = $path;
+
+            return $path;
+        });
+        Storage::getFacadeRoot()->set('private', $spy);
+
+        return $disk;
+    }
+
+    private function agreementDeadlock(): QueryException
+    {
+        return new QueryException('mysql', 'select 1', [], new \PDOException(
+            'SQLSTATE[40001]: Serialization failure: 1213 Deadlock found when trying to get lock', 40001,
+        ));
     }
 
     public function test_no_assessment_person_is_in_register_with_truthful_staff_support(): void
@@ -200,6 +276,78 @@ class MedicationSupportWorkflowTest extends TestCase
         $this->actingAs($this->actor)->post('/emar/self-admin/'.$a->id.'/consent', ['direction' => 'more', 'said' => 'I want to do more.', 'occurred_at' => '2026-10-03T06:56+13:00'])->assertSessionHasNoErrors();
         $this->assertSame('staff_given', app(MedicationSupport::class)->mode($this->medicine));
         $this->assertSame('independence_requested', MedicationSupportChange::query()->latest('id')->first()->reason);
+    }
+
+    public function test_concealed_controlled_consent_is_denied_for_the_entire_chosen_set_without_side_effects(): void
+    {
+        [$assessment, $controlled] = $this->mixedSupport();
+        $foreign = ClientMedication::factory()->create(['active' => true, 'state' => 'active', 'controlled_drug' => false, 'end_date' => null]);
+        $this->denyPermission('medications.controlled.view');
+        $this->followups->shouldNotReceive('request');
+        $before = $this->supportSnapshot();
+        foreach (['less', 'more'] as $direction) {
+            foreach ([[], ['client_medication_id' => null], ['client_medication_id' => $controlled->id],
+                ['client_medication_id' => $foreign->id], ['client_medication_id' => $foreign->id + 100000]] as $selection) {
+                $response = $this->actingAs($this->actor)->postJson('/emar/self-admin/'.$assessment->id.'/consent', [
+                    ...$selection, 'direction' => $direction, 'said' => 'Please change my support.',
+                    'occurred_at' => '2026-10-03T06:59+13:00', 'client_request_uuid' => (string) Str::uuid(),
+                ])->assertNotFound();
+                $this->assertStringNotContainsString($controlled->name, $response->getContent());
+                $this->assertSame($before, $this->supportSnapshot());
+            }
+        }
+        $this->actingAs($this->actor)->postJson('/emar/self-admin/'.$assessment->id.'/consent', [
+            'said' => 'No direction selected.', 'occurred_at' => '2026-10-03T06:59+13:00',
+        ])->assertUnprocessable()->assertJsonValidationErrors('direction');
+        $this->assertSame($before, $this->supportSnapshot());
+    }
+
+    public function test_explicit_ordinary_consent_preserves_concealed_controlled_support_and_replay(): void
+    {
+        [$assessment, $controlled] = $this->mixedSupport();
+        $this->denyPermission('medications.controlled.view');
+        $controlledBefore = $controlled->fresh()->getRawOriginal();
+        $changesBefore = MedicationSupportChange::query()->where('client_medication_id', $controlled->id)->get()->map->getRawOriginal()->all();
+        $scopeBefore = collect($assessment->fresh()->med_scope)->keyBy('med_id')->get($controlled->id);
+        $this->followups->shouldReceive('request')->twice();
+        foreach (['more' => 'self_managed', 'less' => 'staff_given'] as $direction => $expectedMode) {
+            $data = ['client_medication_id' => $this->medicine->id, 'direction' => $direction, 'said' => 'Please change vitamin support.',
+                'occurred_at' => '2026-10-03T06:59+13:00', 'client_request_uuid' => (string) Str::uuid()];
+            $this->actingAs($this->actor)->postJson('/emar/self-admin/'.$assessment->id.'/consent', $data)->assertOk()->assertJsonPath('sync.status', 'processed');
+            $this->actingAs($this->actor)->postJson('/emar/self-admin/'.$assessment->id.'/consent', $data)->assertOk()->assertJsonPath('sync.status', 'duplicate');
+            $this->assertSame($expectedMode, app(MedicationSupport::class)->mode($this->medicine));
+            $this->assertSame('assisted', app(MedicationSupport::class)->mode($controlled));
+            $this->assertSame($controlledBefore, $controlled->fresh()->getRawOriginal());
+            $this->assertSame($changesBefore, MedicationSupportChange::query()->where('client_medication_id', $controlled->id)->get()->map->getRawOriginal()->all());
+            $this->assertSame($scopeBefore, collect($assessment->fresh()->med_scope)->keyBy('med_id')->get($controlled->id));
+        }
+        $this->assertSame(2, MedicationSupportChange::query()->where('client_medication_id', $this->medicine->id)
+            ->whereIn('reason', ['consent_withdrawn', 'independence_requested'])->count());
+        $this->assertDatabaseCount('medication_idempotency_results', 2);
+    }
+
+    public function test_visible_controlled_consent_retains_its_existing_view_permission_contract(): void
+    {
+        [$assessment, $controlled] = $this->mixedSupport();
+        $this->denyPermission('medications.controlled.record');
+        $this->assertTrue($this->actor->canDo('medications.controlled.view'));
+        $this->assertFalse($this->actor->canDo('medications.controlled.record'));
+        $this->followups->shouldReceive('request')->times(4);
+        foreach (['more' => 'assisted', 'less' => 'staff_given'] as $direction => $mode) {
+            $this->actingAs($this->actor)->postJson('/emar/self-admin/'.$assessment->id.'/consent', [
+                'client_medication_id' => $controlled->id, 'direction' => $direction, 'said' => 'Please change my support.',
+                'occurred_at' => '2026-10-03T06:59+13:00',
+            ])->assertOk();
+            $this->assertSame($mode, app(MedicationSupport::class)->mode($controlled));
+            $this->assertSame('self_managed', app(MedicationSupport::class)->mode($this->medicine));
+        }
+        foreach (['more' => 'self_managed', 'less' => 'staff_given'] as $direction => $mode) {
+            $this->actingAs($this->actor)->postJson('/emar/self-admin/'.$assessment->id.'/consent', [
+                'direction' => $direction, 'said' => 'Please change all my support.', 'occurred_at' => '2026-10-03T06:59+13:00',
+            ])->assertOk();
+            $this->assertSame($mode, app(MedicationSupport::class)->mode($this->medicine));
+            $this->assertSame('staff_given', app(MedicationSupport::class)->mode($controlled));
+        }
     }
 
     public function test_clinical_reader_without_controlled_access_can_reassess_with_hidden_scope_preserved(): void
@@ -459,6 +607,211 @@ class MedicationSupportWorkflowTest extends TestCase
         $this->assertSame('staff_given', app(MedicationSupport::class)->mode($this->medicine));
     }
 
+    public function test_signed_agreement_stores_once_across_outer_deadlock_retry_and_ordinary_replay(): void
+    {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+        $assessment = $this->assess('self_managed');
+        $paths = [];
+        $disk = $this->spyPrivateWrites($paths);
+        $realRecorder = app(MedicationEventRecorder::class);
+        $attempts = 0;
+        $recorder = Mockery::mock(MedicationEventRecorder::class);
+        $recorder->shouldReceive('appendMany')->twice()->andReturnUsing(function (array $events) use ($realRecorder, &$attempts): array {
+            if (++$attempts === 1) {
+                throw $this->agreementDeadlock();
+            }
+
+            return $realRecorder->appendMany($events);
+        });
+        $this->app->instance(MedicationEventRecorder::class, $recorder);
+        $uuid = (string) Str::uuid();
+        DB::commit(); // Exercise the controller's outer retry, outside RefreshDatabase's enclosing transaction.
+
+        $this->actingAs($this->actor)->post('/emar/self-admin/'.$assessment->id.'/agreement', $this->signedAgreementPayload($uuid))
+            ->assertSessionHasNoErrors()->assertRedirect();
+        $agreement = MedicationSupportAgreement::query()->sole();
+        $this->assertSame(2, $attempts);
+        $this->assertSame([$agreement->attachment_path], $paths);
+        $this->assertSame($this->actor->id, $agreement->recorded_by);
+        $this->assertSame($assessment->id, $agreement->assessment_id);
+        $this->assertSame($agreement->id, $assessment->fresh()->support_agreement_id);
+        $this->assertSame('self_managed', app(MedicationSupport::class)->mode($this->medicine));
+        $this->assertSame(1, MedicationSupportChange::query()->where('reason', 'agreement_recorded')->count());
+        $receipt = MedicationIdempotencyResult::query()->sole();
+        $this->assertSame($uuid, $receipt->request_uuid);
+        $this->assertSame($agreement->id, $receipt->response_payload['agreement_id']);
+        $this->assertNull($receipt->expires_at);
+        $this->assertSame(1, DB::table('medication_events')->where('kind', 'support.agreement_recorded')->count());
+        $this->assertSame("%PDF-1.4\nSynthetic support agreement.\n", $disk->get($agreement->attachment_path));
+        $before = $this->supportSnapshot();
+        $files = $disk->allFiles();
+
+        $this->actingAs($this->actor)->post('/emar/self-admin/'.$assessment->id.'/agreement', $this->signedAgreementPayload($uuid))
+            ->assertSessionHasNoErrors()->assertRedirect();
+        $changed = $this->signedAgreementPayload($uuid);
+        $changed['person_responsibilities'] = 'Different support details.';
+        $this->actingAs($this->actor)->post('/emar/self-admin/'.$assessment->id.'/agreement', $changed)
+            ->assertSessionHasErrors('client_request_uuid');
+        $this->assertSame($before, $this->supportSnapshot());
+        $this->assertSame($files, $disk->allFiles());
+        $this->assertSame([$agreement->attachment_path], $paths);
+        $this->assertSame('Keep this existing file.', $disk->get('unrelated.txt'));
+    }
+
+    public function test_exhausted_agreement_retries_remove_only_the_once_staged_attachment(): void
+    {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+        $assessment = $this->assess('self_managed');
+        $paths = [];
+        $disk = $this->spyPrivateWrites($paths);
+        $attempts = 0;
+        $recorder = Mockery::mock(MedicationEventRecorder::class);
+        $recorder->shouldReceive('appendMany')->times(5)->andReturnUsing(function () use (&$attempts): void {
+            $attempts++;
+            throw $this->agreementDeadlock();
+        });
+        $this->app->instance(MedicationEventRecorder::class, $recorder);
+        $before = $this->supportSnapshot();
+        DB::commit();
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($this->actor)->post('/emar/self-admin/'.$assessment->id.'/agreement', $this->signedAgreementPayload((string) Str::uuid()));
+            $this->fail('Expected the fifth deadlock to terminate the agreement request.');
+        } catch (DeadlockException $error) {
+            $this->assertStringContainsString('1213 Deadlock found', $error->getMessage());
+        }
+        $this->assertSame(5, $attempts);
+        $this->assertCount(1, $paths);
+        $this->assertFalse($disk->exists($paths[0]));
+        $this->assertSame(['unrelated.txt'], $disk->allFiles());
+        $this->assertSame($before, $this->supportSnapshot());
+    }
+
+    public function test_agreement_retry_rechecks_current_authority_and_cleans_its_staged_bytes(): void
+    {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+        $assessment = $this->assess('self_managed');
+        $paths = [];
+        $disk = $this->spyPrivateWrites($paths);
+        $attempts = 0;
+        $revoked = false;
+        $recorder = Mockery::mock(MedicationEventRecorder::class);
+        $recorder->shouldReceive('appendMany')->once()->andReturnUsing(function () use (&$attempts): void {
+            $attempts++;
+            throw $this->agreementDeadlock();
+        });
+        $this->app->instance(MedicationEventRecorder::class, $recorder);
+        DB::connection()->beforeStartingTransaction(function ($connection) use (&$attempts, &$revoked): void {
+            if ($connection->transactionLevel() === 0 && $attempts === 1 && ! $revoked) {
+                $revoked = true;
+                $this->denyPermission('medications.orders.manage');
+            }
+        });
+        $before = $this->supportSnapshot();
+        DB::commit();
+
+        $this->actingAs($this->actor)->post('/emar/self-admin/'.$assessment->id.'/agreement', $this->signedAgreementPayload((string) Str::uuid()))
+            ->assertForbidden();
+        $this->assertTrue($revoked);
+        $this->assertSame(1, $attempts);
+        $this->assertCount(1, $paths);
+        $this->assertFalse($disk->exists($paths[0]));
+        $this->assertSame(['unrelated.txt'], $disk->allFiles());
+        $this->assertSame($before, $this->supportSnapshot());
+    }
+
+    public function test_agreement_retry_rechecks_the_current_assessment_and_cleans_its_staged_bytes(): void
+    {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+        $assessment = $this->assess('self_managed');
+        $paths = [];
+        $disk = $this->spyPrivateWrites($paths);
+        $realRecorder = app(MedicationEventRecorder::class);
+        $attempts = 0;
+        $reassessed = false;
+        $currentSnapshot = null;
+        $recorder = Mockery::mock(MedicationEventRecorder::class);
+        $recorder->shouldReceive('appendMany')->twice()->andReturnUsing(function (array $events) use ($realRecorder, &$attempts): array {
+            if (++$attempts === 1) {
+                throw $this->agreementDeadlock();
+            }
+
+            return $realRecorder->appendMany($events);
+        });
+        $this->app->instance(MedicationEventRecorder::class, $recorder);
+        DB::connection()->beforeStartingTransaction(function ($connection) use ($assessment, &$attempts, &$reassessed, &$currentSnapshot): void {
+            if ($connection->transactionLevel() === 0 && $attempts === 1 && ! $reassessed) {
+                $reassessed = true;
+                $this->actingAs($this->actor)->post('/emar/self-admin', [...$this->payload(), 'supersedes_id' => $assessment->id])
+                    ->assertSessionHasNoErrors()->assertRedirect();
+                $this->assertSame(0, $connection->transactionLevel());
+                $currentSnapshot = $this->supportSnapshot();
+            }
+        });
+        DB::commit();
+
+        $this->actingAs($this->actor)->post('/emar/self-admin/'.$assessment->id.'/agreement', $this->signedAgreementPayload((string) Str::uuid()))
+            ->assertStatus(409);
+        $this->assertTrue($reassessed);
+        $this->assertSame(2, $attempts);
+        $this->assertNotSame($assessment->id, app(MedicationSupport::class)->current($this->person->id)->id);
+        $this->assertCount(1, $paths);
+        $this->assertFalse($disk->exists($paths[0]));
+        $this->assertSame(['unrelated.txt'], $disk->allFiles());
+        $this->assertSame($currentSnapshot, $this->supportSnapshot());
+    }
+
+    public function test_retry_replay_deletes_only_its_unused_attachment_and_preserves_the_competing_agreement(): void
+    {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+        $assessment = $this->assess('self_managed');
+        $paths = [];
+        $disk = $this->spyPrivateWrites($paths, 2);
+        $realRecorder = app(MedicationEventRecorder::class);
+        $attempts = 0;
+        $winnerCommitted = false;
+        $recorder = Mockery::mock(MedicationEventRecorder::class);
+        $recorder->shouldReceive('appendMany')->twice()->andReturnUsing(function (array $events) use ($realRecorder, &$attempts): array {
+            if (++$attempts === 1) {
+                throw $this->agreementDeadlock();
+            }
+
+            return $realRecorder->appendMany($events);
+        });
+        $this->app->instance(MedicationEventRecorder::class, $recorder);
+        $uuid = (string) Str::uuid();
+        DB::connection()->beforeStartingTransaction(function ($connection) use ($assessment, $uuid, &$attempts, &$winnerCommitted): void {
+            if ($connection->transactionLevel() === 0 && $attempts === 1 && ! $winnerCommitted) {
+                $winnerCommitted = true;
+                // The failed request released its locks. A second real request commits the same binding before its retry.
+                $this->actingAs($this->actor)->post('/emar/self-admin/'.$assessment->id.'/agreement', $this->signedAgreementPayload($uuid))
+                    ->assertSessionHasNoErrors()->assertRedirect();
+                $this->assertSame(0, $connection->transactionLevel());
+            }
+        });
+        DB::commit();
+
+        $this->actingAs($this->actor)->post('/emar/self-admin/'.$assessment->id.'/agreement', $this->signedAgreementPayload($uuid))
+            ->assertSessionHasNoErrors()->assertRedirect();
+        $this->assertTrue($winnerCommitted);
+        $this->assertSame(2, $attempts);
+        $this->assertCount(2, $paths);
+        $this->assertNotSame($paths[0], $paths[1]);
+        $agreement = MedicationSupportAgreement::query()->sole();
+        $this->assertSame($paths[1], $agreement->attachment_path);
+        $this->assertSame($this->actor->id, $agreement->recorded_by);
+        $this->assertSame($assessment->id, $agreement->assessment_id);
+        $this->assertSame($agreement->id, $assessment->fresh()->support_agreement_id);
+        $this->assertSame('self_managed', app(MedicationSupport::class)->mode($this->medicine));
+        $this->assertFalse($disk->exists($paths[0]));
+        $this->assertTrue($disk->exists($paths[1]));
+        $this->assertEqualsCanonicalizing(['unrelated.txt', $paths[1]], $disk->allFiles());
+        $this->assertSame("%PDF-1.4\nSynthetic support agreement.\n", $disk->get($paths[1]));
+        $this->assertSame(1, MedicationSupportChange::query()->where('reason', 'agreement_recorded')->count());
+        $this->assertSame($agreement->id, MedicationIdempotencyResult::query()->sole()->response_payload['agreement_id']);
+        $this->assertSame(1, DB::table('medication_events')->where('kind', 'support.agreement_recorded')->count());
+    }
+
     public function test_failed_agreement_audit_removes_only_the_staged_attachment(): void
     {
         Storage::fake('private');
@@ -495,8 +848,8 @@ class MedicationSupportWorkflowTest extends TestCase
         $this->actingAs($this->actor)->post(route('emar.errors.store'), [
             'client_id' => $this->person->id, 'client_medication_id' => $this->medicine->id,
             'error_type' => 'wrong_dose', 'severity' => 'minor', 'description' => 'Synthetic recorded error.',
-                'reached_client' => 'yes', 'harm_level' => 'none',
-                'occurred_at' => CarbonImmutable::now('Pacific/Auckland')->format('Y-m-d\TH:i'), 'report_token' => (string) Str::uuid(),
+            'reached_client' => 'yes', 'harm_level' => 'none',
+            'occurred_at' => CarbonImmutable::now('Pacific/Auckland')->format('Y-m-d\TH:i'), 'report_token' => (string) Str::uuid(),
         ])->assertSessionHasNoErrors()->assertRedirect();
         $source = MedicationError::query()->sole();
         $receipt = MedicationSupportTriggerOutbox::query()->sole();

@@ -1,5 +1,17 @@
 # eMAR implementation and verification status
 
+## Final review and main integration — 6 October 2026
+
+The user has authorised merging the complete eMAR branch into GitHub `main` and synchronising local `main`. This is source integration only; production migrations, backfills, configuration changes and deployment remain outside this step.
+
+Candidate `bf05fb18921ffb1042c53e43e508c41f0d7de02a` completed all **18 CI checks** successfully. Its medication release job passed **383 tests / 5,509 assertions**, and the main desktop job passed **118 tests with two existing skips**. All broad feature groups, foundation, database bootstrap, quality and the other five desktop/visual jobs passed. These results supersede the pending CI statements in the historical checkpoints below.
+
+A subsequent review identified a whole-person consent permission gap, unused signed-agreement attachment cleanup after a transaction retry reaches a duplicate request, and misleading emergency-policy effect text. The follow-up denies a whole-person consent request before any mutation when its chosen medicines include controlled items the actor cannot view. Agreement uploads are staged once per request and retained only when the final committed attempt uses them; final failure or duplicate replay cleans this request's unused file. Policy wording now states that existing grants and their extensions retain their original rules. Independent review, PHP syntax, Pint and diff checks pass. Eight new regressions cover concealed choices without side effects, explicit ordinary choices, the existing controlled-view contract, actual retry success/exhaustion, lost authority, reassessment and a competing committed agreement. Laravel caches an uploaded file's random filename, so repeated stores ordinarily overwrite that path; the demonstrated replay defect leaves the losing request's staged file unreferenced.
+
+The complete support, emergency lifecycle and P11 settings files contain **69 cases**. The local launch guard found a competing test/import process and stopped before creating a runner or schema. No local runtime pass is claimed. The 5,147-file source freeze contains exactly the three approved application changes, and all 13 previously accepted hashes remain unchanged. Runtime acceptance will use fresh GitHub CI's isolated environment, including all three complete files, before merging. The prior green commit does not certify these new fixes.
+
+Thirty-three untracked local eMAR documents that overlap incoming tracked paths have verified private backup copies. Originals remain in place until the guarded fast-forward; unrelated untracked work will remain untouched. No production data or feature flags have changed.
+
 ## NZ date and desktop acceptance follow-up — 6 October 2026
 
 The dedicated medication release job at `fbb30210b47a881d3eb4fc90d98a3cc45d236d3c` passes **383 tests / 5,509 assertions**. Screenshot comparisons and both Governance and IT desktop sizes pass. Broader CI exposed two test fixtures that mixed UTC and New Zealand dates around midnight, plus a desktop assignment test that checked the old page before its save and redirected read finished. These are test corrections; production authorization, payroll safeguards and assignment behavior remain unchanged.

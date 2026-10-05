@@ -361,7 +361,7 @@ class MedicationSettingsRegistry
         );
 
         return new MedicationSettingGroup(
-            key: 'ea', view: self::VIEW_ALERTS, effect: 'From the next emergency-access grant or extension', auditEvent: 'medications.emergency_policy.updated',
+            key: 'ea', view: self::VIEW_ALERTS, effect: 'New grants only. Existing grants and their extensions keep their original rules.', auditEvent: 'medications.emergency_policy.updated',
             definitions: [
                 $number('default_minutes', 'A grant lasts', 'minutes', [5, 1440], MedicationSettingDefinition::HIGHER_IS_LOOSER),
                 $number('extend_minutes', 'Each extension adds', 'minutes', [5, 1440], MedicationSettingDefinition::HIGHER_IS_LOOSER),

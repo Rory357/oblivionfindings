@@ -277,7 +277,7 @@ final class MedicationSupport
         $orders = ClientMedication::query()->active()->where('client_id', $client->id)->orderBy('id')->lockForUpdate()->get();
         $chosen = isset($data['client_medication_id']) ? $orders->where('id', $data['client_medication_id']) : $orders;
         abort_if($chosen->isEmpty(), 404);
-        abort_if(isset($data['client_medication_id']) && $chosen->contains(fn ($m) => $m->controlled_drug) && ! $actor->canDo('medications.controlled.view'), 404);
+        abort_if($chosen->contains(fn ($m) => $m->controlled_drug) && ! $actor->canDo('medications.controlled.view'), 404);
         $scope = collect($assessment->med_scope ?? [])->keyBy('med_id');
         foreach ($chosen as $order) {
             $mode = $data['direction'] === 'less' ? 'staff_given' : $this->mode($order);
