@@ -28,8 +28,8 @@ class StaffTimeOffController extends Controller
             'return_to' => ['nullable', 'string'],
         ]);
 
-        $userId = $data['user_id'] ?? $auth->id;
-        if ($userId !== $auth->id && ! $auth->canDo('staff.availability.updateAny')) {
+        $userId = (int) ($data['user_id'] ?? $auth->id);
+        if ($userId !== (int) $auth->id && ! $auth->canDo('staff.availability.updateAny')) {
             abort(403);
         }
 
@@ -41,12 +41,14 @@ class StaffTimeOffController extends Controller
         // written and HR can see it. unavailable/training stay roster-only (no balance impact).
         if ($data['type'] === 'leave') {
             try {
-                $leaveService->createRosterLeave($target, $data, $auth);
+                $leave = $leaveService->createRosterLeave($target, $data, $auth);
             } catch (\InvalidArgumentException $e) {
                 return redirect($returnTo)->with('error', $e->getMessage());
             }
 
-            return redirect($returnTo)->with('success', 'Leave recorded and synced to the staff member’s HR balance.');
+            return redirect($returnTo)->with('success', $leave->status === 'approved'
+                ? 'Leave approved and synced to the staff member’s HR balance. Cover still needs review.'
+                : 'Leave request submitted for approval.');
         }
 
         StaffTimeOff::create([

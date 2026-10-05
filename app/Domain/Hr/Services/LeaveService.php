@@ -14,12 +14,17 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\StaffTimeOff;
 use App\Models\User;
+use App\Services\CurrentAuthorizationReads;
+use App\Services\Operations\WorkforceMutationGuard;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class LeaveService
 {
@@ -57,7 +62,16 @@ class LeaveService
         private readonly HrLeaveAccessService $access,
         private readonly UserSiteAccessService $siteAccess,
         private readonly WorkforceAvailabilityCoverageService $coverage,
+        private readonly HrLeaveEntryCommandAccessService $entryAccess,
     ) {}
+
+    /** Each whole request uses the year of its start in the configured worker calendar. */
+    private function balanceYear(CarbonInterface|string $startsAt): int
+    {
+        $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
+
+        return Carbon::parse($startsAt)->setTimezone($timezone)->year;
+    }
 
     /**
      * Submit a leave request with balance validation.
@@ -70,17 +84,31 @@ class LeaveService
      *
      * @throws \InvalidArgumentException If leave_type is invalid or dates are malformed
      */
-    public function submitRequest(User $user, array $data): HrLeaveRequest
+    public function submitRequest(User $user, array $data, ?User $actor = null): HrLeaveRequest
+    {
+        $entry = $actor ? HrLeaveEntryCommandAccessService::MANAGED : HrLeaveEntryCommandAccessService::SELF;
+        $actor ??= $user;
+        $calculation = $this->prepareReservation($user, $data);
+
+        return $this->entryTransaction(function () use ($user, $data, $actor, $entry, $calculation): HrLeaveRequest {
+            app(WorkforceMutationGuard::class)->lock();
+            $request = $this->reserveRequest($user, $data, $actor, $calculation);
+            $this->validateReservedEntry($actor, $user, $entry, $calculation);
+
+            return $request->fresh();
+        });
+    }
+
+    /** Validate the original input/formula; final evidence is checked after all native waits. */
+    private function prepareReservation(User $user, array $data): array
     {
         if (! $this->access->isCurrentStaff($user)) {
             throw new \InvalidArgumentException('Leave can only be requested for current approved staff.');
         }
-
         $leaveType = strtolower((string) ($data['leave_type'] ?? ''));
         if (! in_array($leaveType, self::LEAVE_TYPES, true)) {
             throw new \InvalidArgumentException("Unsupported leave type '{$leaveType}'.");
         }
-
         try {
             $timezone = (string) config('app.worker_timezone', config('app.timezone', 'UTC'));
             $localStartsAt = Carbon::parse($data['starts_at'], $timezone)->startOfDay();
@@ -90,98 +118,108 @@ class LeaveService
         } catch (\Throwable) {
             throw new \InvalidArgumentException('Leave dates are invalid.');
         }
-
         if ($startsAt->greaterThan($endsAt)) {
             throw new \InvalidArgumentException('Leave end date must be after the start date.');
         }
-
         $period = $this->normalisePeriod($data['period'] ?? null);
-        $hoursRequested = isset($data['hours_requested']) && (float) $data['hours_requested'] > 0
-            ? (float) $data['hours_requested']
-            : $this->calculateRequestedHours($user, $localStartsAt, $localEndsAt, $period);
-
+        $automatic = ! (isset($data['hours_requested']) && (float) $data['hours_requested'] > 0);
+        $hoursRequested = $automatic
+            ? $this->calculateRequestedHours($user, $localStartsAt, $localEndsAt, $period)
+            : (float) $data['hours_requested'];
         if ($hoursRequested <= 0) {
             throw new \InvalidArgumentException('Requested leave hours must be greater than zero.');
         }
 
-        $hasOverlap = HrLeaveRequest::query()
-            ->where('user_id', $user->id)
-            ->whereIn('status', ['pending', 'approved'])
-            ->where(function ($query) use ($startsAt, $endsAt) {
-                $query->where('starts_at', '<=', $endsAt)
-                    ->where('ends_at', '>=', $startsAt);
-            })
-            ->exists();
+        return compact('leaveType', 'period', 'localStartsAt', 'localEndsAt', 'startsAt', 'endsAt', 'hoursRequested', 'automatic');
+    }
 
-        if ($hasOverlap) {
+    /** The application mutex is held; do not acquire actor/profile locks before optional cover waits. */
+    private function reserveRequest(User $user, array $data, User $actor, array $calculation): HrLeaveRequest
+    {
+        ['leaveType' => $leaveType, 'period' => $period, 'localStartsAt' => $localStartsAt,
+            'startsAt' => $startsAt, 'endsAt' => $endsAt, 'hoursRequested' => $hoursRequested] = $calculation;
+        $overlap = HrLeaveRequest::query()->where('user_id', $user->id)
+            ->whereIn('status', ['pending', 'approved'])
+            ->where('starts_at', '<=', $endsAt)->where('ends_at', '>=', $startsAt)
+            ->lock('for share nowait')->first(['id']);
+        if ($overlap) {
             throw new \InvalidArgumentException('Leave request overlaps with an existing pending or approved leave request.');
         }
-
-        return DB::transaction(function () use ($user, $data, $leaveType, $period, $localStartsAt, $startsAt, $endsAt, $hoursRequested) {
-            $year = $localStartsAt->year;
-            $balance = $this->ensureBalanceRecord($user, $leaveType, $year);
-            $before = $this->snapshotBalance($balance);
-
-            $availableBefore = $this->calculateAvailableHours($before['balance_hours'], $before['used_hours'], $before['pending_hours']);
-            $hasRosterConflict = $this->hasRosterConflict($user->id, $startsAt, $endsAt);
-            $needsEscalation = $availableBefore < $hoursRequested || $hasRosterConflict;
-
-            $approvalRoute = $this->resolveApprovalRoute($user, 1);
-            $primaryApprover = $approvalRoute['approver_user_id'];
-            $approvalDueAt = now()->addHours((int) $approvalRoute['escalation_after_hours']);
-
-            $balance->pending_hours = round((float) $balance->pending_hours + $hoursRequested, 2);
-            $balance->last_synced_at = now();
-            $balance->updated_by = (int) ($data['created_by'] ?? $user->id);
-            $balance->save();
-
-            $request = HrLeaveRequest::create([
-                'user_id' => $user->id,
-                'leave_type' => $leaveType,
-                'period' => $period,
-                'starts_at' => $startsAt,
-                'ends_at' => $endsAt,
-                'hours_requested' => $hoursRequested,
-                'reason' => $data['reason'] ?? null,
-                'supporting_doc_path' => $data['supporting_doc_path'] ?? null,
-                'status' => 'pending',
-                'submitted_at' => now(),
-                'approval_due_at' => $approvalDueAt,
-                'escalated_to' => $primaryApprover,
-                'escalation_level' => 1,
-                'escalated_at' => $needsEscalation ? now() : null,
-                'created_by' => (int) ($data['created_by'] ?? $user->id),
-            ]);
-
-            $this->recordBalanceLedger(
-                balance: $balance,
-                before: $before,
-                entryType: 'reserved',
-                hoursDelta: $hoursRequested,
-                source: $request,
-                createdBy: (int) ($data['created_by'] ?? $user->id),
-                notes: $needsEscalation
-                    ? 'Pending leave reserved and escalated for review.'
-                    : 'Pending leave reserved.',
-            );
-
-            if ($primaryApprover) {
-                $approver = User::find($primaryApprover);
-                if ($approver) {
-                    try {
-                        $approver->notify(new LeaveRequestNotification($request->loadMissing('user')));
-                    } catch (\Throwable $exception) {
-                        Log::warning('Failed to send leave request notification', [
-                            'leave_request_id' => $request->id,
-                            'approver_id' => $approver->id,
-                            'error' => $exception->getMessage(),
-                        ]);
+        $year = $this->balanceYear($localStartsAt);
+        $balance = $this->ensureBalanceRecord($user, $leaveType, $year, true, true);
+        $before = $this->snapshotBalance($balance);
+        $availableBefore = $this->calculateAvailableHours($before['balance_hours'], $before['used_hours'], $before['pending_hours']);
+        $hasRosterConflict = $this->hasRosterConflict($user->id, $startsAt, $endsAt);
+        $needsEscalation = $availableBefore < $hoursRequested || $hasRosterConflict;
+        $approvalRoute = $this->resolveApprovalRoute($user, 1);
+        $primaryApprover = $approvalRoute['approver_user_id'];
+        $approvalDueAt = now()->addHours((int) $approvalRoute['escalation_after_hours']);
+        $balance->pending_hours = round((float) $balance->pending_hours + $hoursRequested, 2);
+        $balance->last_synced_at = now();
+        $balance->updated_by = $actor->id;
+        $balance->save();
+        $request = HrLeaveRequest::create([
+            'user_id' => $user->id, 'leave_type' => $leaveType, 'period' => $period,
+            'starts_at' => $startsAt, 'ends_at' => $endsAt, 'hours_requested' => $hoursRequested,
+            'reason' => $data['reason'] ?? null, 'supporting_doc_path' => $data['supporting_doc_path'] ?? null,
+            'status' => 'pending', 'submitted_at' => now(), 'approval_due_at' => $approvalDueAt,
+            'escalated_to' => $primaryApprover, 'escalation_level' => 1,
+            'escalated_at' => $needsEscalation ? now() : null, 'created_by' => $actor->id,
+        ]);
+        $this->recordBalanceLedger(balance: $balance, before: $before, entryType: 'reserved',
+            hoursDelta: $hoursRequested, source: $request, createdBy: $actor->id,
+            notes: $needsEscalation ? 'Pending leave reserved and escalated for review.' : 'Pending leave reserved.');
+        if ($primaryApprover) {
+            // Reload normal recipient routing only after the actual outer commit.
+            $requestId = (int) $request->id;
+            DB::afterCommit(function () use ($primaryApprover, $requestId, $request): void {
+                try {
+                    $approver = User::find($primaryApprover);
+                    $recipient = User::find($request->user_id);
+                    $request->setRelation('user', $recipient);
+                    if ($approver && $recipient) {
+                        $approver->notify(new LeaveRequestNotification($request));
                     }
+                } catch (\Throwable $exception) {
+                    Log::warning('Failed to send leave request notification', [
+                        'leave_request_id' => $requestId, 'approver_id' => $primaryApprover,
+                        'error' => $exception->getMessage(),
+                    ]);
                 }
-            }
+            });
+        }
 
-            return $request->fresh();
-        });
+        return $request;
+    }
+
+    private function validateReservedEntry(User $actor, User $subject, string $entry, array $calculation): void
+    {
+        [, $currentSubject] = $this->entryAccess->lock($actor, $subject, $entry);
+        if (! $calculation['automatic']) {
+            return; // Positive explicit caller-hours preserve their existing semantics.
+        }
+        $holidays = CurrentAuthorizationReads::within(fn (CurrentAuthorizationReads $reads) => $reads->query(HrPublicHoliday::query())
+            ->whereBetween('date', [$calculation['localStartsAt']->toDateString(), $calculation['localEndsAt']->toDateString()])
+            ->where(fn ($query) => $query->where('is_national', true)->orWhereNull('region')->orWhereRaw('CHAR_LENGTH(region) = 0'))
+            ->orderBy('date')->orderBy('id')->get(['date']));
+        $dates = array_fill_keys($holidays->map(fn (HrPublicHoliday $holiday): string => $holiday->date->toDateString())->all(), true);
+        $currentHours = $this->hoursForCalendar(
+            (float) ($currentSubject->hrEmployeeProfile->hours_per_week ?: 40),
+            $calculation['localStartsAt'], $calculation['localEndsAt'], $calculation['period'],
+            fn (Carbon $day): bool => isset($dates[$day->toDateString()]),
+        );
+        if ($currentHours !== $calculation['hoursRequested']) {
+            throw ValidationException::withMessages(['leave_request' => 'Leave calculation evidence changed. Review the dates and try again.']);
+        }
+    }
+
+    private function entryTransaction(callable $command): mixed
+    {
+        try {
+            return DB::transaction($command);
+        } catch (QueryException $exception) {
+            HrLeaveEntryCommandAccessService::rethrowContention($exception);
+        }
     }
 
     /**
@@ -221,7 +259,7 @@ class LeaveService
             ? (float) $data['hours_requested']
             : $this->calculateRequestedHours($user, $localStartsAt, $localEndsAt, $period);
 
-        $year = $localStartsAt->year;
+        $year = $this->balanceYear($localStartsAt);
         $balance = HrLeaveBalance::query()
             ->where('user_id', $user->id)
             ->where('leave_type', $leaveType)
@@ -268,13 +306,12 @@ class LeaveService
     public function approveRequest(HrLeaveRequest $request, User $reviewer, ?string $reviewNotes = null): HrLeaveRequest
     {
         return DB::transaction(function () use ($request, $reviewer, $reviewNotes) {
-            $request = $this->access->currentRequest($reviewer, $request, lockForUpdate: true);
+            $request = $this->access->reviewRequest($reviewer, $request, lockForUpdate: true);
             if ($request->status !== 'pending') {
                 throw new \LogicException("Cannot approve a '{$request->status}' leave request.");
             }
 
-            $timezone = (string) config('app.worker_timezone', config('app.timezone', 'UTC'));
-            $year = Carbon::parse($request->starts_at)->setTimezone($timezone)->year;
+            $year = $this->balanceYear($request->starts_at);
             $requestUser = $request->user ?: User::query()->findOrFail($request->user_id);
             $balance = $this->ensureBalanceRecord(
                 $requestUser,
@@ -323,6 +360,7 @@ class LeaveService
             );
 
             $this->coverage->syncApprovedLeave($request, $reviewer);
+            $this->access->lockCurrentReviewActor($reviewer, $request);
 
             $requestId = (int) $request->id;
             DB::afterCommit(
@@ -347,12 +385,12 @@ class LeaveService
     public function declineRequest(HrLeaveRequest $request, User $reviewer, string $reason): HrLeaveRequest
     {
         return DB::transaction(function () use ($request, $reviewer, $reason) {
-            $request = $this->access->currentRequest($reviewer, $request, lockForUpdate: true);
+            $request = $this->access->reviewRequest($reviewer, $request, lockForUpdate: true);
             if ($request->status !== 'pending') {
                 throw new \LogicException("Cannot decline a '{$request->status}' leave request.");
             }
 
-            $year = Carbon::parse($request->starts_at)->year;
+            $year = $this->balanceYear($request->starts_at);
             $requestUser = $request->user ?: User::query()->findOrFail($request->user_id);
             $balance = $this->ensureBalanceRecord(
                 $requestUser,
@@ -389,6 +427,7 @@ class LeaveService
             // Real mail + database notification (includes the decline reason via
             // the just-written review_notes) — mirrors the approve path's
             // LeaveApprovedNotification instead of a database-only stub.
+            $this->access->lockCurrentReviewActor($reviewer, $request);
             app(HrNotificationService::class)->notifyLeaveDeclined($request->fresh(['reviewer', 'user']));
 
             return $request->fresh();
@@ -456,9 +495,10 @@ class LeaveService
             throw new \InvalidArgumentException('Adjustment hours cannot be negative.');
         }
 
-        $result = DB::transaction(function () use ($target, $leaveType, $year, $mode, $hours, $reason, $actor) {
+        $result = $this->entryTransaction(function () use ($target, $leaveType, $year, $mode, $hours, $reason, $actor) {
+            app(WorkforceMutationGuard::class)->lock();
             $target = $this->access->currentSubject($actor, $target);
-            $balance = $this->ensureBalanceRecord($target, $leaveType, $year, true);
+            $balance = $this->ensureBalanceRecord($target, $leaveType, $year, true, true);
             $before = $this->snapshotBalance($balance);
 
             $entryType = 'adjustment';
@@ -490,27 +530,26 @@ class LeaveService
                 notes: $reason,
             );
 
+            $this->entryAccess->lock($actor, $target, HrLeaveEntryCommandAccessService::ADJUSTMENT);
+            if ((int) $actor->id !== (int) $target->id) {
+                $targetId = (int) $target->id;
+                $balanceHours = (float) $balance->balance_hours;
+                DB::afterCommit(function () use ($targetId, $leaveType, $year, $delta, $balanceHours, $reason): void {
+                    try {
+                        $recipient = User::find($targetId);
+                        if ($recipient) {
+                            $recipient->notify(new LeaveBalanceAdjustedNotification($leaveType, $year, (float) $delta, $balanceHours, $reason));
+                        }
+                    } catch (\Throwable $exception) {
+                        Log::warning('Failed to send balance-adjusted notification', [
+                            'user_id' => $targetId, 'error' => $exception->getMessage(),
+                        ]);
+                    }
+                });
+            }
+
             return ['balance' => $balance->fresh(), 'delta' => $delta];
         });
-
-        // It's their statutory entitlement — tell them it moved (best-effort,
-        // after commit; skip self-adjustments).
-        if ($actor->id !== $target->id) {
-            try {
-                $target->notify(new LeaveBalanceAdjustedNotification(
-                    $leaveType,
-                    $year,
-                    (float) $result['delta'],
-                    (float) $result['balance']->balance_hours,
-                    $reason,
-                ));
-            } catch (\Throwable $exception) {
-                Log::warning('Failed to send balance-adjusted notification', [
-                    'user_id' => $target->id,
-                    'error' => $exception->getMessage(),
-                ]);
-            }
-        }
 
         return $result['balance'];
     }
@@ -559,7 +598,7 @@ class LeaveService
             }
 
             $wasApproved = $request->status === 'approved';
-            $year = Carbon::parse($request->starts_at)->year;
+            $year = $this->balanceYear($request->starts_at);
             $hours = (float) $request->hours_requested;
             $requestUser = $request->user ?: User::query()->findOrFail($request->user_id);
             $balance = $this->ensureBalanceRecord(
@@ -599,6 +638,7 @@ class LeaveService
             );
 
             $this->coverage->cancelLeave($request, $cancelledBy);
+            $this->access->lockCurrentCancellationActor($cancelledBy, $request);
 
             return ['request' => $request->fresh(), 'was_approved' => $wasApproved];
         });
@@ -620,25 +660,32 @@ class LeaveService
     }
 
     /**
-     * Roster → HR (Direction B): a roster manager entering `leave` time off creates a
-     * real, auto-approved HrLeaveRequest so the balance and ledger are written and the
-     * StaffTimeOff projection is linked — instead of a bare, HR-invisible row.
+     * Roster → HR: record a canonical request. Availability editors submit pending
+     * leave; only actors with HR approval authority approve it and create the
+     * linked time-off/coverage projection in the same transaction.
      *
      * `unavailable` / `training` stay roster-only and never reach here.
      */
     public function createRosterLeave(User $target, array $data, User $actor): HrLeaveRequest
     {
-        return DB::transaction(function () use ($target, $data, $actor) {
+        return $this->entryTransaction(function () use ($target, $data, $actor): HrLeaveRequest {
+            app(WorkforceMutationGuard::class)->lock();
+            $isSelf = (int) $target->id === (int) $actor->id;
+            abort_unless($actor->canDo('staff.availability.updateAny')
+                || ($isSelf && $actor->canDo('staff.availability.updateSelf')), 403);
             $target = $this->access->currentSubject($actor, $target);
-            $request = $this->submitRequest($target, [
-                'leave_type' => $data['leave_type'] ?? 'annual',
-                'starts_at' => $data['starts_at'],
-                'ends_at' => $data['ends_at'],
-                'reason' => $data['label'] ?? $data['notes'] ?? 'Entered via roster',
-                'created_by' => $actor->id,
-            ]);
+            $reservationData = ['leave_type' => $data['leave_type'] ?? 'annual',
+                'starts_at' => $data['starts_at'], 'ends_at' => $data['ends_at'],
+                'reason' => $data['label'] ?? $data['notes'] ?? 'Entered via roster'];
+            $calculation = $this->prepareReservation($target, $reservationData);
+            $request = $this->reserveRequest($target, $reservationData, $actor, $calculation);
+            if ($this->access->canReviewLeave($actor)) {
+                $request = $this->approveRequest($request, $actor, $data['notes'] ?? 'Approved by authorised approver via roster.');
+            }
+            // Optional approval/cover Shift waits finish before entry evidence.
+            $this->validateReservedEntry($actor, $target, HrLeaveEntryCommandAccessService::ROSTER, $calculation);
 
-            return $this->approveRequest($request, $actor, $data['notes'] ?? 'Auto-approved — entered via roster.');
+            return $request->fresh();
         });
     }
 
@@ -996,7 +1043,7 @@ class LeaveService
             ->with('site:id,name')
             ->get(['id', 'user_id', 'site_id', 'starts_at', 'ends_at', 'status']);
 
-        $years = $requests->map(fn ($r) => Carbon::parse($r->starts_at)->year)->unique();
+        $years = $requests->map(fn ($r) => $this->balanceYear($r->starts_at))->unique();
         $balances = HrLeaveBalance::query()
             ->whereIn('user_id', $userIds->all())
             ->whereIn('year', $years->all())
@@ -1005,7 +1052,7 @@ class LeaveService
 
         $out = [];
         foreach ($requests as $req) {
-            $year = Carbon::parse($req->starts_at)->year;
+            $year = $this->balanceYear($req->starts_at);
 
             $overlapping = $shifts->filter(fn (Shift $s) => $s->user_id === $req->user_id
                 && $s->starts_at <= $req->ends_at
@@ -1210,7 +1257,7 @@ class LeaveService
         ];
     }
 
-    protected function ensureBalanceRecord(User $user, string $leaveType, int $year, bool $forUpdate = false): HrLeaveBalance
+    protected function ensureBalanceRecord(User $user, string $leaveType, int $year, bool $forUpdate = false, bool $currentCarryOver = false): HrLeaveBalance
     {
         if (! $this->access->isCurrentStaff($user)) {
             throw new \InvalidArgumentException('A leave balance requires current approved staff.');
@@ -1252,6 +1299,7 @@ class LeaveService
             ->where('user_id', $user->id)
             ->where('leave_type', $leaveType)
             ->where('year', $year - 1)
+            ->when($currentCarryOver, fn ($query) => $query->lock('for share nowait'))
             ->first();
 
         if ($previous) {
@@ -1296,19 +1344,21 @@ class LeaveService
             ->where('user_id', $user->id)
             ->first();
 
-        $hoursPerWeek = (float) ($profile?->hours_per_week ?: 40);
-        $hoursPerDay = max(round($hoursPerWeek / 5, 2), 1);
+        return $this->hoursForCalendar((float) ($profile?->hours_per_week ?: 40), $startsAt, $endsAt, $period,
+            fn (Carbon $day): bool => $this->holidays->isPublicHoliday($day, $region));
+    }
 
+    private function hoursForCalendar(float $hoursPerWeek, Carbon $startsAt, Carbon $endsAt, ?string $period, callable $isHoliday): float
+    {
+        $hoursPerDay = max(round($hoursPerWeek / 5, 2), 1);
         $day = $startsAt->copy()->startOfDay();
         $businessDays = 0;
         while ($day->lessThanOrEqualTo($endsAt)) {
-            if (! $day->isWeekend() && ! $this->holidays->isPublicHoliday($day, $region)) {
+            if (! $day->isWeekend() && ! $isHoliday($day)) {
                 $businessDays++;
             }
             $day->addDay();
         }
-
-        // Part-day only applies to a single charged day (validated upstream).
         if ($businessDays === 1 && in_array($period, ['half_day_am', 'half_day_pm'], true)) {
             return round($hoursPerDay / 2, 2);
         }

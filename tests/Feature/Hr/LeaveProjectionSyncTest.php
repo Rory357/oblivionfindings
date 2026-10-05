@@ -7,7 +7,9 @@ use App\Domain\Hr\Services\LeaveService;
 use App\Models\Permission;
 use App\Models\StaffTimeOff;
 use App\Models\User;
+use App\Models\WorkforceAvailabilityCoverageAction;
 use Database\Seeders\RbacSeeder;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
@@ -124,6 +126,52 @@ test('roster-entered unavailable stays roster-only without creating a leave requ
     expect($row)->not->toBeNull();
     expect($row->hr_leave_request_id)->toBeNull();
     expect(HrLeaveRequest::query()->where('user_id', $this->staff->id)->exists())->toBeFalse();
+});
+
+test('a self availability editor submits roster leave pending without approved projections or used balance', function () {
+    foreach (['staff.availability.updateSelf' => true, 'staff.availability.updateAny' => false,
+        'hr.leave.approve' => false, 'hr.leave.manage' => false] as $key => $allowed) {
+        $permission = Permission::query()->firstOrCreate(['key' => $key], ['description' => $key, 'group' => 'HR']);
+        $this->staff->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => $allowed]]);
+    }
+    $start = today()->addWeeks(2)->nextWeekday();
+
+    $this->actingAs($this->staff)->post(route('operations.rostering.time_off.store'), [
+        'user_id' => (string) $this->staff->id,
+        'starts_at' => $start->toDateString(), 'ends_at' => $start->copy()->addDay()->toDateString(),
+        'type' => 'leave', 'leave_type' => 'annual',
+    ])->assertSessionHas('success', 'Leave request submitted for approval.');
+
+    $request = HrLeaveRequest::query()->where('user_id', $this->staff->id)->sole();
+    $balance = HrLeaveBalance::query()->where('user_id', $this->staff->id)->where('leave_type', 'annual')->sole();
+    expect($request->status)->toBe('pending')
+        ->and((float) $balance->used_hours)->toBe(0.0)
+        ->and((float) $balance->pending_hours)->toBeGreaterThan(0.0)
+        ->and(StaffTimeOff::query()->where('hr_leave_request_id', $request->id)->exists())->toBeFalse()
+        ->and(HrLeaveBalanceLedger::query()->where('source_id', $request->id)->where('entry_type', 'approved')->exists())->toBeFalse()
+        ->and(WorkforceAvailabilityCoverageAction::query()->where('source_id', $request->id)->exists())->toBeFalse();
+});
+
+test('shared approval and decline commands deny availability-only actors without moving leave state', function () {
+    $request = pendingRequest($this->staff);
+    foreach (['hr.leave.approve', 'hr.leave.manage'] as $key) {
+        $permission = Permission::query()->firstOrCreate(['key' => $key], ['description' => $key, 'group' => 'HR']);
+        $this->manager->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => false]]);
+    }
+    $actor = $this->manager->fresh();
+
+    foreach (['approveRequest', 'declineRequest'] as $command) {
+        try {
+            app(LeaveService::class)->{$command}($request, $actor, 'Review');
+            $this->fail('An availability editor must not review leave.');
+        } catch (HttpException $exception) {
+            expect($exception->getStatusCode())->toBe(403);
+        }
+    }
+
+    expect($request->fresh()->status)->toBe('pending')
+        ->and(StaffTimeOff::query()->where('hr_leave_request_id', $request->id)->exists())->toBeFalse()
+        ->and(HrLeaveBalanceLedger::query()->where('source_id', $request->id)->exists())->toBeFalse();
 });
 
 test('a roster delete of an approved leave projection is blocked to protect the balance', function () {
