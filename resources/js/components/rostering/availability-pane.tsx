@@ -1,7 +1,5 @@
 import {
     CalendarCheck,
-    CalendarOff,
-    CheckCircle,
     Clock,
     Plane,
     Search,
@@ -99,38 +97,8 @@ export function AvailabilityPane({
         [staff, searchTerm],
     );
 
-    // "Declared today" — staff who have an availability block for today's
-    // day-of-week. A row in staff_availabilities means the worker said
-    // "I'm available this day during these hours", so existence == availability.
+    // Highlight the current day in each staff member’s schedule.
     const todayIdx = new Date().getDay();
-    const declaredToday = useMemo(() => {
-        return filtered.filter((member) =>
-            member.staff_availability?.some(
-                (slot) => slot.day_of_week === todayIdx,
-            ),
-        ).length;
-    }, [filtered, todayIdx]);
-
-    const onLeave = useMemo(() => {
-        const now = new Date().toISOString();
-        return filtered.filter((member) =>
-            (upcomingLeave[member.id] ?? []).some(
-                (leave) => leave.starts_at <= now && leave.ends_at >= now,
-            ),
-        ).length;
-    }, [filtered, upcomingLeave]);
-
-    const noDataCount = useMemo(
-        () =>
-            filtered.filter(
-                (member) =>
-                    (member.staff_availability?.length ?? 0) === 0 &&
-                    (member.staff_time_off?.length ?? 0) === 0 &&
-                    (upcomingLeave[member.id]?.length ?? 0) === 0,
-            ).length,
-        [filtered, upcomingLeave],
-    );
-
     const editingBlocks: EditAvailabilityBlock[] = useMemo(() => {
         if (!editing) return [];
         return (editing.staff_availability ?? []).map((slot) => ({
@@ -155,6 +123,9 @@ export function AvailabilityPane({
                         Weekly availability, planned time off, and approved
                         leave for roster decisions.
                     </p>
+                    <p className="mt-1 text-xs text-muted-foreground" role="status">
+                        {filtered.length} of {staff.length} staff shown
+                    </p>
                 </div>
                 <div className="relative w-full sm:w-72">
                     <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -167,33 +138,6 @@ export function AvailabilityPane({
                         className="h-9 pl-9 text-sm"
                     />
                 </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <AvailabilityStat
-                    icon={User}
-                    label="Total staff"
-                    value={filtered.length}
-                    tone="info"
-                />
-                <AvailabilityStat
-                    icon={CheckCircle}
-                    label="Declared today"
-                    value={declaredToday}
-                    tone="success"
-                />
-                <AvailabilityStat
-                    icon={Plane}
-                    label="Currently on leave"
-                    value={onLeave}
-                    tone="warning"
-                />
-                <AvailabilityStat
-                    icon={CalendarOff}
-                    label="No data"
-                    value={noDataCount}
-                    tone="muted"
-                />
             </div>
 
             {filtered.length === 0 ? (
@@ -451,47 +395,6 @@ function AvailabilityCard({
                 </footer>
             ) : null}
         </article>
-    );
-}
-
-function AvailabilityStat({
-    icon: Icon,
-    label,
-    value,
-    tone,
-}: {
-    icon: typeof User;
-    label: string;
-    value: number;
-    tone: 'info' | 'success' | 'warning' | 'muted';
-}) {
-    const toneClass =
-        tone === 'success'
-            ? 'bg-status-success-bg text-status-success'
-            : tone === 'warning'
-              ? 'bg-status-warning-bg text-status-warning'
-              : tone === 'muted'
-                ? 'bg-muted text-muted-foreground'
-                : 'bg-status-info-bg text-status-info';
-
-    return (
-        <Card>
-            <CardContent className="flex items-center gap-3 pt-5">
-                <div
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${toneClass}`}
-                >
-                    <Icon className="h-5 w-5" />
-                </div>
-                <div className="min-w-0">
-                    <p className="text-2xl leading-none font-bold tabular-nums">
-                        {value}
-                    </p>
-                    <p className="mt-1 truncate text-xs text-muted-foreground">
-                        {label}
-                    </p>
-                </div>
-            </CardContent>
-        </Card>
     );
 }
 

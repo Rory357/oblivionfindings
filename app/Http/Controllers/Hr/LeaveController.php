@@ -560,7 +560,7 @@ class LeaveController extends Controller
         $data['created_by'] = $user->id;
 
         try {
-            $leaveRequest = $this->leaveService->submitRequest($requestUser, $data);
+            $leaveRequest = $this->leaveService->submitRequest($requestUser, $data, $user);
             $this->webhookService->publishApplicationEvent('leave.request.submitted', [
                 'leave_request_id' => $leaveRequest->id,
                 'user_id' => $leaveRequest->user_id,
@@ -773,6 +773,8 @@ class LeaveController extends Controller
                     'leave_request' => 'Only pending requests can have SLA due updated.',
                 ]);
             }
+
+            $this->access->lockCurrentReviewActor($user, $locked);
 
             $locked->update([
                 'approval_due_at' => now()->addHours((int) $validated['hours']),

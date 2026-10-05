@@ -437,6 +437,7 @@ export function PageHeaderSearchTrigger({
  * placed inside that child.
  */
 type HeaderButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+    ref?: Ref<HTMLButtonElement>;
     icon?: IconType;
     asChild?: boolean;
 };

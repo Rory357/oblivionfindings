@@ -22,6 +22,7 @@ export function DatePicker({
     describedBy,
     allowClear = false,
     disabled = false,
+    timeZone = 'Pacific/Auckland',
     trigger,
     compact: compactOverride,
 }: {
@@ -33,6 +34,7 @@ export function DatePicker({
     describedBy?: string;
     allowClear?: boolean;
     disabled?: boolean;
+    timeZone?: string;
     trigger?: React.ReactNode;
     /** A touch-sized single-line trigger for dense operational forms. */
     compact?: boolean;
@@ -101,7 +103,7 @@ export function DatePicker({
                 <div className="time-picker-heading">
                     <div>
                         <strong>{label}</strong>
-                        <small>Pacific/Auckland · one date</small>
+                        <small>{timeZone} · one date</small>
                     </div>
                     <CalendarDays className="size-4 text-primary" />
                 </div>

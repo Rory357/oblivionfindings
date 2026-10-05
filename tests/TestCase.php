@@ -490,6 +490,12 @@ abstract class TestCase extends BaseTestCase
             }
         }
 
+        // Full native dumps can contain delimiters, triggers and routines that
+        // the table-only PDO parser cannot preserve. Explicit callers fail closed.
+        if (filter_var($this->environmentValue('MYSQL_TEST_SCHEMA_REQUIRE_NATIVE') ?? false, FILTER_VALIDATE_BOOL)) {
+            throw new \RuntimeException('The required native MySQL schema import did not succeed; PDO fallback is disabled.');
+        }
+
         // Fallback path: pure-PHP PDO loader. Slightly slower but works on
         // machines that don't ship the `mysql.exe` client (e.g. Herd on
         // Windows). The dump produced by `php artisan rostering:dump-schema-portable`

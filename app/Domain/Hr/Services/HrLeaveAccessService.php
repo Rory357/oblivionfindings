@@ -6,9 +6,13 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Models\User;
+use App\Services\AuthorizationEvidenceLockService;
+use App\Services\CurrentAuthorizationReads;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Canonical ownership, current-staff, and Site boundary for Leave.
@@ -24,6 +28,7 @@ final class HrLeaveAccessService
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
         private readonly HrCurrentStaffService $currentStaff,
+        private readonly AuthorizationEvidenceLockService $authorization,
     ) {}
 
     /** @return list<int> */
@@ -138,6 +143,83 @@ final class HrLeaveAccessService
         return $query->firstOrFail();
     }
 
+    public function canReviewLeave(User $viewer): bool
+    {
+        return $viewer->canDo('hr.leave.approve') || $viewer->canDo('hr.leave.manage');
+    }
+
+    public function reviewRequest(
+        User $viewer,
+        HrLeaveRequest|int $request,
+        bool $lockForUpdate = false,
+    ): HrLeaveRequest {
+        abort_unless($this->canReviewLeave($viewer), 403);
+
+        return $this->currentRequest($viewer, $request, $lockForUpdate);
+    }
+
+    /**
+     * Final command evidence, acquired after all aggregate waits. Taking these
+     * shared locks before cover Shifts would invert Shift-first roster writers.
+     */
+    public function lockCurrentReviewActor(User $actor, HrLeaveRequest $request): User
+    {
+        return $this->lockCurrentCommandActor($actor, $request, 'review');
+    }
+
+    public function lockCurrentCancellationActor(User $actor, HrLeaveRequest $request): User
+    {
+        return $this->lockCurrentCommandActor($actor, $request, 'cancel');
+    }
+
+    private function lockCurrentCommandActor(User $actor, HrLeaveRequest $request, string $command): User
+    {
+        try {
+            $actor = $this->authorization->lockForUserWithoutWaiting($actor, ['hr.leave.approve', 'hr.leave.manage']);
+            abort_unless($actor->isApproved(), 403);
+            $isSelfCancellation = $command === 'cancel' && (int) $request->user_id === (int) $actor->id;
+            if (! $isSelfCancellation) {
+                abort_unless($command === 'review' ? $this->canReviewLeave($actor) : $actor->canDo('hr.leave.manage'), 403);
+            }
+
+            return CurrentAuthorizationReads::within(function (CurrentAuthorizationReads $reads) use ($actor, $request, $command, $isSelfCancellation): User {
+                // ensureBalanceRecord already requires a current approved
+                // subject. Retain that predicate even for manager cancellation.
+                $subject = $this->currentStaff->currentUsersQuery()->whereKey($request->user_id);
+                if (! $isSelfCancellation) {
+                    $siteIds = $this->siteAccess->accessibleSiteIds($actor, [], $reads);
+                    $profiles = HrEmployeeProfile::query()->select('user_id');
+                    if ($command === 'cancel') {
+                        // Cancellation retains the existing historical Site
+                        // scope, alongside the current-staff balance guard.
+                        $profiles->withTrashed();
+                    }
+                    $profiles->where(function (Builder $sites) use ($siteIds): void {
+                        $sites->whereIn('primary_site_id', $siteIds);
+                        foreach ($siteIds as $siteId) {
+                            $sites->orWhereJsonContains('secondary_site_ids', $siteId);
+                        }
+                    });
+                    // whereIn compiles its subquery immediately into an SQL
+                    // expression. Register its current read before that point.
+                    $subject->whereIn('users.id', $reads->query($profiles));
+                }
+                // EXISTS subqueries, including profile and role exclusions,
+                // are current locking reads rather than an earlier RR snapshot.
+                $reads->query($subject)->firstOrFail(['users.id']);
+
+                return $actor;
+            });
+        } catch (QueryException $exception) {
+            if ((int) ($exception->errorInfo[1] ?? 0) !== 3572) {
+                throw $exception;
+            }
+            throw ValidationException::withMessages([
+                'leave_request' => 'Leave access is being updated. Please try again.',
+            ]);
+        }
+    }
+
     public function staffShareSite(User|int $first, User|int $second): bool
     {
         $firstSites = $this->siteIdsFor($first);
@@ -153,7 +235,7 @@ final class HrLeaveAccessService
         return $subject->getKey() !== $candidate->getKey()
             && $this->currentStaff->isCurrent($subject)
             && $this->currentStaff->isCurrent($candidate)
-            && ($candidate->canDo('hr.leave.approve') || $candidate->canDo('hr.leave.manage'))
+            && $this->canReviewLeave($candidate)
             && $this->staffShareSite($subject, $candidate);
     }
 

@@ -2,6 +2,7 @@
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\LeaveService;
+use App\Models\Permission;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
@@ -15,6 +16,10 @@ beforeEach(function () {
         'role' => 'hr',
         'approved_at' => now(),
     ]);
+    $approve = Permission::query()->firstOrCreate(['key' => 'hr.leave.approve'], [
+        'description' => 'Leave boundary fixture approval', 'group' => 'HR', 'module' => 'HR',
+    ]);
+    $this->hr->permissionOverrides()->attach($approve->id, ['allowed' => true]);
 
     $this->staff = User::factory()->create([
         'role' => 'support_worker',

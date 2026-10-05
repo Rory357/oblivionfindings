@@ -24,6 +24,7 @@ export function TimePicker({
     onChange,
     invalid,
     describedBy,
+    timezone = 'Pacific/Auckland',
     compact: compactOverride,
 }: {
     id: string;
@@ -32,6 +33,7 @@ export function TimePicker({
     onChange: (value: string) => void;
     invalid?: boolean;
     describedBy?: string;
+    timezone?: string;
     /** A touch-sized single-line trigger for dense operational forms. */
     compact?: boolean;
 }) {
@@ -141,7 +143,7 @@ export function TimePicker({
                 <div className="time-picker-heading">
                     <div>
                         <strong>{label}</strong>
-                        <small>Pacific/Auckland</small>
+                        <small>{timezone}</small>
                     </div>
                     <span className="time-picker-mode-label">
                         {manual ? 'Type a time' : 'Select a time'}
