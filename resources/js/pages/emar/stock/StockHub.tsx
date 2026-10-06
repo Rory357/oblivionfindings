@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { MedicinePicture } from '../catalogue/_medicine-picture';
+import { ConnectedServicesMenu } from '../connected/_entry-points';
 import {
     CountReview,
     CountWizard,
@@ -361,6 +362,9 @@ export default function StockHub({
                     subline="Person-owned medicines, deliveries and counts"
                     actions={
                         <>
+                            <ConnectedServicesMenu
+                                clientId={filters.client_id ?? undefined}
+                            />
                             <PageHeaderSearch
                                 value={search}
                                 onChange={setSearch}

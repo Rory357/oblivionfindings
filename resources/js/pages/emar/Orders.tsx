@@ -14,10 +14,7 @@ import {
     PageHeaderRail,
     PageHeaderSearch,
 } from '@/components/page';
-import {
-    PageHeaderGlassButton,
-    PageHeaderPrimaryButton,
-} from '@/components/page/page-header';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
@@ -45,7 +42,7 @@ import {
     XCircle,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { useConnectedAccess } from './connected/_entry-points';
+import { ConnectedServicesMenu } from './connected/_entry-points';
 import {
     CovertStatus,
     CovertWizard,
@@ -146,8 +143,6 @@ type Props = {
 };
 
 export default function Orders(props: Props) {
-    const connectedAccess = useConnectedAccess();
-
     const [modal, setModal] = useState<Modal>(null);
     const [search, setSearch] = useState(props.filters.search ?? '');
     const request = useRef<AbortController | null>(null);
@@ -424,23 +419,15 @@ export default function Orders(props: Props) {
                     subline={`Prescriber’s instructions, checks and transitions · loaded ${formatDateTime(props.loaded_at)}`}
                     actions={
                         <>
-                            {(connectedAccess.externalManage ||
-                                connectedAccess.transfersManage ||
-                                connectedAccess.ordersManage) && (
-                                <PageHeaderGlassButton
-                                    onClick={() =>
-                                        router.visit(
-                                            '/emar/connected-care' +
-                                                (new URLSearchParams(window.location.search).get('client_id')
-                                                    ? '?client_id=' +
-                                                      new URLSearchParams(window.location.search).get('client_id')
-                                                    : ''),
-                                        )
-                                    }
-                                >
-                                    Connected care
-                                </PageHeaderGlassButton>
-                            )}
+                            <ConnectedServicesMenu
+                                clientId={
+                                    Number(
+                                        new URLSearchParams(
+                                            window.location.search,
+                                        ).get('client_id'),
+                                    ) || undefined
+                                }
+                            />
                             <PageHeaderSearch
                                 value={search}
                                 onChange={setSearch}

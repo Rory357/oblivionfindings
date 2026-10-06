@@ -34,6 +34,7 @@ vi.mock('@/components/emar/record/record-dose-launch', () => ({
     RecordDoseLaunch: () => null,
 }));
 vi.mock('@/components/emar/record/chart', () => ({
+    ChartViewSwitch: () => null,
     ChartSection: ({
         date,
         week,

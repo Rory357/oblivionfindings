@@ -1,3 +1,5 @@
+import { Button } from '@/components/ui/button';
+import { formatTime } from '@/lib/datetime';
 import { router } from '@inertiajs/react';
 import { ExternalLink, Info, Lock, Pill } from 'lucide-react';
 import { useRef, useState, type KeyboardEvent } from 'react';
@@ -30,15 +32,6 @@ import {
 } from './dose-cell';
 import type { DayDose, DayMedicine, MedicationDay } from './types';
 
-/** Where "now" falls: after the last dose time at or before it (-1: before the first). */
-export function nowColumn(times: string[], nowHm: string): number {
-    let index = -1;
-    times.forEach((time, i) => {
-        if (time <= nowHm) index = i;
-    });
-    return index;
-}
-
 function firstName(name: string | null | undefined): string {
     return (name ?? '').trim().split(/\s+/)[0] ?? '';
 }
@@ -54,7 +47,7 @@ function cellSubline(dose: DayDose, kind: CellKind): string | null {
                 : null;
         case 'due_now':
             return dose.window_ends_at
-                ? `until ${clockLabel(dose.window_ends_at.slice(11, 16))}`
+                ? `until ${formatTime(dose.window_ends_at)}`
                 : null;
         case 'overdue':
             return 'not recorded';
@@ -79,8 +72,6 @@ export function MarDayGrid({
     onMedicineDetails: (medicine: DayMedicine) => void;
 }) {
     const isToday = day.date === day.today;
-    const nowHm = day.now.slice(11, 16);
-    const marker = isToday ? nowColumn(day.times, nowHm) : null;
     const { ctx, open, close } = useEntityContextMenu<DayMedicine>();
 
     // Roving focus over the grid (arrow keys, Home / End).
@@ -133,7 +124,7 @@ export function MarDayGrid({
                 role="region"
                 aria-label={`Scheduled medication chart for ${personName}. Scroll horizontally to see all dose times.`}
                 tabIndex={0}
-                className="relative min-w-0 max-w-full overflow-x-auto rounded-lg border border-border outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                className="relative max-w-full min-w-0 overflow-x-auto rounded-lg border border-border outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
             >
                 <table
                     role="grid"
@@ -144,31 +135,17 @@ export function MarDayGrid({
                         <tr>
                             <th
                                 scope="col"
-                                className="sticky left-0 z-20 min-w-28 max-w-28 border-b border-border bg-muted/40 px-3 py-2 text-left text-xs font-semibold text-muted-foreground sm:min-w-[220px] sm:max-w-none"
+                                className="text-caption sticky left-0 z-20 w-[280px] min-w-[240px] border-b border-border bg-card px-4 py-3 text-left font-semibold text-muted-foreground"
                             >
                                 Medicine
                             </th>
-                            {day.times.map((time, col) => (
+                            {day.times.map((time) => (
                                 <th
                                     key={time}
                                     scope="col"
-                                    className={cn(
-                                        'min-w-[120px] border-b border-border bg-muted/40 px-2 py-2 text-center text-xs font-semibold whitespace-nowrap',
-                                        marker === col &&
-                                            'border-r-2 border-r-primary',
-                                        marker === -1 &&
-                                            col === 0 &&
-                                            'border-l-2 border-l-primary',
-                                    )}
+                                    className="min-w-[144px] border-b border-l border-border bg-muted/40 px-3 py-3 text-center text-sm font-semibold whitespace-nowrap"
                                 >
                                     {clockLabel(time)}
-                                    {marker !== null &&
-                                    (marker === col ||
-                                        (marker === -1 && col === 0)) ? (
-                                        <span className="ml-1.5 inline-flex items-center rounded-full bg-primary-fill px-1.5 py-0.5 text-[10px] font-semibold text-primary-fill-foreground">
-                                            Now {clockLabel(nowHm)}
-                                        </span>
-                                    ) : null}
                                 </th>
                             ))}
                             <th
@@ -188,15 +165,19 @@ export function MarDayGrid({
                             >
                                 <th
                                     scope="row"
-                                    className="sticky left-0 z-10 max-w-28 border-b border-border bg-card px-3 py-2 text-left align-middle font-normal group-hover:bg-muted sm:max-w-[280px]"
+                                    className="sticky left-0 z-10 w-[280px] max-w-[360px] min-w-[240px] border-b border-border bg-card px-4 py-3 text-left align-middle font-normal group-hover:bg-muted"
                                 >
-                                    <div
-                                        className="font-medium break-words sm:line-clamp-2"
-                                        title={medicine.name}
+                                    <Button
+                                        unstyled
+                                        className="text-left font-semibold text-primary underline-offset-4 hover:underline"
+                                        onClick={() =>
+                                            onMedicineDetails(medicine)
+                                        }
+                                        aria-label={`Medicine details for ${medicine.name}`}
                                     >
                                         {medicine.name}
-                                    </div>
-                                    <div className="text-caption break-words text-muted-foreground sm:line-clamp-1">
+                                    </Button>
+                                    <div className="text-caption mt-1 break-words text-muted-foreground">
                                         {[medicine.dose, medicine.route]
                                             .filter(Boolean)
                                             .join(' · ') || '—'}
@@ -243,21 +224,13 @@ export function MarDayGrid({
                                                 `${row}:${col}`,
                                             );
                                     };
-                                    const edge = cn(
-                                        marker === col &&
-                                            'border-r-2 border-r-primary',
-                                        marker === -1 &&
-                                            col === 0 &&
-                                            'border-l-2 border-l-primary',
-                                    );
                                     if (!dose) {
                                         return (
                                             <td
                                                 key={time}
                                                 role="gridcell"
                                                 className={cn(
-                                                    'border-b border-border px-1.5 py-1.5 text-center group-hover:bg-muted/40',
-                                                    edge,
+                                                    'border-b border-l border-border px-3 py-2 text-center group-hover:bg-muted/40',
                                                 )}
                                             >
                                                 <span
@@ -332,7 +305,7 @@ export function MarDayGrid({
                                             className={cn(
                                                 'frontline-tap flex w-full flex-col items-center justify-center gap-1 rounded-lg border px-2 py-1.5 text-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring',
                                                 recordable
-                                                    ? 'border-dashed border-primary/60 hover:bg-muted'
+                                                    ? 'border-dashed border-primary/60 bg-primary/5 hover:bg-muted'
                                                     : opensRecord
                                                       ? 'border-transparent hover:bg-muted'
                                                       : 'cursor-default border-transparent',
@@ -347,6 +320,11 @@ export function MarDayGrid({
                                                     {pill}
                                                 </span>
                                             </StatusBadge>
+                                            {recordable && (
+                                                <span className="text-caption font-medium text-primary">
+                                                    Record dose
+                                                </span>
+                                            )}
                                             {sub ? (
                                                 <span className="text-caption line-clamp-2 max-w-[160px] text-muted-foreground">
                                                     {sub}
@@ -359,8 +337,7 @@ export function MarDayGrid({
                                             key={time}
                                             role="gridcell"
                                             className={cn(
-                                                'border-b border-border px-1.5 py-1.5 align-middle group-hover:bg-muted/40',
-                                                edge,
+                                                'border-b border-l border-border px-3 py-2 align-middle group-hover:bg-muted/40',
                                             )}
                                         >
                                             {hint ? (
