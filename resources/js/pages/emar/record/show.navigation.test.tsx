@@ -63,7 +63,7 @@ vi.mock('@/components/emar/record/reading', () => ({
     RecordMedicineDialog: () => null,
 }));
 vi.mock('@/components/emar/record/safety', () => ({
-    SafetySection: () => null,
+    SafetySection: () => <section>Allergy contents</section>,
 }));
 vi.mock('@/components/emar/record/support', () => ({
     CanonicalSupportSection: () => null,
@@ -124,6 +124,24 @@ describe('person medication record context', () => {
         expect(back.searchParams.get('date')).toBe('2026-10-04');
         expect(back.searchParams.get('site_id')).toBe('3');
         expect(back.searchParams.has('client_id')).toBe(false);
+    });
+
+    it('opens allergies inside the medication record without wider profile access', () => {
+        render(<PersonMedicationRecord {...props} />);
+        fireEvent.click(screen.getByRole('button', { name: 'View allergies' }));
+        expect(screen.getByText('Allergy contents')).toBeInTheDocument();
+        expect(
+            screen.getByRole('tab', { name: 'Allergies' }),
+        ).toHaveAttribute('aria-selected', 'true');
+        const destination = new URL(state.url, 'https://example.test');
+        expect(destination.pathname).toBe('/emar/mar');
+        expect(Object.fromEntries(destination.searchParams)).toEqual({
+            client_id: '10',
+            date: '2026-10-04',
+            site_id: '3',
+            mode: 'week',
+            tab: 'allergies',
+        });
     });
 
     it('changes the day without losing the house or keeping week mode', () => {

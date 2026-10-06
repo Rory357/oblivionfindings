@@ -225,7 +225,8 @@ function AvailableRecord({
                             </PageHeaderMeterBlock>
                             <PageHeaderMeterBlock
                                 label="Allergies"
-                                href={`/clients/${person.id}?tab=medical`}
+                                onClick={() => jump('allergies', 'allergies')}
+                                ariaLabel="View allergies"
                                 tone={
                                     meters.allergies.status === 'recorded'
                                         ? 'critical'
