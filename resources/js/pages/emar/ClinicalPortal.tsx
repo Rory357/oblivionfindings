@@ -81,6 +81,7 @@ export default function ClinicalPortal(props: Props) {
             <main className="min-h-screen bg-background p-5 text-foreground">
                 <div className="mx-auto max-w-[1600px] space-y-5">
                     <PageHeader
+                        wrapTitle
                         icon={Stethoscope}
                         title="Clinical portal"
                         subline={

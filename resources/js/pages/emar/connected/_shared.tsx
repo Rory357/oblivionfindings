@@ -140,6 +140,7 @@ export function ConnectedHeader({
             <Head title={title} />
             <div className="space-y-5">
                 <PageHeader
+                    wrapTitle
                     icon={Link2}
                     title={title}
                     subline={subline}
