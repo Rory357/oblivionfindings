@@ -3,6 +3,7 @@
 namespace App\Services\Medication\Settings;
 
 use App\Models\AppSetting;
+use App\Models\BreakGlassPolicy;
 use App\Models\MedicationAdminRule;
 use App\Models\MedicationRoundTemplate;
 use App\Models\MedicationSettingChange;
@@ -47,6 +48,19 @@ class MedicationSettingsStore
     public const ONCALL_GROUP = 'oncall';
 
     public function __construct(private readonly MedicationSettingsRegistry $registry) {}
+
+    /** New grants retain this current policy while holding the same mutex as settings writes. */
+    public function lockedEmergencyPolicySnapshot(): array
+    {
+        if (DB::transactionLevel() === 0) {
+            throw new \LogicException('The emergency policy snapshot requires an enclosing transaction.');
+        }
+        $this->lockForWrite();
+        // A locking read sees the current committed policy even after an earlier RR snapshot.
+        $policy = BreakGlassPolicy::query()->oldest('id')->lockForUpdate()->first();
+
+        return ($policy ?? new BreakGlassPolicy(BreakGlassPolicy::defaults()))->snapshot();
+    }
 
     /** @return array<string, array<string, string>> Saved organisation values, by group then key. */
     public function organisationValues(): array

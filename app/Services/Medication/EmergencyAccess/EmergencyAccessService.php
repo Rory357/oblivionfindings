@@ -9,6 +9,7 @@ use App\Models\ClientBreakGlassAccess;
 use App\Models\MedicationEmergencyAccessReview;
 use App\Models\User;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\Settings\MedicationSettingsStore;
 use App\Services\Medication\WitnessPinService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +25,7 @@ class EmergencyAccessService
         private readonly EmergencyAccessEvents $events,
         private readonly EmergencyAccessNotifications $notifications,
         private readonly MedicationGovernanceScopeService $governance,
+        private readonly MedicationSettingsStore $settings,
     ) {}
 
     public function start(User $actor, Client $client, array $data): ClientBreakGlassAccess
@@ -40,26 +42,19 @@ class EmergencyAccessService
             if (! ($data['acknowledged_min_necessary'] ?? false) || ! ($data['acknowledged_incident_report'] ?? false)) {
                 throw ValidationException::withMessages(['acknowledgements' => 'Both acknowledgements are required before emergency access starts.']);
             }
-            $policy = BreakGlassPolicy::current();
-            $snapshot = $policy->snapshot();
-            // Recheck the exact policy retained on the grant, including a concurrent policy edit.
-            $data = Validator::make($data, [
-                'reason' => [$snapshot['reason_required'] ? 'required' : 'nullable', 'string', 'min:5', 'max:255'],
+            // Validate shape before selecting the people whose current authority must be locked.
+            $rules = [
+                'reason' => ['nullable', 'string', 'min:5', 'max:255'],
                 'reason_category' => ['required', 'string', 'max:100'],
-                'minutes' => ['nullable', 'integer', 'min:5', 'max:'.$snapshot['max_minutes']],
+                'minutes' => ['nullable', 'integer', 'min:5'],
                 'authorization_mode' => ['required', Rule::in(['self', 'co_sign'])],
                 'co_signed_by' => ['nullable', 'integer', 'required_if:authorization_mode,co_sign'],
                 'co_signer_pin' => ['nullable', 'string', 'required_if:authorization_mode,co_sign'],
                 'acknowledged_min_necessary' => ['accepted'],
                 'acknowledged_incident_report' => ['accepted'],
-            ])->validate();
+            ];
+            $data = Validator::make($data, $rules)->validate();
             $mode = $data['authorization_mode'] ?? 'self';
-            if ($snapshot['second_person'] === 'required' && $mode !== 'co_sign') {
-                throw ValidationException::withMessages(['co_signed_by' => 'A second person must confirm before emergency access can start.']);
-            }
-            if ($snapshot['second_person'] === 'off' && $mode === 'co_sign') {
-                throw ValidationException::withMessages(['authorization_mode' => 'The current policy does not ask for a second person.']);
-            }
             $ids = [$actor->id];
             if ($mode === 'co_sign') {
                 $candidate = User::query()->whereNotNull('approved_at')->find($data['co_signed_by'] ?? 0);
@@ -74,6 +69,17 @@ class EmergencyAccessService
             $actor = $locked->get($actor->id);
             $this->governance->lockCurrentMedicationSite((int) $client->site_id);
             abort_unless($actor->canDo('medications.breakglass') && in_array((int) $client->site_id, $this->sites->accessibleSiteIds($actor), true), 404);
+            // Match settings writers' people/Site -> revision -> policy order; retain through commit.
+            $snapshot = $this->settings->lockedEmergencyPolicySnapshot();
+            $rules['reason'][0] = $snapshot['reason_required'] ? 'required' : 'nullable';
+            $rules['minutes'][] = 'max:'.$snapshot['max_minutes'];
+            $data = Validator::make($data, $rules)->validate();
+            if ($snapshot['second_person'] === 'required' && $mode !== 'co_sign') {
+                throw ValidationException::withMessages(['co_signed_by' => 'A second person must confirm before emergency access can start.']);
+            }
+            if ($snapshot['second_person'] === 'off' && $mode === 'co_sign') {
+                throw ValidationException::withMessages(['authorization_mode' => 'The current policy does not ask for a second person.']);
+            }
             $cosigner = null;
             if ($mode === 'co_sign') {
                 $cosigner = $locked->get((int) ($data['co_signed_by'] ?? 0));

@@ -1,5 +1,17 @@
 # eMAR implementation and verification status
 
+## Emergency policy concurrency and request recovery — 6 October 2026
+
+New emergency-access grants now take the same settings revision lock as policy saves, after locking the current people, profiles and house, and read the current policy under lock. Reason, duration and second-person requirements are revalidated against that snapshot before the grant commits, including when no policy has yet been stored. Existing grants and their extensions keep their recorded policy.
+
+The request dialog now follows refreshed second-person rules after a validation redirect, keeping the person's request draft while showing the required colleague/PIN controls or clearing those fields from the outgoing request when confirmation is off. Four interaction regressions reproduced the original failures and now pass; the two existing duration/countdown cases also pass. Full TypeScript, scoped lint, PHP syntax, Pint and independent source reviews pass.
+
+Focused backend acceptance passes 74 distinct cases / 788 assertions across four complete files: lifecycle 28 / 284, emergency access 25 / 208, settings storage 8 / 165 and P11 completion 13 / 131. The first run's five failures exposed a copied connection name in the new concurrency fixture. After that test-only correction, the complete lifecycle file passed with actual exit zero; its earlier 23 partial passes are not added to the final total. The final cases exercise real separate-connection contention and stale REPEATABLE READ snapshots, denial without mutation, absent/default policy storage, transaction misuse and unchanged existing-grant extensions.
+
+All frozen source, tested-file and runtime hashes matched after acceptance, and the exact owned database, connections and processes were verified absent. Final acceptance evidence SHA256: `880A68BCCFD195F5ED34D4A86E885E0546EC7E71EAC255D13469023002C1F574`.
+
+Complete fresh GitHub checks on the resulting commit remain required before the normal main merge. No production deployment, live migration, backfill or feature activation is included.
+
 ## Competency reporting review follow-up — 6 October 2026
 
 Two final review findings exposed a report-only mismatch: staff with no assessment or a secondary-house assignment were omitted, and a latest assessment's status/expiry could disagree with the canonical competency decision. The report now shares Staff eligibility's current, approved staff population, distinguishes staff in scope from assessments on file, and calculates current coverage using the existing competency policy. Independent declaration, staff acknowledgement, New Zealand expiry dates and valid prior assessments are preserved; temporary house exemptions do not count as current assessments. The entry action opens Staff eligibility only within the existing medication-read permission boundary. Clinical recording policy, schema and permissions are unchanged.

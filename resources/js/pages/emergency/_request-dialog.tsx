@@ -71,9 +71,16 @@ export function RequestAccessDialog({
     const [minutes, setMinutes] = useState(
         Math.min(policy.default_minutes, policy.max_minutes),
     );
-    const [mode, setMode] = useState<'self' | 'co_sign'>(
+    const [selectedMode, setMode] = useState<'self' | 'co_sign'>(
         policy.second_person === 'required' ? 'co_sign' : 'self',
     );
+    // Validation redirects can refresh policy while preserving this request draft.
+    const mode =
+        policy.second_person === 'required'
+            ? 'co_sign'
+            : policy.second_person === 'off'
+              ? 'self'
+              : selectedMode;
     const [colleague, setColleague] = useState<number | null>(null);
     const [pin, setPin] = useState('');
     const [ackMinimum, setAckMinimum] = useState(false);

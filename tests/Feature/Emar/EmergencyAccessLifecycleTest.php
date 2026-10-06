@@ -3,6 +3,7 @@
 namespace Tests\Feature\Emar;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AppSetting;
 use App\Models\BreakGlassPolicy;
 use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
@@ -19,16 +20,26 @@ use App\Models\UserWitnessPin;
 use App\Notifications\AppEventNotification;
 use App\Notifications\MedicationAlertNotification;
 use App\Services\Medication\EmergencyAccess\EmergencyAccessService;
-use App\Services\Tasks\Providers\MedicationEmergencyAccessReviewProvider;
+use App\Services\Medication\Settings\MedicationSettingsRegistry;
+use App\Services\Medication\Settings\MedicationSettingsStore;
 use App\Services\NotificationService;
+use App\Services\Tasks\Providers\MedicationEmergencyAccessReviewProvider;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Database\Connection;
+use Illuminate\Database\DatabaseTransactionsManager;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Tests\Support\CommittedFixtureCleanup;
+use Tests\Support\OwnedTestDatabase;
 use Tests\TestCase;
 
 class EmergencyAccessLifecycleTest extends TestCase
@@ -135,6 +146,233 @@ class EmergencyAccessLifecycleTest extends TestCase
         $this->assertDatabaseCount('medication_emergency_access_extensions', 1);
     }
 
+    public static function tightenedPolicies(): array
+    {
+        return [
+            'shorter duration' => [[['default_minutes', '60', '30'], ['max_minutes', '240', '30']], [], 'minutes'],
+            'required reason' => [[['reason_required', 'no', 'yes']], ['reason' => null], 'reason'],
+            'required second person' => [[['second_person', 'optional', 'required']], [], 'co_signed_by'],
+        ];
+    }
+
+    #[DataProvider('tightenedPolicies')]
+    public function test_new_grant_reads_a_committed_tightening_despite_an_earlier_repeatable_read_snapshot(array $changes, array $input, string $field): void
+    {
+        $editor = $this->staff('admin', ['medications.emergency_policy.manage']);
+        $this->assertDatabaseCount('break_glass_policies', 0);
+        BreakGlassPolicy::updateApplicationPolicy(['reason_required' => false]);
+        AppSetting::create(['key' => MedicationSettingsStore::REVISION_KEY, 'value' => 0]);
+
+        $this->withCommittedPolicySessions(function (Connection $primary, Connection $writer) use ($editor, $changes, $input, $field): void {
+            $primary->beginTransaction();
+            $old = BreakGlassPolicy::current()->snapshot(); // Establish a real REPEATABLE READ snapshot.
+            $saved = $this->savePolicyOn($writer, $editor, $changes);
+            $this->assertSame(count($changes), $saved['saved']);
+            $this->assertSame($old, BreakGlassPolicy::current()->snapshot());
+            $this->assertSame(count($changes), $writer->table('medication_setting_changes')->where('setting_group', 'ea')->count());
+            $this->assertFalse($writer->getPdo()->inTransaction());
+            $before = $this->emergencyEvidence($writer);
+
+            try {
+                $this->start($input);
+                $this->fail('A new grant must use the policy committed by the settings writer.');
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey($field, $exception->errors());
+            }
+
+            $this->assertSame($before, $this->emergencyEvidence($writer));
+            $this->assertSame(0, $writer->table('client_break_glass_accesses')->count());
+            $this->assertSame(0, $writer->table('medication_events')->where('kind', 'emergency_access')->count());
+            Notification::assertNothingSent();
+        });
+    }
+
+    public static function policyStorageStates(): array
+    {
+        return ['stored policy' => [true], 'absent policy and revision use defaults' => [false]];
+    }
+
+    #[DataProvider('policyStorageStates')]
+    public function test_new_grant_holds_the_settings_mutex_until_commit_even_when_policy_is_absent(bool $stored): void
+    {
+        $editor = $this->staff('admin', ['medications.emergency_policy.manage']);
+        $other = Client::factory()->create(['site_id' => $this->site->id, 'status' => 'active']);
+        $this->assertDatabaseCount('break_glass_policies', 0);
+        $this->assertDatabaseMissing('app_settings', ['key' => MedicationSettingsStore::REVISION_KEY]);
+        if ($stored) {
+            BreakGlassPolicy::updateApplicationPolicy(BreakGlassPolicy::defaults());
+        }
+        $changes = [['default_minutes', '60', '30'], ['max_minutes', '240', '30']];
+
+        $this->withCommittedPolicySessions(function (Connection $primary, Connection $writer) use ($editor, $other, $changes, $stored): void {
+            $attempted = false;
+            $blocked = false;
+            $dispatcher = $primary->getEventDispatcher();
+            $primary->setEventDispatcher(clone $dispatcher);
+            $primary->listen(function (QueryExecuted $query) use ($primary, $writer, $editor, $changes, &$attempted, &$blocked): void {
+                if ($attempted || ! str_contains($query->sql, 'from `break_glass_policies`')) {
+                    return;
+                }
+                $attempted = true;
+                $this->assertTrue($primary->getPdo()->inTransaction());
+                // The real canonical writer contends after the grant's policy read, before its insertion.
+                try {
+                    $this->savePolicyOn($writer, $editor, $changes);
+                } catch (QueryException $exception) {
+                    $this->assertSame(1205, (int) ($exception->errorInfo[1] ?? 0));
+                    $blocked = true;
+                }
+            });
+            try {
+                $grant = $this->start();
+            } finally {
+                $primary->setEventDispatcher($dispatcher);
+            }
+
+            $this->assertTrue($attempted);
+            $this->assertTrue($blocked, 'The settings writer must not commit between the policy read and grant commit.');
+            $this->assertFalse($primary->getPdo()->inTransaction());
+            $this->assertFalse($writer->getPdo()->inTransaction());
+            $this->assertSame(1, $writer->table('client_break_glass_accesses')->count());
+            $this->assertSame(collect(BreakGlassPolicy::defaults())->sortKeys()->all(), collect($grant->fresh()->policy_snapshot)->sortKeys()->all());
+            $this->assertSame($stored ? 1 : 0, $writer->table('break_glass_policies')->count());
+            $this->assertSame(0, $writer->table('medication_setting_changes')->count());
+            $this->assertSame(0, $writer->table('medication_events')->where('kind', 'settings.changed')->count());
+            $this->assertSame(1, $writer->table('medication_events')->where('kind', 'emergency_access')->where('facts->action', 'opened')->count());
+            $original = $grant->fresh()->getRawOriginal();
+
+            $this->assertSame(2, $this->savePolicyOn($writer, $editor, $changes)['saved']);
+            $this->assertSame(30, (int) $writer->table('break_glass_policies')->value('max_minutes'));
+            $this->assertSame($original, $grant->fresh()->getRawOriginal());
+            $before = $this->emergencyEvidence($writer);
+            $notifications = Notification::sentNotifications();
+            try {
+                app(EmergencyAccessService::class)->start($this->owner, $other, $this->payload());
+                $this->fail('The newly committed shorter policy must refuse another sixty-minute grant.');
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey('minutes', $exception->errors());
+            }
+            $this->assertSame($before, $this->emergencyEvidence($writer));
+            $this->assertSame($notifications, Notification::sentNotifications());
+
+            $this->travel(51)->minutes();
+            try {
+                app(EmergencyAccessService::class)->extend($this->owner, $grant, 'Relief is still on the way');
+                $this->assertEquals($grant->expires_at->copy()->addMinutes(30), $grant->fresh()->expires_at);
+                $this->assertSame(collect(BreakGlassPolicy::defaults())->sortKeys()->all(), collect($grant->fresh()->policy_snapshot)->sortKeys()->all());
+                $this->assertSame(1, $writer->table('medication_emergency_access_extensions')->count());
+            } finally {
+                $this->travelBack();
+            }
+        });
+    }
+
+    public function test_locked_policy_snapshot_refuses_use_without_an_enclosing_transaction(): void
+    {
+        $this->withCommittedPolicySessions(function (Connection $primary, Connection $writer): void {
+            $before = $this->emergencyEvidence($writer);
+            $this->assertSame(0, $primary->transactionLevel());
+            try {
+                app(MedicationSettingsStore::class)->lockedEmergencyPolicySnapshot();
+                $this->fail('An unlocked snapshot must not be exposed as authoritative.');
+            } catch (\LogicException $exception) {
+                $this->assertSame('The emergency policy snapshot requires an enclosing transaction.', $exception->getMessage());
+            }
+            $this->assertSame($before, $this->emergencyEvidence($writer));
+            Notification::assertNothingSent();
+        });
+    }
+
+    private function savePolicyOn(Connection $writer, User $editor, array $changes): array
+    {
+        $previous = DB::getDefaultConnection();
+        DB::setDefaultConnection($writer->getName());
+        try {
+            $this->assertSame($writer, DB::connection());
+            $registry = app(MedicationSettingsRegistry::class);
+            $editor = User::query()->findOrFail($editor->id);
+            $this->assertSame($writer, $editor->getConnection());
+            $this->assertSame($writer->getPdo(), $editor->getConnection()->getPdo());
+            $this->assertNotNull($editor->approved_at);
+            $this->assertTrue($editor->canDo('medications.emergency_policy.manage'));
+
+            return app(MedicationSettingsStore::class)->apply($editor, array_map(fn (array $change): array => [
+                'definition' => $registry->definition('ea', $change[0]), 'site_id' => null,
+                'from' => $change[1], 'value' => $change[2],
+            ], $changes), false);
+        } finally {
+            DB::setDefaultConnection($previous);
+        }
+    }
+
+    private function emergencyEvidence(Connection $connection): array
+    {
+        return collect([
+            'client_break_glass_accesses', 'medication_emergency_access_extensions', 'medication_emergency_access_reviews',
+            'medication_events', 'medication_event_heads', 'medication_alerts', 'notifications', 'audit_logs',
+            'app_settings', 'break_glass_policies', 'medication_setting_changes',
+        ])->mapWithKeys(fn (string $table): array => [$table => $connection->table($table)->get()
+            ->map(fn (object $row): array => (array) $row)->sortBy(fn (array $row): string => serialize($row))->values()->all()])->all();
+    }
+
+    private function withCommittedPolicySessions(callable $exercise): void
+    {
+        $primary = DB::connection();
+        $database = $primary->getDatabaseName();
+        $this->assertTrue(app()->environment('testing'));
+        $this->assertSame('mysql', $primary->getDriverName());
+        $this->assertSame(static::$isolatedMysqlDatabase, $database);
+        $this->assertTrue(OwnedTestDatabase::isOwnedBy($database, getmypid()));
+        $this->assertSame($database, (string) $primary->getPdo()->query('SELECT DATABASE()')->fetchColumn());
+        $this->assertSame(1, $primary->transactionLevel());
+        $this->assertTrue($primary->getPdo()->inTransaction());
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+
+        $writerName = 'emar_emergency_policy_contender';
+        $originalConfig = config('database.connections.'.$writerName);
+        $originalDefault = DB::getDefaultConnection();
+        $originalManager = $this->app['db.transactions'];
+        $writer = null;
+        $timeout = null;
+        DB::commit();
+        $manager = new DatabaseTransactionsManager;
+        $this->app->instance('db.transactions', $manager);
+        $primary->setTransactionManager($manager);
+        try {
+            $this->assertSame(0, $primary->transactionLevel());
+            config(['database.connections.'.$writerName => array_replace($primary->getConfig(), ['name' => $writerName])]);
+            DB::purge($writerName);
+            $writer = DB::connection($writerName);
+            $this->assertSame('emar_emergency_policy_contender', $writer->getName());
+            $this->assertNotSame($primary->getName(), $writer->getName());
+            $this->assertSame($database, (string) $writer->getPdo()->query('SELECT DATABASE()')->fetchColumn());
+            $this->assertNotSame((int) $primary->getPdo()->query('SELECT CONNECTION_ID()')->fetchColumn(),
+                (int) $writer->getPdo()->query('SELECT CONNECTION_ID()')->fetchColumn());
+            $this->assertSame('REPEATABLE-READ', $primary->selectOne('SELECT @@SESSION.transaction_isolation AS isolation_level')->isolation_level);
+            $timeout = (int) $writer->selectOne('SELECT @@SESSION.innodb_lock_wait_timeout AS seconds')->seconds;
+            $writer->statement('SET SESSION innodb_lock_wait_timeout = 1');
+            $exercise($primary, $writer);
+        } finally {
+            DB::setDefaultConnection($originalDefault);
+            if ($writer !== null) {
+                while ($writer->transactionLevel() > 0) {
+                    $writer->rollBack();
+                }
+                if ($timeout !== null) {
+                    $writer->statement('SET SESSION innodb_lock_wait_timeout = '.$timeout);
+                }
+            }
+            DB::purge($writerName);
+            config(['database.connections.'.$writerName => $originalConfig]);
+            while ($primary->transactionLevel() > 0) {
+                $primary->rollBack();
+            }
+            $this->app->instance('db.transactions', $originalManager);
+            $primary->setTransactionManager($originalManager);
+            $primary->beginTransaction();
+        }
+    }
+
     public function test_auditor_can_view_but_cannot_end_or_extend_another_grant(): void
     {
         $grant = $this->start();
@@ -159,12 +397,10 @@ class EmergencyAccessLifecycleTest extends TestCase
         $this->assertSame($reason, $ended->end_reason);
         $this->assertFalse($ended->isRunning());
         $this->assertSame($colleague->id, MedicationEvent::where('facts->action', 'closed')->sole()->actor_id);
-        Notification::assertSentTo($this->owner, AppEventNotification::class, fn (AppEventNotification $notification): bool =>
-            $notification->payload['event_key'] === 'break_glass_access.ended'
+        Notification::assertSentTo($this->owner, AppEventNotification::class, fn (AppEventNotification $notification): bool => $notification->payload['event_key'] === 'break_glass_access.ended'
             && $notification->payload['access_id'] === $grant->id
             && $notification->payload['body'] === $reason);
-        Notification::assertNotSentTo($colleague, AppEventNotification::class, fn (AppEventNotification $notification): bool =>
-            $notification->payload['event_key'] === 'break_glass_access.ended');
+        Notification::assertNotSentTo($colleague, AppEventNotification::class, fn (AppEventNotification $notification): bool => $notification->payload['event_key'] === 'break_glass_access.ended');
     }
 
     public function test_explicit_support_collection_preserves_recipients_and_user_over_role_preferences(): void
