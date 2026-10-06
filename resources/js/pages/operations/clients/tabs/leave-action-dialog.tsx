@@ -5,6 +5,7 @@ import {
 import ConfirmDialog from '@/components/confirm-dialog';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -69,31 +70,55 @@ export function LeaveActionDialog({
     const [step, setStep] = useState(0);
     const [local, setLocal] = useState(() => toDatetimeLocal(new Date()));
     const [offset, setOffset] = useState('');
+    const [alreadyReturned, setAlreadyReturned] = useState(false);
+    const [returnLocal, setReturnLocal] = useState('');
+    const [returnOffset, setReturnOffset] = useState('');
     const [reason, setReason] = useState('');
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
     const [confirm, setConfirm] = useState(false);
     const [discard, setDiscard] = useState(false);
-    const effect =
-        item.medication_away_enabled === true
-            ? EFFECT[action]
-            : {
-                  approve:
-                      'Approves the leave plan and keeps its history. The medication schedule connection is off; this action does not change medication reminders.',
-                  decline:
-                      'Declines the leave plan and keeps its history. Medication reminders are unchanged.',
-                  depart: 'Records when the person actually left and keeps the history. The medication schedule connection is off; doses will not automatically show Away.',
-                  return: 'Records the actual return and keeps the history. The medication schedule connection is off; medication reminders are unchanged.',
-                  withdraw:
-                      'Withdraws the planned leave and keeps its history. Medication reminders are unchanged. Actual departed leave must be ended by recording a return.',
-              }[action];
+    const closedLeave = action === 'depart' && alreadyReturned;
+    const actionLabel = closedLeave
+        ? 'Record departure and return'
+        : LEAVE_ACTION_LABEL[action];
+    const effect = closedLeave
+        ? item.medication_away_enabled === true
+            ? 'Records the actual departure and return together. Only doses due during that absence show Away; recorded outcomes stay unchanged.'
+            : 'Records the actual departure and return together and keeps their history. The medication schedule connection is off; medication reminders are unchanged.'
+        : item.medication_away_enabled === true
+          ? EFFECT[action]
+          : {
+                approve:
+                    'Approves the leave plan and keeps its history. The medication schedule connection is off; this action does not change medication reminders.',
+                decline:
+                    'Declines the leave plan and keeps its history. Medication reminders are unchanged.',
+                depart: 'Records when the person actually left and keeps the history. The medication schedule connection is off; doses will not automatically show Away.',
+                return: 'Records the actual return and keeps the history. The medication schedule connection is off; medication reminders are unchanged.',
+                withdraw:
+                    'Withdraws the planned leave and keeps its history. Medication reminders are unchanged. Actual departed leave must be ended by recording a return.',
+            }[action];
     const timed = action === 'depart' || action === 'return';
     const instant = actualEventInstant(local, offset);
+    const returnInstant = actualEventInstant(returnLocal, returnOffset);
     function validate() {
         const next: Record<string, string> = {};
         if (timed && (!instant || Date.parse(instant) > Date.now()))
             next.occurred_at =
                 'Choose the actual time, including which clock reading if repeated. It cannot be in the future.';
+        if (
+            closedLeave &&
+            (!returnInstant || Date.parse(returnInstant) > Date.now())
+        )
+            next.returned_at =
+                'Choose the actual return time, including which clock reading if repeated. It cannot be in the future.';
+        else if (
+            closedLeave &&
+            instant &&
+            Date.parse(returnInstant) < Date.parse(instant)
+        )
+            next.returned_at =
+                'The actual return must be at or after the departure.';
         if (action === 'withdraw' && !reason.trim())
             next.reason = 'Explain why the leave is being withdrawn.';
         if (!item.version || !item.allowed_actions?.includes(action))
@@ -111,6 +136,7 @@ export function LeaveActionDialog({
                 action,
                 version: item.version!,
                 ...(timed ? { occurred_at: instant } : {}),
+                ...(closedLeave ? { returned_at: returnInstant } : {}),
                 ...(action === 'withdraw'
                     ? { reason: reason.trim() }
                     : { approval_notes: reason.trim() || null }),
@@ -133,10 +159,10 @@ export function LeaveActionDialog({
                 onClose={() => {
                     if (!saving) setDiscard(true);
                 }}
-                title={LEAVE_ACTION_LABEL[action]}
+                title={actionLabel}
                 description={effect}
                 railIcon={CalendarRange}
-                railTitle={LEAVE_ACTION_LABEL[action]}
+                railTitle={actionLabel}
                 railSub={item.destination || 'Planned leave'}
                 steps={STEPS}
                 stepIndex={step}
@@ -171,7 +197,7 @@ export function LeaveActionDialog({
                             ? 'Saving…'
                             : step === 0
                               ? 'Continue'
-                              : LEAVE_ACTION_LABEL[action]}
+                              : actionLabel}
                     </Button>
                 }
             >
@@ -203,6 +229,43 @@ export function LeaveActionDialog({
                                     error={errors.occurred_at}
                                 />
                             )}
+                            {action === 'depart' && (
+                                <div className="space-y-4 rounded-lg border p-3">
+                                    <div className="flex items-start gap-3">
+                                        <Checkbox
+                                            id="leave-already-returned"
+                                            checked={alreadyReturned}
+                                            onCheckedChange={(checked) =>
+                                                setAlreadyReturned(
+                                                    checked === true,
+                                                )
+                                            }
+                                        />
+                                        <div className="space-y-1">
+                                            <Label htmlFor="leave-already-returned">
+                                                This leave has already ended
+                                            </Label>
+                                            <p className="text-subtle">
+                                                Add the actual return to record
+                                                both times together.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {alreadyReturned && (
+                                        <ActualEventTimeField
+                                            id="leave-historical-return"
+                                            label="Actually returned"
+                                            value={returnLocal}
+                                            offset={returnOffset}
+                                            onChange={(v, o) => {
+                                                setReturnLocal(v);
+                                                setReturnOffset(o);
+                                            }}
+                                            error={errors.returned_at}
+                                        />
+                                    )}
+                                </div>
+                            )}
                             <div className="space-y-2">
                                 <Label htmlFor="leave-action-notes">
                                     {action === 'withdraw'
@@ -221,21 +284,32 @@ export function LeaveActionDialog({
                             icon={ClipboardCheck}
                             title="Change to the leave record"
                         >
-                            <ReviewRow
-                                label="Action"
-                                value={LEAVE_ACTION_LABEL[action]}
-                            />
+                            <ReviewRow label="Action" value={actionLabel} />
                             <ReviewRow
                                 label="Destination"
                                 value={item.destination}
                             />
                             {timed && (
                                 <ReviewRow
-                                    label="Actual time · Pacific/Auckland"
+                                    label={
+                                        closedLeave
+                                            ? 'Actually left · Pacific/Auckland'
+                                            : 'Actual time · Pacific/Auckland'
+                                    }
                                     value={
                                         formatDateTime(instant) +
                                         ' · UTC' +
                                         instant.slice(-6)
+                                    }
+                                />
+                            )}
+                            {closedLeave && (
+                                <ReviewRow
+                                    label="Actually returned · Pacific/Auckland"
+                                    value={
+                                        formatDateTime(returnInstant) +
+                                        ' · UTC' +
+                                        returnInstant.slice(-6)
                                     }
                                 />
                             )}
@@ -250,9 +324,9 @@ export function LeaveActionDialog({
                     if (!saving) setConfirm(false);
                 }}
                 onConfirm={save}
-                title={LEAVE_ACTION_LABEL[action] + '?'}
+                title={actionLabel + '?'}
                 description={effect}
-                confirmText={LEAVE_ACTION_LABEL[action]}
+                confirmText={actionLabel}
                 variant="default"
                 processing={saving}
             />

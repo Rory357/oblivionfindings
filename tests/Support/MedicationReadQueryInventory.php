@@ -19,6 +19,7 @@ final class MedicationReadQueryInventory
             $purpose = match (self::topLevelTable($sql)) {
                 'medication_followups' => 'followup_scope',
                 'medication_refusal_followups' => 'refusal_scope',
+                'medication_second_person_confirmations' => 'second_person_scope',
                 'client_medication_administrations' => self::administrationPurpose($sql),
                 default => 'unexpected',
             };
@@ -68,10 +69,12 @@ final class MedicationReadQueryInventory
         foreach ($tokens[0] as $token) {
             if ($token === '(') {
                 $depth++;
+
                 continue;
             }
             if ($token === ')') {
                 $depth--;
+
                 continue;
             }
             if ($depth !== 0) {

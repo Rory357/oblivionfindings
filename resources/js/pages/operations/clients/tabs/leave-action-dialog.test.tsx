@@ -122,4 +122,117 @@ describe('actual client leave action', () => {
             screen.queryByText(/Doses due during this absence show Away/),
         ).not.toBeInTheDocument();
     });
+
+    it('reviews and sends both actual times atomically, retaining a rejected closed-interval draft', () => {
+        render(<LeaveActionDialog {...props} action="depart" />);
+        fireEvent.change(screen.getByLabelText('Actually left'), {
+            target: { value: '2026-01-01T09:00' },
+        });
+        fireEvent.click(
+            screen.getByRole('checkbox', {
+                name: 'This leave has already ended',
+            }),
+        );
+        fireEvent.change(screen.getByLabelText('Actually returned'), {
+            target: { value: '2026-01-02T12:00' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+        expect(
+            screen.getByText('Actually left · Pacific/Auckland'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Actually returned · Pacific/Auckland'),
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Record departure and return' }),
+        );
+        expect(put).not.toHaveBeenCalled();
+        fireEvent.click(
+            within(screen.getByRole('alertdialog')).getByRole('button', {
+                name: 'Record departure and return',
+            }),
+        );
+        expect(put.mock.calls[0][1]).toEqual({
+            action: 'depart',
+            version: 1,
+            occurred_at: '2026-01-01T09:00:00+13:00',
+            returned_at: '2026-01-02T12:00:00+13:00',
+            approval_notes: null,
+        });
+        const callbacks = put.mock.calls[0][2];
+        act(() => {
+            callbacks.onError({
+                returned_at: 'This interval overlaps another recorded leave.',
+            });
+            callbacks.onFinish();
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+        expect(
+            screen.getByRole('checkbox', {
+                name: 'This leave has already ended',
+            }),
+        ).toBeChecked();
+        expect(screen.getByLabelText('Actually left')).toHaveValue(
+            '2026-01-01T09:00',
+        );
+        expect(screen.getByLabelText('Actually returned')).toHaveValue(
+            '2026-01-02T12:00',
+        );
+    });
+    it.each(['', '2025-12-31T09:00', '2099-01-02T12:00'])(
+        'rejects an invalid paired return %s before submission',
+        (value) => {
+            render(<LeaveActionDialog {...props} action="depart" />);
+            fireEvent.change(screen.getByLabelText('Actually left'), {
+                target: { value: '2026-01-01T09:00' },
+            });
+            fireEvent.click(
+                screen.getByRole('checkbox', {
+                    name: 'This leave has already ended',
+                }),
+            );
+            fireEvent.change(screen.getByLabelText('Actually returned'), {
+                target: { value },
+            });
+            fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+            expect(screen.getByLabelText('Actually left')).toBeInTheDocument();
+            expect(screen.getByRole('alert')).toHaveTextContent(
+                /actual return/i,
+            );
+            expect(put).not.toHaveBeenCalled();
+        },
+    );
+    it('omits a retained return when the closed-leave option is switched off', () => {
+        render(<LeaveActionDialog {...props} action="depart" />);
+        fireEvent.change(screen.getByLabelText('Actually left'), {
+            target: { value: '2026-01-01T09:00' },
+        });
+        fireEvent.click(
+            screen.getByRole('checkbox', {
+                name: 'This leave has already ended',
+            }),
+        );
+        fireEvent.change(screen.getByLabelText('Actually returned'), {
+            target: { value: '2026-01-02T12:00' },
+        });
+        fireEvent.click(
+            screen.getByRole('checkbox', {
+                name: 'This leave has already ended',
+            }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Record departure' }),
+        );
+        fireEvent.click(
+            within(screen.getByRole('alertdialog')).getByRole('button', {
+                name: 'Record departure',
+            }),
+        );
+        expect(put.mock.calls[0][1]).not.toHaveProperty('returned_at');
+        expect(put.mock.calls[0][1]).toHaveProperty(
+            'occurred_at',
+            '2026-01-01T09:00:00+13:00',
+        );
+    });
 });

@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\Emar;
 
+use App\Domain\Clinical\Events\ClinicalEventRecorded;
 use App\Domain\Clinical\Models\ClinicalEvent;
 use App\Domain\Clinical\Services\ClinicalEventService;
+use App\Domain\Clinical\Services\ClinicalSignalService;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientLeaveRequest;
@@ -13,6 +15,7 @@ use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Services\Clients\ClientLeaveWorkflow;
+use App\Services\Timeline\TimelineEmitter;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Database\Connection;
@@ -21,6 +24,7 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -176,7 +180,255 @@ class ActualAbsenceLifecycleTest extends TestCase
             'declined is terminal' => ['declined', ['action' => 'approve']],
             'no invented approval time' => ['requested', ['action' => 'approve', 'occurred_at' => '2026-06-15T07:00:00+12:00']],
             'blank withdrawal reason' => ['approved', ['action' => 'withdraw', 'reason' => '     ']],
+            'paired return before departure' => ['approved', ['action' => 'depart', 'occurred_at' => '2026-06-15T07:00:00+12:00', 'returned_at' => '2026-06-15T06:59:00+12:00']],
+            'paired future return' => ['approved', ['action' => 'depart', 'occurred_at' => '2026-06-15T07:00:00+12:00', 'returned_at' => '2026-06-16T12:00:00+12:00']],
+            'paired future departure' => ['approved', ['action' => 'depart', 'occurred_at' => '2026-06-16T07:00:00+12:00', 'returned_at' => '2026-06-16T12:00:00+12:00']],
+            'paired malformed return' => ['approved', ['action' => 'depart', 'occurred_at' => '2026-06-15T07:00:00+12:00', 'returned_at' => 'not-a-timeZ']],
+            'paired ambiguous return' => ['approved', ['action' => 'depart', 'occurred_at' => '2026-06-15T07:00:00+12:00', 'returned_at' => '2026-04-05 02:30:00']],
+            'paired ambiguous departure' => ['approved', ['action' => 'depart', 'occurred_at' => '2026-04-05 02:30:00', 'returned_at' => '2026-04-05T03:00:00+12:00']],
+            'paired stale version' => ['approved', ['action' => 'depart', 'version' => 99, 'occurred_at' => '2026-06-15T07:00:00+12:00', 'returned_at' => '2026-06-15T12:00:00+12:00']],
+            'paired return on approval' => ['requested', ['action' => 'approve', 'returned_at' => '2026-06-15T12:00:00+12:00']],
+            'paired return on return command' => ['departed', ['action' => 'return', 'occurred_at' => '2026-06-15T12:00:00+12:00', 'returned_at' => '2026-06-15T12:00:00+12:00']],
         ];
+    }
+
+    public function test_closed_historical_leave_before_later_completed_leave_has_atomic_actual_provenance(): void
+    {
+        $later = $this->departed();
+        $this->action($later, ['action' => 'return', 'occurred_at' => '2026-06-15T12:00:00+12:00'])->assertRedirect();
+        $laterFacts = $later->fresh()->getAttributes();
+        $earlier = $this->leave('approved');
+        $this->action($earlier, ['action' => 'depart', 'occurred_at' => '2026-06-14T07:00:00+12:00',
+            'returned_at' => '2026-06-14T12:00:00+12:00'])->assertRedirect();
+        $earlier->refresh();
+        $this->assertSame('completed', $earlier->status);
+        $this->assertSame(2, $earlier->version);
+        $this->assertSame([], $earlier->allowedActions());
+        $this->assertSame($this->actor->id, $earlier->departed_by);
+        $this->assertSame($this->actor->id, $earlier->returned_by);
+        $this->assertSame('2026-06-13 19:00:00', $earlier->getRawOriginal('departed_at'));
+        $this->assertSame('2026-06-14 00:00:00', $earlier->getRawOriginal('returned_at'));
+        $this->assertSame(['2026-06-15', '2026-06-20'], [$earlier->starts_on->toDateString(), $earlier->ends_on->toDateString()]);
+        $this->assertSame(['created', 'depart', 'return'], $earlier->transitions()->get()->pluck('meta.action')->all());
+        $this->assertSame([1, 2, 2], $earlier->transitions()->get()->pluck('meta.version')->all());
+        $this->assertSame(array_fill(0, 3, $this->actor->id), $earlier->transitions()->pluck('actor_user_id')->all());
+        $this->assertSame(['2026-06-13 19:00:00', '2026-06-14 00:00:00'], $earlier->transitions()->whereIn('type', ['leave_transition_depart', 'leave_transition_return'])->get()->map(fn ($event) => $event->getRawOriginal('occurred_at'))->all());
+        $this->assertSame(2, DB::table('audit_logs')->where('action', 'clientleave.transition')->where('auditable_id', $earlier->id)
+            ->where('auditable_type', $earlier->getMorphClass())->whereIn('meta->action', ['depart', 'return'])->where('user_id', $this->actor->id)->count());
+        $this->assertSame($laterFacts, $later->fresh()->getAttributes());
+    }
+
+    public function test_paired_leave_uses_both_half_open_bounds_and_omitted_end_remains_unbounded(): void
+    {
+        $later = $this->departed();
+        $this->action($later, ['action' => 'return', 'occurred_at' => '2026-06-15T12:00:00+12:00'])->assertRedirect();
+        $pending = $this->leave('approved');
+        foreach ([['2026-06-14T07:00:00+12:00', null], ['2026-06-14T07:00:00+12:00', '2026-06-15T08:00:00+12:00'],
+            ['2026-06-15T08:00:00+12:00', '2026-06-15T11:00:00+12:00'], ['2026-06-14T07:00:00+12:00', '2026-06-15T13:00:00+12:00']] as [$start, $end]) {
+            $before = $this->facts();
+            $this->action($pending, ['action' => 'depart', 'occurred_at' => $start, 'returned_at' => $end])->assertUnprocessable();
+            $this->assertSame($before, $this->facts());
+        }
+        foreach ([['2026-06-14T07:00:00+12:00', '2026-06-15T07:00:00+12:00'],
+            ['2026-06-15T12:00:00+12:00', '2026-06-15T13:00:00+12:00'], ['2026-06-15T09:00:00+12:00', '2026-06-15T09:00:00+12:00']] as [$start, $end]) {
+            $leave = $this->leave('approved');
+            $this->action($leave, ['action' => 'depart', 'occurred_at' => $start, 'returned_at' => $end])->assertRedirect();
+            $this->assertSame('completed', $leave->fresh()->status);
+        }
+        $this->assertSame([], $pending->fresh()->transitions()->whereIn('type', ['leave_transition_depart', 'leave_transition_return'])->get()->all());
+    }
+
+    public function test_paired_leave_rolls_back_both_times_and_transition_audits_on_return_timeline_failure(): void
+    {
+        $leave = $this->leave('approved');
+        $before = $this->facts();
+        $timeline = app(TimelineEmitter::class);
+        $timelineMock = $this->mock(TimelineEmitter::class);
+        $timelineMock->shouldReceive('project')->once()->andReturnUsing(fn (...$arguments) => $timeline->project(...$arguments));
+        $timelineMock->shouldReceive('record')->andReturnUsing(function (array $input) use ($timeline) {
+            if ($input['type'] === 'leave_transition_return') {
+                throw new \RuntimeException('Synthetic return timeline failure');
+            }
+
+            return $timeline->record($input);
+        });
+        try {
+            app(ClientLeaveWorkflow::class)->transition($this->actor, $this->client, $leave, ['action' => 'depart', 'version' => 1,
+                'occurred_at' => '2026-06-14T07:00:00+12:00', 'returned_at' => '2026-06-14T12:00:00+12:00']);
+            $this->fail('The paired transition must fail atomically.');
+        } catch (\RuntimeException $error) {
+            $this->assertSame('Synthetic return timeline failure', $error->getMessage());
+        }
+        $this->assertSame($before, $this->facts());
+    }
+
+    public function test_closed_historical_hospital_stay_before_later_stay_emits_both_canonical_events_once(): void
+    {
+        $later = $this->hospital();
+        app(ClinicalEventService::class)->record($this->client, $this->actor, $this->eventInput('hospital_discharge', '2026-06-15T12:00:00+12:00', $later->id));
+        $laterFacts = $later->fresh()->getAttributes();
+        $emitted = [];
+        $this->mock(ClinicalSignalService::class)->shouldReceive('emitForEvent')->twice()->andReturnUsing(function (ClinicalEvent $event) use (&$emitted): void {
+            $this->assertSame(1, DB::connection()->transactionLevel());
+            $emitted[] = [$event->id, $event->event_type->value, $event->site_id, $event->reported_by];
+        });
+        Event::fake([ClinicalEventRecorded::class]);
+        $response = $this->actingAs($this->actor)->postJson($this->hospitalUrl(), $this->eventInput('hospital_admission', '2026-06-14T07:00:00+12:00')
+            + ['hospital_discharged_at' => '2026-06-14T12:00:00+12:00'])->assertCreated()->assertJsonPath('hospital_discharged_at', '2026-06-14T00:00:00.000000Z');
+        $admission = ClinicalEvent::findOrFail($response->json('id'));
+        $discharge = ClinicalEvent::findOrFail($response->json('hospital_discharge_id'));
+        $this->assertSame($admission->id, $discharge->hospital_admission_id);
+        $this->assertNull($admission->hospital_discharged_at);
+        $this->assertSame('2026-06-13 19:00:00', $admission->getRawOriginal('hospital_admitted_at'));
+        $this->assertSame('2026-06-14 00:00:00', $discharge->getRawOriginal('hospital_discharged_at'));
+        $this->assertSame($discharge->getRawOriginal('hospital_discharged_at'), $discharge->getRawOriginal('occurred_at'));
+        $this->assertSame(array_fill(0, 2, '2026-06-15 04:00:00'), [$admission->getRawOriginal('reported_at'), $discharge->getRawOriginal('reported_at')]);
+        $this->assertSame([[$admission->id, 'hospital_admission', $this->site->id, $this->actor->id],
+            [$discharge->id, 'hospital_discharge', $this->site->id, $this->actor->id]], $emitted);
+        Event::assertDispatchedTimes(ClinicalEventRecorded::class, 2);
+        Event::assertDispatched(ClinicalEventRecorded::class, fn ($event) => $event->clinicalEvent->id === $discharge->id);
+        $this->assertSame(2, TimelineEvent::where('type', 'clinical_event')->whereIn('source_id', [$admission->id, $discharge->id])
+            ->where('actor_user_id', $this->actor->id)->where('site_id', $this->site->id)->count());
+        $this->assertSame(2, DB::table('audit_logs')->where('action', 'clinicalevent.hospital_pair')->whereIn('auditable_id', [$admission->id, $discharge->id])
+            ->where('user_id', $this->actor->id)->where('client_id', $this->client->id)->count());
+        $this->assertSame($laterFacts, $later->fresh()->getAttributes());
+        $this->getJson($this->hospitalUrl('hospital-admissions'))->assertExactJson(['admissions' => []]);
+    }
+
+    public function test_paired_hospital_uses_both_bounds_including_adjacency_and_empty_intervals(): void
+    {
+        $later = $this->hospital();
+        app(ClinicalEventService::class)->record($this->client, $this->actor, $this->eventInput('hospital_discharge', '2026-06-15T12:00:00+12:00', $later->id));
+        foreach ([['2026-06-14T07:00:00+12:00', null], ['2026-06-14T07:00:00+12:00', '2026-06-15T08:00:00+12:00'],
+            ['2026-06-15T08:00:00+12:00', '2026-06-15T11:00:00+12:00'], ['2026-06-14T07:00:00+12:00', '2026-06-15T13:00:00+12:00']] as [$start, $end]) {
+            $before = $this->facts();
+            $this->actingAs($this->actor)->postJson($this->hospitalUrl(), $this->eventInput('hospital_admission', $start)
+                + ['hospital_discharged_at' => $end])->assertUnprocessable();
+            $this->assertSame($before, $this->facts());
+        }
+        foreach ([['2026-06-14T07:00:00+12:00', '2026-06-15T07:00:00+12:00'],
+            ['2026-06-15T12:00:00+12:00', '2026-06-15T13:00:00+12:00'], ['2026-06-15T09:00:00+12:00', '2026-06-15T09:00:00+12:00']] as [$start, $end]) {
+            $this->postJson($this->hospitalUrl(), $this->eventInput('hospital_admission', $start)
+                + ['hospital_discharged_at' => $end])->assertCreated()->assertJsonPath('hospital_discharged_at', Carbon::parse($end)->utc()->toISOString());
+        }
+        $this->getJson($this->hospitalUrl('hospital-admissions'))->assertExactJson(['admissions' => []]);
+    }
+
+    #[DataProvider('invalidPairedHospitalInputs')]
+    public function test_paired_hospital_validation_is_shared_by_client_shift_dashboard_and_direct_commands(array $input, string $field): void
+    {
+        $admission = $this->hospital();
+        $shift = Shift::factory()->create(['client_id' => $this->client->id, 'site_id' => $this->site->id, 'user_id' => $this->actor->id]);
+        $input += ['event_type' => 'hospital_admission', 'severity' => 'medium', 'description' => 'Historical attendance',
+            'occurred_at' => '2026-06-14T07:00:00+12:00'];
+        if ($input['event_type'] === 'hospital_discharge') {
+            $input['hospital_admission_id'] = $admission->id;
+        }
+        $before = $this->facts();
+        foreach ([$this->hospitalUrl(), '/shifts/'.$shift->id.'/clinical/events', '/health-clinical/events'] as $url) {
+            $this->actingAs($this->actor)->postJson($url, $input + ['client_id' => $this->client->id])->assertUnprocessable()->assertJsonValidationErrors($field);
+            $this->assertSame($before, $this->facts());
+        }
+        try {
+            app(ClinicalEventService::class)->record($this->client, $this->actor, $input);
+            $this->fail('A direct command must validate the same actual-time contract.');
+        } catch (ValidationException $error) {
+            $this->assertArrayHasKey($field, $error->errors());
+        }
+        $this->assertSame($before, $this->facts());
+    }
+
+    public static function invalidPairedHospitalInputs(): array
+    {
+        return [
+            'malformed end' => [['hospital_discharged_at' => 'invalidZ'], 'hospital_discharged_at'],
+            'ambiguous end' => [['hospital_discharged_at' => '2026-04-05 02:30:00'], 'hospital_discharged_at'],
+            'future end' => [['hospital_discharged_at' => '2026-06-16T12:00:00+12:00'], 'hospital_discharged_at'],
+            'end before start' => [['hospital_discharged_at' => '2026-06-14T06:59:00+12:00'], 'hospital_discharged_at'],
+            'malformed start' => [['occurred_at' => 'invalidZ', 'hospital_discharged_at' => '2026-06-14T12:00:00+12:00'], 'occurred_at'],
+            'ambiguous start' => [['occurred_at' => '2026-04-05 02:30:00', 'hospital_discharged_at' => '2026-06-14T12:00:00+12:00'], 'occurred_at'],
+            'future start' => [['occurred_at' => '2026-06-16T07:00:00+12:00', 'hospital_discharged_at' => '2026-06-16T12:00:00+12:00'], 'occurred_at'],
+            'end on separate discharge' => [['event_type' => 'hospital_discharge', 'occurred_at' => '2026-06-15T12:00:00+12:00', 'hospital_discharged_at' => '2026-06-15T12:00:00+12:00'], 'hospital_discharged_at'],
+            'end on another event' => [['event_type' => 'other', 'hospital_discharged_at' => '2026-06-14T12:00:00+12:00'], 'hospital_discharged_at'],
+        ];
+    }
+
+    public function test_paired_hospital_rolls_back_admission_discharge_and_audits_if_second_timeline_fails(): void
+    {
+        $before = $this->facts();
+        $timeline = app(TimelineEmitter::class);
+        $this->mock(TimelineEmitter::class)->shouldReceive('record')->andReturnUsing(function (array $input) use ($timeline) {
+            if (($input['meta']['event_type'] ?? null) === 'hospital_discharge') {
+                throw new \RuntimeException('Synthetic discharge timeline failure');
+            }
+
+            return $timeline->record($input);
+        });
+        $this->mock(ClinicalSignalService::class)->shouldNotReceive('emitForEvent');
+        Event::fake([ClinicalEventRecorded::class]);
+        try {
+            app(ClinicalEventService::class)->record($this->client, $this->actor, $this->eventInput('hospital_admission', '2026-06-14T07:00:00+12:00')
+                + ['hospital_discharged_at' => '2026-06-14T12:00:00+12:00']);
+            $this->fail('The whole closed stay must fail atomically.');
+        } catch (\RuntimeException $error) {
+            $this->assertSame('Synthetic discharge timeline failure', $error->getMessage());
+        }
+        $this->assertSame($before, $this->facts());
+        Event::assertNotDispatched(ClinicalEventRecorded::class);
+    }
+
+    public function test_paired_commands_preserve_current_authority_and_wrong_person_denials(): void
+    {
+        $leave = $this->leave('approved');
+        $leaveInput = ['action' => 'depart', 'version' => 1, 'occurred_at' => '2026-06-14T07:00:00+12:00', 'returned_at' => '2026-06-14T12:00:00+12:00'];
+        $hospitalInput = $this->eventInput('hospital_admission', '2026-06-14T07:00:00+12:00') + ['hospital_discharged_at' => '2026-06-14T12:00:00+12:00'];
+        $other = Client::factory()->create(['site_id' => $this->site->id]);
+        $before = $this->facts();
+        $this->actingAs($this->actor)->putJson('/operations/clients/'.$other->id.'/leave/'.$leave->id, $leaveInput)->assertNotFound();
+        $this->assertSame($before, $this->facts());
+        foreach (['clients.update' => 'leave', 'clinical.events.record' => 'hospital'] as $key => $kind) {
+            $permission = Permission::where('key', $key)->sole();
+            $this->actor->permissionOverrides()->updateExistingPivot($permission->id, ['allowed' => false]);
+            $before = $this->facts();
+            if ($kind === 'leave') {
+                $this->actingAs($this->actor->fresh())->putJson($this->leaveUrl($leave), $leaveInput)->assertForbidden();
+            } else {
+                $this->actingAs($this->actor->fresh())->postJson($this->hospitalUrl(), $hospitalInput)->assertForbidden();
+            }
+            $this->assertSame($before, $this->facts());
+            $this->actor->permissionOverrides()->updateExistingPivot($permission->id, ['allowed' => true]);
+        }
+        $stale = $this->actor->fresh();
+        $this->assertTrue($stale->canDo('clinical.events.record'));
+        $this->assertTrue($stale->canDo('clients.update'));
+        HrEmployeeProfile::where('user_id', $this->actor->id)->update(['primary_site_id' => Site::factory()->create(['is_active' => true])->id]);
+        $before = $this->facts();
+        foreach (['leave' => 403, 'hospital' => 404] as $kind => $status) {
+            try {
+                if ($kind === 'leave') {
+                    app(ClientLeaveWorkflow::class)->transition($stale, $this->client, $leave, $leaveInput);
+                } else {
+                    app(ClinicalEventService::class)->record($this->client, $stale, $hospitalInput);
+                }
+                $this->fail('A stale actor cannot bypass current Site authority.');
+            } catch (HttpExceptionInterface $error) {
+                $this->assertSame($status, $error->getStatusCode());
+            }
+            $this->assertSame($before, $this->facts());
+        }
+    }
+
+    public function test_shift_and_module_entry_paths_keep_both_ends_of_a_paired_hospital_stay(): void
+    {
+        $shift = Shift::factory()->create(['client_id' => $this->client->id, 'site_id' => $this->site->id, 'user_id' => $this->actor->id]);
+        $response = $this->actingAs($this->actor)->postJson('/shifts/'.$shift->id.'/clinical/events',
+            $this->eventInput('hospital_admission', '2026-06-14T07:00:00+12:00') + ['hospital_discharged_at' => '2026-06-14T12:00:00+12:00'])
+            ->assertCreated()->assertJsonPath('shift_id', $shift->id)->assertJsonPath('hospital_discharged_at', '2026-06-14T00:00:00.000000Z');
+        $this->assertSame($shift->id, ClinicalEvent::findOrFail($response->json('hospital_discharge_id'))->shift_id);
+        $this->postJson('/health-clinical/events', $this->eventInput('hospital_admission', '2026-06-13T07:00:00+12:00')
+            + ['hospital_discharged_at' => '2026-06-13T12:00:00+12:00', 'client_id' => $this->client->id])->assertRedirect();
+        $earlier = ClinicalEvent::where('client_id', $this->client->id)->where('hospital_admitted_at', '2026-06-12 19:00:00')->sole();
+        $this->assertSame('2026-06-13 00:00:00', $earlier->hospitalDischarges()->sole()->getRawOriginal('hospital_discharged_at'));
     }
 
     public function test_legacy_approval_needs_explicit_confirmation_and_overlapping_leave_is_rejected(): void
@@ -359,6 +611,56 @@ class ActualAbsenceLifecycleTest extends TestCase
             }
         });
         $this->assertSame($originalAdmission, (array) DB::table('clinical_events')->where('id', $admission->id)->sole());
+    }
+
+    public function test_real_mysql_contender_cannot_overlap_an_atomic_paired_historical_stay(): void
+    {
+        $this->withCommittedSessions(function (Connection $primary, Connection $contender): void {
+            $dispatcher = $primary->getEventDispatcher();
+            $primary->setEventDispatcher(clone $dispatcher);
+            $attempts = 0;
+            $blocked = false;
+            $input = $this->eventInput('hospital_admission', '2026-06-14T07:00:00+12:00') + ['hospital_discharged_at' => '2026-06-14T12:00:00+12:00'];
+            $competing = $this->eventInput('hospital_admission', '2026-06-14T08:00:00+12:00') + ['hospital_discharged_at' => '2026-06-14T11:00:00+12:00'];
+            try {
+                $primary->getEventDispatcher()->listen(QueryExecuted::class, function (QueryExecuted $query) use ($primary, $contender, $competing, &$attempts, &$blocked): void {
+                    if ($attempts !== 0 || ! str_starts_with(strtolower($query->sql), 'insert into `clinical_events`')
+                        || ! in_array('hospital_admission', $query->bindings, true)) {
+                        return;
+                    }
+                    $attempts++;
+                    $this->assertTrue($primary->getPdo()->inTransaction());
+                    $default = DB::getDefaultConnection();
+                    DB::setDefaultConnection($contender->getName());
+                    try {
+                        $this->assertSame($contender, DB::connection());
+                        $this->assertSame($contender->getPdo(), (new ClinicalEvent)->getConnection()->getPdo());
+                        app(ClinicalEventService::class)->record(Client::findOrFail($this->client->id), User::findOrFail($this->actor->id), $competing);
+                        $this->fail('A competing pair must wait for the canonical person mutex.');
+                    } catch (QueryException $error) {
+                        $this->assertSame(1205, (int) ($error->errorInfo[1] ?? 0));
+                        $blocked = true;
+                    } finally {
+                        DB::setDefaultConnection($default);
+                    }
+                });
+                $admission = app(ClinicalEventService::class)->record($this->client, $this->actor, $input);
+                $this->assertSame(1, $attempts);
+                $this->assertTrue($blocked);
+                $this->assertSame(1, $admission->hospitalDischarges()->count());
+                $before = $this->facts();
+                try {
+                    app(ClinicalEventService::class)->record($this->client, $this->actor, $competing);
+                    $this->fail('After the winner commits, both interval bounds must still reject overlap.');
+                } catch (ValidationException $error) {
+                    $this->assertArrayHasKey('occurred_at', $error->errors());
+                }
+                $this->assertSame($before, $this->facts());
+                $this->assertSame(2, ClinicalEvent::where('client_id', $this->client->id)->count());
+            } finally {
+                $primary->setEventDispatcher($dispatcher);
+            }
+        });
     }
 
     private function leave(string $status = 'requested'): ClientLeaveRequest

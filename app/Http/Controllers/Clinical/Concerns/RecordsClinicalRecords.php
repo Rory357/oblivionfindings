@@ -97,6 +97,7 @@ trait RecordsClinicalRecords
             ],
             'outcome' => ['nullable', 'string', 'max:5000'],
             'hospital_admission_id' => ['required_if:event_type,hospital_discharge', 'nullable', 'integer', 'min:1'],
+            'hospital_discharged_at' => ['prohibited_unless:event_type,hospital_admission', 'nullable', 'date'],
             'witnesses' => ['nullable', 'array'],
             'witnesses.*' => ['string', 'max:255'],
             'requires_followup' => ['nullable', 'boolean'],

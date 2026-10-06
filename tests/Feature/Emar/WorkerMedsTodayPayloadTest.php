@@ -363,7 +363,12 @@ class WorkerMedsTodayPayloadTest extends TestCase
             $this->assertSame([
                 'scheduled_window' => 1, 'board_day' => 1, 'prn_unresolved' => 2,
                 'administration_batch' => 0, 'followup_scope' => 1, 'refusal_scope' => 1, 'unexpected' => 0,
+                'second_person_scope' => 1,
             ], MedicationReadQueryInventory::counts($reads), MedicationReadQueryInventory::describe($reads));
+            $confirmationRead = $reads['second_person_scope'][0];
+            $this->assertStringContainsString('has_effective_administration', $confirmationRead['query']);
+            $this->assertMatchesRegularExpression('/`nominated_user_id` = \\? and `status` = \\?/i', $confirmationRead['query']);
+            $this->assertSame([$worker->id, 'pending'], array_slice($confirmationRead['bindings'], -2));
             $this->assertDatabaseCount('client_medication_administrations', 0);
         }
         // Concealed controlled doses have their own canonical count read.
@@ -382,6 +387,29 @@ class WorkerMedsTodayPayloadTest extends TestCase
         foreach ($hidden as $order) {
             $this->actingAs($worker->fresh())->getJson(route('emar.medications.detail', $order))->assertNotFound();
         }
+    }
+
+    public function test_query_inventory_distinguishes_named_confirmation_scope_from_unknown_parent_reads(): void
+    {
+        $baseline = [
+            'scheduled_window' => 0, 'board_day' => 0, 'prn_unresolved' => 0,
+            'administration_batch' => 0, 'followup_scope' => 0, 'refusal_scope' => 0, 'unexpected' => 0,
+        ];
+        $this->assertSame($baseline, MedicationReadQueryInventory::counts(MedicationReadQueryInventory::fromLog([])));
+        $confirmation = [
+            'query' => 'select `medication_second_person_confirmations`.*, exists(select * from `client_medication_administrations` where `medication_second_person_confirmations`.`administration_id` = `client_medication_administrations`.`id`) as `has_effective_administration` from `medication_second_person_confirmations` where `nominated_user_id` = ? and `status` = ?',
+            'bindings' => [42, 'pending'],
+        ];
+        $unknown = [
+            'query' => 'select * from `unrecognised_confirmation_parent` where exists(select * from `medication_second_person_confirmations` where exists(select * from `client_medication_administrations`))',
+            'bindings' => [],
+        ];
+        $reads = MedicationReadQueryInventory::fromLog([$confirmation, $unknown]);
+        $this->assertSame([$confirmation], $reads['second_person_scope']);
+        $this->assertSame([$unknown], $reads['unexpected']);
+        $this->assertSame([
+            ...$baseline, 'unexpected' => 1, 'second_person_scope' => 1,
+        ], MedicationReadQueryInventory::counts($reads));
     }
 
     public function test_sidebar_badge_keeps_an_overnight_shift_after_midnight(): void

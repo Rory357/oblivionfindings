@@ -105,6 +105,9 @@ function EventRecordForm({
     const [severity, setSeverity] = useState<Severity>('medium');
     const [occurredAt, setOccurredAt] = useState(toDatetimeLocal(new Date()));
     const [offset, setOffset] = useState('');
+    const [stayEnded, setStayEnded] = useState(false);
+    const [dischargedAt, setDischargedAt] = useState('');
+    const [dischargeOffset, setDischargeOffset] = useState('');
     const [step, setStep] = useState(0);
     const [confirm, setConfirm] = useState(false);
     const [discard, setDiscard] = useState(false);
@@ -126,6 +129,8 @@ function EventRecordForm({
         eventType === 'hospital_admission' ||
         eventType === 'hospital_discharge';
     const eventInstant = actualEventInstant(occurredAt, offset);
+    const closedStay = eventType === 'hospital_admission' && stayEnded;
+    const dischargeInstant = actualEventInstant(dischargedAt, dischargeOffset);
     const admissionsUrl = shiftId
         ? '/shifts/' + shiftId + '/clinical/hospital-admissions'
         : clientId
@@ -181,6 +186,19 @@ function EventRecordForm({
         if (!eventInstant || Date.parse(eventInstant) > Date.now())
             next.occurred_at =
                 'Choose the actual event time in New Zealand. It cannot be in the future.';
+        if (
+            closedStay &&
+            (!dischargeInstant || Date.parse(dischargeInstant) > Date.now())
+        )
+            next.hospital_discharged_at =
+                'Choose the actual discharge time in New Zealand. It cannot be in the future.';
+        else if (
+            closedStay &&
+            eventInstant &&
+            Date.parse(dischargeInstant) < Date.parse(eventInstant)
+        )
+            next.hospital_discharged_at =
+                'Discharge must be at or after the actual admission.';
         if (!description.trim()) next.description = 'Describe what happened.';
         if (immediateActionRequired && !immediateActionTaken.trim())
             next.immediate_action_taken = 'Record what was done straight away.';
@@ -203,6 +221,9 @@ function EventRecordForm({
     const resetForm = useCallback(() => {
         setEventType('other');
         setOffset('');
+        setStayEnded(false);
+        setDischargedAt('');
+        setDischargeOffset('');
         setStep(0);
         setConfirm(false);
         setDiscard(false);
@@ -248,6 +269,9 @@ function EventRecordForm({
                 event_type: eventType,
                 severity,
                 occurred_at: eventInstant,
+                ...(closedStay
+                    ? { hospital_discharged_at: dischargeInstant }
+                    : {}),
                 ...(eventType === 'hospital_discharge'
                     ? { hospital_admission_id: Number(admissionId) }
                     : {}),
@@ -340,9 +364,12 @@ function EventRecordForm({
                                     </Label>
                                     <Select
                                         value={eventType}
-                                        onValueChange={(value) =>
-                                            setEventType(value as EventType)
-                                        }
+                                        onValueChange={(value) => {
+                                            setEventType(value as EventType);
+                                            setStayEnded(false);
+                                            setDischargedAt('');
+                                            setDischargeOffset('');
+                                        }}
                                     >
                                         <SelectTrigger id="clinical-event-type">
                                             <SelectValue />
@@ -404,6 +431,46 @@ function EventRecordForm({
                                         ? 'Record an actual hospital admission, not a planned appointment. Medication due during the stay shows Away. Earlier doses still need an outcome.'
                                         : 'Choose the recorded admission and actual discharge time. Medication due after discharge is assessed normally; other active absences still apply.'}
                                 </p>
+                            )}
+                            {eventType === 'hospital_admission' && (
+                                <div className="space-y-4 rounded-lg border p-3">
+                                    <div className="flex items-start gap-3">
+                                        <Checkbox
+                                            id="hospital-stay-ended"
+                                            checked={stayEnded}
+                                            onCheckedChange={(checked) =>
+                                                setStayEnded(checked === true)
+                                            }
+                                        />
+                                        <div className="space-y-1">
+                                            <Label htmlFor="hospital-stay-ended">
+                                                This hospital stay has already
+                                                ended
+                                            </Label>
+                                            <p className="text-subtle">
+                                                Record the actual admission and
+                                                discharge together. Medication
+                                                Away applies only during that
+                                                stay.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {stayEnded && (
+                                        <ActualEventTimeField
+                                            id="hospital-historical-discharge"
+                                            label="Actually discharged"
+                                            value={dischargedAt}
+                                            offset={dischargeOffset}
+                                            onChange={(v, o) => {
+                                                setDischargedAt(v);
+                                                setDischargeOffset(o);
+                                            }}
+                                            error={
+                                                errors.hospital_discharged_at
+                                            }
+                                        />
+                                    )}
+                                </div>
                             )}
                             {eventType === 'hospital_discharge' && (
                                 <div className="space-y-2">
@@ -596,19 +663,36 @@ function EventRecordForm({
                             <ReviewRow
                                 label="Event"
                                 value={
-                                    EVENT_TYPES.find(
-                                        (item) => item.value === eventType,
-                                    )?.label
+                                    closedStay
+                                        ? 'Hospital admission and discharge'
+                                        : EVENT_TYPES.find(
+                                              (item) =>
+                                                  item.value === eventType,
+                                          )?.label
                                 }
                             />
                             <ReviewRow
-                                label="Actual time · Pacific/Auckland"
+                                label={
+                                    closedStay
+                                        ? 'Actually admitted · Pacific/Auckland'
+                                        : 'Actual time · Pacific/Auckland'
+                                }
                                 value={
                                     formatDateTime(eventInstant) +
                                     ' · UTC' +
                                     eventInstant.slice(-6)
                                 }
                             />
+                            {closedStay && (
+                                <ReviewRow
+                                    label="Actually discharged · Pacific/Auckland"
+                                    value={
+                                        formatDateTime(dischargeInstant) +
+                                        ' · UTC' +
+                                        dischargeInstant.slice(-6)
+                                    }
+                                />
+                            )}
                             {eventType === 'hospital_discharge' && (
                                 <ReviewRow
                                     label="Admission"

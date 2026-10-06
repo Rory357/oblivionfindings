@@ -52,15 +52,17 @@ final class ClientLeaveWorkflow
         if (is_string($input['reason'] ?? null)) {
             $input['reason'] = trim($input['reason']);
         }
+        $explicitOffset = function (string $attribute, mixed $value, \Closure $fail): void {
+            if (! $value instanceof DateTimeInterface && (! is_string($value) || preg_match('/(?:Z|[+-]\d{2}:?\d{2})$/i', $value) !== 1)) {
+                $fail('Choose an actual time with its timezone offset.');
+            }
+        };
         $input = Validator::make($input, [
             'action' => ['required', Rule::in(['approve', 'decline', 'depart', 'return', 'withdraw'])],
             'version' => ['required', 'integer', 'min:1'],
             'occurred_at' => ['required_if:action,depart,return', 'prohibited_unless:action,depart,return', 'nullable', 'date',
-                function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (! $value instanceof DateTimeInterface && (! is_string($value) || preg_match('/(?:Z|[+-]\d{2}:?\d{2})$/i', $value) !== 1)) {
-                        $fail('Choose an actual time with its timezone offset.');
-                    }
-                }],
+                $explicitOffset],
+            'returned_at' => ['prohibited_unless:action,depart', 'nullable', 'date', $explicitOffset],
             'reason' => ['required_if:action,withdraw', 'nullable', 'string', 'min:5', 'max:5000'],
             'approval_notes' => ['nullable', 'string', 'max:5000'],
         ])->validate();
@@ -79,16 +81,26 @@ final class ClientLeaveWorkflow
             if ($at !== null && $at->isFuture()) {
                 throw ValidationException::withMessages(['occurred_at' => 'Record an actual time, not a future plan.']);
             }
+            $returnedAt = WorkerClock::toUtc($input['returned_at'] ?? null);
+            if ($returnedAt !== null && ($returnedAt->isFuture() || $returnedAt->lessThan($at))) {
+                throw ValidationException::withMessages(['returned_at' => 'The actual return must be at or after departure and must not be in the future.']);
+            }
             if ($action === 'depart') {
-                // A second open departure would leave return attribution ambiguous.
-                $conflict = ClientLeaveRequest::query()->where('client_id', $client->id)->whereKeyNot($leave->id)
+                // Compare both half-open boundaries. An omitted return remains
+                // unbounded, so it cannot silently span a later recorded leave.
+                $conflict = ($returnedAt === null || $returnedAt->greaterThan($at)) && ClientLeaveRequest::query()->where('client_id', $client->id)->whereKeyNot($leave->id)
                     ->whereNotNull('departed_at')->whereNull('withdrawn_at')
                     ->whereIn('status', ['approved', 'completed'])
+                    ->when($returnedAt !== null, fn ($q) => $q->where('departed_at', '<', $returnedAt))
+                    ->where(fn ($q) => $q->whereNull('returned_at')->orWhereColumn('returned_at', '>', 'departed_at'))
                     ->where(fn ($q) => $q->whereNull('returned_at')->orWhere('returned_at', '>', $at))->lockForUpdate()->exists();
                 if ($conflict) {
-                    throw ValidationException::withMessages(['occurred_at' => 'Another recorded leave overlaps this departure. Record or clarify its return first.']);
+                    throw ValidationException::withMessages(['occurred_at' => 'These actual times overlap another recorded leave. Check the times; for leave that has ended, record departure and return together.']);
                 }
                 $leave->forceFill(['departed_at' => $at, 'departed_by' => $actor->id]);
+                if ($returnedAt !== null) {
+                    $leave->forceFill(['returned_at' => $returnedAt, 'returned_by' => $actor->id, 'status' => 'completed']);
+                }
             } elseif ($action === 'return') {
                 $departure = $leave->getRawOriginal('departed_at') === null ? null : CarbonImmutable::parse($leave->getRawOriginal('departed_at'), 'UTC');
                 if ($departure === null || $at->lessThan($departure)) {
@@ -107,6 +119,9 @@ final class ClientLeaveWorkflow
             $leave->version = ((int) $leave->version) + 1;
             $leave->save();
             $this->record($leave, $client, $actor, $action, $input['reason'] ?? null, $at);
+            if ($action === 'depart' && $returnedAt !== null) {
+                $this->record($leave, $client, $actor, 'return', null, $returnedAt);
+            }
 
             return $leave;
         }, 5);

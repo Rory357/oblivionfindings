@@ -11,6 +11,7 @@ use App\Models\HsEvent;
 use App\Models\Shift;
 use App\Models\TimelineEvent;
 use App\Models\User;
+use App\Services\AuditLogger;
 use App\Services\AuthorizationEvidenceLockService;
 use App\Services\CurrentAuthorizationReads;
 use App\Services\HealthSafety\HsEventService;
@@ -23,6 +24,7 @@ use DomainException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class ClinicalEventService
@@ -58,6 +60,9 @@ class ClinicalEventService
         $type = $input['event_type'] instanceof ClinicalEventType
             ? $input['event_type']
             : ClinicalEventType::from($input['event_type']);
+        Validator::make([...$input, 'event_type' => $type->value], [
+            'hospital_discharged_at' => ['prohibited_unless:event_type,hospital_admission', 'nullable', 'date'],
+        ])->validate();
 
         $severity = AlertSeverity::normalise($input['severity'] ?? AlertSeverity::MEDIUM);
         $siteId = $this->resolveCanonicalSiteId($client, $shift, $type->shouldLinkToHs());
@@ -68,7 +73,7 @@ class ClinicalEventService
             throw new DomainException('Immediate action taken is required for clinical events linked to Health & Safety.');
         }
 
-        $event = DB::transaction(function () use (
+        $events = DB::transaction(function () use (
             $client,
             $hasImmediateAction,
             $immediateAction,
@@ -78,7 +83,7 @@ class ClinicalEventService
             $shift,
             $siteId,
             $type,
-        ): ClinicalEvent {
+        ): array {
             $hospital = [];
             if (in_array($type, [ClinicalEventType::HospitalAdmission, ClinicalEventType::HospitalDischarge], true)) {
                 $client = Client::query()->lockForUpdate()->findOrFail($client->id);
@@ -112,23 +117,50 @@ class ClinicalEventService
                 $this->linkToHsEvent($event);
             }
 
-            return $event;
+            $events = [$event];
+            $dischargedAt = WorkerClock::toUtc($input['hospital_discharged_at'] ?? null);
+            if ($type === ClinicalEventType::HospitalAdmission && $dischargedAt !== null) {
+                // A closed historical stay is two canonical, immutable events.
+                // No intermediate open admission is visible outside this transaction.
+                $discharge = ClinicalEvent::create([
+                    'client_id' => $client->id, 'shift_id' => $shift?->id, 'site_id' => $siteId,
+                    'reported_by' => $reporter->id, 'event_type' => ClinicalEventType::HospitalDischarge,
+                    'severity' => $severity, 'occurred_at' => $dischargedAt, 'reported_at' => $event->reported_at,
+                    'description' => $input['description'], 'status' => 'open', 'requires_followup' => false,
+                    'hospital_admitted_at' => null, 'hospital_discharged_at' => $dischargedAt,
+                    'hospital_admission_id' => $event->id,
+                ]);
+                $this->createTimelineEvent($discharge, $reporter);
+                $events[] = $discharge;
+                foreach ($events as $recorded) {
+                    AuditLogger::logOrFail('clinicalevent.hospital_pair', $recorded, [
+                        'actor_id' => (int) $reporter->id, 'site_id' => $siteId,
+                        'hospital_admission_id' => (int) $event->id, 'hospital_discharge_id' => (int) $discharge->id,
+                        'event_type' => $recorded->event_type->value, 'occurred_at' => $recorded->occurred_at->toISOString(),
+                    ]);
+                }
+                $event->setRelation('hospitalDischarges', collect([$discharge]));
+            }
+
+            return $events;
         }, 3);
 
-        $this->signalService->emitForEvent($event);
+        foreach ($events as $event) {
+            $this->signalService->emitForEvent($event);
 
-        ClinicalEventRecorded::dispatch($event);
+            ClinicalEventRecorded::dispatch($event);
 
-        Log::info('ClinicalEventService: event recorded', [
-            'clinical_event_id' => $event->id,
-            'event_type' => $type->value,
-            'severity' => $severity,
-            'client_id' => $client->id,
-            'shift_id' => $shift?->id,
-            'linked_to_hs' => $event->linked_hs_event_id !== null,
-        ]);
+            Log::info('ClinicalEventService: event recorded', [
+                'clinical_event_id' => $event->id,
+                'event_type' => $event->event_type->value,
+                'severity' => $severity,
+                'client_id' => $client->id,
+                'shift_id' => $shift?->id,
+                'linked_to_hs' => $event->linked_hs_event_id !== null,
+            ]);
+        }
 
-        return $event;
+        return $events[0];
     }
 
     /** Thin, current-person references for the admission chosen by a discharge form. */
@@ -170,13 +202,22 @@ class ClinicalEventService
 
     private function hospitalFacts(Client $client, ClinicalEventType $type, array $input): array
     {
-        $value = $input['occurred_at'] ?? null;
-        if (! $value instanceof DateTimeInterface && (! is_string($value) || preg_match('/(?:Z|[+-]\d{2}:?\d{2})$/i', $value) !== 1)) {
-            throw ValidationException::withMessages(['occurred_at' => 'Choose an actual time with its timezone offset.']);
-        }
+        $explicitOffset = function (string $attribute, mixed $value, \Closure $fail): void {
+            if (! $value instanceof DateTimeInterface && (! is_string($value) || preg_match('/(?:Z|[+-]\d{2}:?\d{2})$/i', $value) !== 1)) {
+                $fail('Choose an actual time with its timezone offset.');
+            }
+        };
+        Validator::make($input, [
+            'occurred_at' => ['required', 'date', $explicitOffset],
+            'hospital_discharged_at' => ['nullable', 'date', $explicitOffset],
+        ])->validate();
         $at = WorkerClock::toUtc($input['occurred_at'] ?? null);
         if ($at === null || $at->isFuture()) {
             throw ValidationException::withMessages(['occurred_at' => 'Record the actual admission or discharge time; future plans do not establish absence.']);
+        }
+        $dischargedAt = WorkerClock::toUtc($input['hospital_discharged_at'] ?? null);
+        if ($dischargedAt !== null && ($dischargedAt->isFuture() || $dischargedAt->lessThan($at))) {
+            throw ValidationException::withMessages(['hospital_discharged_at' => 'The actual discharge must be at or after admission and must not be in the future.']);
         }
         if ($type === ClinicalEventType::HospitalAdmission) {
             if (! empty($input['hospital_admission_id'])) {
@@ -185,11 +226,19 @@ class ClinicalEventService
             $admissions = ClinicalEvent::query()->where('client_id', $client->id)
                 ->where('event_type', $type->value)->whereNotNull('hospital_admitted_at')->lockForUpdate()->get();
             foreach ($admissions as $admission) {
+                if ($dischargedAt !== null && $dischargedAt->equalTo($at)) {
+                    break; // An explicitly empty half-open interval establishes no absence.
+                }
+                $start = CarbonImmutable::parse($admission->getRawOriginal('hospital_admitted_at'), 'UTC');
                 $discharge = $admission->hospitalDischarges()->where('client_id', $admission->client_id)
                     ->whereNotNull('hospital_discharged_at')->whereColumn('hospital_discharged_at', 'occurred_at')
                     ->where('hospital_discharged_at', '>=', $admission->hospital_admitted_at)->orderBy('hospital_discharged_at')->lockForUpdate()->first();
-                if ($discharge === null || CarbonImmutable::parse($discharge->getRawOriginal('occurred_at'), 'UTC')->greaterThan($at)) {
-                    throw ValidationException::withMessages(['occurred_at' => 'Another hospital admission overlaps this time. Record or clarify its discharge first.']);
+                $end = $discharge === null ? null : CarbonImmutable::parse($discharge->getRawOriginal('occurred_at'), 'UTC');
+                if ($end !== null && $end->equalTo($start)) {
+                    continue;
+                }
+                if (($dischargedAt === null || $start->lessThan($dischargedAt)) && ($end === null || $end->greaterThan($at))) {
+                    throw ValidationException::withMessages(['occurred_at' => 'These actual times overlap another recorded hospital stay. Check the times; for a stay that has ended, record admission and discharge together.']);
                 }
             }
 

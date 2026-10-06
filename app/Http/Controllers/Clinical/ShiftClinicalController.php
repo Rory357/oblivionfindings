@@ -169,6 +169,7 @@ class ShiftClinicalController extends Controller
             ],
             'outcome' => ['nullable', 'string', 'max:5000'],
             'hospital_admission_id' => ['required_if:event_type,hospital_discharge', 'nullable', 'integer', 'min:1'],
+            'hospital_discharged_at' => ['prohibited_unless:event_type,hospital_admission', 'nullable', 'date'],
             'requires_followup' => ['nullable', 'boolean'],
             'followup_notes' => ['nullable', 'string', 'max:2000'],
         ]);
@@ -187,11 +188,16 @@ class ShiftClinicalController extends Controller
         );
 
         if ($request->wantsJson()) {
+            $discharge = $event->hospital_discharged_at !== null ? $event
+                : ($event->relationLoaded('hospitalDischarges') ? $event->getRelation('hospitalDischarges')->first() : null);
+
             return response()->json([
                 'id' => $event->id,
                 'event_type' => $event->event_type->value,
                 'occurred_at' => $event->occurred_at->toISOString(),
                 'hospital_admission_id' => $event->hospital_admission_id,
+                'hospital_discharge_id' => $discharge?->id,
+                'hospital_discharged_at' => $discharge?->hospital_discharged_at?->toISOString(),
                 'requires_followup' => $event->requires_followup,
                 'shift_id' => $event->shift_id,
             ], 201);

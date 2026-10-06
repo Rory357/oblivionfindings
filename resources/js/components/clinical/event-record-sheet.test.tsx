@@ -167,4 +167,115 @@ describe('clinical actual hospital event workflow', () => {
         ).toBeInTheDocument();
         expect(post).not.toHaveBeenCalled();
     });
+
+    it('reviews and submits an already-ended hospital stay as one request and retains a rejected draft', async () => {
+        render(<EventRecordSheet {...props} />);
+        await selectType('Hospital admission');
+        fill();
+        fireEvent.click(
+            screen.getByRole('checkbox', {
+                name: 'This hospital stay has already ended',
+            }),
+        );
+        fireEvent.change(screen.getByLabelText('Actually discharged'), {
+            target: { value: '2026-01-04T11:00' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+        expect(
+            screen.getByText('Hospital admission and discharge'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Actually admitted · Pacific/Auckland'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Actually discharged · Pacific/Auckland'),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Record event' }));
+        expect(post).not.toHaveBeenCalled();
+        fireEvent.click(
+            within(screen.getByRole('alertdialog')).getByRole('button', {
+                name: 'Record event',
+            }),
+        );
+        expect(post.mock.calls[0][1]).toEqual(
+            expect.objectContaining({
+                event_type: 'hospital_admission',
+                occurred_at: '2026-01-03T10:15:00+13:00',
+                hospital_discharged_at: '2026-01-04T11:00:00+13:00',
+            }),
+        );
+        expect(post.mock.calls[0][1]).not.toHaveProperty(
+            'hospital_admission_id',
+        );
+        expect(fetchMock).not.toHaveBeenCalled();
+        const callbacks = post.mock.calls[0][2];
+        act(() => {
+            callbacks.onError({
+                hospital_discharged_at: 'This stay overlaps another admission.',
+            });
+            callbacks.onFinish();
+        });
+        expect(screen.getByLabelText('When it happened')).toHaveValue(
+            '2026-01-03T10:15',
+        );
+        expect(screen.getByLabelText('Actually discharged')).toHaveValue(
+            '2026-01-04T11:00',
+        );
+        expect(
+            screen.getByRole('checkbox', {
+                name: 'This hospital stay has already ended',
+            }),
+        ).toBeChecked();
+    });
+    it.each(['', '2026-01-02T09:00', '2099-01-04T11:00'])(
+        'rejects an invalid paired discharge %s before submission',
+        async (value) => {
+            render(<EventRecordSheet {...props} />);
+            await selectType('Hospital admission');
+            fill();
+            fireEvent.click(
+                screen.getByRole('checkbox', {
+                    name: 'This hospital stay has already ended',
+                }),
+            );
+            fireEvent.change(screen.getByLabelText('Actually discharged'), {
+                target: { value },
+            });
+            fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+            expect(
+                screen.getByLabelText('When it happened'),
+            ).toBeInTheDocument();
+            expect(
+                screen.getAllByText(
+                    /(Choose the actual discharge|Discharge must be)/,
+                ).length,
+            ).toBeGreaterThan(0);
+            expect(post).not.toHaveBeenCalled();
+        },
+    );
+    it('drops the paired discharge when changing to another event type', async () => {
+        render(<EventRecordSheet {...props} />);
+        await selectType('Hospital admission');
+        fill();
+        fireEvent.click(
+            screen.getByRole('checkbox', {
+                name: 'This hospital stay has already ended',
+            }),
+        );
+        fireEvent.change(screen.getByLabelText('Actually discharged'), {
+            target: { value: '2026-01-04T11:00' },
+        });
+        await selectType('Other Clinical Event');
+        fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Record event' }));
+        fireEvent.click(
+            within(screen.getByRole('alertdialog')).getByRole('button', {
+                name: 'Record event',
+            }),
+        );
+        expect(post.mock.calls[0][1]).toHaveProperty('event_type', 'other');
+        expect(post.mock.calls[0][1]).not.toHaveProperty(
+            'hospital_discharged_at',
+        );
+    });
 });
