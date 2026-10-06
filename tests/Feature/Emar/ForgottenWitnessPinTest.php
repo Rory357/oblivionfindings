@@ -988,6 +988,74 @@ class ForgottenWitnessPinTest extends TestCase
         });
     }
 
+    #[DataProvider('expiryAdministrationVisibility')]
+    public function test_expiry_skips_superseded_candidates_and_locks_only_the_remaining_current_due_nomination(bool $deletedCurrent): void
+    {
+        $witness = $this->witnessOnShift();
+        $historical = collect();
+        foreach ([1, 2] as $number) {
+            $order = $this->order(['09:30'], ['name' => 'Superseded nomination '.$number, 'dose_amount' => 1, 'dose_unit' => 'tablet']);
+            $response = $this->record($order, '09:30', $this->fallback($witness), true)->assertOk();
+            $dose = ClientMedicationAdministration::findOrFail($response->json('administration.id'));
+            $nomination = MedicationSecondPersonConfirmation::where('administration_id', $dose->id)->sole();
+            [$correction, $lead] = $this->requestCorrection($dose, 'withheld');
+            $this->actingAs($lead)->postJson($this->correctionUrl($correction, 'approve'), ['request_uuid' => (string) Str::uuid()])->assertOk();
+            $this->assertSame('pending', $nomination->refresh()->status);
+            $historical->push($dose, $nomination, $correction,
+                MedicationFollowup::where('source_key', 'confirm:'.$nomination->id)->sole());
+        }
+        $historicalBefore = $historical->map(fn ($row) => $row->fresh()->getRawOriginal())->all();
+        $currentOrder = $this->order(['09:30'], ['name' => 'Current due nomination', 'dose_amount' => 1, 'dose_unit' => 'tablet']);
+        $response = $this->record($currentOrder, '09:30', $this->fallback($witness), true)->assertOk();
+        $currentDose = ClientMedicationAdministration::findOrFail($response->json('administration.id'));
+        $current = MedicationSecondPersonConfirmation::where('administration_id', $currentDose->id)->sole();
+        if ($deletedCurrent) {
+            $currentDose->delete();
+        }
+        $this->travel(30)->minutes();
+        $retrieved = [];
+        $collecting = true;
+        MedicationSecondPersonConfirmation::retrieved(function (MedicationSecondPersonConfirmation $row) use (&$retrieved, &$collecting): void {
+            if ($collecting) {
+                $retrieved[] = (int) $row->id;
+            }
+        });
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        try {
+            $service = app(ForgottenWitnessPinService::class);
+            $this->assertSame(1, $service->expireDue());
+            $this->assertSame([$current->id], array_values(array_unique($retrieved)), 'Superseded nominations must never be materialized as expiry candidates.');
+            $locks = collect(DB::getQueryLog())->filter(fn ($query) => str_contains($query['query'], 'for update'));
+            foreach (['client_medications' => $currentOrder->id, 'client_medication_administrations' => $currentDose->id,
+                'medication_second_person_confirmations' => $current->id] as $table => $id) {
+                $lockedIds = $locks->filter(fn ($query) => str_starts_with($query['query'], 'select * from `'.$table.'`'))
+                    ->map(fn ($query) => (int) $query['bindings'][0])->unique()->values()->all();
+                $this->assertSame([$id], $lockedIds, 'Only the current due '.$table.' row may enter the expiry mutex.');
+            }
+            $retrieved = [];
+            DB::flushQueryLog();
+            $this->assertSame(0, $service->expireDue());
+            $this->assertSame([], $retrieved, 'Retained pending nominations must not be rescanned on the next scheduled expiry.');
+            $this->assertCount(0, collect(DB::getQueryLog())->filter(fn ($query) => preg_match('/for (?:update|share)/i', $query['query'])));
+        } finally {
+            $collecting = false;
+            DB::disableQueryLog();
+            DB::flushQueryLog();
+        }
+        $this->assertSame($historicalBefore, $historical->map(fn ($row) => $row->fresh()->getRawOriginal())->all());
+        $this->assertSame('expired', $current->refresh()->status);
+        $this->assertSame('expired', $currentDose->refresh()->second_person_status);
+        $this->assertSame($deletedCurrent, $currentDose->trashed());
+        $this->assertSame('done', MedicationFollowup::where('source_key', 'confirm:'.$current->id)->sole()->state);
+        $this->assertSame(1, MedicationEvent::where('kind', 'second_person.expired')->count());
+    }
+
+    public static function expiryAdministrationVisibility(): array
+    {
+        return ['current administration' => [false], 'soft-deleted current administration' => [true]];
+    }
+
     private function withCommittedConfirmationSessions(callable $exercise): void
     {
         $primary = DB::connection();

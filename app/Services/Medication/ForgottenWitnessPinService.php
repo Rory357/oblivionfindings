@@ -225,6 +225,7 @@ final class ForgottenWitnessPinService
     {
         $count = 0;
         MedicationSecondPersonConfirmation::query()->where('status', MedicationSecondPersonConfirmation::PENDING)
+            ->whereHas('administration', fn ($query) => $query->withTrashed()->effectiveClinicalEvidence())
             ->where('due_at', '<=', now())->orderBy('id')->chunkById(100, function ($rows) use (&$count): void {
                 foreach ($rows as $snapshot) {
                     $count += (int) DB::transaction(function () use ($snapshot): bool {
