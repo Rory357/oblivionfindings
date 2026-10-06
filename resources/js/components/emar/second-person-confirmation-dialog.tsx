@@ -92,7 +92,7 @@ export function SecondPersonConfirmationDialog(
     return (
         <Dialog open={props.open} onOpenChange={props.onOpenChange}>
             <DialogContent
-                className="frontline-dialog max-h-[90vh] overflow-y-auto p-0"
+                className="frontline-dialog flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 [&>[data-slot=dialog-close]]:top-5 [&>[data-slot=dialog-close]]:right-5"
                 style={{
                     width: 'min(92vw, 480px)',
                     maxWidth: 'min(92vw, 480px)',
@@ -287,7 +287,7 @@ function ConfirmationBody({
 
     return (
         <>
-            <DialogHeader className="border-b px-6 py-5 pr-14 text-left">
+            <DialogHeader className="shrink-0 border-b px-6 py-5 pr-14 text-left">
                 <div className="flex items-center gap-3">
                     <span className="rounded-xl bg-primary/10 p-2.5 text-primary">
                         <UserCheck className="size-5" aria-hidden="true" />
@@ -301,7 +301,7 @@ function ConfirmationBody({
                 </div>
             </DialogHeader>
             <div
-                className="space-y-4 px-6 py-5"
+                className="min-h-0 min-w-0 space-y-4 overflow-y-auto px-6 py-5 [overflow-wrap:anywhere]"
                 aria-live="polite"
                 aria-busy={sending}
             >
@@ -393,7 +393,7 @@ function ConfirmationBody({
                     </>
                 )}
             </div>
-            <DialogFooter className="border-t bg-muted/30 px-6 py-4">
+            <DialogFooter className="shrink-0 flex-wrap border-t bg-muted/30 px-6 py-4">
                 <Button
                     variant="outline"
                     className="frontline-hit"
