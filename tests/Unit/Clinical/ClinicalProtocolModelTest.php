@@ -68,7 +68,12 @@ class ClinicalProtocolModelTest extends TestCase
     public function test_schedules_relationship(): void
     {
         $protocol = ClinicalProtocol::factory()->create();
-        ClinicalProtocolSchedule::factory()->count(3)->create([
+        $dueAt = now()->utc()->startOfSecond();
+        ClinicalProtocolSchedule::factory()->count(3)->sequence(
+            ['due_at' => $dueAt->copy()->addHour()],
+            ['due_at' => $dueAt->copy()->addHours(2)],
+            ['due_at' => $dueAt->copy()->addHours(3)],
+        )->create([
             'clinical_protocol_id' => $protocol->id,
         ]);
 

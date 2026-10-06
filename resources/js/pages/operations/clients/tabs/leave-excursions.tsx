@@ -250,7 +250,9 @@ export function LeaveExcursionsTab({
                                         </summary>
                                         <ul className="mt-2 space-y-1">
                                             {item.history.map((event) => (
-                                                <li key={event.version}>
+                                                <li
+                                                    key={`${event.version}:${event.action}`}
+                                                >
                                                     {event.action} ·{' '}
                                                     {formatDateTime(
                                                         event.occurred_at,
