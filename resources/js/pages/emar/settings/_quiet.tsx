@@ -125,6 +125,7 @@ export function QuietHoursGroup({
                                 htmlFor="dl-quietFrom"
                             >
                                 <TimePicker
+                                    compact
                                     id="dl-quietFrom"
                                     label="Quiet hours start"
                                     value={isTime(from) ? from : ''}
@@ -144,6 +145,7 @@ export function QuietHoursGroup({
                                 htmlFor="dl-quietUntil"
                             >
                                 <TimePicker
+                                    compact
                                     id="dl-quietUntil"
                                     label="Quiet hours end"
                                     value={isTime(until) ? until : ''}
@@ -237,6 +239,7 @@ export function QuietHoursGroup({
                                               htmlFor={`dl-qh-${h.id}-from`}
                                           >
                                               <TimePicker
+                                                  compact
                                                   id={`dl-qh-${h.id}-from`}
                                                   label={`Quiet hours start at ${h.name}`}
                                                   value={qh.from}
@@ -257,6 +260,7 @@ export function QuietHoursGroup({
                                               htmlFor={`dl-qh-${h.id}-until`}
                                           >
                                               <TimePicker
+                                                  compact
                                                   id={`dl-qh-${h.id}-until`}
                                                   label={`Quiet hours end at ${h.name}`}
                                                   value={qh.until}

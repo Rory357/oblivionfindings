@@ -60,6 +60,7 @@ export function AcknowledgeAssessment({
     };
     return (
         <SettingsModal
+            frontline
             title="Acknowledge your assessment"
             description={`Recorded by ${assessment.assessor ?? 'your assessor'} on ${day(assessment.assessed_on)}. Only you can acknowledge it.`}
             onClose={onClose}

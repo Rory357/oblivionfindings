@@ -12,6 +12,10 @@ use App\Models\ClientMedicationStock;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoomAlert;
 use App\Models\MedicationCompetencyAssessment;
+use App\Models\MedicationEvent;
+use App\Models\MedicationFollowup;
+use App\Models\MedicationStockLot;
+use App\Models\MedicationStockMovement;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
@@ -22,17 +26,20 @@ use App\Models\User;
 use App\Models\UserWitnessPin;
 use App\Services\ControlRoom\SignalProcessingService;
 use App\Services\Incidents\IncidentJourneyService;
+use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\MedicationSignalService;
 use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationIncidentIntegrationService;
+use App\Services\MedicationScanVerificationService;
 use Carbon\Carbon;
+use Database\Factories\UserFactory;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use RuntimeException;
 use Tests\TestCase;
-use Database\Factories\UserFactory;
 
 /**
  * Desktop medication board — scheduled-dose recording (Record Dose wizard),
@@ -167,6 +174,154 @@ class WorkerMedsRecordDoseTest extends TestCase
                 ->where('activity.0.icon', 'check')
                 ->where('auth.can.medications.overdueTodayCount', 0)
             );
+    }
+
+    public function test_shared_shift_recording_rechecks_pack_code_and_submitted_shift(): void
+    {
+        $medication = $this->scheduledMedication(['09:30']);
+        $payload = [
+            'client_medication_id' => $medication->id,
+            'scheduled_for' => Carbon::parse('2026-04-30 09:30', config('app.worker_timezone'))->toIso8601String(),
+            'status' => 'given',
+            'scan_verified' => true,
+            'scan_code' => 'WRONG-PACK-CODE',
+        ];
+        $this->actingAs($this->worker)->postJson('/meds/today/record', $payload)
+            ->assertUnprocessable()->assertJsonValidationErrors('scan_code');
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+
+        $payload['scan_code'] = app(MedicationScanVerificationService::class)->internalCode($this->client, $medication);
+        $payload['shift_id'] = 999999999;
+        $this->actingAs($this->worker)->postJson('/meds/today/record', $payload)->assertForbidden();
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $payload['shift_id'] = Shift::query()->where('user_id', $this->worker->id)->sole()->id;
+        $payload['client_request_uuid'] = '09e7da73-b562-49f0-895b-b51991584892';
+        $this->actingAs($this->worker)->postJson('/meds/today/record', $payload)->assertOk();
+        $this->actingAs($this->worker)->postJson('/meds/today/record', $payload)->assertOk()->assertJsonPath('replayed', true);
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+        $this->assertDatabaseCount('medication_events', 1);
+        $this->assertSame((int) $payload['shift_id'], (int) ClientMedicationAdministration::sole()->shift_id);
+    }
+
+    public function test_audit_append_failure_rolls_back_the_dose_and_its_follow_up(): void
+    {
+        $medication = $this->scheduledMedication(['09:30']);
+        $this->mock(MedicationEventRecorder::class)
+            ->shouldReceive('append')->once()->andThrow(new RuntimeException('Audit recorder unavailable'));
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($this->worker)->postJson('/meds/today/record', [
+                'client_medication_id' => $medication->id,
+                'scheduled_for' => Carbon::parse('2026-04-30 09:30', config('app.worker_timezone'))->toIso8601String(),
+                'status' => 'refused', 'reason_code' => 'refused',
+            ]);
+            $this->fail('A failed audit append must reject the source transaction.');
+        } catch (RuntimeException $error) {
+            $this->assertSame('Audit recorder unavailable', $error->getMessage());
+        }
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertDatabaseCount('medication_followups', 0);
+        $this->assertDatabaseCount('medication_events', 0);
+    }
+
+    public function test_started_ordinary_stock_allocates_fefo_once_even_with_the_rollout_flag_off(): void
+    {
+        config(['medications.stock_lots_enabled' => false]);
+        $medication = $this->scheduledMedication(['09:30'], ['dose_amount' => 1, 'dose_unit' => 'tablet']);
+        [$stock, $early, $later, $expired] = $this->trackedStock($medication);
+        $payload = ['client_medication_id' => $medication->id, 'scheduled_for' => now()->toIso8601String(),
+            'administered_at' => now()->toIso8601String(), 'status' => 'given', 'amount_mode' => 'as_ordered',
+            'client_request_uuid' => '48b2537a-d389-41c0-8f12-6763be829a33'];
+        $this->actingAs($this->worker)->postJson('/meds/today/record', $payload)->assertOk();
+        $this->postJson('/meds/today/record', $payload)->assertOk();
+
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+        $this->assertSame('0.00', $early->fresh()->quantity_remaining);
+        $this->assertSame('4.00', $later->fresh()->quantity_remaining);
+        $this->assertSame('20.00', $expired->fresh()->quantity_remaining);
+        $this->assertSame('4.00', $stock->fresh()->on_hand);
+        $this->assertSame(2, MedicationStockMovement::where('kind', 'given')->count());
+        $this->assertSame(1, MedicationEvent::where('kind', 'dose.recorded')->count());
+    }
+
+    public function test_tracked_ordinary_stock_requires_explicit_quantity_in_an_unmatched_stock_unit(): void
+    {
+        $medication = $this->scheduledMedication(['09:30'], ['dose_amount' => 500, 'dose_unit' => 'mg']);
+        [$stock] = $this->trackedStock($medication);
+        $payload = ['client_medication_id' => $medication->id, 'scheduled_for' => now()->toIso8601String(),
+            'administered_at' => now()->toIso8601String(), 'status' => 'given', 'amount_mode' => 'as_ordered'];
+        $this->actingAs($this->worker)->postJson('/meds/today/record', $payload)
+            ->assertUnprocessable()->assertJsonValidationErrors('quantity_administered');
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertSame('25.00', $stock->fresh()->on_hand);
+        $payload['quantity_administered'] = '0.333';
+        $this->postJson('/meds/today/record', $payload)->assertUnprocessable()->assertJsonValidationErrors('quantity_administered');
+        $payload['quantity_administered'] = '1.25';
+        $this->postJson('/meds/today/record', $payload)->assertOk();
+        $this->assertSame('3.75', $stock->fresh()->on_hand);
+    }
+
+    public function test_insufficient_usable_packs_roll_back_the_clinical_dose_and_audit(): void
+    {
+        $medication = $this->scheduledMedication(['09:30'], ['dose_amount' => 6, 'dose_unit' => 'tablet']);
+        [$stock, $early, $later, $expired] = $this->trackedStock($medication);
+        $this->actingAs($this->worker)->postJson('/meds/today/record', [
+            'client_medication_id' => $medication->id, 'scheduled_for' => now()->toIso8601String(),
+            'administered_at' => now()->toIso8601String(), 'status' => 'given', 'amount_mode' => 'as_ordered',
+        ])->assertUnprocessable()->assertJsonValidationErrors('quantity_administered');
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertDatabaseCount('medication_stock_movements', 0);
+        $this->assertDatabaseCount('medication_events', 0);
+        $this->assertSame('0.75', $early->fresh()->quantity_remaining);
+        $this->assertSame('4.25', $later->fresh()->quantity_remaining);
+        $this->assertSame('20.00', $expired->fresh()->quantity_remaining);
+        $this->assertSame('25.00', $stock->fresh()->on_hand);
+    }
+
+    public function test_a_final_audit_failure_rolls_back_all_ordinary_pack_allocations(): void
+    {
+        $medication = $this->scheduledMedication(['09:30'], ['dose_amount' => 1, 'dose_unit' => 'tablet']);
+        [$stock, $early, $later] = $this->trackedStock($medication);
+        $this->mock(MedicationEventRecorder::class)->shouldReceive('append')->once()->andThrow(new RuntimeException('Synthetic audit failure'));
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($this->worker)->postJson('/meds/today/record', [
+                'client_medication_id' => $medication->id, 'scheduled_for' => now()->toIso8601String(),
+                'administered_at' => now()->toIso8601String(), 'status' => 'given', 'amount_mode' => 'as_ordered',
+            ]);
+            $this->fail('The audit failure must propagate.');
+        } catch (RuntimeException $error) {
+            $this->assertSame('Synthetic audit failure', $error->getMessage());
+        }
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertDatabaseCount('medication_stock_movements', 0);
+        $this->assertSame('0.75', $early->fresh()->quantity_remaining);
+        $this->assertSame('4.25', $later->fresh()->quantity_remaining);
+        $this->assertSame('25.00', $stock->fresh()->on_hand);
+    }
+
+    public function test_refusing_an_ordinary_tracked_dose_does_not_allocate_stock(): void
+    {
+        $medication = $this->scheduledMedication(['09:30']);
+        [$stock] = $this->trackedStock($medication);
+        $this->actingAs($this->worker)->postJson('/meds/today/record', [
+            'client_medication_id' => $medication->id, 'scheduled_for' => now()->toIso8601String(),
+            'administered_at' => now()->toIso8601String(), 'status' => 'refused', 'reason_code' => 'refused', 'reason' => 'Person declined.',
+        ])->assertOk();
+        $this->assertDatabaseCount('medication_stock_movements', 0);
+        $this->assertSame('25.00', $stock->fresh()->on_hand);
+    }
+
+    private function trackedStock(ClientMedication $medication): array
+    {
+        $stock = ClientMedicationStock::query()->forceCreate(['client_medication_id' => $medication->id, 'unit' => 'tablets',
+            'on_hand' => '25.00', 'lots_started_at' => now()]);
+        $create = fn (string $quantity, string $expiry) => MedicationStockLot::create([
+            'client_medication_stock_id' => $stock->id, 'quantity_received' => $quantity, 'quantity_remaining' => $quantity,
+            'expiry_date' => $expiry, 'source' => 'pharmacy', 'received_at' => now(), 'received_by' => $this->worker->id,
+        ]);
+
+        return [$stock, $create('0.75', '2026-05-01'), $create('4.25', '2026-06-01'), $create('20.00', '2026-04-29')];
     }
 
     public function test_late_recording_outside_the_window_requires_a_reason(): void
@@ -470,7 +625,7 @@ class WorkerMedsRecordDoseTest extends TestCase
         $failedAttempts = fn (): int => (int) UserWitnessPin::query()->where('user_id', $witness->id)->value('failed_attempts');
 
         foreach (range(1, 4) as $attempt) {
-            $record('000001')->assertSessionHasErrors(['witness_credential' => WitnessPinService::INCORRECT]);
+            $record('000001')->assertSessionHasErrors('witness_credential');
             $this->assertSame($attempt, $failedAttempts(), "Wrong PIN {$attempt} must be counted.");
         }
 
@@ -1141,6 +1296,7 @@ class WorkerMedsRecordDoseTest extends TestCase
             'expiry_date' => now()->addYear()->toDateString(),
             'assessor_declared_at' => now()->subMonth(),
             'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+            'controlled_drugs' => true,
             'can_witness_controlled' => true,
         ]);
         Shift::factory()->create([
@@ -1272,6 +1428,8 @@ class WorkerMedsRecordDoseTest extends TestCase
                 'client_medication_administration_id' => $administration->id,
                 'effectiveness' => 'effective',
                 'observations' => 'Settled within half an hour.',
+                'request_uuid' => (string) Str::uuid(),
+                'revision' => 1,
             ])
             ->assertRedirect('/meds/today')
             ->assertSessionHas('success');
@@ -1282,15 +1440,16 @@ class WorkerMedsRecordDoseTest extends TestCase
             'reviewed_by' => $this->worker->id,
         ]);
 
-        // Re-recording revises the single register entry (updateOrCreate keyed
-        // on the administration) rather than blocking or duplicating it — the
-        // eMAR "Re-record effectiveness" action. (Updated: the duplicate path now
-        // succeeds with a revise message instead of the old "warning" no-op.)
+        // A new submission and current revision amend the retained effect row.
         $this->actingAs($this->worker)
             ->from('/meds/today')
             ->post('/meds/today/prn/effect', [
                 'client_medication_administration_id' => $administration->id,
                 'effectiveness' => 'not_effective',
+                'request_uuid' => (string) Str::uuid(),
+                'revision' => 2,
+                'told' => 'Shift lead',
+                'escalation_action' => 'Requested clinical review because the medicine did not help.',
             ])
             ->assertRedirect('/meds/today')
             ->assertSessionHas('success');
@@ -1306,6 +1465,55 @@ class WorkerMedsRecordDoseTest extends TestCase
             ->get('/meds/today')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->count('prn_follow_ups', 0));
+    }
+
+    public function test_unresolved_prn_checks_survive_midnight_and_use_the_stored_time_without_a_default(): void
+    {
+        $prn = ClientMedication::query()->create([
+            'client_id' => $this->client->id,
+            'name' => 'Synthetic as-needed medicine',
+            'is_prn' => true,
+            'active' => true,
+            'state' => 'active',
+        ]);
+        $dueAt = Carbon::parse('2026-04-30 07:17:00', config('app.worker_timezone'))->utc();
+        $previousDay = ClientMedicationAdministration::create([
+            'client_id' => $this->client->id,
+            'client_medication_id' => $prn->id,
+            'administered_by' => $this->worker->id,
+            'administered_at' => now()->subDay(),
+            'effect_check_due_at' => $dueAt,
+            'status' => 'given',
+        ]);
+        $noTime = ClientMedicationAdministration::create([
+            'client_id' => $this->client->id,
+            'client_medication_id' => $prn->id,
+            'administered_by' => $this->worker->id,
+            'administered_at' => now()->subMinutes(10),
+            'status' => 'given',
+        ]);
+
+        $this->actingAs($this->worker)->get('/meds/today')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->count('prn_follow_ups', 2)
+                ->where('prn_follow_ups', function ($rows) use ($previousDay, $noTime, $dueAt) {
+                    $rows = collect($rows)->keyBy('administration_id');
+
+                    return Carbon::parse($rows[$previousDay->id]['effect_check_due_at'])->equalTo($dueAt)
+                        && $rows[$previousDay->id]['overdue'] === true
+                        && $rows[$noTime->id]['effect_check_due_at'] === null
+                        && $rows[$noTime->id]['check_at'] === null;
+                }));
+
+        $this->actingAs($this->worker)->post('/meds/today/prn/effect', [
+            'client_medication_administration_id' => $previousDay->id,
+            'effectiveness' => 'effective',
+            'request_uuid' => (string) Str::uuid(),
+            'revision' => 1,
+        ])->assertSessionHas('success');
+        $this->get('/meds/today')->assertInertia(fn (Assert $page) => $page
+            ->count('prn_follow_ups', 1)
+            ->where('prn_follow_ups.0.administration_id', $noTime->id));
     }
 
     public function test_controlled_prn_effect_requires_the_exact_controlled_record_capability(): void
@@ -1336,8 +1544,12 @@ class WorkerMedsRecordDoseTest extends TestCase
             'client_medication_administration_id' => $administration->id,
             'effectiveness' => 'effective',
             'observations' => 'Pain settled after the dose.',
+            'request_uuid' => (string) Str::uuid(),
+            'revision' => 1,
         ];
 
+        $before = $administration->fresh()->getRawOriginal();
+        $followupsBefore = MedicationFollowup::query()->orderBy('id')->get()->map->getRawOriginal()->all();
         foreach (['/meds/today/prn/effect', '/emar/prn/effectiveness'] as $endpoint) {
             $this->actingAs($this->worker)
                 ->post($endpoint, $payload)
@@ -1357,6 +1569,8 @@ class WorkerMedsRecordDoseTest extends TestCase
                 ->assertNotFound();
         }
         $this->assertDatabaseCount('medication_prn_effectiveness', 0);
+        $this->assertSame($before, $administration->fresh()->getRawOriginal());
+        $this->assertSame($followupsBefore, MedicationFollowup::query()->orderBy('id')->get()->map->getRawOriginal()->all());
 
         $this->grantPermissions($this->worker, ['medications.controlled.record']);
         $this->worker->unsetRelation('permissionOverrides')->unsetRelation('roles');
@@ -1437,6 +1651,10 @@ class WorkerMedsRecordDoseTest extends TestCase
             'frequency' => 'Daily',
             'dose_times' => $doseTimes,
             'is_prn' => false,
+            'controlled_drug' => false,
+            'nz_controlled_class' => ($overrides['controlled_drug'] ?? false) ? 'B' : null,
+            'controlled_class_source' => ($overrides['controlled_drug'] ?? false) ? 'Synthetic reviewed test configuration' : null,
+            'approval_status' => 'verified',
             'active' => true,
             'state' => 'active',
         ], $overrides));
@@ -1471,6 +1689,7 @@ class WorkerMedsRecordDoseTest extends TestCase
                 'expiry_date' => now()->addYear()->toDateString(),
                 'assessor_declared_at' => now()->subMonth(),
                 'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+                'controlled_drugs' => true,
                 'can_witness_controlled' => true,
             ]);
             Shift::factory()->create([

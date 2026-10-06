@@ -26,8 +26,22 @@ jobs:
           - chromium-desktop-visual
           - it-security-desktop-1440
           - it-security-desktop-1280
+        include:
+          - project: governance-desktop-1366
+            config: playwright.governance.config.ts
+          - project: governance-desktop-1920
+            config: playwright.governance.config.ts
 
     services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=12
       mysql:
         image: mysql:8.0
         env:
@@ -75,6 +89,9 @@ jobs:
         run: |
           cp .env.example .env
           php artisan key:generate
+          # Governed command journeys exercise the real signer. This key is
+          # private to this disposable job and is never printed or uploaded.
+          php -r '$keys = json_encode(["visual-ci" => base64_encode(random_bytes(SODIUM_CRYPTO_AUTH_KEYBYTES))], JSON_THROW_ON_ERROR); file_put_contents(".env", "\nMONITORING_SIGNING_KEY_ID=visual-ci\nMONITORING_SIGNING_KEYS=" . chr(39) . $keys . chr(39) . "\n", FILE_APPEND);'
 
       - name: Grant testUser global privileges
         run: |
@@ -82,6 +99,9 @@ jobs:
 
       - name: Run Fresh Migrations And Seeders
         env:
+          APP_ENV: ${{ matrix.project == 'chromium-desktop-visual' && 'testing' || 'local' }}
+          VISUAL_FROZEN_NOW: ${{ matrix.project == 'chromium-desktop-visual' && '2026-10-05T00:00:00Z' || '' }}
+          VISUAL_RANDOM_SEED: ${{ matrix.project == 'chromium-desktop-visual' && '20261005' || '' }}
           APP_URL: http://127.0.0.1:4173
           DB_CONNECTION: mysql
           DB_HOST: 127.0.0.1
@@ -94,11 +114,20 @@ jobs:
           MAIL_MAILER: array
           QUEUE_CONNECTION: sync
           SESSION_DRIVER: file
-        run: php artisan migrate:fresh --seed --force
+        run: |
+          if [[ "${{ matrix.project }}" == chromium-desktop-visual ]]; then
+            php tests/visual/artisan.php migrate:fresh --seed --force
+          else
+            php artisan migrate:fresh --seed --force
+          fi
 
       - name: Visual Regression (${{ matrix.project }})
         timeout-minutes: 50
         env:
+          APP_ENV: ${{ matrix.project == 'chromium-desktop-visual' && 'testing' || 'local' }}
+          VISUAL_FROZEN_NOW: ${{ matrix.project == 'chromium-desktop-visual' && '2026-10-05T00:00:00Z' || '' }}
+          VISUAL_RANDOM_SEED: ${{ matrix.project == 'chromium-desktop-visual' && '20261005' || '' }}
+          PLAYWRIGHT_SKIP_RESEED: ${{ matrix.project == 'chromium-desktop-visual' && 'true' || 'false' }}
           APP_URL: http://127.0.0.1:4173
           DB_CONNECTION: mysql
           DB_HOST: 127.0.0.1
@@ -111,12 +140,26 @@ jobs:
           MAIL_MAILER: array
           PLAYWRIGHT_PORT: 4173
           QUEUE_CONNECTION: sync
+          REDIS_CLIENT: predis
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+          REDIS_DB: 0
+          REDIS_CACHE_DB: 1
+          REDIS_QUEUE_RETRY_AFTER: 960
           SESSION_DRIVER: file
           FEATURE_ROSTERING_PUBLISH: true
           FEATURE_ROSTERING_AUTO_SCHEDULE: true
           VISUAL_EMAIL: admin@demo.test
           VISUAL_PASSWORD: password
-        run: npx playwright test --project=${{ matrix.project }}
+        run: |
+          # Discovery explicitly uses Redis; its worker must share the browser's
+          # database cache for unique job locks. Other workloads keep sync.
+          if [[ "${{ matrix.project }}" == it-security-* ]]; then
+            CACHE_STORE=database php artisan queue:work redis --queue=monitoring-discovery --sleep=1 --tries=1 --timeout=900 --max-time=3300 --no-interaction > storage/logs/visual-discovery-worker.log 2>&1 &
+            discovery_worker_pid=$!
+            trap 'kill "$discovery_worker_pid" 2>/dev/null || true; wait "$discovery_worker_pid" 2>/dev/null || true' EXIT
+          fi
+          npx playwright test --config=${{ matrix.config || 'playwright.config.ts' }} --project=${{ matrix.project }}
 
       - name: Upload Playwright Artifacts
         if: failure()
@@ -125,4 +168,5 @@ jobs:
           name: playwright-artifacts-${{ matrix.project }}
           path: |
             playwright-report
+            playwright-report-governance
             test-results

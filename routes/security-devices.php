@@ -412,7 +412,7 @@ Route::middleware([
     Route::prefix('/discovery/collectors')
         ->middleware([
             'permission:securityDevices.integrations.manage',
-            'throttle:6,1',
+            'throttle:6,1,security-device-collectors:',
         ])
         ->group(function () {
             Route::post('/enrolments', [MonitoringCollectorLifecycleController::class, 'issue'])

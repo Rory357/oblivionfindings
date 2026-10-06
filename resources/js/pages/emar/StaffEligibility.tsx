@@ -106,9 +106,9 @@ const VIEWS: [View, string][] = [
 ];
 const STATUS_FILTERS = [
     { value: 'all', label: 'Any status' },
-    { value: 'alone', label: 'Can record given doses alone' },
+    { value: 'alone', label: 'Given competency met without a co-signer' },
     { value: 'due', label: 'Due for renewal' },
-    { value: 'cant', label: 'Can’t record given doses' },
+    { value: 'cant', label: 'Given competency not met' },
     { value: 'restricted', label: 'Restricted' },
     { value: 'areas', label: 'Areas not passed' },
 ];
@@ -309,7 +309,7 @@ export default function StaffEligibility(props: Props) {
                     {houses.length} {houses.length === 1 ? 'house' : 'houses'}
                 </PageHeaderStatusChip>
             }
-            subline={`${houseNames.length > 3 ? `${houseNames.slice(0, 3).join(', ')} and ${houseNames.length - 3} more` : houseNames.join(' and ') || 'No houses'} · your approved houses · times in NZDT (Pacific/Auckland)`}
+            subline={`${houseNames.length > 3 ? `${houseNames.slice(0, 3).join(', ')} and ${houseNames.length - 3} more` : houseNames.join(' and ') || 'No houses'} · your approved houses · times in Pacific/Auckland`}
             actions={
                 <>
                     <PageHeaderSearch
@@ -339,8 +339,8 @@ export default function StaffEligibility(props: Props) {
             meters={
                 <>
                     <PageHeaderMeterBlock
-                        label="Can record alone"
-                        ariaLabel={`View ${alone.length} staff who can record given doses alone`}
+                        label="Given competency met"
+                        ariaLabel={`View ${alone.length} staff whose given competency needs no co-signer`}
                         pressed={view === 'register' && status === 'alone'}
                         onClick={() => go('register', 'alone')}
                     >
@@ -351,7 +351,7 @@ export default function StaffEligibility(props: Props) {
                                     <>
                                         {alone.length} of {scoped.length}
                                         <br />
-                                        current, not restricted
+                                        current competency, not restricted
                                     </>
                                 }
                             />
@@ -379,17 +379,17 @@ export default function StaffEligibility(props: Props) {
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Can’t record given"
+                        label="Given competency not met"
                         tone={cant.length ? 'critical' : 'brand'}
-                        ariaLabel={`View ${cant.length} staff who can’t record given doses`}
+                        ariaLabel={`View ${cant.length} staff whose given competency is not met`}
                         pressed={view === 'register' && status === 'cant'}
                         onClick={() => go('register', 'cant')}
                     >
                         <PageHeaderMeterBig>{cant.length}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
                             {cant.length
-                                ? 'Refused and withheld only'
-                                : 'Everyone can'}
+                                ? 'No assessment for refused, withheld or away'
+                                : 'No competency blocks'}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
@@ -523,7 +523,7 @@ export default function StaffEligibility(props: Props) {
             <EmptyState
                 icon={UserCheck}
                 title="Nobody has been assessed yet"
-                description="Until someone is assessed, nobody at your houses can record doses as given. Refused, withheld and away can always be recorded."
+                description="No current competency assessment for given doses is recorded here yet. Refused, withheld and away have no competency assessment requirement; the usual recording checks still apply."
                 action={
                     can.assess ? (
                         <Button
@@ -612,6 +612,11 @@ export default function StaffEligibility(props: Props) {
             <Head title="Staff eligibility" />
             <div className="flex flex-col gap-5 p-6">
                 {header}
+                <Note>
+                    These are competency requirements. Recording each dose still
+                    needs permission, person and house access, and any required
+                    roster, clock-in and dose checks.
+                </Note>
                 {body}
             </div>
             {open ? (
@@ -667,6 +672,7 @@ export default function StaffEligibility(props: Props) {
                 />
             ) : null}
             <ConfirmDialog
+                frontline
                 open={dialog?.kind === 'delete'}
                 onClose={() => setDialog(null)}
                 processing={busy}
@@ -691,6 +697,7 @@ export default function StaffEligibility(props: Props) {
                 variant="destructive"
             />
             <ConfirmDialog
+                frontline
                 open={dialog?.kind === 'reset'}
                 onClose={() => setDialog(null)}
                 processing={busy}
@@ -773,7 +780,7 @@ function Register({
                         },
                         {
                             key: 'can',
-                            label: 'What they can do',
+                            label: 'Competency requirements',
                             width: '1.3fr',
                             cell: (x) => {
                                 const g = givenAbility(x, policy);
@@ -792,13 +799,13 @@ function Register({
                                         <p>
                                             {g.v === 'no'
                                                 ? x.st === 'restricted'
-                                                    ? 'Can’t sign given doses — restricted'
-                                                    : 'Refused, withheld and away only'
+                                                    ? 'Given competency blocks signing'
+                                                    : 'Given competency not met'
                                                 : g.v === 'part'
                                                   ? x.st === 'restricted'
-                                                      ? 'Given doses with a co-signer'
-                                                      : 'Given doses under an exemption'
-                                                  : 'Given doses'}
+                                                      ? 'Given competency needs a co-signer'
+                                                      : 'Given competency uses an exemption'
+                                                  : 'Given competency met'}
                                         </p>
                                         {cdBlocked ? (
                                             <p className="text-muted-foreground">
@@ -894,8 +901,8 @@ function Register({
             />
             <Note>
                 “Due for renewal” starts {policy.renewal_days} days before the
-                end date. Refused, withheld and away can always be recorded,
-                whatever the status.
+                end date. Refused, withheld and away have no competency
+                assessment requirement. The usual recording checks still apply.
             </Note>
         </Section>
     );
@@ -975,8 +982,8 @@ function Renewals({
         <div className="space-y-5">
             <Section
                 id="rn-now"
-                title="Can’t record given doses now"
-                caption={`${now.length} people · refused, withheld and away still recordable`}
+                title="Given competency not met"
+                caption={`${now.length} people · competency requirements for given doses`}
             >
                 {now.length ? (
                     table(now)
@@ -984,7 +991,7 @@ function Renewals({
                     <EmptyState
                         variant="inline"
                         icon={UserCheck}
-                        title="Everyone at your houses can record given doses."
+                        title="No competency blocks on given doses at your houses."
                     />
                 )}
             </Section>

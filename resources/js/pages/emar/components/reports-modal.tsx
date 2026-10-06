@@ -1,3 +1,4 @@
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 /* Reports & exports — BUILD-NEW modal on the shared Add-Client wizard chrome.
  * Single-purpose 2-step picker that builds a GET download URL for the existing
  * eMAR export/PDF routes and triggers the download (window.location.href). */
@@ -240,33 +241,34 @@ export function ReportsModal({
                     {report?.single ? (
                         <Field label="Date" required span>
                             {/* eslint-disable-next-line no-restricted-syntax -- native date input; no shadcn date control in wizard primitives. */}
-                            <input
-                                type="date"
+                            <DatePicker
+                                compact
+                                id="emar-reports-modal-1"
+                                label="Date"
                                 value={singleDate}
-                                onChange={(e) => setSingleDate(e.target.value)}
-                                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                                onChange={(value) => setSingleDate(value)}
                             />
                         </Field>
                     ) : (
                         <>
                             <Field label="From" required>
                                 {/* eslint-disable-next-line no-restricted-syntax -- native date input. */}
-                                <input
-                                    type="date"
+                                <DatePicker
+                                    compact
+                                    id="emar-reports-modal-2"
+                                    label="From"
                                     value={dateFrom}
-                                    onChange={(e) =>
-                                        setDateFrom(e.target.value)
-                                    }
-                                    className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                                    onChange={(value) => setDateFrom(value)}
                                 />
                             </Field>
                             <Field label="To" required>
                                 {/* eslint-disable-next-line no-restricted-syntax -- native date input. */}
-                                <input
-                                    type="date"
+                                <DatePicker
+                                    compact
+                                    id="emar-reports-modal-3"
+                                    label="To"
                                     value={dateTo}
-                                    onChange={(e) => setDateTo(e.target.value)}
-                                    className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                                    onChange={(value) => setDateTo(value)}
                                 />
                             </Field>
                         </>

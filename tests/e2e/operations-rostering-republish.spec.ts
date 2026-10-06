@@ -23,7 +23,9 @@ test.describe('operations rostering — republish flow', () => {
     test('manager sees a dirty roster diff and republishes it', async ({
         page,
     }) => {
-        test.setTimeout(60_000);
+        // Two governed publishes, a persisted shift edit and several redirected
+        // reads run against the same single-worker PHP server in CI.
+        test.setTimeout(90_000);
 
         const consoleErrors = collectConsoleErrors(page);
 
@@ -66,12 +68,30 @@ test.describe('operations rostering — republish flow', () => {
         );
 
         await expect(
-            page.getByRole('heading', { name: /Publish diff/i }),
+            page.getByRole('heading', {
+                name: 'Rostering E2E House',
+                level: 1,
+                exact: true,
+            }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole('heading', {
+                name: 'All changes',
+                level: 2,
+                exact: true,
+            }),
         ).toBeVisible();
         await expect(page.getByText(/Changed/i).first()).toBeVisible();
         await expect(page.getByText(/Rostering/i).first()).toBeVisible();
 
+        const republishResponse = page.waitForResponse(
+            (response) =>
+                /\/operations\/rostering\/periods\/\d+\/republish$/.test(
+                    new URL(response.url()).pathname,
+                ) && response.request().method() === 'POST',
+        );
         await page.getByRole('button', { name: /Re-publish/i }).click();
+        expect((await republishResponse).status()).toBe(302);
         await expect(page).toHaveURL(/\/operations\/rostering(?:\?|$)/);
         await expect(publishPanel).toContainText(/published/i);
         await expect(publishPanel).not.toContainText(/changed after publish/i);

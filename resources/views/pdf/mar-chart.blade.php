@@ -46,10 +46,13 @@
     <div class="allergy-banner">
         <strong>ALLERGIES:</strong>
         @foreach($allergies as $allergy)
-            {{ $allergy->allergen }} ({{ $allergy->severity }})@if(!$loop->last), @endif
+            {{ $allergy->allergen }}@if($allergy->severity) ({{ $allergy->severity }})@endif
+            @if($allergy->reaction) — {{ $allergy->reaction }}@endif
+            @if(!$loop->last), @endif
         @endforeach
     </div>
     @endif
+    <p>{{ ($allergySummary['reviewed'] ?? null) ? (($allergySummary['status'] ?? '') === 'no_known' ? 'No known allergies — reviewed' : 'Allergy record reviewed') : 'Allergy record not reviewed' }}</p>
 
     <h2>Scheduled Medications</h2>
     <table class="med-table">
@@ -75,11 +78,15 @@
                 <td style="text-align: center;">
                     @php
                         $admins = $med->administrations->filter(function ($a) use ($date) {
-                            return $a->scheduled_for && $a->scheduled_for->toDateString() === $date;
+                            return $a->scheduled_for && $a->scheduled_for->copy()->timezone(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString() === $date;
                         });
                     @endphp
-                    @foreach($admins as $admin)
-                        <span class="status-{{ $admin->status }}">{{ strtoupper(substr($admin->status, 0, 1)) }}</span>
+                    {{-- One dose time can hold more than one record (a refusal, then a
+                         re-offer given): the slot reads as its latest record; the
+                         earlier ones stay, greyed, as history. --}}
+                    @foreach($admins->groupBy(fn ($a) => $a->getRawOriginal('scheduled_for'))->sortKeys() as $slotRecords)
+                        @php $slotRecords = $slotRecords->sortBy('id')->values(); $latest = $slotRecords->last(); @endphp
+                        <span class="status-{{ $latest->status }}">{{ strtoupper(substr($latest->status, 0, 1)) }}</span>@foreach($slotRecords->slice(0, -1) as $earlier)<span style="color: #999;">({{ strtoupper(substr($earlier->status, 0, 1)) }})</span>@endforeach
                     @endforeach
                 </td>
                 @endforeach
@@ -120,7 +127,7 @@
                 <td style="text-align: center;">
                     @php
                         $admins = $med->administrations->filter(function ($a) use ($date) {
-                            return $a->administered_at && $a->administered_at->toDateString() === $date;
+                            return $a->administered_at && $a->administered_at->copy()->timezone(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString() === $date;
                         });
                     @endphp
                     @if($admins->count() > 0)

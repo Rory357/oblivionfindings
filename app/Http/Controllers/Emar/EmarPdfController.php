@@ -6,13 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
-use App\Models\MedicationAllergy;
 use App\Models\MedicationRound;
+use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 class EmarPdfController extends Controller
@@ -31,10 +32,16 @@ class EmarPdfController extends Controller
             'client_id' => 'required|integer|min:1',
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date|after_or_equal:date_from',
+            'include_prn' => 'nullable|boolean',
         ]);
 
         $dateFrom = $request->input('date_from', Carbon::now()->startOfMonth()->toDateString());
         $dateTo = $request->input('date_to', Carbon::now()->endOfMonth()->toDateString());
+        // NZ days, both ends included (P02-1b): a date is the organisation's day.
+        $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        $fromUtc = Carbon::parse($dateFrom, $timezone)->startOfDay()->utc();
+        $toUtc = Carbon::parse($dateTo, $timezone)->endOfDay()->utc();
+        $includePrn = ! $request->has('include_prn') || $request->boolean('include_prn');
 
         $actor = $request->user();
         abort_unless($actor, 403);
@@ -48,37 +55,32 @@ class EmarPdfController extends Controller
         $this->recordAccess->assertReportable($actor, $client);
         $includeControlled = $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY);
 
-        $scheduledMedications = ClientMedication::where('client_id', $client->id)
-            ->where('active', true)
+        $scheduledMedications = $this->ordersForPeriod($client, $dateFrom, $dateTo, $fromUtc, $toUtc, 'scheduled_for')
             ->where('is_prn', false)
             ->when(! $includeControlled, fn ($query) => $query->where('controlled_drug', false))
-            ->with(['administrations' => function ($query) use ($client, $dateFrom, $dateTo) {
+            ->with(['administrations' => function ($query) use ($client, $fromUtc, $toUtc) {
                 $query->effectiveClinicalEvidence()
                     ->where('client_id', $client->id)
-                    ->whereBetween('scheduled_for', [
-                        Carbon::parse($dateFrom)->startOfDay(),
-                        Carbon::parse($dateTo)->endOfDay(),
-                    ]);
+                    ->whereBetween('scheduled_for', [$fromUtc, $toUtc]);
             }])
             ->orderBy('name')
             ->get();
 
-        $prnMedications = ClientMedication::where('client_id', $client->id)
-            ->where('active', true)
+        $prnMedications = $this->ordersForPeriod($client, $dateFrom, $dateTo, $fromUtc, $toUtc, 'administered_at')
             ->where('is_prn', true)
             ->when(! $includeControlled, fn ($query) => $query->where('controlled_drug', false))
-            ->with(['administrations' => function ($query) use ($client, $dateFrom, $dateTo) {
+            // Leaving out as-needed medicines is the report's choice (P02-1b).
+            ->when(! $includePrn, fn ($query) => $query->whereRaw('1 = 0'))
+            ->with(['administrations' => function ($query) use ($client, $fromUtc, $toUtc) {
                 $query->effectiveClinicalEvidence()
                     ->where('client_id', $client->id)
-                    ->whereBetween('administered_at', [
-                        Carbon::parse($dateFrom)->startOfDay(),
-                        Carbon::parse($dateTo)->endOfDay(),
-                    ]);
+                    ->whereBetween('administered_at', [$fromUtc, $toUtc]);
             }])
             ->orderBy('name')
             ->get();
 
-        $allergies = MedicationAllergy::where('client_id', $client->id)->get();
+        $allergySummary = app(ClientAllergyRecordService::class)->summary($client);
+        $allergies = collect($allergySummary['entries'])->map(fn ($entry) => (object) $entry);
 
         $dates = collect(CarbonPeriod::create($dateFrom, $dateTo))->map(fn ($d) => $d->toDateString())->toArray();
 
@@ -87,6 +89,7 @@ class EmarPdfController extends Controller
             'scheduledMedications' => $scheduledMedications,
             'prnMedications' => $prnMedications,
             'allergies' => $allergies,
+            'allergySummary' => $allergySummary,
             'dates' => $dates,
             'dateFrom' => $dateFrom,
             'dateTo' => $dateTo,
@@ -97,9 +100,20 @@ class EmarPdfController extends Controller
         return $pdf->download("mar-chart-{$client->last_name}.pdf");
     }
 
-    /**
-     * Generate a Controlled Drug Register PDF for a client.
-     */
+    /** Retained orders overlapping this period or containing actual dose evidence. */
+    private function ordersForPeriod(Client $client, string $from, string $to, Carbon $fromUtc, Carbon $toUtc, string $recordTime): Builder
+    {
+        return ClientMedication::withTrashed()->where('client_id', $client->id)->where(function ($orders) use ($client, $from, $to, $fromUtc, $toUtc, $recordTime) {
+            $orders->where(function ($order) use ($from, $to, $fromUtc, $toUtc) {
+                $order->where('created_at', '<=', $toUtc)
+                    ->where(fn ($q) => $q->whereNull('start_date')->orWhereDate('start_date', '<=', $to))
+                    ->where(fn ($q) => $q->whereNull('end_date')->orWhereDate('end_date', '>=', $from))
+                    ->where(fn ($q) => $q->whereNull('ceased_at')->orWhere('ceased_at', '>', $fromUtc))
+                    ->where(fn ($q) => $q->whereNull('superseded_at')->orWhere('superseded_at', '>', $fromUtc));
+            })->orWhereHas('administrations', fn ($q) => $q->effectiveClinicalEvidence()->where('client_id', $client->id)->whereBetween($recordTime, [$fromUtc, $toUtc]));
+        });
+    }
+
     public function controlledDrugRegister(Request $request)
     {
         abort_unless($request->user()?->canDo('medications.controlled.view'), 403);

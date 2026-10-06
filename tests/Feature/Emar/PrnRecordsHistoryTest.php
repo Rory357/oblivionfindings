@@ -7,14 +7,17 @@ use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationFollowup;
 use App\Models\MedicationPrnEffectiveness;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -27,6 +30,13 @@ use Tests\TestCase;
 class PrnRecordsHistoryTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Keep the explicit fallback contract; public defaults are covered separately.
+        config(['medications.person_record' => 'legacy']);
+    }
 
     public function test_history_is_paginated_and_carries_detail_fields(): void
     {
@@ -106,36 +116,55 @@ class PrnRecordsHistoryTest extends TestCase
 
     public function test_effectiveness_review_is_idempotent_on_re_record(): void
     {
+        $this->travelTo(CarbonImmutable::parse('2026-10-02T20:00:00Z'));
         $user = $this->prnAdmin();
         $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
         $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
         $med = $this->prnMed($client);
-        $dose = $this->dose($client, $med, $user);
+        $dose = $this->dose($client, $med, $user, ['administered_at' => now()->subMinutes(30)]);
         $this->onShiftWith($user, $client);
-
-        $this->actingAs($user)->from('/emar/prn')->post('/meds/today/prn/effect', [
+        $first = [
+            'request_uuid' => (string) Str::uuid(), 'revision' => 1,
             'client_medication_administration_id' => $dose->id,
-            'effectiveness' => 'effective',
-            'review_minutes_after' => 30,
-        ])->assertRedirect();
+            'effectiveness' => 'effective', 'review_minutes_after' => 30,
+        ];
+        $this->actingAs($user)->from('/emar/prn')->post('/meds/today/prn/effect', $first)
+            ->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseHas('medication_prn_effectiveness', [
-            'client_medication_administration_id' => $dose->id,
-            'effectiveness' => 'effective',
-            'review_minutes_after' => 30,
+            'client_medication_administration_id' => $dose->id, 'effectiveness' => 'effective',
+            'review_minutes_after' => 30, 'reviewed_by' => $user->id, 'reviewed_at' => '2026-10-02 20:00:00',
         ]);
-
-        // Re-record revises the single hasOne entry rather than duplicating it.
-        $this->actingAs($user)->from('/emar/prn')->post('/meds/today/prn/effect', [
+        $work = MedicationFollowup::query()->where('administration_id', $dose->id)->where('type', 'effect')->sole();
+        $originalEvent = $work->events()->where('action', 'effect')->sole();
+        $originalEvidence = $originalEvent->getRawOriginal();
+        $this->assertSame('effective', $originalEvent->data['outcome']);
+        $this->travel(30)->minutes();
+        $amendment = [
+            'request_uuid' => (string) Str::uuid(), 'revision' => $work->fresh()->revision,
             'client_medication_administration_id' => $dose->id,
-            'effectiveness' => 'not_effective',
-            'review_minutes_after' => 60,
-        ])->assertRedirect();
+            'effectiveness' => 'not_effective', 'review_minutes_after' => 60,
+            'told' => 'Synthetic on-call clinician', 'escalation_action' => 'Requested advice and stayed with the person.',
+        ];
+        // Amendment updates the one current summary and retains its earlier event.
+        $this->actingAs($user)->from('/emar/prn')->post('/meds/today/prn/effect', $amendment)
+            ->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseCount('medication_prn_effectiveness', 1);
         $this->assertDatabaseHas('medication_prn_effectiveness', [
-            'client_medication_administration_id' => $dose->id,
-            'effectiveness' => 'not_effective',
-            'review_minutes_after' => 60,
+            'client_medication_administration_id' => $dose->id, 'effectiveness' => 'not_effective',
+            'review_minutes_after' => 60, 'reviewed_by' => $user->id, 'reviewed_at' => '2026-10-02 20:30:00',
+            'escalation_needed' => true, 'escalation_action' => $amendment['escalation_action'],
         ]);
+        $amended = $work->events()->where('action', 'amend_effect')->sole();
+        $this->assertSame((int) $user->id, (int) $amended->actor_id);
+        $this->assertSame('not_effective', $amended->data['outcome']);
+        $this->assertSame($originalEvidence, $originalEvent->fresh()->getRawOriginal());
+        $eventCount = $work->events()->count();
+        $summaryBefore = MedicationPrnEffectiveness::query()->sole()->getRawOriginal();
+        $this->actingAs($user)->from('/emar/prn')->post('/meds/today/prn/effect', $amendment)
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame($eventCount, $work->events()->count());
+        $this->assertSame($summaryBefore, MedicationPrnEffectiveness::query()->sole()->getRawOriginal());
+        $this->assertSame($originalEvidence, $originalEvent->fresh()->getRawOriginal());
     }
 
     public function test_near_limit_payload_carries_timeline_and_over_limit_incident(): void
@@ -211,7 +240,7 @@ class PrnRecordsHistoryTest extends TestCase
             'name' => 'Paracetamol PRN',
             'dosage' => '500mg',
             'frequency' => 'As needed',
-            'is_prn' => true,
+            'is_prn' => true, 'controlled_drug' => false,
             'prn_reason' => 'Pain',
             'max_per_day' => 4,
             'active' => true,

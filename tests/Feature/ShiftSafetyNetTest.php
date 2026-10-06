@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
@@ -11,11 +12,13 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\Site;
+use App\Models\TimelineEvent;
 use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\ShiftCancellationService;
 use App\Services\ShiftHandoverService;
 use App\Services\ShiftTimelineService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
@@ -40,7 +43,7 @@ class ShiftSafetyNetTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create([
             'role' => 'admin',
@@ -140,7 +143,7 @@ class ShiftSafetyNetTest extends TestCase
         $this->assertDatabaseCount('client_notes', 1);
         $this->assertSame(
             1,
-            \App\Models\TimelineEvent::query()
+            TimelineEvent::query()
                 ->where('type', ShiftTimelineService::COMPLETED_EVENT_TYPE)
                 ->where('source_type', Shift::class)
                 ->where('source_id', $shift->id)
@@ -160,16 +163,38 @@ class ShiftSafetyNetTest extends TestCase
             'shift_type_snapshot' => 'standard',
         ]);
 
+        $timesheet->refresh();
         $firstApprovedAt = $timesheet->approved_at;
+        $original = $timesheet->getRawOriginal();
 
+        $this->assertTrue($this->admin->canDo('timesheets.approve'));
         $this->actingAs($this->admin)
             ->post("/operations/timesheets/{$timesheet->id}/approve")
+            ->assertForbidden();
+        $this->assertSame($original, $timesheet->fresh()->getRawOriginal());
+
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->admin->id,
+            'position_role' => 'coordinator',
+            'employment_type' => 'full_time',
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+        ]);
+        app()->forgetScopedInstances();
+
+        $this->actingAs($this->admin->fresh())
+            ->post("/operations/timesheets/{$timesheet->id}/approve")
+            ->assertRedirect()
             ->assertSessionHas('success', 'Timesheet already approved.');
 
         $timesheet->refresh();
 
         $this->assertSame('approved', $timesheet->status);
         $this->assertTrue($timesheet->approved_at->equalTo($firstApprovedAt));
+        $this->assertSame($original, $timesheet->getRawOriginal());
     }
 
     public function test_handover_submission_is_idempotent_on_repeat_submission(): void
@@ -220,7 +245,7 @@ class ShiftSafetyNetTest extends TestCase
         $this->assertTrue(optional($handover->submitted_at)->equalTo($submittedAt));
         $this->assertSame(
             1,
-            \App\Models\AuditLog::query()
+            AuditLog::query()
                 ->where('action', 'shift.handover.submitted')
                 ->where('auditable_type', ShiftHandover::class)
                 ->where('auditable_id', $handover->id)

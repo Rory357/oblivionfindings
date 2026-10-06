@@ -2,12 +2,14 @@
 
 namespace Tests\Feature\Emar;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationRound;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\GuidedRoundService;
@@ -159,21 +161,56 @@ class RoundDoseSlotsTest extends TestCase
 
     public function test_reports_count_a_round_completed_after_its_nz_window_as_late(): void
     {
-        $this->round('08:00', 60, ['status' => 'completed', 'completed_at' => Carbon::parse('2026-06-15 08:50', 'Pacific/Auckland')->utc()]);
+        $middayOrder = $this->order($this->aroha, 'Midday medicine', ['12:00']);
+        $morning = $this->round('08:00', 60, ['status' => 'completed', 'completed_at' => Carbon::parse('2026-06-15 08:50', 'Pacific/Auckland')->utc()]);
         // Completed 13:30 NZST: 01:30 UTC, before 13:00 as UTC wall-clock.
-        $this->round('12:00', 60, ['status' => 'completed', 'completed_at' => Carbon::parse('2026-06-15 13:30', 'Pacific/Auckland')->utc()]);
+        $midday = $this->round('12:00', 60, ['status' => 'completed', 'completed_at' => Carbon::parse('2026-06-15 13:30', 'Pacific/Auckland')->utc()]);
+        // Completion is derived from recorded dose outcomes, including doses
+        // recorded elsewhere; a completed_at marker cannot manufacture them.
+        $this->at('2026-06-15 08:50');
+        $this->record($this->metformin, '2026-06-15 08:00', 'given', $morning);
+        $this->record($this->iron, '2026-06-15 08:00', 'given');
+        $this->at('2026-06-15 13:30');
+        $this->record($middayOrder, '2026-06-15 12:00', 'given', $midday);
         $this->at('2026-06-15 18:00');
 
-        $summary = $this->actingAs($this->reader())
-            ->get(route('emar.reports', ['date_from' => '2026-06-15', 'date_to' => '2026-06-15']))
-            ->assertOk()
-            ->inertiaProps('roundCompletion.summary');
+        $report = $this->actingAs($this->reader())
+            ->get(route('emar.reports', ['report' => 'rounds', 'date_from' => '2026-06-15', 'date_to' => '2026-06-15']))
+            ->assertOk();
+        $summary = $report->inertiaProps('data.totals');
 
-        $this->assertSame([2, 2, 50.0, 50.0], [$summary['total'], $summary['completed'], (float) $summary['on_time_pct'], (float) $summary['late_pct']]);
+        $this->assertSame([2, 1, 1, 50.0], [$summary['ended'], $summary['on_time'], $summary['late'], (float) $summary['on_time_pct']]);
+        $rows = collect($report->inertiaProps('page.data'))->keyBy('reference');
+        $this->assertSame('on_time', $rows['round:'.$morning->id]['status']);
+        $this->assertSame('late', $rows['round:'.$midday->id]['status']);
+        $this->assertSame('2026-06-15T01:00:00+00:00', Carbon::parse($rows['round:'.$midday->id]['window_ends_at'])->utc()->toIso8601String());
     }
 
     public function test_my_calendar_shows_a_round_at_its_nz_time(): void
     {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->worker->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+        $this->aroha->supportWorkers()->attach($this->worker->id);
+        $this->ben->supportWorkers()->attach($this->worker->id);
+        foreach (['medications.view', 'clients.viewAssigned'] as $key) {
+            $permission = Permission::query()->firstOrCreate(['key' => $key], ['description' => $key, 'group' => 'medications']);
+            $this->worker->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
+        }
+        $this->worker->unsetRelation('permissionOverrides')->unsetRelation('roles');
+        Shift::factory()->published()->create([
+            'user_id' => $this->worker->id,
+            'client_id' => $this->aroha->id,
+            'site_id' => $this->site->id,
+            'starts_at' => Carbon::parse('2026-06-15 07:00', 'Pacific/Auckland')->utc(),
+            'ends_at' => Carbon::parse('2026-06-15 10:00', 'Pacific/Auckland')->utc(),
+            'status' => 'scheduled',
+        ]);
         $round = $this->round('08:00', 60, ['assigned_to' => $this->worker->id]);
 
         $events = $this->actingAs($this->worker)
@@ -181,7 +218,7 @@ class RoundDoseSlotsTest extends TestCase
             ->assertOk()
             ->json();
 
-        $event = collect($events)->firstWhere('id', 'med-round-'.$round->id);
+        $event = collect($events)->firstWhere('id', 'medication-round-'.$round->id);
         $this->assertNotNull($event);
         $this->assertSame('2026-06-14T20:00:00+00:00', Carbon::parse($event['start'])->utc()->toIso8601String());
     }
@@ -254,7 +291,7 @@ class RoundDoseSlotsTest extends TestCase
         $user = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $user->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
         $user->permissionOverrides()->syncWithoutDetaching(
-            Permission::query()->whereIn('key', ['medications.reports.export', 'medications.view'])->pluck('id')
+            Permission::query()->whereIn('key', ['medications.reports.view', 'medications.reports.export', 'medications.view'])->pluck('id')
                 ->mapWithKeys(fn (int $id): array => [$id => ['allowed' => true]])
                 ->all(),
         );

@@ -117,12 +117,24 @@ final class DatabaseReleaseFixtureCommandRuntime implements ReleaseFixtureComman
         $seen = [];
         foreach ($manifest['records'] as $record) {
             if (! is_array($record)
-                || array_diff_key($record, ['type' => true, 'id' => true]) !== []
+                || array_diff_key($record, ['type' => true, 'id' => true, 'baseline_sha256' => true, 'tracking_clock_sha256' => true]) !== []
                 || array_diff_key(['type' => true, 'id' => true], $record) !== []
                 || ! is_string($record['type'])
                 || preg_match('/\A[a-z][a-z0-9_]*\z/', $record['type']) !== 1
                 || ! is_int($record['id'])
                 || $record['id'] < 1) {
+                return false;
+            }
+            // Match the canonical manager's typed ownership provenance fields.
+            if ((in_array($record['type'], ['it_ticket_approval', 'it_catalog_version'], true)
+                && (! is_string($record['baseline_sha256'] ?? null)
+                    || preg_match('/\A[a-f0-9]{64}\z/', $record['baseline_sha256']) !== 1))
+                || (! in_array($record['type'], ['it_ticket_approval', 'it_catalog_version'], true) && array_key_exists('baseline_sha256', $record))) {
+                return false;
+            }
+            if (array_key_exists('tracking_clock_sha256', $record)
+                && ($record['type'] !== 'device_assignment' || ! is_string($record['tracking_clock_sha256'])
+                    || preg_match('/\A[a-f0-9]{64}\z/', $record['tracking_clock_sha256']) !== 1)) {
                 return false;
             }
             $key = $record['type'].':'.$record['id'];

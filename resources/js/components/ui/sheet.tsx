@@ -11,6 +11,7 @@ import {
     useOverlayFocusReturn,
 } from '@/components/ui/overlay-focus-return';
 import { cn } from '@/lib/utils';
+import { CompactDateTimeContext } from '@/components/ui/date-time-presentation';
 
 function Sheet({
     children,
@@ -126,7 +127,9 @@ function SheetContent({
                     }
                 }}
             >
-                {children}
+                <CompactDateTimeContext.Provider value={true}>
+                    {children}
+                </CompactDateTimeContext.Provider>
                 {/* Drawn at 1rem; frontline-hit gives it a 44 px target. The
                     16 px floor on the inset keeps that target inside the
                     screen edge when the sheet touches it (14 px root). */}

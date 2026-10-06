@@ -25,6 +25,7 @@ use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Services\ControlRoom\SignalProcessingService;
 use App\Services\Incidents\IncidentJourneyService;
+use App\Services\Medication\MedicationErrorReporter;
 use App\Services\Medication\MedicationSignalService;
 use App\Services\Timeline\TimelineEmitter;
 use Database\Seeders\RbacSeeder;
@@ -33,6 +34,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Mockery\MockInterface;
 use Tests\Support\CommittedFixtureCleanup;
@@ -52,7 +54,7 @@ class MedicationErrorsTest extends TestCase
     {
         $this->seed(RbacSeeder::class);
         $user = $this->makeRoleUser('admin');
-        $this->grantPermissions($user, ['medications.view', 'medications.administer.record', 'medications.administer.correct', 'clients.update']);
+        $this->grantPermissions($user, ['medications.view', 'medications.administer.record', 'medications.administer.correct', 'medications.errors.manage', 'clients.update']);
         $site = Site::factory()->create(['type' => 'house', 'is_active' => true, 'brand_colour' => '#5E35B1']);
         $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
         HrEmployeeProfile::factory()->create([
@@ -83,7 +85,7 @@ class MedicationErrorsTest extends TestCase
         ['user' => $user, 'site' => $site, 'client' => $client] = $this->seedErrors();
         MedicationError::query()->create([
             'client_id' => $client->id, 'error_type' => 'omission', 'severity' => 'near_miss', 'description' => 'Dose missed but caught.',
-            'status' => 'reported', 'reported_by' => $user->id, 'reported_at' => now(),
+            'reached_client' => 'no', 'harm_level' => 'none', 'status' => 'reported', 'reported_by' => $user->id, 'reported_at' => now(),
         ]);
 
         $this->actingAs($user)
@@ -91,11 +93,11 @@ class MedicationErrorsTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('emar/MedicationErrors')
-                ->where('site_brand_colour', '#5E35B1')
+                ->where('can.manage', true)
                 ->has('errors', 1)
                 ->where('errors.0.ref', MedicationError::query()->first()->reference_number)
                 ->has('stats.trend', 8)
-                ->has('stats.by_severity')
+                ->where('stats.triage', 1)
                 ->where('stats.near_miss', 1)
             );
     }
@@ -262,6 +264,12 @@ class MedicationErrorsTest extends TestCase
             'uploaded_by' => $viewer->id,
         ]);
 
+        // Historical controlled classification still governs attachment props.
+        // Model a retained historical soft-deletion from before orders became append-only.
+        // Current order deletion remains forbidden.
+        DB::table('client_medications')->where('id', $controlledMedication->id)->update(['deleted_at' => now()]);
+        $this->assertTrue(ClientMedication::withTrashed()->findOrFail($controlledMedication->id)->trashed());
+
         $this->actingAs($viewer)
             ->get('/emar/errors?site_id='.$site->id)
             ->assertOk()
@@ -294,7 +302,7 @@ class MedicationErrorsTest extends TestCase
     {
         ['site' => $site, 'client' => $client] = $this->seedErrors();
         $corrector = User::factory()->create(['approved_at' => now()]);
-        $this->grantPermissions($corrector, ['medications.administer.correct']);
+        $this->grantPermissions($corrector, ['medications.view', 'clients.viewAny', 'medications.errors.manage']);
         HrEmployeeProfile::factory()->create([
             'user_id' => $corrector->id,
             'primary_site_id' => $site->id,
@@ -331,9 +339,10 @@ class MedicationErrorsTest extends TestCase
         $corrector->unsetRelation('permissionOverrides')->unsetRelation('roles');
 
         $this->actingAs($corrector)
-            ->put(route('emar.errors.update', $error), ['description' => 'Authorised correction.'])
+            ->put(route('emar.errors.update', $error), ['text' => 'Authorised correction.'])
             ->assertRedirect();
-        $this->assertSame('Authorised correction.', $error->fresh()->description);
+        $this->assertSame('Restricted governed evidence.', $error->fresh()->description);
+        $this->assertSame('Authorised correction.', $error->entries()->where('kind', 'note')->sole()->text);
     }
 
     public function test_journey_defining_fields_cannot_be_reclassified_after_reporting(): void
@@ -397,13 +406,13 @@ class MedicationErrorsTest extends TestCase
             'client_id' => $client->id,
             'controlled_drug' => true,
         ]);
-        $payload = [
+        $payload = $this->reportPayload($client, [
             'client_id' => $client->id,
             'client_medication_id' => $controlledMedication->id,
             'error_type' => 'documentation',
             'severity' => 'minor',
             'description' => 'Restricted controlled medication evidence.',
-        ];
+        ]);
 
         $this->actingAs($recorder)
             ->post(route('emar.errors.store'), $payload)
@@ -425,21 +434,21 @@ class MedicationErrorsTest extends TestCase
         ]);
     }
 
-    public function test_store_persists_ncc_merp_fields(): void
+    public function test_store_persists_plain_reach_and_harm(): void
     {
         ['user' => $user, 'client' => $client] = $this->seedErrors();
 
         $this->actingAs($user)
             ->from('/emar/errors')
-            ->post('/emar/errors', [
+            ->post('/emar/errors', $this->reportPayload($client, [
                 'client_id' => $client->id, 'error_type' => 'wrong_dose', 'severity' => 'moderate',
-                'description' => 'Double dose given.', 'reached_client' => 'yes', 'open_disclosure' => 'pending',
-            ])
+                'description' => 'Double dose given.', 'reached_client' => 'yes', 'harm_level' => 'minor',
+            ]))
             ->assertSessionHasNoErrors();
 
         $error = MedicationError::query()->firstOrFail();
         $this->assertSame('yes', $error->reached_client);
-        $this->assertSame('pending', $error->open_disclosure);
+        $this->assertSame('minor', $error->harm_level);
     }
 
     public function test_serious_direct_incident_requires_an_actual_immediate_action_before_any_write(): void
@@ -639,7 +648,7 @@ class MedicationErrorsTest extends TestCase
 
         $this->assertNotNull($exception);
         $this->assertSame(
-            'App\\Exceptions\\MedicationSignalDeliveryException',
+            'App\Exceptions\MedicationSignalDeliveryException',
             $exception::class,
         );
         $this->assertSame('suppressed', $exception->reason());
@@ -710,7 +719,7 @@ class MedicationErrorsTest extends TestCase
 
         $this->assertNotNull($exception);
         $this->assertSame(
-            'App\\Exceptions\\MedicationSignalDeliveryException',
+            'App\Exceptions\MedicationSignalDeliveryException',
             $exception::class,
         );
         $this->assertSame($signal->id, $exception->signalId());
@@ -806,7 +815,7 @@ class MedicationErrorsTest extends TestCase
         $this->withoutExceptionHandling();
 
         try {
-            $this->actingAs($user)->post('/emar/errors', $this->majorOperationalPayload($client));
+            $this->createLegacyOperationalError($user, $client);
             $this->fail('A required event-backed medication alert must fail closed when its source is unavailable.');
         } catch (\RuntimeException $exception) {
             $this->assertSame(
@@ -836,7 +845,7 @@ class MedicationErrorsTest extends TestCase
         $this->withoutExceptionHandling();
 
         try {
-            $this->actingAs($user)->post('/emar/errors', $this->majorOperationalPayload($client));
+            $this->createLegacyOperationalError($user, $client);
             $this->fail('A required event-backed medication alert must roll back its error when processing fails.');
         } catch (\RuntimeException $exception) {
             $this->assertSame('Forced unlinked medication error processing failure', $exception->getMessage());
@@ -849,7 +858,7 @@ class MedicationErrorsTest extends TestCase
         );
     }
 
-    public function test_major_error_without_incident_still_creates_its_required_operational_alert(): void
+    public function test_moderate_harm_creates_its_required_incident_and_operational_alert(): void
     {
         ['user' => $user, 'client' => $client] = $this->seedErrors();
 
@@ -861,12 +870,13 @@ class MedicationErrorsTest extends TestCase
         $signal = Signal::query()->sole();
         $alert = ControlRoomAlert::query()->sole();
 
-        $this->assertNull($error->client_incident_id);
+        $this->assertSame(ClientIncident::query()->sole()->id, $error->client_incident_id);
         $this->assertSame($error->id, data_get($signal->normalized_data, 'medication_error_id'));
-        $this->assertSame($alert->id, $signal->alert_id);
+        $this->assertNull($signal->alert_id);
+        $this->assertSame($alert->id, $signal->correlated_alert_id);
         $this->assertSame('high', $alert->severity);
-        $this->assertDatabaseCount('client_incidents', 0);
-        $this->assertDatabaseCount('hs_events', 0);
+        $this->assertDatabaseCount('client_incidents', 1);
+        $this->assertDatabaseCount('hs_events', 1);
     }
 
     public function test_store_retries_the_outer_transaction_after_a_deadlock(): void
@@ -895,12 +905,12 @@ class MedicationErrorsTest extends TestCase
         DB::commit();
 
         $this->actingAs($user)
-            ->post('/emar/errors', [
+            ->post('/emar/errors', $this->reportPayload($client, [
                 'client_id' => $client->id,
                 'error_type' => 'wrong_dose',
                 'severity' => 'moderate',
                 'description' => 'Retry the complete reporting transaction.',
-            ])
+            ]))
             ->assertRedirect();
 
         $this->assertSame(2, $attempts);
@@ -912,7 +922,7 @@ class MedicationErrorsTest extends TestCase
         ['user' => $user, 'client' => $client] = $this->seedErrors();
         $error = MedicationError::query()->create([
             'client_id' => $client->id, 'error_type' => 'wrong_dose', 'severity' => 'moderate', 'description' => 'x',
-            'status' => 'resolved', 'reported_by' => $user->id, 'reported_at' => now(),
+            'status' => 'resolved', 'owner_id' => $user->id, 'reached_client' => 'no', 'reported_by' => User::factory()->create()->id, 'reported_at' => now(),
         ]);
 
         $this->actingAs($user)
@@ -959,7 +969,7 @@ class MedicationErrorsTest extends TestCase
 
         $error->refresh();
         $this->assertNotNull($error->client_incident_id, 'The error should be linked to the new incident.');
-        $response->assertRedirect(route('incidents.show', $error->client_incident_id));
+        $response->assertRedirect('/emar/errors');
 
         $incident = ClientIncident::query()->findOrFail($error->client_incident_id);
         $this->assertSame($client->id, $incident->client_id);
@@ -967,7 +977,8 @@ class MedicationErrorsTest extends TestCase
         $this->assertSame('medication_error', $incident->type);
         $this->assertSame($user->id, (int) $incident->reported_by);
         $this->assertSame('critical', $incident->severity);
-        $this->assertSame('Clinical review completed.', $incident->immediate_action_taken);
+        $this->assertStringNotContainsString('Clinical review completed.', $incident->immediate_action_taken);
+        $this->assertStringContainsString('permitted medication error record', $incident->immediate_action_taken);
     }
 
     public function test_record_only_actor_cannot_link_an_incident(): void
@@ -1003,11 +1014,11 @@ class MedicationErrorsTest extends TestCase
         $this->assertDatabaseCount('client_incidents', 0);
     }
 
-    public function test_terminal_unlinked_errors_cannot_be_mutated_or_linked_to_a_new_incident(): void
+    public function test_closed_unlinked_errors_cannot_be_mutated_or_linked_to_a_new_incident(): void
     {
         ['user' => $user, 'client' => $client] = $this->seedErrors();
 
-        foreach (['resolved', 'closed'] as $status) {
+        foreach (['closed'] as $status) {
             $error = MedicationError::query()->create([
                 'client_id' => $client->id,
                 'error_type' => 'wrong_dose',
@@ -1063,7 +1074,7 @@ class MedicationErrorsTest extends TestCase
 
         $this->actingAs($user)
             ->put(route('emar.errors.update', $error), [
-                'description' => 'Governed correction.',
+                'text' => 'Governed correction.',
             ])
             ->assertRedirect();
 
@@ -1080,7 +1091,8 @@ class MedicationErrorsTest extends TestCase
         $this->assertNotFalse($errorLock, 'The medication error must be locked.');
         $this->assertLessThan($medicationLock, $clientLock);
         $this->assertLessThan($errorLock, $medicationLock);
-        $this->assertSame('Governed correction.', $error->fresh()->description);
+        $this->assertSame('Original description.', $error->fresh()->description);
+        $this->assertSame('Governed correction.', $error->entries()->where('kind', 'note')->sole()->text);
     }
 
     public function test_linking_a_serious_error_requires_and_persists_the_actual_immediate_action(): void
@@ -1111,20 +1123,16 @@ class MedicationErrorsTest extends TestCase
 
         $this->assertSame(
             'The client was assessed and the prescriber was contacted.',
-            $error->fresh()->immediate_action,
+            $error->entries()->where('kind', 'immediate_action')->sole()->text,
         );
-        $this->assertSame(
-            'The client was assessed and the prescriber was contacted.',
-            ClientIncident::query()->sole()->immediate_action_taken,
-        );
+        $this->assertNull($error->fresh()->immediate_action);
+        $this->assertStringNotContainsString('The client was assessed', ClientIncident::query()->sole()->immediate_action_taken);
     }
 
     public function test_link_incident_is_idempotent_when_already_linked(): void
     {
         ['user' => $user, 'client' => $client] = $this->seedErrors();
-        $this->actingAs($user)
-            ->post('/emar/errors', $this->majorOperationalPayload($client))
-            ->assertRedirect();
+        $this->createLegacyOperationalError($user, $client);
         $error = MedicationError::query()->sole();
         $originalAlert = ControlRoomAlert::query()->sole();
         $originalSignal = Signal::query()->sole();
@@ -1143,7 +1151,7 @@ class MedicationErrorsTest extends TestCase
 
         $this->assertSame($firstIncidentId, $error->refresh()->client_incident_id);
         $this->assertSame(1, ClientIncident::query()->count(), 'A second link must not create a duplicate incident.');
-        $response->assertRedirect(route('incidents.show', $firstIncidentId));
+        $response->assertRedirect('/emar/errors');
 
         $incident = ClientIncident::query()->sole();
         $event = HsEvent::query()->sole();
@@ -1175,9 +1183,7 @@ class MedicationErrorsTest extends TestCase
     public function test_link_incident_reuses_processed_correlated_only_signal_and_promotes_canonical_links(): void
     {
         ['user' => $user, 'client' => $client] = $this->seedErrors();
-        $this->actingAs($user)
-            ->post('/emar/errors', $this->majorOperationalPayload($client))
-            ->assertRedirect();
+        $this->createLegacyOperationalError($user, $client);
         $error = MedicationError::query()->sole();
         $alert = ControlRoomAlert::query()->sole();
         $signal = Signal::query()->sole();
@@ -1223,9 +1229,7 @@ class MedicationErrorsTest extends TestCase
             'moderate' => ['incident' => 'medium', 'operational' => 'high'],
             'critical' => ['incident' => 'critical', 'operational' => 'critical'],
         ] as $editedSeverity => $expected) {
-            $this->actingAs($user)
-                ->post('/emar/errors', $this->majorOperationalPayload($client))
-                ->assertRedirect();
+            $this->createLegacyOperationalError($user, $client);
 
             $error = MedicationError::query()->latest('id')->firstOrFail();
             $signal = Signal::query()
@@ -1260,9 +1264,7 @@ class MedicationErrorsTest extends TestCase
     public function test_link_incident_rolls_back_without_orphaning_a_journey_when_canonical_attachment_fails(): void
     {
         ['user' => $user, 'client' => $client] = $this->seedErrors();
-        $this->actingAs($user)
-            ->post('/emar/errors', $this->majorOperationalPayload($client))
-            ->assertRedirect();
+        $this->createLegacyOperationalError($user, $client);
         $error = MedicationError::query()->sole();
         $alert = ControlRoomAlert::query()->sole();
         $signal = Signal::query()->sole();
@@ -1315,28 +1317,47 @@ class MedicationErrorsTest extends TestCase
         $user->permissionOverrides()->syncWithoutDetaching($permissionMap);
     }
 
+    private function reportPayload(Client $client, array $overrides = []): array
+    {
+        return array_replace([
+            'client_id' => $client->id, 'error_type' => 'documentation', 'description' => 'Synthetic report',
+            'reached_client' => 'no', 'harm_level' => 'none',
+            'occurred_at' => now('Pacific/Auckland')->subMinutes(5)->format('Y-m-d\TH:i'),
+            'report_token' => (string) Str::uuid(),
+        ], $overrides);
+    }
+
+    /** Preserve the pre-P08b operational-only state for canonical promotion regressions. */
+    private function createLegacyOperationalError(User $actor, Client $client): MedicationError
+    {
+        return DB::transaction(fn () => app(MedicationErrorReporter::class)->report(
+            $client, (int) $client->site_id, $actor,
+            ['error_type' => 'wrong_dose', 'severity' => 'major', 'reached_client' => 'unknown', 'harm_level' => 'unknown',
+                'description' => 'Synthetic historical operational-only report', 'immediate_action' => 'Clinical review completed.'],
+            false,
+        ));
+    }
+
     private function majorIncidentPayload(Client $client): array
     {
-        return [
-            'client_id' => $client->id,
+        return $this->reportPayload($client, [
             'error_type' => 'wrong_dose',
-            'severity' => 'major',
+            'reached_client' => 'yes', 'harm_level' => 'moderate',
             'description' => 'A major medication error requiring an official incident.',
             'immediate_action' => 'Clinical review completed.',
             'create_incident' => true,
-        ];
+        ]);
     }
 
     private function majorOperationalPayload(Client $client): array
     {
-        return [
-            'client_id' => $client->id,
+        return $this->reportPayload($client, [
             'error_type' => 'wrong_dose',
-            'severity' => 'major',
+            'reached_client' => 'yes', 'harm_level' => 'moderate',
             'description' => 'A major medication error requiring an operational alert.',
             'immediate_action' => 'Clinical review completed.',
             'create_incident' => false,
-        ];
+        ]);
     }
 
     private function assertNoMedicationErrorJourneyRecords(): void

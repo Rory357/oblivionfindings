@@ -16,15 +16,17 @@ use App\Models\Shift;
 use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\Reporting\MedicationReportAccess;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 class CombinedReportController extends Controller
 {
     public function __construct(
         private readonly MedicationGovernanceScopeService $medicationScope,
         private readonly BoardPackAccessService $boardPackAccess,
+        private readonly MedicationReportAccess $medicationReports,
     ) {}
 
     public function show(Request $request, string $report)
@@ -38,12 +40,19 @@ class CombinedReportController extends Controller
         return inertia('reports/combined', $payload);
     }
 
-    public function export(Request $request, string $report): StreamedResponse
+    public function export(Request $request, string $report): Response
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('reports.viewAny'), 403);
 
-        $payload = $this->reportPayload($report, $user);
+        if ($report === 'care-quality' && $this->canReadMedication($user)) {
+            abort_unless($this->medicationReports->canExport($user, 'doses'), 403);
+            $this->medicationReports->siteIds($user);
+
+            return redirect('/emar/reports?view=exports');
+        }
+
+        $payload = $this->reportPayload($report, $user, forExport: true);
         abort_unless($payload !== null, 404);
 
         $filename = sprintf(
@@ -109,7 +118,7 @@ class CombinedReportController extends Controller
     /**
      * @return array<string, mixed>|null
      */
-    private function reportPayload(string $key, User $user): ?array
+    private function reportPayload(string $key, User $user, bool $forExport = false): ?array
     {
         $definition = collect(self::definitions())->firstWhere('key', $key);
         if (! is_array($definition)) {
@@ -119,10 +128,18 @@ class CombinedReportController extends Controller
         $now = now();
         $from7 = $now->copy()->subDays(7)->startOfDay();
         $from30 = $now->copy()->subDays(30)->startOfDay();
-        $medicationSiteIds = $this->medicationScope->reportSiteIds($user);
-        $canViewControlled = $user->canDo(
+        $canReadMedication = ! $forExport && $this->canReadMedication($user);
+        $medicationSiteIds = $canReadMedication ? $this->medicationReports->siteIds($user) : [];
+        $canViewControlled = $canReadMedication && $user->canDo(
             MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
         );
+        if (! $canReadMedication) {
+            $definition['modules'] = array_values(array_diff($definition['modules'] ?? [], ['medication_administrations', 'controlled_drug_discrepancies']));
+        }
+        if ($key === 'care-quality' && $canReadMedication) {
+            $definition['export_route'] = $this->medicationReports->canExport($user, 'doses') ? '/emar/reports?view=exports' : null;
+            $definition['export_label'] = 'Print & exports';
+        }
         if (! $canViewControlled) {
             $definition['modules'] = collect($definition['modules'] ?? [])
                 ->reject(fn (string $module): bool => $module === 'controlled_drug_discrepancies')
@@ -311,11 +328,13 @@ class CombinedReportController extends Controller
                 ['label' => 'Overdue maintenance', 'value' => Asset::query()->where('requires_maintenance', true)->whereNotNull('maintenance_due_at')->where('maintenance_due_at', '<', $now->toDateString())->count()],
                 ['label' => 'Open safeguarding concerns', 'value' => SafeguardingConcern::query()->where('status', '!=', 'closed')->count()],
                 ['label' => 'Overdue privacy requests', 'value' => DataSubjectRequest::query()->overdue()->count()],
-                ['label' => 'Break-glass accesses (7d)', 'value' => ClientBreakGlassAccess::query()
-                    ->whereHas('client', fn (Builder $client): Builder => $client->whereIn('site_id', $medicationSiteIds))
-                    ->where('created_at', '>=', $from7)
-                    ->count()],
             ];
+            if ($canReadMedication && $user->canDo('medications.audit.view')) {
+                $metrics[] = ['label' => 'Break-glass accesses (7d)', 'value' => ClientBreakGlassAccess::query()
+                    ->whereIn('client_id', $this->medicationReports->clientIds($user, $medicationSiteIds))
+                    ->where('created_at', '>=', $from7)
+                    ->count()];
+            }
             $sections = [
                 [
                     'title' => 'Recent Audit Events',
@@ -402,6 +421,11 @@ class CombinedReportController extends Controller
             ];
         }
 
+        if (! $canReadMedication) {
+            $metrics = array_values(array_filter($metrics, fn (array $metric): bool => ! in_array($metric['label'], ['Medication exceptions (7d)', 'Open controlled discrepancies'], true)));
+            $sections = array_values(array_filter($sections, fn (array $section): bool => $section['title'] !== 'Recent Medication Exceptions'));
+        }
+
         return [
             'report' => $definition,
             'generated_at' => $now->toDateTimeString(),
@@ -419,6 +443,7 @@ class CombinedReportController extends Controller
             $siteIds,
             allowNullMedication: false,
         );
+        $query->whereIn('client_medication_administrations.client_id', $this->medicationReports->clientIds($user, $siteIds));
         if (! $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
             $this->medicationScope->scopeWithoutControlledMedicationRows($query);
         }
@@ -436,8 +461,14 @@ class CombinedReportController extends Controller
             $siteIds,
             allowNullMedication: false,
         );
+        $query->whereIn('client_controlled_drug_discrepancies.client_id', $this->medicationReports->clientIds($user, $siteIds));
 
         return $query;
+    }
+
+    private function canReadMedication(User $user): bool
+    {
+        return $user->canDo('medications.reports.view') && ! $this->medicationReports->financeOnly($user);
     }
 
     private function generalAuditActivityQuery(User $user): Builder
@@ -451,25 +482,7 @@ class CombinedReportController extends Controller
 
     private function excludeMedicationAuditFamilies(Builder $query): void
     {
-        $query->where(function (Builder $nonMedication): void {
-            $nonMedication->whereNull('auditable_type')
-                ->orWhere(function (Builder $typed): void {
-                    $typed->where('auditable_type', 'not like', '%Medication%')
-                        ->where('auditable_type', 'not like', '%ControlledDrug%');
-                });
-        })->where(function (Builder $nonMedicationAction): void {
-            $nonMedicationAction->whereNull('action')
-                ->orWhere(function (Builder $action): void {
-                    $action->where('action', 'not like', 'medication%')
-                        ->where('action', 'not like', 'meds.%')
-                        ->where('action', 'not like', 'emar.%')
-                        ->where('action', 'not like', 'clientmedication%')
-                        ->where('action', 'not like', 'clientcontrolleddrug%')
-                        ->where('action', 'not like', 'controlled_drug%')
-                        ->where('action', 'not like', 'cd.%')
-                        ->where('action', 'not like', 'cd\_%');
-                });
-        });
+        $query->withoutMedicationEvidence();
     }
 
     private function excludeBoardPackAuditUnlessManager(Builder $query, User $user): void

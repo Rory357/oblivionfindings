@@ -158,7 +158,7 @@ class MyTasksController extends Controller
 
         // 12. Active guided medication round (PR 9). Surfaces a resume / start
         //     banner on /my-day for the worker assigned to today's round.
-        $activeRound = $this->getActiveRound($user, $workerNow);
+        $activeRound = $this->getActiveRound($user, $workerNow, $clientIds);
 
         // 13. Shift lifecycle hero payloads.
         $nextShiftBriefing = $clock['open_session']
@@ -880,6 +880,9 @@ class MyTasksController extends Controller
                     if ($scheduled->lt($windowStart) || $scheduled->gt($windowEnd)) {
                         continue;
                     }
+                    if ($dose['state'] === 'self_managed') {
+                        continue;
+                    }
 
                     $scheduledIso = $scheduled->toIso8601String();
                     $snoozeKey = sprintf(
@@ -934,6 +937,7 @@ class MyTasksController extends Controller
                         'can_give' => ! $awaitingCheck && $canRecord && ! $med->controlled_drug,
                         'scheduled_for' => $scheduledIso,
                         'status' => $status,
+                        'state' => $dose['state'],
                         // Away (C7): why, shown as "Away · reason".
                         'away_reason' => $status === 'away' ? $dose['away_reason'] : null,
                         'emar_url' => $canOpenEmar
@@ -1135,7 +1139,7 @@ class MyTasksController extends Controller
      * the guided page itself — so the banner never disagrees with what the
      * worker sees when they tap it.
      */
-    private function getActiveRound(User $user, Carbon $now): ?array
+    private function getActiveRound(User $user, Carbon $now, array $clientIds): ?array
     {
         if (! $user->canDo('medications.administer.record')) {
             return null;
@@ -1150,7 +1154,7 @@ class MyTasksController extends Controller
                 return null;
             }
 
-            $round = MedicationRound::query()
+            $rounds = MedicationRound::query()
                 ->whereNotNull('site_id')
                 ->whereIn('site_id', $siteIds)
                 ->whereDate('round_date', $now->toDateString())
@@ -1161,33 +1165,37 @@ class MyTasksController extends Controller
                 ->whereIn('status', ['in_progress', 'pending'])
                 ->orderByRaw("CASE status WHEN 'in_progress' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END")
                 ->orderBy('scheduled_time')
-                ->first();
-
-            if (! $round) {
-                return null;
-            }
+                ->get();
 
             $service = app(GuidedRoundService::class);
-            $progress = $service->progress(
-                $round,
-                $user->canDo('medications.controlled.view'),
-            );
+            $readableClientIds = DoseSlotReaderScope::forViewerClients($user, $clientIds)->clientIds ?? [];
 
-            if ($progress['total'] === 0) {
-                return null;
+            foreach ($rounds as $round) {
+                $progress = $service->progress(
+                    $round,
+                    $user->canDo('medications.controlled.view'),
+                    $readableClientIds,
+                );
+
+                if ($progress['total'] === 0) {
+                    continue;
+                }
+
+                return [
+                    'id' => $round->id,
+                    'name' => $round->name,
+                    'status' => $round->status,
+                    'scheduled_time' => $round->scheduled_time,
+                    'scheduled_at' => $round->scheduledAt()?->toIso8601String(),
+                    'given' => $progress['given'],
+                    'total' => $progress['total'],
+                    'completed' => $progress['completed'],
+                    'percent' => $progress['percent'],
+                    'url' => route('meds.round.show', $round),
+                ];
             }
 
-            return [
-                'id' => $round->id,
-                'name' => $round->name,
-                'status' => $round->status,
-                'scheduled_time' => $round->scheduled_time,
-                'given' => $progress['given'],
-                'total' => $progress['total'],
-                'completed' => $progress['completed'],
-                'percent' => $progress['percent'],
-                'url' => route('meds.round.show', $round),
-            ];
+            return null;
         } catch (\Throwable $e) {
             report($e);
             $this->unavailableSections[] = 'Medication round';

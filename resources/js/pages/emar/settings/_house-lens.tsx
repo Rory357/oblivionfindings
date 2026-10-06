@@ -18,6 +18,7 @@ import {
     WizardShell,
     WizardStepPane,
 } from '@/components/wizard/shell';
+import { useIsDesktopLg } from '@/hooks/use-mobile';
 import {
     ArrowUpRight,
     Bell,
@@ -134,6 +135,8 @@ export function HouseLens({
 }) {
     const [houseId, setHouseId] = useState(houses[0]?.id ?? 0);
     const [step, setStep] = useState(0);
+    const wideLayout = useIsDesktopLg();
+    const housesInFooter = wideLayout && houses.length <= FOOTER_HOUSES;
     const steps = oncall
         ? [
               ...STEPS,
@@ -211,6 +214,7 @@ export function HouseLens({
 
     return (
         <WizardShell
+            frontline
             open
             onClose={onClose}
             title={`What applies at ${name}`}
@@ -225,7 +229,7 @@ export function HouseLens({
             pct={null}
             headerLabel={steps[step].label}
             footerStart={
-                houses.length > 1 && houses.length <= FOOTER_HOUSES ? (
+                houses.length > 1 && housesInFooter ? (
                     <Choice
                         value={String(houseId)}
                         onChange={(id) => setHouseId(Number(id))}
@@ -242,7 +246,7 @@ export function HouseLens({
             }
         >
             <WizardStepPane key={`${houseId}-${step}`}>
-                {houses.length > FOOTER_HOUSES ? (
+                {houses.length > 1 && !housesInFooter ? (
                     <div className="mb-4 max-w-sm">
                         <RecordPicker
                             id="lens-house"

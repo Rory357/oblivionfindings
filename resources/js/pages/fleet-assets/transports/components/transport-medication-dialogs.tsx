@@ -1,4 +1,11 @@
 import MedicationScanVerificationPanel from '@/components/medications/MedicationScanVerificationPanel';
+import {
+    StockPackFields,
+    StockPackReview,
+    validateStockPackLines,
+    type PackStockContext,
+    type StockPackLine,
+} from '@/components/medications/stock-pack-fields';
 import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -52,8 +59,19 @@ import {
     createTransportMedicationReplayState,
     prepareTransportMedicationReplayState,
 } from '../transport-medication-replay';
+import {
+    blankTransitDoseFacts,
+    TransitDoseFields,
+    validateTransitDoseFacts,
+} from './transport-dose-facts';
+import {
+    TransitReturnFields,
+    validateTransitReturn,
+    type TransitReturnLine,
+} from './transport-pack-return-fields';
 
 export type TransportMedicationOption = {
+    pack_stock?: PackStockContext;
     id: number;
     name: string;
     dosage: string | null;
@@ -68,6 +86,23 @@ export type TransportMedicationOption = {
 };
 
 export type TransportMedicationLog = {
+    dose_amount?: number | null;
+    dose_unit?: string | null;
+    stock_reconciliation_status?: 'complete' | 'shortfall' | null;
+    stock_reconciliation_reason?: string | null;
+    stock_loss_report_id?: number | null;
+    pack_stock?: PackStockContext & {
+        allocations: {
+            lot_id: number;
+            outward_movement_id: number;
+            quantity_out: string;
+            quantity_used: string;
+            quantity_returned: string;
+            quantity_missing: string;
+            quantity_remaining_away: string;
+            closed_at: string | null;
+        }[];
+    };
     id: number;
     transport?: {
         id: number;
@@ -82,7 +117,10 @@ export type TransportMedicationLog = {
     medication_id: number | null;
     medication_name: string;
     is_controlled_drug: boolean;
+    /** Requirement recorded when packed. */
     witness_required: boolean;
+    /** Historical packing requirement or current dose and countersign policy. */
+    requires_administration_witness: boolean;
     packed_witness_name?: string | null;
     packed_witness?: { id: number; name: string } | null;
     packed_witnessed_at?: string | null;
@@ -171,6 +209,7 @@ export function buildPackMedicationPayload({
     attestationReason,
     notes,
     scan,
+    packLines,
 }: {
     clientId: number;
     medication: TransportMedicationOption;
@@ -180,9 +219,13 @@ export function buildPackMedicationPayload({
     attestationReason: string;
     notes: string;
     scan: MedicationScanCapture;
+    packLines?: StockPackLine[];
 }) {
     return {
         client_id: clientId,
+        ...(medication.pack_stock?.lots_started && packLines
+            ? { pack_lines: packLines }
+            : {}),
         medication_id: medication.id,
         medication_name: medication.name,
         is_controlled_drug: medication.controlled_drug,
@@ -221,15 +264,21 @@ export function buildAdministerMedicationPayload({
     witnessCredential,
     notes,
     scan,
+    quantityUnit,
+    packLines,
 }: {
     quantityAdministered: string;
     witnessedByUserId: string;
     witnessCredential: string;
     notes: string;
     scan: MedicationScanCapture;
+    quantityUnit?: string;
+    packLines?: StockPackLine[];
 }) {
     return {
         quantity_administered: quantityAdministered.trim(),
+        ...(quantityUnit ? { quantity_unit: quantityUnit } : {}),
+        ...(packLines ? { pack_lines: packLines } : {}),
         witnessed_by_user_id: witnessedByUserId
             ? Number(witnessedByUserId)
             : null,
@@ -290,6 +339,7 @@ export function PackMedicationWizard({
     );
     const [submitting, setSubmitting] = useState(false);
     const packReplay = useRef(createTransportMedicationReplayState());
+    const [packLines, setPackLines] = useState<StockPackLine[]>([]);
     const form = useForm({
         medication_id: '',
         attestation_state: 'accepted' as 'accepted' | 'refused' | 'unavailable',
@@ -308,10 +358,7 @@ export function PackMedicationWizard({
             ) ?? null,
         [form.data.medication_id, medications],
     );
-    const requiresWitness = !!(
-        selectedMedication?.witness_required ||
-        selectedMedication?.controlled_drug
-    );
+    const requiresWitness = !!selectedMedication?.witness_required;
     const requiresScan = !!selectedMedication?.scan_verification;
     const acceptedForPacking =
         !requiresWitness || form.data.attestation_state === 'accepted';
@@ -327,6 +374,12 @@ export function PackMedicationWizard({
     const canContinue =
         !!client &&
         !!selectedMedication &&
+        (!acceptedForPacking ||
+            !selectedMedication.pack_stock?.lots_started ||
+            !validateStockPackLines(
+                selectedMedication.pack_stock,
+                packLines,
+            )) &&
         witnessDecisionReady &&
         (!acceptedForPacking ||
             !requiresScan ||
@@ -338,9 +391,11 @@ export function PackMedicationWizard({
         form.clearErrors();
         setScanCapture(emptyMedicationScanCapture());
         packReplay.current = createTransportMedicationReplayState();
+        setPackLines([]);
     };
 
     const close = () => {
+        if (submitting) return;
         reset();
         onClose();
     };
@@ -361,6 +416,7 @@ export function PackMedicationWizard({
                     attestationReason: form.data.attestation_reason,
                     notes: form.data.notes,
                     scan: scanCapture,
+                    packLines,
                 }),
                 client_request_uuid: packReplay.current.uuid,
             };
@@ -423,7 +479,9 @@ export function PackMedicationWizard({
             steps={packSteps}
             stepIndex={stepIndex}
             onStepClick={(index) =>
-                index === 0 || canContinue ? setStepIndex(index) : undefined
+                !submitting && (index === 0 || canContinue)
+                    ? setStepIndex(index)
+                    : undefined
             }
             pct={stepIndex === 0 ? (canContinue ? 50 : 20) : 100}
             footerStart={
@@ -469,391 +527,454 @@ export function PackMedicationWizard({
             }
         >
             <WizardStepPane>
-                {stepIndex === 0 ? (
-                    <div className="space-y-5">
-                        <div className="rounded-lg border bg-muted/20 p-4 text-sm">
-                            <div className="font-semibold">
-                                {client?.name ?? residentName}
-                            </div>
-                            <div className="mt-1 text-muted-foreground">
-                                Select an active medication and complete any
-                                custody checks.
-                            </div>
+                <fieldset disabled={submitting} className="min-w-0 space-y-4">
+                    {Object.values(form.errors).length > 0 && (
+                        <div
+                            role="alert"
+                            className="rounded-lg border border-status-critical bg-status-critical-bg p-3 text-status-critical-foreground"
+                        >
+                            {[...new Set(Object.values(form.errors))].map(
+                                (error) => (
+                                    <p key={error}>{error}</p>
+                                ),
+                            )}
                         </div>
+                    )}
+                    {stepIndex === 0 ? (
+                        <div className="space-y-5">
+                            <div className="rounded-lg border bg-muted/20 p-4 text-sm">
+                                <div className="font-semibold">
+                                    {client?.name ?? residentName}
+                                </div>
+                                <div className="mt-1 text-muted-foreground">
+                                    Select an active medication and complete any
+                                    custody checks.
+                                </div>
+                            </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="pack-medication-id">
-                                Medication
-                            </Label>
-                            <Select
-                                value={form.data.medication_id || 'none'}
-                                onValueChange={(value) => {
-                                    form.clearErrors('medication_id');
-                                    form.clearErrors('scan_code');
-                                    form.setData(
-                                        'medication_id',
-                                        value === 'none' ? '' : value,
-                                    );
-                                    form.setData(
-                                        'attestation_state',
-                                        'accepted',
-                                    );
-                                    form.setData('witnessed_by_user_id', '');
-                                    form.setData('witness_credential', '');
-                                    form.setData('attestation_reason', '');
-                                    setScanCapture(
-                                        emptyMedicationScanCapture(),
-                                    );
-                                }}
-                            >
-                                <SelectTrigger id="pack-medication-id">
-                                    <SelectValue placeholder="Select medication" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">
-                                        Select medication
-                                    </SelectItem>
-                                    {medications.map((medication) => (
-                                        <SelectItem
-                                            key={medication.id}
-                                            value={String(medication.id)}
-                                        >
-                                            {medication.name}
-                                            {medication.dosage
-                                                ? ` ${medication.dosage}`
-                                                : ''}
+                            <div className="space-y-2">
+                                <Label htmlFor="pack-medication-id">
+                                    Medication
+                                </Label>
+                                <Select
+                                    value={form.data.medication_id || 'none'}
+                                    onValueChange={(value) => {
+                                        form.clearErrors('medication_id');
+                                        form.clearErrors('scan_code');
+                                        form.setData(
+                                            'medication_id',
+                                            value === 'none' ? '' : value,
+                                        );
+                                        form.setData(
+                                            'attestation_state',
+                                            'accepted',
+                                        );
+                                        form.setData(
+                                            'witnessed_by_user_id',
+                                            '',
+                                        );
+                                        form.setData('witness_credential', '');
+                                        form.setData('attestation_reason', '');
+                                        setPackLines([]);
+                                        setScanCapture(
+                                            emptyMedicationScanCapture(),
+                                        );
+                                    }}
+                                >
+                                    <SelectTrigger id="pack-medication-id">
+                                        <SelectValue placeholder="Select medication" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">
+                                            Select medication
                                         </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            {form.errors.medication_id ? (
-                                <p className="text-sm text-destructive">
-                                    {form.errors.medication_id}
-                                </p>
-                            ) : null}
-                        </div>
-
-                        {selectedMedication ? (
-                            <div className="rounded-lg border p-4">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <span className="text-sm font-semibold">
-                                        {selectedMedication.name}
-                                    </span>
-                                    {selectedMedication.dosage ? (
-                                        <span className="text-xs text-muted-foreground">
-                                            {selectedMedication.dosage}
-                                        </span>
-                                    ) : null}
-                                    <Badge
-                                        variant={
-                                            selectedMedication.is_prn
-                                                ? 'secondary'
-                                                : 'outline'
-                                        }
-                                    >
-                                        {selectedMedication.is_prn
-                                            ? 'PRN'
-                                            : 'Scheduled'}
-                                    </Badge>
-                                    {selectedMedication.controlled_drug ? (
-                                        <Badge variant="destructive">
-                                            Controlled
-                                        </Badge>
-                                    ) : null}
-                                </div>
-                                {selectedMedication.route ? (
-                                    <div className="mt-2 text-xs text-muted-foreground">
-                                        Route: {selectedMedication.route}
-                                    </div>
-                                ) : null}
-                                {selectedMedication.instructions ? (
-                                    <div className="mt-1 text-xs text-muted-foreground">
-                                        {selectedMedication.instructions}
-                                    </div>
+                                        {medications.map((medication) => (
+                                            <SelectItem
+                                                key={medication.id}
+                                                value={String(medication.id)}
+                                            >
+                                                {medication.name}
+                                                {medication.dosage
+                                                    ? ` ${medication.dosage}`
+                                                    : ''}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                {form.errors.medication_id ? (
+                                    <p className="text-sm text-destructive">
+                                        {form.errors.medication_id}
+                                    </p>
                                 ) : null}
                             </div>
-                        ) : null}
 
-                        {requiresWitness ? (
-                            <div className="space-y-3 rounded-lg border p-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="pack-attestation-state">
-                                        Second-checker decision
-                                    </Label>
-                                    <Select
-                                        value={form.data.attestation_state}
-                                        onValueChange={(
-                                            value:
-                                                | 'accepted'
-                                                | 'refused'
-                                                | 'unavailable',
-                                        ) => {
-                                            form.clearErrors();
-                                            form.setData(
-                                                'attestation_state',
-                                                value,
-                                            );
-                                            if (value === 'unavailable') {
-                                                form.setData(
-                                                    'witnessed_by_user_id',
-                                                    '',
-                                                );
-                                                form.setData(
-                                                    'witness_credential',
-                                                    '',
-                                                );
+                            {selectedMedication ? (
+                                <div className="rounded-lg border p-4">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="text-sm font-semibold">
+                                            {selectedMedication.name}
+                                        </span>
+                                        {selectedMedication.dosage ? (
+                                            <span className="text-xs text-muted-foreground">
+                                                {selectedMedication.dosage}
+                                            </span>
+                                        ) : null}
+                                        <Badge
+                                            variant={
+                                                selectedMedication.is_prn
+                                                    ? 'secondary'
+                                                    : 'outline'
                                             }
-                                            if (value === 'accepted') {
-                                                form.setData(
-                                                    'attestation_reason',
-                                                    '',
-                                                );
-                                            }
-                                        }}
-                                    >
-                                        <SelectTrigger id="pack-attestation-state">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="accepted">
-                                                Accepted in person
-                                            </SelectItem>
-                                            <SelectItem value="refused">
-                                                Declined to attest
-                                            </SelectItem>
-                                            <SelectItem value="unavailable">
-                                                No eligible checker available
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                                        >
+                                            {selectedMedication.is_prn
+                                                ? 'PRN'
+                                                : 'Scheduled'}
+                                        </Badge>
+                                        {selectedMedication.controlled_drug ? (
+                                            <Badge variant="destructive">
+                                                Controlled
+                                            </Badge>
+                                        ) : null}
+                                    </div>
+                                    {selectedMedication.route ? (
+                                        <div className="mt-2 text-xs text-muted-foreground">
+                                            Route: {selectedMedication.route}
+                                        </div>
+                                    ) : null}
+                                    {selectedMedication.instructions ? (
+                                        <div className="mt-1 text-xs text-muted-foreground">
+                                            {selectedMedication.instructions}
+                                        </div>
+                                    ) : null}
                                 </div>
+                            ) : null}
 
-                                {form.data.attestation_state !==
-                                'unavailable' ? (
-                                    <>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="pack-witness">
-                                                Second checker
-                                            </Label>
-                                            <Select
-                                                value={
-                                                    form.data
-                                                        .witnessed_by_user_id ||
-                                                    'none'
-                                                }
-                                                onValueChange={(value) => {
-                                                    form.clearErrors(
-                                                        'witnessed_by_user_id',
-                                                    );
-                                                    form.clearErrors(
-                                                        'witness_credential',
-                                                    );
+                            {requiresWitness ? (
+                                <div className="space-y-3 rounded-lg border p-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="pack-attestation-state">
+                                            Second-checker decision
+                                        </Label>
+                                        <Select
+                                            value={form.data.attestation_state}
+                                            onValueChange={(
+                                                value:
+                                                    | 'accepted'
+                                                    | 'refused'
+                                                    | 'unavailable',
+                                            ) => {
+                                                form.clearErrors();
+                                                form.setData(
+                                                    'attestation_state',
+                                                    value,
+                                                );
+                                                if (value === 'unavailable') {
                                                     form.setData(
                                                         'witnessed_by_user_id',
-                                                        value === 'none'
-                                                            ? ''
-                                                            : value,
+                                                        '',
                                                     );
                                                     form.setData(
                                                         'witness_credential',
                                                         '',
                                                     );
-                                                }}
-                                            >
-                                                <SelectTrigger id="pack-witness">
-                                                    <SelectValue placeholder="Select second checker" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="none">
-                                                        Select second checker
-                                                    </SelectItem>
-                                                    {witnesses.map(
-                                                        (witness) => (
-                                                            <SelectItem
-                                                                key={witness.id}
-                                                                value={String(
-                                                                    witness.id,
-                                                                )}
-                                                                disabled={
-                                                                    !witnessIsSelectable(
+                                                }
+                                                if (value === 'accepted') {
+                                                    form.setData(
+                                                        'attestation_reason',
+                                                        '',
+                                                    );
+                                                }
+                                            }}
+                                        >
+                                            <SelectTrigger id="pack-attestation-state">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="accepted">
+                                                    Accepted in person
+                                                </SelectItem>
+                                                <SelectItem value="refused">
+                                                    Declined to attest
+                                                </SelectItem>
+                                                <SelectItem value="unavailable">
+                                                    No eligible checker
+                                                    available
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    {form.data.attestation_state !==
+                                    'unavailable' ? (
+                                        <>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="pack-witness">
+                                                    Second checker
+                                                </Label>
+                                                <Select
+                                                    value={
+                                                        form.data
+                                                            .witnessed_by_user_id ||
+                                                        'none'
+                                                    }
+                                                    onValueChange={(value) => {
+                                                        form.clearErrors(
+                                                            'witnessed_by_user_id',
+                                                        );
+                                                        form.clearErrors(
+                                                            'witness_credential',
+                                                        );
+                                                        form.setData(
+                                                            'witnessed_by_user_id',
+                                                            value === 'none'
+                                                                ? ''
+                                                                : value,
+                                                        );
+                                                        form.setData(
+                                                            'witness_credential',
+                                                            '',
+                                                        );
+                                                    }}
+                                                >
+                                                    <SelectTrigger id="pack-witness">
+                                                        <SelectValue placeholder="Select second checker" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="none">
+                                                            Select second
+                                                            checker
+                                                        </SelectItem>
+                                                        {witnesses.map(
+                                                            (witness) => (
+                                                                <SelectItem
+                                                                    key={
+                                                                        witness.id
+                                                                    }
+                                                                    value={String(
+                                                                        witness.id,
+                                                                    )}
+                                                                    disabled={
+                                                                        !witnessIsSelectable(
+                                                                            witness,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    {witnessOptionLabel(
                                                                         witness,
-                                                                    )
-                                                                }
-                                                            >
-                                                                {witnessOptionLabel(
-                                                                    witness,
-                                                                )}
-                                                            </SelectItem>
-                                                        ),
-                                                    )}
-                                                </SelectContent>
-                                            </Select>
-                                            {form.errors
-                                                .witnessed_by_user_id ? (
+                                                                    )}
+                                                                </SelectItem>
+                                                            ),
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                                {form.errors
+                                                    .witnessed_by_user_id ? (
+                                                    <p className="text-sm text-destructive">
+                                                        {
+                                                            form.errors
+                                                                .witnessed_by_user_id
+                                                        }
+                                                    </p>
+                                                ) : null}
+                                            </div>
+                                            <WitnessPinInput
+                                                id="pack-witness-credential"
+                                                label="Their witness PIN"
+                                                required={false}
+                                                value={
+                                                    form.data.witness_credential
+                                                }
+                                                onChange={(value) => {
+                                                    form.clearErrors(
+                                                        'witness_credential',
+                                                    );
+                                                    form.setData(
+                                                        'witness_credential',
+                                                        value,
+                                                    );
+                                                }}
+                                                error={
+                                                    form.errors
+                                                        .witness_credential
+                                                }
+                                            />
+                                        </>
+                                    ) : null}
+
+                                    {form.data.attestation_state !==
+                                    'accepted' ? (
+                                        <div className="space-y-2">
+                                            <Label htmlFor="pack-attestation-reason">
+                                                Reason
+                                            </Label>
+                                            <Textarea
+                                                id="pack-attestation-reason"
+                                                value={
+                                                    form.data.attestation_reason
+                                                }
+                                                onChange={(event) => {
+                                                    form.clearErrors(
+                                                        'attestation_reason',
+                                                    );
+                                                    form.setData(
+                                                        'attestation_reason',
+                                                        event.target.value,
+                                                    );
+                                                }}
+                                                rows={3}
+                                            />
+                                            {form.errors.attestation_reason ? (
                                                 <p className="text-sm text-destructive">
                                                     {
                                                         form.errors
-                                                            .witnessed_by_user_id
+                                                            .attestation_reason
                                                     }
                                                 </p>
                                             ) : null}
                                         </div>
-                                        <WitnessPinInput
-                                            id="pack-witness-credential"
-                                            label="Their witness PIN"
-                                            required={false}
-                                            value={form.data.witness_credential}
-                                            onChange={(value) => {
-                                                form.clearErrors(
-                                                    'witness_credential',
-                                                );
-                                                form.setData(
-                                                    'witness_credential',
-                                                    value,
-                                                );
-                                            }}
-                                            error={
-                                                form.errors.witness_credential
-                                            }
-                                        />
-                                    </>
-                                ) : null}
+                                    ) : null}
+                                </div>
+                            ) : null}
 
-                                {form.data.attestation_state !== 'accepted' ? (
-                                    <div className="space-y-2">
-                                        <Label htmlFor="pack-attestation-reason">
-                                            Reason
-                                        </Label>
-                                        <Textarea
-                                            id="pack-attestation-reason"
-                                            value={form.data.attestation_reason}
-                                            onChange={(event) => {
-                                                form.clearErrors(
-                                                    'attestation_reason',
-                                                );
-                                                form.setData(
-                                                    'attestation_reason',
-                                                    event.target.value,
-                                                );
-                                            }}
-                                            rows={3}
-                                        />
-                                        {form.errors.attestation_reason ? (
-                                            <p className="text-sm text-destructive">
-                                                {form.errors.attestation_reason}
-                                            </p>
-                                        ) : null}
-                                    </div>
-                                ) : null}
-                            </div>
-                        ) : null}
-
-                        {acceptedForPacking &&
-                        selectedMedication?.scan_verification ? (
-                            <MedicationScanVerificationPanel
-                                clientId={client?.id ?? null}
-                                medicationId={selectedMedication.id}
-                                scanVerification={
-                                    selectedMedication.scan_verification
-                                }
-                                requirementText="Verification is required before packing this medication for transit."
-                                resetKey={`pack-${selectedMedication.id}-${open}`}
-                                onChange={(capture) => {
-                                    form.clearErrors('scan_code');
-                                    setScanCapture(capture);
-                                }}
-                            />
-                        ) : null}
-                        {form.errors.scan_code ? (
-                            <p className="text-sm text-destructive">
-                                {form.errors.scan_code}
-                            </p>
-                        ) : null}
-
-                        <div className="space-y-2">
-                            <Label htmlFor="pack-notes">Notes</Label>
-                            <Textarea
-                                id="pack-notes"
-                                value={form.data.notes}
-                                onChange={(event) =>
-                                    form.setData('notes', event.target.value)
-                                }
-                                placeholder="Add any chain-of-custody or handling notes..."
-                            />
-                            {form.errors.notes ? (
+                            {acceptedForPacking &&
+                            selectedMedication?.scan_verification ? (
+                                <MedicationScanVerificationPanel
+                                    clientId={client?.id ?? null}
+                                    medicationId={selectedMedication.id}
+                                    scanVerification={
+                                        selectedMedication.scan_verification
+                                    }
+                                    requirementText="Verification is required before packing this medication for transit."
+                                    resetKey={`pack-${selectedMedication.id}-${open}`}
+                                    onChange={(capture) => {
+                                        form.clearErrors('scan_code');
+                                        setScanCapture(capture);
+                                    }}
+                                />
+                            ) : null}
+                            {form.errors.scan_code ? (
                                 <p className="text-sm text-destructive">
-                                    {form.errors.notes}
+                                    {form.errors.scan_code}
                                 </p>
                             ) : null}
+
+                            <div className="space-y-2">
+                                {acceptedForPacking &&
+                                    selectedMedication?.pack_stock
+                                        ?.lots_started && (
+                                        <StockPackFields
+                                            stock={{
+                                                ...selectedMedication.pack_stock,
+                                                lots: selectedMedication.pack_stock.lots.filter(
+                                                    (lot) =>
+                                                        lot.usable !== false,
+                                                ),
+                                            }}
+                                            value={packLines}
+                                            onChange={setPackLines}
+                                            idPrefix="transit-pack"
+                                            disabled={submitting}
+                                        />
+                                    )}
+                                <Label htmlFor="pack-notes">Notes</Label>
+                                <Textarea
+                                    id="pack-notes"
+                                    value={form.data.notes}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'notes',
+                                            event.target.value,
+                                        )
+                                    }
+                                    placeholder="Add any chain-of-custody or handling notes..."
+                                />
+                                {form.errors.notes ? (
+                                    <p className="text-sm text-destructive">
+                                        {form.errors.notes}
+                                    </p>
+                                ) : null}
+                            </div>
                         </div>
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">
-                            {acceptedForPacking
-                                ? 'Review medication pack'
-                                : 'Review second-checker decision'}
-                        </h3>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                            <ReviewItem
-                                label="Resident"
-                                value={client?.name ?? residentName}
-                            />
-                            <ReviewItem
-                                label="Medication"
-                                value={
-                                    selectedMedication?.name ?? 'Not selected'
-                                }
-                            />
-                            <ReviewItem
-                                label="Controlled drug"
-                                value={
-                                    selectedMedication?.controlled_drug
-                                        ? 'Yes'
-                                        : 'No'
-                                }
-                            />
-                            <ReviewItem
-                                label="Second checker"
-                                value={
-                                    form.data.attestation_state ===
-                                    'unavailable'
-                                        ? 'No eligible checker available'
-                                        : (witnesses.find(
-                                              (witness) =>
-                                                  String(witness.id) ===
-                                                  form.data
-                                                      .witnessed_by_user_id,
-                                          )?.name ?? 'Not required')
-                                }
-                            />
-                            {requiresWitness ? (
+                    ) : (
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-semibold">
+                                {acceptedForPacking
+                                    ? 'Review medication pack'
+                                    : 'Review second-checker decision'}
+                            </h3>
+                            <div className="grid gap-3 sm:grid-cols-2">
                                 <ReviewItem
-                                    label="Decision"
+                                    label="Resident"
+                                    value={client?.name ?? residentName}
+                                />
+                                <ReviewItem
+                                    label="Medication"
+                                    value={
+                                        selectedMedication?.name ??
+                                        'Not selected'
+                                    }
+                                />
+                                <ReviewItem
+                                    label="Controlled drug"
+                                    value={
+                                        selectedMedication?.controlled_drug
+                                            ? 'Yes'
+                                            : 'No'
+                                    }
+                                />
+                                <ReviewItem
+                                    label="Second checker"
                                     value={
                                         form.data.attestation_state ===
-                                        'accepted'
-                                            ? 'Accepted in person'
-                                            : form.data.attestation_state ===
-                                                'refused'
-                                              ? 'Declined to attest'
-                                              : 'Unavailable'
+                                        'unavailable'
+                                            ? 'No eligible checker available'
+                                            : (witnesses.find(
+                                                  (witness) =>
+                                                      String(witness.id) ===
+                                                      form.data
+                                                          .witnessed_by_user_id,
+                                              )?.name ?? 'Not required')
                                     }
+                                />
+                                {requiresWitness ? (
+                                    <ReviewItem
+                                        label="Decision"
+                                        value={
+                                            form.data.attestation_state ===
+                                            'accepted'
+                                                ? 'Accepted in person'
+                                                : form.data
+                                                        .attestation_state ===
+                                                    'refused'
+                                                  ? 'Declined to attest'
+                                                  : 'Unavailable'
+                                        }
+                                    />
+                                ) : null}
+                            </div>
+                            <ReviewItem
+                                label="Notes"
+                                value={
+                                    form.data.notes.trim() || 'No notes added'
+                                }
+                            />
+                            {acceptedForPacking &&
+                                selectedMedication?.pack_stock
+                                    ?.lots_started && (
+                                    <StockPackReview
+                                        stock={selectedMedication.pack_stock}
+                                        lines={packLines}
+                                    />
+                                )}
+                            {form.data.attestation_state !== 'accepted' ? (
+                                <ReviewItem
+                                    label="Decision reason"
+                                    value={form.data.attestation_reason.trim()}
                                 />
                             ) : null}
                         </div>
-                        <ReviewItem
-                            label="Notes"
-                            value={form.data.notes.trim() || 'No notes added'}
-                        />
-                        {form.data.attestation_state !== 'accepted' ? (
-                            <ReviewItem
-                                label="Decision reason"
-                                value={form.data.attestation_reason.trim()}
-                            />
-                        ) : null}
-                    </div>
-                )}
+                    )}
+                </fieldset>
             </WizardStepPane>
         </WizardShell>
     );
@@ -897,6 +1018,7 @@ export function CorrectPackingAttestationWizard({
         correctionReplay.current = createTransportMedicationReplayState();
     };
     const close = () => {
+        if (submitting) return;
         reset();
         onClose();
     };
@@ -963,7 +1085,9 @@ export function CorrectPackingAttestationWizard({
             steps={packingCorrectionSteps}
             stepIndex={stepIndex}
             onStepClick={(index) =>
-                index === 0 || canContinue ? setStepIndex(index) : undefined
+                !submitting && (index === 0 || canContinue)
+                    ? setStepIndex(index)
+                    : undefined
             }
             pct={stepIndex === 0 ? (canContinue ? 50 : 25) : 100}
             footerStart={
@@ -1007,121 +1131,143 @@ export function CorrectPackingAttestationWizard({
             }
         >
             <WizardStepPane>
-                {stepIndex === 0 ? (
-                    <div className="space-y-5">
-                        <MedicationSummary log={log} />
-                        <div className="rounded-lg border bg-muted/20 p-3 text-sm">
-                            <div className="text-xs text-muted-foreground">
-                                Current packing witness
-                            </div>
-                            <div className="mt-1 font-medium">
-                                {log?.packed_witness?.name ??
-                                    (log?.packed_witness_name
-                                        ? `${log.packed_witness_name} (legacy label only)`
-                                        : 'No authenticated witness recorded')}
-                            </div>
+                <fieldset disabled={submitting} className="min-w-0 space-y-4">
+                    {Object.values(form.errors).length > 0 && (
+                        <div
+                            role="alert"
+                            className="rounded-lg border border-status-critical bg-status-critical-bg p-3 text-status-critical-foreground"
+                        >
+                            {[...new Set(Object.values(form.errors))].map(
+                                (error) => (
+                                    <p key={error}>{error}</p>
+                                ),
+                            )}
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="correct-pack-witness">
-                                Correct second checker
-                            </Label>
-                            <Select
-                                value={form.data.witnessed_by_user_id || 'none'}
-                                onValueChange={(value) => {
-                                    form.clearErrors('witnessed_by_user_id');
-                                    form.clearErrors('witness_credential');
-                                    form.setData(
-                                        'witnessed_by_user_id',
-                                        value === 'none' ? '' : value,
-                                    );
-                                    form.setData('witness_credential', '');
-                                }}
-                            >
-                                <SelectTrigger id="correct-pack-witness">
-                                    <SelectValue placeholder="Select second checker" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">
-                                        Select second checker
-                                    </SelectItem>
-                                    {correctionWitnesses.map((witness) => (
-                                        <SelectItem
-                                            key={witness.id}
-                                            value={String(witness.id)}
-                                            disabled={
-                                                !witnessIsSelectable(witness)
-                                            }
-                                        >
-                                            {witnessOptionLabel(witness)}
+                    )}
+                    {stepIndex === 0 ? (
+                        <div className="space-y-5">
+                            <MedicationSummary log={log} />
+                            <div className="rounded-lg border bg-muted/20 p-3 text-sm">
+                                <div className="text-xs text-muted-foreground">
+                                    Current packing witness
+                                </div>
+                                <div className="mt-1 font-medium">
+                                    {log?.packed_witness?.name ??
+                                        (log?.packed_witness_name
+                                            ? `${log.packed_witness_name} (legacy label only)`
+                                            : 'No authenticated witness recorded')}
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="correct-pack-witness">
+                                    Correct second checker
+                                </Label>
+                                <Select
+                                    value={
+                                        form.data.witnessed_by_user_id || 'none'
+                                    }
+                                    onValueChange={(value) => {
+                                        form.clearErrors(
+                                            'witnessed_by_user_id',
+                                        );
+                                        form.clearErrors('witness_credential');
+                                        form.setData(
+                                            'witnessed_by_user_id',
+                                            value === 'none' ? '' : value,
+                                        );
+                                        form.setData('witness_credential', '');
+                                    }}
+                                >
+                                    <SelectTrigger id="correct-pack-witness">
+                                        <SelectValue placeholder="Select second checker" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">
+                                            Select second checker
                                         </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            {form.errors.witnessed_by_user_id ? (
-                                <p className="text-sm text-destructive">
-                                    {form.errors.witnessed_by_user_id}
-                                </p>
-                            ) : null}
-                        </div>
-                        <WitnessPinInput
-                            id="correct-pack-witness-credential"
-                            label="Their witness PIN"
-                            required={false}
-                            value={form.data.witness_credential}
-                            onChange={(value) => {
-                                form.clearErrors('witness_credential');
-                                form.setData('witness_credential', value);
-                            }}
-                            error={form.errors.witness_credential}
-                        />
-                        <div className="space-y-2">
-                            <Label htmlFor="packing-correction-reason">
-                                Correction reason
-                            </Label>
-                            <Textarea
-                                id="packing-correction-reason"
-                                value={form.data.correction_reason}
-                                onChange={(event) => {
-                                    form.clearErrors('correction_reason');
-                                    form.setData(
-                                        'correction_reason',
-                                        event.target.value,
-                                    );
+                                        {correctionWitnesses.map((witness) => (
+                                            <SelectItem
+                                                key={witness.id}
+                                                value={String(witness.id)}
+                                                disabled={
+                                                    !witnessIsSelectable(
+                                                        witness,
+                                                    )
+                                                }
+                                            >
+                                                {witnessOptionLabel(witness)}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                {form.errors.witnessed_by_user_id ? (
+                                    <p className="text-sm text-destructive">
+                                        {form.errors.witnessed_by_user_id}
+                                    </p>
+                                ) : null}
+                            </div>
+                            <WitnessPinInput
+                                id="correct-pack-witness-credential"
+                                label="Their witness PIN"
+                                required={false}
+                                value={form.data.witness_credential}
+                                onChange={(value) => {
+                                    form.clearErrors('witness_credential');
+                                    form.setData('witness_credential', value);
                                 }}
-                                rows={3}
+                                error={form.errors.witness_credential}
                             />
-                            {form.errors.correction_reason ? (
-                                <p className="text-sm text-destructive">
-                                    {form.errors.correction_reason}
-                                </p>
-                            ) : null}
+                            <div className="space-y-2">
+                                <Label htmlFor="packing-correction-reason">
+                                    Correction reason
+                                </Label>
+                                <Textarea
+                                    id="packing-correction-reason"
+                                    value={form.data.correction_reason}
+                                    onChange={(event) => {
+                                        form.clearErrors('correction_reason');
+                                        form.setData(
+                                            'correction_reason',
+                                            event.target.value,
+                                        );
+                                    }}
+                                    rows={3}
+                                />
+                                {form.errors.correction_reason ? (
+                                    <p className="text-sm text-destructive">
+                                        {form.errors.correction_reason}
+                                    </p>
+                                ) : null}
+                            </div>
                         </div>
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">
-                            Review packing witness correction
-                        </h3>
-                        <div className="grid gap-3 sm:grid-cols-2">
+                    ) : (
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-semibold">
+                                Review packing witness correction
+                            </h3>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <ReviewItem
+                                    label="Medication"
+                                    value={log?.medication_name ?? '---'}
+                                />
+                                <ReviewItem
+                                    label="Correct second checker"
+                                    value={
+                                        selectedWitness?.name ?? 'Not selected'
+                                    }
+                                />
+                            </div>
                             <ReviewItem
-                                label="Medication"
-                                value={log?.medication_name ?? '---'}
+                                label="Correction reason"
+                                value={form.data.correction_reason.trim()}
                             />
-                            <ReviewItem
-                                label="Correct second checker"
-                                value={selectedWitness?.name ?? 'Not selected'}
-                            />
+                            <p className="text-sm text-muted-foreground">
+                                The original evidence remains in the journey
+                                history; this appends a linked correction.
+                            </p>
                         </div>
-                        <ReviewItem
-                            label="Correction reason"
-                            value={form.data.correction_reason.trim()}
-                        />
-                        <p className="text-sm text-muted-foreground">
-                            The original evidence remains in the journey
-                            history; this appends a linked correction.
-                        </p>
-                    </div>
-                )}
+                    )}
+                </fieldset>
             </WizardStepPane>
         </WizardShell>
     );
@@ -1144,6 +1290,28 @@ export function AdministerTransportMedicationWizard({
     );
     const [submitting, setSubmitting] = useState(false);
     const administrationReplay = useRef(createTransportMedicationReplayState());
+    const [dosePackLines, setDosePackLines] = useState<StockPackLine[]>([]);
+    const [doseFacts, setDoseFacts] = useState(blankTransitDoseFacts);
+    const awayStock = log?.pack_stock?.lots_started
+        ? {
+              ...log.pack_stock,
+              lots: log.pack_stock.lots
+                  .filter((lot) =>
+                      log.pack_stock!.allocations.some(
+                          (allocation) =>
+                              allocation.lot_id === lot.id &&
+                              Number(allocation.quantity_remaining_away) > 0 &&
+                              !allocation.closed_at,
+                      ),
+                  )
+                  .map((lot) => ({
+                      ...lot,
+                      quantity_remaining: log.pack_stock!.allocations.find(
+                          (allocation) => allocation.lot_id === lot.id,
+                      )!.quantity_remaining_away,
+                  })),
+          }
+        : null;
     const form = useForm({
         quantity_administered: '',
         witnessed_by_user_id: '',
@@ -1151,9 +1319,7 @@ export function AdministerTransportMedicationWizard({
         notes: '',
         scan_code: '',
     });
-    const requiresWitness = !!(
-        log?.witness_required || log?.is_controlled_drug
-    );
+    const requiresWitness = !!log?.requires_administration_witness;
     const requiresScan = !!log?.scan_verification;
     const normalizedQuantity = form.data.quantity_administered.trim();
     const quantityIsValid =
@@ -1163,6 +1329,21 @@ export function AdministerTransportMedicationWizard({
     const canContinue =
         !!log &&
         quantityIsValid &&
+        (!awayStock ||
+            (!validateStockPackLines(awayStock, dosePackLines) &&
+                !validateTransitDoseFacts(
+                    doseFacts,
+                    dosePackLines,
+                    normalizedQuantity,
+                    log.dose_unit,
+                    awayStock.unit,
+                ) &&
+                Math.round(
+                    dosePackLines.reduce(
+                        (sum, line) => sum + Number(line.quantity),
+                        0,
+                    ) * 100,
+                ) === Math.round(Number(normalizedQuantity) * 100))) &&
         (!requiresWitness ||
             (!!form.data.witnessed_by_user_id &&
                 form.data.witness_credential.trim().length ===
@@ -1175,8 +1356,11 @@ export function AdministerTransportMedicationWizard({
         form.clearErrors();
         setScanCapture(emptyMedicationScanCapture());
         administrationReplay.current = createTransportMedicationReplayState();
+        setDosePackLines([]);
+        setDoseFacts(blankTransitDoseFacts());
     };
     const close = () => {
+        if (submitting) return;
         reset();
         onClose();
     };
@@ -1188,12 +1372,17 @@ export function AdministerTransportMedicationWizard({
             const initialPayload = {
                 ...buildAdministerMedicationPayload({
                     quantityAdministered: form.data.quantity_administered,
+                    quantityUnit: log.pack_stock?.lots_started
+                        ? log.pack_stock.unit
+                        : undefined,
+                    packLines: awayStock ? dosePackLines : undefined,
                     witnessedByUserId: form.data.witnessed_by_user_id,
                     witnessCredential: form.data.witness_credential,
                     notes: form.data.notes,
                     scan: scanCapture,
                 }),
                 client_request_uuid: administrationReplay.current.uuid,
+                ...(awayStock ? doseFacts : {}),
             };
             administrationReplay.current =
                 prepareTransportMedicationReplayState(
@@ -1249,7 +1438,9 @@ export function AdministerTransportMedicationWizard({
             steps={administerSteps}
             stepIndex={stepIndex}
             onStepClick={(index) =>
-                index === 0 || canContinue ? setStepIndex(index) : undefined
+                !submitting && (index === 0 || canContinue)
+                    ? setStepIndex(index)
+                    : undefined
             }
             pct={stepIndex === 0 ? (canContinue ? 50 : 25) : 100}
             footerStart={
@@ -1293,180 +1484,304 @@ export function AdministerTransportMedicationWizard({
             }
         >
             <WizardStepPane>
-                {stepIndex === 0 ? (
-                    <div className="space-y-5">
-                        <MedicationSummary log={log} />
-                        <div className="space-y-2">
-                            <Label htmlFor="administer-quantity">
-                                Units given
-                            </Label>
-                            <Input
-                                id="administer-quantity"
-                                type="number"
-                                inputMode="decimal"
-                                min={0.01}
-                                max={99_999_999.99}
-                                step="0.01"
-                                required
-                                placeholder="e.g. 1 or 0.25"
-                                value={form.data.quantity_administered}
-                                onChange={(event) => {
-                                    form.clearErrors('quantity_administered');
-                                    form.setData(
-                                        'quantity_administered',
-                                        event.target.value,
-                                    );
-                                }}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                Enter the amount actually given. This is removed
-                                from medication stock where stock is tracked.
-                            </p>
-                            {form.errors.quantity_administered ? (
-                                <p className="text-sm text-destructive">
-                                    {form.errors.quantity_administered}
-                                </p>
-                            ) : null}
+                <fieldset disabled={submitting} className="min-w-0 space-y-4">
+                    {Object.values(form.errors).length > 0 && (
+                        <div
+                            role="alert"
+                            className="rounded-lg border border-status-critical bg-status-critical-bg p-3 text-status-critical-foreground"
+                        >
+                            {[...new Set(Object.values(form.errors))].map(
+                                (error) => (
+                                    <p key={error}>{error}</p>
+                                ),
+                            )}
                         </div>
-                        {requiresWitness ? (
+                    )}
+                    {stepIndex === 0 ? (
+                        <div className="space-y-5">
+                            <MedicationSummary log={log} />
                             <div className="space-y-2">
-                                <Label htmlFor="administer-witness">
-                                    Witness
+                                <Label htmlFor="administer-quantity">
+                                    {awayStock
+                                        ? `Taken from the trip pack (${awayStock.unit})`
+                                        : 'Units given'}
                                 </Label>
-                                <Select
-                                    value={
-                                        form.data.witnessed_by_user_id || 'none'
-                                    }
-                                    onValueChange={(value) => {
+                                <Input
+                                    id="administer-quantity"
+                                    type="number"
+                                    inputMode="decimal"
+                                    min={0.01}
+                                    max={99_999_999.99}
+                                    step="0.01"
+                                    required
+                                    placeholder="e.g. 1 or 0.25"
+                                    value={form.data.quantity_administered}
+                                    onChange={(event) => {
                                         form.clearErrors(
-                                            'witnessed_by_user_id',
+                                            'quantity_administered',
                                         );
-                                        form.clearErrors('witness_credential');
                                         form.setData(
-                                            'witnessed_by_user_id',
-                                            value === 'none' ? '' : value,
+                                            'quantity_administered',
+                                            event.target.value,
                                         );
-                                        form.setData('witness_credential', '');
                                     }}
-                                >
-                                    <SelectTrigger id="administer-witness">
-                                        <SelectValue placeholder="Select witness" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="none">
-                                            Select witness
-                                        </SelectItem>
-                                        {witnesses.map((witness) => (
-                                            <SelectItem
-                                                key={witness.id}
-                                                value={String(witness.id)}
-                                                disabled={
-                                                    !witnessIsSelectable(
-                                                        witness,
-                                                    )
-                                                }
-                                            >
-                                                {witnessOptionLabel(witness)}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                {form.errors.witnessed_by_user_id ? (
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    {awayStock
+                                        ? 'Enter the total taken from the trip packs, including any waste. Record the clinical amount given separately below. House stock was already reduced when packed.'
+                                        : 'Enter the amount actually given. This is removed from medication stock where stock is tracked.'}
+                                </p>
+                                {form.errors.quantity_administered ? (
                                     <p className="text-sm text-destructive">
-                                        {form.errors.witnessed_by_user_id}
+                                        {form.errors.quantity_administered}
                                     </p>
                                 ) : null}
-                                <WitnessPinInput
-                                    id="administer-witness-credential"
-                                    required={false}
-                                    value={form.data.witness_credential}
-                                    onChange={(value) => {
-                                        form.clearErrors('witness_credential');
-                                        form.setData(
-                                            'witness_credential',
-                                            value,
-                                        );
-                                    }}
-                                    error={form.errors.witness_credential}
-                                />
                             </div>
-                        ) : null}
-                        {requiresScan && log ? (
-                            <MedicationScanVerificationPanel
-                                clientId={log.client?.id ?? null}
-                                medicationId={log.medication_id}
-                                scanVerification={log.scan_verification ?? null}
-                                requirementText="Verification is required before recording this administration."
-                                resetKey={`administer-${log.id}`}
-                                onChange={(capture) => {
-                                    form.clearErrors('scan_code');
-                                    setScanCapture(capture);
-                                }}
-                            />
-                        ) : null}
-                        {form.errors.scan_code ? (
-                            <p className="text-sm text-destructive">
-                                {form.errors.scan_code}
-                            </p>
-                        ) : null}
-                        <div className="space-y-2">
-                            <Label htmlFor="administer-notes">Notes</Label>
-                            <Textarea
-                                id="administer-notes"
-                                value={form.data.notes}
-                                onChange={(event) =>
-                                    form.setData('notes', event.target.value)
-                                }
-                                placeholder="Add any transport administration notes..."
-                            />
-                            {form.errors.notes ? (
+                            {requiresWitness ? (
+                                <div className="space-y-2">
+                                    <Label htmlFor="administer-witness">
+                                        Witness
+                                    </Label>
+                                    <Select
+                                        value={
+                                            form.data.witnessed_by_user_id ||
+                                            'none'
+                                        }
+                                        onValueChange={(value) => {
+                                            form.clearErrors(
+                                                'witnessed_by_user_id',
+                                            );
+                                            form.clearErrors(
+                                                'witness_credential',
+                                            );
+                                            form.setData(
+                                                'witnessed_by_user_id',
+                                                value === 'none' ? '' : value,
+                                            );
+                                            form.setData(
+                                                'witness_credential',
+                                                '',
+                                            );
+                                        }}
+                                    >
+                                        <SelectTrigger id="administer-witness">
+                                            <SelectValue placeholder="Select witness" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">
+                                                Select witness
+                                            </SelectItem>
+                                            {witnesses.map((witness) => (
+                                                <SelectItem
+                                                    key={witness.id}
+                                                    value={String(witness.id)}
+                                                    disabled={
+                                                        !witnessIsSelectable(
+                                                            witness,
+                                                        )
+                                                    }
+                                                >
+                                                    {witnessOptionLabel(
+                                                        witness,
+                                                    )}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {form.errors.witnessed_by_user_id ? (
+                                        <p className="text-sm text-destructive">
+                                            {form.errors.witnessed_by_user_id}
+                                        </p>
+                                    ) : null}
+                                    <WitnessPinInput
+                                        id="administer-witness-credential"
+                                        required={false}
+                                        value={form.data.witness_credential}
+                                        onChange={(value) => {
+                                            form.clearErrors(
+                                                'witness_credential',
+                                            );
+                                            form.setData(
+                                                'witness_credential',
+                                                value,
+                                            );
+                                        }}
+                                        error={form.errors.witness_credential}
+                                    />
+                                </div>
+                            ) : null}
+                            {requiresScan && log ? (
+                                <MedicationScanVerificationPanel
+                                    clientId={log.client?.id ?? null}
+                                    medicationId={log.medication_id}
+                                    scanVerification={
+                                        log.scan_verification ?? null
+                                    }
+                                    requirementText="Verification is required before recording this administration."
+                                    resetKey={`administer-${log.id}`}
+                                    onChange={(capture) => {
+                                        form.clearErrors('scan_code');
+                                        setScanCapture(capture);
+                                    }}
+                                />
+                            ) : null}
+                            {form.errors.scan_code ? (
                                 <p className="text-sm text-destructive">
-                                    {form.errors.notes}
+                                    {form.errors.scan_code}
                                 </p>
                             ) : null}
+                            <div className="space-y-2">
+                                {awayStock && (
+                                    <>
+                                        <TransitDoseFields
+                                            value={doseFacts}
+                                            onChange={setDoseFacts}
+                                            clinicalUnit={log?.dose_unit}
+                                            stockUnit={awayStock.unit}
+                                        />
+                                        <StockPackFields
+                                            stock={awayStock}
+                                            value={dosePackLines}
+                                            onChange={setDosePackLines}
+                                            disabled={submitting}
+                                            waste
+                                            idPrefix="transit-dose-pack"
+                                        />
+                                        <p
+                                            className="text-caption"
+                                            role="status"
+                                        >
+                                            {validateStockPackLines(
+                                                awayStock,
+                                                dosePackLines,
+                                            ) ||
+                                                validateTransitDoseFacts(
+                                                    doseFacts,
+                                                    dosePackLines,
+                                                    normalizedQuantity,
+                                                    log?.dose_unit,
+                                                    awayStock.unit,
+                                                ) ||
+                                                (Math.round(
+                                                    dosePackLines.reduce(
+                                                        (sum, line) =>
+                                                            sum +
+                                                            Number(
+                                                                line.quantity,
+                                                            ),
+                                                        0,
+                                                    ) * 100,
+                                                ) !==
+                                                Math.round(
+                                                    Number(normalizedQuantity) *
+                                                        100,
+                                                )
+                                                    ? 'The amounts taken from each pack must match the total taken from the trip pack.'
+                                                    : 'Pack amounts and waste are accounted for.')}
+                                        </p>
+                                    </>
+                                )}
+                                <Label htmlFor="administer-notes">Notes</Label>
+                                <Textarea
+                                    id="administer-notes"
+                                    value={form.data.notes}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'notes',
+                                            event.target.value,
+                                        )
+                                    }
+                                    placeholder="Add any transport administration notes..."
+                                />
+                                {form.errors.notes ? (
+                                    <p className="text-sm text-destructive">
+                                        {form.errors.notes}
+                                    </p>
+                                ) : null}
+                            </div>
                         </div>
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">
-                            Review administration
-                        </h3>
-                        <div className="grid gap-3 sm:grid-cols-2">
+                    ) : (
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-semibold">
+                                Review administration
+                            </h3>
+                            {awayStock && (
+                                <StockPackReview
+                                    stock={awayStock}
+                                    lines={dosePackLines}
+                                />
+                            )}
+                            {awayStock && (
+                                <>
+                                    <ReviewItem
+                                        label="Actually given"
+                                        value={`${doseFacts.quantity_given} ${log?.dose_unit ?? ''} · ${doseFacts.amount_mode.replaceAll('_', ' ')}`}
+                                    />
+                                    <ReviewItem
+                                        label="Wasted"
+                                        value={`${doseFacts.quantity_wasted} ${awayStock.unit}${doseFacts.waste_reason ? ` · ${doseFacts.waste_reason}` : ''}`}
+                                    />
+                                    {doseFacts.amount_reason && (
+                                        <ReviewItem
+                                            label="Different amount reason"
+                                            value={doseFacts.amount_reason}
+                                        />
+                                    )}{' '}
+                                    {doseFacts.more_severity && (
+                                        <ReviewItem
+                                            label="Extra amount: severity and immediate action"
+                                            value={`${doseFacts.more_severity} · ${doseFacts.more_immediate_action}`}
+                                        />
+                                    )}{' '}
+                                    {doseFacts.late_reason && (
+                                        <ReviewItem
+                                            label="Outside-window reason"
+                                            value={doseFacts.late_reason}
+                                        />
+                                    )}
+                                </>
+                            )}
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <ReviewItem
+                                    label="Medication"
+                                    value={log?.medication_name ?? '---'}
+                                />
+                                <ReviewItem
+                                    label="Resident"
+                                    value={log?.client?.name ?? '---'}
+                                />
+                                <ReviewItem
+                                    label="Units given"
+                                    value={`${form.data.quantity_administered.trim()} ${log?.pack_stock?.lots_started ? log.pack_stock.unit : ''}`.trim()}
+                                />
+                                <ReviewItem
+                                    label="Witness"
+                                    value={
+                                        witnesses.find(
+                                            (witness) =>
+                                                String(witness.id) ===
+                                                form.data.witnessed_by_user_id,
+                                        )?.name ?? 'Not required'
+                                    }
+                                />
+                                <ReviewItem
+                                    label="Verification"
+                                    value={
+                                        requiresScan
+                                            ? 'Verified'
+                                            : 'Not required'
+                                    }
+                                />
+                            </div>
                             <ReviewItem
-                                label="Medication"
-                                value={log?.medication_name ?? '---'}
-                            />
-                            <ReviewItem
-                                label="Resident"
-                                value={log?.client?.name ?? '---'}
-                            />
-                            <ReviewItem
-                                label="Units given"
-                                value={form.data.quantity_administered.trim()}
-                            />
-                            <ReviewItem
-                                label="Witness"
+                                label="Notes"
                                 value={
-                                    witnesses.find(
-                                        (witness) =>
-                                            String(witness.id) ===
-                                            form.data.witnessed_by_user_id,
-                                    )?.name ?? 'Not required'
+                                    form.data.notes.trim() || 'No notes added'
                                 }
                             />
-                            <ReviewItem
-                                label="Verification"
-                                value={
-                                    requiresScan ? 'Verified' : 'Not required'
-                                }
-                            />
                         </div>
-                        <ReviewItem
-                            label="Notes"
-                            value={form.data.notes.trim() || 'No notes added'}
-                        />
-                    </div>
-                )}
+                    )}
+                </fieldset>
             </WizardStepPane>
         </WizardShell>
     );
@@ -1474,10 +1789,12 @@ export function AdministerTransportMedicationWizard({
 
 export function ReturnTransportMedicationWizard({
     log,
+    witnesses = [],
     onClose,
     onCompleted,
 }: {
     log: TransportMedicationLog | null;
+    witnesses?: Array<WitnessPickerOption & { id: number }>;
     onClose: () => void;
     onCompleted: MutationCompleted;
 }) {
@@ -1487,10 +1804,37 @@ export function ReturnTransportMedicationWizard({
     );
     const [submitting, setSubmitting] = useState(false);
     const returnReplay = useRef(createTransportMedicationReplayState());
-    const form = useForm({ notes: '', scan_code: '' });
+    const form = useForm({
+        notes: '',
+        scan_code: '',
+        reconciliation_reason: '',
+        immediate_action_taken: '',
+        witnessed_by_user_id: '',
+        witness_credential: '',
+    });
+    const [returnLines, setReturnLines] = useState<TransitReturnLine[]>([]);
+    const requiresWitness =
+        !!log?.is_controlled_drug && !!log.pack_stock?.lots_started;
+    const returnError = validateTransitReturn(
+        log,
+        returnLines,
+        form.data.reconciliation_reason,
+    );
     const requiresScan = !!log?.scan_verification;
     const canContinue =
-        !!log && (!requiresScan || hasVerifiedMedicationScan(scanCapture));
+        !!log &&
+        !returnError &&
+        (!requiresWitness ||
+            !returnLines.some((line) => Number(line.missing) > 0) ||
+            !!form.data.immediate_action_taken.trim()) &&
+        (!requiresWitness ||
+            (witnesses.some(
+                (person) =>
+                    String(person.id) === form.data.witnessed_by_user_id &&
+                    witnessIsSelectable(person),
+            ) &&
+                /^\d{6}$/.test(form.data.witness_credential))) &&
+        (!requiresScan || hasVerifiedMedicationScan(scanCapture));
 
     const reset = () => {
         setStepIndex(0);
@@ -1498,8 +1842,10 @@ export function ReturnTransportMedicationWizard({
         form.clearErrors();
         setScanCapture(emptyMedicationScanCapture());
         returnReplay.current = createTransportMedicationReplayState();
+        setReturnLines([]);
     };
     const close = () => {
+        if (submitting) return;
         reset();
         onClose();
     };
@@ -1514,6 +1860,24 @@ export function ReturnTransportMedicationWizard({
                     scan: scanCapture,
                 }),
                 client_request_uuid: returnReplay.current.uuid,
+                ...(log.pack_stock?.lots_started
+                    ? {
+                          return_lines: returnLines,
+                          reconciliation_reason:
+                              form.data.reconciliation_reason,
+                          immediate_action_taken:
+                              form.data.immediate_action_taken,
+                          ...(requiresWitness
+                              ? {
+                                    witnessed_by_user_id: Number(
+                                        form.data.witnessed_by_user_id,
+                                    ),
+                                    witness_credential:
+                                        form.data.witness_credential,
+                                }
+                              : {}),
+                      }
+                    : {}),
             };
             returnReplay.current = prepareTransportMedicationReplayState(
                 returnReplay.current,
@@ -1531,6 +1895,7 @@ export function ReturnTransportMedicationWizard({
                 },
                 {
                     successMessage: 'Medication return recorded.',
+                    allowQueueWhenOffline: !requiresWitness,
                     queuedMessage:
                         'Medication return saved offline and will sync automatically when the device reconnects.',
                 },
@@ -1567,7 +1932,9 @@ export function ReturnTransportMedicationWizard({
             steps={returnSteps}
             stepIndex={stepIndex}
             onStepClick={(index) =>
-                index === 0 || canContinue ? setStepIndex(index) : undefined
+                !submitting && (index === 0 || canContinue)
+                    ? setStepIndex(index)
+                    : undefined
             }
             pct={stepIndex === 0 ? (canContinue ? 50 : 25) : 100}
             footerStart={
@@ -1611,75 +1978,185 @@ export function ReturnTransportMedicationWizard({
             }
         >
             <WizardStepPane>
-                {stepIndex === 0 ? (
-                    <div className="space-y-5">
-                        <MedicationSummary log={log} />
-                        {requiresScan && log ? (
-                            <MedicationScanVerificationPanel
-                                clientId={log.client?.id ?? null}
-                                medicationId={log.medication_id}
-                                scanVerification={log.scan_verification ?? null}
-                                requirementText="Verification is required before returning this medication to house stock."
-                                resetKey={`return-${log.id}`}
-                                onChange={(capture) => {
-                                    form.clearErrors('scan_code');
-                                    setScanCapture(capture);
-                                }}
-                            />
-                        ) : null}
-                        {form.errors.scan_code ? (
-                            <p className="text-sm text-destructive">
-                                {form.errors.scan_code}
-                            </p>
-                        ) : null}
-                        <div className="space-y-2">
-                            <Label htmlFor="return-notes">Return notes</Label>
-                            <Textarea
-                                id="return-notes"
-                                value={form.data.notes}
-                                onChange={(event) =>
-                                    form.setData('notes', event.target.value)
-                                }
-                                placeholder="Add any hand-back or chain-of-custody notes..."
-                            />
-                            {form.errors.notes ? (
+                <fieldset disabled={submitting} className="min-w-0 space-y-4">
+                    {Object.values(form.errors).length > 0 && (
+                        <div
+                            role="alert"
+                            className="rounded-lg border border-status-critical bg-status-critical-bg p-3 text-status-critical-foreground"
+                        >
+                            {[...new Set(Object.values(form.errors))].map(
+                                (error) => (
+                                    <p key={error}>{error}</p>
+                                ),
+                            )}
+                        </div>
+                    )}
+                    {stepIndex === 0 ? (
+                        <div className="space-y-5">
+                            <MedicationSummary log={log} />
+                            {requiresScan && log ? (
+                                <MedicationScanVerificationPanel
+                                    clientId={log.client?.id ?? null}
+                                    medicationId={log.medication_id}
+                                    scanVerification={
+                                        log.scan_verification ?? null
+                                    }
+                                    requirementText="Verification is required before returning this medication to house stock."
+                                    resetKey={`return-${log.id}`}
+                                    onChange={(capture) => {
+                                        form.clearErrors('scan_code');
+                                        setScanCapture(capture);
+                                    }}
+                                />
+                            ) : null}
+                            {log?.pack_stock?.lots_started && (
+                                <TransitReturnFields
+                                    log={log}
+                                    lines={returnLines}
+                                    onChange={setReturnLines}
+                                    reason={form.data.reconciliation_reason}
+                                    onReasonChange={(value) =>
+                                        form.setData(
+                                            'reconciliation_reason',
+                                            value,
+                                        )
+                                    }
+                                    immediateAction={
+                                        form.data.immediate_action_taken
+                                    }
+                                    onImmediateActionChange={(value) =>
+                                        form.setData(
+                                            'immediate_action_taken',
+                                            value,
+                                        )
+                                    }
+                                    witnessId={form.data.witnessed_by_user_id}
+                                    onWitnessChange={(value) => {
+                                        form.setData(
+                                            'witnessed_by_user_id',
+                                            value,
+                                        );
+                                        form.setData('witness_credential', '');
+                                    }}
+                                    credential={form.data.witness_credential}
+                                    onCredentialChange={(value) =>
+                                        form.setData(
+                                            'witness_credential',
+                                            value,
+                                        )
+                                    }
+                                    witnesses={witnesses}
+                                />
+                            )}
+                            {returnError && (
+                                <p role="status" className="text-caption">
+                                    {returnError}
+                                </p>
+                            )}
+                            {form.errors.scan_code ? (
                                 <p className="text-sm text-destructive">
-                                    {form.errors.notes}
+                                    {form.errors.scan_code}
                                 </p>
                             ) : null}
+                            <div className="space-y-2">
+                                <Label htmlFor="return-notes">
+                                    Return notes
+                                </Label>
+                                <Textarea
+                                    id="return-notes"
+                                    value={form.data.notes}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'notes',
+                                            event.target.value,
+                                        )
+                                    }
+                                    placeholder="Add any hand-back or chain-of-custody notes..."
+                                />
+                                {form.errors.notes ? (
+                                    <p className="text-sm text-destructive">
+                                        {form.errors.notes}
+                                    </p>
+                                ) : null}
+                            </div>
                         </div>
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">
-                            Review medication return
-                        </h3>
-                        <div className="grid gap-3 sm:grid-cols-2">
+                    ) : (
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-semibold">
+                                Review medication return
+                            </h3>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <ReviewItem
+                                    label="Medication"
+                                    value={log?.medication_name ?? '---'}
+                                />
+                                <ReviewItem
+                                    label="Resident"
+                                    value={log?.client?.name ?? '---'}
+                                />
+                                <ReviewItem
+                                    label="Destination"
+                                    value="House stock"
+                                />
+                                <ReviewItem
+                                    label="Verification"
+                                    value={
+                                        requiresScan
+                                            ? 'Verified'
+                                            : 'Not required'
+                                    }
+                                />
+                            </div>
                             <ReviewItem
-                                label="Medication"
-                                value={log?.medication_name ?? '---'}
-                            />
-                            <ReviewItem
-                                label="Resident"
-                                value={log?.client?.name ?? '---'}
-                            />
-                            <ReviewItem
-                                label="Destination"
-                                value="House stock"
-                            />
-                            <ReviewItem
-                                label="Verification"
+                                label="Return notes"
                                 value={
-                                    requiresScan ? 'Verified' : 'Not required'
+                                    form.data.notes.trim() || 'No notes added'
                                 }
                             />
+                            {log?.pack_stock?.lots_started && (
+                                <div className="space-y-2">
+                                    {returnLines.map((line) => (
+                                        <ReviewItem
+                                            key={line.lot_id}
+                                            label={`Pack ${line.lot_id}`}
+                                            value={`${line.quantity} ${log.pack_stock!.unit} returned · ${line.missing} missing`}
+                                        />
+                                    ))}
+                                    <ReviewItem
+                                        label="Missing stock follow-up"
+                                        value={
+                                            form.data.reconciliation_reason ||
+                                            'None recorded'
+                                        }
+                                    />
+                                    {log?.is_controlled_drug &&
+                                        form.data.immediate_action_taken && (
+                                            <ReviewItem
+                                                label="What you did straight away"
+                                                value={
+                                                    form.data
+                                                        .immediate_action_taken
+                                                }
+                                            />
+                                        )}
+                                    {requiresWitness && (
+                                        <ReviewItem
+                                            label="Witness"
+                                            value={
+                                                witnesses.find(
+                                                    (person) =>
+                                                        String(person.id) ===
+                                                        form.data
+                                                            .witnessed_by_user_id,
+                                                )?.name ?? 'Not selected'
+                                            }
+                                        />
+                                    )}
+                                </div>
+                            )}
                         </div>
-                        <ReviewItem
-                            label="Return notes"
-                            value={form.data.notes.trim() || 'No notes added'}
-                        />
-                    </div>
-                )}
+                    )}
+                </fieldset>
             </WizardStepPane>
         </WizardShell>
     );

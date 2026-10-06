@@ -44,7 +44,8 @@ class OrderAllergyEndpointTest extends TestCase
         ])->delete();
         ClientMedicalProfile::query()->updateOrCreate(
             ['client_id' => $client->id],
-            // An option key (duplicate of the register entry) and free text.
+            // The same allergen without the register's reaction/severity is
+            // distinct evidence from the profile, alongside its free text.
             ['allergies' => ['penicillin', 'Kiwifruit']],
         );
 
@@ -55,7 +56,8 @@ class OrderAllergyEndpointTest extends TestCase
         // The register list keeps its existing shape for other callers.
         $response->assertJsonCount(1, 'allergies')
             ->assertJsonPath('allergies.0.allergen', 'Penicillin')
-            ->assertJsonStructure(['allergies' => [['id', 'allergen', 'reaction', 'severity', 'is_severe']]]);
+            ->assertJsonStructure(['allergies' => [['id', 'allergen', 'reaction', 'severity', 'is_severe']]])
+            ->assertDontSee('Removed allergen', false);
 
         $this->assertSame([
             [
@@ -63,6 +65,12 @@ class OrderAllergyEndpointTest extends TestCase
                 'severity' => 'life_threatening',
                 'reaction' => 'Anaphylaxis',
                 'source' => 'medication_register',
+            ],
+            [
+                'allergen' => 'Penicillin',
+                'severity' => null,
+                'reaction' => null,
+                'source' => 'health_profile',
             ],
             [
                 'allergen' => 'Kiwifruit',

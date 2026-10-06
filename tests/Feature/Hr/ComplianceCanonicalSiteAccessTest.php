@@ -7,6 +7,7 @@ use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
@@ -92,13 +93,15 @@ function complianceCanonicalStatus(
 }
 
 test('compliance overview rows counts search and contact fields share the canonical Site boundary', function () {
+    $this->travelTo(Carbon::parse('2026-10-04 12:00:00', 'UTC'));
+    $workerNow = Carbon::now(config('app.worker_timezone', 'Pacific/Auckland'));
     $allowed = complianceCanonicalStaff('Allowed Compliance Worker', $this->complianceAllowedSite);
     $hidden = complianceCanonicalStaff('Hidden Compliance Worker', $this->complianceHiddenSite);
     $ended = complianceCanonicalStaff('Ended Compliance Worker', $this->complianceAllowedSite, [], [
-        'end_date' => now()->subDay()->toDateString(),
+        'end_date' => $workerNow->copy()->subDay()->toDateString(),
     ]);
     $future = complianceCanonicalStaff('Future Compliance Worker', $this->complianceAllowedSite, [], [
-        'start_date' => now()->addDay()->toDateString(),
+        'start_date' => $workerNow->copy()->addDay()->toDateString(),
     ]);
     $inactive = complianceCanonicalStaff('Inactive Compliance Worker', $this->complianceAllowedSite, [], [
         'is_active' => false,
@@ -115,6 +118,9 @@ test('compliance overview rows counts search and contact fields share the canoni
         ->assertOk();
 
     $rows = collect($response->inertiaProps('staffStatuses.data'));
+    expect($rows->pluck('user_id')->sort()->values()->all())->toBe(
+        collect([$this->complianceViewer->id, $allowed->id])->sort()->values()->all(),
+    );
     expect($rows->pluck('user_name')->all())
         ->toContain('Compliance Site Manager', 'Allowed Compliance Worker')
         ->not->toContain(

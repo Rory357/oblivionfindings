@@ -27,10 +27,12 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Testing\TestResponse;
+use Tests\Support\ReadsRetainedMedicationAuditEvidence;
 use Tests\TestCase;
 
 class MedicationGovernanceResidualSurfaceTest extends TestCase
 {
+    use ReadsRetainedMedicationAuditEvidence;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -52,11 +54,13 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
         $reader = $this->userWithPermissions([
             'medications.view',
             'medications.audit.view',
+            'medications.audit.export',
+            'medications.reports.view',
             'medications.reports.export',
             'medications.administer.record',
         ], $context['local_site']);
 
-        $page = $this->actingAs($reader)->get(route('medications.audit.index'))->assertOk();
+        $page = $this->retainedAuditLogs($reader)->assertOk();
         $logs = collect($page->inertiaProps('logs'));
         $this->assertTrue($logs->contains('id', $context['local_log']->id));
         $this->assertFalse($logs->contains('id', $context['foreign_log']->id));
@@ -79,29 +83,28 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
         );
 
         foreach ([$context['foreign_client']->id, 999999] as $clientId) {
-            $this->actingAs($reader)
-                ->get(route('medications.audit.index', ['client_id' => $clientId]))
+            $this->canonicalGet($reader, 'medications.audit.index', ['client_id' => $clientId])
                 ->assertNotFound();
             $this->actingAs($reader)
-                ->get(route('medications.audit.export', ['client_id' => $clientId]))
+                ->get(route('medications.audit.export', ['client_id' => $clientId, 'purpose' => 'audit']))
                 ->assertNotFound();
             $this->actingAs($reader)
-                ->get(route('emar.audit.export', ['client_id' => $clientId]))
+                ->get(route('emar.audit.export', ['client_id' => $clientId, 'purpose' => 'audit']))
                 ->assertNotFound();
         }
 
         $csv = $this->actingAs($reader)
-            ->get(route('medications.audit.export'))
+            ->get(route('medications.audit.export', ['purpose' => 'audit']))
             ->assertOk()
-            ->streamedContent();
+            ->getContent();
         $this->assertStringContainsString('Local Resident', $csv);
         $this->assertStringNotContainsString('Foreign Resident', $csv);
         $this->assertStringNotContainsString('198.51.100.77', $csv);
         $this->assertStringNotContainsString('private_history', $csv);
         $emarCsv = $this->actingAs($reader)
-            ->get(route('emar.audit.export'))
+            ->get(route('emar.audit.export', ['purpose' => 'audit']))
             ->assertOk()
-            ->streamedContent();
+            ->getContent();
         $this->assertStringContainsString('Local Resident', $emarCsv);
         $this->assertStringNotContainsString('Foreign Resident', $emarCsv);
         $this->assertStringNotContainsString('198.51.100.77', $emarCsv);
@@ -111,9 +114,9 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
                 ->getJson(route('emar.audit.event.integrity', ['id' => 'admin_'.$context['local_administration']->id])),
         );
         $eventCsv = $this->actingAs($reader)
-            ->get(route('emar.audit.event.export', ['id' => 'admin_'.$context['local_administration']->id]))
+            ->get(route('emar.audit.event.export', ['id' => 'admin_'.$context['local_administration']->id, 'purpose' => 'audit']))
             ->assertOk()
-            ->streamedContent();
+            ->getContent();
         $this->assertStringContainsString('dose_given', $eventCsv);
         $this->assertStringNotContainsString('PRIVATE ADMINISTRATION HISTORY', $eventCsv);
         $this->assertStringNotContainsString('198.51.100.77', $eventCsv);
@@ -149,7 +152,7 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
                 ->getJson(route('emar.audit.event.integrity', ['id' => $eventId]))
                 ->assertNotFound();
             $this->actingAs($reader)
-                ->get(route('emar.audit.event.export', ['id' => $eventId]))
+                ->get(route('emar.audit.event.export', ['id' => $eventId, 'purpose' => 'audit']))
                 ->assertNotFound();
             $this->actingAs($reader)
                 ->post(route('emar.audit.event.flag', ['id' => $eventId]), ['flag' => 'no_actor'])
@@ -168,13 +171,14 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
             $ordinary = $this->userWithPermissions([
                 'medications.view',
                 'medications.audit.view',
+                'medications.audit.export',
+                'medications.reports.view',
                 'medications.reports.export',
                 'medications.administer.record',
             ], $context['local_site'], ['medications.controlled.view']);
             $this->assertFalse($ordinary->canDo('medications.controlled.view'));
 
-            $ordinaryAudit = $this->actingAs($ordinary)
-                ->get(route('medications.audit.index'))
+            $ordinaryAudit = $this->retainedAuditLogs($ordinary)
                 ->assertOk();
             $ordinaryLogs = collect($ordinaryAudit->inertiaProps('logs'));
             $this->assertTrue($ordinaryLogs->contains('id', $context['local_log']->id));
@@ -184,8 +188,7 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
             $this->assertFalse($ordinaryLogs->contains('id', $context['forged_audit_log_id']));
             $this->assertFalse($ordinaryLogs->contains('id', $context['foreign_audit_log_id']));
 
-            $ordinaryFeed = collect($this->actingAs($ordinary)
-                ->get(route('emar.audit'))
+            $ordinaryFeed = collect($this->retainedAuditFeed($ordinary)
                 ->assertOk()
                 ->inertiaProps('events'));
             $ordinaryEventIds = $ordinaryFeed->pluck('id');
@@ -207,9 +210,9 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
 
             foreach (['medications.audit.export', 'emar.audit.export'] as $routeName) {
                 $csv = $this->actingAs($ordinary)
-                    ->get(route($routeName))
+                    ->get(route($routeName, ['purpose' => 'audit']))
                     ->assertOk()
-                    ->streamedContent();
+                    ->getContent();
                 foreach ($context['controlled_audit_actions'] as $action) {
                     $this->assertStringNotContainsString($action, $csv, $routeName);
                 }
@@ -224,7 +227,7 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
                     ->getJson(route('emar.audit.event.integrity', ['id' => $eventId]))
                     ->assertNotFound();
                 $this->actingAs($ordinary)
-                    ->get(route('emar.audit.event.export', ['id' => $eventId]))
+                    ->get(route('emar.audit.event.export', ['id' => $eventId, 'purpose' => 'audit']))
                     ->assertNotFound();
                 $this->actingAs($ordinary)
                     ->post(route('emar.audit.event.flag', ['id' => $eventId]), ['flag' => 'no_actor'])
@@ -241,14 +244,15 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
             $controlledReader = $this->userWithPermissions([
                 'medications.view',
                 'medications.audit.view',
+                'medications.audit.export',
+                'medications.reports.view',
                 'medications.reports.export',
                 'medications.administer.record',
                 'medications.controlled.view',
             ], $context['local_site']);
             $this->assertTrue($controlledReader->canDo('medications.controlled.view'));
 
-            $controlledLogs = collect($this->actingAs($controlledReader)
-                ->get(route('medications.audit.index'))
+            $controlledLogs = collect($this->retainedAuditLogs($controlledReader)
                 ->assertOk()
                 ->inertiaProps('logs'));
             foreach ($context['controlled_audit_log_ids'] as $logId) {
@@ -257,8 +261,7 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
             $this->assertFalse($controlledLogs->contains('id', $context['forged_audit_log_id']));
             $this->assertFalse($controlledLogs->contains('id', $context['foreign_audit_log_id']));
 
-            $controlledFeed = collect($this->actingAs($controlledReader)
-                ->get(route('emar.audit'))
+            $controlledFeed = collect($this->retainedAuditFeed($controlledReader)
                 ->assertOk()
                 ->inertiaProps('events'));
             $controlledEventIds = $controlledFeed->pluck('id');
@@ -275,9 +278,9 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
 
             foreach (['medications.audit.export', 'emar.audit.export'] as $routeName) {
                 $csv = $this->actingAs($controlledReader)
-                    ->get(route($routeName))
+                    ->get(route($routeName, ['purpose' => 'audit']))
                     ->assertOk()
-                    ->streamedContent();
+                    ->getContent();
                 foreach ($context['controlled_audit_actions'] as $action) {
                     $this->assertStringContainsString($action, $csv, $routeName);
                 }
@@ -289,9 +292,9 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
                         ->getJson(route('emar.audit.event.integrity', ['id' => $eventId])),
                 );
                 $eventCsv = $this->actingAs($controlledReader)
-                    ->get(route('emar.audit.event.export', ['id' => $eventId]))
+                    ->get(route('emar.audit.event.export', ['id' => $eventId, 'purpose' => 'audit']))
                     ->assertOk()
-                    ->streamedContent();
+                    ->getContent();
                 $this->assertStringContainsString($recordLabel, $eventCsv);
             }
 
@@ -321,24 +324,19 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
         $empty = $this->userWithPermissions([
             'medications.view',
             'medications.audit.view',
+            'medications.audit.export',
+            'medications.reports.view',
             'medications.reports.export',
             'shifts.manageAny',
         ]);
 
-        $emptyAudit = $this->actingAs($empty)->get(route('medications.audit.index'))->assertOk();
+        $emptyAudit = $this->retainedAuditLogs($empty)->assertOk();
         $this->assertSame([], collect($emptyAudit->inertiaProps('logs'))->all());
         $this->assertSame([], collect($emptyAudit->inertiaProps('clients'))->all());
         $this->assertSame([], collect($emptyAudit->inertiaProps('sites'))->all());
-        $emptyCsv = $this->actingAs($empty)
-            ->get(route('medications.audit.export'))
-            ->assertOk()
-            ->streamedContent();
-        $this->assertStringNotContainsString('Local Resident', $emptyCsv);
-        $emptyEmarCsv = $this->actingAs($empty)
-            ->get(route('emar.audit.export'))
-            ->assertOk()
-            ->streamedContent();
-        $this->assertStringNotContainsString('Local Resident', $emptyEmarCsv);
+        $this->actingAs($empty)->getJson(route('medications.audit.export', ['purpose' => 'audit']))->assertUnprocessable();
+        $this->actingAs($empty)->getJson(route('emar.audit.export', ['purpose' => 'audit']))->assertUnprocessable();
+        $this->assertDatabaseCount('medication_events', 0);
         // No readable Site: no scheduled doses, so the admin rate is n/a.
         $this->assertDashboardWidgets($empty, null, 0, 0, 0, 0);
 
@@ -366,11 +364,13 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
             $global = $this->userWithPermissions([
                 'medications.view',
                 'medications.audit.view',
+                'medications.audit.export',
+                'medications.reports.view',
                 'medications.reports.export',
                 'shifts.manageAny',
                 $bypassPermission,
             ]);
-            $audit = $this->actingAs($global)->get(route('medications.audit.index'))->assertOk();
+            $audit = $this->retainedAuditLogs($global)->assertOk();
             $auditIds = collect($audit->inertiaProps('logs'))->pluck('id');
             $this->assertTrue($auditIds->contains($context['local_log']->id));
             $this->assertTrue($auditIds->contains($context['foreign_log']->id));
@@ -380,15 +380,15 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
                     ->getJson(route('emar.audit.event.integrity', ['id' => 'admin_'.$context['foreign_administration']->id])),
             );
             $foreignEventCsv = $this->actingAs($global)
-                ->get(route('emar.audit.event.export', ['id' => 'admin_'.$context['foreign_administration']->id]))
+                ->get(route('emar.audit.event.export', ['id' => 'admin_'.$context['foreign_administration']->id, 'purpose' => 'audit']))
                 ->assertOk()
-                ->streamedContent();
+                ->getContent();
             $this->assertStringContainsString((string) $context['foreign_administration']->id, $foreignEventCsv);
             $this->assertStringNotContainsString('FOREIGN PRIVATE HISTORY', $foreignEventCsv);
             $globalCsv = $this->actingAs($global)
-                ->get(route('medications.audit.export'))
+                ->get(route('medications.audit.export', ['purpose' => 'audit']))
                 ->assertOk()
-                ->streamedContent();
+                ->getContent();
             $this->assertStringContainsString('Local Resident', $globalCsv);
             $this->assertStringContainsString('Foreign Resident', $globalCsv);
             // Both Sites: local given, foreign recorded missed, and both
@@ -397,14 +397,16 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
         }
     }
 
-    public function test_route_contracts_keep_audit_exact_and_allow_either_report_capability(): void
+    public function test_route_contracts_keep_report_and_audit_capabilities_exact(): void
     {
         foreach ([
             'medications.audit.index' => ['medications.view', 'medications.audit.view'],
-            'medications.audit.export' => ['medications.view', 'medications.audit.view', 'medications.reports.export'],
-            'emar.audit.export' => ['medications.view', 'medications.audit.view', 'medications.reports.export'],
+            'medications.audit.export' => ['medications.view', 'medications.audit.view', 'medications.audit.export'],
+            'emar.audit.export' => ['medications.view', 'medications.audit.view', 'medications.audit.export'],
             'emar.audit.event.integrity' => ['medications.view', 'medications.audit.view'],
-            'emar.audit.event.export' => ['medications.view', 'medications.audit.view', 'medications.reports.export'],
+            'emar.audit.event.export' => ['medications.view', 'medications.audit.view', 'medications.audit.export'],
+            'emar.reports.history' => ['medications.reports.view', 'medications.view', 'medications.audit.view'],
+            'emar.reports.history_logs' => ['medications.reports.view', 'medications.view', 'medications.audit.view'],
             'emar.audit.event.flag' => ['medications.view', 'medications.audit.view', 'medications.administer.record'],
             'api.medications.alerts.acknowledge' => ['medications.view', 'medications.administer.correct'],
             'api.medications.alerts.resolve' => ['medications.view', 'medications.administer.correct'],
@@ -437,19 +439,18 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
         ] as $routeName) {
             $middleware = Route::getRoutes()->getByName($routeName)?->gatherMiddleware() ?? [];
             $this->assertContains(
-                'permission:medications.reports.export|reports.viewAny',
+                'permission:medications.reports.view',
                 $middleware,
                 $routeName,
             );
+            $this->assertNotContains('permission:medications.reports.export|reports.viewAny', $middleware, $routeName);
+            if (! in_array($routeName, ['emar.reports', 'emar.reports.export', 'reports.medications', 'api.medications.reports'], true)) {
+                $this->assertContains('permission:medications.reports.export', $middleware, $routeName);
+            }
             $this->assertNotContains('permission:medications.view', $middleware, $routeName);
         }
 
-        $emarController = file_get_contents(app_path('Http/Controllers/Emar/EmarController.php'));
-        $this->assertIsString($emarController);
-        $this->assertMatchesRegularExpression(
-            "/'export_reports'\\s*=>\\s*\\(bool\\)\\s*\\\$user\\s*&&\\s*\\(\\s*\\\$user->canDo\\('medications\\.reports\\.export'\\)\\s*\\|\\|\\s*\\\$user->canDo\\('reports\\.viewAny'\\)\\s*\\)/s",
-            $emarController,
-        );
+        $this->assertSame(['POST'], Route::getRoutes()->getByName('emar.reports.export')->methods());
 
         $context = $this->context();
         $reportsWithoutAudit = $this->userWithPermissions([
@@ -457,37 +458,38 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
             'reports.viewAny',
         ], $context['local_site']);
         $this->actingAs($reportsWithoutAudit)->get(route('medications.audit.index'))->assertForbidden();
-        $this->actingAs($reportsWithoutAudit)->get(route('medications.audit.export'))->assertForbidden();
+        $this->actingAs($reportsWithoutAudit)->get(route('medications.audit.export', ['purpose' => 'audit']))->assertForbidden();
 
         $generalReportsOnly = $this->userWithPermissions([
             'reports.viewAny',
         ], $context['local_site'], ['medications.view']);
         $this->assertFalse($generalReportsOnly->canDo('medications.view'));
         $this->actingAs($generalReportsOnly)->get(route('medications.audit.index'))->assertForbidden();
-        $this->actingAs($generalReportsOnly)->get(route('medications.audit.export'))->assertForbidden();
+        $this->actingAs($generalReportsOnly)->get(route('medications.audit.export', ['purpose' => 'audit']))->assertForbidden();
         foreach ([
             'emar.reports',
-            'emar.reports.export',
             'reports.medications',
             'api.medications.reports',
             'api.medications.reports.export',
         ] as $routeName) {
-            $this->actingAs($generalReportsOnly)->get(route($routeName))->assertOk();
+            $this->canonicalGet($generalReportsOnly, $routeName, ['purpose' => 'audit'])->assertForbidden();
         }
+        $this->actingAs($generalReportsOnly)->postJson(route('emar.reports.export'), ['type' => 'doses', 'purpose' => 'care'])->assertForbidden();
 
         $auditOnly = $this->userWithPermissions([
             'medications.view',
             'medications.audit.view',
+            'medications.reports.view',
         ], $context['local_site']);
-        $this->actingAs($auditOnly)->get(route('medications.audit.index'))->assertOk();
-        $this->actingAs($auditOnly)->get(route('medications.audit.export'))->assertForbidden();
+        $this->retainedAuditLogs($auditOnly)->assertOk();
+        $this->actingAs($auditOnly)->get(route('medications.audit.export', ['purpose' => 'audit']))->assertForbidden();
 
         $ordinaryExporter = $this->userWithPermissions([
+            'medications.reports.view',
             'medications.reports.export',
         ], $context['local_site'], ['medications.view']);
         $this->assertFalse($ordinaryExporter->canDo('medications.view'));
-        $this->actingAs($ordinaryExporter)
-            ->get(route('reports.medications'))
+        $this->canonicalGet($ordinaryExporter, 'reports.medications')
             ->assertOk();
         $this->actingAs($ordinaryExporter)
             ->get(route('emar.reports'))
@@ -496,11 +498,12 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
             ->getJson(route('api.medications.reports'))
             ->assertOk();
         $this->actingAs($ordinaryExporter)
-            ->get(route('api.medications.reports.export'))
+            ->get(route('api.medications.reports.export', ['purpose' => 'care']))
             ->assertOk();
 
         foreach (MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS as $bypassPermission) {
             $globalExporter = $this->userWithPermissions([
+                'medications.reports.view',
                 'medications.reports.export',
                 $bypassPermission,
             ], null, ['medications.view']);
@@ -509,7 +512,7 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
                 ->getJson(route('api.medications.reports'))
                 ->assertOk();
             $this->actingAs($globalExporter)
-                ->get(route('api.medications.reports.export'))
+                ->get(route('api.medications.reports.export', ['purpose' => 'care']))
                 ->assertOk();
         }
     }
@@ -938,6 +941,11 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
         $user->permissionOverrides()->sync(
             $permissionIds->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])->all(),
         );
+        $deniedPermissions = array_values(array_unique([...$deniedPermissions, ...array_diff([
+            'medications.controlled.view', 'medications.audit.view', 'medications.audit.export',
+            'medications.reports.view', 'medications.reports.export',
+            ...MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS,
+        ], $permissions)]));
 
         $deniedPermissionIds = Permission::query()->whereIn('key', $deniedPermissions)->pluck('id');
         $this->assertCount(count($deniedPermissions), $deniedPermissionIds, 'Missing denied permission in test setup.');

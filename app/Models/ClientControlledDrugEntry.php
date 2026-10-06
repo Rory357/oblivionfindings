@@ -14,6 +14,7 @@ class ClientControlledDrugEntry extends Model
     protected $fillable = [
         'client_id',
         'client_medication_id',
+        'client_medication_administration_id',
         'pharmacy_order_id',
         'shift_id',
         'service_context_id',
@@ -29,6 +30,16 @@ class ClientControlledDrugEntry extends Model
         'recorded_at',
         'recorded_by',
         'witnessed_by',
+        'reverses_entry_id',
+        'second_witness_id',
+        'first_count',
+        'recount',
+        'count_due_at',
+        'source_type',
+        'source_id',
+        'stock_balance_scope',
+        'transit_log_id',
+        'stock_count_record_id',
     ];
 
     protected $casts = [
@@ -37,7 +48,16 @@ class ClientControlledDrugEntry extends Model
         'on_hand_after' => 'decimal:2',
         'recorded_at' => 'datetime',
         'expiry_date' => 'date',
+        'first_count' => 'decimal:2',
+        'recount' => 'decimal:2',
+        'count_due_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::updating(fn () => throw new \LogicException('Controlled register entries are append-only. Void and correct the original entry.'));
+        static::deleting(fn () => throw new \LogicException('Controlled register entries cannot be deleted.'));
+    }
 
     public function client()
     {
@@ -47,6 +67,25 @@ class ClientControlledDrugEntry extends Model
     public function medication()
     {
         return $this->belongsTo(ClientMedication::class, 'client_medication_id')->withTrashed();
+    }
+
+    public function administration()
+    {
+        return $this->belongsTo(ClientMedicationAdministration::class, 'client_medication_administration_id')->withTrashed();
+    }
+
+    public function destructions()
+    {
+        return $this->hasMany(MedicationDestruction::class, 'register_entry_id')->withTrashed();
+    }
+
+    /** Clinical and physical-use evidence cannot be undone by a register-only reversal. */
+    public function requiresGovernedReconciliation(): bool
+    {
+        return $this->transit_log_id !== null || ($this->stock_balance_scope ?? 'house') !== 'house'
+            || $this->client_medication_administration_id !== null
+            || in_array($this->entry_type, ['administered', 'administration', 'disposal', 'waste'], true)
+            || (bool) ($this->getAttribute('destructions_exists') ?? $this->destructions()->exists());
     }
 
     public function pharmacyOrder()

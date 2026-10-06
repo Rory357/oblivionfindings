@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    ageOnWorkerDay,
     formatDateForFilename,
     formatDateOnly,
     formatDateTimeInZone,
@@ -8,6 +9,41 @@ import {
     toDateInput,
     toDatetimeLocal,
 } from './datetime';
+
+describe('age on the NZ calendar day', () => {
+    it('changes on the birthday, including before the UTC day changes', () => {
+        expect(
+            ageOnWorkerDay('1984-10-04', new Date('2026-10-03T10:59:59Z')),
+        ).toBe(41);
+        expect(
+            ageOnWorkerDay('1984-10-04', new Date('2026-10-03T11:00:00Z')),
+        ).toBe(42);
+        expect(
+            ageOnWorkerDay('1984-10-04', new Date('2026-10-04T07:15:00Z')),
+        ).toBe(42);
+    });
+
+    it('counts completed years across a leap-day birthday', () => {
+        expect(ageOnWorkerDay('2000-02-29', '2026-02-28T00:00:00Z')).toBe(25);
+        expect(ageOnWorkerDay('2000-02-29', '2026-03-01T00:00:00Z')).toBe(26);
+    });
+
+    it('does not invent an age for missing, invalid or future dates', () => {
+        for (const birthDate of [
+            undefined,
+            null,
+            '',
+            'not-a-date',
+            '2026-02-31',
+            '2026-10-05',
+        ]) {
+            expect(
+                ageOnWorkerDay(birthDate, '2026-10-04T00:00:00Z'),
+            ).toBeNull();
+        }
+        expect(ageOnWorkerDay('1984-10-04', 'not-a-date')).toBeNull();
+    });
+});
 
 describe('NZ date input and filename boundaries', () => {
     it('formats a date-only value without shifting it through a timezone', () => {

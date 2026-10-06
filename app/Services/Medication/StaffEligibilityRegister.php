@@ -67,7 +67,23 @@ class StaffEligibilityRegister
         if ($siteIds === []) {
             return collect();
         }
-        $users = $this->currentStaff->currentUsersQuery()
+
+        return $this->build($this->users($siteIds));
+    }
+
+    /**
+     * The shared current-staff population for the register and competency report.
+     *
+     * @param  list<int>  $siteIds
+     * @return Collection<int, User>
+     */
+    public function users(array $siteIds): Collection
+    {
+        if ($siteIds === []) {
+            return collect();
+        }
+
+        return $this->currentStaff->currentUsersQuery()
             ->with([
                 'hrEmployeeProfile:id,user_id,primary_site_id,secondary_site_ids,start_date',
                 'medicationCompetencyAssessments.assessor:id,name',
@@ -77,8 +93,6 @@ class StaffEligibilityRegister
             ->filter(fn (User $user): bool => collect($this->siteIdsOf($user))->intersect($siteIds)->isNotEmpty()
                 && ($user->canDo('medications.administer.record') || $user->medicationCompetencyAssessments->isNotEmpty()))
             ->values();
-
-        return $this->build($users);
     }
 
     /** One person's eligibility (My eligibility). */

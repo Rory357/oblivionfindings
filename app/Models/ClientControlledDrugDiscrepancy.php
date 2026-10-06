@@ -29,6 +29,9 @@ class ClientControlledDrugDiscrepancy extends Model
         'resolved_at',
         'resolved_by',
         'resolution_notes',
+        'count_entry_id',
+        'owner_id',
+        'resolution_outcome',
     ];
 
     protected $casts = [
@@ -46,7 +49,7 @@ class ClientControlledDrugDiscrepancy extends Model
 
     public function medication(): BelongsTo
     {
-        return $this->belongsTo(ClientMedication::class, 'client_medication_id');
+        return $this->belongsTo(ClientMedication::class, 'client_medication_id')->withTrashed();
     }
 
     public function serviceContext(): BelongsTo

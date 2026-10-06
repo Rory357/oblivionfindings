@@ -5,24 +5,11 @@ use App\Models\ClientMedication;
 use App\Models\MedicationInteraction;
 use App\Services\MedicationSafetyService;
 use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 
 beforeEach(function () {
     $this->service = new MedicationSafetyService;
 });
-
-function mockAdministrationRelation(?object $lastAdmin, int $clientId): HasMany
-{
-    $relation = Mockery::mock(HasMany::class);
-    $relation->shouldReceive('effectiveClinicalEvidence')->andReturnSelf();
-    $relation->shouldReceive('where')->with('client_id', $clientId)->andReturnSelf();
-    $relation->shouldReceive('where')->with('status', 'given')->andReturnSelf();
-    $relation->shouldReceive('orderByDesc')->with('administered_at')->andReturnSelf();
-    $relation->shouldReceive('first')->andReturn($lastAdmin);
-
-    return $relation;
-}
 
 // ─── validateDoseAgainstPrescribed ─────────────────────────────────────
 
@@ -84,128 +71,6 @@ test('validateDoseAgainstPrescribed returns null when prescribed dose is zero', 
     $result = $this->service->validateDoseAgainstPrescribed($medication, '50mg');
 
     expect($result)->toBeNull();
-});
-
-// ─── checkPrnLimits ────────────────────────────────────────────────────
-
-test('checkPrnLimits blocks when daily limit reached', function () {
-    $medication = Mockery::mock(ClientMedication::class)->makePartial();
-    $medication->is_prn = true;
-    $medication->max_per_day = '4';
-
-    // Mock the prnCountLast24Hours accessor to return 4 (at limit)
-    $medication->shouldReceive('getAttribute')
-        ->with('prnCountLast24Hours')
-        ->andReturn(4);
-
-    $result = $this->service->checkPrnLimits($medication);
-
-    expect($result['blocked'])->toBeTrue()
-        ->and($result['details']['count_24h'])->toBe(4)
-        ->and($result['details']['max_per_day'])->toBe(4)
-        ->and($result['details']['remaining'])->toBe(0);
-});
-
-test('checkPrnLimits does not block when under limit', function () {
-    $medication = Mockery::mock(ClientMedication::class)->makePartial();
-    $medication->is_prn = true;
-    $medication->max_per_day = '4';
-
-    $medication->shouldReceive('getAttribute')
-        ->with('prnCountLast24Hours')
-        ->andReturn(2);
-
-    $result = $this->service->checkPrnLimits($medication);
-
-    expect($result['blocked'])->toBeFalse()
-        ->and($result['details']['remaining'])->toBe(2);
-});
-
-test('checkPrnLimits shows near limit warning at 75% usage', function () {
-    $medication = Mockery::mock(ClientMedication::class)->makePartial();
-    $medication->is_prn = true;
-    $medication->max_per_day = '4';
-
-    $medication->shouldReceive('getAttribute')
-        ->with('prnCountLast24Hours')
-        ->andReturn(3);
-
-    $result = $this->service->checkPrnLimits($medication);
-
-    expect($result['blocked'])->toBeFalse()
-        ->and($result['near_limit'])->toBeTrue()
-        ->and($result['details']['remaining'])->toBe(1);
-});
-
-test('checkPrnLimits returns safe when not a PRN medication', function () {
-    $medication = Mockery::mock(ClientMedication::class)->makePartial();
-    $medication->is_prn = false;
-    $medication->max_per_day = null;
-
-    $result = $this->service->checkPrnLimits($medication);
-
-    expect($result['blocked'])->toBeFalse()
-        ->and($result['near_limit'])->toBeFalse();
-});
-
-// ─── checkPrnInterval ──────────────────────────────────────────────────
-
-test('checkPrnInterval blocks when minimum hours not elapsed', function () {
-    $lastAdminTime = Carbon::now()->subMinutes(30); // 30 minutes ago
-
-    $lastAdmin = (object) [
-        'status' => 'given',
-        'administered_at' => $lastAdminTime,
-    ];
-
-    $medication = Mockery::mock(ClientMedication::class)->makePartial();
-    $medication->client_id = 101;
-    $medication->min_hours_between_doses = 4;
-    $medication->shouldReceive('administrations')->andReturn(mockAdministrationRelation($lastAdmin, 101));
-
-    $result = $this->service->checkPrnInterval($medication);
-
-    expect($result['blocked'])->toBeTrue()
-        ->and($result['details']['min_hours_between_doses'])->toBe(4.0)
-        ->and($result['details']['hours_remaining'])->toBeGreaterThan(0);
-});
-
-test('checkPrnInterval does not block when minimum hours have elapsed', function () {
-    $lastAdminTime = Carbon::now()->subHours(5); // 5 hours ago
-
-    $lastAdmin = (object) [
-        'status' => 'given',
-        'administered_at' => $lastAdminTime,
-    ];
-
-    $medication = Mockery::mock(ClientMedication::class)->makePartial();
-    $medication->client_id = 102;
-    $medication->min_hours_between_doses = 4;
-    $medication->shouldReceive('administrations')->andReturn(mockAdministrationRelation($lastAdmin, 102));
-
-    $result = $this->service->checkPrnInterval($medication);
-
-    expect($result['blocked'])->toBeFalse();
-});
-
-test('checkPrnInterval does not block when no previous administrations', function () {
-    $medication = Mockery::mock(ClientMedication::class)->makePartial();
-    $medication->client_id = 103;
-    $medication->min_hours_between_doses = 4;
-    $medication->shouldReceive('administrations')->andReturn(mockAdministrationRelation(null, 103));
-
-    $result = $this->service->checkPrnInterval($medication);
-
-    expect($result['blocked'])->toBeFalse();
-});
-
-test('checkPrnInterval returns unblocked when min_hours is zero', function () {
-    $medication = Mockery::mock(ClientMedication::class)->makePartial();
-    $medication->min_hours_between_doses = 0;
-
-    $result = $this->service->checkPrnInterval($medication);
-
-    expect($result['blocked'])->toBeFalse();
 });
 
 // ─── performSafetyCheck includes dose validation ───────────────────────

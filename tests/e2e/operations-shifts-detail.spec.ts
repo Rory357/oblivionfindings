@@ -16,6 +16,9 @@ test.describe('operations shifts — detail assignment flow', () => {
     test('manager opens an unassigned shift and assigns an eligible worker', async ({
         page,
     }) => {
+        // Fixture setup, sign-in and the assignment redirect share the single
+        // PHP worker in CI. Keep individual UI assertions at their normal limit.
+        test.setTimeout(60_000);
         const consoleErrors = collectConsoleErrors(page);
 
         resetRosteringReadinessFixtures({ assignmentShiftStatus: 'draft' });
@@ -25,7 +28,11 @@ test.describe('operations shifts — detail assignment flow', () => {
         );
 
         await expect(
-            page.getByRole('heading', { name: /Shifts/i }),
+            page.getByRole('heading', {
+                name: 'Shifts',
+                level: 1,
+                exact: true,
+            }),
         ).toBeVisible();
         await page.getByTestId('shift-row-9201').click();
         const quickView = page.getByRole('dialog', {
@@ -46,7 +53,36 @@ test.describe('operations shifts — detail assignment flow', () => {
             );
         await expect(candidateCard).toBeVisible();
         await expect(candidateCard).toContainText(/Eligible|Warning|Score/i);
-        await candidateCard.getByRole('button', { name: /^Assign$/ }).click();
+        const assignmentPath = '/operations/shifts/9201/assign';
+        const detailPath = '/operations/shifts/9201';
+        const [assignmentResponse, refreshedShift] = await Promise.all([
+            page.waitForResponse(
+                (response) =>
+                    new URL(response.url()).pathname === assignmentPath &&
+                    response.request().method() === 'POST',
+            ),
+            page.waitForResponse((response) => {
+                const request = response.request();
+                const redirectedFrom = request.redirectedFrom();
+
+                return (
+                    new URL(response.url()).pathname === detailPath &&
+                    request.method() === 'GET' &&
+                    redirectedFrom?.method() === 'POST' &&
+                    new URL(redirectedFrom.url()).pathname === assignmentPath
+                );
+            }),
+            candidateCard.getByRole('button', { name: /^Assign$/ }).click(),
+        ]);
+        expect(assignmentResponse.status()).toBe(302);
+        expect(refreshedShift.status()).toBe(200);
+        const { props } = await refreshedShift.json();
+        expect(props.errors).toEqual({});
+        expect(props.shift).toMatchObject({
+            id: 9201,
+            status: 'scheduled',
+            staff: { name: 'Rostering E2E Candidate' },
+        });
 
         await expect(page).toHaveURL(/\/operations\/shifts\/9201/);
         await expect(
@@ -55,7 +91,9 @@ test.describe('operations shifts — detail assignment flow', () => {
         await expect(page.getByText(/Scheduled/i).first()).toBeVisible();
 
         await page.getByRole('tab', { name: /Audit history/i }).click();
-        await expect(page.getByText(/Shift assigned/i).first()).toBeVisible();
+        await expect(
+            page.getByText('Shift assigned', { exact: true }),
+        ).toBeVisible();
 
         expectNoConsoleErrors(consoleErrors);
     });

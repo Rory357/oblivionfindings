@@ -177,7 +177,7 @@ export function IdentityHeader({ req, compact = false }: { req: DoseRequirements
                             'Compare with the photo on file.'
                         ) : (
                             <>
-                                No photo on file. Check identity using: <NotConfigured />
+                                No photo on file. Use your organisation’s identity-check procedure. If you cannot find the guidance or are unsure how to check, ask the house lead.
                             </>
                         )}
                     </dd>

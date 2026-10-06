@@ -5,6 +5,8 @@ namespace Tests\Feature\Emar;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationOrderRevision;
+use App\Models\MedicationOrderVersion;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -20,7 +22,8 @@ use Tests\TestCase;
  * doses Meds today and the overdue alerts call overdue — over the whole
  * period (no 31-day clamp), for orders since ceased too; never a dose still
  * in its window, waiting for the order check, or recorded (missed is a
- * record). Controlled ones only for controlled-medicine readers.
+ * record). Controlled medicine names require controlled-medicine access;
+ * the concealed dose still counts for other readers.
  *
  * "Now" is Monday 15 June 2026, 08:30 NZST.
  */
@@ -82,9 +85,8 @@ class AuditOmissionsTest extends TestCase
         $this->order('Iron', ['08:00']);                      // in its window at 08:30: not yet
         $given = $this->order('Vitamin D', ['07:15']);         // given
         $missed = $this->order('Calcium', ['06:30']);          // recorded as missed: a record
-        $changed = $this->order('Paracetamol', ['07:30']);     // waits for the order check
+        $this->order('Paracetamol', ['07:30'], ['approval_status' => 'pending_verification']); // never checked
         $this->at('2026-06-15 06:45');
-        $changed->update(['dosage' => '2 tablets']);
         $this->record($given, '2026-06-15 07:15', 'given');
         $this->record($missed, '2026-06-15 06:30', 'missed');
 
@@ -93,7 +95,7 @@ class AuditOmissionsTest extends TestCase
         $this->assertSame(['Metformin 2026-06-15 07:00'], $this->omissions($this->reader()));
     }
 
-    public function test_controlled_omissions_are_only_for_controlled_medicine_readers(): void
+    public function test_controlled_omission_names_require_controlled_access_without_changing_counts(): void
     {
         $this->at('2026-06-15 00:00');
         $this->order('Metformin', ['07:00']);
@@ -101,7 +103,41 @@ class AuditOmissionsTest extends TestCase
         $this->at('2026-06-15 08:30');
 
         $this->assertSame(['Metformin 2026-06-15 07:00', 'Morphine 2026-06-15 07:00'], $this->omissions($this->reader(controlled: true)));
-        $this->assertSame(['Metformin 2026-06-15 07:00'], $this->omissions($this->reader(controlled: false)));
+        $this->assertSame(['Controlled medicine 2026-06-15 07:00', 'Metformin 2026-06-15 07:00'], $this->omissions($this->reader(controlled: false)));
+    }
+
+    public function test_pending_amendment_keeps_the_checked_order_dose_in_omission_evidence(): void
+    {
+        $this->at('2026-06-15 00:00');
+        $order = $this->order('Checked medicine', ['07:00']);
+        $actor = $this->reader();
+        $checked = MedicationOrderVersion::query()->create([
+            'client_id' => $this->aroha->id, 'client_medication_id' => $order->id, 'version_number' => 1,
+            'name' => 'Checked medicine', 'dosage' => '1 tablet', 'route' => 'oral',
+            'changed_by' => $actor->id, 'changed_at' => now(),
+        ]);
+        MedicationOrderRevision::query()->create([
+            'client_id' => $this->aroha->id, 'client_medication_id' => $order->id,
+            'medication_order_version_id' => $checked->id, 'base_version' => 1,
+            'status' => 'checked', 'checked_at' => now(), 'checked_by' => $actor->id, 'entered_by' => $actor->id,
+        ]);
+        $this->at('2026-06-15 06:00');
+        $proposal = MedicationOrderVersion::query()->create([
+            'client_id' => $this->aroha->id, 'client_medication_id' => $order->id, 'version_number' => 2,
+            'name' => 'Proposed medicine name', 'dosage' => '99 tablets', 'route' => 'oral',
+            'changed_by' => $actor->id, 'changed_at' => now(),
+        ]);
+        MedicationOrderRevision::query()->create([
+            'client_id' => $this->aroha->id, 'client_medication_id' => $order->id,
+            'medication_order_version_id' => $proposal->id, 'base_version' => 1,
+            'status' => 'pending', 'entered_by' => $actor->id,
+        ]);
+        $this->at('2026-06-15 08:30');
+        $this->actingAs($actor)->get('/emar/reports?view=audit&sub=gaps&period=today')->assertOk()
+            ->assertInertia(fn ($page) => $page->has('page.data', 1)
+                ->where('page.data.0.medicine', 'Checked medicine')->where('page.data.0.dose', '1 tablet')
+                ->where('page.data.0.version_reference', 'order-version:'.$checked->id)
+                ->where('page.data.0.status', 'late')->where('page.data.0.recorded_at', null));
     }
 
     public function test_a_period_before_the_dose_record_says_so(): void
@@ -111,13 +147,13 @@ class AuditOmissionsTest extends TestCase
         $this->at('2026-06-15 08:30');
 
         $this->actingAs($this->reader())
-            ->get(route('emar.audit', ['date_from' => '2026-06-01', 'date_to' => '2026-06-15']))
+            ->get('/emar/reports?view=audit&sub=gaps&date_from=2026-06-01&date_to=2026-06-15')
             ->assertOk()
-            ->assertInertia(fn ($page) => $page->where('omissions_notice', 'Not available before 15 June 2026'));
+            ->assertInertia(fn ($page) => $page->where('data.notice', 'Not available before 15 June 2026'));
         $this->actingAs($this->reader())
-            ->get(route('emar.audit', ['date_from' => '2026-06-15', 'date_to' => '2026-06-15']))
+            ->get('/emar/reports?view=audit&sub=gaps&date_from=2026-06-15&date_to=2026-06-15')
             ->assertOk()
-            ->assertInertia(fn ($page) => $page->where('omissions_notice', null));
+            ->assertInertia(fn ($page) => $page->where('data.notice', null));
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────
@@ -134,14 +170,16 @@ class AuditOmissionsTest extends TestCase
     private function omissions(User $reader, array $query = []): array
     {
         $events = $this->actingAs($reader)
-            ->get(route('emar.audit', [...$query, 'event_types' => 'omission']))
+            ->get('/emar/reports?'.http_build_query($query + ['view' => 'audit', 'sub' => 'gaps', 'period' => isset($query['date_from']) ? 'custom' : 'today']))
             ->assertOk()
-            ->inertiaProps('events');
+            ->inertiaProps('page.data');
 
         return collect($events)
-            ->where('event_type', 'omission')
-            ->map(fn (array $event): string => $event['details']['medication'].' '
-                .Carbon::parse($event['details']['scheduled_for'])->timezone('Pacific/Auckland')->format('Y-m-d H:i'))
+            // Today's ended, unrecorded window is Late; an earlier day's
+            // unrecorded window is Not recorded. Both are omission evidence.
+            ->whereIn('status', ['late', 'not_recorded'])
+            ->map(fn (array $event): string => $event['medicine'].' '
+                .Carbon::parse($event['due_at'])->timezone('Pacific/Auckland')->format('Y-m-d H:i'))
             ->sort()
             ->values()
             ->all();

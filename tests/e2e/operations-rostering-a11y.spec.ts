@@ -48,12 +48,29 @@ async function openPublishDiff(page: Page) {
     await page.goto(
         `${reviewUrl.pathname.replace(/\/review$/, '/diff')}${reviewUrl.search}`,
     );
+    await expect(page).toHaveURL(
+        /\/operations\/rostering\/periods\/\d+\/diff(?:\?|$)/,
+    );
     await expect(
-        page.getByRole('heading', { name: /Publish diff/i }),
+        page.getByRole('heading', {
+            name: 'Rostering E2E House',
+            level: 1,
+            exact: true,
+        }),
+    ).toBeVisible();
+    await expect(
+        page.getByRole('heading', {
+            name: 'All changes',
+            level: 2,
+            exact: true,
+        }),
     ).toBeVisible();
 }
 
 test.describe('operations rostering a11y smoke', () => {
+    // Seeded sign-in and governed redirects share one CI PHP worker. Reserve
+    // time for the full axe scan; keep its checks and assertion limits intact.
+    test.setTimeout(60_000);
     test.skip(!rosteringFlagsEnabled, rosteringFlagSkipReason);
     test.beforeEach(() => {
         resetRosteringReadinessFixtures();
@@ -67,6 +84,7 @@ test.describe('operations rostering a11y smoke', () => {
         await loginAsStaff(page);
         await page.goto('/operations/rostering?week=2026-05-04&site_id=9001');
         await expect(page.getByTestId('rostering-publish-panel')).toBeVisible();
+        await expect(page.getByRole('main')).toHaveCount(1);
 
         await expectNoBlockingAxeViolations(page);
         expectNoConsoleErrors(consoleErrors);
@@ -106,6 +124,10 @@ test.describe('operations rostering a11y smoke', () => {
         await loginAsStaff(page);
         await page.goto('/operations/rostering?week=2026-05-11&site_id=9001');
         await page.getByTestId('rostering-suggest-assignments').click();
+        // The request redirects before the suggestions page can be checked.
+        await page.waitForURL(
+            /\/operations\/rostering\/suggestions\/\d+(?:\?|$)/,
+        );
         await expect(page.getByTestId('roster-suggestions-page')).toBeVisible();
 
         await expectNoBlockingAxeViolations(page);

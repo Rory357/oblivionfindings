@@ -3,11 +3,14 @@
  * lens). Fed by GET /emar/handovers/shift-medications?shift_id=… — see
  * app/Services/Emar/ShiftMedicationSnapshotService. Operations never wires the
  * snapshot URL, so this is eMAR-only in practice. Semantic tokens throughout. */
+import { OutstandingMedicationWork } from '@/components/emar/followups/outstanding-work';
+import type { OutstandingMedicationWorkData } from '@/components/emar/followups/types';
+import { Button } from '@/components/ui/button';
 import { AlertTriangle, Loader2, Pill } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
-export type ShiftMedSnapshot = {
+export type ShiftMedSnapshot = OutstandingMedicationWorkData & {
     window: { start: string; end: string };
     counts: {
         due: number;
@@ -62,12 +65,16 @@ export function ShiftMedSummary({
     loading,
     hasShift,
     note,
+    onRetry,
+    showControlled = true,
     noShiftHint = 'No outgoing shift linked — nothing to chart.',
 }: {
     snapshot: ShiftMedSnapshot | null;
     loading: boolean;
     hasShift: boolean;
     note?: string;
+    onRetry?: () => void;
+    showControlled?: boolean;
     noShiftHint?: string;
 }) {
     return (
@@ -91,11 +98,24 @@ export function ShiftMedSummary({
                     Loading the shift's medication state…
                 </div>
             ) : !snapshot ? (
-                <div className="text-[12.5px] text-muted-foreground">
-                    No medication data for this shift's window.
+                <div role="alert" className="space-y-2 text-sm">
+                    <p className="text-status-warning">
+                        Medication information is unavailable. Check the MAR
+                        before relying on this handover.
+                    </p>
+                    {onRetry && (
+                        <Button
+                            variant="outline"
+                            className="frontline-tap"
+                            onClick={onRetry}
+                        >
+                            Retry medication information
+                        </Button>
+                    )}
                 </div>
             ) : (
                 <div className="space-y-2.5">
+                    <OutstandingMedicationWork work={snapshot} handover />
                     <div className="grid grid-cols-4 gap-1.5">
                         <ShiftMedStat label="Due" value={snapshot.counts.due} />
                         <ShiftMedStat
@@ -117,7 +137,7 @@ export function ShiftMedSummary({
                             value={snapshot.counts.prn_given}
                         />
                         <ShiftMedStat
-                            label="Reviews due"
+                            label="Effect checks from shift"
                             value={snapshot.counts.reviews_outstanding}
                             tone="warning"
                         />
@@ -126,11 +146,13 @@ export function ShiftMedSummary({
                             value={snapshot.counts.omissions}
                             tone="critical"
                         />
-                        <ShiftMedStat
-                            label="CD due"
-                            value={snapshot.counts.cd_due}
-                            tone="warning"
-                        />
+                        {showControlled && (
+                            <ShiftMedStat
+                                label="CD due"
+                                value={snapshot.counts.cd_due}
+                                tone="warning"
+                            />
+                        )}
                     </div>
                     {note ? (
                         <div className="text-[11.5px] text-muted-foreground">

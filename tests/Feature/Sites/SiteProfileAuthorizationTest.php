@@ -152,10 +152,12 @@ class SiteProfileAuthorizationTest extends TestCase
                 ->where('hero.quick_actions.0.href', route('sites.edit', $this->site))
                 ->where('hero.quick_actions.1.id', 'add_client')
                 ->where('hero.quick_actions.1.href', route('clients.create', ['site_id' => $this->site->id]))
-                ->where('hero.quick_actions.2.id', 'add_calendar_event')
-                ->where('hero.quick_actions.2.href', route('sites.calendar.index', [$this->site, 'action' => 'create']))
-                ->where('hero.quick_actions.3.id', 'report_hazard')
-                ->where('hero.quick_actions.3.href', route('sites.hazards.create', $this->site))
+                ->where('hero.quick_actions.2.id', 'link_resident')
+                ->where('hero.quick_actions.2.href', route('sites.show', [$this->site, 'tab' => 'clients', 'action' => 'link']))
+                ->where('hero.quick_actions.3.id', 'add_calendar_event')
+                ->where('hero.quick_actions.3.href', route('sites.calendar.index', [$this->site, 'action' => 'create']))
+                ->where('hero.quick_actions.4.id', 'report_hazard')
+                ->where('hero.quick_actions.4.href', route('sites.hazards.create', $this->site))
             );
     }
 

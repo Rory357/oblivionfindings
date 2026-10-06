@@ -622,7 +622,10 @@ export function MonitorCard({
             : monitor.collection.collector_name;
 
     return (
-        <div className="rounded-xl border p-4">
+        <article
+            aria-label={`Monitor ${monitor.name}`}
+            className="rounded-xl border p-4"
+        >
             <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-start">
                 <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -753,7 +756,7 @@ export function MonitorCard({
                     ) : null}
                 </div>
             ) : null}
-        </div>
+        </article>
     );
 }
 

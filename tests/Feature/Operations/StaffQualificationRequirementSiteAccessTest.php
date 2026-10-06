@@ -4,6 +4,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\ServiceContext;
 use App\Models\Site;
 use App\Models\StaffQualificationRequirement;
 use App\Models\User;
@@ -51,6 +52,46 @@ it('rejects creating a qualification requirement for an inaccessible Client Site
         ->assertForbidden();
 
     expect(StaffQualificationRequirement::query()->where('client_id', $outsideClient->id)->exists())->toBeFalse();
+});
+
+it('keeps joined Client options and statistics within the requirement Site and service context', function () {
+    $accessibleSite = Site::factory()->create();
+    $outsideSite = Site::factory()->create();
+    $manager = qualificationSiteManager($accessibleSite);
+    $globalContext = ServiceContext::factory()->create(['site_id' => null]);
+    $matchingContext = ServiceContext::factory()->create(['site_id' => $accessibleSite->id]);
+    $outsideContext = ServiceContext::factory()->create(['site_id' => $outsideSite->id]);
+    $client = Client::factory()->create(['site_id' => $accessibleSite->id, 'service_context_id' => $globalContext->id]);
+    $outsideClient = Client::factory()->create(['site_id' => $outsideSite->id]);
+    $plain = qualificationRequirementFor($client, 'Medication support');
+    $matching = qualificationRequirementFor($client, 'Clinical delegation');
+    $matching->update(['service_context_id' => $matchingContext->id]);
+    $global = qualificationRequirementFor($client, 'First aid');
+    $global->update(['service_context_id' => $globalContext->id]);
+    $mismatch = qualificationRequirementFor($client, 'Foreign context');
+    $mismatch->update(['service_context_id' => $outsideContext->id]);
+    qualificationRequirementFor($outsideClient, 'Outside Site');
+    $visibleIds = [$plain->id, $matching->id, $global->id];
+    sort($visibleIds);
+    $before = StaffQualificationRequirement::query()->orderBy('id')->get()->map->getRawOriginal()->all();
+
+    $this->actingAs($manager)
+        ->get(route('operations.qualifications.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('requirements.data', 3)
+            ->where('requirements.data', fn ($rows) => collect($rows)->pluck('id')->sort()->values()->all() === $visibleIds)
+            ->where('stats', ['total' => 3, 'mandatory' => 3, 'clients' => 1])
+            ->has('clients', 1)
+            ->where('clients.0.id', $client->id));
+
+    $this->actingAs($manager)
+        ->put(route('operations.qualifications.update', $mismatch), ['qualification_name' => 'Hidden change'])
+        ->assertNotFound();
+    $this->actingAs($manager)
+        ->delete(route('operations.qualifications.destroy', $mismatch))
+        ->assertNotFound();
+    expect(StaffQualificationRequirement::query()->orderBy('id')->get()->map->getRawOriginal()->all())->toBe($before);
 });
 
 function qualificationSiteManager(Site $site): User

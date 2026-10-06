@@ -45,6 +45,8 @@ class ControlledDrugLossReport extends Model
         'resolved_by',
         'resolved_at',
         'resolution_outcome',
+        'register_entry_id',
+        'suspected_theft',
     ];
 
     protected $casts = [
@@ -57,6 +59,7 @@ class ControlledDrugLossReport extends Model
         'reported_to_pharmacy' => 'boolean',
         'reported_to_regulator' => 'boolean',
         'quantity_lost' => 'decimal:2',
+        'suspected_theft' => 'boolean',
     ];
 
     // ─── Relationships ──────────────────────────────────────

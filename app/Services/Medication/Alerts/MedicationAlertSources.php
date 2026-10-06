@@ -4,7 +4,6 @@ namespace App\Services\Medication\Alerts;
 
 use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
-use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationStock;
 use App\Models\ControlledDrugLossReport;
@@ -16,8 +15,11 @@ use App\Models\MedicationReview;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\CompetencyPolicySettings;
+use App\Services\Medication\Controlled\ControlledCountStatus;
+use App\Services\Medication\MedicationErrorSummary;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\RefusalEscalationPolicy;
+use App\Services\Medication\Stock\StockAvailability;
 use App\Support\Medication\MedicationStockQuantity;
 use App\Support\WorkerClock;
 use Carbon\CarbonInterface;
@@ -134,7 +136,7 @@ class MedicationAlertSources
     {
         $this->safely('stock', function (): void {
             $low = ClientMedicationStock::query()
-                ->whereColumn('on_hand', '<=', 'reorder_level')
+                ->lowStock()
                 ->where('reorder_level', '>', 0)
                 ->with('medication.client.site:id,name')
                 ->get()
@@ -149,7 +151,7 @@ class MedicationAlertSources
                         '%s for %s is below its reorder level (%s left). %s.',
                         $medicine,
                         $person,
-                        MedicationStockQuantity::display($stock->on_hand ?? 0),
+                        MedicationStockQuantity::display($stock->usableQuantity() ?? 0),
                         $house,
                     ),
                     fn (string $house): string => "A medicine at {$house} is running low.",
@@ -176,65 +178,55 @@ class MedicationAlertSources
         $this->safely('expiry', function () use ($expiringSoon): void {
             $keys = [];
             foreach ($expiringSoon as $stock) {
-                if ($stock->expiry_date === null || $stock->medication?->client?->site_id === null) {
+                if ($stock->medication?->client?->site_id === null) {
                     continue;
                 }
-                $key = 'expiry:'.$stock->id.':'.$stock->expiry_date->toDateString();
-                $keys[] = $key;
-                $days = WorkerClock::daysUntil($stock->expiry_date);
-                $this->alerts->raise(MedicationAlertCatalogue::EXPIRY, $this->stockSubject(
-                    $stock,
-                    $key,
-                    'Stock expiring',
-                    fn (string $medicine, string $person, string $house): string => sprintf(
-                        '%s for %s expires on %s. %s.',
-                        $medicine,
-                        $person,
-                        $stock->expiry_date->format('j M Y'),
-                        $house,
-                    ),
-                    fn (string $house): string => "A medicine at {$house} expires soon.",
-                    $days <= 7 ? 'critical' : 'warning',
-                ));
+                foreach ($stock->packExpiries(false) as $pack) {
+                    $key = $pack['lot_id'] === null ? 'expiry:'.$stock->id.':'.$pack['date']->toDateString() : 'expiry:pack:'.$pack['lot_id'];
+                    $keys[] = $key;
+                    $date = $pack['date']->format('j M Y');
+                    $days = WorkerClock::daysUntil($pack['date']);
+                    $this->alerts->raise(MedicationAlertCatalogue::EXPIRY, $this->stockSubject($stock, $key, 'Stock expiring',
+                        fn ($medicine, $person, $house) => "{$medicine} for {$person} expires on {$date}. {$house}.",
+                        fn ($house) => "A medicine at {$house} expires soon.", $days <= 7 ? 'critical' : 'warning'));
+                }
             }
             $this->alerts->reconcile(MedicationAlertCatalogue::EXPIRY, $keys, 'Removed or replaced');
         });
-
         $this->safely('outOfStock', function () use ($expired): void {
             $keys = [];
             foreach ($expired as $stock) {
-                if ($stock->expiry_date === null || $stock->medication?->client?->site_id === null) {
+                if ($stock->medication?->client?->site_id === null) {
                     continue;
                 }
-                $key = 'expired:'.$stock->id.':'.$stock->expiry_date->toDateString();
-                $keys[] = $key;
-                $this->alerts->raise(MedicationAlertCatalogue::OUT_OF_STOCK, $this->stockSubject(
-                    $stock,
-                    $key,
-                    'Expired stock',
-                    fn (string $medicine, string $person, string $house): string => sprintf(
-                        '%s for %s expired on %s. %s.',
-                        $medicine,
-                        $person,
-                        $stock->expiry_date->format('j M Y'),
-                        $house,
-                    ),
-                    fn (string $house): string => "A medicine at {$house} has expired stock.",
-                    'critical',
-                ));
+                foreach ($stock->packExpiries(true) as $pack) {
+                    $key = $pack['lot_id'] === null ? 'expired:'.$stock->id.':'.$pack['date']->toDateString() : 'expired:pack:'.$pack['lot_id'];
+                    $keys[] = $key;
+                    $date = $pack['date']->format('j M Y');
+                    $this->alerts->raise(MedicationAlertCatalogue::OUT_OF_STOCK, $this->stockSubject($stock, $key, 'Expired stock',
+                        fn ($medicine, $person, $house) => "{$medicine} for {$person} expired on {$date}. {$house}.",
+                        fn ($house) => "A medicine at {$house} has expired stock.", 'critical'));
+                }
             }
-            $out = ClientMedicationStock::query()
-                ->whereNotNull('on_hand')
-                ->where('on_hand', '<=', 0)
-                ->whereHas('medication', fn ($orders) => $orders->active())
-                ->with('medication.client.site:id,name')
-                ->get()
-                ->filter(fn (ClientMedicationStock $stock): bool => $stock->medication?->client?->site_id !== null);
+            $out = ClientMedicationStock::query()->whereHas('medication', fn ($q) => $q->active())
+                ->whereRaw('('.StockAvailability::usableQuantitySql().') <= 0', [StockAvailability::today()])
+                ->with(['medication.client.site:id,name', 'lots'])->get()
+                ->filter(fn ($stock) => $stock->medication?->client?->site_id !== null);
             foreach ($out as $stock) {
                 $keys[] = $this->raiseOutOfStock($stock);
             }
             $this->alerts->reconcile(MedicationAlertCatalogue::OUT_OF_STOCK, $keys, 'Restocked or removed');
         });
+    }
+
+    /** Committed stock changes use the same independent pack subjects as the daily expiry passage. */
+    public function stockChanged(): void
+    {
+        $this->lowStock();
+        $this->stockCheck(
+            ClientMedicationStock::expiringSoon()->with(['medication.client.site', 'lots'])->get(),
+            ClientMedicationStock::expired()->with(['medication.client.site', 'lots'])->get(),
+        );
     }
 
     /** Competency renewals due: within the renewal reminder (Staff & PINs), not yet renewed. */
@@ -398,14 +390,15 @@ class MedicationAlertSources
     }
 
     /**
-     * Controlled-drug balance check overdue, one alert per house (v5: "No
-     * controlled-drug balance check at Rimu House for 7 days").
+     * Configured controlled counts overdue, one alert per house.
+     * The deprecated days argument cannot override the organisation count policy.
      *
-     * @param  Collection<int, ClientMedication>  $overdue  Controlled orders with no check within the threshold.
+     * @param  Collection<int, ClientMedication>  $overdue  Canonical orders whose configured roster count is overdue.
      */
-    public function controlledChecks(Collection $overdue, int $days): void
+    public function controlledChecks(Collection $overdue, ?int $days = null, ?int $siteId = null): void
     {
-        $this->safely('cdCheck', function () use ($overdue, $days): void {
+        $this->safely('cdCheck', function () use ($overdue, $siteId): void {
+            $scopeSiteId = $siteId;
             $keys = [];
             $bySite = $overdue
                 ->filter(fn (ClientMedication $order): bool => $order->client?->site_id !== null)
@@ -419,41 +412,31 @@ class MedicationAlertSources
                     siteId: (int) $siteId,
                     title: 'Controlled-drug balance check overdue',
                     message: sprintf(
-                        'No controlled-drug balance check at %s for %d days (%d %s).',
+                        'Configured controlled-drug counts at %s are overdue (%d %s).',
                         $house,
-                        $days,
                         $orders->count(),
                         $orders->count() === 1 ? 'medicine' : 'medicines',
                     ),
                     shortMessage: "A controlled-drug check at {$house} is overdue.",
-                    actionUrl: '/emar/controlled-drugs',
+                    actionUrl: '/emar/controlled?'.http_build_query(['view' => 'register', 'site_id' => (int) $siteId]),
                     controlled: true,
                     context: ['client_medication_ids' => $orders->pluck('id')->map(fn ($id): int => (int) $id)->implode(',')],
                 ));
             }
-            $this->alerts->reconcile(MedicationAlertCatalogue::CD_CHECK, $keys, 'Balance check done');
+            if ($scopeSiteId === null) {
+                $this->alerts->reconcile(MedicationAlertCatalogue::CD_CHECK, $keys, 'Count policy settled');
+            } elseif ($keys === []) {
+                $this->alerts->resolve(MedicationAlertCatalogue::CD_CHECK, 'cd-check:'.$scopeSiteId, 'Count policy settled');
+            }
         });
     }
 
     /** A balance check was recorded: the house's alert is dealt with once no order there is overdue. */
-    public function controlledCheckRecorded(int $siteId, int $days = 7): void
+    public function controlledCheckRecorded(int $siteId, ?int $days = null): void
     {
-        $this->safely('cdCheck', function () use ($siteId, $days): void {
-            $orders = ClientMedication::query()
-                ->active()
-                ->controlled()
-                ->whereHas('client', fn ($client) => $client->where('site_id', $siteId))
-                ->pluck('id');
-            $cutoff = now()->subDays($days);
-            $checked = ClientControlledDrugEntry::query()
-                ->where('entry_type', 'balance_check')
-                ->whereIn('client_medication_id', $orders->all())
-                ->where('recorded_at', '>=', $cutoff)
-                ->distinct()
-                ->pluck('client_medication_id');
-            if ($orders->diff($checked)->isEmpty()) {
-                $this->alerts->resolve(MedicationAlertCatalogue::CD_CHECK, 'cd-check:'.$siteId, 'Balance check done');
-            }
+        $this->safely('cdCheck', function () use ($siteId): void {
+            $overdue = app(ControlledCountStatus::class)->refreshDashboardAlerts($siteId);
+            $this->controlledChecks($overdue, siteId: $siteId);
         });
     }
 
@@ -539,8 +522,8 @@ class MedicationAlertSources
             $keys = [];
             foreach ($orders as $order) {
                 $stock = $order->stock;
-                if (! $stock instanceof ClientMedicationStock || $stock->on_hand === null
-                    || ! MedicationStockQuantity::lessThanOrEqual($stock->on_hand, 0)) {
+                if (! $stock instanceof ClientMedicationStock || $stock->usableQuantity() === null
+                    || ! MedicationStockQuantity::lessThanOrEqual($stock->usableQuantity(), 0)) {
                     continue;
                 }
                 $order->setRelation('client', $client);
@@ -606,7 +589,7 @@ class MedicationAlertSources
                 title: 'Controlled-drug loss reported',
                 message: sprintf('A controlled-drug loss was reported — %s at %s.', $fresh->medication?->name ?? 'a controlled medicine', $house),
                 shortMessage: "A controlled-drug loss was reported at {$house}.",
-                actionUrl: '/emar/controlled-drugs',
+                actionUrl: '/emar/controlled?'.http_build_query(['view' => 'losses', 'site_id' => (int) $client->site_id, 'client_id' => (int) $client->id, 'client_medication_id' => (int) $fresh->client_medication_id]),
                 severity: 'critical',
                 clientId: (int) $client->id,
                 controlled: true,
@@ -660,18 +643,13 @@ class MedicationAlertSources
                 key: 'error:'.$fresh->id,
                 siteId: (int) $client->site_id,
                 title: 'Medication error reported',
-                message: sprintf(
-                    'A medication error was reported at %s: %s%s — %s.',
-                    $house,
-                    $this->person($client),
-                    $fresh->medication ? ', '.$fresh->medication->name : '',
-                    $what,
-                ),
+                message: MedicationErrorSummary::for($fresh),
                 shortMessage: "A medication error was reported at {$house}.",
                 actionUrl: '/emar/errors',
                 severity: in_array($fresh->severity, ['major', 'critical'], true) ? 'critical' : 'warning',
                 clientId: (int) $client->id,
-                controlled: (bool) $fresh->medication?->controlled_drug,
+                // P08b D3: every configured recipient receives this neutral summary, including clinical leads.
+                controlled: false,
                 context: ['client_id' => (int) $client->id, 'medication_error_id' => (int) $fresh->id],
             ));
         }));
@@ -695,7 +673,7 @@ class MedicationAlertSources
                 $difference < 0 ? 'short' : 'over',
             ),
             shortMessage: "A controlled-drug count doesn’t match at {$house}.",
-            actionUrl: '/emar/controlled-drugs',
+            actionUrl: '/emar/controlled?'.http_build_query(['view' => 'discrepancies', 'site_id' => (int) $client->site_id, 'client_id' => (int) $client->id, 'client_medication_id' => (int) $discrepancy->client_medication_id]),
             severity: 'critical',
             clientId: (int) $client->id,
             controlled: true,

@@ -97,13 +97,13 @@ export function myMeter(d: MyEligibilityData): {
             return d.policy.restricted_mode === 'cosigner'
                 ? {
                       big: 'Restricted',
-                      cap: 'Co-signer needed for given',
+                      cap: 'Competency needs a co-signer for given',
                       tone: 'warning',
                   }
                 : d.policy.restricted_mode === 'block'
                   ? {
                         big: 'Restricted',
-                        cap: 'Can’t sign doses as given',
+                        cap: 'Competency blocks signing given doses',
                         tone: 'critical',
                     }
                   : {
@@ -120,13 +120,13 @@ export function myMeter(d: MyEligibilityData): {
         case 'failed':
             return {
                 big: 'Not passed',
-                cap: 'Can’t record given doses yet',
+                cap: 'Given competency not met yet',
                 tone: 'critical',
             };
         case 'none':
             return {
                 big: 'Not assessed',
-                cap: 'Can’t record given doses yet',
+                cap: 'Given competency not met yet',
                 tone: 'critical',
             };
         default:
@@ -167,25 +167,25 @@ function meHead(
         return [
             'crit',
             'You haven’t been assessed yet',
-            'You can record refused, withheld and away, but not given. Your house lead books your first assessment.',
+            'Refused, withheld and away have no competency assessment requirement. Given doses need an assessment; your house lead books it.',
         ];
     if (x.status === 'exempt' && x.exemption)
         return [
             'warn',
-            `You can record doses as given until ${day(x.exemption.until)} — exemption`,
+            `Competency exemption for given doses until ${day(x.exemption.until)}`,
             `${x.exemption.by ?? 'A lead'} approved it for ${x.exemption.house ?? 'your house'}: “${x.exemption.reason}”.`,
         ];
     if (x.st === 'failed')
         return [
             'crit',
             'You can’t record doses as given',
-            'Your last assessment wasn’t passed. You can still record refused, withheld and away. Talk to your house lead about a remedial assessment.',
+            'Your last assessment wasn’t passed. Refused, withheld and away have no competency assessment requirement. Talk to your house lead about a remedial assessment.',
         ];
     if (x.st === 'expired')
         return [
             'crit',
             'You can’t record doses as given',
-            `${x.until ? `Your competency ended on ${day(x.until)}.` : 'Your assessment has no end date.'} You can still record refused, withheld and away. Talk to your house lead about reassessment.`,
+            `${x.until ? `Your competency ended on ${day(x.until)}.` : 'Your assessment has no end date.'} Refused, withheld and away have no competency assessment requirement. Talk to your house lead about reassessment.`,
         ];
     if (x.st === 'restricted') {
         const notes = x.assessment?.restriction_notes || 'restricted';
@@ -199,23 +199,23 @@ function meHead(
               ? [
                     'crit',
                     'You can’t sign doses as given on your own',
-                    `Your competency is restricted: ${notes}. A colleague on shift gives the dose; you can record refused, withheld and away.`,
+                    `Your competency is restricted: ${notes}. A colleague on shift gives the dose; refused, withheld and away have no competency assessment requirement.`,
                 ]
               : [
                     'info',
-                    'You can record doses as given',
+                    'Competency requirements met for given doses',
                     `Your competency is restricted (${notes}), but the organisation doesn’t enforce it.`,
                 ];
     }
     if (x.status === 'due')
         return [
             'warn',
-            `You can record doses as given — renewal due in ${x.days} ${x.days === 1 ? 'day' : 'days'}`,
+            `Competency current for given doses — renewal due in ${x.days} ${x.days === 1 ? 'day' : 'days'}`,
             `Your competency ends on ${day(x.until)}. Ask your house lead to book your renewal.`,
         ];
     return [
         'info',
-        'You can record doses as given',
+        'Competency requirements met for given doses',
         `Your competency is current until ${day(x.until)}.`,
     ];
 }
@@ -224,12 +224,12 @@ const ME_SECS = [
     {
         key: 'sum',
         label: 'Summary',
-        blurb: 'Can I give doses now?',
+        blurb: 'My competency status',
         icon: UserCheck,
     },
     {
         key: 'can',
-        label: 'What I can do',
+        label: 'Competency checks',
         blurb: 'Given, controlled, covert',
         icon: CheckCircle2,
     },
@@ -248,7 +248,7 @@ const ME_SECS = [
 ];
 const NOT_GIVEN = {
     v: 'yes' as const,
-    t: 'Refused, withheld and away — always recordable',
+    t: 'No competency assessment needed for refused, withheld or away',
     head: 'Not given',
 };
 
@@ -268,6 +268,7 @@ export function MyEligibility({
     if (!x.records_doses) {
         return (
             <SettingsModal
+                frontline
                 title="My medication eligibility"
                 description={`${name} · ${x.role ?? 'Staff'} · ${checked}`}
                 onClose={onClose}
@@ -300,10 +301,11 @@ export function MyEligibility({
     const a = x.assessment;
     return (
         <WizardShell
+            frontline
             open
             onClose={onClose}
             title="My medication eligibility"
-            description="What you can do right now, from the same rules as the register."
+            description="Your medication competency requirements and assessment."
             railIcon={UserCheck}
             railTitle="My eligibility"
             railSub={`${name} · ${checked}`}
@@ -334,6 +336,13 @@ export function MyEligibility({
             }
         >
             <WizardStepPane key={sec}>
+                <div className="mb-4">
+                    <InfoCard icon={UserCheck}>
+                        Competency requirements only. Each dose still needs
+                        permission, access to that person and house, and any
+                        required roster, clock-in and dose checks.
+                    </InfoCard>
+                </div>
                 {sec === 0 ? (
                     <div className="space-y-4">
                         <InfoCard icon={Icon} tone={tone}>
@@ -342,7 +351,10 @@ export function MyEligibility({
                             {text}
                         </InfoCard>
                         <CanList
-                            items={[{ ...g, head: 'Give doses' }, NOT_GIVEN]}
+                            items={[
+                                { ...g, head: 'Given competency' },
+                                NOT_GIVEN,
+                            ]}
                         />
                     </div>
                 ) : sec === 1 ? (
@@ -350,7 +362,9 @@ export function MyEligibility({
                         items={[
                             ...abilities(x, data.policy, data.areas).map(
                                 (y, i) =>
-                                    i === 0 ? { ...y, head: 'Give doses' } : y,
+                                    i === 0
+                                        ? { ...y, head: 'Given competency' }
+                                        : y,
                             ),
                             NOT_GIVEN,
                         ]}

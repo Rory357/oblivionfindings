@@ -1477,7 +1477,9 @@ function itSecurityCompatibilityEvidenceFingerprints(): array
         'tests/Feature/Monitoring/MetricRetentionTest.php' => '183a09dc2c57e61ac825a7920fc1f2b1c8a66bd8208d5568b794116d4c1fdf74',
         'tests/Feature/Monitoring/MonitoringFoundationMigrationTest.php' => '887bf76dbd5ba516321b4e41dfeac6150b7ac9d66cf803a1da079a09b0bd3b28',
         'tests/Feature/Monitoring/MonitoringObservationProvenanceReconciliationTest.php' => 'ccf15093cf6293e76084781da1142d0621162d8b5fc78e8710f2855bad664e69',
-        'tests/Feature/Monitoring/MonitoringSchemaTest.php' => 'f755c57573d32e70a1746f7558147b3741be022e092d9e3f31498c823185b16e',
+        // Reviewed immutable-evidence regression: only exception wording and
+        // no-effect assertions changed; the three legacy storage writes remain.
+        'tests/Feature/Monitoring/MonitoringSchemaTest.php' => '3159c9921ee8f28862c9234c2386233d249ab011919c709b793f2c5f3db2a6cd',
         'tests/Feature/Monitoring/RuntimeEnvelopePersistenceTest.php' => 'af83c6c0b9e9cd1dcd91aa27740df2a2ebaad85462926a9a49b3878751aeada2',
     ];
 }

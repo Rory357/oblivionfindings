@@ -234,6 +234,32 @@ describe('Alerts & access › On-call contacts (B2 C4)', () => {
         );
     });
 
+    it('keeps unsaved on-call choices until the worker explicitly discards them', () => {
+        render(<Harness initial={{ kind: 'oncall', siteId: 3 }} />);
+        fireEvent.click(
+            screen.getByRole('switch', { name: 'Follow the roster' }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(
+            screen.getByRole('dialog', { name: 'Discard your changes?' }),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
+        expect(
+            screen.getByRole('switch', { name: 'Follow the roster' }),
+        ).not.toBeChecked();
+        expect(
+            screen.queryByRole('switch', {
+                name: 'Then the team lead on shift',
+            }),
+        ).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Discard changes' }),
+        );
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(router.put).not.toHaveBeenCalled();
+    });
+
     it('asks before removing a contact, in red', () => {
         render(<Harness initial={{ kind: 'oncallremove', siteId: 3 }} />);
         const confirm = screen.getByRole('alertdialog');

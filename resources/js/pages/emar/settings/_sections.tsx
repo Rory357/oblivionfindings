@@ -672,6 +672,7 @@ export function PinStatus({
                     : 'Resetting a PIN needs the “Reset another person’s witness PIN” permission — house leads and clinical leads have it by default.'}
             </Note>
             <ConfirmDialog
+                frontline
                 open={target !== null}
                 onClose={() => setTarget(null)}
                 onConfirm={reset}
@@ -693,6 +694,7 @@ export function PinStatus({
                 variant="destructive"
             />
             <ConfirmDialog
+                frontline
                 open={remind !== null}
                 onClose={() => setRemind(null)}
                 onConfirm={sendReminders}

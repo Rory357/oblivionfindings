@@ -75,7 +75,9 @@ export function StudioLibrary({
                     <p className="text-caption font-semibold tracking-widest uppercase">
                         {domain === 'fleet'
                             ? 'Fleet report studio'
-                            : 'Personal tracker reports'}
+                            : domain === 'medication'
+                              ? 'Medication reports'
+                              : 'Personal tracker reports'}
                     </p>
                     <h2 className="text-page-title">
                         {domain === 'fleet'

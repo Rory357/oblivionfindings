@@ -26,6 +26,12 @@ jobs:
             shard_index: 0
             shard_count: 1
             batch_size: 30
+          # Run the complete medication gate files even when a broad feature
+          # shard stops earlier on an unrelated module's failing batch.
+          - suite: emar-release
+            shard_index: 0
+            shard_count: 1
+            batch_size: 1
           - suite: feature
             shard_index: 0
             shard_count: 8
@@ -119,6 +125,7 @@ jobs:
           mysql --host=127.0.0.1 --port=3306 -uroot -proot -e "GRANT ALL PRIVILEGES ON *.* TO 'testUser'@'%' WITH GRANT OPTION; FLUSH PRIVILEGES;"
 
       - name: Crash-safe tests (${{ matrix.suite }} ${{ matrix.shard_index }}/${{ matrix.shard_count }})
+        if: matrix.suite != 'emar-release'
         env:
           DB_CONNECTION: mysql
           DB_HOST: 127.0.0.1
@@ -132,3 +139,45 @@ jobs:
           --shard-index=${{ matrix.shard_index }}
           --shard-count=${{ matrix.shard_count }}
           --batch-size=${{ matrix.batch_size }}
+
+      - name: Pack stock and historical recovery release gates
+        if: matrix.suite == 'emar-release'
+        env:
+          APP_ENV: testing
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: oblivion_findings_codex_test
+          DB_USERNAME: testUser
+          DB_PASSWORD: test101
+        run: >-
+          php vendor/bin/pest
+          tests/Feature/Emar/PackLedgerIntegrationTest.php
+          tests/Feature/Emar/StockPacksWorkflowTest.php
+          tests/Feature/Emar/StockManagementTest.php
+          tests/Feature/Emar/StockManagementPaginationTest.php
+          tests/Feature/Emar/ControlledProductTest.php
+          tests/Feature/FleetAssets/ResidentTransportMedicationTransitTest.php
+          tests/Feature/FleetAssets/ResidentTransportJourneySecurityTest.php
+          tests/Feature/Console/CheckMedicationStockCommandTest.php
+          tests/Feature/Emar/MedicationOverviewServiceTest.php
+          tests/Feature/Emar/MedicationHistoricalRecoveryTest.php
+          tests/Feature/Emar/MedicationDowntimeTest.php
+          tests/Feature/Emar/ForgottenWitnessPinTest.php
+          tests/Feature/Emar/GuidedRoundOfflineReplayTest.php
+          tests/Feature/Emar/P01RecordingContractTest.php
+          tests/Feature/Medication/ControlledDrugStockTruthTest.php
+          tests/Unit/MedicationPaperRecoveryMigrationTest.php
+          tests/Feature/Emar/DoseTimingSettingsTest.php
+          tests/Feature/It/ItTicketTriageTest.php
+          tests/Feature/Incidents/IncidentJourneyPresenterTest.php
+          tests/Feature/FrontlineLifecycleDemoSeederReplayTest.php
+          --log-junit storage/logs/emar-release-gates.xml
+
+      - name: Retain medication gate results
+        if: always() && matrix.suite == 'emar-release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: emar-release-gates
+          path: storage/logs/emar-release-gates.xml
+          if-no-files-found: warn

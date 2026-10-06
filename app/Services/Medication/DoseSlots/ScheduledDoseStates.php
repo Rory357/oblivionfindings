@@ -138,6 +138,7 @@ final class ScheduledDoseStates
                     $nowUtc,
                     $timezone,
                     DoseAwaySources::refAt($clientPeriods, CarbonImmutable::instance($scheduled)->utc()),
+                    app(\App\Services\Medication\Support\MedicationSupport::class)->mode($order, CarbonImmutable::instance($scheduled)->utc()->lessThan($nowUtc) && $nzDate === $nowUtc->setTimezone($timezone)->toDateString() ? $nowUtc : CarbonImmutable::instance($scheduled)->utc()),
                 ),
                 $this->schedule->scheduledTimesForDate($order, $day),
             );
@@ -213,6 +214,7 @@ final class ScheduledDoseStates
 
         return match ($dose['state']) {
             DoseSlotProjection::STATE_AWAY => DoseSlotProjection::STATE_AWAY,
+            DoseSlotProjection::STATE_SELF_MANAGED => DoseSlotProjection::STATE_SELF_MANAGED,
             DoseSlotProjection::STATE_PENDING_CHECK => DoseSlotProjection::STATE_PENDING_CHECK,
             DoseSlotProjection::STATE_DUE => 'due',
             DoseSlotProjection::STATE_LATE, DoseSlotProjection::STATE_NOT_RECORDED => 'overdue',
@@ -285,6 +287,7 @@ final class ScheduledDoseStates
             'window_ends_at' => Carbon::parse($slot['window_ends_at'])->timezone($timezone),
             'due_soon' => $slot['state'] === DoseSlotProjection::STATE_NOT_DUE && $this->isDueSoon($dueAt, $now),
             'order_change_pending' => (bool) $slot['order_change_pending'],
+            'support_mode' => $slot['support_mode'] ?? 'staff_given',
             'away' => $slot['away'] ?? null,
             'away_reason' => null,
         ];
@@ -294,7 +297,7 @@ final class ScheduledDoseStates
      * @param  array{source: string, id: int}|null  $away  the away period the dose falls in, if any
      * @return array{due_at: Carbon, ordered_time: string, state: string, outcome: string|null, window_opens_at: Carbon, window_ends_at: Carbon, due_soon: bool, order_change_pending: bool, away: array{source: string, id: int}|null, away_reason: string|null}
      */
-    private function fromOrder(int $orderId, Carbon $scheduled, string $nzDate, CarbonImmutable $now, string $timezone, ?array $away = null): array
+    private function fromOrder(int $orderId, Carbon $scheduled, string $nzDate, CarbonImmutable $now, string $timezone, ?array $away = null, string $supportMode = 'staff_given'): array
     {
         $dueAt = CarbonImmutable::instance($scheduled)->utc();
         $window = $this->windows->forOrder($orderId);
@@ -303,6 +306,7 @@ final class ScheduledDoseStates
         $today = $now->setTimezone($timezone)->toDateString();
         $state = match (true) {
             $away !== null => DoseSlotProjection::STATE_AWAY,
+            $supportMode === 'self_managed' => DoseSlotProjection::STATE_SELF_MANAGED,
             $now->lessThan($opens) => DoseSlotProjection::STATE_NOT_DUE,
             $now->lessThanOrEqualTo($ends) => DoseSlotProjection::STATE_DUE,
             $nzDate === $today => DoseSlotProjection::STATE_LATE,
@@ -318,6 +322,7 @@ final class ScheduledDoseStates
             'window_ends_at' => Carbon::instance($ends)->timezone($timezone),
             'due_soon' => $state === DoseSlotProjection::STATE_NOT_DUE && $this->isDueSoon($dueAt, $now),
             'order_change_pending' => false,
+            'support_mode' => $supportMode,
             'away' => $away,
             'away_reason' => null,
         ];

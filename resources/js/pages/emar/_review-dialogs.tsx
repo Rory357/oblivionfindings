@@ -1,3 +1,4 @@
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 /* eslint-disable no-restricted-syntax -- wizard fact/summary panes and the recommendation
    row editor are custom-layout bordered surfaces inside the wizard shell, not Card/Button;
    all colours are semantic tokens. */
@@ -5,6 +6,7 @@ import { MedsWizardDialog, SummaryRow } from '@/components/meds/wizard-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Field, SelectInput, StepHead } from '@/components/wizard/primitives';
+import { WizardSuccessPane } from '@/components/wizard/shell';
 import { router, useForm } from '@inertiajs/react';
 import {
     Activity,
@@ -105,6 +107,7 @@ export function ScheduleReviewDialog({
     onClose: () => void;
 }) {
     const [step, setStep] = useState(0);
+    const [saved, setSaved] = useState(false);
     const form = useForm({
         client_id: defaultClientId ? String(defaultClientId) : '',
         review_type: 'routine',
@@ -125,9 +128,20 @@ export function ScheduleReviewDialog({
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Review scheduled');
-                onClose();
+                setSaved(true);
             },
-            onError: () => toast.error('Please check the review details'),
+            onError: (errors) => {
+                setStep(
+                    errors.client_id
+                        ? 0
+                        : errors.review_type ||
+                            errors.scheduled_date ||
+                            errors.trigger_reason
+                          ? 1
+                          : 2,
+                );
+                toast.error('Please check the review details');
+            },
         });
     const valid = [
         !!form.data.client_id,
@@ -137,6 +151,27 @@ export function ScheduleReviewDialog({
     ];
     return (
         <MedsWizardDialog
+            formState={form}
+            completeness={{
+                completed: [
+                    form.data.client_id,
+                    form.data.review_type,
+                    form.data.scheduled_date,
+                    form.data.reviewer_name || form.data.reviewer_user_id,
+                    form.data.reviewer_role,
+                    form.data.trigger_reason,
+                ].filter((value) => value.trim()).length,
+                total: 6,
+            }}
+            success={
+                saved ? (
+                    <WizardSuccessPane
+                        title="Review scheduled"
+                        blurb="The review is saved. You can find it in medication reviews."
+                        actions={<Button onClick={onClose}>Done</Button>}
+                    />
+                ) : undefined
+            }
             open
             onClose={onClose}
             title="Schedule review"
@@ -237,15 +272,15 @@ export function ScheduleReviewDialog({
                             required
                             error={form.errors.scheduled_date}
                         >
-                            <Input
-                                type="date"
+                            <DatePicker
+                                compact
+                                id="emar-review-dialogs-1"
+                                label="Scheduled date"
                                 value={form.data.scheduled_date}
-                                onChange={(e) =>
-                                    form.setData(
-                                        'scheduled_date',
-                                        e.target.value,
-                                    )
+                                onChange={(value) =>
+                                    form.setData('scheduled_date', value)
                                 }
+                                invalid={Boolean(form.errors.scheduled_date)}
                             />
                         </Field>
                         <Field
@@ -445,6 +480,7 @@ export function ConductReviewDialog({
     ];
     return (
         <MedsWizardDialog
+            formState={{ ...form, processing: form.processing || busy }}
             open
             onClose={onClose}
             title="Conduct review"
@@ -712,15 +748,16 @@ export function ConductReviewDialog({
                             label="Next review date"
                             error={form.errors.next_review_date}
                         >
-                            <Input
-                                type="date"
+                            <DatePicker
+                                compact
+                                id="emar-review-dialogs-2"
+                                label="Next review date"
                                 value={form.data.next_review_date}
-                                onChange={(e) =>
-                                    form.setData(
-                                        'next_review_date',
-                                        e.target.value,
-                                    )
+                                onChange={(value) =>
+                                    form.setData('next_review_date', value)
                                 }
+                                invalid={Boolean(form.errors.next_review_date)}
+                                allowClear
                             />
                         </Field>
                     </div>
@@ -807,6 +844,7 @@ export function RescheduleReviewDialog({
     };
     return (
         <MedsWizardDialog
+            formState={form}
             open
             onClose={onClose}
             title="Reschedule review"
@@ -849,11 +887,13 @@ export function RescheduleReviewDialog({
             />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="New date" required>
-                    <Input
-                        type="date"
+                    <DatePicker
+                        compact
+                        id="emar-review-dialogs-3"
+                        label="New date"
                         value={form.data.scheduled_date}
-                        onChange={(e) =>
-                            form.setData('scheduled_date', e.target.value)
+                        onChange={(value) =>
+                            form.setData('scheduled_date', value)
                         }
                     />
                 </Field>

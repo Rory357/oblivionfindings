@@ -65,8 +65,8 @@ class MedicationSettingsAuditorAccessTest extends TestCase
                 ->where('settings.values.safety.restricted_competency', 'block')
                 ->has('settings.history', 1)
                 ->where('settings.history.0.who', $manager->name)
-                ->where('can.manage', false)
-                ->where('can.manage_global', false)
+                ->where('settingsCan.manage', false)
+                ->where('settingsCan.manage_global', false)
                 ->where('witnessPin.can_reset', false)
                 // Organisation-wide medicine rules are part of what they audit.
                 ->has('rules', 1)

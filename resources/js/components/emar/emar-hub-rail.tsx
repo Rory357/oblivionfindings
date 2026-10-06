@@ -3,6 +3,7 @@ import { router, usePage } from '@inertiajs/react';
 import { PageHeaderRail } from '@/components/page';
 import {
     emarHubForUrl,
+    emarScopedHref,
     visibleEmarViews,
     type EmarNavigationPermissions,
 } from '@/lib/emar-navigation';
@@ -11,19 +12,23 @@ import {
  * The connected-tab rail for a Medication hub (lib/emar-navigation.ts) — the
  * Governance SectionRail pattern. The hub and active view come from the URL,
  * so a hub page mounts it in one line: `rail={<EmarHubRail />}` on its
- * PageHeader or PageHero. Tabs open the views' existing URLs.
+ * PageHeader. Query-selected views share the same page without sharing an
+ * active key; tabs open each view's canonical URL.
  *
- * Hubs with their own in-page rail (Meds today, Settings) render nothing.
+ * Hubs with their own in-page rail (Meds today, Reports, Settings) render nothing.
  * Navigation only — every page is still authorised on the server.
  */
 export function EmarHubRail({
     counts,
     alerts,
+    scope,
 }: {
     /** Optional per-view counters, keyed by view key. */
     counts?: Partial<Record<string, number>>;
     /** Per-view counters in the critical pair (shown only when above 0). */
     alerts?: Partial<Record<string, number>>;
+    /** Current picker values, including a selection whose request is still loading. */
+    scope?: { site_id: number | null; client_id: number | null };
 }) {
     const page = usePage<{ auth?: { can?: EmarNavigationPermissions } }>();
     const match = emarHubForUrl(page.url);
@@ -45,7 +50,17 @@ export function EmarHubRail({
             value={match.view.key}
             onSelect={(key) => {
                 const target = items.find((item) => item.key === key);
-                if (target && key !== match.view.key) router.visit(target.href);
+                if (target && key !== match.view.key) {
+                    const context = new URL(page.url, 'https://emar.invalid');
+                    if (scope) {
+                        for (const [name, value] of Object.entries(scope)) {
+                            if (value !== null)
+                                context.searchParams.set(name, String(value));
+                            else context.searchParams.delete(name);
+                        }
+                    }
+                    router.visit(emarScopedHref(target.href, context.href));
+                }
             }}
             items={items.map((item) => {
                 const alert = alerts?.[item.key];

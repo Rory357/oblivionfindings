@@ -417,11 +417,11 @@ class MedicationAlertService
     {
         $stock = $medication->stock;
 
-        if (! $stock || $stock->on_hand === null) {
+        if (! $stock || $stock->usableQuantity() === null) {
             return null;
         }
 
-        if (MedicationStockQuantity::equals($stock->on_hand, 0)) {
+        if (MedicationStockQuantity::equals($stock->usableQuantity(), 0)) {
             $alert = MedicationDashboardAlert::createOrUpdateAlert(
                 $client->id,
                 'stock_low',
@@ -454,7 +454,7 @@ class MedicationAlertService
                 $client->id,
                 'stock_low',
                 'warning',
-                "{$medication->name}: Low stock ({$stock->on_hand} {$stock->unit} remaining)",
+                "{$medication->name}: Low stock ({$stock->available_on_hand} {$stock->unit} remaining)",
                 $medication->id
             );
 

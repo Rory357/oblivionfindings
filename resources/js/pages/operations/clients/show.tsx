@@ -15,6 +15,7 @@ import {
 } from '@/components/clients/profile/overview-grid';
 import { BehaviourAbcTab } from '@/components/clients/profile/tabs/behaviour-abc';
 import { type HealthSummary } from '@/components/clinical/health-summary-card';
+import { AllergyRecord } from '@/components/emar/record/allergy-record';
 import { RaRegisterSection } from '@/components/health-safety/risk-assessments/ra-register-section';
 import type {
     RaPickers,
@@ -67,7 +68,7 @@ import { Separator } from '@/components/ui/separator';
 import { Ring } from '@/components/wizard/primitives';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTimeLong } from '@/lib/datetime';
+import { ageOnWorkerDay, formatDateTimeLong } from '@/lib/datetime';
 import { formatDateTime as formatDT } from '@/lib/fleet-utils';
 import type { WitnessPickerOption } from '@/lib/witness-pin';
 import { ClientClinicalRecordLaunchers } from '@/pages/health-clinical/components/client-clinical-launchers';
@@ -1687,12 +1688,7 @@ export default function ClientShow({
         ? client.status.charAt(0).toUpperCase() + client.status.slice(1)
         : 'Unknown';
 
-    const clientAge = client.date_of_birth
-        ? Math.floor(
-              (Date.now() - new Date(client.date_of_birth).getTime()) /
-                  31557600000,
-          )
-        : null;
+    const clientAge = ageOnWorkerDay(client.date_of_birth);
     const identityLine = [
         client.preferred_name && client.preferred_name !== name
             ? `“${client.preferred_name}”`
@@ -3530,21 +3526,11 @@ export default function ClientShow({
 
                         {tab === 'medical' && (
                             <div className="space-y-4">
-                                {/* Allergy Alert */}
-                                {medical.profile?.allergies &&
-                                    medical.profile.allergies !== '-' && (
-                                        <div className="flex items-center gap-3 rounded-xl border-2 border-status-critical/30 bg-status-critical-bg p-4">
-                                            <ShieldAlert className="h-6 w-6 shrink-0 text-status-critical" />
-                                            <div>
-                                                <p className="text-sm font-bold text-status-critical">
-                                                    Allergies
-                                                </p>
-                                                <p className="text-sm text-status-critical">
-                                                    {medical.profile.allergies}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
+                                <AllergyRecord
+                                    key={client.id}
+                                    clientId={client.id}
+                                    editable
+                                />
 
                                 {/* Quick Stats */}
                                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -4035,35 +4021,10 @@ export default function ClientShow({
                         {tab === 'mar' && (
                             <MarTab
                                 clientId={client.id}
-                                clientFirstName={client.first_name}
-                                siteName={client.site?.name ?? null}
-                                medications={
-                                    (medical?.medications ?? []) as any[]
-                                }
-                                allergies={
-                                    Array.isArray(medical?.profile?.allergies)
-                                        ? (medical.profile
-                                              .allergies as string[])
-                                        : []
-                                }
-                                emarSummary={emarSummary}
-                                canRecord={Boolean(
-                                    can.record_medication_administration,
-                                )}
-                                canRecordControlled={Boolean(
-                                    can.record_controlled_medication,
-                                )}
+                                personName={preferredName}
                                 canViewControlled={Boolean(
                                     auth?.can?.medications?.controlledView,
                                 )}
-                                onRecordDose={(medicationId) =>
-                                    openProfileDialog(
-                                        'emar',
-                                        medicationId
-                                            ? { medicationId }
-                                            : undefined,
-                                    )
-                                }
                             />
                         )}
 
@@ -4244,6 +4205,9 @@ export default function ClientShow({
                                 />
                                 <HealthMonitoringTab
                                     clientId={client.id}
+                                    canViewDoseReadings={canShowProfileTab(
+                                        'medical',
+                                    )}
                                     data={healthMonitoring}
                                     isLoading={!hasHealthMonitoringProp}
                                 />

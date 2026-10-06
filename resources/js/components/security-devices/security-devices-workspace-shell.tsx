@@ -145,12 +145,12 @@ export function WorkspaceFreshness({
         current: {
             icon: RadioTower,
             label: 'Current',
-            className: 'text-emerald-700 dark:text-emerald-300',
+            className: 'bg-status-success-bg text-status-success-foreground',
         },
         stale: {
             icon: TriangleAlert,
             label: 'Stale',
-            className: 'text-amber-700 dark:text-amber-300',
+            className: 'bg-status-warning-bg text-status-warning-foreground',
         },
         unknown: {
             icon: CircleHelp,

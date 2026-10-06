@@ -94,6 +94,7 @@ class Client extends Model
         'suppress_med_admin_alerts' => 'boolean',
         'med_alerts_suppressed_at' => 'datetime',
         'chart_review_interval_months' => 'integer',
+        'medication_review_interval_months' => 'integer',
         'next_chart_review_date' => 'date',
         'phone' => 'encrypted',
         'email' => 'encrypted',

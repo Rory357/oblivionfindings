@@ -12,6 +12,7 @@ use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 
 /** @return list<string> */
@@ -30,6 +31,10 @@ beforeEach(function () {
     $this->allowedSite = Site::factory()->create(['name' => 'Allowed Directory Site']);
     $this->hiddenSite = Site::factory()->create(['name' => 'Hidden Directory Site']);
     $this->viewer = directoryPrivacyUser('Directory Viewer', $this->allowedSite);
+});
+
+afterEach(function () {
+    $this->travelBack();
 });
 
 function directoryPrivacyUser(
@@ -76,13 +81,15 @@ function grantDirectoryPermission(User $user, string $permission): void
 }
 
 test('directory direct cards expose only current approved staff at viewer accessible Sites', function () {
+    $this->travelTo(Carbon::parse('2026-10-04 12:00:00', 'UTC'));
+    $workerNow = Carbon::now(config('app.worker_timezone', 'Pacific/Auckland'));
     $allowed = directoryPrivacyUser('Allowed Current Directory Person', $this->allowedSite);
     $hidden = directoryPrivacyUser('Hidden Directory Person', $this->hiddenSite);
     $ended = directoryPrivacyUser('Ended Directory Person', $this->allowedSite, [
-        'end_date' => now()->subDay()->toDateString(),
+        'end_date' => $workerNow->copy()->subDay()->toDateString(),
     ]);
     $future = directoryPrivacyUser('Future Directory Person', $this->allowedSite, [
-        'start_date' => now()->addDay()->toDateString(),
+        'start_date' => $workerNow->copy()->addDay()->toDateString(),
     ]);
     $inactive = directoryPrivacyUser('Inactive Directory Person', $this->allowedSite, [
         'is_active' => false,

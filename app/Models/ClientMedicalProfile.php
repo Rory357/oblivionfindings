@@ -83,6 +83,13 @@ class ClientMedicalProfile extends Model
         'medical_history',
         'disabilities',
         'allergies',
+        'allergy_records',
+        'allergies_canonical_at',
+        'allergies_reviewed_at',
+        'allergies_reviewed_by',
+        'allergies_review_status',
+        'allergies_review_method',
+        'allergies_review_digest',
         'notes',
         'gp_name',
         'gp_practice',
@@ -99,6 +106,9 @@ class ClientMedicalProfile extends Model
         'organ_donor' => 'boolean',
         'disabilities' => 'array',
         'allergies' => 'array',
+        'allergy_records' => 'array',
+        'allergies_canonical_at' => 'datetime',
+        'allergies_reviewed_at' => 'datetime',
     ];
 
     public function client()

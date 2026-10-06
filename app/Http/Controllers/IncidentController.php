@@ -18,10 +18,12 @@ use App\Models\User;
 use App\Services\HealthSafety\HsCorrectiveActionService;
 use App\Services\HealthSafety\NotifiableEventClassifier;
 use App\Services\Incidents\IncidentAlertLifecycleSignalService;
+use App\Services\Incidents\IncidentClosureService;
 use App\Services\Incidents\IncidentJourney;
 use App\Services\Incidents\IncidentJourneyPresenter;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\Incidents\IncidentReportDraftService;
+use App\Services\Medication\MedicationErrorSummary;
 use App\Services\NotificationService;
 use App\Services\UserSiteAccessService;
 use App\Support\Incidents\LinkedOperationalEvidencePresenter;
@@ -524,7 +526,8 @@ class IncidentController extends Controller
         // incident side carries a back-link into the eMAR error report.
         $medicationError = MedicationError::query()
             ->where('client_incident_id', $incident->id)
-            ->with('medication:id,name')
+            ->where('client_id', $incident->client_id)
+            ->whereHas('client', fn ($q) => $q->where('site_id', $incident->site_id))
             ->first();
 
         return [
@@ -607,9 +610,11 @@ class IncidentController extends Controller
                 'error_type' => $medicationError->error_type,
                 'severity' => $medicationError->severity,
                 'status' => $medicationError->status,
-                'medication' => $medicationError->medication?->name,
+                'medication' => null,
+                'summary' => MedicationErrorSummary::for($medicationError),
+                'ready_to_close' => $medicationError->stage() === 'closed' && $incident->status !== 'closed',
                 'reported_at' => $medicationError->reported_at,
-                'url' => '/emar/errors',
+                'url' => '/emar/errors?error='.$medicationError->id,
             ] : null,
             'control_room_alert' => $linkedControlRoomAlert ? [
                 'id' => $linkedControlRoomAlert->id,
@@ -1632,64 +1637,9 @@ class IncidentController extends Controller
         $siteAccess = app(UserSiteAccessService::class);
         $siteBypassPermissions = $this->incidentReportSiteBypassPermissions();
         $siteAccess->assertCanAccessClientIncident($actor, $incident, $siteBypassPermissions);
-        [$incident, $closeError, $outboxId] = DB::transaction(function () use (
-            $actor,
-            $incident,
-            $data,
-            $siteAccess,
-            $siteBypassPermissions,
-        ): array {
-            $lockedIncident = ClientIncident::query()
-                ->whereKey($incident->id)
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            // Every close/follow-up writer locks this parent first. Whichever
-            // operation wins is visible to the other before it can continue.
-            $this->authorize('close', $lockedIncident);
-            $siteAccess->assertCanAccessClientIncident($actor, $lockedIncident, $siteBypassPermissions);
-            abort_unless($lockedIncident->status === 'reviewed', 403);
-
-            try {
-                // Lock and canonicalise the H&S/alert parents before evaluating
-                // closure. The gate is then protected from a concurrent H&S
-                // transition until the source signal has been recorded.
-                $journey = $this->journeys->ensureForSubmittedIncident(
-                    $lockedIncident,
-                    $actor,
-                );
-                $lockedIncident = $journey->incident;
-                $gate = $this->journeys->closeGate($lockedIncident);
-            } catch (\DomainException) {
-                abort(404);
-            }
-            if (! $gate->allowed) {
-                return [
-                    $lockedIncident,
-                    implode(' ', $gate->blockers()),
-                    null,
-                ];
-            }
-
-            $at = now()->startOfSecond();
-            $lockedIncident->update([
-                'status' => 'closed',
-                'closed_by' => $actor->id,
-                'closed_at' => $at,
-                'closed_outcome' => $data['closed_outcome'],
-                'closed_notes' => $data['closed_notes'] ?? null,
-            ]);
-
-            $outbox = $this->incidentAlertSignals->recordClose(
-                $lockedIncident,
-                $journey,
-                $actor,
-                $at,
-                $data,
-            );
-
-            return [$lockedIncident, null, $outbox->id];
-        }, 3);
+        [$incident, $closeError, $outboxId] = app(IncidentClosureService::class)->close(
+            $incident, $actor, $data, $siteBypassPermissions,
+        );
 
         if ($closeError !== null) {
             return back()->with('error', $closeError);

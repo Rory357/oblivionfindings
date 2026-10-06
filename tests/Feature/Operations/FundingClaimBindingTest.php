@@ -6,6 +6,7 @@ use App\Domain\Finance\Jobs\PostFundingClaimJournalJob;
 use App\Domain\Finance\Models\FinInvoice;
 use App\Domain\Finance\Services\FundingClaimJournalService;
 use App\Domain\Finance\Services\JournalPostingService;
+use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\BillingEntry;
 use App\Models\Client;
@@ -45,6 +46,7 @@ class FundingClaimBindingTest extends TestCase
         $source = $this->deliverySource();
         $actor = $this->actorForSite($source['site'], ['funding.claims.create']);
         $payload = $this->claimPayload($source);
+        $attendanceSnapshot = $source['attendance']->fresh()->getRawOriginal();
 
         $this->actingAs($actor)
             ->post(route('operations.funding.claims.store'), $payload)
@@ -64,6 +66,15 @@ class FundingClaimBindingTest extends TestCase
         $this->assertSame($source['entry']->id, $item->billing_entry_id);
         $this->assertSame($source['timesheet']->id, $item->timesheet_id);
         $this->assertSame($source['shift']->id, $item->shift_id);
+        $attendance = $source['attendance']->fresh();
+        $this->assertSame($attendance->id, (int) $source['timesheet']->fresh()->attendance_session_id);
+        $this->assertSame($source['shift']->id, (int) $attendance->shift_id);
+        $this->assertSame($source['staff']->id, (int) $attendance->user_id);
+        $this->assertSame($source['site']->id, (int) $attendance->site_id);
+        $this->assertSame('closed', $attendance->status);
+        $this->assertTrue($attendance->clock_in_at->equalTo($source['shift']->actual_starts_at));
+        $this->assertTrue($attendance->clock_out_at->equalTo($source['shift']->actual_ends_at));
+        $this->assertSame($attendanceSnapshot, $attendance->getRawOriginal());
         $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', (string) $item->delivery_digest);
         $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', (string) $claim->provenance_digest);
         $this->assertSame('claimed', $source['entry']->fresh()->status);
@@ -86,7 +97,7 @@ class FundingClaimBindingTest extends TestCase
     public function test_exact_delivery_id_is_required_and_identical_snapshots_are_never_inferred(): void
     {
         $source = $this->deliverySource();
-        $sameSnapshot = $this->additionalDeliverySource($source, $source['service_date']);
+        $sameSnapshot = $this->additionalDeliverySource($source, $source['serviceDate']);
         $actor = $this->actorForSite($source['site'], ['funding.claims.create']);
 
         $this->actingAs($actor)
@@ -161,8 +172,8 @@ class FundingClaimBindingTest extends TestCase
 
         $this->actingAs($actor)
             ->postJson(route('operations.funding.claims.store'), $this->claimPayload($local, [
-                'period_start' => $local['service_date']->copy()->addDay()->toDateString(),
-                'period_end' => $local['service_date']->copy()->addDay()->toDateString(),
+                'period_start' => $local['serviceDate']->copy()->addDay()->toDateString(),
+                'period_end' => $local['serviceDate']->copy()->addDay()->toDateString(),
             ]))
             ->assertUnprocessable()
             ->assertJsonValidationErrors('items');
@@ -295,7 +306,7 @@ class FundingClaimBindingTest extends TestCase
         $expiredAgreement = $this->deliverySource();
         $actor = $this->actorForSite($expiredAgreement['site'], ['funding.claims.create']);
         $expiredAgreement['agreement']->forceFill([
-            'ends_at' => $expiredAgreement['service_date']->copy()->subDay(),
+            'ends_at' => $expiredAgreement['serviceDate']->copy()->subDay(),
         ])->save();
 
         try {
@@ -315,8 +326,8 @@ class FundingClaimBindingTest extends TestCase
             'rate_type' => 'weekday',
             'rate' => '75.25',
             'unit' => 'hour',
-            'effective_from' => $expiredRate['service_date']->copy()->subMonth(),
-            'effective_to' => $expiredRate['service_date']->copy()->subDay(),
+            'effective_from' => $expiredRate['serviceDate']->copy()->subMonth(),
+            'effective_to' => $expiredRate['serviceDate']->copy()->subDay(),
         ]);
 
         try {
@@ -339,7 +350,7 @@ class FundingClaimBindingTest extends TestCase
         $source = $this->deliverySource();
         $second = $this->additionalDeliverySource(
             $source,
-            $source['service_date']->copy()->addDay(),
+            $source['serviceDate']->copy()->addDay(),
         );
         $actor = $this->actorForSite($source['site'], ['funding.claims.create']);
         $createdItems = 0;
@@ -781,7 +792,20 @@ class FundingClaimBindingTest extends TestCase
             'actual_ends_at' => $endsAt,
             'status' => 'completed',
         ]);
+        $attendance = HrAttendanceSession::query()->create([
+            'user_id' => $staff->id,
+            'shift_id' => $shift->id,
+            'site_id' => $site->id,
+            'clock_in_at' => $startsAt,
+            'clock_out_at' => $endsAt,
+            'break_minutes' => 0,
+            'status' => 'closed',
+            'source' => 'manual',
+            'created_by' => $staff->id,
+            'closed_by' => $staff->id,
+        ]);
         $timesheet = Timesheet::factory()->create([
+            'attendance_session_id' => $attendance->id,
             'shift_id' => $shift->id,
             'user_id' => $staff->id,
             'client_id' => $client->id,
@@ -816,7 +840,7 @@ class FundingClaimBindingTest extends TestCase
             'status' => 'pending',
         ]);
 
-        return compact('site', 'client', 'staff', 'serviceDate', 'agreement', 'line', 'shift', 'timesheet', 'entry');
+        return compact('site', 'client', 'staff', 'serviceDate', 'agreement', 'line', 'shift', 'attendance', 'timesheet', 'entry');
     }
 
     /** @return array<string, mixed> */
@@ -840,7 +864,20 @@ class FundingClaimBindingTest extends TestCase
             'actual_ends_at' => $endsAt,
             'status' => 'completed',
         ]);
+        $attendance = HrAttendanceSession::query()->create([
+            'user_id' => $staff->id,
+            'shift_id' => $shift->id,
+            'site_id' => $site->id,
+            'clock_in_at' => $startsAt,
+            'clock_out_at' => $endsAt,
+            'break_minutes' => 0,
+            'status' => 'closed',
+            'source' => 'manual',
+            'created_by' => $staff->id,
+            'closed_by' => $staff->id,
+        ]);
         $timesheet = Timesheet::factory()->create([
+            'attendance_session_id' => $attendance->id,
             'shift_id' => $shift->id,
             'user_id' => $staff->id,
             'client_id' => $client->id,
@@ -875,7 +912,7 @@ class FundingClaimBindingTest extends TestCase
             'status' => 'pending',
         ]);
 
-        return compact('site', 'client', 'staff', 'serviceDate', 'agreement', 'line', 'shift', 'timesheet', 'entry');
+        return compact('site', 'client', 'staff', 'serviceDate', 'agreement', 'line', 'shift', 'attendance', 'timesheet', 'entry');
     }
 
     /** @return array{0: FundingClaim, 1: FundingClaimItem} */
@@ -886,8 +923,8 @@ class FundingClaimBindingTest extends TestCase
             'client_id' => $source['client']->id,
             'claim_reference' => 'LEGACY-'.Str::upper(Str::random(8)),
             'status' => 'draft',
-            'period_start' => $source['service_date']->copy()->startOfMonth(),
-            'period_end' => $source['service_date']->copy()->endOfMonth(),
+            'period_start' => $source['serviceDate']->copy()->startOfMonth(),
+            'period_end' => $source['serviceDate']->copy()->endOfMonth(),
             'total_amount' => '150.50',
         ]);
         $item = FundingClaimItem::query()->create([
@@ -899,7 +936,7 @@ class FundingClaimBindingTest extends TestCase
             'quantity' => '2.00',
             'unit_price' => '75.25',
             'total_amount' => '150.50',
-            'service_date' => $source['service_date'],
+            'service_date' => $source['serviceDate'],
             'funding_contract_reference' => $source['line']->funding_contract_reference,
         ]);
 
@@ -1120,6 +1157,7 @@ PHP;
         DB::table('billing_entries')->delete();
         DB::table('timesheet_client_allocations')->delete();
         DB::table('timesheets')->delete();
+        DB::table('hr_attendance_sessions')->delete();
         DB::table('shifts')->delete();
         DB::table('service_agreement_rates')->delete();
         DB::table('service_agreement_line_items')->delete();

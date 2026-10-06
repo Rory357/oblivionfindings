@@ -18,6 +18,8 @@ use App\Models\HsEvent;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\HealthSafety\HsCorrectiveActionService;
+use App\Services\HealthSafety\HsEventClosureService;
 use App\Services\Incidents\IncidentJourney;
 use App\Services\Incidents\IncidentJourneyPresenter;
 use Database\Seeders\RbacSeeder;
@@ -207,24 +209,30 @@ class IncidentJourneyPresenterTest extends TestCase
             'site_id' => $site->id,
             'organization_id' => 1,
         ]);
-        $owner = User::factory()->create();
+        $owner = $this->siteBoundUser($site, ['healthSafety.events.close']);
         $acceptor = User::factory()->create();
+        $verifier = $this->siteBoundUser($site, ['hazards.manage']);
         $alert = ControlRoomAlert::factory()->triaging()->create([
             'site_id' => $site->id,
             'client_id' => $client->id,
+            'severity' => 'low',
         ]);
         $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->submitted()->create([
             'site_id' => $site->id,
             'client_id' => $client->id,
             'control_room_alert_id' => $alert->id,
+            'type' => 'fall',
+            'severity' => 'low',
         ]));
         $hsEvent = HsEvent::factory()
             ->forClientIncident($incident)
             ->awaitingHandoverAcceptance($owner)
+            ->worksafeNotNotifiable($owner)
             ->create([
                 'control_room_alert_id' => $alert->id,
                 'site_id' => $site->id,
                 'client_id' => $client->id,
+                'severity' => HsEvent::SEVERITY_LOW,
             ]);
         $presenter = app(IncidentJourneyPresenter::class);
 
@@ -266,20 +274,37 @@ class IncidentJourneyPresenterTest extends TestCase
             $presenter->journeyState($incident->fresh(), $alert->fresh(), $hsEvent->fresh()),
         );
 
-        HsCorrectiveAction::factory()->completed()->create([
+        $action = HsCorrectiveAction::factory()->completed()->create([
             'hs_event_id' => $hsEvent->id,
+            'assigned_to_user_id' => $owner->id,
+            'completed_by_user_id' => $owner->id,
+            'created_by' => $owner->id,
         ]);
         $this->assertSame(
             'Awaiting independent verification',
             $presenter->journeyState($incident->fresh(), $alert->fresh(), $hsEvent->fresh()),
         );
 
-        $hsEvent->forceFill([
-            'status' => HsEvent::STATUS_CLOSED,
-            'closed_at' => now(),
-            'closed_by' => $owner->id,
-            'closure_summary' => 'Governance work completed.',
-        ])->save();
+        $this->actingAs($verifier);
+        $verified = app(HsCorrectiveActionService::class)->verify($action, [
+            'verified_by_user_id' => $verifier->id,
+            'evidence_reviewed' => true,
+            'effectiveness_confirmed' => true,
+            'verification_notes' => 'Independent review confirmed the recorded completion evidence.',
+        ]);
+        $this->assertSame(HsCorrectiveAction::STATUS_VERIFIED, $verified->status);
+        $this->assertSame($verifier->id, $verified->verified_by_user_id);
+        $closure = app(HsEventClosureService::class);
+        $readyEvent = $hsEvent->fresh();
+        $this->assertFalse($readyEvent->investigation_required);
+        $readiness = $closure->readiness($readyEvent);
+        $this->assertSame([], array_column($readiness->blockers(), 'key'));
+        $this->assertTrue($readiness->ordinaryAllowed());
+
+        $this->actingAs($owner);
+        $hsEvent = $closure->closeEvent($hsEvent, 'Governance work completed.', $owner);
+        $this->assertSame(HsEvent::STATUS_CLOSED, $hsEvent->status);
+        $this->assertSame($owner->id, $hsEvent->closed_by);
         $this->assertSame(
             'Governance closed',
             $presenter->journeyState($incident->fresh(), $alert->fresh(), $hsEvent->fresh()),

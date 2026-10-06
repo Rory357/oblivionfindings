@@ -3,12 +3,17 @@
 namespace App\Services\Medication\Settings;
 
 use App\Models\AppSetting;
+use App\Models\BreakGlassPolicy;
 use App\Models\MedicationAdminRule;
 use App\Models\MedicationRoundTemplate;
 use App\Models\MedicationSettingChange;
 use App\Models\MedicationSiteSetting;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Medication\Controlled\ControlledCountStatus;
+use App\Services\Medication\Controlled\ControlledPolicy;
+use App\Services\Medication\Controlled\WeeklyCountAnchorCodec;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -44,17 +49,44 @@ class MedicationSettingsStore
 
     public function __construct(private readonly MedicationSettingsRegistry $registry) {}
 
+    /** New grants retain this current policy while holding the same mutex as settings writes. */
+    public function lockedEmergencyPolicySnapshot(): array
+    {
+        if (DB::transactionLevel() === 0) {
+            throw new \LogicException('The emergency policy snapshot requires an enclosing transaction.');
+        }
+        $this->lockForWrite();
+        // A locking read sees the current committed policy even after an earlier RR snapshot.
+        $policy = BreakGlassPolicy::query()->oldest('id')->lockForUpdate()->first();
+
+        return ($policy ?? new BreakGlassPolicy(BreakGlassPolicy::defaults()))->snapshot();
+    }
+
     /** @return array<string, array<string, string>> Saved organisation values, by group then key. */
     public function organisationValues(): array
     {
         $definitions = $this->organisationDefinitions();
-        $stored = AppSetting::query()
+
+        return $this->organisationValuesFrom($definitions, $this->organisationRows($definitions));
+    }
+
+    private function organisationRows(Collection $definitions): Collection
+    {
+        return AppSetting::query()
             ->whereIn('key', $definitions->pluck('storageKey')->all())
             ->pluck('value', 'key');
+    }
 
-        return $this->nest($definitions->map(fn (MedicationSettingDefinition $d): array => [
+    private function organisationValuesFrom(Collection $definitions, Collection $stored): array
+    {
+        $values = $this->nest($definitions->map(fn (MedicationSettingDefinition $d): array => [
             $d, $d->normalise($stored[$d->storageKey] ?? null),
         ]));
+        if ($definitions->contains('group', 'ea')) {
+            $values['ea'] = app(EmergencyAccessPolicySettings::class)->values();
+        }
+
+        return $values;
     }
 
     /**
@@ -66,7 +98,12 @@ class MedicationSettingsStore
      */
     public function siteValues(array $siteIds): array
     {
-        return $this->siteRows($siteIds)
+        return $this->siteValuesFrom($this->siteRows($siteIds));
+    }
+
+    private function siteValuesFrom(Collection $sites): array
+    {
+        return $sites
             ->map(fn (Collection $rows): array => $this->nest($rows->map(fn (array $row): array => [
                 $row['definition'], $row['value'],
             ])))
@@ -84,10 +121,12 @@ class MedicationSettingsStore
     public function reviewed(): array
     {
         $definitions = $this->organisationDefinitions();
-        $stored = AppSetting::query()
-            ->whereIn('key', $definitions->pluck('storageKey')->all())
-            ->pluck('key')
-            ->flip();
+
+        return $this->reviewedFrom($definitions, $this->organisationRows($definitions));
+    }
+
+    private function reviewedFrom(Collection $definitions, Collection $stored): array
+    {
         $latest = $this->latestChanges(null);
 
         return $this->nest($definitions->map(fn (MedicationSettingDefinition $d): array => [
@@ -103,13 +142,39 @@ class MedicationSettingsStore
      */
     public function siteReviewed(array $siteIds): array
     {
+        return $this->siteReviewedFrom($siteIds, $this->siteRows($siteIds));
+    }
+
+    private function siteReviewedFrom(array $siteIds, Collection $sites): array
+    {
         $latest = $this->latestChanges($siteIds);
 
-        return $this->siteRows($siteIds)
+        return $sites
             ->map(fn (Collection $rows, int $siteId): array => $this->nest($rows->map(fn (array $row): array => [
                 $row['definition'], $this->reviewer($latest->get($this->slot($row['definition'], $siteId))),
             ])))
             ->all();
+    }
+
+    /**
+     * Read values and their review markers from the same saved rows for one
+     * response. No cross-request cache: the next read sees subsequent saves.
+     *
+     * @param  list<int>  $siteIds
+     * @return array{values: array, reviewed: array, site_values: array, site_reviewed: array}
+     */
+    public function valuesAndReviews(array $siteIds): array
+    {
+        $definitions = $this->organisationDefinitions();
+        $stored = $this->organisationRows($definitions);
+        $sites = $this->siteRows($siteIds);
+
+        return [
+            'values' => $this->organisationValuesFrom($definitions, $stored),
+            'reviewed' => $this->reviewedFrom($definitions, $stored),
+            'site_values' => $this->siteValuesFrom($sites),
+            'site_reviewed' => $this->siteReviewedFrom($siteIds, $sites),
+        ];
     }
 
     /**
@@ -126,6 +191,7 @@ class MedicationSettingsStore
         return DB::transaction(function () use ($actor, $changes, $confirmLoosening): array {
             $revision = $this->lockForWrite();
             $current = $this->lockedCurrent($changes);
+            $this->assertEmergencyPolicyConsistent($changes);
 
             $planned = [];
             foreach ($changes as $change) {
@@ -143,6 +209,8 @@ class MedicationSettingsStore
                 ];
             }
 
+            $this->assertControlledCountPolicyConsistent($changes);
+
             if (! $confirmLoosening && collect($planned)->contains('loosens', true)) {
                 throw ValidationException::withMessages([
                     'confirm_loosening' => 'One of these changes loosens a check. Review it and confirm before saving.',
@@ -158,7 +226,7 @@ class MedicationSettingsStore
                 'saved' => count($planned),
                 'effect' => $this->registry->group($planned[0]['definition']->group)?->effect,
             ];
-        });
+        }, 5);
     }
 
     /**
@@ -191,7 +259,7 @@ class MedicationSettingsStore
             $this->record($actor, MedicationSettingChange::ACTION_KEPT, $planned, $revision);
 
             return count($planned);
-        });
+        }, 5);
     }
 
     /**
@@ -382,7 +450,7 @@ class MedicationSettingsStore
                 'note' => $change->note,
                 'event' => $change->audit_event,
                 'concealed' => false,
-            ], ! $canSeeControlled && ($change->controlled || ($change->setting_group === self::RULES_GROUP && isset($concealedKeys[$change->setting_key])))));
+            ], ! $canSeeControlled && ($change->controlled || str_starts_with($change->setting_group, 'controlled_') || ($change->setting_group === self::RULES_GROUP && isset($concealedKeys[$change->setting_key])))));
     }
 
     /**
@@ -420,6 +488,7 @@ class MedicationSettingsStore
             $this->write($p['definition'], $p['site_id'], $p['value']);
         }
 
+        $eventChanges = [];
         foreach ($byGroup as $slot => $items) {
             $first = $items->first();
             $group = $this->registry->group($first['definition']->group);
@@ -440,6 +509,10 @@ class MedicationSettingsStore
                 'audit_event' => $group->auditEvent,
             ])->id)->values()->all();
 
+            array_push($eventChanges, ...$items->values()->map(fn (array $p, int $i): array => [
+                'site_id' => $p['site_id'], 'group' => $p['definition']->group, 'key' => $p['definition']->key, 'change_id' => $changeIds[$i],
+            ])->all());
+
             AuditLogger::logOrFail($group->auditEvent, null, [
                 'actor_id' => $actor->id,
                 'action' => $action,
@@ -453,6 +526,8 @@ class MedicationSettingsStore
         }
 
         $revision->update(['value' => ((int) $revision->value) + 1]);
+        // Last operation: failures roll back values, review markers, history and audits.
+        app(MedicationSettingsEvents::class)->settings($actor, $action, (int) $revision->value, $eventChanges);
     }
 
     private function write(MedicationSettingDefinition $definition, ?int $siteId, string $value): void
@@ -467,6 +542,60 @@ class MedicationSettingsStore
         }
 
         AppSetting::query()->updateOrCreate(['key' => $definition->storageKey], ['value' => $value]);
+        if ($definition->group === 'ea') {
+            app(EmergencyAccessPolicySettings::class)->write($definition->key, $value);
+        }
+    }
+
+    private function assertControlledCountPolicyConsistent(array $changes): void
+    {
+        $countChanges = array_filter($changes, fn (array $change): bool => $change['definition']->group === 'controlled_counts');
+        if ($countChanges === []) {
+            return;
+        }
+        // The global revision lock already serialises the complete prospective group.
+        $before = $this->groupSnapshot('controlled_counts', null);
+        $after = $before;
+        foreach ($countChanges as $change) {
+            $after[$change['definition']->key] = $change['value'];
+        }
+        $codec = new WeeklyCountAnchorCodec(config('app.worker_timezone', 'Pacific/Auckland'));
+        if ($after['cadence'] === 'week' && $codec->decode($after['weekly_anchor']) === null) {
+            throw ValidationException::withMessages([
+                'controlled_counts.weekly_anchor' => 'Choose a weekly count day and time before saving weekly counts.',
+            ]);
+        }
+        $anchor = $codec->decode($before['weekly_anchor']);
+        if ($before['cadence'] === 'week' && $anchor !== null
+            && ($before['weekly_anchor'] !== $after['weekly_anchor'] || $before['cadence'] !== $after['cadence'])) {
+            $effectiveAt = AppSetting::query()->whereIn('key', [ControlledPolicy::COUNT_CADENCE, ControlledPolicy::COUNT_WEEKLY_ANCHOR])
+                ->sharedLock()->get(['updated_at'])->max('updated_at');
+            if (! app(ControlledCountStatus::class)->hasUnfinishedWeeklyCounts($anchor,
+                $effectiveAt === null ? null : CarbonImmutable::instance($effectiveAt), (int) $before['overdue_minutes'])) {
+                return;
+            }
+            // A timing change cannot erase already-due witnessed-count obligations.
+            // Keep this generic: publication authority does not expose person details.
+            throw ValidationException::withMessages([
+                'controlled_counts.weekly_anchor' => 'Finish the due weekly witnessed counts before changing count timing.',
+            ]);
+        }
+    }
+
+    private function assertEmergencyPolicyConsistent(array $changes): void
+    {
+        if (! collect($changes)->contains(fn (array $c): bool => $c['definition']->group === 'ea')) {
+            return;
+        }
+        $policy = app(EmergencyAccessPolicySettings::class)->values(true);
+        foreach ($changes as $change) {
+            if ($change['definition']->group === 'ea') {
+                $policy[$change['definition']->key] = $change['value'];
+            }
+        }
+        if ((int) $policy['default_minutes'] > (int) $policy['max_minutes']) {
+            throw ValidationException::withMessages(['ea.default_minutes' => 'A grant cannot last longer than the longest time in all.']);
+        }
     }
 
     /** Serialise every Medication Settings write behind one row. */
@@ -514,7 +643,9 @@ class MedicationSettingsStore
             ->get()
             ->keyBy(fn (MedicationSiteSetting $row): string => $row->site_id.'|'.$row->key);
 
-        return $items->mapWithKeys(function (array $item) use ($orgRows, $siteRows): array {
+        $policy = $items->contains(fn (array $item): bool => $item['definition']->group === 'ea') ? app(EmergencyAccessPolicySettings::class)->values(true) : [];
+
+        return $items->mapWithKeys(function (array $item) use ($orgRows, $siteRows, $policy): array {
             $definition = $item['definition'];
             $row = $definition->isSiteScoped()
                 ? $siteRows->get($item['site_id'].'|'.$definition->storageKey)
@@ -522,7 +653,7 @@ class MedicationSettingsStore
 
             return [$this->slot($definition, $item['site_id']) => [
                 'exists' => $row !== null,
-                'value' => $definition->normalise($row?->value),
+                'value' => $definition->group === 'ea' ? $policy[$definition->key] : $definition->normalise($row?->value),
             ]];
         })->all();
     }
@@ -534,6 +665,9 @@ class MedicationSettingsStore
      */
     private function groupSnapshot(string $groupKey, ?int $siteId): array
     {
+        if ($groupKey === 'ea') {
+            return app(EmergencyAccessPolicySettings::class)->values(true);
+        }
         $definitions = collect($this->registry->group($groupKey)?->definitions ?? [])
             ->filter(fn (MedicationSettingDefinition $d): bool => $d->isSiteScoped() === ($siteId !== null))
             ->keyBy('storageKey');

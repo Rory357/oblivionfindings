@@ -180,8 +180,14 @@ export function TriageDialog({
         ['Preventive actions', error.preventive_actions],
         ['Close-out note', error.close_note],
     ];
+    const draftValues = JSON.stringify([linkAction]);
+    const [draftBaseline] = useState(draftValues);
     return (
         <MedsWizardDialog
+            formState={{
+                isDirty: draftValues !== draftBaseline,
+                processing: linking,
+            }}
             open
             onClose={onDismiss}
             title={`Error triage · ${error.ref}`}
@@ -424,8 +430,14 @@ export function ReviewErrorDialog({
         );
     };
     const valid = [notes.trim().length > 0, true];
+    const draftValues = JSON.stringify([notes, status]);
+    const [draftBaseline] = useState(draftValues);
     return (
         <MedsWizardDialog
+            formState={{
+                isDirty: draftValues !== draftBaseline,
+                processing: busy,
+            }}
             open
             onClose={onClose}
             title={`Review · ${error.ref}`}
@@ -552,8 +564,14 @@ export function ResolveErrorDialog({
         );
     };
     const valid = [outcome.trim().length > 0, preventive.trim().length > 0];
+    const draftValues = JSON.stringify([outcome, harm, preventive]);
+    const [draftBaseline] = useState(draftValues);
     return (
         <MedsWizardDialog
+            formState={{
+                isDirty: draftValues !== draftBaseline,
+                processing: busy,
+            }}
             open
             onClose={onClose}
             title={`Resolve · ${error.ref}`}
@@ -670,8 +688,14 @@ export function CloseErrorDialog({
             },
         );
     };
+    const draftValues = JSON.stringify([note, ack]);
+    const [draftBaseline] = useState(draftValues);
     return (
         <MedsWizardDialog
+            formState={{
+                isDirty: draftValues !== draftBaseline,
+                processing: busy,
+            }}
             open
             onClose={onClose}
             title={`Close out · ${error.ref}`}

@@ -65,6 +65,7 @@ export type EmarMedication = {
     is_prn?: boolean;
     controlled_drug?: boolean;
     witness_required?: boolean;
+    requires_witness?: boolean;
     /** Server: the profile can record this one (as-needed only). */
     record_on_profile?: boolean;
 };
@@ -232,7 +233,7 @@ export function EmarRecordDialog({
     const needsWitness = Boolean(
         outcome === 'given' &&
         medication &&
-        (medication.controlled_drug || medication.witness_required),
+        (medication.requires_witness ?? medication.witness_required),
     );
     const isPrn = Boolean(medication?.is_prn);
 

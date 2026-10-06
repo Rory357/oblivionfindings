@@ -56,8 +56,9 @@ it('keeps crossed My Day actor witness pairs on one canonical administration loc
 });
 
 it('keeps prescription medication and prn effectiveness mutations on the same scope boundary', function () {
+    $root = dirname(__DIR__, 2);
     $source = (string) file_get_contents(
-        dirname(__DIR__, 2).'/app/Http/Controllers/Emar/EmarController.php',
+        $root.'/app/Http/Controllers/Emar/EmarController.php',
     );
 
     expect($source)
@@ -65,7 +66,22 @@ it('keeps prescription medication and prn effectiveness mutations on the same sc
         ->toContain('->forClient(')
         ->toContain('->forPrescription(')
         ->toContain('->forMedication(')
-        ->toContain('->forPrnEffectiveness(');
+        ->toContain('app(LegacyEffectFollowupAdapter::class)->save($request, $this->medicationScope)');
+
+    $adapter = (string) file_get_contents($root.'/app/Services/Medication/Followups/LegacyEffectFollowupAdapter.php');
+    expect($adapter)->toContain(
+        '$work->assertAdministrationReadable($actor, (int) $id)',
+        '$work->prepareAdministration($actor, (int) $id)',
+        '$work->transition($actor, (int) $row->id, $data)',
+    )->not->toContain('PrnEffectiveness::', '->forPrnEffectiveness(');
+
+    $workflow = (string) file_get_contents($root.'/app/Services/Medication/Followups/MedicationFollowupService.php');
+    expect($workflow)->toContain(
+        '$this->clinicalScope->lockLatestGrant($actor, $client)',
+        '$this->governance->lockCurrentMedicationSite((int) $client->site_id)',
+        '$this->records->assertReadable($lockedActor, $client)',
+        '->lockForUpdate()->firstOrFail()',
+    );
 });
 
 it('does not reintroduce nullable best effort shift lookup in medication write controllers', function () {

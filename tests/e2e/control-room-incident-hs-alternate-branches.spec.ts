@@ -258,26 +258,112 @@ echo json_encode(['id' => $definition->id], JSON_THROW_ON_ERROR);
                 'Initial response resolved before new witness evidence.',
             resolution_code: 'initial_review_complete',
         });
-        scalar<{ ok: boolean }>(`
-$incident = \\App\\Models\\ClientIncident::query()->findOrFail(${reopenJourney.incidentId});
+        await loginAsFixture(page, manifest.users.owner);
+        await postLaravel(
+            page,
+            `/health-safety/events/${reopenJourney.eventId}/accept-handover`,
+            {
+                owner_user_id: manifest.users.owner.id,
+                acceptance_notes:
+                    'Reviewed the synthetic no-injury incident and its original evidence.',
+            },
+        );
+        await postLaravel(
+            page,
+            `/health-safety/events/${reopenJourney.eventId}/worksafe/decision`,
+            {
+                notifiable: false,
+                source: 'manual',
+                reason: 'Synthetic scenario review found no injury, illness or qualifying dangerous event; no WorkSafe notification threshold was met.',
+            },
+        );
+        const closureReadiness = scalar<{
+            ordinary_allowed: boolean;
+            blockers: unknown[];
+        }>(`
 $event = \\App\\Models\\HsEvent::query()->findOrFail(${reopenJourney.eventId});
-$event->forceFill([
-    'status' => \\App\\Models\\HsEvent::STATUS_CLOSED,
-    'closed_at' => now(),
-    'closed_by' => ${manifest.users.owner.id},
-    'closure_summary' => 'Initial governance closure before new evidence.',
-])->saveQuietly();
-$incident->forceFill([
-    'status' => 'closed',
-    'reviewed_at' => now()->subMinute(),
-    'reviewed_by' => ${manifest.users.reviewer.id},
-    'closed_at' => now(),
-    'closed_by' => ${manifest.users.reviewer.id},
-    'closed_outcome' => 'Initial review complete',
-])->saveQuietly();
-echo json_encode(['ok' => true], JSON_THROW_ON_ERROR);
+$readiness = app(\\App\\Services\\HealthSafety\\HsEventClosureService::class)->readiness($event);
+echo json_encode([
+    'ordinary_allowed' => $readiness->ordinaryAllowed(),
+    'blockers' => $readiness->blockers(),
+], JSON_THROW_ON_ERROR);
 `);
+        expect(closureReadiness).toEqual({
+            ordinary_allowed: true,
+            blockers: [],
+        });
+        await postLaravel(
+            page,
+            `/health-safety/events/${reopenJourney.eventId}/close`,
+            {
+                closure_summary:
+                    'Initial governance closure before new evidence.',
+            },
+        );
+        const closedEvent = scalar<{
+            status: string;
+            closed_by: number;
+            has_closed_at: boolean;
+            closure_audits: number;
+        }>(`
+$event = \\App\\Models\\HsEvent::query()->findOrFail(${reopenJourney.eventId});
+echo json_encode([
+    'status' => $event->status,
+    'closed_by' => $event->closed_by,
+    'has_closed_at' => $event->closed_at !== null,
+    'closure_audits' => \\App\\Models\\AuditLog::query()
+        ->where('auditable_type', $event->getMorphClass())
+        ->where('auditable_id', $event->id)
+        ->where('action', 'healthSafety.event.closed')->count(),
+], JSON_THROW_ON_ERROR);
+`);
+        expect(closedEvent).toEqual({
+            status: 'closed',
+            closed_by: manifest.users.owner.id,
+            has_closed_at: true,
+            closure_audits: 1,
+        });
         await loginAsFixture(page, manifest.users.reviewer);
+        await postLaravel(
+            page,
+            `/incidents/${reopenJourney.incidentId}/review`,
+            {
+                review_notes:
+                    'Initial independent review of the synthetic incident is complete.',
+            },
+        );
+        await postLaravel(
+            page,
+            `/incidents/${reopenJourney.incidentId}/close`,
+            {
+                closed_outcome: 'Initial review complete',
+                closed_notes:
+                    'The linked H&S event was closed through its ordinary readiness checks.',
+            },
+        );
+        const closedIncident = scalar<{
+            status: string;
+            reviewed_by: number;
+            has_reviewed_at: boolean;
+            closed_by: number;
+            has_closed_at: boolean;
+        }>(`
+$incident = \\App\\Models\\ClientIncident::query()->findOrFail(${reopenJourney.incidentId});
+echo json_encode([
+    'status' => $incident->status,
+    'reviewed_by' => $incident->reviewed_by,
+    'has_reviewed_at' => $incident->reviewed_at !== null,
+    'closed_by' => $incident->closed_by,
+    'has_closed_at' => $incident->closed_at !== null,
+], JSON_THROW_ON_ERROR);
+`);
+        expect(closedIncident).toEqual({
+            status: 'closed',
+            reviewed_by: manifest.users.reviewer.id,
+            has_reviewed_at: true,
+            closed_by: manifest.users.reviewer.id,
+            has_closed_at: true,
+        });
         await postLaravel(
             page,
             `/incidents/${reopenJourney.incidentId}/reopen`,

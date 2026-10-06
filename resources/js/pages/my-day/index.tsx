@@ -37,6 +37,7 @@ import {
 import { BeforeYouFinish } from './components/before-you-finish';
 import { DayWorkList } from './components/day-work-list';
 import { DigestPanel } from './components/digest-panel';
+import { MedicinesCard } from './components/medicines-card';
 import {
     MyDayHeader,
     type MyDayView,
@@ -970,6 +971,19 @@ export default function MyDay() {
                     )}
                 </div>
                 <aside className="flex min-w-0 flex-col gap-5">
+                    {props.can_view_medications && (
+                        <MedicinesCard
+                            rows={visibleMeds}
+                            today={props.today_iso ?? ''}
+                            hidden={props.medications_hidden_controlled}
+                            hiddenLate={
+                                props.medications_hidden_controlled_overdue
+                            }
+                            unavailable={props.data_unavailable?.includes(
+                                'Medications',
+                            )}
+                        />
+                    )}
                     <ShiftSummary
                         location={
                             site?.name ??
@@ -1334,8 +1348,8 @@ function ShiftChecklistRow({
 
 function ActiveRoundBanner({ round }: { round: MyDayActiveRound }) {
     const verb = round.status === 'in_progress' ? 'Resume' : 'Start';
-    const scheduled = round.scheduled_time
-        ? round.scheduled_time.slice(0, 5)
+    const scheduled = round.scheduled_at
+        ? formatTime(round.scheduled_at)
         : null;
 
     return (

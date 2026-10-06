@@ -193,6 +193,7 @@ export function ExemptionWizard({
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={close}
                 title="Grant an exemption"
@@ -321,6 +322,7 @@ export function ExemptionWizard({
                                     htmlFor="xw-from"
                                 >
                                     <DatePicker
+                                        compact
                                         id="xw-from"
                                         label="From"
                                         value={X.from}
@@ -339,6 +341,7 @@ export function ExemptionWizard({
                                     htmlFor="xw-until"
                                 >
                                     <DatePicker
+                                        compact
                                         id="xw-until"
                                         label="Until"
                                         value={X.until}
@@ -424,6 +427,7 @@ export function ExemptionWizard({
                 </WizardStepPane>
             </WizardShell>
             <DiscardDraftDialog
+                frontline
                 open={guard}
                 mode="create"
                 description="Nothing you’ve entered here has been saved. Closing now loses it."
@@ -473,6 +477,7 @@ export function EndExemption({
     };
     return (
         <SettingsModal
+            frontline
             title={`End ${exemption.person}’s exemption early?`}
             description={`From now, ${firstName(exemption.person)} can’t record doses as given at ${exemption.house} until they have a current assessment.`}
             onClose={onClose}

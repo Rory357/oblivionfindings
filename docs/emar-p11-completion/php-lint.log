@@ -1,0 +1,15 @@
+No syntax errors detected in app/Console/Commands/PruneTimelineAndAuditLogs.php
+No syntax errors detected in app/Http/Controllers/Emar/MedicationSettingsController.php
+No syntax errors detected in app/Http/Controllers/Settings/ProfileController.php
+No syntax errors detected in app/Http/Middleware/HandleInertiaRequests.php
+No syntax errors detected in app/Http/Requests/Settings/ProfileUpdateRequest.php
+No syntax errors detected in app/Models/User.php
+No syntax errors detected in app/Services/Medication/Alerts/OnCallResolver.php
+No syntax errors detected in app/Services/Medication/Settings/MedicationSettingsRegistry.php
+No syntax errors detected in app/Services/Medication/Settings/MedicationSettingsStore.php
+No syntax errors detected in app/Services/Medication/Alerts/MedicationAlertLog.php
+No syntax errors detected in app/Services/Medication/Alerts/MedicationBellOrder.php
+No syntax errors detected in app/Services/Medication/Settings/EmergencyAccessPolicySettings.php
+No syntax errors detected in database/migrations/2026_10_03_211100_grant_emergency_medication_policy_permission.php
+No syntax errors detected in database/migrations/2026_10_03_211200_add_on_call_cellphone_consent.php
+No syntax errors detected in tests/Feature/Emar/P11CompletionTest.php

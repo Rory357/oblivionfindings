@@ -9,12 +9,19 @@ import {
     type DestructionRow,
 } from '@/components/emar/destruction-detail-dialog';
 import { EmarHubRail } from '@/components/emar/emar-hub-rail';
-import { PageHero, type PageHeroStat } from '@/components/page';
+import {
+    EmarMeters,
+    EmarViewFilter,
+} from '@/components/emar/workspace-navigation';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderSearch,
+} from '@/components/page';
 import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
     EntityFilter,
     ShiftContextMenu,
-    TabStrip,
     type RosterTabItem,
     type ShiftCtxItem,
     type ShiftCtxState,
@@ -27,7 +34,7 @@ import {
     RecordDestructionDialog,
     VoidDestructionDialog,
 } from '@/pages/emar/_cd-dialogs';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Ban,
@@ -38,7 +45,6 @@ import {
     Lock,
     Package,
     Plus,
-    Search,
     Trash2,
     User,
     X,
@@ -197,7 +203,13 @@ export default function Destructions({
     const [siteFilter, setSiteFilter] = useState<number | null>(
         activeSite?.id ?? null,
     );
-    const [clientFilter, setClientFilter] = useState<number | null>(null);
+    const { url: pageUrl } = usePage();
+    const [clientFilter, setClientFilter] = useState<number | null>(
+        () =>
+            Number(
+                new URLSearchParams(pageUrl.split('?')[1]).get('client_id'),
+            ) || null,
+    );
     const [search, setSearch] = useState('');
     const [modal, setModal] = useState<Modal>(null);
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
@@ -242,15 +254,15 @@ export default function Destructions({
     const liveFiltered = useMemo(() => live.filter(matches), [live, matches]);
     const isFiltered = clientFilter !== null || search.trim() !== '';
 
-    const destroyed30 = live.filter((d) =>
+    const destroyed30 = liveFiltered.filter((d) =>
         withinDays(d.destroyed_at, 30),
     ).length;
-    const cd30 = controlled.filter(
+    const cd30 = controlledRows.filter(
         (d) => !d.is_voided && withinDays(d.destroyed_at, 30),
     ).length;
     const voidedCount = destructions.length - live.length;
     const lastAt =
-        live
+        liveFiltered
             .map((d) => d.destroyed_at)
             .filter(Boolean)
             .sort()
@@ -419,130 +431,138 @@ export default function Destructions({
         },
     ];
 
-    const heroStats: PageHeroStat[] = [
-        { label: 'Live records', value: live.length },
-        { label: 'Destroyed (30d)', value: destroyed30 },
-        {
-            label: 'CD destructions (30d)',
-            value: cd30,
-            tone: cd30 > 0 ? 'warning' : 'neutral',
-        },
-        { label: 'Last destruction', value: relativeDays(lastAt) },
-    ];
-
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Medication Destruction Register" />
-            <div className="flex flex-col gap-6 p-6">
-                <PageHero
+            <div className="flex flex-col gap-5">
+                <PageHeader
+                    wrapTitle
+                    mobileSummary={`${liveFiltered.length} disposal records`}
                     rail={<EmarHubRail />}
-                    variant="hero"
-                    category="ops"
                     brandColour={brandColour}
                     icon={Trash2}
-                    title={
-                        <span>
-                            <span className="flex items-center gap-2 text-[10.5px] font-semibold tracking-wide text-primary-foreground/80 uppercase">
-                                <span
-                                    aria-hidden
-                                    className="relative inline-flex h-2 w-2"
-                                >
-                                    <span className="absolute inset-0 animate-ping rounded-full bg-status-success/70" />
-                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
-                                </span>
-                                Disposal register · immutable
-                            </span>
-                            <span className="mt-1 block text-[26px] leading-tight font-bold">
-                                Medication disposal &amp; destruction for{' '}
-                                <span className="border-b-2 border-primary-foreground/40">
-                                    {activeSite?.name ?? 'your services'}
-                                </span>
-                            </span>
-                        </span>
+                    title="Disposal & returns"
+                    subline={`${activeSite?.name ?? 'All permitted houses'} · witnessed disposal and retained evidence`}
+                    meters={
+                        <EmarMeters
+                            items={[
+                                {
+                                    label: 'Recorded disposals',
+                                    value: liveFiltered.length,
+                                    caption: 'Excludes void annotations',
+                                    onClick: () => setActiveTab('log'),
+                                },
+                                {
+                                    label: 'Disposed in 30 days',
+                                    value: destroyed30,
+                                    caption:
+                                        'Ordinary and controlled medicines',
+                                    onClick: () => setActiveTab('log'),
+                                },
+                                {
+                                    label: 'Controlled disposals',
+                                    value: cd30,
+                                    caption: 'Recorded within 30 days',
+                                    onClick: () => setActiveTab('controlled'),
+                                },
+                                {
+                                    label: 'Latest disposal',
+                                    value: relativeDays(lastAt),
+                                    caption: 'Open retained register evidence',
+                                    onClick: () => setActiveTab('log'),
+                                },
+                            ]}
+                        />
                     }
-                    description="Witnessed disposal of medication and controlled drugs — append-only and retained. Erroneous entries are voided, never deleted."
-                    stats={heroStats}
                     actions={
                         <>
-                            {canRecord ? (
+                            <PageHeaderSearch
+                                value={search}
+                                onChange={setSearch}
+                                placeholder="Search person, medicine, batch or witness…"
+                            />
+                            <PageHeaderGlassButton
+                                icon={Download}
+                                onClick={() => exportCsv(destructions)}
+                                disabled={!destructions.length}
+                            >
+                                Export register
+                            </PageHeaderGlassButton>
+                            {canRecord && (
                                 <PageHeaderPrimaryButton
                                     icon={Plus}
                                     onClick={() => setModal({ type: 'record' })}
                                 >
-                                    Record destruction
+                                    Record disposal
                                 </PageHeaderPrimaryButton>
-                            ) : null}
-                            <Button
-                                variant="outline"
-                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
-                                onClick={() => exportCsv(destructions)}
-                                disabled={destructions.length === 0}
-                            >
-                                <Download className="h-4 w-4" />
-                                Export register
-                            </Button>
+                            )}
                         </>
                     }
-                    footer={
-                        <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-end">
-                            <div className="flex flex-wrap items-center gap-2 md:ml-auto md:justify-end">
-                                <div className="relative w-full max-w-xs md:w-[280px]">
-                                    <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                    {/* eslint-disable-next-line no-restricted-syntax -- white pill search on the dark hero per the design handoff. */}
-                                    <input
-                                        value={search}
-                                        onChange={(e) =>
-                                            setSearch(e.target.value)
-                                        }
-                                        placeholder="Search client, medication, batch or witness…"
-                                        aria-label="Search the destruction register"
-                                        className="h-8 w-full rounded-full border-0 bg-primary-foreground pr-3 pl-9 text-[13px] text-foreground shadow-sm outline-none placeholder:text-muted-foreground/80 focus:ring-2 focus:ring-primary-foreground/50"
-                                    />
-                                    {search ? (
-                                        // eslint-disable-next-line no-restricted-syntax -- inline clear affordance inside the pill search input.
-                                        <button
-                                            type="button"
-                                            aria-label="Clear search"
-                                            onClick={() => setSearch('')}
-                                            className="absolute top-1/2 right-2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted"
-                                        >
-                                            <X className="h-3.5 w-3.5" />
-                                        </button>
-                                    ) : null}
-                                </div>
-                                {sites.length > 0 ? (
-                                    <EntityFilter
-                                        label="Site"
-                                        allLabel="All sites"
-                                        items={sites}
-                                        value={siteFilter}
-                                        onChange={(id) => {
-                                            setSiteFilter(id);
-                                            router.get(
-                                                '/emar/destructions',
-                                                id ? { site_id: id } : {},
-                                                {
-                                                    preserveState: true,
-                                                    preserveScroll: true,
-                                                },
-                                            );
-                                        }}
-                                        onDark
-                                    />
-                                ) : null}
+                    filters={
+                        <>
+                            <EmarViewFilter
+                                value={activeTab}
+                                onChange={setActiveTab}
+                                items={TABS}
+                                label="Register view"
+                            />
+                            {sites.length > 0 && (
                                 <EntityFilter
-                                    label="Client"
-                                    allLabel="All clients"
-                                    items={clients.map((c) => ({
-                                        id: c.id,
-                                        name: `${c.first_name} ${c.last_name}`.trim(),
-                                    }))}
-                                    value={clientFilter}
-                                    onChange={setClientFilter}
+                                    label="House"
+                                    allLabel="All permitted houses"
+                                    items={sites}
+                                    value={siteFilter}
+                                    onChange={(id) => {
+                                        setSiteFilter(id);
+                                        router.get(
+                                            '/emar/destructions',
+                                            {
+                                                ...(id ? { site_id: id } : {}),
+                                                ...(clientFilter
+                                                    ? {
+                                                          client_id:
+                                                              clientFilter,
+                                                      }
+                                                    : {}),
+                                            },
+                                            {
+                                                preserveState: true,
+                                                preserveScroll: true,
+                                            },
+                                        );
+                                    }}
                                     onDark
                                 />
-                            </div>
-                        </div>
+                            )}
+                            <EntityFilter
+                                label="Person"
+                                allLabel="All permitted people"
+                                items={clients.map((c) => ({
+                                    id: c.id,
+                                    name: `${c.first_name} ${c.last_name}`.trim(),
+                                }))}
+                                value={clientFilter}
+                                onChange={(id) => {
+                                    setClientFilter(id);
+                                    const url = new URL(
+                                        pageUrl,
+                                        window.location.origin,
+                                    );
+                                    if (id)
+                                        url.searchParams.set(
+                                            'client_id',
+                                            String(id),
+                                        );
+                                    else url.searchParams.delete('client_id');
+                                    router.replace({
+                                        url: url.pathname + url.search,
+                                        preserveState: true,
+                                        preserveScroll: true,
+                                    });
+                                }}
+                                onDark
+                            />
+                        </>
                     }
                 />
 
@@ -558,13 +578,6 @@ export default function Destructions({
                         ))}
                     </div>
                 )}
-
-                <TabStrip
-                    value={activeTab}
-                    onChange={setActiveTab}
-                    items={TABS}
-                    ariaLabel="Destruction register views"
-                />
 
                 {activeTab === 'log' && (
                     <TableCard

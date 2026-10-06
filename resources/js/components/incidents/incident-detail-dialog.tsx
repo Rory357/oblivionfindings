@@ -190,6 +190,8 @@ export type IncidentDetail = {
         severity: string;
         status: string;
         medication: string | null;
+        summary?: string;
+        ready_to_close?: boolean;
         reported_at: string | null;
         url: string;
     } | null;
@@ -1772,7 +1774,7 @@ export function LinkedSection({
                         <LinkedRow
                             icon={Pill}
                             title="Medication error report"
-                            sub={`${titleCase(d.medication_error.error_type)} · ${titleCase(d.medication_error.severity)} · ${titleCase(d.medication_error.status)}${d.medication_error.medication ? ` · ${d.medication_error.medication}` : ''}`}
+                            sub={`${d.medication_error.summary ?? 'Details are held in the medication error record.'}${d.medication_error.ready_to_close ? ' Ready to close — medication error closed.' : ''}`}
                             href={d.medication_error.url}
                         />
                     ) : null}

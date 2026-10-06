@@ -60,13 +60,18 @@ test('Site Compliance and feedback expose usable desktop management dialogs', as
     });
 
     await expect(
-        page.getByRole('heading', { name: `${siteName} — Compliance` }),
+        page.getByRole('heading', { name: siteName, level: 1, exact: true }),
+    ).toBeVisible();
+    await expect(
+        page.getByText(
+            'Site compliance · certifications, checks and regulatory requirements',
+        ),
     ).toBeVisible();
     await expect(page.getByText('No certifications found.')).toBeVisible();
     await expect(page.getByText('No compliance checks found.')).toBeVisible();
 
     const addCertification = page.getByRole('button', {
-        name: 'Add Certification',
+        name: 'Add certification',
         exact: true,
     });
     await expect(addCertification).toHaveCount(1);
@@ -82,7 +87,7 @@ test('Site Compliance and feedback expose usable desktop management dialogs', as
     await expect(certificationDialog).toHaveCount(0);
 
     const scheduleCheck = page.getByRole('button', {
-        name: 'Schedule Check',
+        name: 'Schedule check',
         exact: true,
     });
     await expect(scheduleCheck).toHaveCount(1);

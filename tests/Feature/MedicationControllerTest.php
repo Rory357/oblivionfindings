@@ -3,30 +3,43 @@
 namespace Tests\Feature;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
 use App\Models\ClientCondition;
 use App\Models\ClientControlledDrugDiscrepancy;
+use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientEmergencyContact;
 use App\Models\ClientMedicalProfile;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
 use App\Models\MedicationCompetencyAssessment;
+use App\Models\MedicationEvent;
+use App\Models\MedicationOrderRevision;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\Audit\MedicationEventData;
+use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\NotificationService;
 use App\Support\EmarUrl;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
+use Database\Factories\UserFactory;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Mockery\MockInterface;
 use Tests\TestCase;
-use Database\Factories\UserFactory;
 
 class MedicationControllerTest extends TestCase
 {
@@ -157,6 +170,9 @@ class MedicationControllerTest extends TestCase
     {
         $mock = \Mockery::mock(NotificationService::class);
         $mock->shouldReceive('notifyCrud')->andReturnNull();
+        // Keep eligible recipients intact; notification routing has its own focused coverage.
+        Notification::fake();
+        $mock->shouldReceive('applyPreferences')->andReturnUsing(fn ($recipients) => $recipients);
         $this->app->instance(NotificationService::class, $mock);
 
         return $mock;
@@ -282,6 +298,71 @@ class MedicationControllerTest extends TestCase
         ], $overrides));
     }
 
+    /** P07 cases begin with an already checked, current controlled order. */
+    private function p07ControlledMedicine(): ClientMedication
+    {
+        return $this->createControlledDrug([
+            'dosage' => '1 tablet',
+            'dose_amount' => 1,
+            'dose_unit' => 'tablet',
+            'approval_status' => 'verified',
+            'verified_by' => $this->admin->id,
+            'verified_at' => $this->workerNow()->subDay(),
+        ]);
+    }
+
+    /** Positive P07 witnesses have the existing controlled competency endorsement. */
+    private function p07ControlledWitness(): User
+    {
+        $witness = $this->createWitness();
+        MedicationCompetencyAssessment::query()->where('user_id', $witness->id)->sole()->update([
+            'controlled_drugs' => true,
+            'restricted' => false,
+            'not_seen_areas' => [],
+        ]);
+
+        return $witness;
+    }
+
+    /** Capture the actual register head and stock position sent by the current dialog. */
+    private function p07ControlledCommand(ClientMedication $medication, array $fields = []): array
+    {
+        return [
+            'client_medication_id' => $medication->id,
+            'client_request_uuid' => (string) Str::uuid(),
+            'expected_entry_id' => ClientControlledDrugEntry::query()
+                ->where('client_medication_id', $medication->id)->latest('id')->value('id'),
+            'expected_balance' => ClientMedicationStock::query()
+                ->where('client_medication_id', $medication->id)->value('on_hand'),
+            ...$fields,
+        ];
+    }
+
+    private function p07ResolutionFixture(): array
+    {
+        $medication = $this->p07ControlledMedicine();
+        $witness = $this->p07ControlledWitness();
+        ClientMedicationStock::create([
+            'client_medication_id' => $medication->id, 'on_hand' => 8, 'unit' => 'tablets',
+        ]);
+        $count = ClientControlledDrugEntry::create([
+            'client_id' => $this->client->id, 'client_medication_id' => $medication->id,
+            'entry_type' => 'balance_check', 'quantity' => 8, 'unit' => 'tablets',
+            'on_hand_before' => 10, 'on_hand_after' => 8,
+            'recorded_by' => $this->admin->id, 'witnessed_by' => $witness->id,
+            'recorded_at' => $this->workerNow(),
+        ]);
+        $discrepancy = ClientControlledDrugDiscrepancy::create([
+            'client_id' => $this->client->id, 'client_medication_id' => $medication->id,
+            'service_context_id' => $this->serviceContext->id, 'count_entry_id' => $count->id,
+            'on_hand_before' => 10, 'on_hand_after' => 8, 'difference' => -2,
+            'reported_at' => $this->workerNow(), 'reported_by' => $this->admin->id,
+            'witnessed_by' => $witness->id, 'status' => 'open',
+        ]);
+
+        return [$medication, $discrepancy, $witness];
+    }
+
     // ══════════════════════════════════════════════════════════════
     //  1. CENTRAL MEDICATIONS INDEX - Authentication & Permissions
     // ══════════════════════════════════════════════════════════════
@@ -355,17 +436,23 @@ class MedicationControllerTest extends TestCase
             $this->createMedication(['client_id' => $client->id]);
         }
 
-        $pickerIds = collect(
-            $this->actingAs($this->supportWorker)
-                ->get(EmarUrl::mar())
-                ->assertOk()
-                ->inertiaProps('clients'),
-        )->pluck('id');
+        $this->assertSame('p02', config('medications.person_record'));
+        foreach (['p02', 'legacy'] as $renderVariant) {
+            config(['medications.person_record' => $renderVariant]);
+            $page = $this->actingAs($this->supportWorker)->get(EmarUrl::mar())->assertOk();
+            $pickerIds = collect($page->inertiaProps($renderVariant === 'p02' ? 'page.data' : 'clients'))
+                ->pluck($renderVariant === 'p02' ? 'client_id' : 'id');
 
-        $this->assertTrue($pickerIds->contains($assignedClient->id), 'Assigned resident is listed.');
-        $this->assertTrue($pickerIds->contains($coveredClient->id), 'Clocked-in covering-shift resident is listed.');
-        $this->assertFalse($pickerIds->contains($sameSiteClient->id), 'Unassigned, uncovered same-Site resident is hidden.');
-        $this->assertFalse($pickerIds->contains($foreignClient->id), 'Foreign-Site resident is hidden.');
+            $this->assertTrue($pickerIds->contains($assignedClient->id), 'Assigned resident is listed in '.$renderVariant.'.');
+            $this->assertTrue($pickerIds->contains($coveredClient->id), 'Clocked-in covering-shift resident is listed in '.$renderVariant.'.');
+            $this->assertFalse($pickerIds->contains($sameSiteClient->id), 'Unassigned, uncovered same-Site resident is hidden in '.$renderVariant.'.');
+            $this->assertFalse($pickerIds->contains($foreignClient->id), 'Foreign-Site resident is hidden in '.$renderVariant.'.');
+            $this->assertSame(
+                collect([$assignedClient->id, $coveredClient->id])->sort()->values()->all(),
+                $pickerIds->sort()->values()->all(),
+            );
+            $page->assertInertia(fn ($props) => $props->component($renderVariant === 'p02' ? 'emar/record/hub' : 'emar/MarCharts'));
+        }
     }
 
     public function test_admin_sees_all_clients_in_medications_index(): void
@@ -374,14 +461,20 @@ class MedicationControllerTest extends TestCase
         $otherClient = Client::factory()->create(['site_id' => $this->site->id]);
         $this->createMedication(['client_id' => $otherClient->id]);
 
-        $this->actingAs($this->admin)
-            ->get(EmarUrl::mar())
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->where('clients', fn ($clients) => collect($clients)->pluck('id')->contains($this->client->id) &&
-                    collect($clients)->pluck('id')->contains($otherClient->id)
-                )
+        $this->assertSame('p02', config('medications.person_record'));
+        foreach (['p02', 'legacy'] as $renderVariant) {
+            config(['medications.person_record' => $renderVariant]);
+            $page = $this->actingAs($this->admin)->get(EmarUrl::mar())->assertOk();
+            $pickerIds = collect($page->inertiaProps($renderVariant === 'p02' ? 'page.data' : 'clients'))
+                ->pluck($renderVariant === 'p02' ? 'client_id' : 'id');
+            $this->assertTrue($pickerIds->contains($this->client->id));
+            $this->assertTrue($pickerIds->contains($otherClient->id));
+            $this->assertSame(
+                collect([$this->client->id, $otherClient->id])->sort()->values()->all(),
+                $pickerIds->sort()->values()->all(),
             );
+            $page->assertInertia(fn ($props) => $props->component($renderVariant === 'p02' ? 'emar/record/hub' : 'emar/MarCharts'));
+        }
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -395,28 +488,33 @@ class MedicationControllerTest extends TestCase
 
     public function test_audit_index_accessible_by_admin(): void
     {
-        $this->actingAs($this->admin)
-            ->get('/medications/audit')
+        $this->p09ControllerCanonicalRead($this->admin, '/medications/audit')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->component('medications/audit')
-                ->has('logs')
+                ->component('emar/reports/hub')
+                ->where('filters.view', 'audit')
+                ->where('can.audit', true)
+                ->has('page.data')
                 ->has('filters')
             );
     }
 
     public function test_audit_index_accessible_by_coordinator(): void
     {
-        $this->actingAs($this->coordinator)
-            ->get('/medications/audit')
-            ->assertOk();
+        $actor = $this->p09ControllerReportActor($this->coordinator);
+        $this->p09ControllerCanonicalRead($actor, '/medications/audit')
+            ->assertOk()->assertInertia(fn ($page) => $page
+            ->component('emar/reports/hub')
+            ->where('filters.view', 'audit')->where('can.audit', true));
     }
 
     public function test_audit_index_accessible_by_auditor(): void
     {
-        $this->actingAs($this->auditor)
-            ->get('/medications/audit')
-            ->assertOk();
+        $actor = $this->p09ControllerReportActor($this->auditor);
+        $this->p09ControllerCanonicalRead($actor, '/medications/audit')
+            ->assertOk()->assertInertia(fn ($page) => $page
+            ->component('emar/reports/hub')
+            ->where('filters.view', 'audit')->where('can.audit', true));
     }
 
     public function test_audit_index_forbidden_for_support_worker(): void
@@ -444,10 +542,27 @@ class MedicationControllerTest extends TestCase
 
     public function test_audit_export_accessible_by_admin(): void
     {
+        $medicine = $this->p09ControllerReportMedicine();
+        AuditLog::query()->create([
+            'client_id' => $this->client->id,
+            'user_id' => $this->admin->id,
+            'action' => 'Report fixture change',
+            'auditable_type' => ClientMedication::class,
+            'auditable_id' => $medicine->id,
+            'meta' => ['fields' => ['dosage'], 'history' => 'PRIVATE AUDIT HISTORY'],
+        ]);
         $this->actingAs($this->admin)
             ->get('/medications/audit/export')
-            ->assertOk()
-            ->assertHeader('content-type', 'text/csv; charset=utf-8');
+            ->assertSessionHasErrors('purpose');
+        $this->assertSame(0, MedicationEvent::where('kind', 'export.created')->count());
+        $csv = $this->get(route('medications.audit.export', ['purpose' => 'audit', 'client_id' => $this->client->id, 'period' => 'today']))
+            ->assertOk()->assertHeader('content-type', 'text/csv; charset=utf-8')->getContent();
+        $this->assertStringContainsString('Report fixture change', $csv);
+        $this->assertStringContainsString('dosage', $csv);
+        $this->assertStringNotContainsString('PRIVATE AUDIT HISTORY', $csv);
+        $event = MedicationEvent::where('kind', 'export.created')->sole();
+        $this->assertSame('Audit or inspection', $event->facts['purpose']);
+        $this->assertSame($this->client->id, $event->client_id);
     }
 
     public function test_audit_export_forbidden_for_support_worker(): void
@@ -459,9 +574,15 @@ class MedicationControllerTest extends TestCase
 
     public function test_audit_export_forbidden_for_auditor_without_export_permission(): void
     {
-        $this->actingAs($this->auditor)
-            ->get('/medications/audit/export')
+        $actor = $this->p09ControllerReportActor($this->auditor, ['medications.reports.view'], ['medications.audit.export']);
+        $this->assertTrue($actor->canDo('medications.audit.view'));
+        $this->assertFalse($actor->canDo('medications.audit.export'));
+        $this->actingAs($actor)
+            ->get(route('medications.audit.export', ['purpose' => 'audit']))
             ->assertForbidden();
+        $this->postJson(route('emar.reports.export'), ['type' => 'audit', 'period' => 'today', 'purpose' => 'audit'])
+            ->assertForbidden();
+        $this->assertSame(0, MedicationEvent::where('kind', 'export.created')->count());
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -475,16 +596,16 @@ class MedicationControllerTest extends TestCase
 
     public function test_reports_index_accessible_by_admin(): void
     {
-        $this->actingAs($this->admin)
-            ->get('/reports/medications')
+        $this->p09ControllerCanonicalRead($this->admin, '/reports/medications')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->component('reports/medications')
+                ->component('emar/reports/hub')
+                ->where('filters.report', 'doses')
                 ->has('filters')
-                ->has('clients')
-                ->has('service_contexts')
-                ->has('administrations')
-                ->has('discrepancies')
+                ->has('people')
+                ->has('sites')
+                ->has('page.data')
+                ->has('data.totals')
             );
     }
 
@@ -502,10 +623,16 @@ class MedicationControllerTest extends TestCase
 
     public function test_reports_mar_export_accessible_by_admin(): void
     {
-        $this->actingAs($this->admin)
-            ->get('/reports/medications/export-mar')
-            ->assertOk()
-            ->assertHeader('content-type', 'text/csv; charset=UTF-8');
+        $medicine = $this->p09ControllerReportMedicine(['name' => 'Ordinary export medicine']);
+        $this->p09ControllerReportAdministration($medicine);
+        $csv = $this->actingAs($this->admin)
+            ->get(route('reports.medications.export_mar', ['client_id' => $this->client->id, 'period' => 'today', 'purpose' => 'care']))
+            ->assertOk()->assertHeader('content-type', 'text/csv; charset=UTF-8')->getContent();
+        $this->assertStringContainsString('Ordinary export medicine', $csv);
+        $this->assertStringContainsString('given', $csv);
+        $event = MedicationEvent::where('kind', 'export.created')->sole();
+        $this->assertSame('Care and handover', $event->facts['purpose']);
+        $this->assertSame($this->client->id, $event->client_id);
     }
 
     public function test_reports_discrepancies_export_requires_authentication(): void
@@ -515,10 +642,23 @@ class MedicationControllerTest extends TestCase
 
     public function test_reports_discrepancies_export_accessible_by_admin(): void
     {
-        $this->actingAs($this->admin)
-            ->get('/reports/medications/export-controlled-discrepancies')
-            ->assertOk()
-            ->assertHeader('content-type', 'text/csv; charset=UTF-8');
+        $medicine = $this->p09ControllerReportMedicine(['name' => 'Controlled discrepancy export medicine', 'controlled_drug' => true]);
+        ClientControlledDrugDiscrepancy::query()->create([
+            'client_id' => $this->client->id,
+            'client_medication_id' => $medicine->id,
+            'reported_at' => now(),
+            'reported_by' => $this->admin->id,
+            'difference' => -1,
+            'status' => 'open',
+        ]);
+        $csv = $this->actingAs($this->admin)
+            ->get(route('reports.medications.export_discrepancies', ['client_id' => $this->client->id, 'period' => 'week', 'purpose' => 'audit']))
+            ->assertOk()->assertHeader('content-type', 'text/csv; charset=UTF-8')->getContent();
+        $this->assertStringContainsString('Controlled discrepancy export medicine', $csv);
+        $this->assertStringContainsString('open', $csv);
+        $event = MedicationEvent::where('kind', 'export.created')->sole();
+        $this->assertSame('Audit or inspection', $event->facts['purpose']);
+        $this->assertTrue($event->controlled);
     }
 
     public function test_reports_discrepancies_export_forbidden_for_support_worker(): void
@@ -1286,8 +1426,8 @@ class MedicationControllerTest extends TestCase
     public function test_controlled_drug_given_with_valid_witness_succeeds(): void
     {
         $this->mockNotificationService();
-        $med = $this->createControlledDrug();
-        $witness = $this->createWitness();
+        $med = $this->p07ControlledMedicine();
+        $witness = $this->p07ControlledWitness();
         ClientMedicationStock::create([
             'client_medication_id' => $med->id,
             'on_hand' => 10,
@@ -1297,6 +1437,8 @@ class MedicationControllerTest extends TestCase
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
+                'quantity_administered' => 1,
+                'client_request_uuid' => (string) Str::uuid(),
                 'witnessed_by' => $witness->id,
                 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
@@ -1314,8 +1456,8 @@ class MedicationControllerTest extends TestCase
     public function test_controlled_drug_creates_controlled_entry_on_administration(): void
     {
         $this->mockNotificationService();
-        $med = $this->createControlledDrug();
-        $witness = $this->createWitness();
+        $med = $this->p07ControlledMedicine();
+        $witness = $this->p07ControlledWitness();
         $stock = ClientMedicationStock::create([
             'client_medication_id' => $med->id,
             'on_hand' => 10,
@@ -1325,6 +1467,8 @@ class MedicationControllerTest extends TestCase
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
+                'quantity_administered' => 1,
+                'client_request_uuid' => (string) Str::uuid(),
                 'witnessed_by' => $witness->id,
                 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
@@ -1477,8 +1621,8 @@ class MedicationControllerTest extends TestCase
 
     public function test_guided_controlled_balance_check_requires_immediate_action_for_discrepancy(): void
     {
-        $med = $this->createControlledDrug();
-        $witness = $this->createWitness();
+        $med = $this->p07ControlledMedicine();
+        $witness = $this->p07ControlledWitness();
         ClientMedicationStock::create([
             'client_medication_id' => $med->id,
             'on_hand' => 10,
@@ -1487,20 +1631,22 @@ class MedicationControllerTest extends TestCase
 
         $this->actingAs($this->admin)
             ->from('/emar/controlled')
-            ->post(route('emar.controlled.balance_check.store'), [
+            ->postJson(route('emar.controlled.balance_check.store'), [
+                ...$this->p07ControlledCommand($med),
                 'client_medication_id' => $med->id,
                 'expected_balance' => 10,
                 'actual_balance' => 8,
+                'recount_balance' => 8,
                 'witnessed_by' => $witness->id,
                 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
-                'discrepancy_notes' => 'Two tablets are not accounted for.',
+                'notes' => 'Two tablets are not accounted for.',
             ])
-            ->assertSessionHasErrors('immediate_action_taken');
+            ->assertUnprocessable()->assertJsonValidationErrors('immediate_action_taken');
     }
 
     public function test_guided_controlled_balance_check_blocks_self_witness(): void
     {
-        $med = $this->createControlledDrug();
+        $med = $this->p07ControlledMedicine();
         $this->qualifyControlledWitness($this->admin);
         $this->assertTrue($this->admin->canDo('medications.controlled.witness'));
         $stock = ClientMedicationStock::create([
@@ -1511,14 +1657,15 @@ class MedicationControllerTest extends TestCase
 
         $this->actingAs($this->admin)
             ->from('/emar/controlled')
-            ->post(route('emar.controlled.balance_check.store'), [
+            ->postJson(route('emar.controlled.balance_check.store'), [
+                ...$this->p07ControlledCommand($med),
                 'client_medication_id' => $med->id,
                 'expected_balance' => 10,
                 'actual_balance' => 10,
                 'witnessed_by' => $this->admin->id,
                 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
-            ->assertSessionHasErrors('witnessed_by');
+            ->assertUnprocessable()->assertJsonValidationErrors('witnessed_by');
 
         $this->assertSame(10.0, (float) $stock->refresh()->on_hand);
         $this->assertSame(0, $med->controlledDrugEntries()->count());
@@ -1527,8 +1674,8 @@ class MedicationControllerTest extends TestCase
     public function test_guided_controlled_balance_check_creates_entry(): void
     {
         $this->mockNotificationService();
-        $med = $this->createControlledDrug();
-        $witness = $this->createWitness();
+        $med = $this->p07ControlledMedicine();
+        $witness = $this->p07ControlledWitness();
 
         ClientMedicationStock::create([
             'client_medication_id' => $med->id,
@@ -1537,15 +1684,15 @@ class MedicationControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->post(route('emar.controlled.balance_check.store'), [
+            ->postJson(route('emar.controlled.balance_check.store'), [
+                ...$this->p07ControlledCommand($med),
                 'client_medication_id' => $med->id,
                 'expected_balance' => 10,
                 'actual_balance' => 10,
                 'witnessed_by' => $witness->id,
                 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
-            ->assertRedirect()
-            ->assertSessionHas('success');
+            ->assertOk();
 
         $this->assertDatabaseHas('client_controlled_drug_entries', [
             'client_id' => $this->client->id,
@@ -1561,8 +1708,8 @@ class MedicationControllerTest extends TestCase
     public function test_guided_controlled_balance_check_creates_discrepancy_when_amounts_differ(): void
     {
         $this->mockNotificationService();
-        $med = $this->createControlledDrug();
-        $witness = $this->createWitness();
+        $med = $this->p07ControlledMedicine();
+        $witness = $this->p07ControlledWitness();
 
         ClientMedicationStock::create([
             'client_medication_id' => $med->id,
@@ -1571,17 +1718,18 @@ class MedicationControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->post(route('emar.controlled.balance_check.store'), [
+            ->postJson(route('emar.controlled.balance_check.store'), [
+                ...$this->p07ControlledCommand($med),
                 'client_medication_id' => $med->id,
                 'expected_balance' => 10,
                 'actual_balance' => 8,
+                'recount_balance' => 8,
                 'witnessed_by' => $witness->id,
                 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
-                'discrepancy_notes' => 'Two missing after shift change',
+                'notes' => 'Two missing after shift change',
                 'immediate_action_taken' => 'Secured the remaining stock and escalated the discrepancy.',
             ])
-            ->assertRedirect()
-            ->assertSessionHas('success');
+            ->assertOk();
 
         $this->assertDatabaseHas('client_controlled_drug_discrepancies', [
             'client_id' => $this->client->id,
@@ -1599,8 +1747,8 @@ class MedicationControllerTest extends TestCase
     public function test_guided_controlled_balance_check_preserves_half_unit_discrepancy_provenance(): void
     {
         $this->mockNotificationService();
-        $med = $this->createControlledDrug();
-        $witness = $this->createWitness();
+        $med = $this->p07ControlledMedicine();
+        $witness = $this->p07ControlledWitness();
         $stock = ClientMedicationStock::create([
             'client_medication_id' => $med->id,
             'on_hand' => 9.5,
@@ -1608,17 +1756,18 @@ class MedicationControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->post(route('emar.controlled.balance_check.store'), [
+            ->postJson(route('emar.controlled.balance_check.store'), [
+                ...$this->p07ControlledCommand($med),
                 'client_medication_id' => $med->id,
                 'expected_balance' => 9.5,
                 'actual_balance' => 9,
+                'recount_balance' => 9,
                 'witnessed_by' => $witness->id,
                 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
-                'discrepancy_notes' => 'Half tablet count variance',
+                'notes' => 'Half tablet count variance',
                 'immediate_action_taken' => 'Secured the stock and escalated the half-tablet variance.',
             ])
-            ->assertRedirect()
-            ->assertSessionHas('success');
+            ->assertOk();
 
         $entry = $med->controlledDrugEntries()->sole();
         $discrepancy = ClientControlledDrugDiscrepancy::query()
@@ -1663,8 +1812,8 @@ class MedicationControllerTest extends TestCase
     public function test_guided_controlled_balance_check_creates_no_discrepancy_when_amounts_match(): void
     {
         $this->mockNotificationService();
-        $med = $this->createControlledDrug();
-        $witness = $this->createWitness();
+        $med = $this->p07ControlledMedicine();
+        $witness = $this->p07ControlledWitness();
 
         ClientMedicationStock::create([
             'client_medication_id' => $med->id,
@@ -1673,22 +1822,22 @@ class MedicationControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->post(route('emar.controlled.balance_check.store'), [
+            ->postJson(route('emar.controlled.balance_check.store'), [
+                ...$this->p07ControlledCommand($med),
                 'client_medication_id' => $med->id,
                 'expected_balance' => 10,
                 'actual_balance' => 10,
                 'witnessed_by' => $witness->id,
                 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
-            ->assertRedirect()
-            ->assertSessionHas('success');
+            ->assertOk();
 
         $this->assertDatabaseCount('client_controlled_drug_discrepancies', 0);
     }
 
     public function test_guided_controlled_balance_check_conceals_ineligible_witness(): void
     {
-        $med = $this->createControlledDrug();
+        $med = $this->p07ControlledMedicine();
         ClientMedicationStock::create([
             'client_medication_id' => $med->id,
             'on_hand' => 10,
@@ -1696,13 +1845,15 @@ class MedicationControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->post(route('emar.controlled.balance_check.store'), [
+            ->postJson(route('emar.controlled.balance_check.store'), [
+                ...$this->p07ControlledCommand($med),
                 'client_medication_id' => $med->id,
                 'expected_balance' => 10,
                 'actual_balance' => 8,
+                'recount_balance' => 8,
                 'witnessed_by' => $this->hrUser->id,
                 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
-                'discrepancy_notes' => 'Count differs.',
+                'notes' => 'Count differs.',
                 'immediate_action_taken' => 'Secured the stock pending an authorised witness review.',
             ])
             ->assertNotFound();
@@ -1734,54 +1885,67 @@ class MedicationControllerTest extends TestCase
     public function test_close_discrepancy_with_resolution_notes(): void
     {
         $this->mockNotificationService();
-        $disc = ClientControlledDrugDiscrepancy::create([
-            'client_id' => $this->client->id,
-            'client_medication_id' => $this->createControlledDrug()->id,
-            'service_context_id' => $this->serviceContext->id,
-            'on_hand_before' => 10,
-            'on_hand_after' => 8,
-            'difference' => -2,
-            'reported_at' => now(),
-            'reported_by' => $this->admin->id,
-            'witnessed_by' => $this->supportWorker->id,
-            'status' => 'open',
+        [$medication, $disc, $witness] = $this->p07ResolutionFixture();
+        $body = $this->p07ControlledCommand($medication, [
+            'outcome' => 'found', 'quantity' => 2,
+            'notes' => 'Found missing tablets in drawer',
+            'witnessed_by' => $witness->id,
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
         ]);
+        $url = "/clients/{$this->client->id}/medical/controlled-discrepancies/{$disc->id}/close";
 
-        $this->actingAs($this->admin)
-            ->post("/clients/{$this->client->id}/medical/controlled-discrepancies/{$disc->id}/close", [
-                'resolution_notes' => 'Found missing tablets in drawer',
-            ])
-            ->assertRedirect()
-            ->assertSessionHas('success');
+        // Administrative access does not confer independent clinical resolution.
+        $this->assertFalse($this->admin->canDo('medications.controlled.manage'));
+        $this->actingAs($this->admin)->postJson($url, $body)->assertForbidden();
+        $this->assertTrue($this->providerManager->canDo('medications.controlled.manage'));
+
+        $this->actingAs($this->providerManager)->postJson($url, $body)->assertOk();
 
         $disc->refresh();
         $this->assertEquals('closed', $disc->status);
         $this->assertEquals('Found missing tablets in drawer', $disc->resolution_notes);
         $this->assertNotNull($disc->resolved_at);
-        $this->assertEquals($this->admin->id, $disc->resolved_by);
+        $this->assertEquals($this->providerManager->id, $disc->resolved_by);
+        $this->assertSame('found', $disc->resolution_outcome);
+        $this->assertSame('10.00', $medication->stock()->sole()->on_hand);
     }
 
     public function test_close_already_closed_discrepancy_returns_success(): void
     {
-        $disc = ClientControlledDrugDiscrepancy::create([
-            'client_id' => $this->client->id,
-            'client_medication_id' => $this->createControlledDrug()->id,
-            'service_context_id' => $this->serviceContext->id,
-            'on_hand_before' => 10,
-            'on_hand_after' => 8,
-            'difference' => -2,
-            'reported_at' => now(),
-            'reported_by' => $this->admin->id,
-            'witnessed_by' => $this->supportWorker->id,
-            'status' => 'closed',
-            'resolved_at' => now(),
-            'resolved_by' => $this->admin->id,
+        $this->mockNotificationService();
+        [$medication, $disc, $witness] = $this->p07ResolutionFixture();
+        $body = $this->p07ControlledCommand($medication, [
+            'outcome' => 'found', 'quantity' => 2,
+            'notes' => 'Found missing tablets in drawer',
+            'witnessed_by' => $witness->id,
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
         ]);
+        $url = "/clients/{$this->client->id}/medical/controlled-discrepancies/{$disc->id}/close";
+        $first = $this->actingAs($this->providerManager)->postJson($url, $body)->assertOk();
+        $this->assertSame('closed', $disc->refresh()->status);
+        $before = $disc->getRawOriginal();
+        $entryCount = $medication->controlledDrugEntries()->count();
 
-        $this->actingAs($this->admin)
-            ->post("/clients/{$this->client->id}/medical/controlled-discrepancies/{$disc->id}/close")
-            ->assertRedirect()
-            ->assertSessionHas('success');
+        // Only the same durable command replays success after closure.
+        $retry = $this->postJson($url, $body)->assertOk();
+        $this->assertSame(['status' => 'saved', 'duplicate' => false], $first->json('sync'));
+        $this->assertSame(['status' => 'duplicate', 'duplicate' => true], $retry->json('sync'));
+        $this->assertSame($disc->id, $first->json('target_id'));
+        $firstClinicalResult = $first->json();
+        $retryClinicalResult = $retry->json();
+        unset($firstClinicalResult['sync'], $retryClinicalResult['sync']);
+        $this->assertSame($firstClinicalResult, $retryClinicalResult);
+        $this->assertSame($before, $disc->fresh()->getRawOriginal());
+        $this->assertSame($entryCount, $medication->controlledDrugEntries()->count());
+        $this->assertSame('10.00', $medication->stock()->sole()->on_hand);
+
+        $newCommand = $this->p07ControlledCommand($medication, [
+            'outcome' => 'found', 'quantity' => 2, 'notes' => $body['notes'],
+            'witnessed_by' => $witness->id, 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
+        ]);
+        $this->postJson($url, $newCommand)->assertConflict();
+        $this->assertSame($before, $disc->fresh()->getRawOriginal());
+        $this->assertSame($entryCount, $medication->controlledDrugEntries()->count());
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -1800,10 +1964,12 @@ class MedicationControllerTest extends TestCase
 
         $this->actingAs($this->providerManager)
             ->post("/clients/{$this->client->id}/break-glass", [
+                'reason_category' => 'Covering an absence', 'authorization_mode' => 'self',
+                'acknowledged_min_necessary' => true, 'acknowledged_incident_report' => true,
                 'reason' => 'Emergency medication query',
             ])
             ->assertRedirect()
-            ->assertSessionHas('success');
+            ->assertSessionHasNoErrors()->assertSessionHas('success');
 
         $access = ClientBreakGlassAccess::where('client_id', $this->client->id)
             ->where('user_id', $this->providerManager->id)
@@ -1822,11 +1988,13 @@ class MedicationControllerTest extends TestCase
 
         $this->actingAs($this->providerManager)
             ->post("/clients/{$this->client->id}/break-glass", [
+                'reason_category' => 'Covering an absence', 'authorization_mode' => 'self',
+                'acknowledged_min_necessary' => true, 'acknowledged_incident_report' => true,
                 'reason' => 'Extended review needed',
                 'minutes' => 120,
             ])
             ->assertRedirect()
-            ->assertSessionHas('success');
+            ->assertSessionHasNoErrors()->assertSessionHas('success');
 
         $access = ClientBreakGlassAccess::where('client_id', $this->client->id)->first();
         $minutesUntilExpiry = now()->diffInMinutes($access->expires_at, false);
@@ -1952,9 +2120,11 @@ class MedicationControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->delete("/clients/{$this->client->id}/break-glass/{$access->id}")
+            ->delete("/clients/{$this->client->id}/break-glass/{$access->id}", ['reason' => 'Covering staff have arrived; emergency access can end.'])
             ->assertRedirect()
-            ->assertSessionHas('success');
+            ->assertSessionHasNoErrors()->assertSessionHas('success');
+        $this->assertFalse(ClientBreakGlassAccess::withTrashed()->findOrFail($access->id)->isRunning());
+        $this->assertSame('Covering staff have arrived; emergency access can end.', ClientBreakGlassAccess::withTrashed()->findOrFail($access->id)->end_reason);
 
         // Soft-deleted for the audit trail, not hard-erased.
         $this->assertSoftDeleted('client_break_glass_accesses', ['id' => $access->id]);
@@ -1972,9 +2142,11 @@ class MedicationControllerTest extends TestCase
         // Coordinator has breakglass but is not the owner, not admin/provider_manager
         // However coordinator has medications.audit.view so they should be able to revoke
         $this->actingAs($this->coordinator)
-            ->delete("/clients/{$this->client->id}/break-glass/{$access->id}")
+            ->delete("/clients/{$this->client->id}/break-glass/{$access->id}", ['reason' => 'Covering staff have arrived; emergency access can end.'])
             ->assertRedirect()
-            ->assertSessionHas('success');
+            ->assertSessionHasNoErrors()->assertSessionHas('success');
+        $this->assertFalse(ClientBreakGlassAccess::withTrashed()->findOrFail($access->id)->isRunning());
+        $this->assertSame('Covering staff have arrived; emergency access can end.', ClientBreakGlassAccess::withTrashed()->findOrFail($access->id)->end_reason);
     }
 
     public function test_break_glass_destroy_returns_404_for_mismatched_client(): void
@@ -2467,7 +2639,7 @@ class MedicationControllerTest extends TestCase
     public function test_mar_export_csv_returns_csv_for_admin(): void
     {
         $this->actingAs($this->admin)
-            ->get("/clients/{$this->client->id}/mar/export.csv")
+            ->get("/clients/{$this->client->id}/mar/export.csv?purpose=care")
             ->assertOk()
             ->assertHeader('content-type', 'text/csv; charset=utf-8');
     }
@@ -2517,23 +2689,40 @@ class MedicationControllerTest extends TestCase
 
     public function test_coordinator_can_view_audit_log(): void
     {
-        $this->actingAs($this->coordinator)
-            ->get('/medications/audit')
-            ->assertOk();
+        $actor = $this->p09ControllerReportActor($this->coordinator);
+        $this->p09ControllerCanonicalRead($actor, '/medications/audit')
+            ->assertOk()->assertInertia(fn ($page) => $page
+            ->component('emar/reports/hub')
+            ->where('filters.view', 'audit')->where('can.history', true));
     }
 
     public function test_finance_user_can_view_reports(): void
     {
-        $this->actingAs($this->financeUser)
-            ->get('/reports/medications')
-            ->assertOk();
+        $actor = $this->p09ControllerReportActor($this->financeUser);
+        $medicine = $this->p09ControllerReportMedicine();
+        ClientMedicationStock::query()->create(['client_medication_id' => $medicine->id, 'on_hand' => 10, 'unit' => 'tablets']);
+        $this->p09ControllerCanonicalRead($actor, '/reports/medications')
+            ->assertOk()->assertInertia(fn ($page) => $page
+            ->component('emar/reports/hub')
+            ->where('finance', true)->where('filters.report', 'stock')
+            ->has('page.data', 1)->where('page.data.0.on_hand', 10)
+            ->missing('page.data.0.client_id')->missing('page.data.0.person')
+            ->missing('page.data.0.reference')->where('can.audit', false));
+        $this->get('/emar/reports?report=doses')->assertForbidden();
+        $this->get('/emar/reports?report=stock&client_id='.$this->client->id)->assertForbidden();
     }
 
-    public function test_auditor_with_general_report_permission_can_view_medication_reports(): void
+    public function test_auditor_needs_exact_medication_report_permission_beside_general_reporting_access(): void
     {
-        $this->actingAs($this->auditor)
-            ->get('/reports/medications')
-            ->assertOk();
+        $actor = $this->p09ControllerReportActor($this->auditor, ['reports.viewAny'], ['medications.reports.view']);
+        $this->assertTrue($actor->canDo('reports.viewAny'));
+        $this->assertFalse($actor->canDo('medications.reports.view'));
+        $this->actingAs($actor)->get('/reports/medications')->assertForbidden();
+        $this->get('/emar/reports')->assertForbidden();
+        $actor = $this->p09ControllerReportActor($actor);
+        $this->p09ControllerCanonicalRead($actor, '/reports/medications')
+            ->assertOk()->assertInertia(fn ($page) => $page
+            ->component('emar/reports/hub')->where('filters.report', 'doses'));
     }
 
     public function test_coordinator_can_manage_medications(): void
@@ -2628,10 +2817,11 @@ class MedicationControllerTest extends TestCase
         $from = '2025-01-01';
         $to = '2025-01-31';
 
-        $this->actingAs($this->admin)
-            ->get("/reports/medications?date_from={$from}&date_to={$to}")
+        $this->p09ControllerCanonicalRead($this->admin, route('reports.medications', ['period' => 'custom', 'date_from' => $from, 'date_to' => $to]))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
+                ->component('emar/reports/hub')
+                ->where('filters.period', 'custom')
                 ->where('filters.date_from', $from)
                 ->where('filters.date_to', $to)
             );
@@ -2639,21 +2829,33 @@ class MedicationControllerTest extends TestCase
 
     public function test_reports_index_applies_client_filter(): void
     {
-        $this->actingAs($this->admin)
-            ->get("/reports/medications?client_id={$this->client->id}")
+        Client::factory()->create(['site_id' => $this->site->id]);
+        $this->p09ControllerCanonicalRead($this->admin, route('reports.medications', ['client_id' => $this->client->id]))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('filters.client_id', (string) $this->client->id)
+                ->component('emar/reports/hub')
+                ->where('filters.client_id', $this->client->id)
+                ->has('page.data', 1)->where('page.data.0.client_id', $this->client->id)
             );
+        $foreign = Client::factory()->create(['site_id' => Site::factory()->create()->id]);
+        $actor = $this->p09ControllerReportActor($this->coordinator, ['medications.reports.view'], ['clinical.accessAllSites', 'sites.viewAll']);
+        $this->p09ControllerCanonicalRead($actor, route('reports.medications', ['client_id' => $foreign->id]))->assertNotFound();
+        $this->p09ControllerCanonicalRead($actor, route('reports.medications', ['client_id' => 999999]))->assertNotFound();
     }
 
-    public function test_reports_index_applies_status_filter(): void
+    public function test_reports_index_filters_dose_outcomes_by_the_canonical_event_kind(): void
     {
-        $this->actingAs($this->admin)
-            ->get('/reports/medications?status=refused')
+        $this->p09ControllerReportEvent('dose.given', 'Dose given fixture');
+        $refused = $this->p09ControllerReportEvent('dose.refused', 'Dose refused fixture');
+        // Individual outcomes are now filtered in the event list. The dose
+        // report is a per-person total, so its former status prop is retired.
+        $this->p09ControllerCanonicalRead($this->admin, route('reports.medications', ['view' => 'audit', 'period' => 'today', 'kind' => 'dose.refused']))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('filters.status', 'refused')
+                ->component('emar/reports/hub')
+                ->where('filters.view', 'audit')->where('filters.kind', 'dose.refused')
+                ->has('page.data', 1)->where('page.data.0.id', $refused->id)
+                ->where('page.data.0.kind', 'dose.refused')
             );
     }
 
@@ -2663,14 +2865,101 @@ class MedicationControllerTest extends TestCase
 
     public function test_audit_index_applies_filters(): void
     {
-        $this->actingAs($this->admin)
-            ->get("/medications/audit?client_id={$this->client->id}&from=2025-01-01&to=2025-12-31")
+        $this->p09ControllerCanonicalRead($this->admin, route('medications.audit.index', ['client_id' => $this->client->id, 'period' => 'custom', 'date_from' => '2025-01-01', 'date_to' => '2025-12-31']))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('filters.client_id', (string) $this->client->id)
-                ->where('filters.from', '2025-01-01')
-                ->where('filters.to', '2025-12-31')
+                ->component('emar/reports/hub')->where('filters.view', 'audit')
+                ->where('filters.client_id', $this->client->id)
+                ->where('filters.date_from', '2025-01-01')
+                ->where('filters.date_to', '2025-12-31')
             );
+    }
+
+    private function p09ControllerCanonicalRead(User $actor, string $url): TestResponse
+    {
+        $redirect = $this->actingAs($actor)->get($url)->assertRedirect();
+        $location = $redirect->headers->get('Location');
+        $this->assertStringContainsString('/emar/reports', $location);
+
+        return $this->get($location);
+    }
+
+    /** Test-only exact grants; shared role defaults and writer fixtures stay intact. */
+    private function p09ControllerReportActor(
+        User $actor,
+        array $grants = ['medications.reports.view'],
+        array $denials = [],
+    ): User {
+        foreach ([true => $grants, false => $denials] as $allowed => $keys) {
+            $permissions = Permission::query()->whereIn('key', $keys)->pluck('id');
+            $this->assertCount(count($keys), $permissions, 'Missing exact report permission fixture.');
+            $actor->permissionOverrides()->syncWithoutDetaching(
+                $permissions->mapWithKeys(fn ($id) => [$id => ['allowed' => (bool) $allowed]])->all(),
+            );
+        }
+
+        return $actor->refresh();
+    }
+
+    private function p09ControllerReportMedicine(array $overrides = []): ClientMedication
+    {
+        $now = Carbon::getTestNow();
+        Carbon::setTestNow($this->workerNow()->subDay()->utc());
+        try {
+            return ClientMedication::query()->create(array_replace([
+                'client_id' => $this->client->id,
+                'name' => 'Ordinary report fixture medicine',
+                'dosage' => '500 mg',
+                'frequency' => 'Daily',
+                'dose_times' => [$this->workerNow()->format('H:i')],
+                'is_prn' => false,
+                'controlled_drug' => false,
+                'high_risk' => false,
+                'active' => true,
+                'state' => 'active',
+                'approval_status' => 'verified',
+                'start_date' => $this->workerNow()->subDays(2)->toDateString(),
+                'end_date' => null,
+            ], $overrides));
+        } finally {
+            Carbon::setTestNow($now);
+        }
+    }
+
+    private function p09ControllerReportAdministration(
+        ClientMedication $medicine,
+        string $status = 'given',
+    ): ClientMedicationAdministration {
+        return ClientMedicationAdministration::query()->create([
+            'client_id' => $this->client->id,
+            'client_medication_id' => $medicine->id,
+            'service_context_id' => $this->serviceContext->id,
+            'administered_by' => $this->admin->id,
+            'scheduled_for' => $this->workerNow()->utc(),
+            'administered_at' => $this->workerNow()->utc(),
+            'status' => $status,
+            'dose_given' => $status === 'given' ? '500 mg' : null,
+            'reason' => $status === 'refused' ? 'Person declined' : null,
+        ]);
+    }
+
+    private function p09ControllerReportEvent(string $kind, string $summary): MedicationEvent
+    {
+        $medicine = $this->p09ControllerReportMedicine();
+        $record = $this->p09ControllerReportAdministration($medicine, $kind === 'dose.refused' ? 'refused' : 'given');
+
+        return DB::transaction(fn () => app(MedicationEventRecorder::class)
+            ->append(new MedicationEventData(
+                (int) $this->site->id,
+                $kind,
+                'medication_administration',
+                (string) $record->id,
+                (int) $this->admin->id,
+                CarbonImmutable::instance($record->administered_at)->utc(),
+                $summary,
+                ['status' => $record->status],
+                (int) $this->client->id,
+            )));
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -2679,8 +2968,8 @@ class MedicationControllerTest extends TestCase
 
     public function test_guided_controlled_balance_check_remains_available_while_discrepancy_is_open(): void
     {
-        $med = $this->createControlledDrug();
-        $witness = $this->createWitness();
+        $med = $this->p07ControlledMedicine();
+        $witness = $this->p07ControlledWitness();
 
         ClientMedicationStock::create([
             'client_medication_id' => $med->id,
@@ -2703,15 +2992,15 @@ class MedicationControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->supportWorker)
-            ->post(route('emar.controlled.balance_check.store'), [
+            ->postJson(route('emar.controlled.balance_check.store'), [
+                ...$this->p07ControlledCommand($med),
                 'client_medication_id' => $med->id,
                 'expected_balance' => 10,
                 'actual_balance' => 10,
                 'witnessed_by' => $witness->id,
                 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
-            ->assertRedirect()
-            ->assertSessionHas('success');
+            ->assertOk();
 
         $this->assertDatabaseHas('client_controlled_drug_entries', [
             'client_medication_id' => $med->id,
@@ -3083,6 +3372,7 @@ class MedicationControllerTest extends TestCase
     public function test_full_medication_lifecycle(): void
     {
         $this->mockNotificationService();
+        Storage::fake('local');
         $administrationAt = $this->workerNow();
         // The order is entered now, so its dose is the next one: nothing is
         // owed before an order exists (P01 recording guard).
@@ -3096,6 +3386,9 @@ class MedicationControllerTest extends TestCase
                 'frequency' => 'Once daily',
                 'dose_times' => [$doseAt->format('H:i')],
                 'state' => 'active',
+                'controlled_drug' => false,
+                'high_risk' => false,
+                'witness_required' => false,
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
@@ -3103,11 +3396,41 @@ class MedicationControllerTest extends TestCase
         $med = ClientMedication::where('name', 'Lifecycle Med')->first();
         $this->assertNotNull($med);
 
-        // 2. Verify the newly created order before it can be administered.
+        // 2. Retain the signed source and independently check its revision.
+        $sourceRequest = 'lifecycle-source-'.bin2hex(random_bytes(8));
+        $this->actingAs($this->admin)->post('/emar/orders', [
+            'client_id' => $this->client->id,
+            'medication_id' => $med->id,
+            'expected_version' => $med->version,
+            'request_key' => $sourceRequest,
+            'change_reason' => 'Enter the signed prescription.',
+            'source' => [
+                'type' => 'written', 'prescriber' => 'Dr Lifecycle',
+                'received_at' => now()->subMinute()->toIso8601String(), 'description' => 'Signed prescription.',
+            ],
+            'source_file' => UploadedFile::fake()->create('prescription.pdf', 1, 'application/pdf'),
+            'prescription' => [
+                'name' => 'Lifecycle Med', 'dosage' => '10mg', 'frequency' => 'Once daily',
+                'dose_times' => [$doseAt->format('H:i')], 'is_prn' => false, 'route' => 'oral',
+                'indication' => 'Indication from source.', 'start_date' => now('Pacific/Auckland')->toDateString(),
+                'controlled_drug' => false, 'high_risk' => false, 'witness_required' => false,
+            ],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $revision = MedicationOrderRevision::where('client_medication_id', $med->id)
+            ->where('status', 'pending')->whereHas('version', fn ($query) => $query->where('entry_request_key', $sourceRequest))->sole();
+        $versionEvidence = $revision->version->fresh()->getAttributes();
         $this->actingAs($this->providerManager)
-            ->post(route('emar.medications.verify', $med))
+            ->post('/emar/order-revisions/'.$revision->id.'/check', [
+                'source_matches' => true,
+                'dose_route_times_checked' => true,
+                'allergies_interactions_checked' => true,
+            ])
             ->assertRedirect()
+            ->assertSessionHasNoErrors()
             ->assertSessionHas('success');
+        $this->assertSame('checked', $revision->fresh()->status);
+        $this->assertSame('verified', $med->fresh()->approval_status);
+        $this->assertSame($this->providerManager->id, (int) $med->fresh()->verified_by);
 
         // 3. Update stock
         $this->actingAs($this->admin)
@@ -3162,6 +3485,15 @@ class MedicationControllerTest extends TestCase
             'id' => $med->id,
             'state' => 'ceased',
             'deleted_at' => null,
+            'ceased_reason' => 'No longer needed',
+            'ceased_by' => $this->admin->id,
         ]);
+        $this->assertDatabaseHas('client_medication_administrations', [
+            'client_medication_id' => $med->id,
+            'status' => 'given',
+            'administered_by' => $this->supportWorker->id,
+            'dose_given' => '10mg',
+        ]);
+        $this->assertSame($versionEvidence, $revision->version->fresh()->getAttributes());
     }
 }

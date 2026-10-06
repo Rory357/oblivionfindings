@@ -699,6 +699,7 @@ export function TemplateWizard({
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={onClose}
                 title={src ? 'Edit round template' : 'Add a round template'}
@@ -848,6 +849,7 @@ export function TemplateWizard({
                                     error={errs.time}
                                 >
                                     <TimePicker
+                                        compact
                                         id="tw-time"
                                         label="Round time"
                                         value={t.time}
@@ -1087,6 +1089,7 @@ export function TemplateWizard({
                 </WizardStepPane>
             </WizardShell>
             <DiscardDraftDialog
+                frontline
                 open={guard}
                 mode={src ? 'edit' : 'create'}
                 description="Nothing you’ve entered here has been saved. Closing now loses it."
@@ -1106,6 +1109,7 @@ export function TemplateView({ id, data }: { id: number; data: TemplateData }) {
     if (!t) return <NotFound what="template" />;
     return (
         <SettingsModal
+            frontline
             title={`${t.name} — ${houseOf(t)}`}
             description={
                 t.status === 'retired'
@@ -1168,6 +1172,7 @@ export function TemplateToggle({
     if (act === 'resume' && needsHouse(t))
         return (
             <SettingsModal
+                frontline
                 title="Choose a house first"
                 description={`${t.name} has no house, so no rounds can be created from it.`}
                 onClose={close}
@@ -1210,6 +1215,7 @@ export function TemplateToggle({
     };
     return (
         <ConfirmDialog
+            frontline
             open
             onClose={close}
             processing={saving}
@@ -1332,7 +1338,9 @@ export function CreateRounds({ data }: { data: TemplateData }) {
         );
     return (
         <SettingsModal
+            frontline
             title="Create rounds for a day"
+            width={720}
             description="Rounds are created automatically at 12:05 am each day. Use this to create them sooner — for example after adding a template."
             onClose={close}
             footer={
@@ -1370,6 +1378,7 @@ export function CreateRounds({ data }: { data: TemplateData }) {
             />
             <Field label="Day" hint={WORKER_TIMEZONE} htmlFor="gw-date">
                 <DatePicker
+                    compact
                     id="gw-date"
                     label="Day"
                     value={date}

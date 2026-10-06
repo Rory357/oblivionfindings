@@ -142,18 +142,23 @@ it('relates a typed monitor to canonical device site profile collector and obser
         ->and($observation->collector->is($collector))->toBeTrue()
         ->and($monitor->observations()->sole()->is($observation))->toBeTrue();
 
+    $evidenceBefore = $observation->fresh()->getRawOriginal();
+    $observationCount = MonitorObservation::query()->count();
     expect(fn () => $observation->update(['site_id' => Site::factory()->create()->id]))
-        ->toThrow(LogicException::class, 'Monitoring observation provenance is immutable.');
+        ->toThrow(LogicException::class, 'Monitoring observation evidence is immutable.');
+    expect($observation->fresh()->getRawOriginal())->toBe($evidenceBefore);
 
     expect(fn () => $observation->fresh()
         ->forceFill(['device_id' => $otherDevice->id])
         ->saveQuietly())
-        ->toThrow(LogicException::class, 'Monitoring observation provenance is immutable.');
+        ->toThrow(LogicException::class, 'Monitoring observation evidence is immutable.');
+    expect($observation->fresh()->getRawOriginal())->toBe($evidenceBefore);
 
     expect(fn () => MonitorObservation::query()
         ->whereKey($observation->id)
         ->update(['collector_id' => $otherCollector->id]))
         ->toThrow(LogicException::class, 'Monitoring observation provenance is immutable.');
+    expect($observation->fresh()->getRawOriginal())->toBe($evidenceBefore);
 
     expect(fn () => MonitorObservation::query()->insert([
         ...LegacyStorageContext::attributes(),
@@ -168,4 +173,6 @@ it('relates a typed monitor to canonical device site profile collector and obser
         'created_at' => now(),
         'updated_at' => now(),
     ]))->toThrow(LogicException::class, 'Monitoring observations must use the canonical creation boundary.');
+    expect(MonitorObservation::query()->count())->toBe($observationCount)
+        ->and($observation->fresh()->getRawOriginal())->toBe($evidenceBefore);
 });

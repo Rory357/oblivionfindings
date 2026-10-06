@@ -4,26 +4,37 @@
  * MedicationOverviewService via EmarController::dashboard(). */
 import { ClientAvatar } from '@/components/meds/board-bits';
 import { DonutChart, OPS_COLORS } from '@/components/ops-stat-card';
-import { PageHero } from '@/components/page';
-import { PageHeaderPrimaryButton } from '@/components/page/page-header';
-import type { PageHeroBadge } from '@/components/page/page-hero-badges';
-import type { PageHeroMetaItem } from '@/components/page/page-hero-meta';
-import type { PageHeroStat } from '@/components/page/page-hero-stats';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
 import { EntityFilter } from '@/components/rostering/entity-filter';
-import { TabStrip, type RosterTabItem } from '@/components/rostering/tab-strip';
+import { type RosterTabItem } from '@/components/rostering/tab-strip';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateOnly } from '@/lib/datetime';
+import {
+    canOpenEmarAudit,
+    canOpenEmarReports,
+    emarReportsHref,
+    type EmarNavigationPermissions,
+} from '@/lib/emar-navigation';
 import { cn } from '@/lib/utils';
 import type { SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
-    Award,
     CalendarCheck,
-    CalendarDays,
     CheckCircle2,
     ChevronLeft,
     ChevronRight,
@@ -33,19 +44,17 @@ import {
     HeartPulse,
     LayoutGrid,
     Lock,
-    MapPin,
     Package,
     Pill,
     Printer,
-    Search,
     Shield,
+    ShieldCheck,
     Syringe,
-    TrendingUp,
     Users,
     X,
     Zap,
 } from 'lucide-react';
-import { useMemo, useState, type ComponentType, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import {
     Area,
     AreaChart,
@@ -58,12 +67,12 @@ import {
 } from 'recharts';
 
 import { EmarHubRail } from '@/components/emar/emar-hub-rail';
+import { RecordDoseDialog } from '@/components/emar/record-dose/record-dose-dialog';
 import {
     addDays,
     DayPickerChip,
     parseYmd,
 } from '@/components/meds/day-picker-chip';
-import { RecordDoseDialog } from '@/components/emar/record-dose/record-dose-dialog';
 import type {
     ClientInfo,
     CompetencyNotice,
@@ -71,7 +80,6 @@ import type {
     ScheduleRow,
 } from '@/pages/meds/today/types';
 import { AddMedicationModal } from './components/add-medication-modal';
-import { AuditLogModal } from './components/audit-log-modal';
 import {
     CdRegisterModal,
     type MedicationOption,
@@ -83,7 +91,6 @@ import {
     ReportErrorModal,
     type ClientOption,
 } from './components/report-error-modal';
-import { ReportsModal } from './components/reports-modal';
 import { StockMovementModal } from './components/stock-movement-modal';
 
 /* ── Types (mirror MedicationOverviewService::payload) ───────────────── */
@@ -343,15 +350,6 @@ function actionHref(it: ActionItem): string {
     }
 }
 
-const HERO_TABS: { id: string; label: string; href: string | null }[] = [
-    { id: 'overview', label: 'Overview', href: null },
-    { id: 'mar', label: 'MAR charts', href: '/emar/mar' },
-    { id: 'cd', label: 'CD register', href: '/emar/controlled' },
-    { id: 'reviews', label: 'Reviews', href: '/emar/reviews' },
-    { id: 'stock', label: 'Stock', href: '/emar/stock' },
-    { id: 'errors', label: 'Errors', href: '/emar/errors' },
-];
-
 type KpiTone = 'success' | 'critical' | 'warning' | 'primary' | 'neutral';
 
 const KPI_TONE: Record<KpiTone, string> = {
@@ -363,93 +361,6 @@ const KPI_TONE: Record<KpiTone, string> = {
 };
 
 /** Responsive sparkline that inherits its colour from `currentColor`. */
-function MiniSparkline({
-    data,
-    className,
-}: {
-    data: number[];
-    className?: string;
-}) {
-    if (!data || data.length < 2) return null;
-    const max = Math.max(...data);
-    const min = Math.min(...data);
-    const range = max - min || 1;
-    const step = 100 / (data.length - 1);
-    const points = data
-        .map((v, i) => `${i * step},${20 - ((v - min) / range) * 20}`)
-        .join(' ');
-    return (
-        <svg
-            viewBox="0 0 100 22"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-            className={cn('h-[22px] w-full', className)}
-        >
-            <polyline
-                points={points}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-        </svg>
-    );
-}
-
-/** Design-spec KPI card: tinted icon chip + top-right pill + value + label + footer. */
-function KpiCard({
-    icon: Icon,
-    tone,
-    value,
-    label,
-    pill,
-    sub,
-    footer,
-}: {
-    icon: ComponentType<{ className?: string }>;
-    tone: KpiTone;
-    value: ReactNode;
-    label: string;
-    pill?: { label: string; tone: KpiTone } | null;
-    sub?: string;
-    footer?: ReactNode;
-}) {
-    return (
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <div className="mb-2.5 flex items-center justify-between gap-2">
-                <span
-                    className={cn(
-                        'grid h-8 w-8 shrink-0 place-items-center rounded-lg',
-                        KPI_TONE[tone],
-                    )}
-                >
-                    <Icon className="h-4 w-4" />
-                </span>
-                {pill ? (
-                    <span
-                        className={cn(
-                            'shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-bold',
-                            KPI_TONE[pill.tone],
-                        )}
-                    >
-                        {pill.label}
-                    </span>
-                ) : null}
-            </div>
-            <div className="text-2xl font-bold tracking-tight tabular-nums">
-                {value}
-            </div>
-            <div className="text-xs text-muted-foreground">{label}</div>
-            {footer ? (
-                <div className="mt-2">{footer}</div>
-            ) : sub ? (
-                <p className="mt-1 text-[11px] text-muted-foreground">{sub}</p>
-            ) : null}
-        </div>
-    );
-}
-
 export default function EmarHome(props: Props) {
     const breadcrumbs = useEmarBreadcrumbs();
     const {
@@ -479,13 +390,19 @@ export default function EmarHome(props: Props) {
     } = props;
 
     const page = usePage<SharedData>();
-    const firstName =
-        (page.props.auth?.user?.name ?? '').split(' ')[0] || 'there';
+    const navigationCan = page.props.auth?.can as
+        | EmarNavigationPermissions
+        | undefined;
+    const canReadReports = canOpenEmarReports(navigationCan);
+    const canReadAudit = canOpenEmarAudit(navigationCan);
     const currentUserId = page.props.auth?.user?.id ?? 0;
 
     const [acFilter, setAcFilter] = useState<'all' | AcCategory>('all');
     const [search, setSearch] = useState('');
     const [siteFilter, setSiteFilter] = useState<number | null>(null);
+    const reportScope = { date, site_id: siteFilter };
+    const auditHref = emarReportsHref('audit', reportScope);
+    const exportsHref = emarReportsHref('exports', reportScope);
     const [dismissed, setDismissed] = useState<Set<string>>(new Set());
     const [modal, setModal] = useState<
         | null
@@ -495,8 +412,6 @@ export default function EmarHome(props: Props) {
         | 'medication-review'
         | 'cd-register'
         | 'stock-movement'
-        | 'reports'
-        | 'audit-log'
     >(null);
     const [modalClientId, setModalClientId] = useState<number | null>(null);
     const [recordWizard, setRecordWizard] = useState<{
@@ -527,16 +442,6 @@ export default function EmarHome(props: Props) {
     const adminRateLabel =
         stats.adminRate === null ? 'n/a' : `${stats.adminRate}%`;
     const deltaLabel = `${deltaUp ? '▲' : '▼'} ${Math.abs(complianceDelta)}`;
-
-    // 6-segment severity bar for the "Doses due now" KPI card.
-    const dueSegments = Array.from({ length: 6 }, (_, i) =>
-        i < Math.min(6, stats.overdue)
-            ? 'bg-status-critical'
-            : i < Math.min(6, stats.dueNow)
-              ? 'bg-status-warning'
-              : 'bg-muted',
-    );
-    const segHeights = ['h-5', 'h-4', 'h-5', 'h-3', 'h-4', 'h-2.5'];
 
     // First overdue dose — named in the critical ribbon, like the design.
     const firstOverdue = actionCentre.find(
@@ -624,114 +529,41 @@ export default function EmarHome(props: Props) {
         .filter((c) => siteFilter === null || c.site === siteNames[siteFilter])
         .filter((c) => !q || c.name.toLowerCase().includes(q));
 
-    /* ── Hero pieces ── */
-    const heroMeta = [
-        { icon: Clock, label: 'Oversight shift · 07:00–15:00' },
-        {
-            icon: MapPin,
-            label: `${siteNames.length || 1} site${siteNames.length === 1 ? '' : 's'} · ${stats.activeClients} clients`,
-        },
-        can.view_controlled && {
-            icon: Shield,
-            label: 'Medication lead · CD witness authorised',
-        },
-    ].filter(Boolean) as PageHeroMetaItem[];
-
-    const heroBadges: PageHeroBadge[] = [
-        stats.overdue > 0 && {
-            tone: 'critical' as const,
-            icon: AlertTriangle,
-            label: `${stats.overdue} dose${stats.overdue === 1 ? '' : 's'} overdue`,
-        },
-        // Can't be recorded until the order is checked, so not overdue.
-        stats.pendingCheckToday > 0 && {
-            tone: 'info' as const,
-            icon: ClipboardCheck,
-            label: `${stats.pendingCheckToday} dose${stats.pendingCheckToday === 1 ? '' : 's'} waiting for the order check`,
-            href: orderCheckUrl,
-        },
-        can.view_controlled &&
-            stats.activeDiscrepancies > 0 && {
-                tone: 'critical' as const,
-                icon: Lock,
-                label: `${stats.activeDiscrepancies} CD discrepancy — investigate`,
-            },
-        stats.overdueReviews > 0 && {
-            tone: 'warning' as const,
-            icon: Clock,
-            label: `${stats.overdueReviews} review${stats.overdueReviews === 1 ? '' : 's'} overdue`,
-        },
-        inrOutOfRange > 0 && {
-            tone: 'warning' as const,
-            icon: HeartPulse,
-            label: `${inrOutOfRange} INR out of range`,
-        },
-    ].filter(Boolean) as PageHeroBadge[];
-
-    const heroStats = [
-        { label: 'Admin rate', value: adminRateLabel },
-        {
-            label: 'Due now',
-            value: stats.dueNow,
-            tone: stats.overdue > 0 ? 'critical' : undefined,
-        },
-        can.view_controlled && { label: 'CD due', value: stats.cdDue },
-        { label: 'Reviews', value: stats.reviewsDue },
-    ].filter(Boolean) as PageHeroStat[];
-
-    const heroFooter = (
-        <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
+    const headerFilters = (
+        <div className="flex w-full flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-1.5">
-                {/* eslint-disable no-restricted-syntax -- segmented day-stepper on the dark hero (rostering idiom). */}
-                <button
-                    type="button"
-                    className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20"
+                <PageHeaderGlassButton
+                    icon={ChevronLeft}
+                    className="frontline-hit"
                     onClick={() => goDate(addDays(date, -1))}
                 >
-                    <ChevronLeft className="h-3.5 w-3.5" />
                     {stepLabel(addDays(date, -1))}
-                </button>
+                </PageHeaderGlassButton>
                 <DayPickerChip date={date} isToday={isToday} onPick={goDate} />
-                <button
-                    type="button"
-                    className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20"
+                <PageHeaderGlassButton
+                    icon={ChevronRight}
+                    className="frontline-hit"
                     onClick={() => goDate(addDays(date, 1))}
                 >
                     {stepLabel(addDays(date, 1))}
-                    <ChevronRight className="h-3.5 w-3.5" />
-                </button>
+                </PageHeaderGlassButton>
                 {!isToday ? (
-                    <button
-                        type="button"
-                        className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/35 bg-primary-foreground/20 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/30"
+                    <PageHeaderGlassButton
+                        className="frontline-hit"
                         onClick={() => goDate(localYmdToday())}
                     >
                         Back to today
-                    </button>
+                    </PageHeaderGlassButton>
                 ) : null}
-                {/* eslint-enable no-restricted-syntax */}
             </div>
-            <div className="flex flex-wrap items-center gap-2 md:ml-auto md:justify-end">
-                <div className="relative w-full max-w-xs md:w-[260px]">
-                    <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    {/* eslint-disable-next-line no-restricted-syntax -- white pill search on the dark hero per design handoff. */}
-                    <input
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Search client, medication or NHI…"
-                        aria-label="Search the medication picture"
-                        className="h-8 w-full rounded-full border-0 bg-primary-foreground pr-3 pl-9 text-[13px] text-foreground shadow-sm outline-none placeholder:text-muted-foreground/80 focus:ring-2 focus:ring-primary-foreground/50"
-                    />
-                </div>
-                <EntityFilter
-                    label="Site"
-                    allLabel="All sites"
-                    items={siteOptions}
-                    value={siteFilter}
-                    onChange={setSiteFilter}
-                    onDark
-                />
-            </div>
+            <EntityFilter
+                label="Site"
+                allLabel="All sites"
+                items={siteOptions}
+                value={siteFilter}
+                onChange={setSiteFilter}
+                onDark
+            />
         </div>
     );
 
@@ -773,12 +605,6 @@ export default function EmarHome(props: Props) {
         },
     ].filter(Boolean) as RosterTabItem[];
 
-    const heroTabs = HERO_TABS.filter(
-        (tab) =>
-            (tab.id !== 'cd' || can.view_controlled) &&
-            (tab.id !== 'stock' || can.manage_stock),
-    );
-
     const donutSegments = outcomeBreakdown.segments
         .filter((s) => s.count > 0)
         .map((s) => ({
@@ -795,131 +621,168 @@ export default function EmarHome(props: Props) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Medication overview" />
-            <div className="flex flex-col gap-4 p-6">
-                {/* ── Hero ── */}
-                <PageHero
-                    rail={<EmarHubRail />}
-                    category="ops"
-                    icon={Pill}
-                    title={
-                        <span>
-                            <span className="mb-2 flex items-center justify-center gap-2 text-[10.5px] font-semibold tracking-wider text-primary-foreground/80 uppercase md:justify-start">
-                                {isToday ? (
-                                    <span
-                                        aria-hidden="true"
-                                        className="relative inline-flex h-2 w-2"
-                                    >
-                                        <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-status-success/70" />
-                                        <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success ring-2 ring-status-success/30" />
-                                    </span>
-                                ) : (
-                                    <CalendarDays className="h-3 w-3" />
-                                )}
-                                {isToday
-                                    ? `Live medication oversight · refreshed ${nowLabel}`
-                                    : 'Medication oversight · day view'}
-                            </span>
-                            <span className="block">
-                                <span className="font-normal text-primary-foreground/80">
-                                    Kia ora {firstName}, the medication picture
-                                    for{' '}
-                                </span>
-                                <span className="border-b-2 border-primary-foreground/40 pb-0.5">
-                                    {dateTitle}
-                                </span>
-                            </span>
-                        </span>
+            <Head title="Medication safety overview" />
+            <div className="flex min-w-0 flex-col gap-5">
+                <PageHeader
+                    icon={ShieldCheck}
+                    title="Safety & oversight"
+                    wrapTitle
+                    titleChip={
+                        <PageHeaderStatusChip variant="neutral">
+                            Overview
+                        </PageHeaderStatusChip>
                     }
-                    description={
-                        <span>
-                            {doseCoverage.day_available ? (
-                                <>
-                                    {stats.totalToday} dose
-                                    {stats.totalToday === 1 ? '' : 's'}{' '}
-                                    scheduled across {siteNames.length || 1}{' '}
-                                    site
-                                    {siteNames.length === 1 ? '' : 's'}.{' '}
-                                    {stats.dueNow} due now
-                                    {stats.overdue > 0
-                                        ? ` (${stats.overdue} overdue)`
-                                        : ''}{' '}
-                                    and{' '}
-                                    {stats.adminRate === null
-                                        ? 'no doses due yet'
-                                        : `${stats.adminRate}% of due doses given so far`}
-                                    .{' '}
-                                </>
-                            ) : (
-                                <>Dose numbers: {doseCoverage.day_notice}. </>
-                            )}
-                            {can.view_controlled ? (
-                                <>
-                                    {stats.activeDiscrepancies} controlled-drug
-                                    discrepancy and{' '}
-                                </>
-                            ) : null}
-                            {stats.overdueReviews} review
-                            {stats.overdueReviews === 1 ? '' : 's'} need a
-                            clinician.
-                        </span>
-                    }
-                    meta={heroMeta}
-                    badges={heroBadges}
-                    stats={heroStats}
+                    subline={`${formatDateOnly(date, dateTitle)} · ${stats.activeClients} people · ${isToday ? `Updated ${nowLabel} NZ time` : 'Day view'}`}
                     actions={
                         <>
+                            <PageHeaderSearch
+                                value={search}
+                                onChange={setSearch}
+                                placeholder="Search people or actions"
+                                ariaLabel="Search the medication overview"
+                            />
                             {can.record ? (
                                 <PageHeaderPrimaryButton
                                     icon={Clock}
+                                    className="frontline-hit"
                                     onClick={() => setModal('generate-rounds')}
                                 >
                                     Generate today&rsquo;s rounds
                                 </PageHeaderPrimaryButton>
                             ) : null}
-                            {can.export_reports ? (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
-                                    onClick={() => setModal('reports')}
+                            {canReadReports ? (
+                                <PageHeaderGlassButton
+                                    icon={Printer}
+                                    className="frontline-hit"
+                                    asChild
                                 >
-                                    <Printer className="h-4 w-4" />
-                                    {can.view_controlled
-                                        ? 'Export MAR & CD register'
-                                        : 'Export MAR'}
-                                </Button>
+                                    <Link href={exportsHref}>
+                                        Print &amp; exports
+                                    </Link>
+                                </PageHeaderGlassButton>
                             ) : null}
                         </>
                     }
-                    footer={heroFooter}
-                />
-
-                {/* ── Hero tab strip ── */}
-                <TabStrip
-                    ariaLabel="eMAR views"
-                    value="overview"
-                    onChange={(id) => {
-                        const t = heroTabs.find((x) => x.id === id);
-                        if (t?.href) router.visit(t.href);
-                    }}
-                    items={heroTabs.map((t) => ({
-                        id: t.id,
-                        label: t.label,
-                        icon:
-                            t.id === 'overview'
-                                ? LayoutGrid
-                                : t.id === 'mar'
-                                  ? Pill
-                                  : t.id === 'cd'
-                                    ? Lock
-                                    : t.id === 'reviews'
-                                      ? ClipboardCheck
-                                      : t.id === 'stock'
-                                        ? Package
-                                        : AlertTriangle,
-                        tone: 'primary',
-                    }))}
+                    meters={
+                        <>
+                            <PageHeaderMeterBlock
+                                label="Due doses given"
+                                href={`/emar/mar?date=${encodeURIComponent(date)}`}
+                                tone="success"
+                            >
+                                {doseCoverage.day_available &&
+                                stats.adminRate !== null ? (
+                                    <PageHeaderMeterDonut
+                                        percent={stats.adminRate}
+                                    />
+                                ) : (
+                                    <PageHeaderMeterBig>—</PageHeaderMeterBig>
+                                )}
+                                <PageHeaderMeterCaption>
+                                    {!doseCoverage.day_available
+                                        ? doseCoverage.day_notice
+                                        : stats.adminRate === null
+                                          ? 'No doses due yet'
+                                          : 'Eligible scheduled doses'}
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Needs recording"
+                                href={`/emar/mar?date=${encodeURIComponent(date)}`}
+                                tone={stats.overdue > 0 ? 'critical' : 'brand'}
+                            >
+                                <PageHeaderMeterBig>
+                                    {doseCoverage.day_available
+                                        ? stats.dueNow
+                                        : '—'}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    {doseCoverage.day_available
+                                        ? `${Math.max(0, stats.dueNow - stats.overdue)} due now · ${stats.overdue} overdue`
+                                        : doseCoverage.day_notice}
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Waiting for order check"
+                                href={orderCheckUrl}
+                                tone={
+                                    stats.pendingCheckToday > 0
+                                        ? 'warning'
+                                        : 'brand'
+                                }
+                            >
+                                <PageHeaderMeterBig>
+                                    {doseCoverage.day_available
+                                        ? stats.pendingCheckToday
+                                        : '—'}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    {doseCoverage.day_available
+                                        ? 'Order must be checked first'
+                                        : doseCoverage.day_notice}
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Reviews due"
+                                href="/emar/reviews"
+                                tone={
+                                    stats.overdueReviews > 0
+                                        ? 'warning'
+                                        : 'brand'
+                                }
+                            >
+                                <PageHeaderMeterBig>
+                                    {stats.reviewsDue}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    {stats.overdueReviews} overdue
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="INR out of range"
+                                tone={inrOutOfRange > 0 ? 'warning' : 'brand'}
+                                onClick={() => {
+                                    setAcFilter('clinical');
+                                    const target = document.getElementById(
+                                        'medication-action-centre',
+                                    );
+                                    target?.scrollIntoView({ block: 'start' });
+                                    target?.focus({ preventScroll: true });
+                                }}
+                            >
+                                <PageHeaderMeterBig>
+                                    {inrOutOfRange}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    Out-of-range results shown below
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            {can.view_controlled ? (
+                                <PageHeaderMeterBlock
+                                    label="Controlled medicines"
+                                    href="/emar/controlled"
+                                    tone={
+                                        stats.activeDiscrepancies > 0
+                                            ? 'critical'
+                                            : 'brand'
+                                    }
+                                >
+                                    <PageHeaderMeterBig>
+                                        {stats.cdDue}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Active · {stats.activeDiscrepancies}{' '}
+                                        open discrepanc
+                                        {stats.activeDiscrepancies === 1
+                                            ? 'y'
+                                            : 'ies'}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            ) : null}
+                        </>
+                    }
+                    filters={headerFilters}
+                    rail={<EmarHubRail />}
                 />
 
                 {/* ── Critical ribbon ── */}
@@ -944,120 +807,36 @@ export default function EmarHome(props: Props) {
                     </div>
                 ) : null}
 
-                {/* ── KPI strip ── */}
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-                    <KpiCard
-                        icon={TrendingUp}
-                        tone="success"
-                        value={adminRateLabel}
-                        label="Admin rate · target 95%"
-                        pill={{
-                            label: deltaLabel,
-                            tone: deltaUp ? 'success' : 'critical',
-                        }}
-                        footer={
-                            <MiniSparkline
-                                data={stats.givenTrend}
-                                className={
-                                    deltaUp
-                                        ? 'text-status-success'
-                                        : 'text-status-critical'
-                                }
-                            />
-                        }
-                    />
-                    <KpiCard
-                        icon={Clock}
-                        tone="critical"
-                        value={stats.dueNow}
-                        label="Doses due now"
-                        pill={
-                            stats.overdue > 0
-                                ? {
-                                      label: `${stats.overdue} overdue`,
-                                      tone: 'critical',
-                                  }
-                                : null
-                        }
-                        footer={
-                            <div className="flex h-[22px] items-end gap-[3px]">
-                                {dueSegments.map((c, i) => (
-                                    <span
-                                        key={i}
-                                        className={cn(
-                                            'flex-1 rounded-sm',
-                                            c,
-                                            segHeights[i],
-                                        )}
-                                    />
-                                ))}
-                            </div>
-                        }
-                    />
-                    {can.view_controlled ? (
-                        <KpiCard
-                            icon={Lock}
-                            tone="primary"
-                            value={stats.controlledCount}
-                            label="Controlled drugs active"
-                            pill={
-                                stats.activeDiscrepancies > 0
-                                    ? {
-                                          label: `${stats.activeDiscrepancies} discrepancy`,
-                                          tone: 'critical',
-                                      }
-                                    : null
-                            }
-                            sub={`${stats.activeDiscrepancies} discrepancy open`}
-                        />
-                    ) : null}
-                    <KpiCard
-                        icon={ClipboardCheck}
-                        tone="warning"
-                        value={stats.reviewsDue}
-                        label="Chart reviews due"
-                        pill={
-                            stats.overdueReviews > 0
-                                ? {
-                                      label: `${stats.overdueReviews} overdue`,
-                                      tone: 'warning',
-                                  }
-                                : null
-                        }
-                        sub="next 7 days"
-                    />
-                    <KpiCard
-                        icon={Award}
-                        tone="primary"
-                        value={stats.competenciesExpiring}
-                        label="Competencies expiring"
-                        pill={{ label: '30 days', tone: 'neutral' }}
-                        sub="med-competent staff"
-                    />
-                    {can.manage_stock ? (
-                        <KpiCard
-                            icon={Package}
-                            tone="warning"
-                            value={stats.stockAlerts}
-                            label="Stock alerts"
-                            pill={
-                                stats.expiredStock > 0
-                                    ? {
-                                          label: `${stats.expiredStock} expired`,
-                                          tone: 'critical',
-                                      }
-                                    : null
-                            }
-                            sub={`${stats.lowStock} low · ${stats.expiringStock} expiring`}
-                        />
-                    ) : null}
+                <div
+                    className="flex flex-wrap gap-3 text-sm"
+                    aria-label="Other medication work"
+                >
+                    <Button variant="link" asChild>
+                        <Link href="/emar/competency">
+                            {stats.competenciesExpiring} staff competencies
+                            expiring within 30 days
+                        </Link>
+                    </Button>
+                    {can.manage_stock && (
+                        <Button variant="link" asChild>
+                            <Link href="/emar/stock">
+                                {stats.stockAlerts} stock alerts ·{' '}
+                                {stats.lowStock} low · {stats.expiringStock}{' '}
+                                expiring
+                            </Link>
+                        </Button>
+                    )}
                 </div>
 
                 {/* ── Main grid: Action centre + right rail ── */}
                 <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
                     {/* LEFT — Action centre */}
                     <Card className="min-w-0 rounded-[18px]">
-                        <CardHeader className="gap-3">
+                        <CardHeader
+                            id="medication-action-centre"
+                            tabIndex={-1}
+                            className="gap-3"
+                        >
                             <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div className="flex min-w-0 items-center gap-2.5">
                                     <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary">
@@ -1068,8 +847,9 @@ export default function EmarHome(props: Props) {
                                             Action centre
                                         </CardTitle>
                                         <p className="text-xs text-muted-foreground">
-                                            Everything that needs a clinician
-                                            right now, most urgent first.
+                                            Priority work, most urgent first.
+                                            This is a selection; open each
+                                            workspace for its complete queue.
                                         </p>
                                     </div>
                                 </div>
@@ -1084,18 +864,39 @@ export default function EmarHome(props: Props) {
                                         Report error
                                     </Button>
                                     <span className="rounded-full border border-status-critical/30 bg-status-critical-bg px-2.5 py-0.5 text-[11px] font-bold text-status-critical">
-                                        {acCounts.all} open
+                                        {acCounts.all} shown
                                     </span>
                                 </div>
                             </div>
-                            <TabStrip
-                                ariaLabel="Action centre filter"
-                                value={acFilter}
-                                onChange={(id) =>
-                                    setAcFilter(id as 'all' | AcCategory)
-                                }
-                                items={acTabs}
-                            />
+                            <div
+                                className="flex flex-wrap gap-2"
+                                role="group"
+                                aria-label="Action centre filter"
+                            >
+                                {acTabs.map((tab) => (
+                                    <Button
+                                        key={tab.id}
+                                        size="sm"
+                                        variant={
+                                            acFilter === tab.id
+                                                ? 'default'
+                                                : 'outline'
+                                        }
+                                        aria-pressed={acFilter === tab.id}
+                                        onClick={() =>
+                                            setAcFilter(
+                                                tab.id as 'all' | AcCategory,
+                                            )
+                                        }
+                                    >
+                                        <tab.icon className="size-4" />
+                                        {tab.label}
+                                        {tab.badge != null && (
+                                            <span>{tab.badge}</span>
+                                        )}
+                                    </Button>
+                                ))}
+                            </div>
                         </CardHeader>
                         <CardContent className="flex flex-col gap-0">
                             {visibleActions.length === 0 ? (
@@ -1233,15 +1034,18 @@ export default function EmarHome(props: Props) {
                                     </div>
                                 ))
                             )}
-                            {/* eslint-disable-next-line no-restricted-syntax -- inline text trigger; a shadcn Button would change the link styling. */}
-                            <button
-                                type="button"
-                                onClick={() => setModal('audit-log')}
-                                className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
-                            >
-                                <FileText className="h-3.5 w-3.5" />
-                                View audit log &amp; resolved history
-                            </button>
+                            {canReadAudit && (
+                                <Button
+                                    variant="link"
+                                    className="frontline-tap mt-2"
+                                    asChild
+                                >
+                                    <Link href={auditHref}>
+                                        <FileText className="h-3.5 w-3.5" />
+                                        View audit trail &amp; resolved history
+                                    </Link>
+                                </Button>
+                            )}
                         </CardContent>
                     </Card>
 
@@ -1363,7 +1167,7 @@ export default function EmarHome(props: Props) {
                         <Card className="rounded-[18px]">
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-sm">
-                                    Today&rsquo;s med-pass outcomes
+                                    Today&rsquo;s medication outcomes
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="flex items-center gap-4">
@@ -1466,10 +1270,10 @@ export default function EmarHome(props: Props) {
                             </span>
                             <div className="min-w-0">
                                 <CardTitle className="text-base">
-                                    Client board — today
+                                    People — today
                                 </CardTitle>
                                 <p className="text-xs text-muted-foreground">
-                                    Med-pass progress per client.
+                                    Medication progress for each person.
                                 </p>
                             </div>
                         </div>
@@ -1485,14 +1289,14 @@ export default function EmarHome(props: Props) {
                                 href="/emar/mar"
                                 className="text-xs font-medium whitespace-nowrap text-primary hover:underline"
                             >
-                                All clients →
+                                All people →
                             </Link>
                         </div>
                     </CardHeader>
                     <CardContent className="min-w-0">
                         {filteredBoard.length === 0 ? (
                             <p className="py-8 text-center text-sm text-muted-foreground">
-                                No clients match this view.
+                                No people match this view.
                             </p>
                         ) : (
                             <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -1934,12 +1738,14 @@ export default function EmarHome(props: Props) {
                                     </div>
                                 ))
                             )}
-                            <Link
-                                href="/emar/audit"
-                                className="inline-flex items-center gap-1 pt-1 text-xs font-medium text-primary hover:underline"
-                            >
-                                Full audit trail →
-                            </Link>
+                            {canReadAudit && (
+                                <Link
+                                    href={auditHref}
+                                    className="frontline-tap inline-flex items-center gap-1 pt-1 text-xs font-medium text-primary hover:underline"
+                                >
+                                    Full audit trail →
+                                </Link>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
@@ -1974,11 +1780,14 @@ export default function EmarHome(props: Props) {
                                     icon: ClipboardCheck,
                                     tone: 'warning' as KpiTone,
                                 },
-                                ...(can.export_reports
+                                ...(canReadReports
                                     ? [
                                           {
                                               title: 'Reports',
-                                              href: '/emar/reports',
+                                              href: emarReportsHref(
+                                                  'standard',
+                                                  reportScope,
+                                              ),
                                               icon: Printer,
                                               tone: 'primary' as KpiTone,
                                           },
@@ -2070,19 +1879,6 @@ export default function EmarHome(props: Props) {
                     initialClientId={modalClientId}
                 />
             ) : null}
-            {can.export_reports ? (
-                <ReportsModal
-                    open={modal === 'reports'}
-                    onClose={() => setModal(null)}
-                    clients={clientOptions}
-                    defaultDate={date}
-                />
-            ) : null}
-            <AuditLogModal
-                open={modal === 'audit-log'}
-                onClose={() => setModal(null)}
-                activity={recentActivity}
-            />
             {recordWizard &&
             can.record &&
             (!recordWizard.row.is_controlled || can.record_controlled) ? (

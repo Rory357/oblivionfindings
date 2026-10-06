@@ -9,6 +9,7 @@ use App\Models\Shift;
 use App\Models\User;
 use App\Services\AuthorizationEvidenceLockService;
 use App\Services\Fleet\ResidentTransportJourneyScope;
+use App\Services\Medication\Downtime\HistoricalSecondPersonPresence;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Closure;
@@ -96,6 +97,50 @@ final class ControlledMedicationTransportWitnessService
         ?Collection $lockedUsers = null,
         ?Collection $lockedPresenceShifts = null,
     ): array {
+        $attestation = $this->attestEligibility(
+            $actor, $siteId, $witnessId, $effectiveAt, $witnessErrorKey,
+            $lockedUsers, $lockedPresenceShifts,
+        );
+        $witness = $attestation['witness'];
+        $beforeCredentialCheck?->__invoke($witness);
+
+        // PIN-1: the second checker confirms with their personal witness PIN,
+        // never their login password (Stephan, 29 Sep 2026). Wrong PINs count
+        // towards that person's lock across every screen.
+        $this->witnessPins->verify($witness, $credential, $credentialErrorKey, [
+            'site_id' => $siteId,
+            'surface' => $credentialErrorKey,
+            'actor_id' => (int) $actor->id,
+        ]);
+
+        return [
+            'witness' => $witness,
+            'witnessed_at' => Carbon::instance($effectiveAt)->copy(),
+            'method' => WitnessPinService::METHOD,
+            ...collect($attestation)->except('witness')->all(),
+        ];
+    }
+
+    /**
+     * Eligibility evidence only; this never authenticates a credential.
+     * PIN-2 uses it for an explicitly unverified, non-controlled nomination.
+     * The caller must hold the governing transaction and sorted Shift/User locks.
+     *
+     * @return array<string, mixed>
+     */
+    public function attestEligibility(
+        User $actor,
+        int $siteId,
+        int $witnessId,
+        CarbonInterface $effectiveAt,
+        string $witnessErrorKey = 'witnessed_by',
+        ?Collection $lockedUsers = null,
+        ?Collection $lockedPresenceShifts = null,
+        bool $historical = false,
+    ): array {
+        if (DB::transactionLevel() < 1) {
+            throw new LogicException('Second-person eligibility must be attested in the governing transaction.');
+        }
         if ($witnessId <= 0 || $witnessId === (int) $actor->id) {
             throw ValidationException::withMessages([
                 $witnessErrorKey => 'The witness must be a different eligible staff member.',
@@ -133,25 +178,11 @@ final class ControlledMedicationTransportWitnessService
             true,
             now(),
             $lockedPresenceShifts,
+            $historical,
         );
         abort_unless($qualification, 404);
-        $beforeCredentialCheck?->__invoke($witness);
 
-        // PIN-1: the second checker confirms with their personal witness PIN,
-        // never their login password (Stephan, 29 Sep 2026). Wrong PINs count
-        // towards that person's lock across every screen.
-        $this->witnessPins->verify($witness, $credential, $credentialErrorKey, [
-            'site_id' => $siteId,
-            'surface' => $credentialErrorKey,
-            'actor_id' => (int) $actor->id,
-        ]);
-
-        return [
-            'witness' => $witness,
-            'witnessed_at' => Carbon::instance($effectiveAt)->copy(),
-            'method' => WitnessPinService::METHOD,
-            ...$qualification,
-        ];
+        return ['witness' => $witness, ...$qualification];
     }
 
     /**
@@ -173,6 +204,7 @@ final class ControlledMedicationTransportWitnessService
         bool $lockForUpdate,
         ?CarbonInterface $currentEmploymentAt = null,
         ?Collection $lockedPresenceShifts = null,
+        bool $historical = false,
     ): ?array {
         if (
             $witness->approved_at === null
@@ -222,6 +254,7 @@ final class ControlledMedicationTransportWitnessService
             $lockForUpdate,
             $lockedPresenceShifts,
         );
+        $presence ??= $historical ? HistoricalSecondPersonPresence::fromLocked($witness, $siteId, $effectiveAt, $lockedPresenceShifts) : null;
         if ($presence === null) {
             return null;
         }
@@ -270,6 +303,9 @@ final class ControlledMedicationTransportWitnessService
             $assessment === null
             || (int) $assessment->user_id !== (int) $witness->id
             || $assessment->status !== 'passed'
+            || $assessment->restricted
+            || ! $assessment->controlled_drugs
+            || in_array('controlled_drugs', $assessment->not_seen_areas ?? [], true)
             || ! $assessment->can_witness_controlled
             || $assessment->assessor_id === null
             || (int) $assessment->assessor_id === (int) $witness->id
@@ -398,6 +434,7 @@ final class ControlledMedicationTransportWitnessService
         int $siteId,
         CarbonInterface $effectiveAt,
         array $additionalShiftIds = [],
+        bool $historical = false,
     ): Collection {
         if (DB::transactionLevel() < 1) {
             throw new LogicException('Controlled-medication presence Shifts must be locked in the governing transaction.');
@@ -423,7 +460,7 @@ final class ControlledMedicationTransportWitnessService
 
         return Shift::query()
             ->with('client:id,site_id')
-            ->where(function (Builder $candidates) use ($ids, $siteId, $storageMoment, $explicitShiftIds): void {
+            ->where(function (Builder $candidates) use ($ids, $siteId, $storageMoment, $explicitShiftIds, $historical): void {
                 if ($explicitShiftIds->isNotEmpty()) {
                     $candidates->whereIn('id', $explicitShiftIds->all());
                 }
@@ -431,6 +468,14 @@ final class ControlledMedicationTransportWitnessService
                     $method = $explicitShiftIds->isNotEmpty() ? 'orWhere' : 'where';
                     $candidates->{$method}(function (Builder $eligible) use ($ids, $siteId, $storageMoment): void {
                         $this->applyPresenceShiftScope($eligible, $ids->all(), $siteId, $storageMoment);
+                    });
+                }
+                if ($historical && $ids->isNotEmpty()) {
+                    $candidates->orWhere(function (Builder $past) use ($ids, $siteId, $storageMoment): void {
+                        $past->whereIn('user_id', $ids->all())->where('status', 'completed')
+                            ->where('actual_starts_at', '<=', $storageMoment)->where('actual_ends_at', '>=', $storageMoment)
+                            ->where(fn (Builder $site) => $site->where('site_id', $siteId)
+                                ->orWhere(fn (Builder $derived) => $derived->whereNull('site_id')->whereHas('client', fn (Builder $client) => $client->where('site_id', $siteId))));
                     });
                 }
             })

@@ -313,8 +313,7 @@ class ShiftController extends Controller
         $canRecordMedications = $auth->canDo('medications.administer.record');
         $canRecordControlledMedications = $canRecordMedications
             && $auth->canDo('medications.controlled.record');
-        $canAccessControlledMedications = $auth->canDo('medications.controlled.view')
-            || $canRecordControlledMedications;
+        $canAccessControlledMedications = $auth->canDo('medications.controlled.view');
         $canViewForms = $auth->canDo('custom_forms.viewAny')
             || $auth->canDo('custom_forms.submit');
         $canSubmitForms = $auth->canDo('custom_forms.submit');

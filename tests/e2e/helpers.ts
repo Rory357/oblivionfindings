@@ -136,11 +136,22 @@ echo json_encode([
 }
 
 export function resetFrontlineLifecycleReadinessFixtures() {
-    runArtisan(['db:seed', '--class=FrontlineLifecycleDemoSeeder', '--force']);
+    const phpBin = resolvePhpBinary() ?? 'php';
+    return execFileSync(phpBin, ['tests/Support/reset-frontline-fixture.php'], {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        shell: phpRequiresShell(phpBin),
+    });
 }
 
 export function resetMedicationReadinessFixtures() {
     resetFrontlineLifecycleReadinessFixtures();
+    runArtisan([
+        'db:seed',
+        '--class=MedicationReadinessAcceptanceSeeder',
+        '--force',
+    ]);
 }
 
 export function resetJobBoardReadinessFixtures() {

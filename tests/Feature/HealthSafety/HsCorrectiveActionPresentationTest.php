@@ -3,6 +3,7 @@
 namespace Tests\Feature\HealthSafety;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AuditLog;
 use App\Models\ControlRoom\AlertTask;
 use App\Models\ControlRoomAlert;
 use App\Models\HsCorrectiveAction;
@@ -15,6 +16,7 @@ use App\Services\HealthSafety\HsCorrectiveActionService;
 use App\Support\HealthSafety\HsCorrectiveActionPresenter;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -400,6 +402,88 @@ class HsCorrectiveActionPresentationTest extends TestCase
         $this->assertTrue($labels->contains('Evidence submitted'));
         $this->assertFalse($labels->contains('Owner started action'));
         $this->assertFalse($labels->contains('Owner submitted evidence'));
+    }
+
+    public function test_event_and_register_verification_capabilities_match_creator_and_reporter_denials(): void
+    {
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $owner = $this->staffAtSite($site, 'health_safety_officer');
+        $actionCreator = $this->staffAtSite($site, 'health_safety_officer');
+        $eventReporter = $this->staffAtSite($site, 'health_safety_officer');
+        $independentVerifier = $this->staffAtSite($site, 'health_safety_officer');
+        $event = HsEvent::factory()->create([
+            'site_id' => $site->id,
+            'status' => HsEvent::STATUS_CORRECTIVE_ACTION,
+            'created_by' => $eventReporter->id,
+        ]);
+        $action = HsCorrectiveAction::factory()->completed()->create([
+            'hs_event_id' => $event->id,
+            'assigned_to_user_id' => $owner->id,
+            'completed_by_user_id' => $owner->id,
+            'created_by' => $actionCreator->id,
+            'completion_notes' => 'Retained independent inspection evidence is ready for review.',
+        ]);
+        $records = collect([$event, $action]);
+        $before = $records->map(fn ($record) => $record->refresh()->getRawOriginal())->all();
+        $auditsBefore = AuditLog::query()->count();
+        $attachmentsBefore = $action->attachments()->count();
+        $rolesBefore = DB::table('role_user')->count();
+        $overridesBefore = DB::table('permission_user')->count();
+        $verifyUrl = "/health-safety/events/{$event->id}/corrective-actions/{$action->id}/verify";
+
+        foreach ([$actionCreator, $eventReporter] as $deniedVerifier) {
+            $this->actingAs($deniedVerifier)
+                ->get("/health-safety/events/{$event->id}")
+                ->assertOk()
+                ->assertInertia(fn (Assert $page) => $page
+                    ->where('detail.corrective_actions.0.id', $action->id)
+                    ->where('detail.corrective_actions.0.evidence.load_state', 'loaded')
+                    ->where('detail.corrective_actions.0.can_verify', false));
+            $this->get('/health-safety/corrective-actions?tab=awaiting_verification')
+                ->assertOk()
+                ->assertInertia(fn (Assert $page) => $page
+                    ->where('actions.data.0.id', $action->id)
+                    ->where('actions.data.0.evidence.load_state', 'loaded')
+                    ->where('actions.data.0.can_verify', false));
+            $this->post($verifyUrl, [
+                'evidence_reviewed' => true,
+                'effective' => true,
+                'verification_notes' => 'This attempt must be denied by the existing separation rule.',
+            ])->assertSessionHas('error', 'Verifier must be a different person than the action owner, completer, and reporter (separation of duties).');
+
+            $this->assertSame($before, $records->map(fn ($record) => $record->refresh()->getRawOriginal())->all());
+            $this->assertSame($auditsBefore, AuditLog::query()->count());
+            $this->assertSame($attachmentsBefore, $action->attachments()->count());
+            $this->assertSame($rolesBefore, DB::table('role_user')->count());
+            $this->assertSame($overridesBefore, DB::table('permission_user')->count());
+        }
+
+        $this->actingAs($independentVerifier)
+            ->get("/health-safety/events/{$event->id}")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('detail.corrective_actions.0.id', $action->id)
+                ->where('detail.corrective_actions.0.can_verify', true));
+        $this->get('/health-safety/corrective-actions?tab=awaiting_verification')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('actions.data.0.id', $action->id)
+                ->where('actions.data.0.can_verify', true));
+        $this->post($verifyUrl, [
+            'evidence_reviewed' => true,
+            'effective' => true,
+            'verification_notes' => 'A separate qualified worker verified the retained evidence.',
+        ])->assertSessionHas('success');
+
+        $action->refresh();
+        $this->assertSame(HsCorrectiveAction::STATUS_VERIFIED, $action->status);
+        $this->assertSame($independentVerifier->id, $action->verified_by_user_id);
+        $this->assertTrue($action->effectiveness_confirmed);
+        $this->assertNotNull($action->verified_at);
+        $this->assertSame($before[0], $event->refresh()->getRawOriginal());
+        $this->assertSame($attachmentsBefore, $action->attachments()->count());
+        $this->assertSame($rolesBefore, DB::table('role_user')->count());
+        $this->assertSame($overridesBefore, DB::table('permission_user')->count());
     }
 
     private function staffAtSite(

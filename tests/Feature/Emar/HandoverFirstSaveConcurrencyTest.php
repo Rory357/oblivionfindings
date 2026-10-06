@@ -71,6 +71,7 @@ class HandoverFirstSaveConcurrencyTest extends TestCase
             'expiry_date' => now()->addYear()->toDateString(),
             'assessor_declared_at' => now()->subMonth(),
             'staff_acknowledged_at' => now()->subMonth(),
+            'controlled_drugs' => true,
             'can_witness_controlled' => true,
         ]);
         $outgoingShift = Shift::factory()->create([
@@ -100,6 +101,8 @@ class HandoverFirstSaveConcurrencyTest extends TestCase
         $medication = ClientMedication::factory()->create([
             'client_id' => $client->id,
             'controlled_drug' => true,
+            'nz_controlled_class' => 'B',
+            'controlled_class_source' => 'Synthetic reviewed test configuration',
             'active' => true,
             'state' => 'active',
             'approval_status' => 'verified',

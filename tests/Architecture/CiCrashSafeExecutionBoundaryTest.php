@@ -1,5 +1,7 @@
 <?php
 
+use Symfony\Component\Yaml\Yaml;
+
 it('keeps PHP and browser CI in bounded crash safe shards', function () {
     $root = dirname(__DIR__, 2);
     $testsWorkflow = (string) file_get_contents($root.'/.github/workflows/tests.yml');
@@ -17,7 +19,32 @@ it('keeps PHP and browser CI in bounded crash safe shards', function () {
         ->not->toContain('run: ./vendor/bin/pest', 'coverage: xdebug');
 
     expect(substr_count($testsWorkflow, 'suite: feature'))->toBe(8)
-        ->and(substr_count($testsWorkflow, 'shard_index:'))->toBe(9);
+        ->and(substr_count($testsWorkflow, 'shard_index:'))->toBe(10);
+
+    $tests = Yaml::parse($testsWorkflow);
+    $phpJob = $tests['jobs']['ci'] ?? [];
+    $phpSteps = collect($phpJob['steps'] ?? []);
+    $shards = $phpSteps->firstWhere('name', 'Crash-safe tests (${{ matrix.suite }} ${{ matrix.shard_index }}/${{ matrix.shard_count }})');
+    $release = $phpSteps->firstWhere('name', 'Pack stock and historical recovery release gates');
+    $expectedMatrix = [
+        ['suite' => 'foundation', 'shard_index' => 0, 'shard_count' => 1, 'batch_size' => 30],
+        ['suite' => 'emar-release', 'shard_index' => 0, 'shard_count' => 1, 'batch_size' => 1],
+    ];
+    foreach (range(0, 7) as $index) {
+        $expectedMatrix[] = ['suite' => 'feature', 'shard_index' => $index, 'shard_count' => 8, 'batch_size' => 12];
+    }
+
+    $phpunit = simplexml_load_file($root.'/phpunit.xml');
+    expect($phpJob['timeout-minutes'] ?? null)->toBe(180)
+        ->and($phpJob['strategy']['fail-fast'] ?? null)->toBeFalse()
+        ->and($phpJob['strategy']['matrix']['include'] ?? null)->toBe($expectedMatrix)
+        ->and($shards['if'] ?? null)->toBe("matrix.suite != 'emar-release'")
+        ->and($release['if'] ?? null)->toBe("matrix.suite == 'emar-release'")
+        ->and($release['run'] ?? '')->toStartWith('php vendor/bin/pest ')
+        ->toContain('tests/Feature/Emar/PackLedgerIntegrationTest.php')
+        ->toContain('tests/Feature/Emar/MedicationHistoricalRecoveryTest.php')
+        ->toContain('--log-junit storage/logs/emar-release-gates.xml')
+        ->and((string) $phpunit->xpath('/phpunit/php/ini[@name="memory_limit"]')[0]['value'])->toBe('1024M');
 
     expect($runner)
         ->toContain("'tests/Unit', 'tests/Integration', 'tests/Architecture'")
@@ -28,21 +55,40 @@ it('keeps PHP and browser CI in bounded crash safe shards', function () {
         ->toContain('$process->setTimeout(null)')
         ->not->toContain('--parallel');
 
-    foreach ([
-        'chromium-desktop',
-        'it-security-desktop-1440',
-        'it-security-desktop-1280',
-    ] as $project) {
-        expect($visualWorkflow)->toContain("- {$project}");
-    }
+    $visual = Yaml::parse($visualWorkflow);
+    $job = $visual['jobs']['visual'] ?? [];
+    $steps = collect($job['steps'] ?? []);
+    $browser = $steps->firstWhere('name', 'Visual Regression (${{ matrix.project }})');
+    $artifacts = $steps->firstWhere('name', 'Upload Playwright Artifacts');
+
+    expect($visual['concurrency']['cancel-in-progress'] ?? null)->toBeTrue()
+        ->and($job['strategy']['fail-fast'] ?? null)->toBeFalse()
+        ->and($job['timeout-minutes'] ?? null)->toBe(70)
+        ->and($browser['timeout-minutes'] ?? null)->toBe(50)
+        ->and($job['strategy']['matrix']['project'] ?? null)->toBe([
+            'chromium-desktop',
+            'chromium-desktop-visual',
+            'it-security-desktop-1440',
+            'it-security-desktop-1280',
+        ])
+        ->and($job['strategy']['matrix']['include'] ?? null)->toBe([
+            ['project' => 'governance-desktop-1366', 'config' => 'playwright.governance.config.ts'],
+            ['project' => 'governance-desktop-1920', 'config' => 'playwright.governance.config.ts'],
+        ])
+        ->and($artifacts['with']['name'] ?? null)->toBe('playwright-artifacts-${{ matrix.project }}')
+        ->and($artifacts['with']['path'] ?? '')->toContain('playwright-report-governance');
+
+    $commands = [];
+    expect(preg_match_all(
+        '/^\s*npx playwright test\s+([^\r\n]+)$/m',
+        (string) ($browser['run'] ?? ''),
+        $commands,
+    ))->toBe(1)
+        ->and($commands[1])->toBe([
+            '--config=${{ matrix.config || \'playwright.config.ts\' }} --project=${{ matrix.project }}',
+        ]);
 
     expect($visualWorkflow)
-        ->toContain('cancel-in-progress: true')
-        ->toContain('fail-fast: false')
-        ->toContain('timeout-minutes: 70')
-        ->toContain('timeout-minutes: 50')
-        ->toContain('npx playwright test --project=${{ matrix.project }}')
-        ->toContain('playwright-artifacts-${{ matrix.project }}')
         ->not->toContain('- chromium-mobile')
         ->not->toContain('run: npm run visual:test');
 });

@@ -11,8 +11,10 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
 use App\Support\LegacyStorageContext;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Tests\TestCase;
 
@@ -65,8 +67,8 @@ class UserSiteAccessServiceTest extends TestCase
 
         foreach ([
             'inactive' => ['is_active' => false],
-            'future' => ['start_date' => now()->addDay()->toDateString()],
-            'ended' => ['end_date' => now()->subDay()->toDateString()],
+            'future' => ['start_date' => now(config('app.worker_timezone', 'Pacific/Auckland'))->addDay()->toDateString()],
+            'ended' => ['end_date' => now(config('app.worker_timezone', 'Pacific/Auckland'))->subDay()->toDateString()],
         ] as $state => $overrides) {
             $user = $this->siteBoundUser($site, profileOverrides: $overrides);
 
@@ -75,6 +77,43 @@ class UserSiteAccessServiceTest extends TestCase
                 $service->accessibleSiteIds($user),
                 $state.' employee profiles must not grant Site access.',
             );
+        }
+    }
+
+    public static function nzEmploymentCalendarBoundaries(): array
+    {
+        return [
+            'before NZ midnight' => ['2026-10-04T10:59:00Z', '2026-10-04', '2026-10-05', '2026-10-03'],
+            'after NZ midnight while UTC is yesterday' => ['2026-10-04T11:01:00Z', '2026-10-05', '2026-10-06', '2026-10-04'],
+        ];
+    }
+
+    #[DataProvider('nzEmploymentCalendarBoundaries')]
+    public function test_employee_date_boundaries_use_the_nz_day_with_a_utc_clock(string $instant, string $today, string $tomorrow, string $yesterday): void
+    {
+        Carbon::setTestNow(Carbon::parse($instant)->utc());
+        try {
+            $this->assertSame('2026-10-04', now()->toDateString());
+            $this->assertSame($today, now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString());
+            $site = Site::factory()->create();
+            $service = app(UserSiteAccessService::class);
+
+            foreach ([
+                'starts today' => ['start_date' => $today],
+                'ends today' => ['end_date' => $today],
+            ] as $state => $overrides) {
+                $user = $this->siteBoundUser($site, profileOverrides: $overrides);
+                $this->assertSame([$site->id], $service->accessibleSiteIds($user), $state.' remains current for the whole NZ date.');
+            }
+            foreach ([
+                'starts tomorrow' => ['start_date' => $tomorrow],
+                'ended yesterday' => ['end_date' => $yesterday],
+            ] as $state => $overrides) {
+                $user = $this->siteBoundUser($site, profileOverrides: $overrides);
+                $this->assertSame([], $service->accessibleSiteIds($user), $state.' must not grant Site access.');
+            }
+        } finally {
+            Carbon::setTestNow();
         }
     }
 

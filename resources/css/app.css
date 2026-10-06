@@ -115,6 +115,7 @@
     --color-live: var(--live);
     --color-live-bg: var(--live-bg);
     --color-tone-teal: var(--tone-teal);
+    --color-tone-teal-foreground: var(--tone-teal-foreground);
     --color-tone-chip-teal: var(--tone-chip-teal);
     --color-tone-chip-success: var(--tone-chip-success);
     --color-tone-chip-warning: var(--tone-chip-warning);
@@ -275,6 +276,8 @@
        0/2/3/4 reuse --primary / status tokens; teal is the cycle's own hue —
        a different job from --live, which marks in-progress states. */
     --tone-teal: oklch(45% 0.1 200);
+    /* Readable on tier-2's compounded 12% tab + 18% count tints. */
+    --tone-teal-foreground: oklch(28% 0.07 200);
     /* Solid icon-chip fills for the toned strip stay DEEP in both themes: the
        dark-theme tone tokens go light, which would sink the white glyph below
        AA contrast. Values mirror the light-theme tones — keep in sync. (The
@@ -525,6 +528,7 @@
     /* Tier-2 tone cycle — dark variant. Only the theme-aware tone flips;
        the --tone-chip-* fills intentionally keep their :root (deep) values. */
     --tone-teal: oklch(72% 0.12 200);
+    --tone-teal-foreground: oklch(92% 0.04 200);
 
     /* Category tokens — dark variants (same derivation pattern, different opacity) */
     --category-ops: var(--primary);
@@ -1220,13 +1224,52 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
     min-width: max(44px, 2.75rem);
 }
 
+/* Keep the global phone controls usable at the smaller supported text size.
+   The narrowest layout retains Messages in the existing navigation menu. */
+@media (max-width: 767px) {
+    .frontline-app-header button,
+    .frontline-app-header a[aria-label^='Messages'] {
+        min-height: max(44px, 2.75rem);
+        min-width: max(44px, 2.75rem);
+    }
+}
+
+/* Compact control marks retain their shape. Their separate hit area below
+   supplies touch clearance without stretching a switch into a circle. */
+.frontline-dialog
+    :is(button, [role='combobox']):not(
+        .frontline-hit,
+        [data-slot='switch'],
+        [data-slot='checkbox']
+    ),
+.eh-header-frontline :is(button, [role='combobox']):not(.frontline-hit) {
+    min-height: max(44px, 2.75rem);
+    min-width: max(44px, 2.75rem);
+}
+.frontline-dialog
+    :is(
+        input:not([type='checkbox']):not([type='radio']):not([type='hidden']),
+        select
+    ),
+.eh-header-frontline input:not([type='hidden']) {
+    min-height: max(44px, 2.75rem);
+}
+
+/* Compact header tabs use .frontline-hit, retaining their 40/34px drawn
+ * shapes while the pseudo-element supplies the 44px interaction target. */
+.eh-meter.frontline-tap {
+    min-width: max(140px, 2.75rem);
+}
+
 /* In the components layer so an `absolute`/`fixed` utility on the host wins. */
 @layer components {
-    .frontline-hit {
+    .frontline-hit,
+    .frontline-dialog :is([data-slot='switch'], [data-slot='checkbox']) {
         position: relative;
     }
 }
-.frontline-hit::after {
+.frontline-hit::after,
+.frontline-dialog :is([data-slot='switch'], [data-slot='checkbox'])::after {
     content: '';
     position: absolute;
     top: 50%;
@@ -1234,6 +1277,37 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
     width: max(100%, 44px, 2.75rem);
     height: max(100%, 44px, 2.75rem);
     transform: translate(-50%, -50%);
+}
+
+/* Keep neighbouring compact controls' touch areas separate. */
+.frontline-dialog .emar-on-off,
+.frontline-dialog label:has([data-slot='checkbox']) {
+    min-height: max(44px, 2.75rem);
+}
+
+/* The neutral off track must remain visible against light dialog surfaces. */
+.frontline-dialog [data-slot='switch'][data-state='unchecked'] {
+    background-color: var(--muted-foreground);
+}
+
+/* Keep the handle visible on both the active and inactive dark tracks. */
+.dark .frontline-dialog [data-slot='switch-thumb'] {
+    background-color: var(--foreground);
+}
+
+/* A review card can be narrow even inside a desktop two-column wizard. */
+.frontline-dialog .wizard-review-card {
+    container: modal-review / inline-size;
+}
+@container modal-review (max-width: 400px) {
+    .wizard-review-row {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    .wizard-review-row > span {
+        max-width: 100%;
+        text-align: left;
+    }
 }
 
 /* ──────────────────────────────────────────────────────────────────────────

@@ -22,6 +22,7 @@ export function seedTrackingWorkspaceReadinessFixtures() {
 $admin = \\App\\Models\\User::query()->where('email', 'admin@demo.test')->firstOrFail();
 $site = \\App\\Models\\Site::query()
     ->where('archived', false)
+    ->where('is_active', true)
     ->orderBy('id')
     ->firstOrFail();
 
@@ -53,51 +54,14 @@ $upsertClient = function (string $firstName, string $preferredName) use ($site, 
 $activeClient = $upsertClient('Playwright Active', 'Mere Active');
 $withdrawnClient = $upsertClient('Playwright Withdrawn', 'Ria Withdrawn');
 
-$consentType = \\App\\Models\\ConsentType::withTrashed()
-    ->where('name', 'Asset Location Tracking (Safety)')
-    ->first();
-if (! $consentType) {
-    $consentType = new \\App\\Models\\ConsentType();
-} elseif ($consentType->trashed()) {
-    $consentType->restore();
-}
-$consentType->forceFill([
-    'name' => 'Asset Location Tracking (Safety)',
-    'category' => 'privacy',
-    'description' => 'Personal location tracking used for safety.',
-    'purpose' => 'Personal safety location tracking',
-    'legal_basis' => 'consent',
-    'allows_withdrawal' => true,
-    'active' => true,
-])->save();
+// Use the existing resident-location contract without rewriting its published
+// purpose, legal basis or version to match a generic asset-tracking fixture.
+$consentType = \\App\\Models\\ConsentType::query()
+    ->where('name', 'Personal Tracker (Wandering Risk)')
+    ->where('active', true)
+    ->sole();
 
-$upsertConsent = function ($client, string $status) use ($consentType, $admin) {
-    $consent = \\App\\Models\\ClientConsent::withTrashed()
-        ->where('client_id', $client->id)
-        ->where('consent_type_id', $consentType->id)
-        ->first();
-    if (! $consent) {
-        $consent = new \\App\\Models\\ClientConsent();
-    } elseif ($consent->trashed()) {
-        $consent->restore();
-    }
-
-    $consent->forceFill([
-        'client_id' => $client->id,
-        'consent_type_id' => $consentType->id,
-        'status' => $status,
-        'given_at' => now()->subDay(),
-        'given_by_user_id' => $admin->id,
-        'given_method' => 'written',
-        'withdrawn_at' => $status === 'withdrawn' ? now()->subHour() : null,
-        'withdrawn_by_user_id' => $status === 'withdrawn' ? $admin->id : null,
-        'expires_at' => now()->addMonth(),
-        'created_by' => $admin->id,
-        'updated_by' => $admin->id,
-    ])->save();
-
-    return $consent;
-};
+$upsertConsent = fn ($client, string $status) => app(\\Database\\Seeders\\TrackingWorkspaceE2EConsentSeeder::class)->seedConsent($client, $consentType, $admin, $status);
 
 $activeConsent = $upsertConsent($activeClient, 'given');
 $withdrawnConsent = $upsertConsent($withdrawnClient, 'withdrawn');

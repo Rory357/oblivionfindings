@@ -3,32 +3,35 @@
 namespace App\Http\Controllers\Emar;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\Governance\RegisterIncidentGovernanceEscalationJob;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\MedicationError;
+use App\Models\MedicationErrorEntry;
 use App\Models\MedicationMarAttachment;
-use App\Models\Site;
 use App\Models\User;
-use App\Services\Incidents\IncidentJourneyService;
+use App\Services\Medication\Audit\MedicationEventData;
+use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\MarLinkService;
-use App\Services\Medication\MedicationErrorReporter;
+use App\Services\Medication\MedicationErrorCommands;
+use App\Services\Medication\MedicationErrorReadScope;
+use App\Services\Medication\MedicationErrorSummary;
+use App\Services\Medication\MedicationErrorWorkflow;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
-use App\Services\Medication\MedicationSignalService;
-use App\Services\MedicationIncidentIntegrationService;
-use App\Services\Timeline\TimelineEmitter;
+use App\Services\Medication\Reporting\MedicationExportAudit;
+use App\Services\Medication\Reporting\MedicationReportAccess;
+use App\Services\Medication\Reporting\RecordsReportingSettings;
+use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
-use Throwable;
 
 class MedicationErrorController extends Controller
 {
@@ -69,6 +72,7 @@ class MedicationErrorController extends Controller
         Request $request,
         bool $controlledMedication,
     ): array {
+        $investigator = $request->user()->canDo('medications.errors.manage') || $request->user()->canDo('medications.audit.view');
         $incident = $error->incident;
         if (
             $incident !== null
@@ -93,6 +97,18 @@ class MedicationErrorController extends Controller
             ->all();
 
         return [
+            'stage' => $error->stage(),
+            'sac' => ['enabled' => app(RecordsReportingSettings::class)->enabled(), 'proposed' => app(RecordsReportingSettings::class)->preselection($error->reached_client, $error->harm_level), 'confirmed' => $error->confirmed_sac, 'confirmed_at' => $error->sac_confirmed_at?->toIso8601String()],
+            'summary' => MedicationErrorSummary::for($error),
+            'occurred_at' => ($error->occurred_at ?? $error->reported_at)?->toIso8601String(),
+            'triage_due_at' => $error->triage_due_at?->toIso8601String(),
+            'investigation_due_at' => $error->investigation_due_at?->toIso8601String(),
+            'owner' => $error->owner?->only(['id', 'name']),
+            'entries' => $error->entries->filter(fn ($entry) => $investigator || in_array($entry->kind, ['reported', 'account', 'closed', 'reopened', 'triaged'], true))->map(fn ($e) => ['id' => $e->id, 'kind' => $e->kind, 'text' => ($investigator || in_array($e->kind, ['reported', 'account'], true)) ? $e->text : null, 'data' => ($investigator || in_array($e->kind, ['reported', 'account'], true)) ? collect($e->data)->except(['report_token', 'fingerprint'])->all() : [], 'by' => $e->actor?->name, 'at' => $e->created_at->toIso8601String()])->values(),
+            'actions' => $error->actions->filter(fn () => $request->user()->canDo('medications.errors.manage') || $request->user()->canDo('medications.audit.view'))->map(fn ($a) => ['id' => $a->id, 'description' => $a->description, 'owner' => $a->owner?->only(['id', 'name']), 'due_at' => $a->due_at->toIso8601String(), 'completed_at' => $a->completed_at?->toIso8601String(), 'completion_note' => $a->completion_note])->values(),
+            'close_blockers' => $request->user()->canDo('medications.errors.manage') ? app(MedicationErrorWorkflow::class)->closeBlockers($error, $request->user()) : [],
+            'can_close' => $request->user()->canDo('medications.errors.manage') && (int) $error->reported_by !== (int) $request->user()->id,
+            'can_reopen' => $request->user()->canDo('medications.errors.manage') && (int) $error->reported_by !== (int) $request->user()->id,
             'id' => $error->id,
             'ref' => $error->reference_number ?? 'ERR-'.str_pad((string) $error->id, 4, '0', STR_PAD_LEFT),
             'error_type' => $error->error_type,
@@ -103,10 +119,10 @@ class MedicationErrorController extends Controller
             'description' => $error->description,
             'immediate_action' => $error->immediate_action,
             'contributing_factors' => $error->contributing_factors,
-            'review_notes' => $error->review_notes,
-            'outcome' => $error->outcome,
-            'preventive_actions' => $error->preventive_actions,
-            'close_note' => $error->close_note,
+            'review_notes' => ($request->user()->canDo('medications.errors.manage') || $request->user()->canDo('medications.audit.view')) ? $error->review_notes : null,
+            'outcome' => ($request->user()->canDo('medications.errors.manage') || $request->user()->canDo('medications.audit.view')) ? $error->outcome : null,
+            'preventive_actions' => ($request->user()->canDo('medications.errors.manage') || $request->user()->canDo('medications.audit.view')) ? $error->preventive_actions : null,
+            'close_note' => ($request->user()->canDo('medications.errors.manage') || $request->user()->canDo('medications.audit.view')) ? $error->close_note : null,
             'status' => $error->status,
             'reported_at' => $error->reported_at?->toIso8601String(),
             'reviewed_at' => $error->reviewed_at?->toIso8601String(),
@@ -125,6 +141,9 @@ class MedicationErrorController extends Controller
             ] : null,
             'incident' => $incident ? [
                 'id' => $incident->id,
+                'status' => $incident->status,
+                'ready_to_close' => $error->stage() === 'closed' && $incident->status !== 'closed',
+                'can_close' => Gate::forUser($request->user())->allows('close', $incident),
                 'ref' => $incident->reference_number ?? 'INC-'.str_pad((string) $incident->id, 4, '0', STR_PAD_LEFT),
             ] : null,
             'mar_url' => $this->marLinks->urlFor($request->user(), $error->client_id),
@@ -143,372 +162,196 @@ class MedicationErrorController extends Controller
     public function index(Request $request)
     {
         $actor = $request->user();
-        abort_unless($actor !== null, 403);
+        abort_unless($actor?->canDo('medications.view'), 403);
         $siteFilter = $request->integer('site_id') ?: null;
-        $accessibleSiteIds = $this->governanceScope->readerSiteIds(
-            $actor,
-            MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
-            requestedSiteId: $siteFilter,
-        );
-        $readerSiteIds = $siteFilter !== null ? [$siteFilter] : $accessibleSiteIds;
-        // Site scope is not person scope: an ordinary support worker sees only
-        // the residents whose chart they may open (ClientPolicy::viewMedications),
-        // leads keep the whole Site. Rows and stats share this boundary.
-        $readerClientIds = $this->marLinks->openableClientIds(
-            $actor,
-            Client::query()->whereIn('site_id', $readerSiteIds)->pluck('id'),
-        );
-
-        // Flat, client-side-filterable register — the redesigned page facets by
-        // tab/search/severity/type/reporter with live counts (drops pagination).
-        $modelQuery = $this->governanceScope->scopeCanonicalClientMedicationRows(
-            MedicationError::query(),
-            $readerSiteIds,
-        )->whereIn('client_id', $readerClientIds);
-        if (! $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
-            $this->governanceScope->scopeWithoutControlledMedicationRows($modelQuery);
+        $sites = $this->governanceScope->readerSiteIds($actor, 'medications.view', requestedSiteId: $siteFilter);
+        $readerSites = $siteFilter ? [$siteFilter] : $sites;
+        $clients = $this->marLinks->openableClientIds($actor, Client::query()->whereIn('site_id', $readerSites)->pluck('id'));
+        $all = $actor->canDo('medications.errors.manage') || $actor->canDo('medications.audit.view');
+        $base = app(MedicationErrorReadScope::class)->apply(MedicationError::query(), $actor, $readerSites);
+        $tab = $request->string('tab', $all ? 'triage' : 'mine')->toString();
+        $query = clone $base;
+        $status = ['triage' => 'reported', 'investigating' => 'investigating', 'actions' => 'resolved', 'closed' => 'closed'][$tab] ?? null;
+        if ($status) {
+            $query->where('status', $status);
         }
-
-        $models = $modelQuery
-            ->with([
-                'client:id,first_name,last_name,site_id',
-                'client.site:id,name',
-                'medication:id,name',
-                'incident' => fn ($query) => $query
-                    ->whereIn('client_id', $readerClientIds)
-                    ->whereIn('site_id', $readerSiteIds)
-                    ->select(['id', 'client_id', 'site_id', 'reference_number']),
-                'reportedBy:id,name',
-                'reviewedBy:id,name',
-                'attachments' => fn ($query) => $query
-                    ->whereIn('client_id', $readerClientIds)
-                    ->with('uploadedBy:id,name'),
-            ])
-            ->orderByDesc('reported_at')
-            ->limit(300)
-            ->get();
-
-        $controlledMedicationIds = ClientMedication::withTrashed()
-            ->whereIn('id', $models->pluck('client_medication_id')->filter())
-            ->where('controlled_drug', true)
-            ->pluck('id')
-            ->map(fn ($id): int => (int) $id);
-        $errors = $models
-            ->map(fn (MedicationError $error) => $this->serializeError(
-                $error,
-                $request,
-                $controlledMedicationIds->contains((int) $error->client_medication_id),
-            ))
-            ->values();
-
-        // Aggregate stats over the whole (optionally site-scoped) register.
-        $statQuery = $this->governanceScope->scopeCanonicalClientMedicationRows(
-            MedicationError::query(),
-            $readerSiteIds,
-        )->whereIn('client_id', $readerClientIds);
-        if (! $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
-            $this->governanceScope->scopeWithoutControlledMedicationRows($statQuery);
+        if ($tab === 'incidents') {
+            $query->whereHas('incident', fn ($q) => $q->where('status', '!=', 'closed'));
         }
-        $statRows = $statQuery->get(['id', 'severity', 'error_type', 'status', 'reported_at', 'updated_at']);
+        if ($tab === 'mine') {
+            $query->where(fn ($q) => $q->where('reported_by', $actor->id)->orWhereHas('entries', fn ($entries) => $entries->where('kind', 'account')->where('actor_id', $actor->id)));
+        }
+        if ($request->filled('q')) {
+            $term = '%'.addcslashes(mb_substr($request->string('q')->toString(), 0, 100), '%_\\').'%';
+            $query->where(fn ($q) => $q->where('reference_number', 'like', $term)->orWhereHas('client', fn ($c) => $c->where('first_name', 'like', $term)->orWhere('last_name', 'like', $term)));
+        }
+        if (in_array($request->input('reach'), ['no', 'yes', 'unknown'], true)) {
+            $query->where('reached_client', $request->input('reach'));
+        }
+        $relations = ['client.site', 'medication' => fn ($q) => $q->withTrashed(), 'incident', 'reportedBy:id,name', 'reviewedBy:id,name', 'owner:id,name', 'entries.actor:id,name', 'actions.owner:id,name', 'attachments.uploadedBy:id,name'];
+        if ($tab === 'triage') {
+            $query->orderBy('triage_due_at')->orderBy('reported_at')->orderBy('id');
+        } elseif ($tab === 'investigating') {
+            $query->orderBy('investigation_due_at')->orderBy('id');
+        } elseif ($tab === 'closed') {
+            $query->orderByDesc('closed_at')->orderByDesc('id');
+        } else {
+            $query->orderByDesc('reported_at')->orderByDesc('id');
+        }
+        $page = $query->with($relations)->paginate(25)->withQueryString();
+        $errors = $page->getCollection()->map(fn ($e) => $this->serializeError($e, $request, (bool) $e->medication?->controlled_drug));
+        $detail = null;
+        if ($request->integer('error') > 0) {
+            $model = (clone $base)->with($relations)->find($request->integer('error'));
+            abort_unless($model, 404);
+            $detail = $this->serializeError($model, $request, (bool) $model->medication?->controlled_drug);
+        }
+        $now = now('Pacific/Auckland');
+        $occurred = 'COALESCE(occurred_at, reported_at)';
+        $recent = (clone $base)->whereRaw($occurred.' >= ? AND '.$occurred.' <= ?', [$now->copy()->startOfDay()->subDays(89)->utc(), now()]);
+        $trend = collect(range(7, 0))->map(function ($week) use ($base, $now, $occurred) {
+            $start = $now->copy()->startOfWeek()->subWeeks($week);
+            $q = (clone $base)->whereRaw($occurred.' >= ? AND '.$occurred.' < ? AND '.$occurred.' <= ?', [$start->copy()->utc(), $start->copy()->addWeek()->utc(), now()]);
 
-        $now = now();
-        $startOfMonth = $now->copy()->startOfMonth();
-        $last30 = $now->copy()->subDays(30);
-        $isOpen = fn ($r) => in_array($r->status, ['reported', 'investigating'], true);
-
-        $trend = collect(range(7, 0))->map(function ($w) use ($statRows, $now) {
-            $start = $now->copy()->startOfWeek()->subWeeks($w);
-            $end = $start->copy()->endOfWeek();
-            $inWeek = $statRows->filter(fn ($r) => $r->reported_at && $r->reported_at->betweenIncluded($start, $end));
-
-            return [
-                'week' => $start->format('d M'),
-                'count' => $inWeek->count(),
-                'near_miss' => $inWeek->where('severity', 'near_miss')->count(),
-            ];
-        })->values();
-        $sites = $this->governanceScope->sitePicker($accessibleSiteIds);
-        $activeSite = $siteFilter !== null ? $sites->firstWhere('id', $siteFilter) : null;
+            return ['week' => $start->format('d M'), 'count' => (clone $q)->count(), 'near_miss' => (clone $q)->where('reached_client', 'no')->count()];
+        });
 
         return Inertia::render('emar/MedicationErrors', [
-            'errors' => $errors,
+            'errors' => $errors, 'detail' => $detail,
+            'pagination' => ['links' => $page->linkCollection(), 'total' => $page->total(), 'from' => $page->firstItem(), 'to' => $page->lastItem(), 'last_page' => $page->lastPage()],
+            'filters' => ['tab' => $tab, 'q' => $request->input('q', ''), 'reach' => $request->input('reach', 'all'), 'site_id' => $siteFilter],
             'stats' => [
-                'total_open' => $statRows->filter($isOpen)->count(),
-                'critical' => $statRows->filter(fn ($r) => $r->severity === 'critical' && $isOpen($r))->count(),
-                'this_month' => $statRows->filter(fn ($r) => $r->reported_at && $r->reported_at->gte($startOfMonth))->count(),
-                'resolved_this_month' => $statRows->filter(fn ($r) => in_array($r->status, ['resolved', 'closed'], true) && $r->updated_at && $r->updated_at->gte($startOfMonth))->count(),
-                'near_miss' => $statRows->filter(fn ($r) => $r->severity === 'near_miss' && $r->reported_at && $r->reported_at->gte($last30))->count(),
-                'trend' => $trend,
-                'by_type' => $statRows->groupBy('error_type')->map->count()->sortDesc()->take(5),
-                'by_severity' => collect(['near_miss', 'minor', 'moderate', 'major', 'critical'])->mapWithKeys(fn ($s) => [$s => $statRows->where('severity', $s)->count()]),
+                'triage' => (clone $base)->where('status', 'reported')->count(), 'investigating' => (clone $base)->where('status', 'investigating')->count(),
+                'actions' => (clone $base)->where('status', 'resolved')->count(), 'closed' => (clone $base)->where('status', 'closed')->count(),
+                'total_open' => (clone $base)->where('status', '!=', 'closed')->count(), 'recent' => (clone $recent)->count(),
+                'reached' => (clone $recent)->where('reached_client', 'yes')->count(), 'near_miss' => (clone $recent)->where('reached_client', 'no')->count(),
+                'unknown_reach' => (clone $recent)->where(fn ($q) => $q->where('reached_client', 'unknown')->orWhereNull('reached_client'))->count(), 'trend' => $trend,
             ],
-            'clients' => $this->governanceScope->clientPicker($readerSiteIds),
-            'staff' => $this->governanceScope->staffPicker($readerSiteIds),
-            'sites' => $sites
-                ->map(fn (Site $site) => $site->only(['id', 'name']))
-                ->values(),
-            'active_site' => $activeSite?->only(['id', 'name']),
-            'site_brand_colour' => $activeSite?->brand_colour,
-            'can' => [
-                'record' => $actor->canDo('medications.administer.record'),
-                'correct' => $actor->canDo('medications.administer.correct'),
-            ],
+            'clients' => $this->governanceScope->clientPicker($readerSites)->whereIn('id', $clients)->values(), 'staff' => $this->governanceScope->staffPicker($readerSites)->filter(fn ($staff) => User::query()->find($staff['id'])?->canDo('medications.errors.manage'))->values(),
+            'sites' => $this->governanceScope->sitePicker($sites)->map(fn ($s) => $s->only(['id', 'name']))->values(),
+            'triage_rule' => app(MedicationErrorWorkflow::class)->triageRule(),
+            'export_period' => ['date_from' => $now->copy()->subDays(89)->toDateString(), 'date_to' => $now->toDateString()],
+            'can' => ['record' => $actor->canDo('medications.administer.record'), 'manage' => $actor->canDo('medications.errors.manage'), 'all' => $all, 'export' => $all && app(MedicationReportAccess::class)->canExport($actor, 'errors'), 'controlled' => $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)],
         ]);
+    }
+
+    public function export(Request $request)
+    {
+        $actor = $request->user();
+        abort_unless($actor?->canDo('medications.view') && ($actor->canDo('medications.errors.manage') || $actor->canDo('medications.audit.view')), 403);
+        abort_unless(app(MedicationReportAccess::class)->canExport($actor, 'errors'), 403);
+        // Retained links used a free-text purpose. Preserve that explanation
+        // through the common, validated "Something else" purpose contract.
+        $purpose = $request->input('purpose');
+        if (is_string($purpose) && trim($purpose) !== '' && ! array_key_exists($purpose, MedicationExportAudit::PURPOSES)) {
+            $request->merge(['purpose' => 'other', 'purpose_detail' => $purpose]);
+        }
+        if (! $request->filled('period') && ! $request->filled('date_from') && ! $request->filled('date_to')) {
+            $now = now('Pacific/Auckland');
+            $request->merge(['period' => 'custom', 'date_from' => $now->copy()->subDays(89)->toDateString(), 'date_to' => $now->toDateString()]);
+        }
+        $request->merge(['type' => 'errors']);
+
+        // One renderer, CSV guard, canonical person/CD scope, current-evidence
+        // release check and final chained export event for both entry points.
+        return app(MedicationReportsController::class)->export($request);
+    }
+
+    public function medicines(Request $request, Client $client)
+    {
+        $actor = $this->recordingActor($request);
+        $client = app(MedicationRecordAccess::class)->client($actor, $client->id);
+        $q = $client->medications()->where('status', 'active');
+        if (! $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
+            $q->where('controlled_drug', false);
+        }
+
+        return response()->json(['medicines' => $q->orderBy('name')->get(['id', 'name'])->toArray()]);
     }
 
     public function store(Request $request)
     {
-        $user = $this->recordingActor($request);
-
-        $validated = $request->validate([
-            'client_id' => ['required', 'integer', 'min:1'],
-            'client_medication_id' => ['nullable', 'integer', 'min:1'],
+        $actor = $this->recordingActor($request);
+        $data = $request->validate([
+            'client_id' => 'required|integer|min:1', 'client_medication_id' => 'nullable|integer|min:1',
             'error_type' => 'required|in:wrong_medication,wrong_client,wrong_dose,wrong_time,wrong_route,omission,unauthorised,documentation,other',
-            'severity' => 'required|in:near_miss,minor,moderate,major,critical',
-            'reached_client' => 'nullable|in:no,yes,unknown',
-            'open_disclosure' => 'nullable|in:na,pending,done',
-            'description' => 'required|string|max:5000',
-            'immediate_action' => [
-                Rule::requiredIf(fn (): bool => $request->boolean('create_incident')
-                    && in_array($request->input('severity'), ['major', 'critical'], true)),
-                'nullable',
-                'string',
-                'max:5000',
-            ],
-            'contributing_factors' => 'nullable|string|max:5000',
-            'create_incident' => 'nullable|boolean',
+            'reached_client' => 'required|in:no,yes,unknown', 'harm_level' => ['required_unless:reached_client,no', 'nullable', Rule::in(MedicationErrorWorkflow::HARMS)],
+            'occurred_at' => 'required|date_format:Y-m-d\\TH:i', 'description' => 'required|string|max:5000',
+            'immediate_action' => 'nullable|string|max:5000', 'contributing_factors' => 'nullable|string|max:5000', 'report_token' => 'required|uuid',
+            'create_incident' => 'nullable|boolean', 'duplicate_id' => 'nullable|integer|min:1', 'separate_reason' => 'nullable|string|max:1000',
         ]);
 
-        return $this->withAssignedClient(
-            $user,
-            (int) $validated['client_id'],
-            function (MedicationScopeDecision $scope) use ($request, $validated, $user) {
-                $attributes = $validated;
+        return $this->withAssignedClient($actor, (int) $data['client_id'], function (MedicationScopeDecision $scope) use ($actor, $data, $request) {
+            $before = $this->entryCursor($scope->client->id);
+            $response = app(MedicationErrorCommands::class)->report($request, $scope->client, $actor, $data);
+            $this->recordEvents($scope->client, $actor, $before);
 
-                if (($attributes['client_medication_id'] ?? null) !== null) {
-                    $medication = ClientMedication::withTrashed()
-                        ->whereKey($attributes['client_medication_id'])
-                        ->where('client_id', $scope->client->id)
-                        ->lockForUpdate()
-                        ->first(['id', 'controlled_drug']);
-                    abort_unless($medication !== null, 404);
-                    abort_if(
-                        (bool) $medication->controlled_drug
-                        && ! $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
-                        404,
-                    );
-                }
-
-                unset($attributes['create_incident']);
-                // The same writes and hooks as the recording dialog's
-                // "More than ordered was given" (P01).
-                app(MedicationErrorReporter::class)->report(
-                    $scope->client,
-                    (int) $scope->siteId,
-                    $user,
-                    $attributes,
-                    $request->boolean('create_incident'),
-                );
-
-                return redirect()->back()->with('success', 'Medication error reported successfully.');
-            },
-        );
+            return $response;
+        });
     }
 
     public function update(Request $request, MedicationError $error)
     {
-        $user = $this->correctionActor($request);
-
-        return $this->withCanonicalError($user, $error, function (MedicationError $lockedError) use ($request) {
-            abort_unless(in_array($lockedError->status, ['reported', 'investigating'], true), 409);
-            $validated = $request->validate([
-                // These fields determine the required incident/signal journey.
-                // They are immutable after reporting; changing either needs a
-                // separately governed correction workflow that synchronizes
-                // every linked operational record atomically.
-                'error_type' => ['prohibited'],
-                'severity' => ['prohibited'],
-                'description' => 'sometimes|string|max:5000',
-                'immediate_action' => 'nullable|string|max:5000',
-                'contributing_factors' => 'nullable|string|max:5000',
-            ]);
-
-            $lockedError->update($validated);
-
-            return redirect()->back()->with('success', 'Medication error updated successfully.');
-        });
+        return $this->manage($request, $error, 'note');
     }
 
     public function review(Request $request, MedicationError $error)
     {
-        $user = $this->correctionActor($request);
-
-        return $this->withCanonicalError($user, $error, function (MedicationError $lockedError) use ($request, $user) {
-            abort_unless(in_array($lockedError->status, ['reported', 'investigating'], true), 409);
-            $validated = $request->validate([
-                'review_notes' => 'required|string|max:5000',
-            ]);
-
-            $lockedError->update([
-                'reviewed_by' => $user->id,
-                'reviewed_at' => now(),
-                'review_notes' => $validated['review_notes'],
-                'status' => 'investigating',
-            ]);
-
-            return redirect()->back()->with('success', 'Error reviewed successfully.');
-        });
+        return $this->manage($request, $error, 'triage');
     }
 
     public function resolve(Request $request, MedicationError $error)
     {
-        $user = $this->correctionActor($request);
-
-        return $this->withCanonicalError($user, $error, function (MedicationError $lockedError) use ($request, $user) {
-            abort_unless(in_array($lockedError->status, ['reported', 'investigating'], true), 409);
-            $validated = $request->validate([
-                'outcome' => 'required|string|max:5000',
-                'preventive_actions' => 'required|string|max:5000',
-                'harm_level' => 'nullable|in:a_c,d_e,f_g,h_i',
-            ]);
-
-            $lockedError->update([
-                'outcome' => $validated['outcome'],
-                'preventive_actions' => $validated['preventive_actions'],
-                'harm_level' => $validated['harm_level'] ?? $lockedError->harm_level,
-                'status' => 'resolved',
-                'reviewed_by' => $lockedError->reviewed_by ?? $user->id,
-                'reviewed_at' => $lockedError->reviewed_at ?? now(),
-            ]);
-
-            app(MedicationIncidentIntegrationService::class)->resolveMedicationError(
-                $lockedError,
-                'Medication error resolved.',
-                $user->id
-            );
-
-            return redirect()->back()->with('success', 'Error resolved successfully.');
-        });
+        return $this->manage($request, $error, 'resolve');
     }
 
-    /**
-     * Close out a resolved error — the final governance sign-off. Closing keeps
-     * the record (SoftDeletes is reserved for retraction); it just marks the
-     * lifecycle complete with an optional close-out note.
-     */
     public function close(Request $request, MedicationError $error)
     {
-        $user = $this->correctionActor($request);
-
-        return $this->withCanonicalError($user, $error, function (MedicationError $lockedError) use ($request, $user) {
-            $validated = $request->validate([
-                'close_note' => 'nullable|string|max:5000',
-            ]);
-
-            if ($lockedError->status === 'closed') {
-                return redirect()->back()->with('success', 'Error already closed out.');
-            }
-
-            if ($lockedError->status !== 'resolved') {
-                return redirect()->back()->withErrors(['status' => 'Only a resolved error can be closed out.']);
-            }
-
-            $lockedError->update([
-                'close_note' => $validated['close_note'] ?? $lockedError->close_note,
-                'status' => 'closed',
-                'closed_at' => now(),
-                'closed_by' => $user->id,
-            ]);
-
-            return redirect()->back()->with('success', 'Error closed out.');
-        });
+        return $this->manage($request, $error, 'close');
     }
 
-    /**
-     * Post-report "create & link incident". The report-time create_incident path
-     * is only available at store(); this exposes the same incident-creation shape
-     * as a standalone action on an already-reported error, links it via
-     * client_incident_id, then navigates to the incidents module (incidents.show).
-     * Idempotent — if an incident is already linked it just jumps to it. This does
-     * NOT modify the incidents module. See docs/ERRORS_GAP_ANALYSIS.md (C1).
-     */
+    public function reopen(Request $request, MedicationError $error)
+    {
+        return $this->manage($request, $error, 'reopen');
+    }
+
+    public function note(Request $request, MedicationError $error)
+    {
+        return $this->manage($request, $error, 'note');
+    }
+
+    public function action(Request $request, MedicationError $error)
+    {
+        return $this->manage($request, $error, 'action');
+    }
+
+    public function disclosure(Request $request, MedicationError $error)
+    {
+        return $this->manage($request, $error, 'disclosure');
+    }
+
     public function linkIncident(Request $request, MedicationError $error)
     {
-        $user = $this->correctionActor($request);
+        return $this->manage($request, $error, 'incident');
+    }
 
-        return $this->withCanonicalError($user, $error, function (MedicationError $lockedError, Client $client) use ($request, $user) {
-            if ($lockedError->client_incident_id !== null) {
-                return redirect()->route('incidents.show', (int) $lockedError->client_incident_id);
-            }
+    public function completeAction(Request $request, MedicationError $error, int $action)
+    {
+        return $this->manage($request, $error, 'complete', $action);
+    }
 
-            if (! in_array($lockedError->status, ['reported', 'investigating'], true)) {
-                throw ValidationException::withMessages([
-                    'status' => 'Only a reported or investigating medication error can be linked to a new incident.',
-                ]);
-            }
+    public function account(Request $request, MedicationError $error)
+    {
+        $actor = $this->recordingActor($request);
 
-            $validated = $request->validate([
-                'immediate_action' => ['nullable', 'string', 'max:5000'],
-            ]);
+        return $this->withCanonicalError($actor, $error, fn ($locked, $client) => app(MedicationErrorCommands::class)->run('account', $request, $locked, $client, $actor), 'medications.administer.record');
+    }
 
-            $immediateAction = trim((string) ($validated['immediate_action'] ?? $lockedError->immediate_action));
-            if (in_array($lockedError->severity, ['major', 'critical'], true)
-                && $immediateAction === ''
-            ) {
-                throw ValidationException::withMessages([
-                    'immediate_action' => 'Record the immediate action actually taken before creating a major or critical incident.',
-                ]);
-            }
+    private function manage(Request $request, MedicationError $error, string $command, ?int $action = null)
+    {
+        $actor = $this->correctionActor($request);
 
-            if ($immediateAction !== '' && $immediateAction !== $lockedError->immediate_action) {
-                $lockedError->forceFill(['immediate_action' => $immediateAction])->save();
-            }
-
-            $incident = ClientIncident::withoutEvents(fn () => ClientIncident::query()->create([
-                'client_id' => $lockedError->client_id,
-                'site_id' => $client->site_id,
-                'title' => 'Medication Error: '.str_replace('_', ' ', (string) $lockedError->error_type),
-                'description' => $lockedError->description ?: 'Linked from medication error '.$lockedError->id.'.',
-                'immediate_action_taken' => $immediateAction === '' ? null : $immediateAction,
-                'occurred_at' => $lockedError->reported_at ?? now(),
-                'reported_by' => $user->id,
-                'severity' => match ($lockedError->severity) {
-                    'critical' => 'critical',
-                    'major' => 'high',
-                    'moderate' => 'medium',
-                    default => 'low',
-                },
-                'status' => 'submitted',
-                'submitted_at' => now(),
-                'type' => 'medication_error',
-            ]));
-
-            $lockedError->forceFill(['client_incident_id' => $incident->id])->save();
-            $linkedError = $lockedError->fresh();
-            $signals = app(MedicationSignalService::class);
-            $signals->emitError($linkedError);
-            $existingAlert = $signals->attachExistingErrorSignalToIncident($linkedError);
-            $journeys = app(IncidentJourneyService::class);
-            $journey = $existingAlert === null
-                ? $journeys->ensureForSubmittedIncident($incident, $user)
-                : $journeys->attachAlertToIncident($incident, $existingAlert, $user);
-            app(TimelineEmitter::class)->project($journey->incident);
-
-            $createdIncidentId = (int) $journey->incident->id;
-            DB::afterCommit(function () use ($createdIncidentId): void {
-                try {
-                    RegisterIncidentGovernanceEscalationJob::dispatch($createdIncidentId);
-                } catch (Throwable $exception) {
-                    Log::error('Linked medication incident governance dispatch failed', [
-                        'client_incident_id' => $createdIncidentId,
-                        'exception' => $exception::class,
-                        'error' => $exception->getMessage(),
-                    ]);
-                }
-            });
-
-            return redirect()->route('incidents.show', $createdIncidentId);
-        });
+        return $this->withCanonicalError($actor, $error, fn ($locked, $client) => app(MedicationErrorCommands::class)->run($command, $request, $locked, $client, $actor, $action));
     }
 
     private function recordingActor(Request $request): User
@@ -522,12 +365,12 @@ class MedicationErrorController extends Controller
     private function correctionActor(Request $request): User
     {
         $user = $request->user();
-        abort_unless($user?->canDo('medications.administer.correct'), 403);
+        abort_unless($user?->canDo('medications.errors.manage'), 403);
 
         return $user;
     }
 
-    private function withCanonicalError(User $user, MedicationError $submittedError, Closure $callback): mixed
+    private function withCanonicalError(User $user, MedicationError $submittedError, Closure $callback, string $capability = 'medications.errors.manage'): mixed
     {
         $snapshot = MedicationError::query()
             ->whereKey($submittedError->getKey())
@@ -540,7 +383,7 @@ class MedicationErrorController extends Controller
         return $this->governanceScope->forClient(
             $user,
             $clientId,
-            'medications.administer.correct',
+            $capability,
             function (Client $client) use ($user, $snapshot, $callback) {
                 if ($snapshot->client_medication_id !== null) {
                     $medication = ClientMedication::withTrashed()
@@ -568,8 +411,13 @@ class MedicationErrorController extends Controller
                     404,
                 );
                 $this->assertErrorOwnership($error, $client);
+                app(MedicationRecordAccess::class)->assertReadable($user, $client);
 
-                return $callback($error, $client);
+                $before = $this->entryCursor($client->id);
+                $response = $callback($error, $client);
+                $this->recordEvents($client, $user, $before);
+
+                return $response;
             },
         );
     }
@@ -609,6 +457,31 @@ class MedicationErrorController extends Controller
                 ->where('site_id', $client->site_id)
                 ->exists();
             abort_unless($incidentMatches, 404);
+        }
+    }
+
+    private function entryCursor(int $clientId): int
+    {
+        return (int) DB::table('medication_error_entries')->whereIn('medication_error_id', MedicationError::query()->where('client_id', $clientId)->select('id'))->max('id');
+    }
+
+    private function recordEvents(Client $client, User $actor, int $after): void
+    {
+        $entries = MedicationErrorEntry::query()->where('id', '>', $after)
+            ->whereIn('medication_error_id', MedicationError::query()->where('client_id', $client->id)->select('id'))->orderBy('id')->get();
+        $items = [];
+        foreach ($entries as $entry) {
+            $error = MedicationError::query()->findOrFail($entry->medication_error_id);
+            $controlled = $error->client_medication_id !== null && ClientMedication::withTrashed()->whereKey($error->client_medication_id)->where('controlled_drug', true)->exists();
+            $items[] = new MedicationEventData(
+                siteId: (int) $client->site_id, kind: 'error.'.$entry->kind, subjectType: 'medication_error', subjectId: (string) $error->id,
+                actorId: (int) $actor->id, occurredAt: CarbonImmutable::instance($entry->created_at),
+                summary: 'Medication error '.$error->reference_number.' — '.str_replace('_', ' ', $entry->kind).'.',
+                facts: ['entry_id' => (int) $entry->id, 'stage' => $error->stage()], clientId: (int) $client->id, controlled: $controlled,
+            );
+        }
+        if ($items !== []) {
+            app(MedicationEventRecorder::class)->appendMany($items);
         }
     }
 }

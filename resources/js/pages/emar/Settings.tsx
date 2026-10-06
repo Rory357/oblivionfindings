@@ -1,3 +1,4 @@
+import { ErrorTriageSettings } from './settings/_error-triage';
 /* Medication › Settings (eMAR P11 v5). The Fleet Settings workspace pattern:
  * one PageHeader page with a rail of views, Sections (TierTwoTabs) inside each
  * view, titled groups of Switch rows, drafts that survive moving between tabs
@@ -18,30 +19,26 @@ import { formatTime } from '@/lib/datetime';
 import { Sections } from '@/pages/fleet-assets/settings/_ui';
 import { Head, router } from '@inertiajs/react';
 import {
-    Activity,
     Bell,
-    BellRing,
-    ClipboardCheck,
-    Clock,
-    FileText,
-    HelpCircle,
     History,
     Home,
-    KeyRound,
     Layers,
-    LockKeyhole,
     Pencil,
     Pill,
     RefreshCw,
     Repeat,
     Settings as SettingsIcon,
-    Shield,
-    ShieldCheck,
     UserCheck,
-    Users,
     type LucideIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    AlertLog,
+    AlertLogView,
+    LOG_RANGE,
+    LOG_SHOW,
+    type AlertLogPage,
+} from './settings/_alert-log';
 import {
     AlertDialogHost,
     AlertsDelivery,
@@ -57,7 +54,9 @@ import {
     type Dialog,
     type SettingsContext,
 } from './settings/_context';
+import { ControlledProductSettings } from './settings/_controlled-product';
 import { DialogHost } from './settings/_dialogs';
+import { EmergencyAccess } from './settings/_emergency';
 import {
     AllChanges,
     HISTORY_FILTERS,
@@ -80,7 +79,7 @@ import {
     sectionLabel,
     SET_VIEWS,
     settingsHash,
-    visibleSections,
+    settingsSectionTabs,
     visibleViews,
     type Built,
 } from './settings/_nav';
@@ -90,12 +89,14 @@ import {
     type OnCallData,
 } from './settings/_oncall';
 import { ReachDialogHost, type ReachGap } from './settings/_reach';
+import { RecordsReporting } from './settings/_records-reporting';
+import { ReviewCadenceSettings } from './settings/_reviews';
 import {
     MedicineRules,
     RuleDialogHost,
     RulesOverview,
+    settingsRuleData,
     type MedicineRule,
-    type RuleData,
     type RuleOptions,
 } from './settings/_rules';
 import {
@@ -126,11 +127,12 @@ type Props = {
     ruleOptions: RuleOptions;
     /** Houses this person can see; the house choices for medicine rules. */
     sites: { id: number; name: string }[];
-    can: { manage: boolean; manage_global: boolean };
+    settingsCan: { manage: boolean; manage_global: boolean };
     settings: SettingsPayload;
     witnessPin: WitnessPinProps;
     /** false = a house lead who can only reset PINs sees Staff & PINs, read-only. */
     settingsAccess: boolean;
+    controlledSettingsAccess: { view: boolean; manageable_site_ids: number[] };
     /** An auditor: every view and the change history, read-only (P11 answer 6). */
     readOnlyAudit: boolean;
     /** Round templates this person can read (Rounds & timing › Round templates). */
@@ -158,6 +160,9 @@ type Props = {
     alertHouses: { id: number; name: string }[];
     /** People with a contact gap: Who can't be reached (B2 C5). */
     alertReachGaps: ReachGap[];
+    emergencyPolicyAccess: boolean;
+    alertLog: AlertLogPage | null;
+    alertLogSummary: { recent: number; open: number };
 };
 
 const VIEW_ICON: Record<ViewKey, LucideIcon> = {
@@ -167,33 +172,17 @@ const VIEW_ICON: Record<ViewKey, LucideIcon> = {
     alerts: Bell,
     history: History,
 };
-const SEC_ICON: Record<string, LucideIcon> = {
-    overview: Activity,
-    medicines: Pill,
-    safety: Shield,
-    controlled: LockKeyhole,
-    photos: FileText,
-    templates: Repeat,
-    timing: Clock,
-    competency: ClipboardCheck,
-    exemptions: ShieldCheck,
-    pins: KeyRound,
-    status: Users,
-    decide: HelpCircle,
-    changes: History,
-    alerts: Bell,
-    delivery: BellRing,
-    oncall: Bell,
-};
 /** Tabs whose settings are saved through the save bar. */
 const SAVED_SECTIONS = [
     'safety',
+    'reviews',
     'timing',
     'competency',
     'exemptions',
     'pins',
     'alerts',
     'delivery',
+    'emergency',
 ];
 const SHOW_OPTIONS = [
     { value: 'all', label: 'All settings' },
@@ -210,6 +199,9 @@ const ALERT_SHOW_OPTIONS = [
 
 export type Filters = {
     show: string;
+    logHouse: string;
+    logShow: string;
+    logRange: string;
     rulesWhere: string;
     rulesState: string;
     pinState: string;
@@ -220,6 +212,9 @@ export type Filters = {
 };
 const F0: Filters = {
     show: 'all',
+    logHouse: 'all',
+    logShow: 'all',
+    logRange: 'recent',
     rulesWhere: 'all',
     rulesState: 'all',
     pinState: 'all',
@@ -238,7 +233,6 @@ const DirtyDot = () => (
 );
 
 export default function EmarSettings(props: Props) {
-    const breadcrumbs = useEmarBreadcrumbs();
     const { witnessPin, settingsAccess, readOnlyAudit, alertAccess } = props;
     // The settings, with the names alert values list and house names, so
     // every change reads in words (P11 B2).
@@ -258,6 +252,16 @@ export default function EmarSettings(props: Props) {
                 site_id: h.site_id,
                 name: h.name,
                 configured: !!h.rule,
+                contact: h.rule?.backup
+                    ? {
+                          id: h.rule.backup.id,
+                          name: h.rule.backup.name,
+                          detail:
+                              h.rule.mode === 'fixed'
+                                  ? 'Configured fixed contact'
+                                  : 'Configured backup contact',
+                      }
+                    : undefined,
             })),
             alert_reach: {
                 houses: props.alertReach.houses,
@@ -290,7 +294,18 @@ export default function EmarSettings(props: Props) {
     const templatesOnly = !settingsAccess && props.templateAccess.read;
     const built: Built = useMemo(
         () => ({
-            rules: settingsAccess ? ['overview', 'medicines', 'safety'] : [],
+            rules: settingsAccess
+                ? [
+                      'overview',
+                      'medicines',
+                      'safety',
+                      ...(s.groups.review_cadence ? ['reviews'] : []),
+                      'records',
+                      ...(props.controlledSettingsAccess.view
+                          ? ['controlled']
+                          : []),
+                  ]
+                : [],
             // P11 F1: whoever manages a house's round templates reaches them
             // here, and nothing else they couldn't already reach.
             rounds: settingsAccess
@@ -305,23 +320,64 @@ export default function EmarSettings(props: Props) {
                   : [],
             // P11 B2: settings readers, and house managers for their houses' extras.
             alerts: alertAccess.view
-                ? ['overview', 'alerts', 'delivery', 'oncall']
+                ? [
+                      'overview',
+                      'alerts',
+                      'delivery',
+                      'triage',
+                      'oncall',
+                      'emergency',
+                      'log',
+                  ]
                 : [],
             history: settingsAccess ? ['decide', 'changes'] : [],
         }),
-        [settingsAccess, templatesOnly, witnessPin.can_reset, alertAccess.view],
+        [
+            settingsAccess,
+            templatesOnly,
+            witnessPin.can_reset,
+            props.controlledSettingsAccess.view,
+            alertAccess.view,
+            s.groups.review_cadence,
+        ],
     );
     const [route, setRoute] = useState(() =>
         parseHash(window.location.hash, built),
     );
     const { view, sec } = route;
+    const breadcrumbs = useEmarBreadcrumbs(
+        `/emar/settings${settingsHash(view, sec)}`,
+    ).map((crumb, index, trail) =>
+        index === trail.length - 1
+            ? {
+                  ...crumb,
+                  title:
+                      sec === 'overview'
+                          ? SET_VIEWS[view].label
+                          : sectionLabel(view, sec),
+                  href: `/emar/settings${settingsHash(view, sec)}`,
+              }
+            : crumb,
+    );
     const [draft, setDraftState] = useState<Draft>({});
     const [dialog, setDialog] = useState<Dialog | null>(null);
     const [lensOpen, setLensOpen] = useState(false);
     const status = useStatusMessage();
     const setMessage = status.show;
-    const [query, setQuery] = useState('');
-    const [f, setF] = useState<Filters>(F0);
+    const [query, setQuery] = useState(() =>
+        route.view === 'alerts' && route.sec === 'log'
+            ? (new URLSearchParams(window.location.search).get('log_q') ?? '')
+            : '',
+    );
+    const [f, setF] = useState<Filters>(() => {
+        const params = new URLSearchParams(window.location.search);
+        return {
+            ...F0,
+            logHouse: params.get('log_house') || 'all',
+            logShow: params.get('log_show') || 'all',
+            logRange: params.get('log_range') || 'recent',
+        };
+    });
     const [page, setPage] = useState(1);
     const [loadedAt, setLoadedAt] = useState(() => new Date());
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -353,7 +409,11 @@ export default function EmarSettings(props: Props) {
             setMessage(null);
         };
         window.addEventListener('hashchange', onHash);
-        return () => window.removeEventListener('hashchange', onHash);
+        window.addEventListener('popstate', onHash);
+        return () => {
+            window.removeEventListener('hashchange', onHash);
+            window.removeEventListener('popstate', onHash);
+        };
     }, [built, setMessage]);
 
     // The server says what was saved; show it on the page (Fleet's status
@@ -445,13 +505,7 @@ export default function EmarSettings(props: Props) {
         staff: props.templateStaff,
         readOnlyAudit,
     };
-    const ruleData: RuleData = {
-        rules: props.rules,
-        options: props.ruleOptions,
-        sites: props.sites,
-        can: props.can,
-        readOnlyAudit,
-    };
+    const ruleData = settingsRuleData({ ...props, readOnlyAudit });
     const onCallData: OnCallData = props.onCall ?? { houses: [], staff: {} };
     const alertData: AlertData = {
         access: alertAccess,
@@ -464,14 +518,17 @@ export default function EmarSettings(props: Props) {
         onCall: onCallData,
         houses: props.alertHouses ?? [],
         reachGaps: props.alertReachGaps ?? [],
+        logSummary: props.alertLogSummary ?? { recent: 0, open: 0 },
     };
     // House extras and quiet hours: their own houses' managers (B2 Q3,
     // Q12); everything else needs all-sites authority.
     const canEdit = (group: string) =>
         !!s.groups[group] &&
-        (group === 'alertExtra' || group === 'quietHouse'
-            ? !readOnlyAudit && alertAccess.house_ids.length > 0
-            : s.can_manage_organisation);
+        (group === 'ea'
+            ? !readOnlyAudit && props.emergencyPolicyAccess
+            : group === 'alertExtra' || group === 'quietHouse'
+              ? !readOnlyAudit && alertAccess.house_ids.length > 0
+              : s.can_manage_organisation);
     const ctx: SettingsContext = {
         s,
         draft,
@@ -675,6 +732,33 @@ export default function EmarSettings(props: Props) {
                     'current',
                 )}
             </>
+        ) : view === 'alerts' && sec === 'log' ? (
+            <>
+                {select(
+                    'House',
+                    f.logHouse,
+                    [
+                        { value: 'all', label: 'All houses' },
+                        ...props.sites.map((x) => ({
+                            value: String(x.id),
+                            label: x.name,
+                        })),
+                    ],
+                    (v) => setF({ ...f, logHouse: v }),
+                    Home,
+                )}
+                {select('Status', f.logShow, LOG_SHOW, (v) =>
+                    setF({ ...f, logShow: v }),
+                )}
+                {select(
+                    'History',
+                    f.logRange,
+                    LOG_RANGE,
+                    (v) => setF({ ...f, logRange: v }),
+                    History,
+                    'recent',
+                )}
+            </>
         ) : view === 'alerts' && sec === 'alerts' ? (
             select('All alerts', f.show, ALERT_SHOW_OPTIONS, (v) =>
                 setF({ ...f, show: v }),
@@ -709,7 +793,7 @@ export default function EmarSettings(props: Props) {
                     Organisation
                 </PageHeaderStatusChip>
             }
-            subline={`Medication rules and house settings · ${accessText} · times in NZDT (Pacific/Auckland)`}
+            subline={`Medication rules and house settings · ${accessText} · times in Pacific/Auckland`}
             actions={
                 <>
                     <PageHeaderSearch
@@ -742,7 +826,7 @@ export default function EmarSettings(props: Props) {
                     <PageHeaderFilterButton
                         icon={RefreshCw}
                         onClick={refresh}
-                        aria-label={`Updated ${formatTime(loadedAt)} NZDT — refresh`}
+                        aria-label={`Updated ${formatTime(loadedAt)} Pacific/Auckland — refresh`}
                     >
                         Updated {formatTime(loadedAt)}
                     </PageHeaderFilterButton>
@@ -783,14 +867,12 @@ export default function EmarSettings(props: Props) {
 
     const secChanges = (k: string) =>
         changes(s, draft, view).filter((c) => c.section === k).length;
-    const tabs = visibleSections(built, view).map(([key, label]) => ({
-        key,
-        label,
-        icon: SEC_ICON[key],
-        ...(key === 'decide' && pending.length
+    const tabs = settingsSectionTabs(built, view).map((tab) => ({
+        ...tab,
+        ...(tab.key === 'decide' && pending.length
             ? { count: pending.length }
             : {}),
-        ...(secChanges(key) ? { warningCount: secChanges(key) } : {}),
+        ...(secChanges(tab.key) ? { warningCount: secChanges(tab.key) } : {}),
     }));
     const clearQ = () => setQuery('');
     const body =
@@ -809,6 +891,29 @@ export default function EmarSettings(props: Props) {
             />
         ) : view === 'rules' && sec === 'safety' ? (
             <SafetyChecks
+                q={query}
+                show={f.show}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+            />
+        ) : view === 'rules' && sec === 'controlled' ? (
+            <ControlledProductSettings
+                q={query}
+                show={f.show}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+                houses={props.sites}
+                houseIds={props.controlledSettingsAccess.manageable_site_ids}
+                readOnlyAudit={readOnlyAudit}
+            />
+        ) : view === 'rules' && sec === 'records' ? (
+            <RecordsReporting q={query} show={f.show} />
+        ) : view === 'rules' && sec === 'reviews' ? (
+            <ReviewCadenceSettings
                 q={query}
                 show={f.show}
                 clear={() => {
@@ -890,6 +995,32 @@ export default function EmarSettings(props: Props) {
                     setF({ ...f, show: 'all' });
                 }}
             />
+        ) : view === 'alerts' && sec === 'emergency' ? (
+            <EmergencyAccess
+                q={query}
+                show={f.show}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+            />
+        ) : view === 'alerts' && sec === 'log' ? (
+            <AlertLog
+                page={props.alertLog ?? null}
+                q={query}
+                house={f.logHouse}
+                show={f.logShow}
+                range={f.logRange}
+                clear={() => {
+                    clearQ();
+                    setF({
+                        ...f,
+                        logHouse: 'all',
+                        logShow: 'all',
+                        logRange: 'recent',
+                    });
+                }}
+            />
         ) : view === 'alerts' && sec === 'delivery' ? (
             <AlertsDelivery
                 q={query}
@@ -900,6 +1031,8 @@ export default function EmarSettings(props: Props) {
                     setF({ ...f, show: 'all' });
                 }}
             />
+        ) : view === 'alerts' && sec === 'triage' ? (
+            <ErrorTriageSettings q={query} show={f.show} clear={clearQ} />
         ) : view === 'alerts' && sec === 'oncall' ? (
             <OnCallContacts
                 q={query}
@@ -950,6 +1083,9 @@ export default function EmarSettings(props: Props) {
                         />
                     ) : null}
                 </div>
+                {dialog?.kind === 'alertlog' && (
+                    <AlertLogView row={dialog.row} />
+                )}
                 <DialogHost dialog={dialog} />
                 {lensOpen ? (
                     <HouseLens

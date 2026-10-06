@@ -87,6 +87,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'two_factor_secret',
         'two_factor_recovery_codes',
         'remember_token',
+        'on_call_cellphone_consented_at',
     ];
 
     protected $appends = ['profile_photo_url', 'avatar'];
@@ -104,6 +105,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'two_factor_confirmed_at' => 'datetime',
             'approved_at' => 'datetime',
             'last_seen_at' => 'datetime',
+            'on_call_cellphone_consented_at' => 'datetime',
             'reduce_motion' => 'boolean',
             'font_size' => 'integer',
             'dnd_enabled' => 'boolean',

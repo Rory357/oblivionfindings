@@ -10,10 +10,12 @@ use App\Models\Permission;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\GuidedRoundService;
 use App\Support\EmarUrl;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\MedicationReadQueryInventory;
 
 beforeEach(function () {
     Cache::flush();
@@ -200,53 +202,66 @@ it('hides a My Day medication slot while the worker snooze cache key is active',
 
 it('matches every dose slot with a single administration query (no N+1)', function () {
     [$worker, $client] = makeWorkerWithMyDayMedicationClient();
-
-    // 3 meds × 2 in-window dose times = 6 slots for one resident. Before F1 the
-    // rail issued one ClientMedicationAdministration query per slot, re-run on
-    // every 60s live refresh; now it must be a single query for the window.
-    foreach (['Paracetamol', 'Metformin', 'Aspirin'] as $name) {
-        myDayEnteredOrder([
-            'client_id' => $client->id,
-            'name' => $name,
-            'is_prn' => false,
-            'active' => true,
-            'state' => 'active',
-            'start_date' => '2026-05-01',
-            'end_date' => null,
-            'dose_times' => ['09:00', '13:00'],
+    $orders = [];
+    $createOrder = function (Client $person, array $times) use (&$orders): void {
+        $orders[] = myDayEnteredOrder([
+            'client_id' => $person->id, 'name' => 'Query fixture medicine '.(count($orders) + 1),
+            'dosage' => '1 tablet', 'frequency' => 'Scheduled', 'is_prn' => false, 'controlled_drug' => false,
+            'active' => true, 'state' => 'active', 'approval_status' => 'verified',
+            'start_date' => '2026-05-01', 'end_date' => null, 'dose_times' => $times,
         ]);
-    }
+    };
+    $createOrder($client, ['09:00']);
 
-    // Isolate the rail's batching contract from the independently cached
-    // navigation badge. A cold badge cache intentionally performs its own
-    // day-wide administration read before sharing the Inertia navigation prop.
-    Cache::put(
-        HandleInertiaRequests::medsOverdueBadgeCacheKey(
-            $worker->id,
-            Carbon::now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString(),
-        ),
-        0,
-        now()->addMinute(),
-    );
-
-    DB::flushQueryLog();
-    DB::enableQueryLog();
-
-    try {
-        $this->actingAs($worker)
-            ->get('/my-day')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page->has('medications_due', 6));
-
-        $adminQueries = collect(DB::getQueryLog())
-            ->filter(fn ($entry) => str_contains($entry['query'], 'client_medication_administrations'))
-            ->count();
-    } finally {
-        DB::disableQueryLog();
+    foreach ([1, 5, 17] as $slotCount) {
+        if ($slotCount === 5) {
+            $createOrder($client, ['09:00', '13:00']);
+            $createOrder($client, ['09:00', '13:00']);
+        } elseif ($slotCount === 17) {
+            for ($personIndex = 0; $personIndex < 2; $personIndex++) {
+                $person = Client::factory()->create(['site_id' => $client->site_id, 'status' => 'active']);
+                $person->supportWorkers()->attach($worker->id);
+                Shift::factory()->assignedToday($worker)->published()->create(['client_id' => $person->id]);
+                for ($orderIndex = 0; $orderIndex < 3; $orderIndex++) {
+                    $createOrder($person, ['09:00', '13:00']);
+                }
+            }
+        }
+        app()->forgetScopedInstances();
+        auth()->forgetUser();
+        Cache::forget("user:{$worker->id}:task-nav:v1");
+        // Keep the independently cached badge primed in every fresh request.
+        Cache::put(HandleInertiaRequests::medsOverdueBadgeCacheKey(
+            $worker->id, Carbon::now(config('app.worker_timezone'))->toDateString(),
+        ), 0, now()->addMinute());
         DB::flushQueryLog();
+        DB::enableQueryLog();
+        try {
+            $response = $this->actingAs($worker->fresh())->get('/my-day')->assertOk();
+            $reads = MedicationReadQueryInventory::fromLog(DB::getQueryLog());
+        } finally {
+            DB::disableQueryLog();
+            DB::flushQueryLog();
+        }
+        $this->assertCount($slotCount, $response->inertiaProps('medications_due'));
+        $this->assertSame(
+            collect($orders)->pluck('id')->sort()->values()->all(),
+            collect($response->inertiaProps('medications_due'))->pluck('medication_id')->unique()->sort()->values()->all(),
+        );
+        $this->assertSame(
+            collect($orders)->pluck('client_id')->unique()->sort()->values()->all(),
+            collect($response->inertiaProps('medications_due'))->pluck('client_id')->unique()->sort()->values()->all(),
+        );
+        // The follow-up parent query proves canonical ownership in EXISTS.
+        // The PRN queue makes one independent canonical unresolved-parent
+        // read, regardless of scheduled-slot growth; neither loads per slot.
+        $this->assertSame(1, count($reads['scheduled_window']));
+        $this->assertSame([
+            'scheduled_window' => 1, 'board_day' => 0, 'prn_unresolved' => 1,
+            'administration_batch' => 0, 'followup_scope' => 1, 'refusal_scope' => 0, 'unexpected' => 0,
+        ], MedicationReadQueryInventory::counts($reads), MedicationReadQueryInventory::describe($reads));
+        $this->assertDatabaseCount('client_medication_administrations', 0);
     }
-
-    expect($adminQueries)->toBe(1);
 })->group('my-day');
 
 it('does not disclose shift medications without an exact medication capability', function () {
@@ -288,13 +303,10 @@ it('does not disclose shift medications without an exact medication capability',
 
 it('only serializes an active medication round with canonical accessible Site provenance', function () {
     $worker = User::factory()->frontlineWorker()->create();
-    $recordPermission = Permission::query()->firstOrCreate(
-        ['key' => 'medications.administer.record'],
-        ['description' => 'medications.administer.record'],
-    );
-    $worker->permissionOverrides()->syncWithoutDetaching([
-        $recordPermission->id => ['allowed' => true],
-    ]);
+    foreach (['medications.administer.record', 'clients.viewAssigned'] as $key) {
+        $permission = Permission::query()->firstOrCreate(['key' => $key], ['description' => $key]);
+        $worker->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
+    }
 
     $localSite = Site::factory()->create();
     $foreignSite = Site::factory()->create();
@@ -309,6 +321,12 @@ it('only serializes an active medication round with canonical accessible Site pr
 
     foreach ([$localSite, $foreignSite] as $site) {
         $client = Client::factory()->create(['site_id' => $site->id]);
+        if ($site->is($localSite)) {
+            $client->supportWorkers()->attach($worker->id);
+            Shift::factory()->assignedToday($worker)->published()->create([
+                'client_id' => $client->id, 'site_id' => $site->id,
+            ]);
+        }
         myDayEnteredOrder([
             'client_id' => $client->id,
             'name' => 'Scheduled medicine for '.$site->name,
@@ -377,6 +395,51 @@ it('only serializes an active medication round with canonical accessible Site pr
             ->where('active_round.name', 'Accessible local round')
         );
     expect($foreignSiteResponse->getContent())->not->toContain('CONCEALED FOREIGN SITE ROUND');
+})->group('my-day');
+
+it('narrows active round progress to the existing My Day medication reader population', function () {
+    [$worker, $client] = makeWorkerWithMyDayMedicationClient();
+    $permission = Permission::query()->firstOrCreate(['key' => 'medications.administer.record'], ['description' => 'medications.administer.record']);
+    $worker->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
+    $hidden = Client::factory()->create(['site_id' => $client->site_id, 'first_name' => 'CONCEALED', 'last_name' => 'Round Person']);
+    $order = myDayEnteredOrder([
+        'client_id' => $client->id, 'name' => 'Visible round dose', 'is_prn' => false, 'active' => true, 'state' => 'active',
+        'approval_status' => 'verified', 'start_date' => '2026-05-01', 'end_date' => null, 'dose_times' => ['09:00'],
+    ]);
+    $hiddenOrder = myDayEnteredOrder([
+        'client_id' => $hidden->id, 'name' => 'CONCEALED round medicine', 'is_prn' => false, 'active' => true, 'state' => 'active',
+        'approval_status' => 'verified', 'start_date' => '2026-05-01', 'end_date' => null, 'dose_times' => ['06:00', '09:00'],
+    ]);
+    $scheduled = Carbon::parse('2026-05-21 09:00:00', 'Pacific/Auckland')->utc();
+    ClientMedicationAdministration::query()->create([
+        'client_id' => $hidden->id, 'client_medication_id' => $hiddenOrder->id, 'status' => 'given',
+        'scheduled_for' => $scheduled, 'administered_at' => $scheduled, 'administered_by' => $worker->id,
+    ]);
+    $round = MedicationRound::query()->create([
+        'site_id' => $client->site_id, 'name' => 'Shared site round', 'round_date' => '2026-05-21',
+        'scheduled_time' => '09:00', 'window_minutes' => 60, 'assigned_to' => $worker->id, 'status' => 'pending',
+    ]);
+    $emptyForWorker = MedicationRound::query()->create([
+        'site_id' => $client->site_id, 'name' => 'Earlier unassigned-person round', 'round_date' => '2026-05-21',
+        'scheduled_time' => '06:00', 'window_minutes' => 10, 'assigned_to' => $worker->id, 'status' => 'in_progress',
+        'started_by' => $worker->id, 'started_at' => now(),
+    ]);
+    // The earlier, higher-priority round is canonically populated but empty
+    // to this reader; the later assigned round must still be selected.
+    expect(app(GuidedRoundService::class)->progress($emptyForWorker, false)['total'])->toBe(1)
+        ->and(app(GuidedRoundService::class)->progress($emptyForWorker, false, [$client->id])['total'])->toBe(0);
+    $canonical = app(GuidedRoundService::class)->progress($round, false);
+    expect($canonical['total'])->toBe(2)->and($canonical['completed'])->toBe(1);
+    $response = $this->actingAs($worker)->get('/my-day')->assertOk()->assertInertia(fn ($page) => $page
+        ->where('active_round.id', $round->id)
+        ->where('active_round.scheduled_at', Carbon::parse('2026-05-21 09:00:00', 'Pacific/Auckland')->toIso8601String())
+        ->where('active_round.total', 1)
+        ->where('active_round.completed', 0)
+        ->where('active_round.given', 0)
+        ->where('active_round.percent', 0)
+        ->where('medications_due', fn ($rows): bool => collect($rows)->pluck('medication_id')->all() === [$order->id]));
+    expect($response->getContent())->not->toContain('CONCEALED Round Person')->not->toContain('CONCEALED round medicine');
+    $this->assertDatabaseCount('client_medication_administrations', 1);
 })->group('my-day');
 
 function makeWorkerWithMyDayMedicationClient(): array

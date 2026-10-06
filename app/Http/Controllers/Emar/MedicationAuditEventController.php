@@ -18,12 +18,16 @@ use App\Models\User;
 use App\Services\Emar\MedicationAuditIntegrityService;
 use App\Services\Medication\Alerts\MedicationAlertSources;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\Medication\Reporting\MedicationExportAudit;
+use App\Services\Medication\Reporting\MedicationReportAccess;
+use App\Services\Medication\Reporting\MedicationReportPeriod;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 /**
@@ -121,37 +125,65 @@ class MedicationAuditEventController extends Controller
         ]);
     }
 
-    public function export(Request $request, string $id): StreamedResponse
+    public function export(Request $request, string $id): Response
     {
-        $user = $request->user();
-        abort_unless($user, 403);
-        $siteIds = $this->governanceScope->readerSiteIds($user, 'medications.audit.view');
-        $this->governanceScope->readerSiteIds($user, 'medications.reports.export');
-        $model = $this->resolveModelOrFail(
-            $id,
-            $siteIds,
-            $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
-        );
+        $actor = $request->user();
+        abort_unless($actor && app(MedicationReportAccess::class)->canExport($actor, 'audit'), 403);
+        $request->validate(['client_id' => ['nullable', 'integer', 'min:1'], 'site_id' => ['nullable', 'integer', 'min:1']]);
+        $audit = app(MedicationExportAudit::class);
+        $purpose = $audit->purpose($request);
+        if ($request->filled('date')) {
+            $request->merge(['period' => 'custom', 'date_from' => $request->input('date'), 'date_to' => $request->input('date')]);
+        } elseif ($request->filled('from') || $request->filled('to')) {
+            $request->merge(['period' => 'custom', 'date_from' => $request->input('from'), 'date_to' => $request->input('to')]);
+        }
+        $period = MedicationReportPeriod::fromRequest($request);
+        $evidence = $this->exportEvidence($actor, $id, $request->integer('site_id') ?: null, $request->integer('client_id') ?: null);
+        $siteId = $evidence['site_id'];
+        $clientId = $evidence['client_id'];
+        $digest = hash('sha256', json_encode($evidence, JSON_THROW_ON_ERROR));
+        $out = fopen('php://temp', 'w+b');
+        $this->putCsv($out, ['Record', $evidence['record']]);
+        $this->putCsv($out, []);
+        $this->putCsv($out, ['Field', 'Value']);
+        foreach ($evidence['attributes'] as $field => $value) {
+            $this->putCsv($out, [$field, is_scalar($value) || $value === null ? (string) $value : (string) json_encode($value)]);
+        }
+        rewind($out);
+        $bytes = stream_get_contents($out);
+        fclose($out);
 
-        $filename = 'audit_record_'.$id.'_'.now()->format('Y-m-d_His').'.csv';
+        // The selected record supplies release scope. Query filters cannot
+        // substitute another person's evidence for the buffered source.
+        $audit->record($actor, 'audit', [$siteId], $period, $purpose, $clientId,
+            ['legacy_route' => $request->route()->getName()],
+            function (User $current) use ($id, $siteId, $clientId, $digest): void {
+                $fresh = $this->exportEvidence($current, $id, $siteId, $clientId);
+                abort_unless(hash_equals($digest, hash('sha256', json_encode($fresh, JSON_THROW_ON_ERROR))), 409,
+                    'The record or your access changed while the file was being prepared. Refresh and try again.');
+            });
 
-        return response()->streamDownload(function () use ($model) {
-            $out = fopen('php://output', 'w');
+        return response($bytes, 200, [
+            'Content-Type' => 'text/csv', 'Cache-Control' => 'no-store',
+            'Content-Disposition' => 'attachment; filename="audit_record_'.$id.'_'.now()->format('Y-m-d_His').'.csv"',
+        ]);
+    }
 
-            $this->putCsv($out, ['Record', class_basename($model).' #'.$model->getKey()]);
-            $this->putCsv($out, []);
-            $this->putCsv($out, ['Field', 'Value']);
-            $attrs = array_intersect_key(
-                $model->getAttributes(),
-                array_flip(self::SAFE_EXPORT_FIELDS),
-            );
-            ksort($attrs);
-            foreach ($attrs as $field => $value) {
-                $this->putCsv($out, [$field, is_scalar($value) || $value === null ? (string) $value : (string) json_encode($value)]);
-            }
+    private function exportEvidence(User $actor, string $id, ?int $siteId, ?int $clientId): array
+    {
+        $this->governanceScope->readerSiteIds($actor, 'medications.audit.view');
+        $this->governanceScope->readerSiteIds($actor, 'medications.audit.export');
+        $sites = app(MedicationReportAccess::class)->siteIds($actor, $siteId, $clientId);
+        $model = $this->resolveModelOrFail($id, $sites, $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY));
+        $actualClientId = $this->clientIdForModel($model);
+        abort_unless($clientId === null || $clientId === $actualClientId, 404);
+        $person = Client::query()->whereIn('site_id', $sites)->find($actualClientId);
+        app(MedicationRecordAccess::class)->assertReportable($actor, $person);
+        $attributes = array_intersect_key($model->getAttributes(), array_flip(self::SAFE_EXPORT_FIELDS));
+        ksort($attributes);
 
-            fclose($out);
-        }, $filename, ['Content-Type' => 'text/csv']);
+        return ['site_id' => (int) $person->site_id, 'client_id' => $actualClientId,
+            'record' => class_basename($model).' #'.$model->getKey(), 'attributes' => $attributes];
     }
 
     public function flag(Request $request, string $id)

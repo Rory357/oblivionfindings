@@ -25,34 +25,54 @@ test.describe('attendance readiness workflows', () => {
         await loginAsClockInCandidateWorker(page, testInfo);
         await gotoMyDay(page);
 
-        const clockInButton = page.getByTestId('clock-in-button').last();
-        if (await clockInButton.isDisabled()) {
-            await page.getByRole('radio').first().click();
-        }
-
+        const clockInButton = page.getByRole('button', {
+            name: 'Clock in',
+            exact: true,
+        });
+        await expect(clockInButton).toBeEnabled();
         await clockInButton.click();
 
-        await expect(page.getByTestId('clock-out-button')).toBeVisible();
+        await expect(
+            page.getByRole('button', { name: 'Finish shift', exact: true }),
+        ).toBeVisible();
         expectNoConsoleErrors(consoleErrors);
     });
 
     test('frontline worker can clock out cleanly with one atomic request', async ({
         page,
     }, testInfo) => {
+        // Allow the persisted clock-out and redirected My Day load to finish
+        // after fixture setup and sign-in on CI's single PHP worker.
+        test.setTimeout(60_000);
         const consoleErrors = collectConsoleErrors(page);
 
         await loginAsClockOutCleanWorker(page, testInfo);
         await gotoMyDay(page);
 
-        await page.getByTestId('clock-out-button').first().click();
+        await page
+            .getByRole('button', { name: 'Finish shift', exact: true })
+            .click();
         await expect(
-            page.getByRole('heading', { name: /End shift for/i }),
+            page.getByRole('heading', {
+                name: 'End shift at Playwright Attendance House',
+                exact: true,
+            }),
         ).toBeVisible();
 
+        const clockOutResponse = page.waitForResponse(
+            (response) =>
+                new URL(response.url()).pathname === '/attendance/clock-out' &&
+                response.request().method() === 'POST',
+        );
         await page.getByTestId('end-shift-submit').click();
+        expect((await clockOutResponse).status()).toBe(302);
 
-        await expect(page.getByTestId('clock-in-button')).toBeVisible();
-        await expect(page.getByTestId('clock-out-button')).toHaveCount(0);
+        await expect(
+            page.getByRole('button', { name: 'Clock in', exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole('button', { name: 'Finish shift', exact: true }),
+        ).toHaveCount(0);
         expectNoConsoleErrors(consoleErrors);
     });
 
@@ -64,8 +84,13 @@ test.describe('attendance readiness workflows', () => {
         await loginAsChecklistWorker(page, testInfo);
         await gotoMyDay(page);
 
-        await page.getByTestId('clock-out-button').first().click();
-        const dialog = page.getByRole('dialog', { name: /End shift for/i });
+        await page
+            .getByRole('button', { name: 'Finish shift', exact: true })
+            .click();
+        const dialog = page.getByRole('dialog', {
+            name: 'End shift at Playwright Attendance House',
+            exact: true,
+        });
         await expect(dialog.getByText(/Finish shift tasks/i)).toBeVisible();
         await expect(dialog.getByText(/Write handover/i)).toBeVisible();
 
@@ -73,13 +98,18 @@ test.describe('attendance readiness workflows', () => {
             .getByRole('checkbox', { name: 'Playwright checklist task' })
             .check();
         await dialog
-            .getByLabel(/What should the next shift know/i)
+            .getByLabel(
+                'What should the next worker know about Playwright Attendance?',
+                { exact: true },
+            )
             .fill('Checklist completed during atomic clock-out test.');
         const submit = dialog.getByTestId('end-shift-submit');
         await expect(submit).toBeEnabled();
         await submit.click();
 
-        await expect(page.getByTestId('clock-in-button')).toBeVisible();
+        await expect(
+            page.getByRole('button', { name: 'Clock in', exact: true }),
+        ).toBeVisible();
         expectNoConsoleErrors(consoleErrors);
     });
 
@@ -91,7 +121,9 @@ test.describe('attendance readiness workflows', () => {
         await loginAsIncidentBlockerWorker(page);
         await gotoMyDay(page);
 
-        await page.getByTestId('clock-out-button').first().click();
+        await page
+            .getByRole('button', { name: 'Finish shift', exact: true })
+            .click();
 
         await expect(page.getByText(/Submit draft incidents/i)).toBeVisible();
         await expect(
@@ -114,7 +146,10 @@ test.describe('timesheet approval readiness workflows', () => {
         await loginAsStaff(page);
         await page.goto('/operations/timesheets/approvals');
 
-        const firstRow = page.getByTestId('approvals-row').first();
+        const firstRow = page
+            .getByTestId('approvals-row')
+            .filter({ hasText: 'Playwright Attendance' })
+            .first();
         await expect(firstRow).toBeVisible();
 
         await firstRow.getByTestId('approvals-row-checkbox').check();

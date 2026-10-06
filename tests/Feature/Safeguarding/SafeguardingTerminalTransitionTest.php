@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Safeguarding;
 
+use App\Domain\Governance\Models\NotifiableIncident;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\AuditLog;
 use App\Models\ControlRoomAlert;
@@ -14,6 +15,7 @@ use App\Models\SafeguardingTerminalTransition;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\HealthSafety\HsEventClosureService;
+use App\Services\HealthSafety\HsEventService;
 use App\Services\Safeguarding\SafeguardingTerminalTransitionService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -215,7 +217,7 @@ class SafeguardingTerminalTransitionTest extends TestCase
         $this->assertSame('mysql', $connection->getDriverName());
         $site = Site::factory()->create();
         $actor = $this->actor($site, ['safeguarding.update']);
-        [$concern, $event, $alert] = $this->readyJourney($site, $actor);
+        [$concern, $event, $alert] = $this->readyJourney($site, $actor, ['severity' => 'critical']);
         $database = $connection->getDatabaseName();
         $token = Str::uuid()->toString();
         $releasePath = sys_get_temp_dir().DIRECTORY_SEPARATOR."safe-terminal-go-{$token}";
@@ -228,6 +230,14 @@ class SafeguardingTerminalTransitionTest extends TestCase
         $connection->commit();
 
         try {
+            $notifiable = NotifiableIncident::query()
+                ->where('incident_type', 'safeguarding')
+                ->where('related_incident_id', $concern->id)
+                ->sole();
+            $this->assertSame($actor->id, (int) $notifiable->submitted_by);
+            $this->assertSame('critical', $notifiable->severity);
+            $notifiableBefore = $notifiable->getRawOriginal();
+
             foreach ($readyPaths as $readyPath) {
                 $process = new Process([
                     PHP_BINARY,
@@ -262,6 +272,7 @@ class SafeguardingTerminalTransitionTest extends TestCase
                 ->where('action', 'safeguarding.concern.terminalTransitionApplied')
                 ->where('auditable_id', $concern->id)
                 ->count());
+            $this->assertSame($notifiableBefore, $notifiable->fresh()->getRawOriginal());
         } finally {
             foreach ($processes as $process) {
                 if ($process->isRunning()) {
@@ -274,23 +285,8 @@ class SafeguardingTerminalTransitionTest extends TestCase
                 }
             }
 
-            try {
-                DB::table('audit_logs')->where(function ($query) use ($concern, $event, $alert, $actor): void {
-                    $query->where('user_id', $actor->id)
-                        ->orWhereIn('auditable_id', [$concern->id, $event->id, $alert->id]);
-                })->delete();
-                DB::table('safeguarding_terminal_transitions')->where('safeguarding_concern_id', $concern->id)->delete();
-                DB::table('hs_events')->where('id', $event->id)->delete();
-                DB::table('control_room_alerts')->where('id', $alert->id)->delete();
-                DB::table('safeguarding_concerns')->where('id', $concern->id)->delete();
-                DB::table('hr_employee_profiles')->where('user_id', $actor->id)->delete();
-                DB::table('permission_user')->where('user_id', $actor->id)->delete();
-                DB::table('role_user')->where('user_id', $actor->id)->delete();
-                DB::table('users')->where('id', $actor->id)->delete();
-                DB::table('sites')->where('id', $site->id)->delete();
-            } finally {
-                $connection->beginTransaction();
-            }
+            // The registered baseline restorer owns all committed fixture rows, including observer-created dependants.
+            $connection->beginTransaction();
         }
     }
 
@@ -335,14 +331,16 @@ class SafeguardingTerminalTransitionTest extends TestCase
             'owner_user_id' => $actor->id,
             'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
             'investigation_required' => false,
-            'worksafe_notifiable' => false,
-            'worksafe_decided_at' => now(),
-            'worksafe_decided_by_user_id' => $actor->id,
-            'worksafe_decision_reason' => 'Assessed as not meeting the WorkSafe notification threshold.',
-            'worksafe_decision_source' => 'manual',
             'worksafe_status' => null,
         ])->save();
         $this->actingAs($actor);
+        $event = app(HsEventService::class)->recordWorksafeDecision(
+            $event->fresh(),
+            false,
+            'Assessed as not meeting the WorkSafe notification threshold.',
+            $actor,
+        );
+        $this->assertTrue($event->hasSignedWorksafeDecision());
         $event = app(HsEventClosureService::class)->closeEvent(
             $event->fresh(),
             'Canonical H&S safeguarding work completed.',

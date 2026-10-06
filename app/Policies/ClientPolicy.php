@@ -76,7 +76,7 @@ class ClientPolicy
             'medications.stock.update',
             'medications.audit.view',
             'medications.reports.export',
-            'reports.viewAny',
+            'medications.reports.view',
         ])
             ->contains(fn (string $permission): bool => $user->canDo($permission));
 

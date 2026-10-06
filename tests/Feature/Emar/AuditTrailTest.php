@@ -18,30 +18,31 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\ReadsRetainedMedicationAuditEvidence;
 use Tests\TestCase;
 
 /**
- * The redesigned Audit Trail resolves the active site's brand colour, now folds
- * controlled-drug movements and medication errors into the unified feed, and
- * flags compliance gaps (a CD transaction without a recorded witness counts as
- * an open gap).
+ * Retained clinical evidence still supports historical audit and integrity
+ * checks. The public audit alias must first reach the canonical ledger screen;
+ * raw historical rows are checked through their separate evidence projection.
  */
 class AuditTrailTest extends TestCase
 {
+    use ReadsRetainedMedicationAuditEvidence;
     use RefreshDatabase;
 
     private function seedAudit(): array
     {
         $this->seed(RbacSeeder::class);
         $user = $this->makeRoleUser('admin');
-        $this->grantPermissions($user, ['medications.audit.view']);
+        $this->grantPermissions($user, ['medications.audit.view', 'medications.reports.view']);
         $site = Site::factory()->create(['type' => 'house', 'is_active' => true, 'brand_colour' => '#5E35B1']);
         $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
 
         return compact('user', 'site', 'client');
     }
 
-    public function test_page_serves_brand_colour_and_flags_cd_witness_gap(): void
+    public function test_retained_projection_serves_brand_colour_and_flags_cd_witness_gap(): void
     {
         ['user' => $user, 'site' => $site, 'client' => $client] = $this->seedAudit();
         $med = ClientMedication::query()->create([
@@ -54,9 +55,9 @@ class AuditTrailTest extends TestCase
             'quantity' => 2, 'unit' => 'tablets', 'on_hand_before' => 10, 'on_hand_after' => 8,
             'reason' => 'PRN dose', 'recorded_by' => $user->id, 'witnessed_by' => null, 'recorded_at' => now(),
         ]);
+        $this->assertDatabaseCount('medication_events', 0);
 
-        $this->actingAs($user)
-            ->get('/emar/audit?site_id='.$site->id)
+        $this->retainedAuditFeed($user, ['site_id' => $site->id])
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('emar/AuditLog')
@@ -77,8 +78,7 @@ class AuditTrailTest extends TestCase
             'status' => 'reported', 'reported_by' => $user->id, 'reported_at' => now(),
         ]);
 
-        $this->actingAs($user)
-            ->get('/emar/audit')
+        $this->retainedAuditFeed($user)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('emar/AuditLog')
@@ -98,7 +98,7 @@ class AuditTrailTest extends TestCase
             'ceased_at' => now()->subDay(), 'ceased_reason' => 'No longer required',
         ]);
 
-        $this->actingAs($user)->get('/emar/audit')->assertOk()->assertInertia(fn (Assert $page) => $page
+        $this->retainedAuditFeed($user)->assertOk()->assertInertia(fn (Assert $page) => $page
             ->where('events', function ($events) {
                 $started = collect($events)->firstWhere('event_type', 'medication_started');
                 $ceased = collect($events)->firstWhere('event_type', 'medication_ceased');
@@ -128,7 +128,7 @@ class AuditTrailTest extends TestCase
             'change_reason' => 'Dose increased', 'changed_by' => $user->id, 'changed_at' => now(),
         ]);
 
-        $this->actingAs($user)->get('/emar/audit')->assertOk()->assertInertia(fn (Assert $page) => $page
+        $this->retainedAuditFeed($user)->assertOk()->assertInertia(fn (Assert $page) => $page
             ->where('events', function ($events) {
                 $changed = collect($events)->firstWhere('event_type', 'medication_changed');
                 $changes = $changed['details']['changes'] ?? [];
@@ -154,7 +154,7 @@ class AuditTrailTest extends TestCase
             'status' => 'refused', 'administered_at' => now(), 'scheduled_for' => now(),
         ]);
 
-        $this->actingAs($user)->get('/emar/audit')->assertOk()->assertInertia(fn (Assert $page) => $page
+        $this->retainedAuditFeed($user)->assertOk()->assertInertia(fn (Assert $page) => $page
             ->where('events', function ($events) use ($coded, $uncoded) {
                 $c = collect($events)->firstWhere('id', 'admin_'.$coded->id);
                 $u = collect($events)->firstWhere('id', 'admin_'.$uncoded->id);
@@ -260,8 +260,7 @@ class AuditTrailTest extends TestCase
             'dose_given' => '75mg',
         ]);
 
-        $events = collect($this->actingAs($user)
-            ->get(route('emar.audit'))
+        $events = collect($this->retainedAuditFeed($user)
             ->assertOk()
             ->inertiaProps('events'));
         $expectedTypes = [
@@ -307,18 +306,30 @@ class AuditTrailTest extends TestCase
         );
         $this->assertSame($correctionRequester->name, $rejectedEvent['details']['submitted_by']);
 
-        $todayApprovedCorrections = collect($this->actingAs($user)
-            ->get(route('emar.audit', [
-                'date_from' => today()->toDateString(),
-                'date_to' => today()->toDateString(),
-                'event_types' => 'correction_approved',
-            ]))
+        // Approval is an evidence event at the decision instant, on its NZ
+        // calendar day; the proposed dose still belongs to the older dose day.
+        $correctionDay = $approvedCorrection->correction_approved_at->copy()
+            ->setTimezone('Pacific/Auckland')->toDateString();
+        $this->assertTrue(Carbon::parse($approvedEvent['timestamp'])->equalTo($approvedCorrection->correction_approved_at));
+        $this->assertTrue(Carbon::parse($events->firstWhere('id', 'admin_'.$original->id)['timestamp'])->equalTo($original->administered_at));
+        $correctionDayEvents = collect($this->retainedAuditFeed($user, [
+            'date_from' => $correctionDay,
+            'date_to' => $correctionDay,
+            'event_types' => 'correction_approved',
+        ])
             ->assertOk()
             ->inertiaProps('events'));
         $this->assertSame(
             ['admin_'.$approvedCorrection->id],
-            $todayApprovedCorrections->pluck('id')->all(),
+            $correctionDayEvents->pluck('id')->all(),
         );
+        $this->assertSame(['correction_approved'], $correctionDayEvents->pluck('event_type')->all());
+        $originalDay = $original->administered_at->copy()->setTimezone('Pacific/Auckland')->toDateString();
+        $this->retainedAuditFeed($user, [
+            'date_from' => $originalDay,
+            'date_to' => $originalDay,
+            'event_types' => 'correction_approved',
+        ])->assertOk()->assertInertia(fn (Assert $page) => $page->has('events', 0));
     }
 
     public function test_unrecorded_scheduled_dose_becomes_an_omission(): void
@@ -340,7 +351,7 @@ class AuditTrailTest extends TestCase
         ]);
         $this->travelBack();
 
-        $this->actingAs($user)->get('/emar/audit')->assertOk()->assertInertia(fn (Assert $page) => $page
+        $this->retainedAuditFeed($user)->assertOk()->assertInertia(fn (Assert $page) => $page
             ->where('events', function ($events) {
                 $omissions = collect($events)->where('event_type', 'omission');
 
@@ -369,7 +380,7 @@ class AuditTrailTest extends TestCase
             'recorded_by' => $user->id, 'witnessed_by' => null, 'recorded_at' => now(),
         ]);
 
-        $this->actingAs($user)->get('/emar/audit')->assertOk()->assertInertia(fn (Assert $page) => $page
+        $this->retainedAuditFeed($user)->assertOk()->assertInertia(fn (Assert $page) => $page
             ->where('stats.open_gaps', 0)
             ->where('events', function ($events) use ($receipt, $count) {
                 $r = collect($events)->firstWhere('id', 'cd_'.$receipt->id);
@@ -394,7 +405,7 @@ class AuditTrailTest extends TestCase
             'ordered_by' => $user->id, 'received_by' => $user->id, 'delivered_at' => now(),
         ]);
 
-        $this->actingAs($user)->get('/emar/audit')->assertOk()->assertInertia(fn (Assert $page) => $page
+        $this->retainedAuditFeed($user)->assertOk()->assertInertia(fn (Assert $page) => $page
             ->where('events', fn ($events) => collect($events)->contains(fn ($e) => $e['event_type'] === 'stock_received' && $e['category'] === 'stock'))
         );
     }
@@ -478,7 +489,7 @@ class AuditTrailTest extends TestCase
                 'status' => 'given', 'dose_given' => '75mg', 'administered_at' => $mondayEarly, 'scheduled_for' => $mondayEarly,
             ]);
 
-            $this->actingAs($user)->get('/emar/audit')->assertOk()->assertInertia(fn (Assert $page) => $page
+            $this->retainedAuditFeed($user)->assertOk()->assertInertia(fn (Assert $page) => $page
                 ->where('stats.this_week', fn ($n) => $n >= 1)
                 ->where('stats.this_month', fn ($n) => $n >= 1)
             );

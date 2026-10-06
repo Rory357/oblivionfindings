@@ -237,21 +237,71 @@ class AssetTrackerRetirementTest extends TestCase
         });
     }
 
-    // ── Fleet dashboard uses canonical device counts ───────────────
+    // ── Canonical device counts belong to the scoped device register ──
 
-    public function test_fleet_dashboard_device_count_from_canonical(): void
+    public function test_fleet_dashboard_omits_retired_totals_and_device_register_counts_only_visible_canonical_devices(): void
     {
-        Device::factory()->tracking()->count(3)->create(['status' => DeviceStatus::Active]);
-        Device::factory()->tracking()->create(['status' => DeviceStatus::Offline]);
+        $viewer = User::factory()->create(['approved_at' => now()]);
+        $permissions = Permission::query()->whereIn('key', ['fleet.viewAny', 'securityDevices.devices.view'])->pluck('id');
+        $viewer->permissionOverrides()->sync($permissions->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])->all());
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $viewer->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now('Pacific/Auckland')->subYear()->toDateString(),
+            'end_date' => null,
+        ]);
+        $this->assertFalse($viewer->canDo('securityDevices.devices.viewAllSites'));
+        $devices = Device::factory()->tracking()->count(3)->create(['status' => DeviceStatus::Active]);
+        $devices->push(Device::factory()->tracking()->create(['status' => DeviceStatus::Offline]));
+        foreach ($devices as $device) {
+            DeviceAssignment::query()->create([
+                'device_id' => $device->id,
+                'assignable_type' => DeviceAssignment::TARGET_SITE,
+                'assignable_id' => $this->site->id,
+                'assigned_at' => now(),
+            ]);
+        }
+        $foreignSite = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $foreignDevice = Device::factory()->tracking()->create([
+            'name' => 'FOREIGN-DASHBOARD-DEVICE',
+            'status' => DeviceStatus::Active,
+        ]);
+        DeviceAssignment::query()->create([
+            'device_id' => $foreignDevice->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $foreignSite->id,
+            'assigned_at' => now(),
+        ]);
+        $vehicle = Asset::factory()->vehicle()->create(['site_id' => $this->site->id, 'home_site_id' => $this->site->id]);
+        $legacy = AssetTracker::query()->create([
+            'asset_id' => $vehicle->id,
+            'vendor' => 'legacy-provider',
+            'device_uid' => 'LEGACY-DASHBOARD-TRACKER',
+            'status' => 'paired',
+            'paired_at' => now(),
+        ]);
+        $records = $devices->concat([$foreignDevice, $legacy]);
+        $before = $records->map(fn ($record) => $record->fresh()->getRawOriginal())->all();
 
-        $response = $this->actingAs($this->admin)->get('/fleet-assets');
-
-        $response->assertOk();
-        // Dashboard should show device counts from canonical devices, not AssetTracker.
-        $response->assertInertia(function ($page) {
-            $stats = $page->toArray()['props']['stats'];
-            $this->assertEquals(3, $stats['total_devices'] ?? $stats['totalDevices'] ?? 0);
-        });
+        $this->actingAs($viewer)->get('/fleet-assets')->assertOk()
+            ->assertInertia(fn ($page) => $page->component('fleet-assets/dashboard')
+                ->has('overview')->missing('stats')->missing('recent_signals')->missing('recent_alerts'));
+        $this->get('/fleet-assets/devices')->assertOk()
+            ->assertInertia(function ($page) use ($devices, $foreignDevice): void {
+                $page->component('fleet-assets/devices/index')
+                    ->where('stats.total', 4)->where('stats.online', 3)->where('stats.offline', 1)
+                    ->has('devices.data', 4);
+                $props = $page->toArray()['props'];
+                $rows = collect($props['devices']['data']);
+                $this->assertEqualsCanonicalizing($devices->modelKeys(), $rows->pluck('id')->all());
+                $this->assertSame(['canonical'], $rows->pluck('source')->unique()->values()->all());
+                $this->assertFalse($rows->contains('id', $foreignDevice->id));
+                $this->assertStringNotContainsString('FOREIGN-DASHBOARD-DEVICE', json_encode($props, JSON_THROW_ON_ERROR));
+                $this->assertStringNotContainsString('LEGACY-DASHBOARD-TRACKER', json_encode($props, JSON_THROW_ON_ERROR));
+            });
+        $this->assertSame($before, $records->map(fn ($record) => $record->fresh()->getRawOriginal())->all());
     }
 
     // ── Asset show uses canonical device links ────────────────────

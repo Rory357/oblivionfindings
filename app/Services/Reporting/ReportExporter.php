@@ -22,14 +22,18 @@ final class ReportExporter
         }
         $text = (string) $value;
 
-        return preg_match('/^[\s]*[=+@\-\t\r\n]/u', $text) ? "'".$text : $text;
+        return (string) \App\Support\CsvCell::sanitize($text);
     }
 
     public function download(User $actor, OperationalReportRun $run, string $format, string $reason, string $section = 'rows')
     {
         $payload = app(ReportRuns::class)->result($actor, $run);
         $definition = $run->definition;
-        if (config('operational-reports.sources.'.$definition['source'].'.domain') !== 'fleet') {
+        $domain = config('operational-reports.sources.'.$definition['source'].'.domain');
+        $medicationType = $definition['source'] === 'medication_stock' ? 'stock' : ($definition['source'] === 'controlled_register' ? 'controlled' : 'doses');
+        if ($domain === 'medication') {
+            abort_unless(app(\App\Services\Medication\Reporting\MedicationReportAccess::class)->canExport($actor->fresh(), $medicationType), 403);
+        } elseif ($domain !== 'fleet') {
             abort_unless($actor->fresh()?->canDo('assets.telemetry.export'), 403);
         }
         $fields = config('operational-reports.sources.'.$definition['source'].'.fields');
@@ -60,10 +64,18 @@ final class ReportExporter
         };
         // Recheck after expensive rendering, before any response leaves the server.
         app(ReportRuns::class)->result($actor, $run->fresh());
-        if (config('operational-reports.sources.'.$definition['source'].'.domain') !== 'fleet') {
+        if ($domain === 'medication') {
+            $scope = app(ReportAccess::class)->context($actor->fresh(), $definition);
+            app(\App\Services\Medication\Reporting\MedicationExportAudit::class)->record($actor, $medicationType, $scope['site_ids'], new \App\Services\Medication\Reporting\MedicationReportPeriod($definition['date_from'], $definition['date_to']), $reason, $definition['subject_id'] ?? null, ['run_id' => $run->id, 'source' => $definition['source'], 'format' => $format], function (User $current) use ($run, $reason, $format, $payload) {
+                app(ReportRuns::class)->result($current, $run->fresh());
+                AuditLogger::logOrFail('reports.export.downloaded', $current, ['run_id' => $run->id, 'actor_id' => $current->id, 'reason' => $reason, 'format' => $format, 'rows' => $payload['result']['row_count']]);
+            });
+        } elseif ($domain !== 'fleet') {
             abort_unless($actor->fresh()?->canDo('assets.telemetry.export'), 403);
         }
-        AuditLogger::logOrFail('reports.export.downloaded', $actor, ['run_id' => $run->id, 'actor_id' => $actor->id, 'reason' => $reason, 'format' => $format, 'rows' => $payload['result']['row_count']]);
+        if ($domain !== 'medication') {
+            AuditLogger::logOrFail('reports.export.downloaded', $actor, ['run_id' => $run->id, 'actor_id' => $actor->id, 'reason' => $reason, 'format' => $format, 'rows' => $payload['result']['row_count']]);
+        }
 
         return response($bytes, 200, [...ClientLocationAccessService::headers(), 'Content-Type' => $mime,
             'Content-Disposition' => 'attachment; filename="report-'.$run->id.'.'.$format.'"', 'X-Report-Row-Count' => (string) $payload['result']['row_count']]);

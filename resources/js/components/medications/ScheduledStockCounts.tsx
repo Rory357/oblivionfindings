@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
@@ -72,6 +74,7 @@ export default function ScheduledStockCounts({
     onUpdate,
 }: ScheduledStockCountsProps) {
     const [counts, setCounts] = useState<StockCount[]>([]);
+    const [packWorkflowUrl, setPackWorkflowUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
     const [showAddForm, setShowAddForm] = useState(false);
@@ -105,6 +108,9 @@ export default function ScheduledStockCounts({
                 `/api/medications/clients/${clientId}/medications/${medicationId}/scheduled-counts`,
             );
             setCounts(response.data.counts);
+            setPackWorkflowUrl(
+                response.data.medication?.pack_workflow_url ?? null,
+            );
         } catch (error) {
             console.error('Failed to load stock counts:', error);
         } finally {
@@ -342,8 +348,18 @@ export default function ScheduledStockCounts({
                     )}
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-h-[80vh] max-w-2xl">
-                <DialogHeader>
+            <DialogContent
+                className="flex max-h-[88vh] flex-col overflow-hidden p-0"
+                style={{
+                    width: 'min(92vw, 900px)',
+                    maxWidth: 'min(92vw, 900px)',
+                }}
+            >
+                <DialogHeader className="shrink-0 border-b p-5 pr-12">
+                    <DialogDescription className="sr-only">
+                        Schedule counts and record witnessed stock quantities
+                        for this medication.
+                    </DialogDescription>
                     <DialogTitle className="flex items-center justify-between text-lg">
                         <span>Scheduled Stock Counts: {medicationName}</span>
                         <Button
@@ -356,294 +372,343 @@ export default function ScheduledStockCounts({
                     </DialogTitle>
                 </DialogHeader>
 
-                {showAddForm && (
-                    <form
-                        onSubmit={handleCreate}
-                        className="space-y-3 rounded-lg border p-4"
-                    >
-                        <h4 className="text-sm font-medium">
-                            Schedule New Stock Count
-                        </h4>
-                        <div className="grid grid-cols-2 gap-3">
+                <div className="min-h-0 space-y-4 overflow-y-auto px-5">
+                    {showAddForm && (
+                        <form
+                            onSubmit={handleCreate}
+                            className="space-y-3 rounded-lg border p-4"
+                        >
+                            <h4 className="text-sm font-medium">
+                                Schedule New Stock Count
+                            </h4>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <Label className="text-xs">Date *</Label>
+                                    <Input
+                                        type="date"
+                                        value={newDate}
+                                        onChange={(e) =>
+                                            setNewDate(e.target.value)
+                                        }
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <Label className="text-xs">Time</Label>
+                                    <Input
+                                        type="time"
+                                        value={newTime}
+                                        onChange={(e) =>
+                                            setNewTime(e.target.value)
+                                        }
+                                    />
+                                </div>
+                            </div>
                             <div>
-                                <Label className="text-xs">Date *</Label>
+                                <Label className="text-xs">
+                                    Expected Quantity
+                                </Label>
                                 <Input
-                                    type="date"
-                                    value={newDate}
-                                    onChange={(e) => setNewDate(e.target.value)}
-                                    required
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    inputMode="decimal"
+                                    value={newExpectedQty}
+                                    onChange={(e) =>
+                                        setNewExpectedQty(e.target.value)
+                                    }
+                                    placeholder="Leave blank for current stock"
                                 />
                             </div>
                             <div>
-                                <Label className="text-xs">Time</Label>
+                                <Label className="text-xs">Notes</Label>
                                 <Input
-                                    type="time"
-                                    value={newTime}
-                                    onChange={(e) => setNewTime(e.target.value)}
+                                    value={newNotes}
+                                    onChange={(e) =>
+                                        setNewNotes(e.target.value)
+                                    }
+                                    placeholder="Optional notes..."
                                 />
                             </div>
-                        </div>
-                        <div>
-                            <Label className="text-xs">Expected Quantity</Label>
-                            <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                inputMode="decimal"
-                                value={newExpectedQty}
-                                onChange={(e) =>
-                                    setNewExpectedQty(e.target.value)
-                                }
-                                placeholder="Leave blank for current stock"
-                            />
-                        </div>
-                        <div>
-                            <Label className="text-xs">Notes</Label>
-                            <Input
-                                value={newNotes}
-                                onChange={(e) => setNewNotes(e.target.value)}
-                                placeholder="Optional notes..."
-                            />
-                        </div>
-                        <div className="flex gap-2">
-                            <Button type="submit" size="sm">
-                                Schedule
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setShowAddForm(false)}
-                            >
-                                Cancel
-                            </Button>
-                        </div>
-                    </form>
-                )}
-
-                {loading ? (
-                    <div className="py-8 text-center text-sm text-muted-foreground">
-                        Loading...
-                    </div>
-                ) : counts.length === 0 ? (
-                    <div className="py-8 text-center text-sm text-muted-foreground">
-                        No scheduled stock counts.
-                    </div>
-                ) : (
-                    <div className="max-h-[50vh] overflow-y-auto">
-                        <div className="space-y-2 pr-4">
-                            {counts.map((count) => (
-                                <div
-                                    key={count.id}
-                                    className={`rounded-lg border p-3 ${
-                                        count.is_overdue
-                                            ? 'border-status-critical/30 bg-status-critical-bg'
-                                            : 'bg-muted'
-                                    }`}
+                            <div className="flex gap-2">
+                                <Button type="submit" size="sm">
+                                    Schedule
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setShowAddForm(false)}
                                 >
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            {getStatusBadge(
-                                                count.status,
-                                                count.is_overdue,
-                                            )}
-                                            <span className="text-sm font-medium">
-                                                {new Date(
-                                                    count.scheduled_date,
-                                                ).toLocaleDateString()}
-                                                {count.scheduled_time &&
-                                                    ` at ${count.scheduled_time}`}
-                                            </span>
-                                        </div>
-                                        {count.status === 'pending' && (
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() =>
-                                                    setCompletingId(
-                                                        completingId ===
-                                                            count.id
-                                                            ? null
-                                                            : count.id,
-                                                    )
-                                                }
-                                            >
-                                                <CheckCircle className="mr-1 h-3 w-3" />
-                                                Complete
-                                            </Button>
-                                        )}
-                                    </div>
+                                    Cancel
+                                </Button>
+                            </div>
+                        </form>
+                    )}
 
-                                    {count.status === 'completed' && (
-                                        <div className="mt-2 space-y-1 text-sm">
-                                            <div className="flex gap-4">
-                                                <span>
-                                                    Expected:{' '}
-                                                    <strong>
-                                                        {count.expected_quantity ??
-                                                            '—'}
-                                                    </strong>
-                                                </span>
-                                                <span>
-                                                    Actual:{' '}
-                                                    <strong>
-                                                        {count.actual_quantity}
-                                                    </strong>
-                                                </span>
-                                                {count.discrepancy !== null &&
-                                                    count.discrepancy !== 0 && (
-                                                        <span className="text-status-critical">
-                                                            Discrepancy:{' '}
-                                                            {(count.discrepancy ??
-                                                                0) > 0
-                                                                ? '+'
-                                                                : ''}
-                                                            {count.discrepancy}
-                                                        </span>
-                                                    )}
-                                            </div>
-                                            {count.completed_by && (
-                                                <div className="text-xs text-muted-foreground">
-                                                    Completed by{' '}
-                                                    {count.completed_by}
-                                                    {count.witnessed_by &&
-                                                        ` • Witnessed by ${count.witnessed_by}`}
-                                                    {count.scan_verified
-                                                        ? ' • Scan verified'
-                                                        : ''}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {completingId === count.id && (
-                                        <div className="mt-3 space-y-3 border-t border-border pt-3">
-                                            <div className="flex items-center gap-2 text-status-warning">
-                                                <AlertCircle className="h-4 w-4" />
-                                                <span className="text-sm">
-                                                    Enter actual count details
+                    {loading ? (
+                        <div className="py-8 text-center text-sm text-muted-foreground">
+                            Loading...
+                        </div>
+                    ) : counts.length === 0 ? (
+                        <div className="py-8 text-center text-sm text-muted-foreground">
+                            No scheduled stock counts.
+                        </div>
+                    ) : (
+                        <div className="max-h-[50vh] overflow-y-auto">
+                            <div className="space-y-2 pr-4">
+                                {counts.map((count) => (
+                                    <div
+                                        key={count.id}
+                                        className={`rounded-lg border p-3 ${
+                                            count.is_overdue
+                                                ? 'border-status-critical/30 bg-status-critical-bg'
+                                                : 'bg-muted'
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                {getStatusBadge(
+                                                    count.status,
+                                                    count.is_overdue,
+                                                )}
+                                                <span className="text-sm font-medium">
+                                                    {new Date(
+                                                        count.scheduled_date,
+                                                    ).toLocaleDateString()}
+                                                    {count.scheduled_time &&
+                                                        ` at ${count.scheduled_time}`}
                                                 </span>
                                             </div>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <Label className="text-xs">
-                                                        Actual Quantity *
-                                                    </Label>
-                                                    <Input
-                                                        type="number"
-                                                        min="0"
-                                                        step="0.01"
-                                                        inputMode="decimal"
-                                                        value={actualQty}
-                                                        onChange={(e) =>
-                                                            setActualQty(
-                                                                e.target.value,
+                                            {count.status === 'pending' &&
+                                                packWorkflowUrl && (
+                                                    <Button
+                                                        asChild
+                                                        size="sm"
+                                                        variant="outline"
+                                                    >
+                                                        <a
+                                                            href={
+                                                                packWorkflowUrl +
+                                                                '&view=counts'
+                                                            }
+                                                        >
+                                                            Open pack counts
+                                                        </a>
+                                                    </Button>
+                                                )}
+                                            {count.status === 'pending' &&
+                                                !packWorkflowUrl && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() =>
+                                                            setCompletingId(
+                                                                completingId ===
+                                                                    count.id
+                                                                    ? null
+                                                                    : count.id,
                                                             )
                                                         }
-                                                        required
-                                                    />
+                                                    >
+                                                        <CheckCircle className="mr-1 h-3 w-3" />
+                                                        Complete
+                                                    </Button>
+                                                )}
+                                        </div>
+
+                                        {count.status === 'completed' && (
+                                            <div className="mt-2 space-y-1 text-sm">
+                                                <div className="flex gap-4">
+                                                    <span>
+                                                        Expected:{' '}
+                                                        <strong>
+                                                            {count.expected_quantity ??
+                                                                '—'}
+                                                        </strong>
+                                                    </span>
+                                                    <span>
+                                                        Actual:{' '}
+                                                        <strong>
+                                                            {
+                                                                count.actual_quantity
+                                                            }
+                                                        </strong>
+                                                    </span>
+                                                    {count.discrepancy !==
+                                                        null &&
+                                                        count.discrepancy !==
+                                                            0 && (
+                                                            <span className="text-status-critical">
+                                                                Discrepancy:{' '}
+                                                                {(count.discrepancy ??
+                                                                    0) > 0
+                                                                    ? '+'
+                                                                    : ''}
+                                                                {
+                                                                    count.discrepancy
+                                                                }
+                                                            </span>
+                                                        )}
                                                 </div>
-                                                {controlledDrug && (
+                                                {count.completed_by && (
+                                                    <div className="text-xs text-muted-foreground">
+                                                        Completed by{' '}
+                                                        {count.completed_by}
+                                                        {count.witnessed_by &&
+                                                            ` • Witnessed by ${count.witnessed_by}`}
+                                                        {count.scan_verified
+                                                            ? ' • Scan verified'
+                                                            : ''}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {completingId === count.id && (
+                                            <div className="mt-3 space-y-3 border-t border-border pt-3">
+                                                <div className="flex items-center gap-2 text-status-warning">
+                                                    <AlertCircle className="h-4 w-4" />
+                                                    <span className="text-sm">
+                                                        Enter actual count
+                                                        details
+                                                    </span>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-3">
                                                     <div>
                                                         <Label className="text-xs">
-                                                            Witness *
+                                                            Actual Quantity *
                                                         </Label>
-                                                        <select
-                                                            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                                                            value={witnessId}
+                                                        <Input
+                                                            type="number"
+                                                            min="0"
+                                                            step="0.01"
+                                                            inputMode="decimal"
+                                                            value={actualQty}
                                                             onChange={(e) =>
-                                                                setWitnessId(
+                                                                setActualQty(
                                                                     e.target
                                                                         .value,
                                                                 )
                                                             }
                                                             required
-                                                        >
-                                                            <option value="">
-                                                                Select
-                                                                witness...
-                                                            </option>
-                                                            {witnesses.map(
-                                                                (w) => (
-                                                                    <option
-                                                                        key={
-                                                                            w.id
-                                                                        }
-                                                                        value={
-                                                                            w.id
-                                                                        }
-                                                                    >
-                                                                        {w.name}
-                                                                    </option>
-                                                                ),
-                                                            )}
-                                                        </select>
+                                                        />
                                                     </div>
-                                                )}
-                                            </div>
-                                            <div>
-                                                <Label className="text-xs">
-                                                    Notes
-                                                </Label>
-                                                <Input
-                                                    value={completeNotes}
-                                                    onChange={(e) =>
-                                                        setCompleteNotes(
-                                                            e.target.value,
-                                                        )
+                                                    {controlledDrug && (
+                                                        <div>
+                                                            <Label className="text-xs">
+                                                                Witness *
+                                                            </Label>
+                                                            <select
+                                                                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                                                value={
+                                                                    witnessId
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setWitnessId(
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                required
+                                                            >
+                                                                <option value="">
+                                                                    Select
+                                                                    witness...
+                                                                </option>
+                                                                {witnesses.map(
+                                                                    (w) => (
+                                                                        <option
+                                                                            key={
+                                                                                w.id
+                                                                            }
+                                                                            value={
+                                                                                w.id
+                                                                            }
+                                                                        >
+                                                                            {
+                                                                                w.name
+                                                                            }
+                                                                        </option>
+                                                                    ),
+                                                                )}
+                                                            </select>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <Label className="text-xs">
+                                                        Notes
+                                                    </Label>
+                                                    <Input
+                                                        value={completeNotes}
+                                                        onChange={(e) =>
+                                                            setCompleteNotes(
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        placeholder="Any notes about the count..."
+                                                    />
+                                                </div>
+                                                <MedicationScanVerificationPanel
+                                                    clientId={clientId}
+                                                    medicationId={medicationId}
+                                                    scanVerification={
+                                                        scanVerification
                                                     }
-                                                    placeholder="Any notes about the count..."
+                                                    resetKey={`${count.id}-${completingId}`}
+                                                    requirementText="Verification is required before completing this count."
+                                                    onChange={setScanCapture}
                                                 />
+                                                <div className="flex gap-2">
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            handleComplete(
+                                                                count.id,
+                                                            )
+                                                        }
+                                                        disabled={
+                                                            !actualQty ||
+                                                            Boolean(
+                                                                controlledDrug &&
+                                                                !witnessId,
+                                                            ) ||
+                                                            Boolean(
+                                                                scanVerification &&
+                                                                !hasVerifiedMedicationScan(
+                                                                    scanCapture,
+                                                                ),
+                                                            )
+                                                        }
+                                                    >
+                                                        Confirm Count
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() =>
+                                                            setCompletingId(
+                                                                null,
+                                                            )
+                                                        }
+                                                    >
+                                                        Cancel
+                                                    </Button>
+                                                </div>
                                             </div>
-                                            <MedicationScanVerificationPanel
-                                                clientId={clientId}
-                                                medicationId={medicationId}
-                                                scanVerification={
-                                                    scanVerification
-                                                }
-                                                resetKey={`${count.id}-${completingId}`}
-                                                requirementText="Verification is required before completing this count."
-                                                onChange={setScanCapture}
-                                            />
-                                            <div className="flex gap-2">
-                                                <Button
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        handleComplete(count.id)
-                                                    }
-                                                    disabled={
-                                                        !actualQty ||
-                                                        Boolean(
-                                                            controlledDrug &&
-                                                            !witnessId,
-                                                        ) ||
-                                                        Boolean(
-                                                            scanVerification &&
-                                                            !hasVerifiedMedicationScan(
-                                                                scanCapture,
-                                                            ),
-                                                        )
-                                                    }
-                                                >
-                                                    Confirm Count
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() =>
-                                                        setCompletingId(null)
-                                                    }
-                                                >
-                                                    Cancel
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
+                <DialogFooter className="shrink-0 border-t bg-muted/30 p-4">
+                    <Button variant="outline" onClick={() => setOpen(false)}>
+                        Close
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

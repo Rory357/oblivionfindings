@@ -175,6 +175,8 @@ export interface GuidedRound {
     };
     items: RoundItem[];
     progress: RoundProgress;
+    /** Visible person's doses; progress above remains the full authorized round. */
+    selected_progress?: RoundProgress;
 }
 
 export interface ActivityItem {
@@ -275,7 +277,11 @@ export function roundCounts(cells: RoundCell[]): RoundCounts {
         due,
         total,
         recorded,
-        pct: total ? Math.round((recorded / total) * 100) : waiting + away > 0 ? 100 : 0,
+        pct: total
+            ? Math.round((recorded / total) * 100)
+            : waiting + away > 0
+              ? 100
+              : 0,
         waiting,
         away,
     };

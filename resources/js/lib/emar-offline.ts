@@ -115,6 +115,8 @@ function registerServiceWorker() {
 }
 
 function inferAction(url: string): OfflineAction {
+    if (url.includes('/self-admin/') && url.endsWith('/consent'))
+        return 'support_consent';
     if (url.includes('/guided/items/')) return 'round_admin';
     if (url.includes('/administrations') && url.includes('/corrections')) {
         return 'correction';

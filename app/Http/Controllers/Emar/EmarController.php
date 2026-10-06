@@ -6,7 +6,6 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\PeopleMutationLockService;
 use App\Http\Controllers\Concerns\HandlesMedicationSync;
 use App\Http\Controllers\Controller;
-use App\Models\AuditLog;
 use App\Models\BreakGlassAccessEvent;
 use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
@@ -27,7 +26,6 @@ use App\Models\MedicationDestruction;
 use App\Models\MedicationInteraction;
 use App\Models\MedicationPharmacyOrder;
 use App\Models\MedicationPrescriberOrder;
-use App\Models\MedicationPrnEffectiveness;
 use App\Models\MedicationReview;
 use App\Models\MedicationRound;
 use App\Models\MedicationRoundTemplate;
@@ -45,17 +43,23 @@ use App\Services\Emar\ShiftMedicationSnapshotService;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
 use App\Services\Medication\Alerts\MedicationAlertSources;
-use App\Services\Medication\MarLinkService;
-use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\CompetencyPolicySettings;
+use App\Services\Medication\Controlled\ControlledRegisterService;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
+use App\Services\Medication\Followups\LegacyEffectFollowupAdapter;
+use App\Services\Medication\Followups\MedicationFollowupProjection;
+use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\MedicationLegacyOrderBridge;
 use App\Services\Medication\MedicationOrderLifecycleService;
+use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationRoundGenerationService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Medication\RoundTemplateCatalogue;
 use App\Services\Medication\Settings\MedicationSettingsStore;
+use App\Services\Medication\Stock\MedicationStockService;
+use App\Services\Medication\Stock\StockManagementReadPayload;
 use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationIncidentIntegrationService;
@@ -68,6 +72,7 @@ use App\Services\UserSiteAccessService;
 use App\Support\Medication\MedicationStockQuantity;
 use App\Support\WorkerClock;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -157,9 +162,11 @@ class EmarController extends Controller
             'manage_stock' => (bool) $user && $user->canDo('medications.stock.update'),
             'view_controlled' => (bool) $user && $user->canDo('medications.controlled.view'),
             'revoke_break_glass' => (bool) $user && ($user->canDo('medications.breakglass') || $user->canDo('medications.audit.view')),
+            'view_reports' => (bool) $user && $user->canDo('medications.reports.view'),
+            'view_audit' => (bool) $user && $user->canDo('medications.reports.view') && $user->canDo('medications.audit.view'),
             'export_reports' => (bool) $user && (
-                $user->canDo('medications.reports.export')
-                || $user->canDo('reports.viewAny')
+                $user->canDo('medications.reports.view')
+                && $user->canDo('medications.reports.export')
             ),
         ];
     }
@@ -1239,6 +1246,15 @@ class EmarController extends Controller
     // ─── MAR Charts ────────────────────────────────────────
     public function mar(Request $request)
     {
+        // The completed record serves a named person; the default bare route
+        // lists permitted charts. An explicit legacy override keeps the earlier page.
+        if (config('medications.person_record') === 'p02' && $request->filled('client_id')) {
+            return app(PersonMedicationRecordController::class)->show($request, $request->integer('client_id'));
+        }
+        if (config('medications.person_record') === 'p02') {
+            return app(MedicationRecordHubController::class)->show($request, 'charts');
+        }
+
         $actor = $request->user();
         abort_unless($actor, 403);
         $requestedClientId = $request->integer('client_id') ?: null;
@@ -1455,7 +1471,7 @@ class EmarController extends Controller
         // dose at 03:00), as the schedule rows carry it.
         $doses = app(ScheduledDoseStates::class)->dosesOn($scheduled, $date, now());
 
-        $scheduledPayload = $scheduled->map(function ($med) use ($client, $date, $ruleService, $scheduleService, $doses) {
+        $scheduledPayload = $scheduled->map(function ($med) use ($client, $ruleService, $scheduleService, $doses) {
             $adminRules = $ruleService->requirementsFor($med);
             $medDoses = collect($doses[(int) $med->id] ?? []);
             $doseTimes = $medDoses
@@ -1514,7 +1530,8 @@ class EmarController extends Controller
                 'administrations' => $administrations->merge($unmatchedAdmins)->values(),
                 'scan_verification' => $this->buildMedicationScanPayload($client, $med),
                 'stock' => $med->stock ? [
-                    'on_hand' => $med->stock->on_hand,
+                    'on_hand' => $med->stock->availableQuantity(),
+                    'pack_workflow_url' => $med->stock->pack_workflow_url,
                     'unit' => $med->stock->unit,
                 ] : null,
             ];
@@ -1542,7 +1559,8 @@ class EmarController extends Controller
                 'administrations' => $med->administrations->map(fn ($a) => $this->serializeAdministration($a))->values(),
                 'scan_verification' => $this->buildMedicationScanPayload($client, $med),
                 'stock' => $med->stock ? [
-                    'on_hand' => $med->stock->on_hand,
+                    'on_hand' => $med->stock->availableQuantity(),
+                    'pack_workflow_url' => $med->stock->pack_workflow_url,
                     'unit' => $med->stock->unit,
                 ] : null,
             ];
@@ -1576,7 +1594,8 @@ class EmarController extends Controller
                     'pharmac_subgroup' => $med->pharmac_subgroup,
                     'scan_verification' => $this->buildMedicationScanPayload($client, $med),
                     'stock' => $med->stock ? [
-                        'on_hand' => $med->stock->on_hand,
+                        'on_hand' => $med->stock->availableQuantity(),
+                        'pack_workflow_url' => $med->stock->pack_workflow_url,
                         'unit' => $med->stock->unit,
                     ] : null,
                 ];
@@ -1669,6 +1688,9 @@ class EmarController extends Controller
     // ─── PRN Records ───────────────────────────────────────
     public function prn(Request $request)
     {
+        if (config('medications.person_record') === 'p02') {
+            return app(MedicationRecordHubController::class)->show($request, 'asneeded');
+        }
         $user = $request->user();
         $canViewControlled = $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY);
         $viewableClientIds = $this->medicationViewableClientIds($user);
@@ -1717,7 +1739,7 @@ class EmarController extends Controller
         // Eager loads shared by the register + History archive (both serialize
         // through serializePrnAdministration()).
         $prnWith = [
-            'client:id,first_name,last_name,room_id',
+            'client:id,first_name,last_name,room_id,site_id',
             'client.room:id,name',
             'client.site:id,name',
             'medication:id,name,dosage,route,max_per_day,indication,controlled_drug,deleted_at',
@@ -2136,7 +2158,8 @@ class EmarController extends Controller
                     'days_since_check' => $daysSince,
                     'overdue_check' => $daysSince === null || $daysSince >= 7,
                     'stock' => $m->stock ? [
-                        'on_hand' => $m->stock->on_hand,
+                        'on_hand' => $m->stock->availableQuantity(),
+                        'pack_workflow_url' => $m->stock->pack_workflow_url,
                         'unit' => $m->stock->unit,
                         'last_counted_at' => $m->stock->last_counted_at instanceof \DateTimeInterface ? $m->stock->last_counted_at->toIso8601String() : null,
                         'expiry_date' => $m->stock->expiry_date instanceof \DateTimeInterface ? $m->stock->expiry_date->toDateString() : ($m->stock->expiry_date ?: null),
@@ -2388,6 +2411,9 @@ class EmarController extends Controller
 
     public function medications(Request $request)
     {
+        if (config('medications.person_record') === 'p02') {
+            return app(MedicationRecordHubController::class)->show($request, 'medicines');
+        }
         $user = $request->user();
         abort_unless($user, 403);
         $clientFilter = $request->integer('client_id') ?: null;
@@ -2492,6 +2518,7 @@ class EmarController extends Controller
                 'controlled_drug' => (bool) $m->controlled_drug,
                 'high_risk' => (bool) $m->high_risk,
                 'witness_required' => (bool) $m->witness_required,
+                'requires_witness' => $m->requiresWitness(),
                 'state' => $m->state,
                 'approval_status' => $m->approval_status,
                 'rejection_reason' => $m->rejection_reason,
@@ -2507,7 +2534,8 @@ class EmarController extends Controller
                 'ceased_reason' => $m->ceased_reason,
                 'review_date' => $m->review_date?->format('j M Y'),
                 'stock' => $m->stock ? [
-                    'on_hand' => $m->stock->on_hand,
+                    'on_hand' => $m->stock->availableQuantity(),
+                    'pack_workflow_url' => $m->stock->pack_workflow_url,
                     'unit' => $m->stock->unit,
                     'low' => $m->stock->isLowStock(),
                 ] : null,
@@ -2520,7 +2548,9 @@ class EmarController extends Controller
 
         return Inertia::render('emar/Medications', [
             'medications' => $rows,
-            'clients' => $this->governanceScope->clientPicker($accessibleSiteIds),
+            'clients' => $this->governanceScope->clientPicker($accessibleSiteIds)
+                ->whereIn('id', $readableClientIds)
+                ->values(),
             'staff' => $this->governanceScope->staffPicker($accessibleSiteIds),
             'sites' => $sites->map(fn (Site $site) => $site->only(['id', 'name']))->values(),
             'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
@@ -2533,285 +2563,13 @@ class EmarController extends Controller
     // ─── Stock Management ──────────────────────────────────
     public function stock(Request $request)
     {
-        $actor = $request->user();
-        abort_unless($actor, 403);
-        $canViewControlled = $actor->canDo('medications.controlled.view');
-        $siteFilter = $request->integer('site_id') ?: null;
-        $clientFilter = $request->integer('client_id') ?: null;
-        $accessibleSiteIds = $this->governanceScope->readerSiteIds(
-            $actor,
-            MedicationGovernanceScopeService::STOCK_CAPABILITY,
-            $siteFilter,
-            $clientFilter,
-        );
-        $readerSiteIds = $siteFilter !== null ? [$siteFilter] : $accessibleSiteIds;
-        $byClient = fn ($q) => $q->where('client_id', $clientFilter);
-
-        $stockModels = ClientMedicationStock::query()
-            ->with(['medication' => fn ($q) => $q->with(['client:id,first_name,last_name,site_id,room_id', 'client.site:id,name', 'client.room:id,name'])])
-            ->whereHas('medication', fn ($q) => $q->active()
-                ->when(! $canViewControlled, fn ($medications) => $medications->where('controlled_drug', false))
-                ->whereHas('client', fn ($c) => $c->whereIn('site_id', $readerSiteIds))
-                ->when($clientFilter, $byClient))
-            ->get();
-        // The route requires medications.stock.update, which viewMedications
-        // already treats as Site-wide, so this keeps the whole Site today; it
-        // is here so the stock register follows the same person rule.
-        $openableClientIds = $this->personScopedClientIds(
-            $actor,
-            $stockModels->map(fn (ClientMedicationStock $s) => $s->medication?->client_id),
-        );
-        $stockModels = $stockModels
-            ->filter(fn (ClientMedicationStock $s) => in_array((int) $s->medication?->client_id, $openableClientIds, true))
-            ->values();
-
-        // Honest movement history per stock item — sourced from the audit log
-        // (AuditableChanges on ClientMedicationStock), no dedicated movements
-        // table. One grouped query; the detail modal shows the recent few.
-        $movementsByStock = AuditLog::query()
-            ->where('auditable_type', (new ClientMedicationStock)->getMorphClass())
-            ->whereIn('auditable_id', $stockModels->pluck('id'))
-            ->whereIn('action', ['clientmedicationstock.create', 'clientmedicationstock.update'])
-            ->with('user:id,name')
-            ->orderByDesc('created_at')
-            ->orderByDesc('id')
-            ->limit(400)
-            ->get()
-            ->groupBy('auditable_id');
-
-        $stockItems = $stockModels->map(fn ($s) => [
-            'id' => $s->id,
-            'medication_id' => $s->client_medication_id,
-            'medication_name' => $s->medication?->name,
-            'medication_dose' => $s->medication?->dosage,
-            'client_name' => trim(($s->medication?->client?->first_name ?? '').' '.($s->medication?->client?->last_name ?? '')),
-            'client_id' => $s->medication?->client_id,
-            'client_room' => $s->medication?->client?->room?->name,
-            'mar_url' => $this->marUrlFor($s->medication?->client_id),
-            'site_id' => $s->medication?->client?->site_id,
-            'site_name' => $s->medication?->client?->site?->name,
-            'on_hand' => $s->on_hand !== null
-                ? MedicationStockQuantity::toFloat($s->on_hand)
-                : null,
-            'unit' => $s->unit,
-            'reorder_level' => $s->reorder_level,
-            'last_counted_at' => $s->last_counted_at?->toIso8601String(),
-            'is_low' => $s->isLowStock(),
-            'controlled' => (bool) $s->medication?->controlled_drug,
-            'storage_condition' => $s->storage_condition ?? 'ambient',
-            'requires_cold_chain' => $s->requiresColdChain(),
-            'expiry_date' => $s->expiry_date?->toDateString(),
-            'batch_number' => $s->batch_number,
-            'supplier_name' => $s->supplier_name,
-            'reorder_quantity' => $s->reorder_quantity,
-            'is_expired' => $s->isExpired(),
-            'is_expiring_soon' => $s->isExpiringSoon(30),
-            'is_expiring_90' => $s->isExpiringSoon(90),
-            'scan_verification' => $s->medication?->client
-                ? $this->buildMedicationScanPayload($s->medication->client, $s->medication)
-                : null,
-            'movements' => ($movementsByStock->get($s->id) ?? collect())
-                ->take(6)
-                ->map(fn (AuditLog $log) => $this->formatStockMovement($log, $s->unit))
-                ->values(),
-        ])->values();
-
-        $lowStockCount = $stockItems->where('is_low', true)->count();
-
-        // Controlled-drug reconciliation: register balance (last witnessed
-        // balance check) vs physical on-hand, plus any open discrepancy.
-        $controlledMedIds = $canViewControlled
-            ? $stockModels->filter(fn ($s) => $s->medication?->controlled_drug)->pluck('client_medication_id')->filter()->values()
-            : collect();
-        $lastChecks = $this->governanceScope->scopeCanonicalClientMedicationRows(
-            ClientControlledDrugEntry::query()
-                ->whereIn('client_medication_id', $controlledMedIds)
-                ->where('entry_type', 'balance_check'),
-            $readerSiteIds,
-            false,
-        )
-            ->with('witnessedBy:id,name')
-            ->latest('recorded_at')
-            ->get()
-            ->groupBy('client_medication_id');
-        $openDiscrepancies = $this->governanceScope->scopeCanonicalClientMedicationRows(
-            ClientControlledDrugDiscrepancy::query()
-                ->whereIn('client_medication_id', $controlledMedIds)
-                ->whereIn('status', ['open', 'under_review']),
-            $readerSiteIds,
-            false,
-        )
-            ->get()
-            ->groupBy('client_medication_id');
-
-        $controlledRegister = $canViewControlled
-            ? $stockModels
-                ->filter(fn ($s) => $s->medication?->controlled_drug)
-                ->map(function ($s) use ($lastChecks, $openDiscrepancies) {
-                    $check = $lastChecks->get($s->client_medication_id)?->first();
-                    $discrepancy = $openDiscrepancies->get($s->client_medication_id)?->first();
-                    $registerBalance = $check?->on_hand_after ?? $s->on_hand;
-
-                    return [
-                        'id' => $s->id,
-                        'medication_id' => $s->client_medication_id,
-                        'medication_name' => $s->medication?->name,
-                        'client_id' => $s->medication?->client_id,
-                        'client_name' => trim(($s->medication?->client?->first_name ?? '').' '.($s->medication?->client?->last_name ?? '')),
-                        'cd_class' => $s->medication?->controlled_drug_class,
-                        'register_balance' => $registerBalance !== null
-                            ? MedicationStockQuantity::toFloat($registerBalance)
-                            : null,
-                        'on_hand' => $s->on_hand !== null
-                            ? MedicationStockQuantity::toFloat($s->on_hand)
-                            : null,
-                        'unit' => $s->unit,
-                        'last_check_at' => $check?->recorded_at instanceof \DateTimeInterface ? $check->recorded_at->toIso8601String() : null,
-                        'last_check_witness' => $check?->witnessedBy?->name,
-                        'discrepancy' => $discrepancy ? (float) $discrepancy->difference : null,
-                    ];
-                })->values()
-            : collect();
-
-        // Flat pharmacy-order lifecycle — the page renders the 5-stage tracker.
-        $pharmacyOrders = $this->governanceScope->scopeCanonicalClientMedicationRows(
-            MedicationPharmacyOrder::query(),
-            $readerSiteIds,
-            false,
-        )
-            ->with(['client:id,first_name,last_name', 'medication:id,name,controlled_drug'])
-            ->when(! $canViewControlled, fn ($orders) => $orders->whereHas(
-                'medication',
-                fn ($medications) => $medications->where('controlled_drug', false),
-            ))
-            ->when($clientFilter, $byClient)
-            ->latest()
-            ->limit(40)
-            ->get()
-            ->map(fn (MedicationPharmacyOrder $o) => [
-                'id' => $o->id,
-                'medication_id' => $o->client_medication_id,
-                'client_name' => $o->client ? trim($o->client->first_name.' '.$o->client->last_name) : 'Unknown',
-                'medication_name' => $o->medication?->name,
-                'controlled' => (bool) $o->medication?->controlled_drug,
-                'pharmacy_name' => $o->pharmacy_name,
-                'order_type' => $o->order_type,
-                'status' => $o->status,
-                'quantity_ordered' => $o->quantity_ordered,
-                'quantity_received' => $o->quantity_received,
-                'ordered_at' => $o->created_at?->toIso8601String(),
-                'submitted_at' => $o->submitted_at?->toIso8601String(),
-                'confirmed_at' => $o->confirmed_at?->toIso8601String(),
-                'dispensed_at' => $o->dispensed_at?->toIso8601String(),
-                'delivered_at' => $o->delivered_at?->toIso8601String(),
-                'batch_number' => $o->batch_number,
-                'batch_expiry' => $o->batch_expiry instanceof \DateTimeInterface ? $o->batch_expiry->toDateString() : null,
-            ])->values();
-
-        $sites = $this->governanceScope->sitePicker($accessibleSiteIds);
-        $activeSite = $siteFilter ? $sites->firstWhere('id', $siteFilter) : null;
-
-        return Inertia::render('emar/StockManagement', [
-            'can_record_controlled' => $request->user()?->canDo('medications.controlled.record') ?? false,
-            'can_view_controlled' => $canViewControlled,
-            'stockItems' => $stockItems,
-            'lowStockCount' => $lowStockCount,
-            'expiringCount' => $stockItems->where('is_expiring_soon', true)->count(),
-            'expiredCount' => $stockItems->where('is_expired', true)->count(),
-            'controlledRegister' => $controlledRegister,
-            'pharmacyOrders' => $pharmacyOrders,
-            'clients' => $this->governanceScope->clientPicker($accessibleSiteIds),
-            'activeMedications' => ClientMedication::active()
-                ->with('client:id,first_name,last_name')
-                ->when(! $canViewControlled, fn ($medications) => $medications->where('controlled_drug', false))
-                ->whereHas('client', fn ($q) => $q->whereIn('site_id', $readerSiteIds))
-                ->when($clientFilter, $byClient)
-                ->orderBy('name')
-                ->get(['id', 'name', 'client_id', 'dosage', 'barcode', 'nzulm_code', 'controlled_drug'])
-                ->map(fn (ClientMedication $medication) => [
-                    'id' => $medication->id,
-                    'name' => $medication->name,
-                    'client_id' => $medication->client_id,
-                    'controlled' => (bool) $medication->controlled_drug,
-                    'client' => $medication->client ? [
-                        'first_name' => $medication->client->first_name,
-                        'last_name' => $medication->client->last_name,
-                    ] : null,
-                    'scan_verification' => $medication->client
-                        ? $this->buildMedicationScanPayload($medication->client, $medication)
-                        : null,
-                ])
-                ->values(),
-            'witnesses' => $this->governanceScope->controlledWitnessPicker($accessibleSiteIds, $actor->id),
-            'sites' => $sites->map(fn (Site $site) => $site->only(['id', 'name']))->values(),
-            'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
-            'site_brand_colour' => $activeSite?->brand_colour,
-            'client_id' => $clientFilter,
-        ]);
+        return Inertia::render('emar/StockManagement', app(StockManagementReadPayload::class)->page($request));
     }
 
-    /**
-     * Format one ClientMedicationStock audit-log entry into a movement row for
-     * the stock detail modal. This is an honest change-ledger derivation from the
-     * recorded before/after snapshot — no invented quantities or movement table.
-     *
-     * @return array<string, mixed>
-     */
-    private function formatStockMovement(AuditLog $log, ?string $unit): array
+    public function stockMedicationContext(Request $request, ClientMedication $medication): JsonResponse
     {
-        $meta = $log->meta ?? [];
-        $after = $meta['after'] ?? [];
-        $before = $meta['before'] ?? [];
-        $fields = $meta['fields'] ?? array_keys($after);
-        $isCreate = str_ends_with($log->action, '.create');
-
-        $delta = null;
-        if (array_key_exists('on_hand', $after) && is_numeric($after['on_hand'])) {
-            $to = MedicationStockQuantity::normalize($after['on_hand']);
-            $from = MedicationStockQuantity::normalize($isCreate ? 0 : ($before['on_hand'] ?? 0));
-            $delta = MedicationStockQuantity::toFloat(MedicationStockQuantity::subtract($to, $from));
-        }
-
-        $notes = $after['notes'] ?? null;
-        $reason = is_string($notes) ? preg_replace('/^Stock adjustment:\s*/', '', $notes) : null;
-
-        if ($isCreate) {
-            $type = 'created';
-            $summary = 'Stock record created';
-        } elseif (in_array('on_hand', $fields, true)) {
-            // An on_hand change with a logged reason came through the adjust/count
-            // path; one without a reason is a receipt increment.
-            if (in_array('notes', $fields, true) && is_string($notes) && str_starts_with($notes, 'Stock adjustment')) {
-                $isCount = $reason !== null && stripos($reason, 'count') !== false;
-                $type = $isCount ? 'counted' : 'adjusted';
-                $summary = $reason !== '' && $reason !== null ? $reason : ($isCount ? 'Stock counted' : 'Stock adjusted');
-            } else {
-                $type = ($delta ?? 0) >= 0 ? 'received' : 'removed';
-                $summary = $type === 'received' ? 'Stock received' : 'Stock removed';
-            }
-        } else {
-            $type = 'updated';
-            $labelMap = [
-                'reorder_level' => 'reorder level',
-                'reorder_quantity' => 'reorder qty',
-                'expiry_date' => 'expiry',
-                'batch_number' => 'batch',
-                'supplier_name' => 'supplier',
-                'storage_condition' => 'storage',
-            ];
-            $labels = array_values(array_intersect_key($labelMap, array_flip($fields)));
-            $summary = $labels ? 'Updated '.implode(', ', $labels) : 'Stock details updated';
-        }
-
-        return [
-            'id' => $log->id,
-            'at' => $log->created_at?->toIso8601String(),
-            'actor' => $log->user?->name,
-            'type' => $type,
-            'summary' => $summary,
-            'delta' => $delta,
-            'unit' => $unit,
-        ];
+        return response()->json(app(StockManagementReadPayload::class)->medicationContext($request, (int) $medication->id))
+            ->header('Cache-Control', 'no-store');
     }
 
     // ─── Prescriptions / Prescriber Orders ─────────────────
@@ -3188,7 +2946,7 @@ class EmarController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
-        $date = $request->input('date', today()->toDateString());
+        $date = app(MarScheduleService::class)->dateFromInput($request->input('date'))->toDateString();
         $siteFilter = $request->integer('site_id') ?: null;
         $canReadRounds = (bool) $user?->canDo('medications.view');
         $canRecordRounds = (bool) $user?->canDo('medications.administer.record');
@@ -3424,7 +3182,7 @@ class EmarController extends Controller
             'can_manage' => $canManageRounds,
             // Round templates are read and changed in Settings › Rounds & timing (P11).
             'can_read_templates' => $canReadRounds,
-            'can_export' => (bool) ($user?->canDo('medications.reports.export') || $user?->canDo('reports.viewAny')),
+            'can_export' => (bool) ($user?->canDo('medications.reports.view') && $user?->canDo('medications.reports.export')),
         ]);
     }
 
@@ -3682,12 +3440,19 @@ class EmarController extends Controller
     public function destructions(Request $request)
     {
         $actor = $request->user();
-        abort_unless($actor, 403);
-        $siteFilter = $request->integer('site_id') ?: null;
-        $clientFilter = $request->integer('client_id') ?: null;
+        abort_unless($actor && $actor->canDo('medications.view'), 403);
+        $filters = $request->validate([
+            'site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'],
+            'client_medication_id' => ['nullable', 'integer', 'min:1'], 'date' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+        $siteFilter = isset($filters['site_id']) ? (int) $filters['site_id'] : null;
+        $clientFilter = isset($filters['client_id']) ? (int) $filters['client_id'] : null;
+        $medicineFilter = isset($filters['client_medication_id']) ? (int) $filters['client_medication_id'] : null;
+        $controlledRead = $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY);
+        abort_unless($controlledRead || $actor->canDo(MedicationGovernanceScopeService::STOCK_CAPABILITY), 403);
         $accessibleSiteIds = $this->governanceScope->readerSiteIds(
             $actor,
-            MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
+            $controlledRead ? MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY : MedicationGovernanceScopeService::STOCK_CAPABILITY,
             $siteFilter,
             $clientFilter,
         );
@@ -3696,6 +3461,14 @@ class EmarController extends Controller
             $actor,
             Client::query()->whereIn('site_id', $readerSiteIds)->pluck('id'),
         );
+        abort_if($clientFilter !== null && ! in_array($clientFilter, $openableClientIds, true), 404);
+        if ($medicineFilter !== null) {
+            $medicine = ClientMedication::withTrashed()->whereKey($medicineFilter)
+                ->whereIn('client_id', $openableClientIds)
+                ->when($clientFilter !== null, fn ($q) => $q->where('client_id', $clientFilter))->firstOrFail();
+            abort_if(! $controlledRead && $medicine->controlled_drug, 404);
+        }
+        $dayStart = isset($filters['date']) ? CarbonImmutable::parse($filters['date'], 'Pacific/Auckland')->startOfDay() : null;
 
         // Flat, client-side-filterable disposal register. Voided records remain
         // in the list (struck through) — the register is immutable (MoD Regs 1977).
@@ -3705,6 +3478,10 @@ class EmarController extends Controller
         )
             ->whereIn('client_id', $openableClientIds)
             ->when($clientFilter, fn ($query) => $query->where('client_id', $clientFilter))
+            ->when($medicineFilter !== null, fn ($query) => $query->where('client_medication_id', $medicineFilter))
+            ->when($dayStart !== null, fn ($query) => $query->where('destroyed_at', '>=', $dayStart->utc())->where('destroyed_at', '<', $dayStart->addDay()->utc()))
+            ->when(! $controlledRead, fn ($query) => $query->where('is_controlled_drug', false)
+                ->whereDoesntHave('medication', fn ($med) => $med->withTrashed()->where('controlled_drug', true)))
             ->with([
                 'client:id,first_name,last_name,site_id',
                 'client.site:id,name',
@@ -3724,6 +3501,8 @@ class EmarController extends Controller
             ->whereHas('client', fn ($client) => $client->whereIn('site_id', $readerSiteIds))
             ->whereIn('client_id', $openableClientIds)
             ->when($clientFilter, fn ($query) => $query->where('client_id', $clientFilter))
+            ->when($medicineFilter !== null, fn ($query) => $query->whereKey($medicineFilter))
+            ->when(! $controlledRead, fn ($query) => $query->where('controlled_drug', false))
             ->with(['client:id,first_name,last_name', 'stock'])
             ->orderBy('name')
             ->get();
@@ -3732,6 +3511,7 @@ class EmarController extends Controller
         $activeSite = $siteFilter ? $sites->firstWhere('id', $siteFilter) : null;
 
         return Inertia::render('emar/Destructions', [
+            'filters' => ['site_id' => $siteFilter, 'client_id' => $clientFilter, 'client_medication_id' => $medicineFilter, 'date' => $filters['date'] ?? null],
             'can_record' => $request->user()?->canDo('medications.controlled.record') ?? false,
             'destructions' => $destructions->map(fn (MedicationDestruction $d) => [
                 'id' => $d->id,
@@ -3773,12 +3553,14 @@ class EmarController extends Controller
                 'client_id' => $m->client_id,
                 'client_name' => $m->client ? trim($m->client->first_name.' '.$m->client->last_name) : 'Unknown',
                 'stock' => $m->stock ? [
-                    'on_hand' => $m->stock->on_hand,
+                    'on_hand' => $m->stock->availableQuantity(),
+                    'pack_workflow_url' => $m->stock->pack_workflow_url,
                     'unit' => $m->stock->unit,
                 ] : null,
             ])->values(),
-            'staff' => $this->governanceScope->controlledWitnessPicker($accessibleSiteIds, $actor->id),
-            'clients' => $this->governanceScope->clientPicker($accessibleSiteIds),
+            'staff' => $actor->canDo('medications.controlled.record') ? $this->governanceScope->controlledWitnessPicker($accessibleSiteIds, $actor->id) : [],
+            'clients' => Client::query()->whereIn('id', $openableClientIds)->get(['id', 'first_name', 'last_name', 'site_id'])
+                ->map(fn ($client) => ['id' => $client->id, 'name' => $client->full_name, 'site_id' => $client->site_id])->values(),
             'sites' => $sites->map(fn (Site $site) => $site->only(['id', 'name']))->values(),
             'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
             'site_brand_colour' => $activeSite?->brand_colour,
@@ -4599,123 +4381,12 @@ class EmarController extends Controller
 
     public function storeCovert(Request $request)
     {
-        $actor = $request->user();
-        abort_unless($actor, 403);
-
-        return $this->governanceScope->forMedication(
-            $actor,
-            (int) $request->input('client_medication_id'),
-            'medications.orders.manage',
-            function (Client $client, ClientMedication $medication) use ($request, $actor) {
-                $this->assertActiveVerifiedPrescriptionMedication($medication);
-                abort_if(
-                    $medication->controlled_drug
-                        && (! $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)
-                            || ! $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_CAPABILITY)),
-                    404,
-                );
-                $validated = $request->validate([
-                    'client_id' => 'required|integer|min:1',
-                    'client_medication_id' => 'required|integer|min:1',
-                    'authorised_by_name' => 'required|string|max:255',
-                    'authorised_by_registration' => 'nullable|string|max:255',
-                    'clinical_justification' => 'required|string',
-                    'legal_basis' => 'nullable|string',
-                    'administration_method' => 'nullable|string|max:255',
-                    'pharmacist_advice' => 'nullable|string',
-                    'authorised_date' => 'required|date',
-                    'review_date' => 'required|date|after:authorised_date',
-                ]);
-                abort_unless(
-                    (int) $validated['client_id'] === (int) $client->id
-                        && (int) $validated['client_medication_id'] === (int) $medication->id,
-                    404,
-                );
-                $actionDate = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
-                if (Carbon::parse($validated['authorised_date'])->toDateString() > $actionDate) {
-                    throw ValidationException::withMessages([
-                        'authorised_date' => 'The authorisation date cannot be in the future.',
-                    ]);
-                }
-                if (Carbon::parse($validated['review_date'])->toDateString() < $actionDate) {
-                    throw ValidationException::withMessages([
-                        'review_date' => 'The review date must not already have lapsed.',
-                    ]);
-                }
-                $activeAuthorisations = MedicationCovertAuthorisation::query()
-                    ->where('client_id', $client->id)
-                    ->where('client_medication_id', $medication->id)
-                    ->where('status', 'active')
-                    ->orderBy('id')
-                    ->lockForUpdate()
-                    ->get();
-                if ($activeAuthorisations->isNotEmpty()) {
-                    throw ValidationException::withMessages([
-                        'clinical_justification' => 'Revoke the current covert authorisation before recording another one.',
-                    ]);
-                }
-
-                $authorisation = MedicationCovertAuthorisation::create(array_merge($validated, [
-                    'client_id' => $client->id,
-                    'client_medication_id' => $medication->id,
-                    'status' => 'active',
-                    'recorded_by' => $actor->id,
-                ]));
-                AuditLogger::logOrFail('medications.covert_authorisation.created', $authorisation, [
-                    'actor_id' => (int) $actor->id,
-                    'client_id' => (int) $client->id,
-                    'client_medication_id' => (int) $medication->id,
-                    'authorisation_id' => (int) $authorisation->id,
-                    'status_before' => null,
-                    'status_after' => 'active',
-                    'authorised_date' => $authorisation->authorised_date?->toDateString(),
-                    'review_date' => $authorisation->review_date?->toDateString(),
-                ]);
-
-                return redirect()->back();
-            },
-            (int) $request->input('client_id'),
-        );
+        return app(MedicationLegacyOrderBridge::class)->covert($request);
     }
 
     public function revokeCovert(Request $request, MedicationCovertAuthorisation $authorisation)
     {
-        $actor = $request->user();
-        abort_unless($actor, 403);
-
-        return $this->governanceScope->forCovertAuthorisation(
-            $actor,
-            $authorisation,
-            function (Client $client, ClientMedication $medication, MedicationCovertAuthorisation $lockedAuthorisation) use ($actor, $request) {
-                abort_if(
-                    $medication->controlled_drug
-                        && (! $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)
-                            || ! $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_CAPABILITY)),
-                    404,
-                );
-                if ($lockedAuthorisation->status !== 'active') {
-                    throw ValidationException::withMessages([
-                        'authorisation' => 'Only an active covert authorisation can be revoked.',
-                    ]);
-                }
-                $validated = $request->validate([
-                    'reason' => 'required|string|max:500',
-                ]);
-                $lockedAuthorisation->update(['status' => 'revoked']);
-                AuditLogger::logOrFail('medications.covert_authorisation.revoked', $lockedAuthorisation, [
-                    'actor_id' => (int) $actor->id,
-                    'client_id' => (int) $client->id,
-                    'client_medication_id' => (int) $medication->id,
-                    'authorisation_id' => (int) $lockedAuthorisation->id,
-                    'status_before' => 'active',
-                    'status_after' => 'revoked',
-                    'revoked_at' => now()->toIso8601String(),
-                    'reason' => trim($validated['reason']),
-                ]);
-
-                return redirect()->back();
-            },
-        );
+        return app(MedicationLegacyOrderBridge::class)->revokeCovert($request, $authorisation);
     }
 
     private function resolveMedicationReviewReviewer(
@@ -5071,21 +4742,27 @@ class EmarController extends Controller
         $actor = $request->user();
         abort_unless($actor, 403);
 
-        return $this->governanceScope->forClient($actor, (int) $client->id, 'medications.orders.manage', function (Client $lockedClient) use ($request) {
+        return $this->governanceScope->forClient($actor, (int) $client->id, 'medications.orders.manage', function (Client $lockedClient, User $lockedActor) use ($request) {
+            $this->recordAccess()->assertReadable($lockedActor, $lockedClient);
+            $reviewMessage = 'Use Medication reviews to change the interval, or book or move a review.';
             $validated = $request->validate([
-                'care_level' => ['nullable', 'string', 'max:60'],
-                'chart_review_interval_months' => ['nullable', 'integer', 'min:1', 'max:12'],
-                'next_chart_review_date' => ['nullable', 'date'],
+                'care_level' => ['sometimes', 'nullable', 'string', 'max:60'],
+                // Cadence decisions and booked dates belong to the Reviews workflow.
+                'chart_review_interval_months' => ['missing'],
+                'medication_review_interval_months' => ['missing'],
+                'next_chart_review_date' => ['missing'],
+            ], [
+                'chart_review_interval_months.missing' => $reviewMessage,
+                'medication_review_interval_months.missing' => $reviewMessage,
+                'next_chart_review_date.missing' => $reviewMessage,
             ]);
 
-            $lockedClient->forceFill([
-                'care_level' => $validated['care_level'] ?? null,
-                'chart_review_interval_months' => $validated['chart_review_interval_months'] ?? $lockedClient->chart_review_interval_months ?? 3,
-                'next_chart_review_date' => $validated['next_chart_review_date'] ?? null,
-            ])->save();
-            app(MedicationAlertService::class)->generateClientAlerts($lockedClient->fresh());
+            if (array_key_exists('care_level', $validated)) {
+                $lockedClient->forceFill(['care_level' => $validated['care_level']])->save();
+                app(MedicationAlertService::class)->generateClientAlerts($lockedClient->fresh());
+            }
 
-            return redirect()->back()->with('success', 'Medication chart settings updated.');
+            return redirect()->back()->with('success', 'Care level settings updated.');
         });
     }
 
@@ -5117,85 +4794,21 @@ class EmarController extends Controller
 
     public function storeInr(Request $request, Client $client)
     {
-        $actor = $request->user();
-        abort_unless($actor, 403);
+        $response = app(PersonMedicationClinicalController::class)->store($request, (int) $client->id, 'inr');
 
-        return $this->governanceScope->forClient($actor, (int) $client->id, 'medications.orders.manage', function (Client $lockedClient) use ($request, $actor) {
-            $record = function (?ClientMedication $medication = null) use ($request, $actor, $lockedClient) {
-                $validated = $request->validate([
-                    'client_medication_id' => ['nullable', 'integer'],
-                    'inr_value' => ['required', 'numeric', 'min:0.5', 'max:20'],
-                    'target_range_low' => ['nullable', 'numeric', 'min:0.5', 'max:20'],
-                    'target_range_high' => ['nullable', 'numeric', 'min:0.5', 'max:20', 'gte:target_range_low'],
-                    'dose_mg' => ['nullable', 'numeric', 'min:0', 'max:999.99'],
-                    'tested_on' => ['required', 'date'],
-                    'next_test_date' => ['nullable', 'date', 'after_or_equal:tested_on'],
-                    'notes' => ['nullable', 'string', 'max:2000'],
-                ]);
-                if ($medication !== null) {
-                    abort_unless((int) $validated['client_medication_id'] === (int) $medication->id, 404);
-                    $validated['client_medication_id'] = $medication->id;
-                }
-
-                $lockedClient->inrRecords()->create([
-                    ...$validated,
-                    'recorded_by' => $actor->id,
-                ]);
-                app(MedicationAlertService::class)->generateClientAlerts($lockedClient->fresh());
-
-                return redirect()->back()->with('success', 'INR result recorded.');
-            };
-
-            $medicationId = (int) $request->input('client_medication_id');
-            if ($medicationId <= 0) {
-                return $record();
-            }
-
-            return $this->governanceScope->forMedication(
-                $actor,
-                $medicationId,
-                'medications.orders.manage',
-                function (Client $canonicalClient, ClientMedication $medication) use ($actor, $lockedClient, $record) {
-                    abort_unless((int) $canonicalClient->id === (int) $lockedClient->id, 404);
-                    abort_if(
-                        $medication->controlled_drug
-                            && ! $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
-                        404,
-                    );
-
-                    return $record($medication);
-                },
-                $lockedClient->id,
-            );
-        });
+        return $request->expectsJson() || $request->header('X-Inertia')
+            ? $response
+            : redirect()->back()->with('success', 'INR result recorded.');
     }
 
     public function disableInr(Request $request, ClientInrRecord $inr)
     {
-        $actor = $request->user();
-        abort_unless($actor, 403);
+        $request->merge(['record_id' => (int) $inr->id]);
+        $response = app(PersonMedicationClinicalController::class)->store($request, (int) $inr->client_id, 'disable-inr');
 
-        return $this->governanceScope->forClientRecord($actor, $inr, 'medications.orders.manage', function (Client $client, ClientInrRecord $lockedInr) use ($actor) {
-            if ($lockedInr->client_medication_id !== null) {
-                $medication = ClientMedication::withTrashed()
-                    ->whereKey($lockedInr->client_medication_id)
-                    ->where('client_id', $client->id)
-                    ->lockForUpdate()
-                    ->first();
-                abort_unless($medication !== null, 404);
-                abort_if(
-                    $medication->controlled_drug
-                        && ! $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
-                    404,
-                );
-            }
-            if (! $lockedInr->disabled_at) {
-                $lockedInr->disable($actor->id);
-            }
-            app(MedicationAlertService::class)->generateClientAlerts($client->fresh());
-
-            return redirect()->back()->with('success', 'INR result disabled.');
-        });
+        return $request->expectsJson() || $request->header('X-Inertia')
+            ? $response
+            : redirect()->back()->with('success', 'INR result marked as entered in error.');
     }
 
     public function storeSyringeDriver(Request $request, Client $client)
@@ -5285,7 +4898,8 @@ class EmarController extends Controller
         $actor = $request->user();
         abort_unless($actor, 403);
 
-        return $this->governanceScope->forClientRecord($actor, $driver, 'medications.orders.manage', function (Client $client, MedicationSyringeDriver $lockedDriver) use ($request, $actor) {
+        return $this->governanceScope->forClientRecord($actor, $driver, 'medications.administer.record', function (Client $client, MedicationSyringeDriver $lockedDriver) use ($request, $actor) {
+            app(MedicationRecordAccess::class)->assertReadable($actor, $client);
             abort_if($lockedDriver->site_id !== null && (int) $lockedDriver->site_id !== (int) $client->site_id, 404);
             $this->assertRunningSyringeDriverMutationAuthority($client, $lockedDriver, $actor);
             $validated = $request->validate([
@@ -6135,15 +5749,18 @@ class EmarController extends Controller
                 ->all(),
         ];
 
+        $message = sprintf(
+            '%d %s created (%d already existed and %d skipped).',
+            $summary['created'],
+            $summary['created'] === 1 ? 'round' : 'rounds',
+            $summary['already_exists'],
+            $summary['skipped'],
+        );
+
         return redirect()->back()
             ->with('round_generation', $summary)
-            ->with('medication_settings_saved', sprintf(
-                '%d %s created (%d already existed and %s skipped).',
-                $summary['created'],
-                $summary['created'] === 1 ? 'round' : 'rounds',
-                $summary['already_exists'],
-                $summary['already_exists'] === 1 ? 'was' : 'were',
-            ));
+            ->with('medication_settings_saved', $message)
+            ->with('success', $message);
     }
 
     public function startRound(Request $request, MedicationRound $round)
@@ -6433,7 +6050,7 @@ class EmarController extends Controller
 
     // ─── Destructions CRUD ──────────────────────────────────
 
-    public function storeDestruction(Request $request)
+    public function storeDestruction(Request $request, bool $ordinaryOnly = false)
     {
         $this->assertMedicationCapability($request, 'medications.controlled.record');
 
@@ -6452,6 +6069,10 @@ class EmarController extends Controller
             'medication_name' => 'required|string|max:255',
             'form' => 'nullable|string|max:255',
             'strength' => 'nullable|string|max:255',
+            'pack_lines' => ['nullable', 'array', 'max:100'],
+            'pack_lines.*.lot_id' => ['required', 'integer', 'min:1'],
+            'pack_lines.*.revision' => ['required', 'integer', 'min:0'],
+            'pack_lines.*.quantity' => ['required', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0.01', MedicationStockQuantity::DECIMAL_10_2_MAX_RULE],
             'quantity' => ['required', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0.01', MedicationStockQuantity::DECIMAL_10_2_MAX_RULE],
             'unit' => 'required|string|max:50',
             'batch_number' => 'nullable|string|max:255',
@@ -6482,8 +6103,10 @@ class EmarController extends Controller
             ClientMedication $medication,
             User $lockedActor,
             Collection $lockedWitnessUsers,
-        ) use ($request, $rules, $actor, $witnessEffectiveAt) {
+        ) use ($request, $rules, $actor, $witnessEffectiveAt, $ordinaryOnly) {
             $actor = $lockedActor;
+            // The compatibility dispatch cannot admit an order whose classification changed under lock.
+            abort_if($ordinaryOnly && $medication->controlled_drug, 404);
             if ((bool) $medication->controlled_drug) {
                 abort_unless(
                     $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)
@@ -6657,6 +6280,7 @@ class EmarController extends Controller
             $payload['destroyed_by'] = $actor->id;
             $payload['destroyed_at'] = now();
             unset(
+                $payload['pack_lines'],
                 $payload['witness_1_credential'],
                 $payload['witness_2_credential'],
                 $payload['denaturing_confirmed'],
@@ -6677,7 +6301,8 @@ class EmarController extends Controller
                 ]);
             }
 
-            $before = MedicationStockQuantity::normalize($stock->on_hand ?? 0);
+            $packTracked = $stock->lots_started_at !== null;
+            $before = $packTracked ? app(MedicationStockService::class)->physicalQuantity($stock) : MedicationStockQuantity::normalize($stock->on_hand ?? 0);
             $qty = $payload['quantity'];
 
             if (MedicationStockQuantity::greaterThan($qty, $before)) {
@@ -6692,9 +6317,16 @@ class EmarController extends Controller
             $destruction = MedicationDestruction::create($payload);
             $registerEntry = null;
 
-            $stock->on_hand = $after;
-            $stock->last_counted_at = now();
-            $stock->save();
+            if ($packTracked) {
+                abort_if($medication->controlled_drug, 422, 'Use the canonical witnessed controlled pack destruction.');
+                app(MedicationStockService::class)->removeForDestruction($stock, $actor, $destruction,
+                    $validated['pack_lines'] ?? [], $validated['client_request_uuid'] ?? (string) Str::uuid());
+                $after = $stock->availableQuantity();
+            } else {
+                $stock->on_hand = $after;
+                $stock->last_counted_at = now();
+                $stock->save();
+            }
 
             if (! empty($payload['is_controlled_drug'])) {
                 $registerEntry = ClientControlledDrugEntry::create([
@@ -6904,10 +6536,13 @@ class EmarController extends Controller
         );
 
         return response()->json([
-            'snapshot' => app(ShiftMedicationSnapshotService::class)->forShift(
-                $shift,
-                $auth->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
-            ),
+            'snapshot' => [
+                ...app(ShiftMedicationSnapshotService::class)->forShift(
+                    $shift,
+                    $auth->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
+                ),
+                ...app(MedicationFollowupProjection::class)->forClient($auth, (int) $shift->client_id),
+            ],
         ]);
     }
 
@@ -7153,6 +6788,10 @@ class EmarController extends Controller
                     return redirect()->back()->withErrors(['status' => 'Order cannot be advanced from its current status.']);
                 }
 
+                // New pack orders require the explicit communication/dispense/receipt workflow.
+                // Replay above still returns evidence from a previously completed legacy request.
+                $packStock = ClientMedicationStock::where('client_medication_id', $medication->id)->lockForUpdate()->first();
+                $packStock?->rejectScalarWrite('status');
                 $updateData = ['status' => $nextStatus];
                 switch ($nextStatus) {
                     case 'submitted':
@@ -7305,6 +6944,15 @@ class EmarController extends Controller
             ) use ($request, $actor) {
                 $validated = $request->validate([
                     'client_medication_id' => 'required|integer|min:1',
+                    'packs' => ['nullable', 'array', 'min:1', 'max:25'],
+                    'packs.*.quantity' => ['required', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0.01', MedicationStockQuantity::DECIMAL_10_2_MAX_RULE],
+                    'packs.*.batch_number' => ['nullable', 'string', 'max:100'],
+                    'packs.*.batch_not_printed' => ['required', 'boolean'],
+                    'packs.*.expiry_month' => ['nullable', 'string', 'max:7'],
+                    'packs.*.expiry_not_printed' => ['required', 'boolean'],
+                    'packs.*.short_expiry_reason' => ['nullable', 'string', 'max:2000'],
+                    'delivery_outcome' => ['nullable', 'in:still_to_come,closed_short'],
+                    'closure_reason' => ['nullable', 'string', 'max:2000'],
                     'quantity_received' => ['required', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0.01', MedicationStockQuantity::DECIMAL_10_2_MAX_RULE],
                     'on_hand_before' => ['required', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0', MedicationStockQuantity::DECIMAL_12_2_MAX_RULE],
                     'on_hand_after' => ['required', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0', MedicationStockQuantity::DECIMAL_12_2_MAX_RULE],
@@ -7331,6 +6979,9 @@ class EmarController extends Controller
                     'client_medication_id' => (int) $medication->id,
                     'pharmacy_order_id' => (int) $lockedOrder->id,
                     'quantity_received' => $quantityReceived,
+                    'packs' => $validated['packs'] ?? null,
+                    'delivery_outcome' => $validated['delivery_outcome'] ?? null,
+                    'closure_reason' => $validated['closure_reason'] ?? null,
                     'on_hand_before' => $onHandBefore,
                     'on_hand_after' => $onHandAfter,
                     'witnessed_by' => (int) $validated['witnessed_by'],
@@ -7341,8 +6992,9 @@ class EmarController extends Controller
                 ], JSON_THROW_ON_ERROR));
 
                 // An exact replay is still a controlled-drug action: recheck
-                // the current in-person witness authority and credential before
-                // returning the durable result.
+                // the recorder's presence and the current in-person witness
+                // authority and credential before returning the durable result.
+                app(ControlledRegisterService::class)->assertPresent($lockedActor, (int) $client->site_id, true);
                 $witness = $this->governanceScope->confirmedControlledWitness(
                     $lockedActor,
                     $client,
@@ -7419,26 +7071,17 @@ class EmarController extends Controller
                     'witnessed_by' => $witness->id,
                 ]);
 
-                $this->mergeDeliveredBatch(
-                    $stock,
-                    $lockedOrder->batch_number,
-                    $lockedOrder->batch_expiry,
-                    $authoritativeBefore,
-                );
-                $stock->forceFill([
-                    'on_hand' => $expectedAfter,
-                    'supplier_name' => $lockedOrder->pharmacy_name,
-                    'last_counted_at' => now(),
-                ])->save();
-
-                $lockedOrder->forceFill([
-                    'status' => 'delivered',
-                    'delivered_at' => now(),
-                    'received_by' => $actor->id,
-                    'quantity_received' => $quantityReceived,
-                    'delivery_notes' => $validated['delivery_notes'] ?? null,
-                ])->save();
-
+                if ($stock->lots_started_at !== null) {
+                    $stock->forceFill(['on_hand' => $expectedAfter, 'supplier_name' => $lockedOrder->pharmacy_name])->saveFromPackLedger();
+                    app(MedicationStockService::class)->controlledDeliveryAfterRegister($stock, $lockedActor,
+                        [...$validated, 'request_uuid' => $validated['client_request_uuid'], 'packs' => $validated['packs'] ?? [],
+                            'source' => 'pharmacy', 'source_reference' => 'Pharmacy order '.$lockedOrder->id], $entry, $lockedOrder);
+                } else {
+                    $this->mergeDeliveredBatch($stock, $lockedOrder->batch_number, $lockedOrder->batch_expiry, $authoritativeBefore);
+                    $stock->forceFill(['on_hand' => $expectedAfter, 'supplier_name' => $lockedOrder->pharmacy_name, 'last_counted_at' => now()])->save();
+                    $lockedOrder->forceFill(['status' => 'delivered', 'delivered_at' => now(), 'received_by' => $actor->id,
+                        'quantity_received' => $quantityReceived, 'delivery_notes' => $validated['delivery_notes'] ?? null])->save();
+                }
                 AuditLogger::logOrFail('medications.controlled.pharmacy_delivery.receive', $entry, [
                     'actor_id' => $actor->id,
                     'client_id' => $client->id,
@@ -7446,6 +7089,9 @@ class EmarController extends Controller
                     'pharmacy_order_id' => $lockedOrder->id,
                     'stock_id' => $stock->id,
                     'quantity_received' => $quantityReceived,
+                    'packs' => $validated['packs'] ?? null,
+                    'delivery_outcome' => $validated['delivery_outcome'] ?? null,
+                    'closure_reason' => $validated['closure_reason'] ?? null,
                     'on_hand_before' => $authoritativeBefore,
                     'on_hand_after' => $expectedAfter,
                     'witnessed_by' => $witness->id,
@@ -7573,6 +7219,7 @@ class EmarController extends Controller
                     ]);
                 }
 
+                $stock->rejectScalarWrite('quantity');
                 $stock->on_hand = $this->addMedicationStockBalanceOrFail(
                     $stock->on_hand ?? 0,
                     $validated['quantity'],
@@ -7680,6 +7327,16 @@ class EmarController extends Controller
                         throw ValidationException::withMessages($errors);
                     }
                 }
+                if ($lockedStock->lots_started_at !== null && ! $medication->controlled_drug) {
+                    $submitted = array_intersect_key($validated, array_flip(['batch_number', 'expiry_date']));
+                    $changed = (array_key_exists('batch_number', $submitted) && ($submitted['batch_number'] ?: null) !== $lockedStock->batch_number)
+                        || (array_key_exists('expiry_date', $submitted) && ($submitted['expiry_date'] ?: null) !== $lockedStock->expiry_date?->toDateString());
+                    if ($changed) {
+                        $lockedStock->rejectScalarWrite('batch_number');
+                    }
+                    // Aggregate batch metadata is historic evidence; pack labels are recorded at receipt.
+                    $validated = array_diff_key($validated, array_flip(['batch_number', 'expiry_date']));
+                }
                 $lockedStock->update($validated);
 
                 AuditLogger::logOrFail('medications.stock.metadata.update', $lockedStock, [
@@ -7774,6 +7431,7 @@ class EmarController extends Controller
                         'unit' => 'units',
                     ]);
                 }
+                $stock->rejectScalarWrite('new_quantity');
                 $onHandBefore = MedicationStockQuantity::normalize($stock->on_hand ?? 0);
                 $stock->update([
                     'on_hand' => $validated['new_quantity'],
@@ -7829,338 +7487,23 @@ class EmarController extends Controller
 
     public function storePrnEffectiveness(Request $request)
     {
-        $this->assertMedicationCapability($request, 'medications.administer.record');
-
-        $user = $request->user();
-        abort_unless($user, 403);
-        $administration = ClientMedicationAdministration::query()
-            ->whereKey($request->integer('client_medication_administration_id'))
-            ->firstOrFail();
-
-        return $this->medicationScope->forPrnEffectiveness(
-            $user,
-            $administration,
-            now(),
-            function (MedicationScopeDecision $scope) use ($request) {
-                abort_if(
-                    $scope->medication->controlled_drug
-                        && ! $scope->performer->canDo('medications.controlled.record'),
-                    404,
-                );
-                $validated = $request->validate([
-                    'client_medication_administration_id' => 'required|integer',
-                    'effectiveness' => 'required|in:effective,partially_effective,not_effective',
-                    'review_minutes_after' => 'nullable|integer|min:0',
-                    'observations' => 'nullable|string',
-                    'escalation_needed' => 'nullable|boolean',
-                    'escalation_action' => 'nullable|string',
-                ]);
-                MedicationPrnEffectiveness::updateOrCreate(
-                    ['client_medication_administration_id' => $scope->administration->id],
-                    [
-                        ...$validated,
-                        'client_id' => $scope->client->id,
-                        'client_medication_id' => $scope->medication->id,
-                        'reviewed_by' => $scope->performer->id,
-                        'reviewed_at' => now(),
-                    ],
-                );
-                $this->medicationScope->recordBreakGlassUse(
-                    $scope,
-                    'recorded_prn_effectiveness',
-                    'Administration '.$scope->administration->id,
-                );
-
-                return redirect()->back();
-            },
-        );
+        return app(LegacyEffectFollowupAdapter::class)->save($request, $this->medicationScope);
     }
-
     // ─── Medications CRUD ─────────────────────────────────
 
     public function storeMedication(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user, 403);
-
-        return $this->medicationScope->forClient(
-            $user,
-            $request->integer('client_id'),
-            now(),
-            function (MedicationScopeDecision $scope) use ($request, $user) {
-                $validated = $request->validate([
-                    'client_id' => 'required|integer',
-                    'medication_name' => 'required|string|max:255',
-                    'brand_name' => 'nullable|string|max:255',
-                    'dose' => 'required|string|max:100',
-                    'dose_unit' => 'nullable|string|max:50',
-                    'frequency' => 'required|string|max:100',
-                    'route' => 'nullable|string|max:50',
-                    'form' => 'nullable|string|max:50',
-                    'instructions' => 'nullable|string|max:2000',
-                    'indication' => 'nullable|string|max:500',
-                    'is_prn' => 'nullable|boolean',
-                    'prn_reason' => 'nullable|string|max:500',
-                    'max_per_day' => 'nullable|integer|min:1',
-                    'max_doses_per_day' => 'nullable|integer|min:1',
-                    'min_hours_between_doses' => 'nullable|numeric|min:0',
-                    'controlled_drug' => 'nullable|boolean',
-                    'is_controlled_drug' => 'nullable|boolean',
-                    'high_risk' => 'nullable|boolean',
-                    'is_high_risk' => 'nullable|boolean',
-                    'witness_required' => 'nullable|boolean',
-                    'start_date' => 'nullable|date',
-                    'prescriber' => 'nullable|string|max:255',
-                    'prescriber_name' => 'nullable|string|max:255',
-                    'pharmac_therapeutic_group' => 'nullable|string|max:255',
-                    'pharmac_subgroup' => 'nullable|string|max:255',
-                ]);
-                $payload = $this->buildMedicationPayload($validated);
-                $this->assertControlledMedicationOrderWriteAuthority(
-                    $user,
-                    (bool) ($payload['controlled_drug'] ?? false),
-                );
-                $payload['client_id'] = $scope->client->id;
-
-                $medication = ClientMedication::create(array_merge(
-                    $payload,
-                    [
-                        'created_by' => $user->id,
-                        'start_date' => $validated['start_date'] ?? WorkerClock::today()->toDateString(),
-                        'state' => 'active',
-                        'active' => true,
-                        'approval_status' => 'pending_verification',
-                        'verified_by' => null,
-                        'verified_at' => null,
-                    ],
-                ));
-                $this->medicationScope->recordBreakGlassUse(
-                    $scope,
-                    'created_medication_order',
-                    'Medication '.$medication->id,
-                );
-
-                return redirect()->back();
-            },
-        );
+        return app(MedicationLegacyOrderBridge::class)->enter($request);
     }
 
     public function updateMedication(Request $request, ClientMedication $medication)
     {
-        $user = $request->user();
-        abort_unless($user, 403);
-
-        return $this->medicationScope->forMedication(
-            $user,
-            $medication,
-            now(),
-            function (MedicationScopeDecision $scope) use ($request, $user) {
-                $this->assertControlledMedicationOrderWriteAuthority(
-                    $user,
-                    (bool) $scope->medication->controlled_drug,
-                );
-                $validated = $request->validate([
-                    'client_id' => 'nullable|integer',
-                    'medication_name' => 'sometimes|string|max:255',
-                    'brand_name' => 'nullable|string|max:255',
-                    'dose' => 'sometimes|string|max:100',
-                    'dose_unit' => 'nullable|string|max:50',
-                    'frequency' => 'sometimes|string|max:100',
-                    'route' => 'nullable|string|max:50',
-                    'form' => 'nullable|string|max:50',
-                    'instructions' => 'nullable|string|max:2000',
-                    'indication' => 'nullable|string|max:500',
-                    'is_prn' => 'nullable|boolean',
-                    'prn_reason' => 'nullable|string|max:500',
-                    'max_per_day' => 'nullable|integer|min:1',
-                    'max_doses_per_day' => 'nullable|integer|min:1',
-                    'min_hours_between_doses' => 'nullable|numeric|min:0',
-                    'controlled_drug' => 'nullable|boolean',
-                    'is_controlled_drug' => 'nullable|boolean',
-                    'high_risk' => 'nullable|boolean',
-                    'is_high_risk' => 'nullable|boolean',
-                    'witness_required' => 'nullable|boolean',
-                    'start_date' => 'nullable|date',
-                    'prescriber' => 'nullable|string|max:255',
-                    'prescriber_name' => 'nullable|string|max:255',
-                    'pharmac_therapeutic_group' => 'nullable|string|max:255',
-                    'pharmac_subgroup' => 'nullable|string|max:255',
-                ]);
-                if (array_key_exists('client_id', $validated)
-                    && (int) $validated['client_id'] !== (int) $scope->client->id) {
-                    throw ValidationException::withMessages([
-                        'client_id' => 'The requested medication action is not available.',
-                    ]);
-                }
-
-                $payload = $this->buildMedicationPayload($validated);
-                unset($payload['client_id']);
-                if (array_key_exists('controlled_drug', $payload)) {
-                    $this->assertControlledMedicationOrderWriteAuthority(
-                        $user,
-                        (bool) $payload['controlled_drug'],
-                    );
-                    if ((bool) $payload['controlled_drug'] !== (bool) $scope->medication->controlled_drug) {
-                        throw ValidationException::withMessages([
-                            'controlled_drug' => 'Controlled-drug classification cannot be changed on an existing medication order.',
-                        ]);
-                    }
-                }
-                $payload['approval_status'] = 'pending_verification';
-                $payload['verified_by'] = null;
-                $payload['verified_at'] = null;
-                $payload['rejection_reason'] = null;
-
-                $scope->medication->update($payload);
-                $this->medicationScope->recordBreakGlassUse(
-                    $scope,
-                    'updated_medication_order',
-                    'Medication '.$scope->medication->id,
-                );
-
-                return redirect()->back();
-            },
-        );
+        return app(MedicationLegacyOrderBridge::class)->enter($request, $medication);
     }
 
     public function verifyMedication(Request $request, ClientMedication $medication)
     {
-        $verifier = $request->user();
-        abort_unless($this->canVerifyMedicationOrders($verifier), 403);
-
-        return $this->medicationScope->forMedication(
-            $verifier,
-            $medication,
-            now(),
-            function (MedicationScopeDecision $scope) use ($request, $verifier) {
-                $this->assertControlledMedicationOrderWriteAuthority(
-                    $verifier,
-                    (bool) $scope->medication->controlled_drug,
-                );
-                if ($scope->medication->approval_status === 'verified') {
-                    return redirect()->back()->with('success', 'Medication order was already verified.');
-                }
-
-                if ($scope->medication->approval_status !== 'pending_verification') {
-                    throw ValidationException::withMessages([
-                        'approval_status' => 'Only a medication order awaiting verification can be verified.',
-                    ]);
-                }
-
-                if ($scope->medication->state !== 'active' || ! (bool) $scope->medication->active) {
-                    throw ValidationException::withMessages([
-                        'medication' => 'Only an active medication order can be verified.',
-                    ]);
-                }
-
-                $validated = $request->validate([
-                    'waiver_reason' => [
-                        'nullable',
-                        'string',
-                        'max:1000',
-                        'required_with:waiver_approved_by,waiver_approver_credential',
-                    ],
-                    'waiver_approved_by' => [
-                        'nullable',
-                        'integer',
-                        'required_with:waiver_reason,waiver_approver_credential',
-                    ],
-                    'waiver_approver_credential' => [
-                        'nullable',
-                        'string',
-                        'max:255',
-                        'required_with:waiver_reason,waiver_approved_by',
-                    ],
-                    'scan_code' => ['nullable', 'string', 'max:255'],
-                    'scan_source' => ['nullable', 'string', 'in:manual,scanner'],
-                    'scan_verified' => ['nullable', 'boolean'],
-                    'scan_match_source' => ['nullable', 'string', 'max:50'],
-                ]);
-
-                $scanEvidenceSubmitted = collect([
-                    'scan_code',
-                    'scan_source',
-                    'scan_verified',
-                    'scan_match_source',
-                ])->contains(fn (string $key): bool => $request->exists($key));
-                $scanAudit = $scanEvidenceSubmitted
-                    ? $this->verifyMedicationScanOrFail(
-                        $scope->client,
-                        $scope->medication,
-                        $validated,
-                    )
-                    : null;
-
-                $requiresIndependentVerifier = $scope->medication->requiresIndependentVerification();
-                $creatorSeparationUnproved = $scope->medication->created_by === null
-                    || (int) $scope->medication->created_by === (int) $verifier->id;
-                $waiverApprover = null;
-                $waiverEvidenceSubmitted = collect([
-                    'waiver_reason',
-                    'waiver_approved_by',
-                    'waiver_approver_credential',
-                ])->contains(fn (string $key): bool => filled($validated[$key] ?? null));
-
-                if ($requiresIndependentVerifier && $creatorSeparationUnproved) {
-                    $waiverApprover = $this->resolveMedicationVerificationWaiverApprover(
-                        $scope,
-                        $verifier,
-                        $validated,
-                    );
-                } elseif ($waiverEvidenceSubmitted) {
-                    throw ValidationException::withMessages([
-                        'waiver_reason' => 'An emergency waiver is only available when a high-risk order creator must verify their own order.',
-                    ]);
-                }
-
-                $orderEvidenceHash = $scope->medication->verificationEvidenceHash();
-                $orderVersion = (int) ($scope->medication->version ?? 1);
-
-                $scope->medication->forceFill([
-                    'approval_status' => 'verified',
-                    'verified_by' => $verifier->id,
-                    'verified_at' => now(),
-                    'rejection_reason' => null,
-                ])->save();
-
-                $auditMeta = [
-                    'site_id' => $scope->siteId,
-                    'creator_user_id' => $scope->medication->created_by !== null
-                        ? (int) $scope->medication->created_by
-                        : null,
-                    'verifier_user_id' => (int) $verifier->id,
-                    'independent_verifier_required' => $requiresIndependentVerifier,
-                    'verification_mode' => $waiverApprover !== null
-                        ? 'emergency_waiver'
-                        : ($requiresIndependentVerifier ? 'independent_verifier' : 'standard'),
-                    'approval_status_from' => 'pending_verification',
-                    'approval_status_to' => 'verified',
-                    'order_version' => $orderVersion,
-                    'order_evidence_sha256' => $orderEvidenceHash,
-                    'scan_verification_used' => $scanAudit !== null,
-                ];
-                if ($waiverApprover !== null) {
-                    $auditMeta['waiver_reason'] = trim((string) $validated['waiver_reason']);
-                    $auditMeta['waiver_approved_by_user_id'] = (int) $waiverApprover->id;
-                }
-                if ($scanAudit !== null) {
-                    $auditMeta['scan_source'] = $scanAudit['scan_source'];
-                    $auditMeta['scan_match_source'] = $scanAudit['scan_match_source'];
-                    $auditMeta['scan_match_label'] = $scanAudit['scan_match_label'];
-                    $auditMeta['entered_code_suffix'] = $scanAudit['scan_code_suffix'];
-                }
-
-                AuditLogger::logOrFail('medications.order.verified', $scope->medication, $auditMeta);
-                $this->medicationScope->recordBreakGlassUse(
-                    $scope,
-                    'verified_medication_order',
-                    'Medication '.$scope->medication->id,
-                );
-
-                return redirect()->back()->with('success', 'Medication order verified.');
-            },
-            allowCeased: true,
-        );
+        return app(MedicationLegacyOrderBridge::class)->check($request, $medication);
     }
 
     /**
@@ -8211,84 +7554,12 @@ class EmarController extends Controller
 
     public function rejectMedication(Request $request, ClientMedication $medication)
     {
-        $reviewer = $request->user();
-        abort_unless($this->canVerifyMedicationOrders($reviewer), 403);
-
-        return $this->medicationScope->forMedication(
-            $reviewer,
-            $medication,
-            now(),
-            function (MedicationScopeDecision $scope) use ($request, $reviewer) {
-                $this->assertControlledMedicationOrderWriteAuthority(
-                    $reviewer,
-                    (bool) $scope->medication->controlled_drug,
-                );
-                if ($scope->medication->approval_status === 'rejected') {
-                    return redirect()->back()->with('success', 'Medication order was already rejected.');
-                }
-
-                if ($scope->medication->approval_status !== 'pending_verification') {
-                    throw ValidationException::withMessages([
-                        'approval_status' => 'Only a medication order awaiting verification can be rejected.',
-                    ]);
-                }
-
-                if ($scope->medication->state !== 'active' || ! (bool) $scope->medication->active) {
-                    throw ValidationException::withMessages([
-                        'medication' => 'Only an active medication order can be rejected.',
-                    ]);
-                }
-
-                $validated = $request->validate([
-                    'rejection_reason' => ['required', 'string', 'max:1000'],
-                ]);
-                $reason = trim($validated['rejection_reason']);
-                $orderEvidenceHash = $scope->medication->verificationEvidenceHash();
-                $orderVersion = (int) ($scope->medication->version ?? 1);
-
-                $scope->medication->forceFill([
-                    'approval_status' => 'rejected',
-                    'verified_by' => null,
-                    'verified_at' => null,
-                    'rejection_reason' => $reason,
-                ])->save();
-
-                AuditLogger::logOrFail('medications.order.rejected', $scope->medication, [
-                    'site_id' => $scope->siteId,
-                    'creator_user_id' => $scope->medication->created_by !== null
-                        ? (int) $scope->medication->created_by
-                        : null,
-                    'reviewer_user_id' => (int) $reviewer->id,
-                    'approval_status_from' => 'pending_verification',
-                    'approval_status_to' => 'rejected',
-                    'order_version' => $orderVersion,
-                    'order_evidence_sha256' => $orderEvidenceHash,
-                    'rejection_reason_sha256' => hash('sha256', $reason),
-                ]);
-                $this->medicationScope->recordBreakGlassUse(
-                    $scope,
-                    'rejected_medication_order',
-                    'Medication '.$scope->medication->id,
-                );
-
-                return redirect()->back()->with('success', 'Medication order rejected.');
-            },
-        );
+        return app(MedicationLegacyOrderBridge::class)->check($request, $medication, sendBack: true);
     }
 
     public function discontinueMedication(Request $request, ClientMedication $medication)
     {
-        $user = $request->user();
-        abort_unless($user, 403);
-
-        $this->medicationOrderLifecycle->discontinue(
-            $user,
-            $medication,
-            $request->input('reason'),
-            requestKey: $request->input('request_key'),
-        );
-
-        return redirect()->back()->with('success', 'Medication discontinued successfully.');
+        return app(MedicationOrdersController::class)->stop($request, $medication->id);
     }
 
     // ─── Controlled Drug Entry CRUD ──────────────────────
@@ -9045,6 +8316,9 @@ class EmarController extends Controller
             $actor,
             $destruction,
             function (Client $client, ?ClientMedication $medication, MedicationDestruction $lockedDestruction) use ($request, $actor) {
+                $this->recordAccess()->assertReadable($actor, $client);
+                abort_if(($lockedDestruction->is_controlled_drug || $medication?->controlled_drug)
+                    && ! $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY), 404);
                 $validated = $request->validate([
                     'void_reason' => 'required|string|max:1000',
                 ]);
@@ -9096,6 +8370,7 @@ class EmarController extends Controller
 
         $rows = [];
         $rowNumber = 0;
+        $importRowCount = 0;
 
         try {
             while (($row = fgetcsv($handle)) !== false) {
@@ -9108,6 +8383,8 @@ class EmarController extends Controller
                 if ($rowNumber === 1 && stripos($row[0] ?? '', 'client') !== false) {
                     continue;
                 }
+
+                $importRowCount++;
 
                 if (count($row) < 4) {
                     continue;
@@ -9156,7 +8433,9 @@ class EmarController extends Controller
             ['clinical.accessAllSites', 'sites.viewAll'],
         );
         if ($rows === [] || $accessibleSiteIds === []) {
-            return redirect()->back();
+            throw ValidationException::withMessages([
+                'csv_file' => 'No medication rows could be imported. Check the CSV format and person names.',
+            ]);
         }
 
         $resolvedRows = [];
@@ -9179,7 +8458,9 @@ class EmarController extends Controller
         }
 
         if ($resolvedRows === []) {
-            return redirect()->back();
+            throw ValidationException::withMessages([
+                'csv_file' => 'No medication rows could be imported. Check the CSV format and person names.',
+            ]);
         }
 
         DB::transaction(function () use ($resolvedRows, $accessibleSiteIds, $user): void {
@@ -9228,6 +8509,15 @@ class EmarController extends Controller
             }
         }, 3);
 
-        return redirect()->back();
+        $importedCount = count($resolvedRows);
+        $skippedCount = $importRowCount - $importedCount;
+
+        return redirect()->back()->with('success', sprintf(
+            '%d medication %s imported for checking; %d %s skipped.',
+            $importedCount,
+            $importedCount === 1 ? 'order' : 'orders',
+            $skippedCount,
+            $skippedCount === 1 ? 'row' : 'rows',
+        ));
     }
 }

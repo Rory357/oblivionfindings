@@ -3,13 +3,18 @@
    components. All colours are semantic tokens. */
 import { AddClientDialog } from '@/components/clients/add-client-dialog';
 import { EmarHubRail } from '@/components/emar/emar-hub-rail';
-import { PageHero, type PageHeroStat } from '@/components/page';
-import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
-    EntityFilter,
-    TabStrip,
-    type RosterTabItem,
-} from '@/components/rostering';
+    EmarMeters,
+    EmarViewFilter,
+} from '@/components/emar/workspace-navigation';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
+import { EntityFilter, type RosterTabItem } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
@@ -36,7 +41,6 @@ import {
     Layers,
     Pill,
     Plus,
-    Search,
     Send,
     ShieldAlert,
     X,
@@ -330,7 +334,6 @@ export default function Handovers({
         editingId != null
             ? (handovers.find((h) => h.id === editingId) ?? null)
             : null;
-    const firstName = currentUser?.name?.split(' ')?.[0] ?? 'team';
 
     const goWeek = (week: Date) => {
         const target = ymd(week);
@@ -444,102 +447,117 @@ export default function Handovers({
         },
         { id: 'activity', label: 'Activity', icon: History, tone: 'info' },
     ];
-    const heroStats: PageHeroStat[] = [
-        { label: 'Total', value: counts.total },
-        { label: 'Submitted', value: counts.submitted },
-        { label: "Ack'd", value: counts.acknowledged },
-        {
-            label: 'Open',
-            value: counts.openIncoming,
-            tone: counts.openIncoming > 0 ? 'critical' : 'neutral',
-        },
-    ];
-
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Medication handovers" />
-            <div className="flex flex-col gap-6 p-6">
-                <PageHero
+            <div className="flex flex-col gap-5">
+                <PageHeader
+                    wrapTitle
                     rail={<EmarHubRail />}
-                    variant="hero"
-                    category="ops"
                     brandColour={brandColour}
                     icon={ArrowLeftRight}
-                    title={
-                        <span>
-                            <span className="flex items-center gap-2 text-[10.5px] font-semibold tracking-wide text-primary-foreground/80 uppercase">
-                                <span
-                                    aria-hidden
-                                    className="relative inline-flex h-2 w-2"
-                                >
-                                    <span className="absolute inset-0 animate-ping rounded-full bg-status-success/70" />
-                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
-                                </span>
-                                Live handovers · synced
-                            </span>
-                            <span className="mt-1 block text-[26px] leading-tight font-bold">
-                                Kia ora {firstName}, this week's medication
-                                handovers —{' '}
-                                <span className="border-b-2 border-primary-foreground/40">
-                                    {fmtRange(weekStart, weekEnd)}
-                                </span>
-                            </span>
-                        </span>
+                    title="Medication handovers"
+                    titleChip={
+                        <PageHeaderStatusChip variant="neutral">
+                            Selected week
+                        </PageHeaderStatusChip>
                     }
-                    description={`${counts.total} handover${counts.total === 1 ? '' : 's'} this week. ${counts.needsAck} awaiting your acknowledgement, ${counts.openIncoming} with an open incoming shift.`}
-                    stats={heroStats}
+                    subline={`${fmtRange(weekStart, weekEnd)} · Pacific/Auckland`}
+                    meters={
+                        <EmarMeters
+                            items={[
+                                {
+                                    label: 'Handovers',
+                                    value: counts.total,
+                                    caption: 'In the selected week',
+                                    onClick: () => setTab('all'),
+                                },
+                                {
+                                    label: 'Submitted',
+                                    value: counts.submitted,
+                                    caption: 'Ready for the next shift',
+                                    onClick: () => setTab('submitted'),
+                                },
+                                {
+                                    label: 'Acknowledged',
+                                    value: counts.acknowledged,
+                                    caption: 'Received by the next shift',
+                                    onClick: () => setTab('acknowledged'),
+                                },
+                                {
+                                    label: 'Needs acknowledgement',
+                                    value: counts.needsAck,
+                                    caption: 'Waiting for you',
+                                    tone:
+                                        counts.needsAck > 0
+                                            ? 'warning'
+                                            : 'brand',
+                                    onClick: () => setTab('needs_ack'),
+                                },
+                                {
+                                    label: 'Open incoming',
+                                    value: counts.openIncoming,
+                                    caption: 'Incoming shifts still open',
+                                    tone:
+                                        counts.openIncoming > 0
+                                            ? 'critical'
+                                            : 'brand',
+                                    onClick: () => setTab('open_incoming'),
+                                },
+                            ]}
+                        />
+                    }
                     actions={
-                        can.create ? (
-                            <PageHeaderPrimaryButton
-                                icon={Plus}
-                                onClick={openNew}
-                            >
-                                New handover
-                            </PageHeaderPrimaryButton>
-                        ) : undefined
+                        <>
+                            <PageHeaderSearch
+                                value={search}
+                                onChange={setSearch}
+                                placeholder="Search person, staff or note…"
+                                ariaLabel="Search handovers"
+                            />
+                            {can.create ? (
+                                <PageHeaderPrimaryButton
+                                    icon={Plus}
+                                    onClick={openNew}
+                                >
+                                    New handover
+                                </PageHeaderPrimaryButton>
+                            ) : null}
+                        </>
                     }
-                    footer={
-                        <div className="flex flex-col gap-3 py-3 lg:flex-row lg:items-center lg:justify-between">
+                    filters={
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                            <EmarViewFilter
+                                value={tab}
+                                onChange={setTab}
+                                items={TABS}
+                                label="Handover view"
+                            />
                             <div className="flex items-center gap-2">
-                                <button
+                                <PageHeaderFilterButton
+                                    aria-label="Previous week"
                                     onClick={() => stepWeek(-1)}
-                                    className="rounded-full border border-primary-foreground/20 bg-primary-foreground/10 p-1.5 text-primary-foreground hover:bg-primary-foreground/20"
                                 >
                                     <ChevronLeft className="h-3.5 w-3.5" />
-                                </button>
+                                </PageHeaderFilterButton>
                                 <span className="rounded-full border border-primary-foreground/30 bg-primary-foreground/15 px-3 py-1 text-xs font-medium text-primary-foreground">
                                     Wk · {fmtRange(weekStart, weekEnd)}
                                 </span>
-                                <button
+                                <PageHeaderFilterButton
+                                    aria-label="Next week"
                                     onClick={() => stepWeek(1)}
-                                    className="rounded-full border border-primary-foreground/20 bg-primary-foreground/10 p-1.5 text-primary-foreground hover:bg-primary-foreground/20"
                                 >
                                     <ChevronRight className="h-3.5 w-3.5" />
-                                </button>
+                                </PageHeaderFilterButton>
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
-                                <div className="relative w-full sm:w-[240px]">
-                                    <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                    <input
-                                        value={search}
-                                        onChange={(e) =>
-                                            setSearch(e.target.value)
-                                        }
-                                        placeholder="Search client, staff or note…"
-                                        aria-label="Search handovers"
-                                        className="h-8 w-full rounded-full border-0 bg-primary-foreground pr-8 pl-9 text-[13px] text-foreground shadow-sm outline-none placeholder:text-muted-foreground/80 focus:ring-2 focus:ring-primary-foreground/50"
-                                    />
-                                    {search ? (
-                                        <button
-                                            type="button"
-                                            aria-label="Clear search"
-                                            onClick={() => setSearch('')}
-                                            className="absolute top-1/2 right-2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted"
-                                        >
-                                            <X className="h-3.5 w-3.5" />
-                                        </button>
-                                    ) : null}
-                                </div>
+                                {search && (
+                                    <PageHeaderFilterButton
+                                        onClick={() => setSearch('')}
+                                    >
+                                        Clear search
+                                    </PageHeaderFilterButton>
+                                )}
                                 {sites.length > 0 && (
                                     <EntityFilter
                                         label="Site"
@@ -595,13 +613,6 @@ export default function Handovers({
                     </div>
                 )}
 
-                <TabStrip
-                    value={tab}
-                    onChange={setTab}
-                    items={TABS}
-                    ariaLabel="Handover views"
-                />
-
                 {tab === 'activity' ? (
                     <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                         {activity.length === 0 ? (
@@ -645,7 +656,10 @@ export default function Handovers({
                     </div>
                 ) : (
                     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
-                        <main className="min-w-0">
+                        <section
+                            className="min-w-0"
+                            aria-label="Medication handovers in this view"
+                        >
                             {filtered.length === 0 ? (
                                 <div className="rounded-2xl border border-dashed bg-card px-5 py-16 text-center">
                                     <Pill className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
@@ -671,7 +685,7 @@ export default function Handovers({
                             ) : (
                                 <CardsView handovers={filtered} {...handlers} />
                             )}
-                        </main>
+                        </section>
                         <HandoverRail
                             handovers={handovers}
                             counts={counts}

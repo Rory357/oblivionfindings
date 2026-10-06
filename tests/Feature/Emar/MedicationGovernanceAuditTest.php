@@ -16,11 +16,13 @@ use App\Models\Role;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\Followups\MedicationFollowupService;
+use Database\Factories\UserFactory;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Tests\TestCase;
-use Database\Factories\UserFactory;
 
 /**
  * Round-3 governance/export audit (2026-07-02): correction two-person rule,
@@ -73,11 +75,12 @@ class MedicationGovernanceAuditTest extends TestCase
             'administered_at' => now(),
         ]);
 
-        // The person who raised the correction is blocked from approving it.
+        // The person who raised the correction is blocked from approving it
+        // (a validation error since P02-1).
         $this->actingAs($user)
             ->from('/emar/mar')
             ->post("/emar/corrections/{$correction->id}/approve")
-            ->assertSessionHas('error');
+            ->assertSessionHasErrors('correction');
 
         $this->assertSame('pending', $correction->fresh()->correction_status);
 
@@ -98,7 +101,7 @@ class MedicationGovernanceAuditTest extends TestCase
     public function test_cd_register_entry_rejects_unauthorised_witness(): void
     {
         $user = $this->admin();
-        $this->grantPermissions($user, ['medications.view', 'medications.orders.manage', 'medications.controlled.record']);
+        $this->grantPermissions($user, ['medications.view', 'medications.orders.manage', 'medications.controlled.view', 'medications.controlled.record']);
         [$site, $client] = $this->siteClientFor($user);
         $medication = ClientMedication::create([
             'client_id' => $client->id, 'name' => 'Morphine', 'dosage' => '10mg',
@@ -111,6 +114,8 @@ class MedicationGovernanceAuditTest extends TestCase
             'unit' => 'tablets',
         ]);
 
+        $this->recordPresence($user, $client);
+
         // A witness with no controlled-witness permission is rejected.
         $badWitness = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
         $this->assignStaffToSite($badWitness, $site);
@@ -118,7 +123,11 @@ class MedicationGovernanceAuditTest extends TestCase
             'client_medication_id' => $medication->id,
             'client_id' => $client->id,
             'medication_name' => $medication->name,
-            'entry_type' => 'administration',
+            'movement_type' => 'going_out',
+            'client_request_uuid' => (string) Str::uuid(),
+            'expected_balance' => 10,
+            'expected_entry_id' => null,
+            'actual_balance' => 9,
             'quantity' => 1,
             'on_hand_before' => 10,
             'on_hand_after' => 9,
@@ -153,14 +162,17 @@ class MedicationGovernanceAuditTest extends TestCase
             'assessor_declared_at' => now()->subMonth(),
             'staff_acknowledged_at' => now()->subMonth()->addMinute(),
             'can_witness_controlled' => true,
+            'controlled_drugs' => true,
+            'restricted' => false,
         ]);
         Shift::factory()->create([
             'client_id' => $client->id,
             'site_id' => $site->id,
             'service_context_id' => $client->service_context_id,
             'user_id' => $goodWitness->id,
-            'starts_at' => now()->subHour(),
-            'ends_at' => now()->addHour(),
+            'starts_at' => now()->utc()->subHour(),
+            'ends_at' => now()->utc()->addHour(),
+            'actual_starts_at' => now()->utc()->subHour(),
             'status' => 'in_progress',
             'created_by' => $user->id,
         ]);
@@ -171,6 +183,7 @@ class MedicationGovernanceAuditTest extends TestCase
                 ...$payload,
                 'witnessed_by' => $goodWitness->id,
             ])
+            ->assertRedirect('/emar/controlled')
             ->assertSessionHasNoErrors();
         $this->assertSame('9.00', $stock->refresh()->on_hand);
         $this->assertDatabaseCount('client_controlled_drug_entries', 1);
@@ -206,7 +219,7 @@ class MedicationGovernanceAuditTest extends TestCase
         [, $client] = $this->siteClientFor($user);
         $medication = ClientMedication::create([
             'client_id' => $client->id, 'name' => 'Paracetamol', 'dosage' => '500mg',
-            'frequency' => 'PRN', 'is_prn' => true, 'active' => true, 'state' => 'active',
+            'frequency' => 'PRN', 'is_prn' => true, 'active' => true, 'state' => 'active', 'controlled_drug' => false,
         ]);
         $administration = ClientMedicationAdministration::create([
             'client_id' => $client->id,
@@ -222,10 +235,13 @@ class MedicationGovernanceAuditTest extends TestCase
             'created_by' => $user->id,
         ]);
 
+        $work = app(MedicationFollowupService::class)->prepareAdministration($user, $administration->id, 'reoffer');
+        $command = ['request_uuid' => (string) Str::uuid(), 'revision' => $work->revision];
+
         // Completion without an outcome is rejected.
         $this->actingAs($user)
             ->from('/emar/prn')
-            ->post("/emar/refusal-followups/{$followup->id}/complete", [])
+            ->post("/emar/refusal-followups/{$followup->id}/complete", $command)
             ->assertSessionHasErrors('outcome');
 
         $this->assertNull($followup->fresh()->follow_up_completed_at);
@@ -234,13 +250,16 @@ class MedicationGovernanceAuditTest extends TestCase
         $this->actingAs($user)
             ->from('/emar/prn')
             ->post("/emar/refusal-followups/{$followup->id}/complete", [
-                'outcome' => 'GP reviewed; dose moved to evening with food.',
+                'request_uuid' => (string) Str::uuid(),
+                'revision' => $work->fresh()->revision,
+                'outcome' => 'not_needed',
+                'reason' => 'GP reviewed; dose moved to evening with food.',
             ])
             ->assertSessionHasNoErrors();
 
         $fresh = $followup->fresh();
         $this->assertNotNull($fresh->follow_up_completed_at);
-        $this->assertSame('GP reviewed; dose moved to evening with food.', $fresh->follow_up_outcome);
+        $this->assertSame('not_needed: GP reviewed; dose moved to evening with food.', $fresh->follow_up_outcome);
     }
 
     public function test_syringe_driver_cannot_complete_without_a_recorded_check(): void
@@ -349,6 +368,17 @@ class MedicationGovernanceAuditTest extends TestCase
         ]);
 
         return [$site, $client];
+    }
+
+    private function recordPresence(User $user, Client $client): void
+    {
+        $client->supportWorkers()->syncWithoutDetaching([$user->id]);
+        Shift::factory()->create([
+            'user_id' => $user->id, 'client_id' => $client->id, 'site_id' => $client->site_id,
+            'service_context_id' => $client->service_context_id, 'status' => 'in_progress',
+            'starts_at' => now()->utc()->subHour(), 'ends_at' => now()->utc()->addHour(),
+            'actual_starts_at' => now()->utc()->subHour(), 'started_by' => $user->id,
+        ]);
     }
 
     private function assignStaffToSite(User $user, Site $site): void

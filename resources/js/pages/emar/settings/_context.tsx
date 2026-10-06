@@ -2,6 +2,7 @@
  * server's settings, the page's draft, who may change what, navigation
  * between views and tabs, the open dialog, and the in-page status message. */
 import { createContext, useContext } from 'react';
+import type { AlertLogRow } from './_alert-log';
 import type { Draft, SettingsPayload, ViewKey } from './_model';
 
 export type Dialog =
@@ -28,7 +29,8 @@ export type Dialog =
     | { kind: 'oncall'; siteId: number }
     | { kind: 'oncallview'; siteId: number }
     | { kind: 'oncallremove'; siteId: number }
-    | { kind: 'reach'; id: number };
+    | { kind: 'reach'; id: number }
+    | { kind: 'alertlog'; row: AlertLogRow };
 
 export type SettingsContext = {
     s: SettingsPayload;

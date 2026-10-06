@@ -246,6 +246,10 @@ class MedicationAlertRecipients
         if ($user->approved_at === null) {
             return 'no';
         }
+        if ($reason === MedicationAlertCatalogue::EA_REVIEWERS || ($subject->context['emergency_access_review_report'] ?? false)) {
+            return $this->can($user, 'medications.audit.view') && $subject->siteId !== null
+                && in_array($subject->siteId, $this->siteAccess->accessibleSiteIds($user, ['medications.audit.view']), true) ? 'yes' : 'no';
+        }
         if ($reason === MedicationAlertCatalogue::STAFF_MEMBER) {
             return 'yes';
         }
@@ -277,6 +281,7 @@ class MedicationAlertRecipients
             MedicationAlertCatalogue::CLINICAL_LEAD => $this->withRole('clinical_lead'),
             MedicationAlertCatalogue::PROVIDER_MANAGER => $this->withRole('provider_manager'),
             MedicationAlertCatalogue::STOCK_STAFF => $this->withPermission('medications.stock.update'),
+            MedicationAlertCatalogue::EA_REVIEWERS => $this->withPermission('medications.audit.view'),
             MedicationAlertCatalogue::STAFF_MEMBER => $subject->staffUserId === null
                 ? collect()
                 : $this->approved([$subject->staffUserId]),

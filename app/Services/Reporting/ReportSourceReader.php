@@ -38,7 +38,11 @@ final class ReportSourceReader
         $rows = [];
         $authority = [];
         $retentionExpires = null;
-        if (in_array($source, ['obligations', 'custody', 'stocktakes', 'downtime', 'finance_bills', 'resource_costs'])) {
+        if ($context['domain'] === 'medication') {
+            $medication = app(\App\Services\Medication\Reporting\MedicationBuilderSource::class)->read($context['actor'], $definition, $context['site_ids']);
+            $rows = $medication['rows'];
+            $watermark['medication_digest'] = $medication['digest'];
+        } elseif (in_array($source, ['obligations', 'custody', 'stocktakes', 'downtime', 'finance_bills', 'resource_costs'])) {
             $rows = app(FleetSupplementalReports::class)->read($source, $context, $from, $to, $watermark, $evidence);
         } elseif ($context['domain'] === 'fleet') {
             [$query, $dateField] = match ($source) {

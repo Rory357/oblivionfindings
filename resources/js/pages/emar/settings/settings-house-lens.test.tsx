@@ -7,6 +7,11 @@ import type { WitnessPinStaffRow } from './_sections';
 import type { RoundTemplate } from './_templates';
 
 vi.mock('@inertiajs/react', () => ({ router: { post: vi.fn() } }));
+const layout = vi.hoisted(() => ({ wide: true }));
+vi.mock('@/hooks/use-mobile', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/hooks/use-mobile')>()),
+    useIsDesktopLg: () => layout.wide,
+}));
 
 const def = (
     group: string,
@@ -119,9 +124,39 @@ const pins = [
     { id: 3, name: 'Chloe', status: 'set', house_id: 4 },
 ] as WitnessPinStaffRow[];
 
-afterEach(cleanup);
+afterEach(() => {
+    cleanup();
+    layout.wide = true;
+});
 
 describe('What applies at a house', () => {
+    it('uses a searchable house picker on small screens and keeps the footer compact', () => {
+        layout.wide = false;
+        render(
+            <HouseLens
+                s={s}
+                houses={houses}
+                rules={[rule({ id: 3, site_id: 4, what: 'Morphine' })]}
+                templates={templates}
+                pins={pins}
+                onOpen={vi.fn()}
+                onClose={vi.fn()}
+            />,
+        );
+        expect(
+            screen.queryByRole('button', { name: 'Rimu House' }),
+        ).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('combobox', { name: 'House' }));
+        fireEvent.click(screen.getByRole('option', { name: /Rimu House/ }));
+        expect(
+            screen.getByText('What applies at Rimu House'),
+        ).toBeInTheDocument();
+        expect(screen.getByText('Morphine')).toBeInTheDocument();
+        expect(screen.getByRole('contentinfo')).toHaveTextContent('Close');
+        expect(screen.getByRole('contentinfo')).not.toHaveTextContent(
+            'Rimu House',
+        );
+    });
     it('lists the organisation’s rules and the house’s own, read-only', () => {
         render(
             <HouseLens

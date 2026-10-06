@@ -31,9 +31,15 @@ import {
     type ShiftCtxState,
 } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import { useOfflineQueueState } from '@/hooks/use-offline-queue';
 import AppLayout from '@/layouts/app-layout';
+import {
+    canOpenEmarAudit,
+    emarReportsHref,
+    type EmarNavigationPermissions,
+} from '@/lib/emar-navigation';
 import {
     BalanceCheckDialog,
     CdPill,
@@ -43,7 +49,7 @@ import {
     ReportLossDialog,
     ResolveDiscrepancyDialog,
 } from '@/pages/emar/_cd-dialogs';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
@@ -156,6 +162,8 @@ function persistDismissedAlerts(kinds: string[]): string[] {
 
 export default function ControlledDrugs(props: Props) {
     const breadcrumbs = useEmarBreadcrumbs();
+    const page = usePage<{ auth?: { can?: EmarNavigationPermissions } }>();
+    const canReadAudit = canOpenEmarAudit(page.props.auth?.can);
     const {
         medications,
         recentEntries,
@@ -1378,69 +1386,40 @@ export default function ControlledDrugs(props: Props) {
                 )}
 
                 {activeTab === 'audit' && (
-                    <TableCard
-                        head={[
-                            'When',
-                            'Medication',
-                            'Movement',
-                            'Balance',
-                            'By · witness',
-                        ]}
-                        title={`Audit trail · ${props.date_label}`}
-                        count={recentEntries.length}
-                        action={btnEntry}
-                        cta={recentEntries.length === 0 ? btnEntry : undefined}
-                        empty={
-                            entriesF.length === 0
-                                ? recentEntries.length === 0
-                                    ? `No audit entries on ${props.date_label}.`
-                                    : 'No audit entries match your search.'
-                                : null
-                        }
-                    >
-                        {entriesF.map((e) => (
-                            <tr
-                                key={e.id}
-                                {...rowProps(
-                                    {
-                                        kind: 'entry',
-                                        entry: e,
-                                        med: medForEntry(e),
-                                    },
-                                    true,
-                                )}
-                            >
-                                <td className="px-4 py-3 text-muted-foreground">
-                                    {e.recorded_at
-                                        ? new Date(
-                                              e.recorded_at,
-                                          ).toLocaleString('en-NZ', {
-                                              day: 'numeric',
-                                              month: 'short',
-                                              hour: '2-digit',
-                                              minute: '2-digit',
-                                          })
-                                        : '—'}
-                                </td>
-                                <td className="px-4 py-3 font-medium">
-                                    {e.medication_name}
-                                </td>
-                                <td className="px-4 py-3 text-muted-foreground capitalize">
-                                    {e.entry_type.replace('_', ' ')}{' '}
-                                    {e.quantity}
-                                </td>
-                                <td className="px-4 py-3 text-muted-foreground tabular-nums">
-                                    {e.on_hand_after ?? '—'}
-                                </td>
-                                <td className="px-4 py-3 text-muted-foreground">
-                                    {e.recorded_by_name ?? '—'}
-                                    {e.witnessed_by_name
-                                        ? ` · ${e.witnessed_by_name}`
-                                        : ''}
-                                </td>
-                            </tr>
-                        ))}
-                    </TableCard>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Medication audit trail</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <p className="text-sm text-muted-foreground">
+                                Register movements remain in Recent entries. The
+                                full audit trail includes controlled-drug events
+                                for the selected house, person and day. Exports
+                                require a recorded purpose.
+                            </p>
+                            {canReadAudit ? (
+                                <Button className="frontline-tap" asChild>
+                                    <Link
+                                        href={emarReportsHref('audit', {
+                                            date,
+                                            site_id: siteFilter,
+                                            client_id: clientFilter,
+                                            report: 'controlled',
+                                            q: search,
+                                        })}
+                                    >
+                                        <Activity className="size-4" />
+                                        Open audit trail
+                                    </Link>
+                                </Button>
+                            ) : (
+                                <p className="text-sm">
+                                    Medication report and audit access are
+                                    required to open the full audit trail.
+                                </p>
+                            )}
+                        </CardContent>
+                    </Card>
                 )}
             </div>
 

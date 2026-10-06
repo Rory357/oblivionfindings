@@ -69,6 +69,49 @@ test.describe('operations client consent-request readiness', () => {
             .getByTestId('consent-data-scope-input')
             .fill('Care team and on-call coordinator');
         await page.getByTestId('consent-retention-days-input').fill('180');
+
+        // This fictional guardian request needs decision-specific evidence;
+        // the relationship alone must never imply a lack of capacity.
+        await expect(
+            page.getByTestId('substitute-decision-evidence'),
+        ).toBeVisible();
+        await selectOption(
+            page,
+            'capacity-outcome-select',
+            /Lacks capacity for this decision/i,
+        );
+        const now = Date.now();
+        await page
+            .getByTestId('capacity-assessed-at-input')
+            .fill(new Date(now - 2 * 86_400_000).toISOString().slice(0, 16));
+        await page
+            .getByTestId('capacity-expires-at-input')
+            .fill(new Date(now + 30 * 86_400_000).toISOString().slice(0, 16));
+        await page
+            .getByTestId('capacity-reason-input')
+            .fill(
+                'Synthetic assessment: the fictional client could not understand or weigh the location tracking decision after supported explanation.',
+            );
+        await page
+            .getByTestId('capacity-evidence-type-input')
+            .fill('Synthetic decision-specific assessment');
+        await page
+            .getByTestId('capacity-evidence-reference-input')
+            .fill('PW-CONSENT-CAPACITY-001');
+        await page
+            .getByTestId('best-interests-reason-input')
+            .fill(
+                'Synthetic review: considered the fictional client’s wishes, privacy, safety, consultation and less restrictive alternatives for this tracking decision.',
+            );
+        await page
+            .getByTestId('best-interests-evidence-type-input')
+            .fill('Synthetic best-interests review');
+        await page
+            .getByTestId('best-interests-evidence-reference-input')
+            .fill('PW-CONSENT-REVIEW-001');
+        await page
+            .getByTestId('best-interests-consultees-input')
+            .fill('Playwright Consent Guardian\nPlaywright key worker');
         await page
             .getByTestId('consent-staff-notes-input')
             .fill('Created by Playwright readiness coverage.');

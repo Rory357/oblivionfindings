@@ -65,26 +65,27 @@ class ReportDoseNumbersTest extends TestCase
             ->assertOk();
 
         $this->assertSame(
-            ['total' => 3, 'given' => 1, 'refused' => 1, 'withheld' => 0, 'missed' => 0, 'not_recorded' => 1, 'compliance_rate' => 33.3],
-            array_intersect_key($page->inertiaProps('adminSummary'), array_flip(['total', 'given', 'refused', 'withheld', 'missed', 'not_recorded', 'compliance_rate'])),
+            ['due' => 3, 'given' => 1, 'refused' => 1, 'withheld' => 0, 'missed' => 0, 'not_recorded' => 1, 'given_rate' => 33.3],
+            array_intersect_key($page->inertiaProps('data.totals'), array_flip(['due', 'given', 'refused', 'withheld', 'missed', 'not_recorded', 'given_rate'])),
         );
         // One NZ day — Monday — though the doses were due on Sunday in UTC.
-        $this->assertSame(['Jun 15'], collect($page->inertiaProps('dailyAdmin'))->pluck('date')->all());
+        $this->assertSame(['2026-06-15'], collect($page->inertiaProps('data.weeks'))->pluck('week')->all());
         $this->assertSame(
-            [['client_name' => 'Aroha Ngata', 'total' => 3, 'not_recorded' => 1, 'compliance' => 33.3]],
-            collect($page->inertiaProps('clientBreakdown'))->map(fn (array $row): array => Arr::only($row, ['client_name', 'total', 'not_recorded', 'compliance']))->all(),
+            [['person' => 'Aroha Ngata', 'due' => 3, 'not_recorded' => 1, 'given_rate' => 33.3]],
+            collect($page->inertiaProps('page.data'))->map(fn (array $row): array => Arr::only($row, ['person', 'due', 'not_recorded', 'given_rate']))->all(),
         );
-        $this->assertNull($page->inertiaProps('dose_notice'));
+        $this->assertNull($page->inertiaProps('data.notice'));
     }
 
     public function test_a_day_with_nothing_due_is_not_applicable(): void
     {
+        $this->at('2026-06-16 00:00');
         $page = $this->actingAs($this->reader())
             ->get(route('emar.reports', ['date_from' => '2026-06-16', 'date_to' => '2026-06-16']))
             ->assertOk();
 
-        $this->assertSame(0, $page->inertiaProps('adminSummary.total'));
-        $this->assertNull($page->inertiaProps('adminSummary.compliance_rate'));
+        $this->assertSame(0, $page->inertiaProps('data.totals.due'));
+        $this->assertNull($page->inertiaProps('data.totals.given_rate'));
     }
 
     public function test_a_period_before_the_dose_record_says_so(): void
@@ -93,8 +94,8 @@ class ReportDoseNumbersTest extends TestCase
             ->get(route('emar.reports', ['date_from' => '2026-06-01', 'date_to' => '2026-06-15']))
             ->assertOk();
 
-        $this->assertSame('Not available before 15 June 2026', $page->inertiaProps('dose_notice'));
-        $this->assertSame(3, $page->inertiaProps('adminSummary.total'));
+        $this->assertSame('Not available before 15 June 2026', $page->inertiaProps('data.notice'));
+        $this->assertSame(3, $page->inertiaProps('data.totals.due'));
     }
 
     public function test_compliance_mar_exceptions_count_doses_not_given_or_not_recorded_today(): void

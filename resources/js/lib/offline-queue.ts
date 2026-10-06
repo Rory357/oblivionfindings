@@ -27,7 +27,9 @@ import { toast } from 'sonner';
 
 export type OfflineAction =
     | 'prn'
+    | 'medication_followup'
     | 'progress_note'
+    | 'support_consent'
     | 'round_admin'
     | 'administration'
     | 'correction'
@@ -533,6 +535,12 @@ export async function getPendingCount(): Promise<number> {
  * Remove server-rejected items once the worker has read why they were not
  * recorded. Only items the server definitively refused are removed.
  */
+/** Dismiss one definitively rejected item belonging to the current actor. */
+export async function dismissRejectedOfflineSubmission(id: string): Promise<void> {
+    const item = (await listQueue()).find((entry) => entry.id === id && entry.rejected);
+    if (item) await removeQueueItem(item.id);
+    await broadcastState();
+}
 export async function dismissRejectedOfflineSubmissions(): Promise<void> {
     const queue = await listQueue();
     for (const item of queue) {

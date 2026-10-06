@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Models\AppSetting;
 use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
@@ -20,22 +21,25 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Models\UserPushSubscription;
-use App\Notifications\MedicationAlertNotification;
 use App\Notifications\Channels\PushChannel;
-use App\Services\Medication\Alerts\MedicationAlertRecipients;
+use App\Notifications\MedicationAlertNotification;
 use App\Services\Medication\Alerts\MedicationAlertAttendance;
 use App\Services\Medication\Alerts\MedicationAlertFollowUps;
+use App\Services\Medication\Alerts\MedicationAlertRecipients;
 use App\Services\Medication\Alerts\MedicationAlerts;
 use App\Services\Medication\Alerts\MedicationAlertSettings;
 use App\Services\Medication\Alerts\MedicationAlertSources;
 use App\Services\Medication\Alerts\MedicationAlertSubject;
 use App\Services\Medication\Alerts\OnCallResolver;
+use App\Services\Medication\Controlled\ControlledPolicy;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\Settings\MedicationSettingsRegistry;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationIncidentIntegrationService;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -284,12 +288,16 @@ it('raises low stock, expiring, expired and out-of-stock alerts from the stock c
 it('raises one balance-check alert per house and deals with it when every check is done', function () {
     $site = Site::factory()->create(['name' => 'Rimu House']);
     $lead = b2Staff($site, 'team_lead');
-    b2Order($site, ['name' => 'Methylphenidate', 'controlled_drug' => true]);
+    $order = b2Order($site, ['name' => 'Methylphenidate', 'controlled_drug' => true, 'approval_status' => 'verified']);
+    DB::table('client_medications')->where('id', $order->id)->update(['created_at' => now()->subDay()]);
+    AppSetting::updateOrCreate(['key' => ControlledPolicy::COUNT_CADENCE], ['value' => 'shift']);
+    Shift::factory()->create(['site_id' => $site->id, 'client_id' => $order->client_id,
+        'starts_at' => now()->subHours(2), 'ends_at' => now()->addHours(2), 'status' => 'in_progress', 'is_on_call' => false]);
 
     $this->artisan('emar:escalate-overdue-cd-checks')->assertExitCode(0);
 
     $alert = MedicationAlert::query()->where('type', 'cdCheck')->firstOrFail();
-    expect($alert->message)->toBe('No controlled-drug balance check at Rimu House for 7 days (1 medicine).')
+    expect($alert->message)->toBe('Configured controlled-drug counts at Rimu House are overdue (1 medicine).')
         ->and(b2Told($lead, 'cdCheck'))->toBeTrue();
 
     ClientMedication::query()->update(['active' => false]);
@@ -354,11 +362,16 @@ it('tells people about a reported medication error and a controlled-drug discrep
     app(MedicationAlertSources::class)->discrepancy($discrepancy);
 
     expect(MedicationAlert::query()->where('type', 'errors')->value('message'))
-        ->toBe('A medication error was reported at Rimu House: Aroha N., Methylphenidate — wrong time.')
+        ->toBe('Medication error '.$error->fresh()->reference_number.'. Reach not known yet. Details are held in the medication error record.')
+        ->and(MedicationAlert::query()->where('type', 'errors')->value('action_url'))->toBe('/emar/errors')
         ->and(MedicationAlert::query()->where('type', 'cdDiscrepancy')->value('message'))
         ->toBe('Controlled-drug count doesn’t match — Methylphenidate at Rimu House: 1 short.')
         ->and(b2Told($lead, 'errors'))->toBeTrue()
         ->and(b2Told($lead, 'cdDiscrepancy'))->toBeTrue();
+    $sentError = Notification::sent($lead, MedicationAlertNotification::class)
+        ->first(fn (MedicationAlertNotification $notification): bool => $notification->alert->type === 'errors');
+    expect($sentError->toArray($lead)['message'])->not->toContain('Aroha N.', 'Methylphenidate', 'Given at the wrong time.')
+        ->and($sentError->toArray($lead)['medication_error_id'])->toBe($error->id);
 
     app(MedicationAlertSources::class)->discrepancyResolved($discrepancy);
     expect(MedicationAlert::query()->where('type', 'cdDiscrepancy')->value('status'))->toBe('dealt_with');
@@ -394,10 +407,20 @@ it('never raises an alert that isn’t offered yet', function () {
     $site = Site::factory()->create();
     b2Staff($site, 'team_lead');
 
-    // Witness overrides arrive with PIN-2; the emergency-access report keeps its routing until B3.
-    expect(app(MedicationAlerts::class)->raise('override', b2Subject($site, 'override:1')))->toBeNull()
-        ->and(app(MedicationAlerts::class)->raise('breakglass', b2Subject($site, 'report:1')))->toBeNull();
+    // Witness overrides still arrive with PIN-2. Emergency reports are released.
+    expect(app(MedicationAlerts::class)->raise('override', b2Subject($site, 'override:1')))->toBeNull();
     expect(MedicationAlert::query()->count())->toBe(0);
+});
+
+it('raises the released emergency report for a reviewer once per open daily subject', function () {
+    $site = Site::factory()->create(['is_active' => true]);
+    $reviewer = b2Staff($site, 'auditor');
+    $alerts = app(MedicationAlerts::class);
+
+    expect($alerts->raise('breakglass', b2Subject($site, 'report:1')))->not->toBeNull()
+        ->and(b2Told($reviewer, 'breakglass'))->toBeTrue();
+    expect($alerts->raise('breakglass', b2Subject($site, 'report:1')))->toBeNull();
+    expect(MedicationAlert::where('type', 'breakglass')->count())->toBe(1);
 });
 
 /** How many of this alert type the person was sent. */
@@ -631,7 +654,7 @@ it('carries over at deploy what people were already told, so the first run tells
  */
 
 /** The notifications this person was sent for an alert type. */
-function b2Sent(User $user, string $type): Illuminate\Support\Collection
+function b2Sent(User $user, string $type): Collection
 {
     return Notification::sent($user, MedicationAlertNotification::class)
         ->filter(fn (MedicationAlertNotification $n) => $n->alert->type === $type)
@@ -923,7 +946,7 @@ it('stops follow-up when the alert is dealt with, and never schedules it without
 });
 
 it('runs the follow-up tick every 15 minutes, one run at a time on one server', function () {
-    $event = collect(app(Illuminate\Console\Scheduling\Schedule::class)->events())
+    $event = collect(app(Schedule::class)->events())
         ->first(fn ($e) => str_contains((string) $e->command, 'emar:alert-follow-ups'));
 
     expect($event)->not->toBeNull()
@@ -986,7 +1009,7 @@ it('works out the on-call contact: on-call shift, then the team lead on shift, t
     expect($resolver()->at($site->id, now()))->toMatchArray(['how' => 'Always this person']);
 
     // The backup on approved leave: nobody.
-    App\Domain\Hr\Models\HrLeaveRequest::query()->create([
+    HrLeaveRequest::query()->create([
         'tenant_id' => 1,
         'user_id' => $backup->id,
         'leave_type' => 'annual',

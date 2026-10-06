@@ -34,6 +34,7 @@ use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Support\CommittedFixtureCleanup;
 use Tests\Support\LeaveReservationProcess;
+use Tests\Support\OwnedTestDatabase;
 use Tests\TestCase;
 
 class LeaveReservationIntegrityTest extends TestCase
@@ -514,7 +515,12 @@ class LeaveReservationIntegrityTest extends TestCase
     {
         $this->assertFalse($this->committed);
         $this->assertSame(1, DB::transactionLevel());
-        $this->assertMatchesRegularExpression('/^oblivion_workforce_[A-Za-z0-9_]+_'.getmypid().'$/D', DB::connection()->getDatabaseName());
+        $connection = DB::connection();
+        $this->assertTrue(app()->environment('testing'));
+        $this->assertSame('mysql', $connection->getDriverName());
+        $this->assertSame(static::$isolatedMysqlDatabase, $connection->getDatabaseName());
+        $this->assertTrue(OwnedTestDatabase::isOwnedBy($connection->getDatabaseName(), getmypid()));
+        $this->assertSame($connection->getDatabaseName(), $connection->selectOne('SELECT DATABASE() AS selected_database')->selected_database);
         $cleanup = CommittedFixtureCleanup::capture();
         $this->beforeApplicationDestroyed(fn () => $cleanup->restore());
         DB::commit();

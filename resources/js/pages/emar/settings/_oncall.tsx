@@ -6,6 +6,7 @@
  * phone, Q8). A contact saves straight away, not through the page draft, and
  * is recorded in the change history. */
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { DiscardDraftDialog } from '@/components/governance/DiscardDraftDialog';
 import { SettingsModal } from '@/components/settings/settings-modal';
 import { SettingsNotice } from '@/components/settings/settings-notice';
 import { Button } from '@/components/ui/button';
@@ -390,7 +391,7 @@ function RosterPreview({
                         label={`${n.label} · ${n.hours}`}
                         value={
                             x.who ? (
-                                <span className="text-right">
+                                <span>
                                     <b>{x.who.name}</b> ·{' '}
                                     <span className="whitespace-nowrap">
                                         {phoneText(x.who)}
@@ -400,7 +401,7 @@ function RosterPreview({
                                     </span>
                                 </span>
                             ) : (
-                                <span className="text-right text-status-critical">
+                                <span className="text-status-critical">
                                     {x.warning ? (
                                         <>
                                             {x.warning}
@@ -439,7 +440,7 @@ function SwitchRow({
 }) {
     return (
         <div className="flex items-center justify-between gap-4 p-3">
-            <div>
+            <div className="min-w-0">
                 <label htmlFor={id} className="text-[13px] font-semibold">
                     {label}
                 </label>
@@ -465,14 +466,28 @@ export function OnCallDialog({
 }) {
     const { close } = useSettings();
     const h = data.houses.find((x) => x.site_id === siteId);
-    const [d, setD] = useState<Draft>(() => ({
+    const [initial] = useState<Draft>(() => ({
         mode: h?.rule?.mode ?? 'roster',
         team_lead: h?.rule?.team_lead ?? true,
         backup: h?.rule?.backup ? String(h.rule.backup.id) : '',
     }));
+    const [d, setD] = useState(initial);
+    const [discardOpen, setDiscardOpen] = useState(false);
     const [err, setErr] = useState('');
     const [fail, setFail] = useState('');
     const [saving, setSaving] = useState(false);
+    const requestClose = () => {
+        if (saving) return;
+        if (
+            d.mode !== initial.mode ||
+            d.team_lead !== initial.team_lead ||
+            d.backup !== initial.backup
+        ) {
+            setDiscardOpen(true);
+        } else {
+            close();
+        }
+    };
     if (!h) return <NotFound what="house" />;
     if (!h.can_manage) return <OnCallView siteId={siteId} data={data} />;
     const roster = d.mode === 'roster';
@@ -517,85 +532,100 @@ export function OnCallDialog({
         );
     };
     return (
-        <SettingsModal
-            title={`On-call contact — ${h.name}`}
-            description="Who staff at this house call when they need help. Shown on escalations and follow-ups."
-            onClose={close}
-            footer={
-                <>
-                    <Button variant="outline" onClick={close}>
-                        Cancel
-                    </Button>
-                    <Button onClick={save} disabled={saving}>
-                        {fail ? 'Try again' : 'Save contact'}
-                    </Button>
-                </>
-            }
-        >
-            {fail ? (
-                <SettingsNotice>
-                    <span>
-                        <b>Couldn’t save — nothing was changed.</b> {fail} Your
-                        choices are kept.
-                    </span>
-                </SettingsNotice>
-            ) : null}
-            <div className="divide-y divide-border rounded-xl border">
-                <SwitchRow
-                    id="ow-roster"
-                    label="Follow the roster"
-                    hint={`Whoever is on an on-call shift at ${h.name}. On-call shifts are set in Rostering.`}
-                    checked={roster}
-                    onChange={(v) =>
-                        setD({ ...d, mode: v ? 'roster' : 'fixed' })
-                    }
-                />
-                {roster ? (
-                    <SwitchRow
-                        id="ow-lead"
-                        label="Then the team lead on shift"
-                        hint="If nobody is on an on-call shift, the team lead working at the house."
-                        checked={d.team_lead}
-                        onChange={(v) => setD({ ...d, team_lead: v })}
-                    />
+        <>
+            <SettingsModal
+                frontline
+                title={`On-call contact — ${h.name}`}
+                width={720}
+                description="Who staff at this house call when they need help. Shown on escalations and follow-ups."
+                onClose={requestClose}
+                footer={
+                    <>
+                        <Button
+                            variant="outline"
+                            onClick={requestClose}
+                            disabled={saving}
+                        >
+                            Cancel
+                        </Button>
+                        <Button onClick={save} disabled={saving}>
+                            {fail ? 'Try again' : 'Save contact'}
+                        </Button>
+                    </>
+                }
+            >
+                {fail ? (
+                    <SettingsNotice>
+                        <span>
+                            <b>Couldn’t save — nothing was changed.</b> {fail}{' '}
+                            Your choices are kept.
+                        </span>
+                    </SettingsNotice>
                 ) : null}
-            </div>
-            <RecordPicker
-                id="ow-person"
-                label={roster ? 'If nobody is rostered' : 'On-call person'}
-                required
-                value={d.backup}
-                items={items}
-                error={err}
-                onChange={(v) => {
-                    setD({ ...d, backup: v });
-                    setErr('');
-                }}
-                placeholder="Search and choose a staff member"
-                search="Search staff…"
-                foot={`Employed staff with access to ${h.name}. Their phone number comes from their staff record.`}
+                <div className="divide-y divide-border rounded-xl border">
+                    <SwitchRow
+                        id="ow-roster"
+                        label="Follow the roster"
+                        hint={`Whoever is on an on-call shift at ${h.name}. On-call shifts are set in Rostering.`}
+                        checked={roster}
+                        onChange={(v) =>
+                            setD({ ...d, mode: v ? 'roster' : 'fixed' })
+                        }
+                    />
+                    {roster ? (
+                        <SwitchRow
+                            id="ow-lead"
+                            label="Then the team lead on shift"
+                            hint="If nobody is on an on-call shift, the team lead working at the house."
+                            checked={d.team_lead}
+                            onChange={(v) => setD({ ...d, team_lead: v })}
+                        />
+                    ) : null}
+                </div>
+                <RecordPicker
+                    id="ow-person"
+                    label={roster ? 'If nobody is rostered' : 'On-call person'}
+                    required
+                    value={d.backup}
+                    items={items}
+                    error={err}
+                    onChange={(v) => {
+                        setD({ ...d, backup: v });
+                        setErr('');
+                    }}
+                    placeholder="Search and choose a staff member"
+                    search="Search staff…"
+                    foot={`Employed staff with access to ${h.name}. Their phone number comes from their staff record.`}
+                />
+                {pick ? (
+                    <InfoCard
+                        icon={Phone}
+                        tone={pick.away.length ? 'warn' : 'info'}
+                    >
+                        <b>{pick.name}</b> · {pick.phone} — work phone, from
+                        their staff record.
+                        {pick.leave
+                            ? ` ${pick.leave} — nights they’re away show nobody.`
+                            : ''}
+                    </InfoCard>
+                ) : null}
+                <RosterPreview
+                    h={h}
+                    rule={d}
+                    backup={pick ? { ...pick, away: pick.away } : null}
+                />
+                <p className="text-caption">
+                    Recorded in the change history. Other houses are unchanged.
+                </p>
+            </SettingsModal>
+            <DiscardDraftDialog
+                frontline
+                open={discardOpen}
+                description="Your on-call contact changes haven’t been saved. Closing now loses them."
+                onKeepEditing={() => setDiscardOpen(false)}
+                onDiscard={close}
             />
-            {pick ? (
-                <InfoCard
-                    icon={Phone}
-                    tone={pick.away.length ? 'warn' : 'info'}
-                >
-                    <b>{pick.name}</b> · {pick.phone} — work phone, from their
-                    staff record.
-                    {pick.leave
-                        ? ` ${pick.leave} — nights they’re away show nobody.`
-                        : ''}
-                </InfoCard>
-            ) : null}
-            <RosterPreview
-                h={h}
-                rule={d}
-                backup={pick ? { ...pick, away: pick.away } : null}
-            />
-            <p className="text-caption">
-                Recorded in the change history. Other houses are unchanged.
-            </p>
-        </SettingsModal>
+        </>
     );
 }
 
@@ -613,6 +643,7 @@ export function OnCallView({
     const r = h.rule;
     return (
         <SettingsModal
+            frontline
             title={`On-call contact — ${h.name}`}
             description="Only someone who manages settings for this house can change it."
             onClose={close}
@@ -670,6 +701,7 @@ export function OnCallRemove({
     if (!h || !h.can_manage) return <NotFound what="house" />;
     return (
         <ConfirmDialog
+            frontline
             open
             onClose={close}
             variant="destructive"

@@ -6,6 +6,7 @@ import {
     DialogFooter,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 import type { ComponentProps, ReactNode } from 'react';
 
 /**
@@ -21,6 +22,7 @@ export function SettingsModal({
     onClose,
     onCloseAutoFocus,
     width = 480,
+    frontline = false,
 }: {
     title: string;
     description: ReactNode;
@@ -30,20 +32,19 @@ export function SettingsModal({
     onCloseAutoFocus?: ComponentProps<typeof DialogContent>['onCloseAutoFocus'];
     /** The popup guide's width tokens: 480 (default), 720 or 900 px. */
     width?: 480 | 720 | 900;
+    frontline?: boolean;
 }) {
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent
-                className={
-                    width === 480
-                        ? 'flex max-h-[88vh] flex-col overflow-hidden p-0 sm:max-w-[480px]'
-                        : 'flex max-h-[88vh] flex-col overflow-hidden p-0'
-                }
-                style={
-                    width === 480
-                        ? undefined
-                        : { width: `min(92vw, ${width}px)`, maxWidth: `min(92vw, ${width}px)` }
-                }
+                className={cn(
+                    'flex max-h-[88vh] flex-col overflow-hidden p-0',
+                    frontline && 'frontline-dialog',
+                )}
+                style={{
+                    width: `min(92vw, ${width}px)`,
+                    maxWidth: `min(92vw, ${width}px)`,
+                }}
                 onCloseAutoFocus={onCloseAutoFocus}
             >
                 <div className="shrink-0 border-b p-5 pr-12">
@@ -55,7 +56,13 @@ export function SettingsModal({
                 <div className="min-h-0 space-y-4 overflow-y-auto p-5">
                     {children}
                 </div>
-                <DialogFooter className="shrink-0 border-t bg-muted/30 p-4">
+                <DialogFooter
+                    className={cn(
+                        'shrink-0 border-t bg-muted/30 p-4',
+                        frontline &&
+                            'flex-wrap [&_button]:h-auto [&_button]:max-w-full [&_button]:whitespace-normal',
+                    )}
+                >
                     {footer ?? (
                         <Button variant="outline" onClick={onClose}>
                             Close

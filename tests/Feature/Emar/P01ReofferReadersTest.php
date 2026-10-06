@@ -50,6 +50,8 @@ class P01ReofferReadersTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Keep the explicit fallback contract; public defaults are covered separately.
+        config(['medications.person_record' => 'legacy']);
 
         Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', 'Pacific/Auckland')->utc());
         $this->seed(RbacSeeder::class);

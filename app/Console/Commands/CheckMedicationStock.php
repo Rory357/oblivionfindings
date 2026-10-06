@@ -32,7 +32,11 @@ class CheckMedicationStock extends Command
                 continue;
             }
 
-            $daysUntilExpiry = Carbon::today()->diffInDays($stock->expiry_date);
+            $expiry = $stock->packExpiries(false)->sortBy('date')->first();
+            if (! $expiry) {
+                continue;
+            }
+            $daysUntilExpiry = (int) Carbon::today(config('app.worker_timezone', 'Pacific/Auckland'))->diffInDays($expiry['date']);
             $medicationName = $stock->medication?->name ?? 'Unknown';
             $clientName = $stock->medication?->client
                 ? $stock->medication->client->first_name.' '.$stock->medication->client->last_name
@@ -43,7 +47,7 @@ class CheckMedicationStock extends Command
                 clientId: $stock->medication?->client_id ?? 0,
                 alertType: 'expiring_soon',
                 severity: $daysUntilExpiry <= 7 ? 'critical' : 'warning',
-                message: "{$medicationName} for {$clientName} expires in {$daysUntilExpiry} days (batch: {$stock->batch_number}).",
+                message: "{$medicationName} for {$clientName} expires in {$daysUntilExpiry} days (batch: {$expiry['batch']}).",
                 medicationId: $stock->client_medication_id,
             );
 
@@ -67,12 +71,18 @@ class CheckMedicationStock extends Command
                 ? $stock->medication->client->first_name.' '.$stock->medication->client->last_name
                 : 'Unknown';
 
+            $expiry = $stock->packExpiries(true)->sortBy('date')->first();
+            if (! $expiry) {
+                continue;
+            }
+            $expiryLabel = $expiry['date']->format('d/m/Y');
+
             // Dashboard alert (UI compat)
             MedicationDashboardAlert::createOrUpdateAlert(
                 clientId: $stock->medication?->client_id ?? 0,
                 alertType: 'expired',
                 severity: 'critical',
-                message: "{$medicationName} for {$clientName} has EXPIRED (expiry: {$stock->expiry_date->format('d/m/Y')}, batch: {$stock->batch_number}).",
+                message: "{$medicationName} for {$clientName} has EXPIRED (expiry: {$expiryLabel}, batch: {$expiry['batch']}).",
                 medicationId: $stock->client_medication_id,
             );
 
@@ -86,8 +96,9 @@ class CheckMedicationStock extends Command
                     [
                         'client_medication_id' => $stock->client_medication_id,
                         'medication_name' => $publicMedicationName,
-                        'expiry_date' => $stock->expiry_date->toDateString(),
-                        'batch_number' => $stock->batch_number,
+                        'expiry_date' => $expiry['date']->toDateString(),
+                        'stock_lot_id' => $expiry['lot_id'],
+                        'batch_number' => $expiry['batch'],
                         'site_id' => $stock->medication->client?->site_id,
                     ],
                 );
@@ -113,6 +124,7 @@ class CheckMedicationStock extends Command
                 ? $stock->medication->client->first_name.' '.$stock->medication->client->last_name
                 : 'Unknown';
 
+            $available = $stock->usableQuantity();
             $suggestedQty = $stock->reorder_quantity
                 ? " Suggested reorder: {$stock->reorder_quantity} {$stock->unit}."
                 : '';
@@ -121,13 +133,13 @@ class CheckMedicationStock extends Command
             MedicationDashboardAlert::createOrUpdateAlert(
                 clientId: $stock->medication?->client_id ?? 0,
                 alertType: 'stock_low',
-                severity: MedicationStockQuantity::lessThanOrEqual($stock->on_hand ?? 0, 0) ? 'critical' : 'warning',
-                message: "{$medicationName} for {$clientName} is low ({$stock->on_hand} {$stock->unit} remaining, reorder level: {$stock->reorder_level}).{$suggestedQty}",
+                severity: MedicationStockQuantity::lessThanOrEqual($available ?? 0, 0) ? 'critical' : 'warning',
+                message: "{$medicationName} for {$clientName} is low ({$available} {$stock->unit} remaining, reorder level: {$stock->reorder_level}).{$suggestedQty}",
                 medicationId: $stock->client_medication_id,
             );
 
             // OUT OF STOCK → operational signal. Low stock → dashboard only.
-            if (MedicationStockQuantity::lessThanOrEqual($stock->on_hand ?? 0, 0) && $stock->medication?->client_id) {
+            if (MedicationStockQuantity::lessThanOrEqual($available ?? 0, 0) && $stock->medication?->client_id) {
                 $signalService->emit(
                     MedicationSignalService::TYPE_STOCK_OUT,
                     $stock->medication->client_id,
@@ -142,7 +154,7 @@ class CheckMedicationStock extends Command
             }
 
             $alertsCreated++;
-            $this->info("  Low stock: {$medicationName} ({$stock->on_hand} {$stock->unit})");
+            $this->info("  Low stock: {$medicationName} ({$available} {$stock->unit})");
         }
 
         // Stock expiring, expired and run out: people are told as Medication

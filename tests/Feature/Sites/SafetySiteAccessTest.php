@@ -97,9 +97,12 @@ test('hazard registers details exports and mutations honour canonical Site acces
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('detail', null));
 
-    $this->actingAs($this->viewer)
-        ->get("/hazards/{$hiddenHazard->id}")
-        ->assertForbidden();
+    foreach ([$hiddenHazard->id, (int) SiteHazard::query()->max('id') + 1] as $hazardId) {
+        $this->actingAs($this->viewer)
+            ->get("/hazards/{$hazardId}")
+            ->assertNotFound()
+            ->assertDontSee('Restricted safety hazard');
+    }
 
     $this->actingAs($this->viewer)
         ->get("/compliance/hazards?site_id={$this->hiddenSite->id}")
@@ -109,16 +112,21 @@ test('hazard registers details exports and mutations honour canonical Site acces
         ->get("/compliance/hazards/export?site_id={$this->hiddenSite->id}")
         ->assertForbidden();
 
-    $this->actingAs($this->viewer)
-        ->post("/sites/{$this->hiddenSite->id}/hazards", [
-            'hazard_type' => 'slip_trip_fall',
-            'severity' => 'low',
-            'likelihood' => 'rare',
-            'description' => 'Rejected cross-Site hazard',
-        ])
-        ->assertForbidden();
+    $hazardCount = SiteHazard::query()->count();
+    foreach ([$this->hiddenSite->id, (int) Site::query()->max('id') + 1] as $siteId) {
+        $this->actingAs($this->viewer)
+            ->post("/sites/{$siteId}/hazards", [
+                'hazard_type' => 'slip_trip_fall',
+                'severity' => 'low',
+                'likelihood' => 'rare',
+                'description' => 'Rejected cross-Site hazard',
+            ])
+            ->assertNotFound();
+    }
 
-    expect(SiteHazard::query()->where('description', 'Rejected cross-Site hazard')->exists())->toBeFalse();
+    expect(SiteHazard::query()->where('description', 'Rejected cross-Site hazard')->exists())->toBeFalse()
+        ->and(SiteHazard::query()->count())->toBe($hazardCount)
+        ->and($hiddenHazard->fresh()->status)->toBe('open');
 });
 
 test('inspection registers filters and mutations honour canonical Site access', function (): void {
@@ -160,20 +168,31 @@ test('inspection registers filters and mutations honour canonical Site access', 
         ->get("/sites/inspections?site_id={$this->hiddenSite->id}")
         ->assertForbidden();
 
-    $this->actingAs($this->viewer)
-        ->get("/sites/{$this->hiddenSite->id}/inspections")
-        ->assertForbidden();
-
-    $this->actingAs($this->viewer)
-        ->post("/sites/{$this->hiddenSite->id}/inspections", [
-            'inspection_type' => 'fire_safety',
-            'title' => 'Rejected cross-Site inspection',
-            'frequency' => 'monthly',
-            'first_due_date' => today()->toDateString(),
-        ])
-        ->assertForbidden();
-
     $recordCount = SiteInspectionRecord::query()->count();
+    $scheduleCount = SiteInspectionSchedule::query()->count();
+    foreach ([$this->hiddenSite->id, (int) Site::query()->max('id') + 1] as $siteId) {
+        $this->actingAs($this->viewer)
+            ->get("/sites/{$siteId}/inspections")
+            ->assertNotFound()
+            ->assertDontSee('Restricted fire inspection')
+            ->assertDontSee('Restricted result');
+
+        $this->actingAs($this->viewer)
+            ->post("/sites/{$siteId}/inspections", [
+                'inspection_type' => 'fire_safety',
+                'title' => 'Rejected cross-Site inspection',
+                'frequency' => 'monthly',
+                'first_due_date' => today()->toDateString(),
+            ])
+            ->assertNotFound();
+
+        $this->actingAs($this->viewer)
+            ->post("/sites/{$siteId}/inspections/{$hiddenSchedule->id}/complete", [
+                'result' => 'pass',
+            ])
+            ->assertNotFound();
+    }
+
     $this->actingAs($this->viewer)
         ->from("/sites/{$this->visibleSite->id}/inspections")
         ->post("/sites/{$this->visibleSite->id}/inspections/{$visibleSchedule->id}/complete", [
@@ -182,12 +201,7 @@ test('inspection registers filters and mutations honour canonical Site access', 
         ])
         ->assertSessionHasErrors('linked_hazard_id');
 
-    $this->actingAs($this->viewer)
-        ->post("/sites/{$this->hiddenSite->id}/inspections/{$hiddenSchedule->id}/complete", [
-            'result' => 'pass',
-        ])
-        ->assertForbidden();
-
     expect(SiteInspectionSchedule::query()->where('title', 'Rejected cross-Site inspection')->exists())->toBeFalse()
+        ->and(SiteInspectionSchedule::query()->count())->toBe($scheduleCount)
         ->and(SiteInspectionRecord::query()->count())->toBe($recordCount);
 });

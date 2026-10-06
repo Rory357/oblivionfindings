@@ -419,3 +419,14 @@ No full-capsule (`999px`) pills anywhere in the header or sub nav.
 6. Existing rules still bind: lucide icons only, `<StatusBadge>`
    semantics, typography helpers, 20px gutter/gap rule, motion budget,
    reduced-motion, density.
+
+
+### Frontline phone summary (eMAR audit, 2026-10-04)
+
+The shared header may receive an explicit `mobileSummary` for a task page on
+phones. The short, truthful count stays visible with a 44 px Details & filters
+button; the same meters and filters expand underneath. Desktop keeps all four
+rows. Do not hide the primary task, active view, scope identity or safety alerts.
+The connected rail retains the drawn 40/34 px geometry and 23 px label baseline;
+frontline tabs use the shared `frontline-hit` target rather than enlarging the
+drawn pills. Measure the visual shape and the touch area separately.

@@ -14,12 +14,15 @@ test.describe('IT & Support service management navigation', () => {
     test('keeps setup and service-delivery workspaces understandable on desktop', async ({
         page,
     }) => {
+        // This journey includes sign-in, setup panels, two wizards and a final
+        // service-desk navigation. Keep individual assertions bounded at 10s.
+        test.setTimeout(60_000);
         const errors = collectConsoleErrors(page);
 
         await page.goto('/it/setup');
         await expect(
             page.getByRole('heading', {
-                name: 'Teams, queues & services',
+                name: 'IT setup',
                 level: 1,
             }),
         ).toBeVisible();
@@ -37,10 +40,10 @@ test.describe('IT & Support service management navigation', () => {
         await expect(
             page.getByRole('button', { name: 'New service' }),
         ).toBeVisible();
-        await page.getByRole('tab', { name: 'Provisioning workflows' }).click();
+        await page.getByRole('tab', { name: 'Workflows', exact: true }).click();
         await expect(
             page.getByRole('heading', {
-                name: 'Provisioning workflows',
+                name: 'IT setup',
                 level: 1,
             }),
         ).toBeVisible();
@@ -66,6 +69,11 @@ test.describe('IT & Support service management navigation', () => {
                 name: 'New lifecycle template',
             }),
         ).toBeVisible();
+        await templateDialog
+            .getByRole('button', {
+                name: /Workflow steps.*Ownership, dependencies and evidence/,
+            })
+            .click();
         await expect(
             templateDialog.getByText('Minimum employee details shown'),
         ).toBeVisible();
@@ -75,12 +83,18 @@ test.describe('IT & Support service management navigation', () => {
         await expect(
             templateDialog.getByText('Evidence required'),
         ).toBeVisible();
-        await templateDialog.getByRole('button', { name: 'Cancel' }).click();
-        await page.getByRole('tab', { name: 'API identities' }).click();
+        await templateDialog
+            .getByRole('button', { name: 'Close', exact: true })
+            .click();
+        await expect(templateDialog).toBeHidden();
+        await page.getByRole('tab', { name: 'API', exact: true }).click();
         await expect(
             page.getByRole('heading', { name: 'API identities', level: 2 }),
         ).toBeVisible();
-        await page.getByRole('button', { name: 'New API identity' }).click();
+        await page
+            .getByRole('button', { name: 'New API identity' })
+            .first()
+            .click();
         await expect(
             page.getByRole('dialog').getByRole('heading', {
                 name: 'New API identity',
@@ -88,13 +102,21 @@ test.describe('IT & Support service management navigation', () => {
         ).toBeVisible();
         await expect(page.getByLabel('Identity name')).toBeVisible();
         await expect(page.getByLabel('Execution account')).toBeVisible();
+        await page
+            .getByRole('dialog')
+            .getByRole('button', {
+                name: /Scope and fields.*Sites and delegated fields/,
+            })
+            .click();
         await expect(
             page.getByText(
                 'Require a timestamped HMAC signature on every request',
             ),
         ).toBeVisible();
         await page.getByRole('button', { name: 'Cancel' }).click();
-        await page.getByRole('tab', { name: 'Operations audit' }).click();
+        await page
+            .getByRole('tab', { name: 'Operations', exact: true })
+            .click();
         await expect(
             page.getByRole('heading', {
                 name: 'Configuration audit',
@@ -109,27 +131,36 @@ test.describe('IT & Support service management navigation', () => {
             page.getByText(/does not create a second scheduler/),
         ).toBeVisible();
 
-        const sidebar = page.locator('aside').filter({
-            has: page.getByRole('navigation', { name: 'IT & Support' }),
+        const sidebar = page.getByRole('group', {
+            name: 'IT & Support navigation',
         });
 
         await expect(sidebar).toBeVisible();
-        for (const group of [
-            'Service Desk',
-            'Service Delivery',
-            'Operations',
+        for (const destination of [
+            'Service desk',
+            'Provisioning',
+            'Work planning',
+            'Problems',
+            'Changes',
+            'Major incidents',
+            'Reports',
             'Setup',
         ]) {
             await expect(
-                sidebar.getByText(group, { exact: true }),
+                sidebar.getByRole('link', { name: destination, exact: true }),
             ).toBeVisible();
         }
         await expect(
             sidebar.getByRole('link', {
-                name: 'Teams, queues & services',
+                name: 'Setup',
+                exact: true,
             }),
         ).toHaveAttribute('aria-current', 'page');
-        await sidebar.getByRole('link', { name: 'Service catalogue' }).click();
+        await sidebar
+            .getByRole('link', { name: 'Service desk', exact: true })
+            .click();
+        await expect(page).toHaveURL(/\/it(?:\?.*)?$/);
+        await page.getByRole('tab', { name: /Service catalogue/ }).click();
 
         await expect(page).toHaveURL(/\/it\?.*tab=catalog/);
         await expect(

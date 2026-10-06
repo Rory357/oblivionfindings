@@ -15,8 +15,10 @@ use App\Http\Controllers\ClientPortalUserController;
 use App\Http\Controllers\ClientRagController;
 use App\Http\Controllers\ClientRiskController;
 use App\Http\Controllers\ClientSupportPlanController;
+use App\Http\Controllers\Emar\ControlledProductController;
 use App\Http\Controllers\MedicationAdministrationCorrectionController;
 use App\Http\Controllers\Sites\SiteGeocodingController;
+use App\Http\Middleware\ClientMarExportGuard;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -48,6 +50,7 @@ Route::middleware(['auth'])->group(function () {
             ->whereNumber('client')
             ->name('clients.mar.show');
         Route::get('/clients/{client}/mar/export.csv', [ClientMarController::class, 'exportCsv'])
+            ->middleware(ClientMarExportGuard::class)
             ->whereNumber('client')
             ->name('clients.mar.export_csv');
     });
@@ -212,8 +215,8 @@ Route::middleware(['auth'])->group(function () {
     // (routes/emar.php); bare /emergency-access redirects there (routes/web.php).
 
     // Controlled medication discrepancies
-    Route::post('/clients/{client}/medical/controlled-discrepancies/{discrepancy}/close', [ClientMedicalController::class, 'closeControlledDiscrepancy'])
-        ->middleware('permission:medications.controlled.record')
+    Route::post('/clients/{client}/medical/controlled-discrepancies/{discrepancy}/close', [ControlledProductController::class, 'legacy'])
+        ->middleware('permission:medications.view', 'permission:medications.controlled.view', 'permission:medications.controlled.manage')
         ->name('clients.medical.controlled_discrepancies.close');
 
     // Client incidents

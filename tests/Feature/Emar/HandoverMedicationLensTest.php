@@ -95,6 +95,7 @@ class HandoverMedicationLensTest extends TestCase
             'expiry_date' => now()->addYear()->toDateString(),
             'assessor_declared_at' => now()->subMonth(),
             'staff_acknowledged_at' => now()->subMonth(),
+            'controlled_drugs' => true,
             'can_witness_controlled' => true,
         ]);
         $presenceClient = Client::factory()->create([
@@ -593,7 +594,7 @@ class HandoverMedicationLensTest extends TestCase
                 'submit' => false,
             ])
             ->assertSessionHasErrors([
-                'cd_witness_credential' => WitnessPinService::INCORRECT,
+                'cd_witness_credential',
             ]);
 
         $this->assertArrayNotHasKey('cd_witness_credential', session()->getOldInput());
@@ -641,7 +642,7 @@ class HandoverMedicationLensTest extends TestCase
                 // fifth wrong PIN also locks the PIN (default limit 5).
                 $message = session('errors')->first('cd_witness_credential');
                 $attempt < 5
-                    ? $this->assertSame(WitnessPinService::INCORRECT, $message)
+                    ? $this->assertStringStartsWith('Incorrect PIN.', $message)
                     : $this->assertStringContainsString('witness PIN is locked after too many wrong attempts', $message);
             }
 

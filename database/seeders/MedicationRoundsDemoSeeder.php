@@ -141,10 +141,10 @@ class MedicationRoundsDemoSeeder extends Seeder
             ],
         ];
 
-        // A new order, or one whose clinical fields changed (start_date moves
-        // daily), starts pending verification and is off every round until
-        // verified — record it the way EmarController::verifyMedication does,
-        // by someone other than the creator when there is anyone else.
+        // These demo orders were entered and checked before today's rounds.
+        // Give only newly created fixtures that historical entry time; reseeding
+        // preserves existing entry/check evidence and checks actual changes now.
+        $initialOrderAt = $schedule->dateFromInput($roundDate)->subMonths(2)->startOfDay()->utc();
         $verifier = $staff
             ? (User::query()->whereKeyNot($staff->id)->orderBy('id')->first() ?? $staff)
             : null;
@@ -152,32 +152,39 @@ class MedicationRoundsDemoSeeder extends Seeder
         $meds = [];
         foreach ($medDefs as $nhi => $list) {
             foreach ($list as $m) {
-                $meds[$nhi][$m['name']] = $med = ClientMedication::query()->updateOrCreate(
-                    ['client_id' => $clients[$nhi]->id, 'name' => $m['name']],
-                    [
-                        'created_by' => $staff?->id,
-                        'dosage' => $m['dosage'],
-                        'route' => $m['route'],
-                        'form' => $m['form'],
-                        'frequency' => count($m['times']) > 1 ? 'Twice daily' : 'Once daily',
-                        'dose_times' => $m['times'],
-                        'is_prn' => false,
-                        'controlled_drug' => $m['controlled_drug'] ?? false,
-                        'high_risk' => $m['high_risk'] ?? false,
-                        'witness_required' => $m['witness_required'] ?? false,
-                        'instructions' => $m['instructions'] ?? null,
-                        'start_date' => today()->subMonths(2)->toDateString(),
-                        'end_date' => null,
-                        'active' => true,
-                        'state' => 'active',
-                    ],
-                );
+                $med = ClientMedication::query()->firstOrNew([
+                    'client_id' => $clients[$nhi]->id, 'name' => $m['name'],
+                ]);
+                $newOrder = ! $med->exists;
+                $med->fill([
+                    'created_by' => $staff?->id,
+                    'dosage' => $m['dosage'],
+                    'route' => $m['route'],
+                    'form' => $m['form'],
+                    'frequency' => count($m['times']) > 1 ? 'Twice daily' : 'Once daily',
+                    'dose_times' => $m['times'],
+                    'is_prn' => false,
+                    'controlled_drug' => $m['controlled_drug'] ?? false,
+                    'high_risk' => $m['high_risk'] ?? false,
+                    'witness_required' => $m['witness_required'] ?? false,
+                    'instructions' => $m['instructions'] ?? null,
+                    'start_date' => $med->start_date?->toDateString()
+                        ?? $initialOrderAt->copy()->timezone(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString(),
+                    'end_date' => null,
+                    'active' => true,
+                    'state' => 'active',
+                ]);
+                if ($newOrder) {
+                    $med->forceFill(['created_at' => $initialOrderAt]);
+                }
+                $med->save();
+                $meds[$nhi][$m['name']] = $med;
 
                 if ($med->approval_status !== 'verified') {
                     $med->forceFill([
                         'approval_status' => 'verified',
                         'verified_by' => $verifier?->id,
-                        'verified_at' => now(),
+                        'verified_at' => $newOrder ? $initialOrderAt : now(),
                         'rejection_reason' => null,
                     ])->save();
                 }

@@ -2832,6 +2832,7 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
     return (
         <SheetContent
             side="left"
+            aria-modal="true"
             overlayClassName="bg-black/50 md:hidden"
             closeButtonClassName="frontline-focus frontline-tap top-1.5 right-2.5 flex items-center justify-center rounded-md text-sidebar-foreground opacity-100 hover:bg-sidebar-accent hover:opacity-100 focus:ring-sidebar-ring [&_svg]:size-5"
             closeLabel="Close menu"
@@ -2871,7 +2872,7 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
                                         )
                                     }
                                     className={cn(
-                                        'frontline-focus min-h-11 w-full justify-start gap-3 rounded-none px-4 py-2 text-sm font-normal transition-colors',
+                                        'frontline-focus frontline-tap w-full justify-start gap-3 rounded-none px-4 py-2 text-sm font-normal transition-colors',
                                         active
                                             ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
                                             : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
@@ -2909,7 +2910,7 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
                                                     }
                                                     prefetch
                                                     className={cn(
-                                                        'frontline-focus flex min-h-11 items-center gap-3 px-4 py-2 text-sm transition-colors',
+                                                        'frontline-focus frontline-tap flex items-center gap-3 px-4 py-2 text-sm transition-colors',
                                                         isSubItemActive(
                                                             currentUrl,
                                                             sub.href,
@@ -2954,7 +2955,7 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
                                 aria-current={active ? 'page' : undefined}
                                 prefetch
                                 className={cn(
-                                    'frontline-focus flex min-h-11 items-center gap-3 px-4 py-2 text-sm transition-colors',
+                                    'frontline-focus frontline-tap flex items-center gap-3 px-4 py-2 text-sm transition-colors',
                                     active
                                         ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
                                         : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',

@@ -10,9 +10,11 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\HandoverWorkerNotes;
 use App\Services\ShiftHandoverService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
+    $this->travelTo(Carbon::parse('2026-10-05 10:30:00', 'Pacific/Auckland')->utc());
     $this->worker = User::factory()->frontlineWorker()->create();
     $this->site = Site::factory()->create(['is_active' => true, 'archived' => false]);
     HrEmployeeProfile::factory()->create([
@@ -43,6 +45,10 @@ beforeEach(function () {
         ])->all()],
     ];
     $this->actingAs($this->worker);
+});
+
+afterEach(function () {
+    $this->travelBack();
 });
 
 it('saves three person sections without filing other people under the primary client', function () {

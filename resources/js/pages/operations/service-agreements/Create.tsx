@@ -387,25 +387,23 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                                         />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <Label>Status</Label>
-                                        <Select
-                                            value={data.status}
-                                            onValueChange={(v) =>
-                                                setData('status', v)
-                                            }
+                                        <Label htmlFor="agreement-status">
+                                            Initial status
+                                        </Label>
+                                        <Input
+                                            id="agreement-status"
+                                            value="Draft"
+                                            readOnly
+                                            aria-describedby="agreement-status-help"
+                                        />
+                                        <p
+                                            id="agreement-status-help"
+                                            className="text-xs text-muted-foreground"
                                         >
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="draft">
-                                                    Draft
-                                                </SelectItem>
-                                                <SelectItem value="active">
-                                                    Active
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                            Save first, then submit for
+                                            independent approval before the
+                                            agreement starts.
+                                        </p>
                                     </div>
                                 </div>
                                 <div className="grid gap-4 sm:grid-cols-3">
@@ -1045,9 +1043,8 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                     {/* Submit */}
                     <div className="flex items-center justify-between rounded-xl border bg-muted p-4">
                         <p className="text-sm text-muted-foreground">
-                            {data.status === 'draft'
-                                ? 'This agreement will be saved as a draft.'
-                                : 'This agreement will be created as active.'}
+                            This agreement will be saved as a draft. Independent
+                            approval is required before it becomes active.
                         </p>
                         <div className="flex gap-2">
                             <Button
@@ -1068,9 +1065,7 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                                 disabled={processing}
                                 className="bg-primary hover:bg-primary"
                             >
-                                {processing
-                                    ? 'Creating...'
-                                    : 'Create Agreement'}
+                                {processing ? 'Saving...' : 'Save draft'}
                             </Button>
                         </div>
                     </div>

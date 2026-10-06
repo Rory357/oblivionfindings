@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Services\Assurance\NzsAssuranceResolver;
 use App\Services\Fleet\FleetMapSettings;
 use App\Services\MarScheduleService;
+use App\Services\Medication\Alerts\MedicationBellOrder;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Operations\OpsMessageVisibilityService;
@@ -119,7 +120,7 @@ class HandleInertiaRequests extends Middleware
                 || (($can['medications']['view'] ?? false) && ($can['medications']['stockUpdate'] ?? false))
                 || ($can['medications']['auditView'] ?? false)
                 || ($can['medications']['reportsExport'] ?? false)
-                || ($can['reports']['viewAny'] ?? false)
+                || ($can['medications']['reportsView'] ?? false)
             ) && (
                 ($can['medications']['administerRecord'] ?? false)
                 || ($can['medications']['view'] ?? false)
@@ -372,7 +373,7 @@ class HandleInertiaRequests extends Middleware
                         ? $this->boardPackAccess->visibleNotificationQuery($user, unreadOnly: true)->count()
                         : 0,
                     'items' => $hasNotificationsTable
-                        ? $this->boardPackAccess->visibleNotificationQuery($user)
+                        ? app(MedicationBellOrder::class)->apply($this->boardPackAccess->visibleNotificationQuery($user))
                             ->latest()
                             ->limit(8)
                             ->get(['id', 'type', 'data', 'read_at', 'acknowledged_at', 'escalation_count', 'created_at'])
@@ -608,10 +609,13 @@ class HandleInertiaRequests extends Middleware
                 // and action re-checks its own permission on the server.
                 'ordersVerify' => $user->canDo('medications.orders.verify'),
                 'settingsManage' => $user->canDo('medications.settings.manage'),
+                'alertsManageHouse' => $user->canDo('medications.alerts.manage_house'),
                 'administerRecord' => $user->canDo('medications.administer.record'),
                 'administerCorrect' => $user->canDo('medications.administer.correct'),
                 'auditView' => $user->canDo('medications.audit.view'),
                 'reportsExport' => $user->canDo('medications.reports.export'),
+                'reportsView' => $user->canDo('medications.reports.view'),
+                'auditExport' => $user->canDo('medications.audit.export'),
                 'stockUpdate' => $user->canDo('medications.stock.update'),
                 'controlledView' => $user->canDo('medications.controlled.view'),
                 'controlledRecord' => $user->canDo('medications.controlled.record'),

@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\ConsentRequest;
 use App\Models\NextOfKin;
 use App\Models\User;
+use App\Support\NewZealandLocalTime;
 use Carbon\CarbonImmutable;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
@@ -277,11 +278,19 @@ class ConsentDecisionEvidenceService
         }
 
         try {
-            $parsed = $value instanceof \DateTimeInterface
-                ? CarbonImmutable::instance($value)
-                : CarbonImmutable::parse($value);
+            if ($value instanceof \DateTimeInterface) {
+                $parsed = CarbonImmutable::instance($value);
+            } elseif (preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?$/D', $value)) {
+                // Form datetime-local values are NZ wall times. Offset/Z
+                // timestamps and date objects keep their absolute meaning.
+                $parsed = (new NewZealandLocalTime)->parse($value, $key);
+            } else {
+                $parsed = CarbonImmutable::parse($value);
+            }
 
             return $parsed->setTimezone((string) config('app.timezone', 'UTC'));
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Throwable) {
             throw ValidationException::withMessages([
                 $key => "Record a valid {$key} time.",

@@ -27,9 +27,14 @@ final class LeaveReservationProcess
     {
         $config = DB::connection()->getConfig();
         $database = (string) $config['database'];
-        if (! preg_match('/^oblivion_workforce_[A-Za-z0-9_]+_'.getmypid().'$/D', $database)
+        if (! app()->environment('testing') || DB::connection()->getDriverName() !== 'mysql'
+            || ! OwnedTestDatabase::isOwnedBy($database, getmypid())
             || dirname($prefix) !== base_path('test-results') || ! preg_match('/^leave-reservation-[a-f0-9-]+$/D', basename($prefix))) {
             throw new RuntimeException('Only this process-owned schema and receipt prefix are permitted.');
+        }
+        $checkpointDirectory = dirname($prefix);
+        if (! is_dir($checkpointDirectory) && ! @mkdir($checkpointDirectory, 0755) && ! is_dir($checkpointDirectory)) {
+            throw new RuntimeException('The owned checkpoint directory could not be created.');
         }
         $process = new Process([PHP_BINARY, __FILE__, json_encode($operation, JSON_THROW_ON_ERROR)], base_path(), [
             'APP_ENV' => 'testing', 'APP_KEY' => config('app.key'), 'DB_CONNECTION' => 'mysql', 'DB_URL' => '',
@@ -68,6 +73,8 @@ final class LeaveReservationProcess
 
     public static function main(array $arguments): void
     {
+        require_once __DIR__.'/OwnedTestDatabase.php';
+
         try {
             $base = (string) getenv('LEAVE_RUNTIME_BASE');
             $database = (string) getenv('LEAVE_RUNTIME_DATABASE');
@@ -75,8 +82,8 @@ final class LeaveReservationProcess
             $owner = (string) getenv('LEAVE_RUNTIME_OWNER');
             $configCachePath = 'test-results/'.basename($prefix).'-absent-config.php';
             $routesCachePath = 'test-results/'.basename($prefix).'-absent-routes.php';
-            if (getenv('APP_ENV') !== 'testing' || ! ctype_digit($owner)
-                || ! preg_match('/^oblivion_workforce_[A-Za-z0-9_]+_'.$owner.'$/D', $database)
+            if (getenv('APP_ENV') !== 'testing' || ! ctype_digit($owner) || (string) (int) $owner !== $owner
+                || ! OwnedTestDatabase::isOwnedBy($database, (int) $owner)
                 || realpath($base) !== realpath(__DIR__.'/../..') || dirname($prefix) !== $base.DIRECTORY_SEPARATOR.'test-results'
                 || ! preg_match('/^leave-reservation-[a-f0-9-]+$/D', basename($prefix))
                 || getenv('DB_DATABASE') !== $database || getenv('DB_CONNECTION') !== 'mysql' || getenv('DB_URL') !== ''

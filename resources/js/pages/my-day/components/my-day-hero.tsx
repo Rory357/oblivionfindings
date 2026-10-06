@@ -1,3 +1,4 @@
+import { medsTodayHref } from '@/lib/meds-today-location';
 import {
     AlertTriangle,
     ArrowUpRight,
@@ -417,7 +418,7 @@ export function MyDayHero({
                       {
                           icon: Pill,
                           label: t('res_give_meds'),
-                          href: `/meds/today?client=${r.id}`,
+                          href: medsTodayHref(r.id),
                       },
                       {
                           icon: StickyNote,
@@ -467,7 +468,7 @@ export function MyDayHero({
                           {
                               icon: Pill,
                               label: t('res_give_meds'),
-                              href: `/meds/today?client=${singleResident.id}`,
+                              href: medsTodayHref(singleResident.id),
                           },
                           {
                               icon: StickyNote,

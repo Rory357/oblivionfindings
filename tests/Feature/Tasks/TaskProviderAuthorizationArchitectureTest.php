@@ -5,6 +5,8 @@ use App\Http\Controllers\AllTasksController;
 use App\Http\Controllers\MyTasksController;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Notifications\AppEventNotification;
+use App\Services\Medication\Downtime\DowntimeService;
+use App\Services\Medication\Reviews\MedicationReviewReader;
 use App\Services\NotificationService;
 use App\Services\Tasks\Contracts\ExplicitlyGlobalTaskProvider;
 use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
@@ -30,7 +32,16 @@ use App\Services\Tasks\Providers\ItKnowledgeReviewTaskProvider;
 use App\Services\Tasks\Providers\ItProvisioningTaskProvider;
 use App\Services\Tasks\Providers\ItRecurrenceFailureTaskProvider;
 use App\Services\Tasks\Providers\ItWorkTaskProvider;
+use App\Services\Tasks\Providers\LegacyMedicationEffectProvider;
+use App\Services\Tasks\Providers\MedicationEmergencyAccessReviewProvider;
+use App\Services\Tasks\Providers\MedicationErrorActionProvider;
 use App\Services\Tasks\Providers\MedicationErrorProvider;
+use App\Services\Tasks\Providers\MedicationFollowupProvider;
+use App\Services\Tasks\Providers\MedicationPaperGiverConfirmationProvider;
+use App\Services\Tasks\Providers\MedicationPaperWitnessConfirmationProvider;
+use App\Services\Tasks\Providers\MedicationReviewChangeProvider;
+use App\Services\Tasks\Providers\MedicationReviewProvider;
+use App\Services\Tasks\Providers\MedicationRoundProvider;
 use App\Services\Tasks\Providers\RespiteTaskProvider;
 use App\Services\Tasks\Providers\RestraintReviewProvider;
 use App\Services\Tasks\Providers\SafeguardingActionPlanProvider;
@@ -48,7 +59,7 @@ use Illuminate\Support\Facades\Route;
 it('registers every task source behind exactly one authorization boundary', function () {
     $providers = TaskAggregator::defaultProviders();
 
-    expect($providers)->toHaveCount(31);
+    expect($providers)->toHaveCount(40);
     expect(collect($providers)->mapWithKeys(fn (TaskProvider $provider): array => [
         $provider::class => $provider->sourceKey(),
     ])->all())->toBe([
@@ -73,6 +84,15 @@ it('registers every task source behind exactly one authorization boundary', func
         FleetMaintenanceProvider::class => 'fleet_maintenance',
         FleetFinanceReviewProvider::class => 'fleet_finance_review',
         MedicationErrorProvider::class => 'med_error',
+        MedicationFollowupProvider::class => 'medication-followup',
+        LegacyMedicationEffectProvider::class => 'medication-effect-source',
+        MedicationErrorActionProvider::class => 'med_error_action',
+        MedicationReviewProvider::class => 'medication_review',
+        MedicationReviewChangeProvider::class => 'medication_review_change',
+        MedicationEmergencyAccessReviewProvider::class => 'med_emergency_review',
+        MedicationPaperGiverConfirmationProvider::class => 'med_paper_giver',
+        MedicationPaperWitnessConfirmationProvider::class => 'med_paper_witness',
+        MedicationRoundProvider::class => 'medication-round',
         CdLossReportProvider::class => 'cd_loss',
         DataBreachProvider::class => 'breach',
         DataSubjectRequestProvider::class => 'dsr',
@@ -85,6 +105,15 @@ it('registers every task source behind exactly one authorization boundary', func
         RestraintReviewProvider::class => 'restraint_review',
     ]);
 
+    // Owning-domain adapters retain the same Site/person boundary; their
+    // canonical readers load rows before these providers project task items.
+    $domainAdapters = [
+        MedicationReviewProvider::class => [MedicationReviewReader::class, '->query($user)'],
+        MedicationReviewChangeProvider::class => [MedicationReviewReader::class, '->clientIds($user)', "whereColumn('medication_reviews.client_id', 'medication_review_items.client_id')"],
+        MedicationPaperGiverConfirmationProvider::class => [DowntimeService::class, '->pendingConfirmations($user)'],
+        MedicationPaperWitnessConfirmationProvider::class => [DowntimeService::class, '->pendingConfirmations($user)'],
+    ];
+
     foreach ($providers as $provider) {
         $siteScoped = $provider instanceof SiteScopedTaskProvider;
         $explicitlyGlobal = $provider instanceof ExplicitlyGlobalTaskProvider;
@@ -94,9 +123,19 @@ it('registers every task source behind exactly one authorization boundary', func
             ->and((int) $siteScoped + (int) $explicitlyGlobal)
             ->toBe(1, $provider::class.' must declare exactly one row-authorization mode.');
 
-        $reflection = new ReflectionClass($provider);
+        $reflection = new ReflectionMethod($provider, 'authorizedTasks');
         $path = $reflection->getFileName();
         $source = $path === false ? '' : file_get_contents($path);
+
+        expect($source)->not->toContain('public function tasks(');
+        if (isset($domainAdapters[$provider::class])) {
+            expect($source)->toContain('if (! $this->canView($user))');
+            foreach ($domainAdapters[$provider::class] as $requiredScope) {
+                expect($source)->toContain($requiredScope);
+            }
+
+            continue;
+        }
 
         expect($source)
             ->toContain(TaskProviderAuthorization::class)

@@ -10,12 +10,14 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
 use App\Models\Permission;
+use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class MedicationGenericReportingSurfaceTest extends TestCase
@@ -44,6 +46,7 @@ class MedicationGenericReportingSurfaceTest extends TestCase
         $ordinary = $this->userWithPermissions([
             'reports.viewAny',
             'medications.view',
+            'medications.reports.view',
             'shifts.manageAny',
             'compliance.view',
         ], $context['site']);
@@ -57,19 +60,12 @@ class MedicationGenericReportingSurfaceTest extends TestCase
             $administrations->pluck('id')->map(fn (mixed $id): int => (int) $id)->all(),
         );
 
-        $administrationCsv = $this->actingAs($ordinary)
+        $this->actingAs($ordinary)
             ->get(route('reports.modules.export', 'medication_administrations'))
-            ->assertOk()
-            ->streamedContent();
-        $exportedAdministrationIds = collect(preg_split('/\r?\n/', trim($administrationCsv)))
-            ->skip(1)
-            ->filter()
-            ->map(fn (string $line): int => (int) str_getcsv($line)[0])
-            ->values();
-        $this->assertSame([$context['ordinary_administration']->id], $exportedAdministrationIds->all());
-        foreach ($context['concealed_administration_ids'] as $id) {
-            $this->assertFalse($exportedAdministrationIds->contains($id));
-        }
+            ->assertForbidden();
+        $this->actingAs($ordinary)
+            ->get(route('reports.combined.export', 'care-quality'))
+            ->assertForbidden();
 
         $this->actingAs($ordinary)
             ->get(route('reports.modules.show', 'controlled_drug_discrepancies'))
@@ -186,6 +182,7 @@ class MedicationGenericReportingSurfaceTest extends TestCase
         $controlledReader = $this->userWithPermissions([
             'reports.viewAny',
             'medications.view',
+            'medications.reports.view',
             'medications.controlled.view',
             'shifts.manageAny',
             'compliance.view',
@@ -226,6 +223,64 @@ class MedicationGenericReportingSurfaceTest extends TestCase
         $this->assertSame(5, $controlledKpis->firstWhere('key', 'mar')['value']);
         $this->assertSame(1, collect($controlledCompliance->inertiaProps('charts.cdTrend'))->sum('total'));
         $this->assertSame(2, collect($controlledCompliance->inertiaProps('charts.marTrend'))->sum('missed'));
+    }
+
+    #[DataProvider('nonclinicalReportReaders')]
+    public function test_generic_report_readers_without_clinical_report_access_keep_general_reports_without_medication_data(array $permissions, string $role): void
+    {
+        $context = $this->reportingContext();
+        $reader = $this->userWithPermissions($permissions, $context['site'], $role);
+        if ($role === 'finance') {
+            $reader->roles()->sync([Role::query()->where('name', 'finance')->firstOrFail()->id]);
+            $reader = $reader->fresh();
+        }
+        $this->assertSame($role === 'finance', $reader->hasRole('finance'));
+        $this->assertTrue($reader->canDo('reports.viewAny'));
+        $this->assertSame(in_array('medications.reports.view', $permissions, true), $reader->canDo('medications.reports.view'));
+        $this->assertSame(in_array('medications.controlled.view', $permissions, true), $reader->canDo('medications.controlled.view'));
+        $this->assertFalse($reader->canDo('medications.view'));
+        $this->assertNotNull($context['ordinary_administration']->fresh());
+        $this->assertSame('open', $context['controlled_discrepancy']->fresh()->status);
+        $audit = AuditLog::query()->create([
+            'user_id' => $reader->id,
+            'action' => 'generic_report_reader_sentinel',
+        ]);
+
+        $reports = $this->actingAs($reader)->get(route('reports.index'))->assertOk();
+        $this->assertArrayNotHasKey('missedMeds7d', $reports->inertiaProps('kpis'));
+        $this->assertArrayNotHasKey('openDiscrepancies', $reports->inertiaProps('kpis'));
+        $modules = collect($reports->inertiaProps('modules'));
+        $this->assertTrue($modules->contains('key', 'audit_logs'));
+        $this->assertFalse($modules->contains('key', 'medication_administrations'));
+        $this->assertFalse($modules->contains('key', 'controlled_drug_discrepancies'));
+        foreach ($reports->inertiaProps('combined_reports') as $report) {
+            $this->assertNotContains('medication_administrations', $report['modules']);
+            $this->assertNotContains('controlled_drug_discrepancies', $report['modules']);
+            $this->assertFalse(collect($report['preview'])->contains('label', 'Medication exceptions (7d)'));
+            $this->assertFalse(collect($report['preview'])->contains('label', 'Open discrepancies'));
+        }
+        $auditRows = $this->actingAs($reader)->get(route('reports.modules.show', [
+            'module' => 'audit_logs', 'search' => 'generic_report_reader_sentinel',
+        ]))->assertOk()->inertiaProps('rows.data');
+        $this->assertSame([$audit->id], collect($auditRows)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all());
+        foreach (['medication_administrations', 'controlled_drug_discrepancies'] as $module) {
+            $this->actingAs($reader)->get(route('reports.modules.show', $module))->assertForbidden();
+            $this->actingAs($reader)->get(route('reports.modules.export', $module))->assertForbidden();
+        }
+        $combined = $this->actingAs($reader)->get(route('reports.combined.show', 'care-quality'))->assertOk();
+        $this->assertNotContains('medication_administrations', $combined->inertiaProps('report.modules'));
+        $this->assertNotContains('controlled_drug_discrepancies', $combined->inertiaProps('report.modules'));
+        $this->assertFalse(collect($combined->inertiaProps('metrics'))->contains('label', 'Medication exceptions (7d)'));
+        $this->assertFalse(collect($combined->inertiaProps('sections'))->contains('title', 'Recent Medication Exceptions'));
+    }
+
+    public static function nonclinicalReportReaders(): array
+    {
+        return [
+            'general report access' => [['reports.viewAny'], 'support_worker'],
+            'controlled access without medication report access' => [['reports.viewAny', 'medications.controlled.view'], 'support_worker'],
+            'finance stock report reader' => [['reports.viewAny', 'medications.reports.view', 'medications.controlled.view'], 'finance'],
+        ];
     }
 
     /** @return array<string, mixed> */
@@ -363,10 +418,10 @@ class MedicationGenericReportingSurfaceTest extends TestCase
     }
 
     /** @param array<int, string> $permissions */
-    private function userWithPermissions(array $permissions, Site $site): User
+    private function userWithPermissions(array $permissions, Site $site, string $role = 'support_worker'): User
     {
         $user = User::factory()->create([
-            'role' => 'support_worker',
+            'role' => $role,
             'approved_at' => now(),
         ]);
         HrEmployeeProfile::factory()->create([
@@ -379,9 +434,14 @@ class MedicationGenericReportingSurfaceTest extends TestCase
         ]);
         $permissionIds = Permission::query()->whereIn('key', $permissions)->pluck('id');
         $this->assertCount(count($permissions), $permissionIds);
-        $user->permissionOverrides()->sync(
-            $permissionIds->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])->all(),
-        );
+        $grants = $permissionIds->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])->all();
+        $deniedIds = Permission::query()->whereIn('key', array_diff([
+            'medications.view', 'medications.reports.view', 'medications.controlled.view',
+        ], $permissions))->pluck('id');
+        foreach ($deniedIds as $id) {
+            $grants[(int) $id] = ['allowed' => false];
+        }
+        $user->permissionOverrides()->sync($grants);
 
         return $user->fresh();
     }

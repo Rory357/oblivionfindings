@@ -31,7 +31,7 @@ class OperationalReportController extends Controller
     public function index(Request $request)
     {
         $domain = $request->route('domain') ?? 'fleet';
-        abort_unless(in_array($domain, ['fleet', 'client', 'staff', 'self']), 404);
+        abort_unless(in_array($domain, ['fleet', 'client', 'staff', 'self', 'medication']), 404);
         $sources = $this->access->sources($request->user(), $domain);
         abort_unless($sources !== [], 403);
         $views = ['library', 'builder', 'saved'];
@@ -47,7 +47,7 @@ class OperationalReportController extends Controller
 
         return Inertia::render('reporting/workspace', [
             'initialView' => in_array($view, $views, true) ? $view : 'library',
-            'domain' => $domain, 'sources' => $sources, 'canExport' => $domain === 'fleet' || $request->user()->canDo('assets.telemetry.export'),
+            'domain' => $domain, 'sources' => $sources, 'canExport' => $domain === 'medication' ? ($request->user()->canDo('medications.reports.export') || app(\App\Services\Medication\Reporting\MedicationReportAccess::class)->financeOnly($request->user())) : ($domain === 'fleet' || $request->user()->canDo('assets.telemetry.export')),
             'templates' => array_values(array_filter(config('operational-reports.templates'), fn ($t) => isset($sources[$t['source']]))),
             'saved' => $saved, 'shared' => $shared, 'viewerId' => $request->user()->id, 'initialSubject' => $request->integer('subject') ?: null,
         ])->toResponse($request)->withHeaders(ClientLocationAccessService::headers());
@@ -63,7 +63,12 @@ class OperationalReportController extends Controller
         $q = $data['q'] ?? '';
         $targets = [];
         $sites = [];
-        if ($source['domain'] === 'client') {
+        if ($source['domain'] === 'medication') {
+            $access = app(\App\Services\Medication\Reporting\MedicationReportAccess::class);
+            $scope = $this->access->context($actor, ['source' => $data['source'], 'site_ids' => [], 'resource_ids' => [], 'subject_id' => null]);
+            $sites = Site::whereIn('id', $scope['site_ids'])->orderBy('name')->get(['id', 'name'])->map(fn ($s) => ['id' => $s->id, 'label' => $s->name])->all();
+            $targets = \App\Models\Client::whereIn('id', $access->clientIds($actor, $scope['site_ids']))->where(fn ($query) => $query->where('first_name', 'like', '%'.$q.'%')->orWhere('last_name', 'like', '%'.$q.'%'))->orderBy('first_name')->limit(50)->get()->map(fn ($c) => ['id' => $c->id, 'label' => trim($c->first_name.' '.$c->last_name)])->all();
+        } elseif ($source['domain'] === 'client') {
             $candidates = app(SecurityDevicesAccessService::class)->assignableClients($actor, $q)->take(100);
             foreach ($candidates as $client) {
                 try {

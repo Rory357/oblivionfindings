@@ -90,6 +90,9 @@ class MedicationsApiControllerTest extends TestCase
             'frequency' => 'Once daily',
             'dose_times' => ['09:00'],
             'controlled_drug' => false,
+            'nz_controlled_class' => ($overrides['controlled_drug'] ?? false) ? 'B' : null,
+            'controlled_class_source' => ($overrides['controlled_drug'] ?? false) ? 'Synthetic reviewed test configuration' : null,
+            'approval_status' => 'verified',
             'active' => true,
             'state' => 'active',
         ], $overrides));
@@ -245,6 +248,7 @@ class MedicationsApiControllerTest extends TestCase
             'expiry_date' => now()->addYear()->toDateString(),
             'assessor_declared_at' => now()->subMonth(),
             'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+            'controlled_drugs' => true,
             'can_witness_controlled' => true,
         ]);
         $witnessShift = Shift::factory()->create([

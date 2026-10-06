@@ -118,7 +118,7 @@ export function AppHeader({
                 </div>
             )}
 
-            <header className="sticky top-0 z-50 grid h-[58px] w-full grid-cols-[1fr_auto_1fr] items-center gap-2 bg-sidebar px-3 text-sidebar-foreground md:px-4">
+            <header className="frontline-app-header sticky top-0 z-50 grid h-[58px] w-full grid-cols-[minmax(44px,1fr)_auto_auto] items-center gap-1 bg-sidebar px-3 text-sidebar-foreground md:grid-cols-[1fr_auto_1fr] md:gap-2 md:px-4">
                 {/* Day + date, flush to the sidebar seam. Stays put when the
                     sidebar collapses; the centred search always wins the
                     space fight (tiers documented in the file docblock). */}
@@ -143,7 +143,10 @@ export function AppHeader({
                         <SheetTrigger asChild>
                             <button
                                 type="button"
-                                className={cn(INK_ICON_BUTTON, 'md:hidden')}
+                                className={cn(
+                                    INK_ICON_BUTTON,
+                                    'frontline-tap md:hidden',
+                                )}
                             >
                                 <Menu className="size-5" />
                                 <span className="sr-only">Toggle menu</span>
@@ -154,7 +157,10 @@ export function AppHeader({
                         href="/dashboard"
                         prefetch
                         aria-label={`${resolveWordmarkName(branding?.name)} — home`}
-                        className="flex min-w-0 items-center rounded-lg px-1.5 py-1.5 transition-colors outline-none hover:bg-sidebar-accent/50 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+                        className={cn(
+                            'flex min-w-0 items-center rounded-lg px-1.5 py-1.5 transition-colors outline-none hover:bg-sidebar-accent/50 focus-visible:ring-2 focus-visible:ring-sidebar-ring min-[1320px]:max-w-[228px]',
+                            showMobileMenuTrigger && 'hidden min-[480px]:flex',
+                        )}
                     >
                         <EventHorizonWordmark
                             name={branding?.name}
@@ -169,7 +175,7 @@ export function AppHeader({
                 </div>
 
                 {/* Right cluster */}
-                <div className="flex items-center justify-end gap-1.5">
+                <div className="flex items-center justify-end gap-1 md:gap-1.5">
                     {canReportIncident && (
                         <Button
                             asChild
@@ -202,7 +208,10 @@ export function AppHeader({
                                     ? `Messages — ${unreadMessages} unread`
                                     : 'Messages'
                             }
-                            className={INK_ICON_BUTTON}
+                            className={cn(
+                                INK_ICON_BUTTON,
+                                'hidden min-[360px]:flex',
+                            )}
                         >
                             <MessageSquareText className="size-5" />
                             {unreadMessages > 0 && (

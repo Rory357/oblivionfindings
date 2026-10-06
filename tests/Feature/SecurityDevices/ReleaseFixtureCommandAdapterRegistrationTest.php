@@ -31,6 +31,7 @@ use App\Support\Release\ItSecurityDesktopReleaseFixtureManager;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
+use Database\Seeders\StandardConsentTypesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 
@@ -229,9 +230,29 @@ it('routes both manager-prepared D16 doors through the owned no-network central 
     config()->set('it.desktop_release_fixtures.environment_class', 'approved_non_production');
     config()->set('it.desktop_release_fixtures.release_revision', RELEASE_FIXTURE_REVISION);
 
-    $prepared = app(ItSecurityDesktopReleaseFixtureManager::class)
-        ->execute('prepare', RELEASE_FIXTURE_REVISION);
+    $manager = app(ItSecurityDesktopReleaseFixtureManager::class);
+    $baselineCounts = [Site::query()->count(), Device::query()->count(), User::query()->count()];
+    $missingCatalogue = $manager->execute('prepare', RELEASE_FIXTURE_REVISION);
+    expect($missingCatalogue['state'])->toBe('failed')
+        ->and($missingCatalogue['gap_codes'])->toBe(['release_fixture_tracking_catalogue_missing_or_mismatched'])
+        ->and($missingCatalogue['fixture_mutation_applied'])->toBeFalse()
+        ->and(ItSecurityDesktopReleaseFixturePack::query()->count())->toBe(0)
+        ->and([Site::query()->count(), Device::query()->count(), User::query()->count()])->toBe($baselineCounts)
+        ->and(Storage::disk('private')->allFiles())->toBe([]);
+
+    $this->seed(StandardConsentTypesSeeder::class);
+    $prepared = $manager->execute('prepare', RELEASE_FIXTURE_REVISION);
     expect($prepared['state'])->toBe('ready');
+    $records = collect(ItSecurityDesktopReleaseFixturePack::query()->sole()->manifest['records']);
+    foreach (['it_ticket_approval', 'it_catalog_version'] as $type) {
+        expect($records->firstWhere('type', $type)['baseline_sha256'])->toMatch('/\A[a-f0-9]{64}\z/');
+    }
+    $trackingRecords = $records->filter(fn (array $record): bool => array_key_exists('tracking_clock_sha256', $record));
+    expect($trackingRecords)->not->toBeEmpty();
+    foreach ($trackingRecords as $record) {
+        expect($record['type'])->toBe('device_assignment')
+            ->and($record['tracking_clock_sha256'])->toMatch('/\A[a-f0-9]{64}\z/');
+    }
 
     $runtime = approvedReleaseFixtureDatabaseRuntime();
     $http = new D16ForbiddenCommandHttpTransport;
@@ -252,7 +273,8 @@ it('routes both manager-prepared D16 doors through the owned no-network central 
 
     expect($doors)->toHaveCount(2);
     foreach ($doors as $position => $door) {
-        expect($declared->supports($door, 'access.door.unlock_timed'))->toBeTrue()
+        expect($runtime->owns($door))->toBeTrue()
+            ->and($declared->supports($door, 'access.door.unlock_timed'))->toBeTrue()
             ->and($registry->for($door, 'access.door.unlock_timed'))->toBeInstanceOf(ReleaseFixtureCommandAdapter::class);
         $route = $routes->resolve($door, $siteId, 'access.door.unlock_timed');
         expect($route->available)->toBeTrue()
@@ -327,3 +349,75 @@ it('routes both manager-prepared D16 doors through the owned no-network central 
     expect($http->calls)->toBe(0)
         ->and($credentials->calls)->toBe(0);
 });
+
+it('rejects noncanonical manager provenance even with a recomputed manifest digest', function (string $invalidity) {
+    $this->seed(RbacSeeder::class);
+    $this->seed(SecurityDevicesPermissionsSeeder::class);
+    $this->seed(StandardConsentTypesSeeder::class);
+    Storage::fake('private');
+    config()->set('it.desktop_release_fixtures.actor_password', 'release-only-password');
+    config()->set('it.desktop_release_fixtures.reviewer_totp_secret', 'JBSWY3DPEHPK3PXP');
+    $prepared = app(ItSecurityDesktopReleaseFixtureManager::class)->execute('prepare', RELEASE_FIXTURE_REVISION);
+    expect($prepared['state'])->toBe('ready');
+
+    $runtime = approvedReleaseFixtureDatabaseRuntime();
+    $device = Device::query()->where('name', 'RELEASE V10 Alpha Door')->sole();
+    $pack = ItSecurityDesktopReleaseFixturePack::query()->sole();
+    $manifest = $pack->manifest;
+    $types = array_column($manifest['records'], 'type');
+    $approvalIndex = array_search('it_ticket_approval', $types, true);
+    $catalogueIndex = array_search('it_catalog_version', $types, true);
+    $deviceIndex = array_search('device', $types, true);
+    $trackingIndex = array_key_first(array_filter($manifest['records'], fn (array $record): bool => array_key_exists('tracking_clock_sha256', $record)));
+
+    expect($runtime->owns($device))->toBeTrue();
+    switch ($invalidity) {
+        case 'approval baseline absent':
+            unset($manifest['records'][$approvalIndex]['baseline_sha256']);
+            break;
+        case 'catalogue baseline absent':
+            unset($manifest['records'][$catalogueIndex]['baseline_sha256']);
+            break;
+        case 'baseline malformed':
+            $manifest['records'][$approvalIndex]['baseline_sha256'] = str_repeat('a', 63);
+            break;
+        case 'baseline wrong value type':
+            $manifest['records'][$approvalIndex]['baseline_sha256'] = 123;
+            break;
+        case 'baseline on wrong record type':
+            $manifest['records'][$deviceIndex]['baseline_sha256'] = $manifest['records'][$approvalIndex]['baseline_sha256'];
+            break;
+        case 'tracking clock malformed':
+            $manifest['records'][$trackingIndex]['tracking_clock_sha256'] = str_repeat('A', 64);
+            break;
+        case 'tracking clock wrong value type':
+            $manifest['records'][$trackingIndex]['tracking_clock_sha256'] = null;
+            break;
+        case 'tracking clock on wrong record type':
+            $manifest['records'][$deviceIndex]['tracking_clock_sha256'] = $manifest['records'][$trackingIndex]['tracking_clock_sha256'];
+            break;
+        case 'unknown record key':
+            $manifest['records'][$deviceIndex]['unexpected_provenance'] = true;
+            break;
+        case 'duplicate record':
+            $manifest['records'][] = $manifest['records'][$deviceIndex];
+            break;
+    }
+
+    // Explicitly forged negative evidence must fail shape validation, independently of its digest.
+    $pack->update(['manifest' => $manifest, 'manifest_sha256' => releaseFixtureIntegrityHash($manifest)]);
+    expect($runtime->owns($device))->toBeFalse()
+        ->and((new ReleaseFixtureCommandAdapter($runtime))->supports($device, 'access.door.unlock_timed'))->toBeFalse()
+        ->and(DeviceCommandRequest::query()->count())->toBe(0);
+})->with([
+    'approval baseline absent',
+    'catalogue baseline absent',
+    'baseline malformed',
+    'baseline wrong value type',
+    'baseline on wrong record type',
+    'tracking clock malformed',
+    'tracking clock wrong value type',
+    'tracking clock on wrong record type',
+    'unknown record key',
+    'duplicate record',
+]);

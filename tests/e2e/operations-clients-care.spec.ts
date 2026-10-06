@@ -83,12 +83,16 @@ test.describe('canonical client profile care readiness', () => {
         const profileUrl = new URL(page.url());
         await page.goto(`${profileUrl.pathname}?tab=risk_management`);
 
-        await expect(page.getByText('Active risks')).toBeVisible();
+        const riskPanel = page.getByRole('tabpanel', {
+            name: 'Risk Management',
+        });
+        await expect(riskPanel).toBeVisible();
+        await expect(riskPanel.getByText('Active risks')).toBeVisible();
         await expect(
-            page.getByText('PW Meds active mobility risk'),
+            riskPanel.getByText('PW Meds active mobility risk'),
         ).toBeVisible();
         await expect(
-            page.getByText('Use two-person support for transfers.'),
+            riskPanel.getByText('Use two-person support for transfers.'),
         ).toBeVisible();
 
         expectNoUnexpectedConsoleErrors(consoleErrors);
@@ -103,10 +107,14 @@ test.describe('canonical client profile care readiness', () => {
         const profileUrl = new URL(page.url());
         await page.goto(`${profileUrl.pathname}?tab=mar`);
 
-        await expect(page.getByText('Medication administration')).toBeVisible();
-        await expect(page.getByText('PW Meds Morning Tablets')).toBeVisible();
         await expect(
-            page.getByRole('link', { name: 'Full MAR chart' }).first(),
+            page.getByRole('heading', { name: 'Medication', exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByText('PW Meds Morning Tablets', { exact: true }).first(),
+        ).toBeVisible();
+        await expect(
+            page.getByRole('link', { name: 'Open medication record' }).first(),
         ).toBeVisible();
 
         expectNoUnexpectedConsoleErrors(consoleErrors);

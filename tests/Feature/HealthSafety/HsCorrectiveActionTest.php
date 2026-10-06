@@ -9,12 +9,17 @@ use App\Models\ControlRoomAlert;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
+use App\Models\HsRecommendationDisposition;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use App\Notifications\AppEventNotification;
+use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use App\Services\HealthSafety\HsCorrectiveActionService;
+use App\Services\HealthSafety\HsEventClosureService;
+use App\Services\HealthSafety\HsEventService;
+use App\Services\HealthSafety\HsInvestigationService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -132,27 +137,66 @@ class HsCorrectiveActionTest extends TestCase
 
     public function test_exact_retry_survives_event_closure_and_owner_eligibility_drift(): void
     {
+        Notification::fake();
         [
             'investigation' => $investigation,
             'owner' => $owner,
             'actor' => $actor,
             'event' => $event,
             'task' => $task,
+            'alert' => $alert,
         ] = $this->recommendationJourney();
         $payload = $this->transferPayload($owner, $task);
         $first = $this->service->createFromRecommendation($investigation, 0, $payload, $actor);
 
-        $event->forceFill([
-            'status' => HsEvent::STATUS_CLOSED,
-            'closed_at' => now(),
-            'closed_by' => $actor->id,
-            'closure_summary' => 'Closed after the original handover response was lost.',
-        ])->save();
+        $verifier = User::factory()->create();
+        $this->service->start($first, $owner->id);
+        $this->service->complete($first, [
+            'completed_by_user_id' => $owner->id,
+            'completion_notes' => 'Unsafe bathroom rail replaced and checked.',
+        ]);
+        $this->service->verify($first, [
+            'verified_by_user_id' => $verifier->id,
+            'evidence_reviewed' => true,
+            'effectiveness_confirmed' => true,
+            'verification_notes' => 'Independent review confirmed the rail is secure.',
+        ]);
+        app(HsInvestigationService::class)->dispositionRecommendation(
+            $investigation,
+            1,
+            HsRecommendationDisposition::DISPOSITION_NO_ACTION,
+            $actor,
+            'The completed refresher training already covers this recommendation.',
+        );
+        app(HsEventService::class)->recordWorksafeDecision(
+            $event,
+            false,
+            'Assessed as not meeting the WorkSafe notification threshold.',
+            $actor,
+        );
+        app(ControlRoomAlertLifecycleService::class)->resolve(
+            $alert,
+            $actor,
+            'Protective task transferred and independently verified.',
+            'completed',
+        );
+        $closePermission = Permission::query()->where('key', 'healthSafety.events.close')->firstOrFail();
+        $owner->permissionOverrides()->syncWithoutDetaching([
+            $closePermission->id => ['allowed' => true],
+        ]);
+        $closed = app(HsEventClosureService::class)->closeEvent(
+            $event,
+            'All protective work and recommendation outcomes completed.',
+            $owner,
+        );
+        $this->assertSame(HsEvent::STATUS_CLOSED, $closed->status);
+        $this->assertSame($owner->id, $closed->closed_by);
         $owner->hrEmployeeProfile()->update(['is_active' => false]);
         $hazardsManage = Permission::query()->where('key', 'hazards.manage')->firstOrFail();
         $owner->permissionOverrides()->syncWithoutDetaching([
             $hazardsManage->id => ['allowed' => false],
         ]);
+        $auditsBeforeRetry = AuditLog::query()->count();
 
         $retry = $this->service->createFromRecommendation(
             $investigation->fresh(),
@@ -162,8 +206,12 @@ class HsCorrectiveActionTest extends TestCase
         );
 
         $this->assertSame($first->id, $retry->id);
+        $this->assertSame(HsCorrectiveAction::STATUS_VERIFIED, $retry->status);
+        $this->assertSame(AlertTask::STATUS_TRANSFERRED, $task->fresh()->status);
         $this->assertDatabaseCount('hs_corrective_actions', 1);
-        $this->assertDatabaseCount('hs_recommendation_dispositions', 1);
+        $this->assertDatabaseCount('hs_recommendation_dispositions', 2);
+        $this->assertSame($auditsBeforeRetry, AuditLog::query()->count());
+        Notification::assertSentToTimes($owner, AppEventNotification::class, 1);
     }
 
     public function test_allows_actions_for_different_recommendations(): void
@@ -614,14 +662,23 @@ class HsCorrectiveActionTest extends TestCase
             'completed_by_user_id' => $completer->id,
         ]);
 
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('action owner and completer');
-
-        $this->service->verify($action, [
-            'verified_by_user_id' => $owner->id,
-            'evidence_reviewed' => true,
-            'effectiveness_confirmed' => true,
-        ]);
+        $before = $action->fresh()->getAttributes();
+        $auditsBefore = AuditLog::query()->count();
+        try {
+            $this->service->verify($action, [
+                'verified_by_user_id' => $owner->id,
+                'evidence_reviewed' => true,
+                'effectiveness_confirmed' => true,
+            ]);
+            $this->fail('The action owner must not verify another person\'s completion.');
+        } catch (\InvalidArgumentException $exception) {
+            $this->assertSame(
+                'Verifier must be a different person than the action owner, completer, and reporter (separation of duties).',
+                $exception->getMessage(),
+            );
+        }
+        $this->assertSame($before, $action->fresh()->getAttributes());
+        $this->assertSame($auditsBefore, AuditLog::query()->count());
     }
 
     public function test_verification_requires_evidence_acknowledgement(): void

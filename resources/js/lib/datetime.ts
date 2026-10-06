@@ -139,6 +139,18 @@ export function toDateInput(
     return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
+/** Completed calendar years on the worker's NZ day; a birth date is not an instant. */
+export function ageOnWorkerDay(
+    birthDate: string | null | undefined,
+    asAt: DateInput = new Date(),
+): number | null {
+    if (!birthDate || !formatDateOnly(birthDate, '')) return null;
+    const today = toDateInput(asAt);
+    if (!today || birthDate > today) return null;
+    const years = Number(today.slice(0, 4)) - Number(birthDate.slice(0, 4));
+    return years - (today.slice(5) < birthDate.slice(5) ? 1 : 0);
+}
+
 /** "July 2026" — month heading for Fleet calendars and reports. */
 export function formatMonthYear(
     value: DateInput,
@@ -285,6 +297,40 @@ export function toDatetimeLocal(value: DateInput): string {
         parts.find((p) => p.type === type)?.value ?? '';
     const hour = get('hour') === '24' ? '00' : get('hour');
     return `${get('year')}-${get('month')}-${get('day')}T${hour}:${get('minute')}`;
+}
+
+const workerOffsetFormatter = new Intl.DateTimeFormat('en', {
+    timeZone: WORKER_TIMEZONE,
+    timeZoneName: 'longOffset',
+});
+
+export function workerTimeOffset(instant: string): string {
+    const date = new Date(instant);
+    if (!Number.isFinite(date.getTime())) return '';
+    return (
+        workerOffsetFormatter
+            .formatToParts(date)
+            .find((part) => part.type === 'timeZoneName')
+            ?.value.replace('GMT', '') || '+00:00'
+    );
+}
+
+/** Zero choices is a skipped spring time; two choices is a repeated autumn time. */
+export function workerTimeOffsets(local: string): string[] {
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(local)) return [];
+    const nominal = Date.parse(`${local}:00Z`);
+    if (!Number.isFinite(nominal)) return [];
+    const candidates = new Set(
+        [-86400000, 0, 86400000].map((delta) =>
+            workerTimeOffset(new Date(nominal + delta).toISOString()),
+        ),
+    );
+    return [...candidates]
+        .filter((offset) => toDatetimeLocal(`${local}:00${offset}`) === local)
+        .sort(
+            (a, b) =>
+                Date.parse(`${local}:00${a}`) - Date.parse(`${local}:00${b}`),
+        );
 }
 
 /**

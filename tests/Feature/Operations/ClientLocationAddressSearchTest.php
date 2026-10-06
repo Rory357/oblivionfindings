@@ -9,7 +9,11 @@ use Tests\Support\ClientLocationWorkspaceFixture;
 beforeEach(function () {
     Http::preventStrayRequests();
     Queue::fake();
-    $this->assertStringStartsWith('oblivion_findings_pkg02a_2b9f_test_', DB::connection()->getDatabaseName());
+    $this->assertTrue(static::$isolatedMysqlPrepared);
+    $ownedDatabase = static::$testDatabaseBaseName.'_'.$this->resolveProcessToken();
+    $this->assertSame($ownedDatabase, static::$isolatedMysqlDatabase);
+    $this->assertNotSame(static::$testDatabaseBaseName, $ownedDatabase);
+    $this->assertSame($ownedDatabase, DB::connection()->getDatabaseName());
     config(['fleet.maps.address_search_cache_store' => 'database', 'cache.stores.database.connection' => DB::getDefaultConnection(), 'cache.stores.database.lock_connection' => DB::getDefaultConnection()]);
     $store = Cache::store('database')->getStore();
     $this->assertSame(DB::connection()->getDatabaseName(), $store->getConnection()->getDatabaseName());

@@ -10,6 +10,7 @@ use App\Models\ShiftHandover;
 use App\Models\ShiftTask;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ShiftHandoverService;
 use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
@@ -93,7 +94,7 @@ test('clock out applies embedded task updates before blocker evaluation', functi
 
     expect(ShiftHandover::query()
         ->where('outgoing_shift_id', $shift->id)
-        ->sole()->status)->toBe('draft');
+        ->sole()->status)->toBe(ShiftHandoverService::STATUS_DRAFT);
     expect(ShiftHandover::query()->where('outgoing_shift_id', $shift->id)->sole()->submitted_at)->toBeNull();
 });
 

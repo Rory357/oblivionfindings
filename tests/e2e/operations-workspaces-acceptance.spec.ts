@@ -73,9 +73,10 @@ test.describe('Monitoring, maintenance, and collector operations', () => {
         ).toBeVisible();
         await expect(page.getByText(fixture.directMonitorName)).toBeVisible();
         await expect(page.getByText(fixture.remoteMonitorName)).toBeVisible();
-        const directMonitorCard = page
-            .locator('div.rounded-xl.border.p-4')
-            .filter({ hasText: fixture.directMonitorName });
+        const directMonitorCard = page.getByRole('article', {
+            name: `Monitor ${fixture.directMonitorName}`,
+            exact: true,
+        });
         await expect(directMonitorCard).toHaveCount(1);
         await expect(
             directMonitorCard.getByText('Direct from main application'),

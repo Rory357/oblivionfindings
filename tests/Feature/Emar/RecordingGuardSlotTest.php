@@ -18,6 +18,7 @@ use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
@@ -42,6 +43,8 @@ class RecordingGuardSlotTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Keep the explicit fallback contract; public defaults are covered separately.
+        config(['medications.person_record' => 'legacy']);
 
         $this->seed(RbacSeeder::class);
         Cache::flush();
@@ -208,7 +211,7 @@ class RecordingGuardSlotTest extends TestCase
         ]);
     }
 
-    private function record(ClientMedication $order, string $scheduledFor): \Illuminate\Testing\TestResponse
+    private function record(ClientMedication $order, string $scheduledFor): TestResponse
     {
         return $this->actingAs($this->worker->fresh())
             ->from('/meds/today')

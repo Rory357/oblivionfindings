@@ -1,3 +1,4 @@
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 /* CD register entry — BUILD-NEW modal on the shared Add-Client wizard chrome.
  * Posts to emar.controlled.entries.store with the idempotency envelope
  * (client_request_uuid). Witness is mandatory and must differ from the signer. */
@@ -269,6 +270,25 @@ export function CdRegisterModal({
 
     return (
         <MedsWizardDialog
+            formState={{
+                isDirty:
+                    clientId !==
+                        (initialClientId ? String(initialClientId) : '') ||
+                    [
+                        clientMedicationId,
+                        entryType,
+                        quantity,
+                        unit,
+                        onHandBefore,
+                        onHandAfter,
+                        witnessedBy,
+                        witnessCredential,
+                        batch,
+                        expiry,
+                        notes,
+                    ].some(Boolean),
+                processing: saving,
+            }}
             open={open}
             onClose={close}
             title="Controlled-drug register entry"
@@ -425,11 +445,13 @@ export function CdRegisterModal({
                     </Field>
                     <Field label="Expiry date">
                         {/* eslint-disable-next-line no-restricted-syntax -- native date input; no shadcn date control in wizard primitives. */}
-                        <input
-                            type="date"
+                        <DatePicker
+                            compact
+                            id="emar-cd-register-modal-1"
+                            label="Expiry date"
                             value={expiry}
-                            onChange={(e) => setExpiry(e.target.value)}
-                            className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                            onChange={(value) => setExpiry(value)}
+                            allowClear
                         />
                     </Field>
                     <InfoCard icon={Info} tone="warn">

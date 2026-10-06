@@ -464,6 +464,9 @@ function makeWorkerAndMedication(array $medicationOverrides = []): array
     $medication = ClientMedication::factory()->create(array_merge([
         'client_id' => $client->id,
         'name' => 'Donepezil',
+        'controlled_drug' => false,
+        'nz_controlled_class' => ($medicationOverrides['controlled_drug'] ?? false) ? 'B' : null,
+        'controlled_class_source' => ($medicationOverrides['controlled_drug'] ?? false) ? 'Synthetic reviewed test configuration' : null,
         'dosage' => '5 mg',
         'dose_times' => ['10:00'],
         'active' => true,
@@ -511,6 +514,7 @@ function makeMedicationWitness(Client $client): User
         'expiry_date' => today()->addYear(),
         'assessor_declared_at' => now()->subMonth(),
         'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+        'controlled_drugs' => true,
         'can_witness_controlled' => true,
     ]);
     Shift::factory()->create([

@@ -16,17 +16,25 @@ test.describe('frontline lifecycle shell', () => {
         await page.goto('/my-day');
         await page.waitForLoadState('domcontentloaded');
 
-        // Header — "Today" with the chevron + global links.
+        // Current My Day header and shared page navigation.
         await expect(
-            page.getByRole('heading', { name: /^Today$/i }).first(),
+            page.getByRole('heading', { name: 'My Day', level: 1 }),
         ).toBeVisible();
-        await expect(page.getByRole('link', { name: /Clients/i }).first()).toBeVisible();
+        await expect(
+            page.getByRole('button', {
+                name: 'Search or jump to a page',
+                exact: true,
+            }),
+        ).toBeVisible();
 
         // Hero + body sections. We can't guarantee the worker has an active
         // shift in CI fixtures, so we assert on the headings that always
         // render regardless of payload state.
         await expect(
-            page.getByRole('heading', { name: /What['’]s next/i }).first(),
+            page.getByRole('heading', {
+                name: 'What needs to happen today',
+                exact: true,
+            }),
         ).toBeVisible();
 
         expectNoConsoleErrors(consoleErrors);

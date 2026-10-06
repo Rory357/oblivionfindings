@@ -8,7 +8,8 @@ type Props = {
         label: string;
         description: string;
         route: string;
-        export_route: string;
+        export_route: string | null;
+        export_label?: string;
         modules: string[];
     };
     generated_at: string;
@@ -59,12 +60,12 @@ export default function CombinedReport({
                             Generated at: {generated_at}
                         </div>
                         <div className="mt-3">
-                            <a
+                            {report.export_route ? <a
                                 href={report.export_route}
                                 className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
                             >
-                                Export CSV
-                            </a>
+                                {report.export_label ?? 'Export CSV'}
+                            </a> : <span className="text-xs text-muted-foreground">Export access is required.</span>}
                         </div>
                     </CardContent>
                 </Card>

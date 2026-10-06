@@ -15,6 +15,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Notifications\Operations\ConsentRequestReminderNotification;
 use App\Notifications\Operations\ConsentRequestRespondedNotification;
+use App\Services\ConsentDecisionEvidenceService;
 use App\Services\ConsentRequestService;
 use App\Services\Consents\ConsentAuthorityScopeService;
 use App\Services\ConsentValidationService;
@@ -1970,3 +1971,141 @@ it('routes every authoritative consent consumer through the canonical decision c
     expect(file_get_contents(base_path('app/Http/Controllers/FleetAssets/DeviceController.php')))
         ->not->toContain('ClientConsent::create');
 });
+
+it('records consent assessment instants from NZ form times while preserving explicit offsets and UTC', function (
+    string $nowUtc,
+    string $assessedAt,
+    string $expiresAt,
+    string $expectedAssessedUtc,
+    string $expectedExpiresUtc,
+) {
+    Carbon::setTestNow(Carbon::parse($nowUtc));
+    try {
+        $context = makeConsentIntegrityContext();
+        $authority = makeVerifiedConsentAuthority($context);
+        $consentCount = ClientConsent::query()->count();
+
+        $this->actingAs($context['staff'])->post(
+            "/operations/clients/{$context['client']->id}/consent-requests",
+            consentIntegrityPayload($context, [
+                'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+                ...consentIntegrityDecisionEvidence([
+                    'capacity_assessed_at' => $assessedAt,
+                    'capacity_assessment_expires_at' => $expiresAt,
+                ]),
+            ]),
+        )->assertRedirect()->assertSessionHasNoErrors()->assertSessionHas('success');
+
+        $recorded = ConsentRequest::query()->sole();
+        expect($recorded->capacity_assessed_at->utc()->format('Y-m-d\TH:i:s\Z'))->toBe($expectedAssessedUtc)
+            ->and($recorded->capacity_assessment_expires_at->utc()->format('Y-m-d\TH:i:s\Z'))->toBe($expectedExpiresUtc)
+            ->and($recorded->capacity_assessor_user_id)->toBe($context['staff']->id)
+            ->and($recorded->decision_evidence_recorded_by_user_id)->toBe($context['staff']->id)
+            ->and($recorded->authority_next_of_kin_id)->toBe($authority->id)
+            ->and($recorded->decision_scope_digest)->toHaveLength(64)
+            ->and($recorded->decision_evidence_accepted_at)->toBeNull()
+            ->and(ClientConsent::query()->count())->toBe($consentCount);
+
+        app(ConsentDecisionEvidenceService::class)->assertCurrent(
+            $recorded, $context['staff'], $context['recipient'], $context['client'], $authority,
+        );
+    } finally {
+        Carbon::setTestNow();
+    }
+})->with([
+    'summer NZ wall time' => ['2026-10-04T01:00:00Z', '2026-10-04T13:55', '2026-10-05T14:00', '2026-10-04T00:55:00Z', '2026-10-05T01:00:00Z'],
+    'winter NZ wall time' => ['2026-07-04T02:00:00Z', '2026-07-04T13:55', '2026-07-05T14:00', '2026-07-04T01:55:00Z', '2026-07-05T02:00:00Z'],
+    'summer explicit NZ offset' => ['2026-10-04T01:00:00Z', '2026-10-04T13:55:00+13:00', '2026-10-05T14:00:00+13:00', '2026-10-04T00:55:00Z', '2026-10-05T01:00:00Z'],
+    'winter explicit NZ offset' => ['2026-07-04T02:00:00Z', '2026-07-04T13:55:00+12:00', '2026-07-05T14:00:00+12:00', '2026-07-04T01:55:00Z', '2026-07-05T02:00:00Z'],
+    'summer UTC instants' => ['2026-10-04T01:00:00Z', '2026-10-04T00:55:00Z', '2026-10-05T01:00:00Z', '2026-10-04T00:55:00Z', '2026-10-05T01:00:00Z'],
+    'winter UTC instants' => ['2026-07-04T02:00:00Z', '2026-07-04T01:55:00Z', '2026-07-05T02:00:00Z', '2026-07-04T01:55:00Z', '2026-07-05T02:00:00Z'],
+    'other explicit offset retains its instant' => ['2026-10-04T01:00:00Z', '2026-10-04T06:25:00+05:30', '2026-10-05T06:30:00+05:30', '2026-10-04T00:55:00Z', '2026-10-05T01:00:00Z'],
+    'first repeated NZ hour' => ['2026-04-05T03:00:00Z', '2026-04-05T02:15:00+13:00', '2026-04-06T14:00', '2026-04-04T13:15:00Z', '2026-04-06T02:00:00Z'],
+    'second repeated NZ hour' => ['2026-04-05T03:00:00Z', '2026-04-05T02:15:00+12:00', '2026-04-06T14:00', '2026-04-04T14:15:00Z', '2026-04-06T02:00:00Z'],
+    'UTC instant with wall digits inside the NZ gap' => ['2026-09-27T03:00:00Z', '2026-09-27T02:15:00Z', '2026-09-28T14:00', '2026-09-27T02:15:00Z', '2026-09-28T01:00:00Z'],
+]);
+
+it('preserves absolute mutable and immutable date objects passed to the consent service', function () {
+    Carbon::setTestNow(Carbon::parse('2026-10-04T01:00:00Z'));
+    try {
+        $context = makeConsentIntegrityContext();
+        $authority = makeVerifiedConsentAuthority($context);
+        $assessedAt = new DateTimeImmutable('2026-10-04T13:55:00+13:00');
+        $expiresAt = new DateTime('2026-10-05T06:30:00+05:30');
+        $payload = consentIntegrityPayload($context, [
+            'client_id' => $context['client']->id,
+            'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+            ...consentIntegrityDecisionEvidence([
+                'capacity_assessed_at' => $assessedAt,
+                'capacity_assessment_expires_at' => $expiresAt,
+            ]),
+        ]);
+        unset($payload['expires_in_days']);
+        $recorded = app(ConsentRequestService::class)->create($payload, $context['staff']);
+
+        expect($recorded->capacity_assessed_at->utc()->toIso8601String())->toBe('2026-10-04T00:55:00+00:00')
+            ->and($recorded->capacity_assessment_expires_at->utc()->toIso8601String())->toBe('2026-10-05T01:00:00+00:00')
+            ->and($assessedAt->format('Y-m-d\TH:i:sP'))->toBe('2026-10-04T13:55:00+13:00')
+            ->and($expiresAt->format('Y-m-d\TH:i:sP'))->toBe('2026-10-05T06:30:00+05:30')
+            ->and($recorded->capacity_assessor_user_id)->toBe($context['staff']->id);
+        app(ConsentDecisionEvidenceService::class)->assertCurrent(
+            $recorded, $context['staff'], $context['recipient'], $context['client'], $authority,
+        );
+    } finally {
+        Carbon::setTestNow();
+    }
+});
+
+it('rejects invalid ambiguous future or expired consent assessment times without evidence effects', function (
+    string $nowUtc,
+    string $assessedAt,
+    string $expiresAt,
+    string $field,
+    ?string $messageFragment,
+) {
+    Carbon::setTestNow(Carbon::parse($nowUtc));
+    try {
+        $context = makeConsentIntegrityContext();
+        $authority = makeVerifiedConsentAuthority($context);
+        $scope = ConsentAuthorityScope::query()->where('next_of_kin_id', $authority->id)->sole();
+        $capacity = $scope->capacityEvidenceConsent;
+        $records = collect([$authority, $scope, $capacity]);
+        $before = $records->map(fn ($record) => $record->refresh()->getRawOriginal())->all();
+        $consentCount = ClientConsent::query()->count();
+        $auditCount = DB::table('audit_logs')->count();
+
+        $response = $this->actingAs($context['staff'])->post(
+            "/operations/clients/{$context['client']->id}/consent-requests",
+            consentIntegrityPayload($context, [
+                'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+                ...consentIntegrityDecisionEvidence([
+                    'capacity_assessed_at' => $assessedAt,
+                    'capacity_assessment_expires_at' => $expiresAt,
+                ]),
+            ]),
+        )->assertSessionHasErrors($field);
+        if ($messageFragment !== null) {
+            $response->assertSessionHas('errors', fn ($errors) => str_contains(
+                implode(' ', $errors->get($field)), $messageFragment,
+            ));
+        }
+
+        expect(ConsentRequest::query()->exists())->toBeFalse()
+            ->and(ClientConsent::query()->count())->toBe($consentCount)
+            ->and(DB::table('audit_logs')->count())->toBe($auditCount)
+            ->and($records->map(fn ($record) => $record->refresh()->getRawOriginal())->all())->toBe($before);
+        Notification::assertNothingSent();
+    } finally {
+        Carbon::setTestNow();
+    }
+})->with([
+    'assessment in the NZ spring gap' => ['2026-10-04T01:00:00Z', '2026-09-27T02:15', '2026-10-05T14:00', 'capacity_assessed_at', 'does not exist in New Zealand'],
+    'assessment in the repeated NZ hour' => ['2026-10-04T01:00:00Z', '2026-04-05T02:15', '2026-10-05T14:00', 'capacity_assessed_at', 'occurs twice'],
+    'expiry in the NZ spring gap' => ['2026-09-26T01:00:00Z', '2026-09-26T12:55', '2026-09-27T02:15', 'capacity_assessment_expires_at', 'does not exist in New Zealand'],
+    'expiry in the repeated NZ hour' => ['2026-04-04T01:00:00Z', '2026-04-04T13:55', '2026-04-05T02:15', 'capacity_assessment_expires_at', 'occurs twice'],
+    'invalid calendar date' => ['2026-10-04T01:00:00Z', '2026-02-30T13:55', '2026-10-05T14:00', 'capacity_assessed_at', null],
+    'future local assessment' => ['2026-10-04T01:00:00Z', '2026-10-04T14:05', '2026-10-05T14:00', 'capacity_assessed_at', 'cannot be in the future'],
+    'future UTC assessment' => ['2026-10-04T01:00:00Z', '2026-10-04T01:05:00Z', '2026-10-05T01:00:00Z', 'capacity_assessed_at', 'cannot be in the future'],
+    'expired local assessment' => ['2026-10-04T01:00:00Z', '2026-10-04T13:55', '2026-10-04T13:59', 'capacity_assessment_expires_at', 'must remain current'],
+    'expired UTC assessment' => ['2026-10-04T01:00:00Z', '2026-10-04T00:55:00Z', '2026-10-04T00:59:00Z', 'capacity_assessment_expires_at', 'must remain current'],
+]);

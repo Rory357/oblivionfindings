@@ -347,6 +347,7 @@ export function RecordDoseWizard({
             open
             onClose={onClose}
             title="Record dose"
+            formState={form}
             description="A guided, audited walk-through for recording a scheduled medication dose to the MAR."
             railIcon={Pill}
             railTitle="Record dose"

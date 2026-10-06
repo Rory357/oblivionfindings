@@ -1,4 +1,6 @@
+import { Link } from '@inertiajs/react';
 import {
+    ArrowUpRight,
     CalendarDays,
     Clock3,
     MessagesSquare,
@@ -54,6 +56,22 @@ interface Props {
 }
 
 export function MyDayHeader(p: Props) {
+    const selectedPerson =
+        p.residents.length === 1
+            ? p.residents[0]
+            : p.residents.find((person) => person.id === p.person);
+    const careRecord = selectedPerson ? (
+        <Link
+            href={`/clients/${selectedPerson.id}`}
+            aria-label={`Open care record for ${selectedPerson.name}`}
+            data-test="my-day-shift-care-action"
+            className="frontline-tap inline-flex items-center gap-2 rounded-lg border border-band-foreground/20 bg-band-foreground/10 px-3 text-sm font-semibold text-band-foreground outline-none hover:bg-band-foreground/20 focus-visible:ring-2 focus-visible:ring-band-foreground/70"
+        >
+            {p.residents.length === 1 ? `${selectedPerson.name} · ` : ''}Care
+            record
+            <ArrowUpRight className="size-4 shrink-0" aria-hidden />
+        </Link>
+    ) : null;
     const tasksUnavailable = p.unavailable?.some((section) =>
         ['Shifts', 'Current shift'].includes(section),
     );
@@ -278,11 +296,14 @@ export function MyDayHeader(p: Props) {
                                         />
                                     </div>
                                 )}
+                                {careRecord}
                             </div>
                         ) : (
-                            <span className="text-sm text-primary-foreground/80">
-                                {p.residents[0]?.name ?? 'Your shift’s work'}
-                            </span>
+                            (careRecord ?? (
+                                <span className="text-sm text-primary-foreground/80">
+                                    Your shift’s work
+                                </span>
+                            ))
                         )}
                         <div
                             role="group"

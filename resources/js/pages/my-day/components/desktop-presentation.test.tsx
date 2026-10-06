@@ -87,6 +87,12 @@ describe('My Day desktop presentation', () => {
         expect(
             forPeople.getByRole('button', { name: 'Everyone' }),
         ).toHaveAttribute('aria-pressed', 'false');
+        const careRecord = screen.getByRole('link', {
+            name: 'Open care record for James Lee',
+        });
+        expect(careRecord).toHaveAttribute('href', '/clients/2');
+        careRecord.focus();
+        expect(careRecord).toHaveFocus();
         const work = within(
             screen.getByRole('group', { name: 'Work to show' }),
         );
@@ -97,6 +103,9 @@ describe('My Day desktop presentation', () => {
         fireEvent.click(screen.getByRole('tab', { name: 'Handover' }));
         expect(
             screen.queryByRole('group', { name: 'People to show' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('link', { name: /Open care record for/ }),
         ).not.toBeInTheDocument();
     });
 

@@ -442,6 +442,8 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
         expect(is_file($root.'/tests/e2e/'.$desktopOnlySpec.'.spec.ts'))->toBeTrue();
     }
 
+    $desktopProject = [];
+
     expect($package['scripts']['visual:test:it-security'] ?? null)
         ->toBe('playwright test -c playwright.config.ts --project=it-security-desktop-1440 --project=it-security-desktop-1280')
         ->and($package['scripts']['visual:test:legacy'] ?? null)
@@ -476,8 +478,9 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
         ))->toBe(1)
         ->and(substr_count($playwrightConfig, 'testMatch: legacyAppShellVisualTestMatch'))->toBe(1)
         ->and(preg_match(
-            "/name: 'chromium-desktop',\\s+testIgnore: \\[\\s*itSecurityDesktopOnlyTestMatch,\\s*legacyAppShellVisualTestMatch,\\s*\\],\\s+use:.*?viewport: \\{ width: 1440, height: 1000 \\}/s",
+            "/name: 'chromium-desktop',\\s+testIgnore: \\[(?<ignored>.*?)\\],\\s+use:.*?viewport: \\{ width: 1440, height: 1000 \\}/s",
             $playwrightConfig,
+            $desktopProject,
         ))->toBe(1)
         ->and(preg_match(
             "/name: 'chromium-desktop-visual',\\s+testMatch: legacyAppShellVisualTestMatch,\\s+snapshotPathTemplate:.*?__screenshots__\\/chromium-desktop.*?viewport: \\{ width: 1440, height: 1000 \\}/s",
@@ -490,6 +493,29 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
         ->and(preg_match(
             "/name: 'it-security-desktop-1280',\\s+testMatch: itSecurityDesktopOnlyTestMatch,\\s+use:.*?viewport: \\{ width: 1280, height: 800 \\}/s",
             $playwrightConfig,
+        ))->toBe(1);
+
+    $ignored = preg_replace('/^[ \t]*\/\/[^\r\n]*$/m', '', $desktopProject['ignored']);
+    expect(preg_replace('/\s+/', '', $ignored))->toBe(
+        'itSecurityDesktopOnlyTestMatch,legacyAppShellVisualTestMatch,/tests[\\\\/]e2e[\\\\/]governance[\\\\/]/,',
+    );
+
+    $governanceConfig = (string) file_get_contents($root.'/playwright.governance.config.ts');
+    expect($governanceConfig)->toContain(
+        "testDir: './tests/e2e/governance'",
+        "globalSetup: './tests/e2e/governance/global-setup.ts'",
+        "globalTeardown: './tests/e2e/governance/global-teardown.ts'",
+        'fullyParallel: false',
+        'workers: 1',
+        'reuseExistingServer: false',
+    )
+        ->and(preg_match(
+            "/name: 'governance-desktop-1366',\\s+use:.*?viewport: \\{ width: 1366, height: 768 \\}/s",
+            $governanceConfig,
+        ))->toBe(1)
+        ->and(preg_match(
+            "/name: 'governance-desktop-1920',\\s+use:.*?viewport: \\{ width: 1920, height: 1080 \\}/s",
+            $governanceConfig,
         ))->toBe(1);
 
     foreach ([

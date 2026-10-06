@@ -140,7 +140,7 @@ class CalendarController extends Controller
 
         $eventQuery = HrCalendarEvent::query()
             ->active()
-            ->inRange($weekStart->toDateString(), $weekEnd->toDateString())
+            ->inRange($weekStart->toDateTimeString(), $weekEnd->toDateTimeString())
             ->with('attendees');
         $this->access->applySiteScope($eventQuery, $user);
         $eventsThisWeek = $this->access->visibleEvents($eventQuery->get(), $user)->count();

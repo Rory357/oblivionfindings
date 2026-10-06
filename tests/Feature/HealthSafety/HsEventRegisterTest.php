@@ -19,6 +19,8 @@ use App\Models\SiteInspectionRecord;
 use App\Models\SiteInspectionSchedule;
 use App\Models\SubstanceExposureRecord;
 use App\Models\User;
+use App\Services\HealthSafety\HsEventClosureService;
+use App\Services\HealthSafety\HsEventService;
 use App\Services\HealthSafety\NotifiableEventClassifier;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -322,12 +324,24 @@ class HsEventRegisterTest extends TestCase
                 ->where('detail.worksafe.can_acknowledge', true)
             );
 
-        $notified->update([
-            'status' => HsEvent::STATUS_CLOSED,
-            'closed_at' => now(),
-            'closed_by' => $actor->id,
-            'closure_summary' => 'Closed under an authorised historic exception.',
+        HsInvestigation::factory()->completed()->create([
+            'hs_event_id' => $notified->id,
+            'recommendations' => [],
         ]);
+        app(HsEventService::class)->recordSitePreservationDecision(
+            $notified,
+            false,
+            'HS-REGISTER-CLOSE-01: applicability reviewed as not required.',
+            $actor,
+        );
+        app(HsEventService::class)->acknowledgeWorksafe($notified, now());
+        $closed = app(HsEventClosureService::class)->closeEvent(
+            $notified,
+            'WorkSafe obligations and investigation completed.',
+            $actor,
+        );
+        $this->assertSame(HsEvent::STATUS_CLOSED, $closed->status);
+        $this->assertSame($actor->id, $closed->closed_by);
 
         $this->actingAs($actor)
             ->get('/health-safety/events?event='.$notified->id)
@@ -335,7 +349,7 @@ class HsEventRegisterTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->where('detail.worksafe.can_decide', false)
                 ->where('detail.worksafe.can_notify', false)
-                ->where('detail.worksafe.can_acknowledge', true)
+                ->where('detail.worksafe.can_acknowledge', false)
             );
     }
 

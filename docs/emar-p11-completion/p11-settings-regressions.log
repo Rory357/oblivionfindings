@@ -1,0 +1,2030 @@
+[heavy-lock] queued behind: emar-main-preview-schema 37496 1791019795 1929211879
+[heavy-lock] queued behind: P09-recorder 36568 1791020061 1716210858
+[heavy-lock] next in line; waiting for: P09-recorder 36568 1791020061 1716210858
+[heavy-lock] P11-settings-regressions running: /c/Users/steph/.config/herd/bin/php84/php.exe vendor/bin/pest tests/Feature/Emar/P11CompletionTest.php tests/Feature/Emar/MedicationSettingsStorageTest.php tests/Feature/Emar/MedicationSettingsSiteScopeTest.php tests/Feature/Emar/MedicationSettingsAuditorAccessTest.php tests/Feature/Emar/MedicationAlertSettingsTest.php tests/Feature/Emar/MedicationAlertsTest.php tests/Feature/Emar/StaffEligibilityTest.php tests/Feature/Settings/ProfileUpdateTest.php tests/Feature/Settings/ProfileWorkContactPrivacyTest.php --display-warnings
+
+   FAIL  Tests\Feature\Emar\P11CompletionTest
+  ! it pages all retained alert history and restricts forged house filters → file_get_contents(C:\Users\steph… 316.52s
+  ! it conceals controlled details from payload and search while retaining the approved shell → file_get_conten… 0.26s
+  ! it removes historical client alerts after a move and denies nonassigned people before counting → file_get_c… 0.32s
+  ! it shows canonical event IDs and delivered recipients without calling held recipients told → file_get_conte… 0.18s
+  ! it retains recently closed and unattended alerts beyond the audit cutoff and dry-run changes nothing → file… 0.47s
+  ! it saves emergency policy into the existing runtime row with structured history and a loosening confirmatio… 2.55s
+  ! it requires the dedicated emergency-policy grant and validates duration relationships under the write lock…  0.83s
+  ! it lets the account owner consent and withdraw without changing HR contacts or exposing the consent in user… 0.49s
+  ! it loads alert history only when asked and applies site filters to the deferred response → file_get_content… 0.93s
+  ⨯ it keeps the bell chronological by default and pins only shared unattended medication followups when enable… 0.86s
+  ! it saves and audits the canonical P10 second-person and review rules without changing an earlier snapshot →… 0.21s
+
+   WARN  Tests\Feature\Emar\MedicationSettingsStorageTest
+  ! a save records the change with the value before it → file_get_contents(C:\Users\steph\.codex\worktrees\emar… 1.15s
+  ! loosening a check needs confirmation and is labelled in the history → file_get_contents(C:\Users\steph\.cod… 0.97s
+  ! a change saved elsewhere is never overwritten → file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-… 0.97s
+  ! keep todays value marks a default reviewed without changing it → file_get_contents(C:\Users\steph\.codex\wo… 1.01s
+  ! each setting must belong to the view and appear once → file_get_contents(C:\Users\steph\.codex\worktrees\em… 0.88s
+  ! house values are stored per house under that houses authority → file_get_contents(C:\Users\steph\.codex\wor… 1.23s
+  ! history words come only from the setting definitions → file_get_contents(C:\Users\steph\.codex\worktrees\em… 0.93s
+
+   WARN  Tests\Feature\Emar\MedicationSettingsSiteScopeTest
+  ! site manager sees only assigned site rules and picker and cannot create outside scope → file_get_contents(C… 0.89s
+  ! site manager gets not found for foreign and global rules and cannot rebind local rule → file_get_contents(C… 0.90s
+  ! explicit global site authority can list and manage site bound and global rules → file_get_contents(C:\Users… 0.89s
+  ! an org rule naming a controlled medicine stays masked for a house manager without controlled access → file_… 0.84s
+
+   WARN  Tests\Feature\Emar\MedicationSettingsAuditorAccessTest
+  ! an auditor reads every setting and the history read only → file_get_contents(C:\Users\steph\.codex\worktree… 1.19s
+  ! every settings write refuses an auditor → file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settin… 0.99s
+
+   WARN  Tests\Feature\Emar\MedicationAlertSettingsTest
+  ! it offers every alert that has a source, with v5’s defaults, not yet reviewed → file_get_contents(C:\Users</>… 1.46s
+  ! it saves who gets an alert in the change history, asking before it loosens → file_get_contents(C:\Users\ste… 1.45s
+  ! it keeps decided groups and in-app on for a decided alert → file_get_contents(C:\Users\steph\.codex\worktre… 1.28s
+  ! it lets a house lead change only their own houses’ extra people → file_get_contents(C:\Users\steph\.codex\w… 1.01s
+  ! it only lets people who can get the alert be named on it → file_get_contents(C:\Users\steph\.codex\worktree… 0.92s
+  ! it refuses a change that switches off every way of telling people → file_get_contents(C:\Users\steph\.codex… 0.86s
+  ! it lets in-app be switched off once email or push is on (B2 C2: at least one channel) → file_get_contents(C… 0.94s
+  ! it saves the privacy switch for email and push, asking before it is switched off → file_get_contents(C:\Use… 0.98s
+  ! it previews each alert from the real notification, with the privacy switch on and off → file_get_contents(C… 1.11s
+  ! it grants the house key to team leads and coordinators, and rolls back only it → file_get_contents(C:\Users… 0.80s
+  ! it grants the settings key only where it is new, so a revoked grant stays revoked → file_get_contents(C:\Us… 0.70s
+  ! it stops Control Room rules notifying only where they still hold their seeded recipients, and restores them… 0.84s
+  ! it keeps the Settings page’s queries bounded as the organisation grows → file_get_contents(C:\Users\steph\.… 1.89s
+  ! it saves follow-up settings that work together, and refuses ones that don’t → file_get_contents(C:\Users\st… 1.00s
+  ! it treats moving what counts as attended towards “opened” as a loosening → file_get_contents(C:\Users\steph… 0.93s
+  ! it saves a house’s on-call contact straight away, in the change history, and removes it after a confirm → f… 0.94s
+  ! it only takes a backup with access to the house and a work phone → file_get_contents(C:\Users\steph\.codex</>… 0.84s
+  ! it lets a house lead set only their own house’s on-call contact → file_get_contents(C:\Users\steph\.codex\w… 0.77s
+  ! it counts a Site as a house by its type, a facility that holds people, or any Site with active orders (Q12)… 0.93s
+  ! it saves the organisation’s quiet hours as one pair, never as a loosening, and refuses half a pair or the s… 0.99s
+  ! it lets a house lead set only their own house’s quiet hours, with both times when it has its own → file_get… 0.84s
+  ! it lists who can’t be reached — work email, push, work phone, and an on-call backup on leave, never the typ… 0.94s
+
+   WARN  Tests\Feature\Emar\MedicationAlertsTest
+  ! it raises an alert once while it is open, even after a deploy clears the cache → file_get_contents(C:\Users… 0.74s
+  ! it tells the groups switched on for the alert, only at the alert’s house → file_get_contents(C:\Users\steph… 0.62s
+  ! it keeps a controlled alert from people without controlled-medicine access, and records who → file_get_cont… 0.65s
+  ! it adds named people everywhere they work and house extras only at their house → file_get_contents(C:\Users… 0.66s
+  ! it tells everyone rostered on a shift covering the alert time → file_get_contents(C:\Users\steph\.codex\wor… 0.95s
+  ! it sends an alert whose groups are empty at the house to medication settings managers there → file_get_cont… 0.64s
+  ! it records “Nobody could be told”, with the reason, when even the safety net is empty → file_get_contents(C… 0.64s
+  ! it marks alerts no longer true as dealt with, so the same subject can alert again → file_get_contents(C:\Us… 0.68s
+  ! it raises low stock, expiring, expired and out-of-stock alerts from the stock checks → file_get_contents(C:… 1.23s
+  ! it raises one balance-check alert per house and deals with it when every check is done → file_get_contents(… 0.76s
+  ! it raises as-needed limit and review alerts when a person’s alerts are refreshed → file_get_contents(C:\Use… 0.83s
+  ! it tells people about a reported medication error and a controlled-drug discrepancy → file_get_contents(C:</>… 0.70s
+  ! it raises a follow-up alert for a refusal follow-up past its due time → file_get_contents(C:\Users\steph\.c… 0.70s
+  ! it never raises an alert that isn’t offered yet → file_get_contents(C:\Users\steph\.codex\worktrees\emar-p1… 0.60s
+  ! it raises out of stock at 0 from the 6:00 am check when the stock has no reorder level → file_get_contents(… 0.67s
+  ! it raises out of stock when a person’s alerts refresh after a change, and deals with it once restocked → fi… 0.71s
+  ! it keeps in-app on for a stored choice with every channel off, so the alert still tells people → file_get_c… 0.64s
+  ! it records an alert with no channel to send on as reaching nobody, not as told → file_get_contents(C:\Users… 0.79s
+  ! it keeps nothing when raising fails part-way, so the next check raises it again → file_get_contents(C:\User… 0.89s
+  ! it deals with a medication error’s alert when the error is resolved → file_get_contents(C:\Users\steph\.cod… 1.05s
+  ! it closes a renewal reminder as renewed only when there is a renewal → file_get_contents(C:\Users\steph\.co… 1.14s
+  ! it carries over at deploy what people were already told, so the first run tells nobody again → file_get_con… 1.05s
+  ! it emails only the work email and pushes only to allowed devices, after the record commits → file_get_conte… 0.88s
+  ! it keeps client names and medicines out of email and push by default, and puts them in when switched off →…  0.81s
+  ! it tells people on email alone when in-app is off, and records those it can’t reach → file_get_contents(C:</>… 0.76s
+  ! it keeps a controlled alert behind the controlled gate on email and push too → file_get_contents(C:\Users\s… 0.77s
+  ! it re-alerts everyone told so far and escalates, one step when both are due, until the re-alerts run out →…  0.77s
+  ! it stops follow-up for everyone once someone acknowledges — opening isn’t enough by default → file_get_cont… 0.72s
+  ! it counts an open as attended when the setting says so, from the bell → file_get_contents(C:\Users\steph\.c… 0.84s
+  ! it does nothing when an attend lands before the tick takes the alert’s lock → file_get_contents(C:\Users\st… 0.69s
+  ! it never re-alerts after an attend that lands after a re-alert → file_get_contents(C:\Users\steph\.codex\wo… 0.69s
+  ! it stops follow-up when the alert is dealt with, and never schedules it without Follow up or with both off…  0.83s
+  ! it runs the follow-up tick every 15 minutes, one run at a time on one server → file_get_contents(C:\Users\s… 1.12s
+  ! it works out the on-call contact: on-call shift, then the team lead on shift, then the backup — nobody when… 0.79s
+  ! it tells the on-call person when an alert includes them, and escalates to them → file_get_contents(C:\Users… 0.71s
+  ! it holds email and push overnight but never the bell, and sends them once when quiet hours end → file_get_c… 0.70s
+  ! it tells someone reached only by a held email when quiet hours end, and never counts them as reaching nobod… 0.75s
+  ! it never holds a Follow up alert, and each house follows the organisation, sets its own hours or has none →… 0.85s
+  ! it sends nothing held for an alert dealt with overnight, and only to people still allowed to get it → file_… 0.86s
+  ! it holds until 7:00 am on the clock across both daylight-saving changes → file_get_contents(C:\Users\steph</>… 0.68s
+
+   WARN  Tests\Feature\Emar\StaffEligibilityTest
+  ! each status comes from the competency policy → file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-s… 1.16s
+  ! the register covers the readers houses and people who record doses → file_get_contents(C:\Users\steph\.code… 1.20s
+  ! each row says what this reader may do → file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings… 1.11s
+  ! exemptions list their state and who can end them → file_get_contents(C:\Users\steph\.codex\worktrees\emar-p… 1.05s
+  ! meds today carries the workers own eligibility → file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11… 1.03s
+
+   WARN  Tests\Feature\Settings\ProfileUpdateTest
+  ! profile page is displayed → file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfin… 0.20s
+  ! profile information can be updated → file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\ob… 0.13s
+  ! email verification status is unchanged when the email address is unchanged → file_get_contents(C:\Users\ste… 0.14s
+  ! self service employment fields update only the current canonical HR profile → file_get_contents(C:\Users\st… 0.21s
+  ! self service cannot invent employment provenance when no canonical HR profile exists → file_get_contents(C:… 0.14s
+  ! user can delete their account → file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivio… 0.64s
+  ! staff cannot delete the canonical employment record through profile settings → file_get_contents(C:\Users\s… 0.14s
+  ! correct password must be provided to delete account → file_get_contents(C:\Users\steph\.codex\worktrees\ema… 0.15s
+
+   WARN  Tests\Feature\Settings\ProfileWorkContactPrivacyTest
+  ! saving a phone in Settings profile leaves the HR work phone unchanged with dataset "a new personal number"…  0.94s
+  ! saving a phone in Settings profile leaves the HR work phone unchanged with dataset "a cleared personal numb… 0.86s
+  ! the My HR directory does not show a number typed only in Settings profile → file_get_contents(C:\Users\step… 1.24s
+  ! the My HR directory keeps showing the HR work phone after a Settings profile save → file_get_contents(C:\Us… 1.06s
+  ! Settings profile saves never replace the HR work email shown in the My HR directory → file_get_contents(C:</>… 1.10s
+  ! the Settings profile page reads back the personal mobile, never the HR work phone → file_get_contents(C:\Us… 1.09s
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\P11CompletionTest > it pages all retained alert history and restricts forged house f…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\P11CompletionTest > it conceals controlled details from payload and search while ret…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\P11CompletionTest > it removes historical client alerts after a move and denies nona…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\P11CompletionTest > it shows canonical event IDs and delivered recipients without ca…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\P11CompletionTest > it retains recently closed and unattended alerts beyond the audi…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\P11CompletionTest > it saves emergency policy into the existing runtime row with str…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\P11CompletionTest > it requires the dedicated emergency-policy grant and validates d…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\P11CompletionTest > it lets the account owner consent and withdraw without changing…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\P11CompletionTest > it loads alert history only when asked and applies site filters…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   FAILED  Tests\Feature\Emar\P11CompletionTest > it keeps the bell chronological by default and pins only shared un…
+  Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+ Array &0 [
+-    0 => 'ea8f6a52-3b97-41e9-b0d8-44ef2fab36a4',
+-    1 => '6d25392c-66a9-4beb-b6c9-695dfa6e0e2d',
++    0 => '6d25392c-66a9-4beb-b6c9-695dfa6e0e2d',
++    1 => 'a3d6a637-aebf-4be1-a438-db8c6146286f',
+ ]
+
+  at tests\Feature\Emar\P11CompletionTest.php:171
+    167▕
+    168▕ it('keeps the bell chronological by default and pins only shared unattended medication followups when enabled', function () {
+    169▕     $site = Site::factory()->create();
+    170▕     $reader = p11FinishActor($site, []);
+  ➜ 171▕     $old = p11FinishAlert($site, ['follow_up' => true]);
+    172▕     $stock = p11FinishAlert($site, ['follow_up' => false]);
+    173▕     $attended = p11FinishAlert($site, ['follow_up' => true, 'attended_at' => now()]);
+    174▕     $make = fn (array $data, $at) => $reader->notifications()->create(['id' => (string) Str::uuid(), 'type' => 'SyntheticP11Bell', 'data' => $data, 'created_at' => $at, 'updated_at' => $at]);
+    175▕     $pinned = $make(['medication_alert_id' => $old->id], now()->subHours(3));
+
+  1   tests\Feature\Emar\P11CompletionTest.php:171
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\P11CompletionTest > it saves and audits the canonical P10 second-person and review r…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationSettingsStorageTest > a save records the change with the value before it
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationSettingsStorageTest > loosening a check needs confirmation and is labelled…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationSettingsStorageTest > a change saved elsewhere is never overwritten
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationSettingsStorageTest > keep todays value marks a default reviewed without c…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationSettingsStorageTest > each setting must belong to the view and appear once
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationSettingsStorageTest > house values are stored per house under that houses…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationSettingsStorageTest > history words come only from the setting definitions
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationSettingsSiteScopeTest > site manager sees only assigned site rules and pic…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationSettingsSiteScopeTest > site manager gets not found for foreign and global…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationSettingsSiteScopeTest > explicit global site authority can list and manage…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationSettingsSiteScopeTest > an org rule naming a controlled medicine stays mas…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationSettingsAuditorAccessTest > an auditor reads every setting and the history…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationSettingsAuditorAccessTest > every settings write refuses an auditor
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertSettingsTest > it offers every alert that has a source, with v5’s def…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertSettingsTest > it saves who gets an alert in the change history, aski…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertSettingsTest > it keeps decided groups and in-app on for a decided al…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertSettingsTest > it lets a house lead change only their own houses’ ext…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertSettingsTest > it only lets people who can get the alert be named on…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertSettingsTest > it refuses a change that switches off every way of tel…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertSettingsTest > it lets in-app be switched off once email or push is o…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertSettingsTest > it saves the privacy switch for email and push, asking…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertSettingsTest > it previews each alert from the real notification, wit…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertSettingsTest > it grants the house key to team leads and coordinators…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertSettingsTest > it grants the settings key only where it is new, so a…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertSettingsTest > it stops Control Room rules notifying only where they…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertSettingsTest > it keeps the Settings page’s queries bounded as the or…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertSettingsTest > it saves follow-up settings that work together, and re…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertSettingsTest > it treats moving what counts as attended towards “open…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertSettingsTest > it saves a house’s on-call contact straight away, in t…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertSettingsTest > it only takes a backup with access to the house and a…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertSettingsTest > it lets a house lead set only their own house’s on-cal…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertSettingsTest > it counts a Site as a house by its type, a facility th…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertSettingsTest > it saves the organisation’s quiet hours as one pair, n…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertSettingsTest > it lets a house lead set only their own house’s quiet…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertSettingsTest > it lists who can’t be reached — work email, push, work…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it raises an alert once while it is open, even after a deploy…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it tells the groups switched on for the alert, only at the al…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it keeps a controlled alert from people without controlled-me…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it adds named people everywhere they work and house extras on…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it tells everyone rostered on a shift covering the alert time
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it sends an alert whose groups are empty at the house to medi…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it records “Nobody could be told”, with the reason, when even…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it marks alerts no longer true as dealt with, so the same sub…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it raises low stock, expiring, expired and out-of-stock alert…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it raises one balance-check alert per house and deals with it…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it raises as-needed limit and review alerts when a person’s a…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it tells people about a reported medication error and a contr…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it raises a follow-up alert for a refusal follow-up past its…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it never raises an alert that isn’t offered yet
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it raises out of stock at 0 from the 6:00 am check when the s…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it raises out of stock when a person’s alerts refresh after a…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it keeps in-app on for a stored choice with every channel off…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it records an alert with no channel to send on as reaching no…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it keeps nothing when raising fails part-way, so the next che…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it deals with a medication error’s alert when the error is re…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it closes a renewal reminder as renewed only when there is a…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it carries over at deploy what people were already told, so t…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it emails only the work email and pushes only to allowed devi…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it keeps client names and medicines out of email and push by…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it tells people on email alone when in-app is off, and record…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it keeps a controlled alert behind the controlled gate on ema…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it re-alerts everyone told so far and escalates, one step whe…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it stops follow-up for everyone once someone acknowledges — o…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it counts an open as attended when the setting says so, from…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it does nothing when an attend lands before the tick takes th…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it never re-alerts after an attend that lands after a re-aler…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it stops follow-up when the alert is dealt with, and never sc…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it runs the follow-up tick every 15 minutes, one run at a tim…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it works out the on-call contact: on-call shift, then the tea…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it tells the on-call person when an alert includes them, and…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it holds email and push overnight but never the bell, and sen…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it tells someone reached only by a held email when quiet hour…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it never holds a Follow up alert, and each house follows the…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it sends nothing held for an alert dealt with overnight, and…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\MedicationAlertsTest > it holds until 7:00 am on the clock across both daylight-savi…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\StaffEligibilityTest > each status comes from the competency policy
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\StaffEligibilityTest > the register covers the readers houses and people who record…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\StaffEligibilityTest > each row says what this reader may do
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\StaffEligibilityTest > exemptions list their state and who can end them
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Emar\StaffEligibilityTest > meds today carries the workers own eligibility
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Settings\ProfileUpdateTest > profile page is displayed
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Settings\ProfileUpdateTest > profile information can be updated
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Settings\ProfileUpdateTest > email verification status is unchanged when the email addres…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Settings\ProfileUpdateTest > self service employment fields update only the current canon…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Settings\ProfileUpdateTest > self service cannot invent employment provenance when no can…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Settings\ProfileUpdateTest > user can delete their account
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Settings\ProfileUpdateTest > staff cannot delete the canonical employment record through…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Settings\ProfileUpdateTest > correct password must be provided to delete account
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Settings\ProfileWorkContactPrivacyTest > saving a phone in Settings profile leaves the HR…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Settings\ProfileWorkContactPrivacyTest > saving a phone in Settings profile leaves the HR…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Settings\ProfileWorkContactPrivacyTest > the My HR directory does not show a number typed…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Settings\ProfileWorkContactPrivacyTest > the My HR directory keeps showing the HR work ph…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Settings\ProfileWorkContactPrivacyTest > Settings profile saves never replace the HR work…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   WARNINGS  Tests\Feature\Settings\ProfileWorkContactPrivacyTest > the Settings profile page reads back the persona…
+  file_get_contents(C:\Users\steph\.codex\worktrees\emar-p11-settings\oblivionfindings\.env): Failed to open stream: No such file or directory
+
+  at vendor\vlucas\phpdotenv\src\Store\File\Reader.php:73
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  1   vendor\vlucas\phpdotenv\src\Store\File\Reader.php:48
+  2   vendor\vlucas\phpdotenv\src\Store\FileStore.php:62
+
+
+  Tests:    1 failed, 104 warnings (1347 assertions)
+  Duration: 404.47s
+
+[heavy-lock] P11-settings-regressions done (exit 1)

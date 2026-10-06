@@ -105,8 +105,11 @@ export default function AppSidebarLayout({
                             }
                         />
                     )}
+                    {/* Radix preserves live regions while hiding siblings;
+                        keep their page controls inactive behind the menu too. */}
                     <main
                         id="main-content"
+                        inert={isMobile && mobileOpen}
                         className="relative flex min-h-[calc(100svh-58px)] w-full min-w-0 flex-col bg-background"
                     >
                         {header === undefined

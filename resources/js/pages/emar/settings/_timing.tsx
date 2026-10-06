@@ -96,7 +96,7 @@ export function DoseTiming({
         <Section
             id="sc-timing"
             title="Dose timing"
-            caption="Every house · recording is never blocked by these times"
+            caption="Every house · giving a dose outside its time window needs a reason"
         >
             <GroupGrid empty={<NoMatches q={q} clear={clear} />}>
                 <SettingGroup
@@ -231,7 +231,7 @@ export function RoundsOverview({
                     title: 'When a dose is due',
                     lines: [
                         `Can be given from ${v('early')} minutes before. Late after ${v('late')} minutes.`,
-                        'Recording is never blocked by these times.',
+                        'Giving a dose outside this time window needs a reason. Other safety checks still apply.',
                     ],
                     badge: notReviewed(['early', 'late', 'due_soon']),
                     cta: 'Review dose timing',

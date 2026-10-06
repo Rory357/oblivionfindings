@@ -139,20 +139,22 @@ class OneChartSettingsTest extends TestCase
         $this->assertDatabaseCount('medication_admin_rules', 0);
     }
 
-    public function test_medication_settings_persist_care_level_and_review_cadence(): void
+    public function test_medication_settings_update_care_level_without_changing_review_cadence(): void
     {
+        $this->client->forceFill([
+            'chart_review_interval_months' => 1,
+            'medication_review_interval_months' => 1,
+            'next_chart_review_date' => today()->addMonth()->toDateString(),
+        ])->save();
         $this->actingAs($this->admin)
-            ->post("/emar/clients/{$this->client->id}/medication-settings", [
-                'care_level' => 'dementia',
-                'chart_review_interval_months' => 1,
-                'next_chart_review_date' => today()->addMonth()->toDateString(),
-            ])
-            ->assertRedirect();
+            ->post("/emar/clients/{$this->client->id}/medication-settings", ['care_level' => 'dementia'])
+            ->assertRedirect()->assertSessionHasNoErrors();
 
         $this->assertDatabaseHas('clients', [
             'id' => $this->client->id,
             'care_level' => 'dementia',
             'chart_review_interval_months' => 1,
+            'medication_review_interval_months' => 1,
             'next_chart_review_date' => today()->addMonth()->toDateString(),
         ]);
     }

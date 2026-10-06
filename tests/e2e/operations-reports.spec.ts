@@ -54,15 +54,33 @@ test.describe('operations reports', () => {
         await page.getByRole('link', { name: /Shift Operations/i }).click();
         await expect(page).toHaveURL(/\/operations\/reports\/shifts/);
         await expect(
-            page.getByRole('heading', { name: /Shift Operations Reports/i }),
+            page.getByRole('heading', {
+                name: 'Shift operations',
+                level: 1,
+                exact: true,
+            }),
         ).toBeVisible();
-        await expect(
-            page.getByRole('button', { name: /Apply Filters/i }),
-        ).toBeVisible();
-
-        await page.locator('input[name="date_from"]').fill('2026-04-01');
-        await page.locator('input[name="date_to"]').fill('2026-04-30');
-        await page.getByRole('button', { name: /Apply Filters/i }).click();
+        // Start from a bookmarked period, then change both ends through the
+        // visible date control while retaining the same report/export journey.
+        await page.goto(
+            '/operations/reports/shifts?date_from=2026-04-02&date_to=2026-04-29',
+        );
+        await page
+            .getByRole('button', { name: 'Custom dates', exact: true })
+            .click();
+        const period = page.getByRole('dialog', {
+            name: 'Custom report period',
+            exact: true,
+        });
+        await period
+            .getByRole('button', { name: 'Wed 1 April 2026', exact: true })
+            .click();
+        await period
+            .getByRole('button', { name: 'Thu 30 April 2026', exact: true })
+            .click();
+        await period
+            .getByRole('button', { name: 'Apply period', exact: true })
+            .click();
         await expect(page).toHaveURL(/date_from=2026-04-01/);
 
         const downloadPromise = page.waitForEvent('download');

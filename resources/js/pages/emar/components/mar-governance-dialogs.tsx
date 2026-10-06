@@ -1,7 +1,10 @@
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
+import { DateTimeField } from '@/components/fleet-assets/maintenance/date-time-field';
 import { WitnessPinInput } from '@/components/medications/witness-pin-input';
-import { MedsWizardDialog } from '@/components/meds/wizard-shell';
+import { MedsWizardDialog, SummaryRow } from '@/components/meds/wizard-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
     Field,
     InfoCard,
@@ -10,10 +13,12 @@ import {
     StepHead,
     TilePicker,
 } from '@/components/wizard/primitives';
+import { WizardSuccessPane } from '@/components/wizard/shell';
+import { formatDateOnly } from '@/lib/datetime';
 import { witnessIsSelectable, witnessOptionLabel } from '@/lib/witness-pin';
 import { AddMedicationDialog } from '@/pages/emar/_dialogs';
 import type { WitnessOption } from '@/pages/meds/today/types';
-import { useForm } from '@inertiajs/react';
+import { router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
     ClipboardCheck,
@@ -50,16 +55,18 @@ export type ChartMedicationOption = {
     dosage: string;
     controlled_drug: boolean;
     witness_required: boolean;
+    requires_witness?: boolean;
 };
 
 /**
- * Mirrors ClientMedication::requiresWitness() on the server: a controlled
- * medicine always needs a witness, whatever its witness_required flag says.
+ * The server evaluates the organisation, house and explicit order witness policy.
  */
 export function syringeDriverRequiresWitness(
     medication: ChartMedicationOption | undefined,
 ): boolean {
-    return Boolean(medication?.witness_required || medication?.controlled_drug);
+    return Boolean(
+        medication?.requires_witness ?? medication?.witness_required,
+    );
 }
 
 export type PendingCorrection = {
@@ -175,7 +182,11 @@ function RecordInrDialog({
     clientId: number;
     onClose: () => void;
 }) {
+    const [step, setStep] = useState(0);
+    const [saved, setSaved] = useState(false);
+    const [requestUuid] = useState(() => crypto.randomUUID());
     const form = useForm({
+        request_uuid: requestUuid,
         inr_value: '',
         tested_on: '',
         target_range_low: '',
@@ -183,13 +194,40 @@ function RecordInrDialog({
         dose_mg: '',
         next_test_date: '',
         notes: '',
+        instruction: '',
+        instruction_source: '',
+        unlinked_reason: '',
     });
 
-    const submit = (e: React.FormEvent) => {
-        e.preventDefault();
+    const ready = [
+        !!form.data.inr_value && !!form.data.tested_on,
+        !!form.data.instruction.trim() &&
+            !!form.data.instruction_source.trim() &&
+            !!form.data.unlinked_reason.trim(),
+        true,
+    ];
+    const submit = (e?: React.FormEvent) => {
+        e?.preventDefault();
+        if (step < 2) {
+            if (ready[step]) setStep(step + 1);
+            return;
+        }
         form.post(`/emar/clients/${clientId}/inr`, {
             preserveScroll: true,
-            onSuccess: onClose,
+            onSuccess: () => setSaved(true),
+            onError: (errors) =>
+                setStep(
+                    [
+                        'inr_value',
+                        'tested_on',
+                        'target_range_low',
+                        'target_range_high',
+                        'dose_mg',
+                        'next_test_date',
+                    ].some((key) => errors[key])
+                        ? 0
+                        : 1,
+                ),
         });
     };
 
@@ -198,7 +236,23 @@ function RecordInrDialog({
             open
             onClose={onClose}
             title="Record INR"
-            description="Record a warfarin INR result"
+            formState={form}
+            completeness={{
+                completed: Object.entries(form.data).filter(
+                    ([key, value]) => key !== 'request_uuid' && value.trim(),
+                ).length,
+                total: 10,
+            }}
+            success={
+                saved ? (
+                    <WizardSuccessPane
+                        title="INR recorded"
+                        blurb="The result and supplied instruction are saved in this person’s medication record."
+                        actions={<Button onClick={onClose}>Done</Button>}
+                    />
+                ) : undefined
+            }
+            description="Record the test result and the instruction supplied with it."
             railIcon={HeartPulse}
             railTitle="Record INR"
             railSubtitle="Warfarin monitoring"
@@ -209,114 +263,282 @@ function RecordInrDialog({
                     blurb: 'Value & schedule',
                     icon: HeartPulse,
                 },
+                {
+                    key: 'instruction',
+                    label: 'Instruction',
+                    blurb: 'Source & record link',
+                    icon: FileText,
+                },
+                {
+                    key: 'review',
+                    label: 'Review',
+                    blurb: 'Check supplied details',
+                    icon: ClipboardCheck,
+                },
             ]}
-            stepIndex={0}
-            onStepClick={() => {}}
+            stepIndex={step}
+            onStepClick={(next) => next < step && setStep(next)}
             footer={
-                <form onSubmit={submit} className="contents">
-                    <FooterRow
-                        onCancel={onClose}
-                        submitLabel="Record INR"
-                        processing={form.processing}
-                    />
-                </form>
+                <>
+                    <Button
+                        variant="ghost"
+                        onClick={step === 0 ? onClose : () => setStep(step - 1)}
+                        disabled={form.processing}
+                    >
+                        {step === 0 ? 'Cancel' : 'Back'}
+                    </Button>
+                    <Button
+                        onClick={() => submit()}
+                        disabled={form.processing || !ready[step]}
+                    >
+                        {step === 2 ? 'Record INR' : 'Continue'}
+                    </Button>
+                </>
             }
         >
             <form onSubmit={submit}>
                 <StepHead
                     icon={HeartPulse}
-                    title="INR result"
-                    blurb="Results are retained — disable, never delete."
+                    title={
+                        step === 0
+                            ? 'INR result'
+                            : step === 1
+                              ? 'Supplied instruction'
+                              : 'Review INR record'
+                    }
+                    blurb="Results are retained. No dose is calculated from this value. Link an unlinked result to its medicine in the person’s record."
                 />
+                {form.errors.request_uuid && (
+                    <p
+                        className="text-subtle text-status-critical"
+                        role="alert"
+                    >
+                        {form.errors.request_uuid}
+                    </p>
+                )}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Field
-                        label="INR value"
-                        required
-                        error={form.errors.inr_value}
-                    >
-                        <Input
-                            type="number"
-                            step="0.1"
-                            value={form.data.inr_value}
-                            onChange={(e) =>
-                                form.setData('inr_value', e.target.value)
-                            }
-                            placeholder="e.g. 2.4"
-                        />
-                    </Field>
-                    <Field
-                        label="Tested on"
-                        required
-                        error={form.errors.tested_on}
-                    >
-                        <Input
-                            type="date"
-                            value={form.data.tested_on}
-                            onChange={(e) =>
-                                form.setData('tested_on', e.target.value)
-                            }
-                        />
-                    </Field>
-                    <Field label="Target range (low)">
-                        <Input
-                            type="number"
-                            step="0.1"
-                            value={form.data.target_range_low}
-                            onChange={(e) =>
-                                form.setData('target_range_low', e.target.value)
-                            }
-                            placeholder="2.0"
-                        />
-                    </Field>
-                    <Field
-                        label="Target range (high)"
-                        error={form.errors.target_range_high}
-                    >
-                        <Input
-                            type="number"
-                            step="0.1"
-                            value={form.data.target_range_high}
-                            onChange={(e) =>
-                                form.setData(
-                                    'target_range_high',
-                                    e.target.value,
-                                )
-                            }
-                            placeholder="3.0"
-                        />
-                    </Field>
-                    <Field label="Dose (mg)">
-                        <Input
-                            type="number"
-                            step="0.01"
-                            value={form.data.dose_mg}
-                            onChange={(e) =>
-                                form.setData('dose_mg', e.target.value)
-                            }
-                            placeholder="e.g. 5"
-                        />
-                    </Field>
-                    <Field
-                        label="Next test date"
-                        error={form.errors.next_test_date}
-                    >
-                        <Input
-                            type="date"
-                            value={form.data.next_test_date}
-                            onChange={(e) =>
-                                form.setData('next_test_date', e.target.value)
-                            }
-                        />
-                    </Field>
-                    <Field label="Notes" span>
-                        <Input
-                            value={form.data.notes}
-                            onChange={(e) =>
-                                form.setData('notes', e.target.value)
-                            }
-                            placeholder="Optional"
-                        />
-                    </Field>
+                    {step === 0 && (
+                        <>
+                            <Field
+                                label="INR value"
+                                required
+                                error={form.errors.inr_value}
+                            >
+                                <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={form.data.inr_value}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'inr_value',
+                                            e.target.value,
+                                        )
+                                    }
+                                    placeholder="e.g. 2.4"
+                                />
+                            </Field>
+                            <Field
+                                label="Tested on"
+                                required
+                                error={form.errors.tested_on}
+                            >
+                                <DatePicker
+                                    compact
+                                    id="emar-mar-governance-dialogs-1"
+                                    label="Tested on"
+                                    value={form.data.tested_on}
+                                    onChange={(value) =>
+                                        form.setData('tested_on', value)
+                                    }
+                                    invalid={Boolean(form.errors.tested_on)}
+                                />
+                            </Field>
+                            <Field label="Target range (low)">
+                                <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={form.data.target_range_low}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'target_range_low',
+                                            e.target.value,
+                                        )
+                                    }
+                                    placeholder="2.0"
+                                />
+                            </Field>
+                            <Field
+                                label="Target range (high)"
+                                error={form.errors.target_range_high}
+                            >
+                                <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={form.data.target_range_high}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'target_range_high',
+                                            e.target.value,
+                                        )
+                                    }
+                                    placeholder="3.0"
+                                />
+                            </Field>
+                            <Field label="Recorded dose (mg), if supplied">
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    value={form.data.dose_mg}
+                                    onChange={(e) =>
+                                        form.setData('dose_mg', e.target.value)
+                                    }
+                                    placeholder="e.g. 5"
+                                />
+                            </Field>
+                            <Field
+                                label="Next test date"
+                                error={form.errors.next_test_date}
+                            >
+                                <DatePicker
+                                    compact
+                                    id="emar-mar-governance-dialogs-2"
+                                    label="Next test date"
+                                    value={form.data.next_test_date}
+                                    onChange={(value) =>
+                                        form.setData('next_test_date', value)
+                                    }
+                                    invalid={Boolean(
+                                        form.errors.next_test_date,
+                                    )}
+                                    allowClear
+                                />
+                            </Field>
+                        </>
+                    )}
+                    {step === 1 && (
+                        <>
+                            <Field label="Notes" span>
+                                <Input
+                                    value={form.data.notes}
+                                    onChange={(e) =>
+                                        form.setData('notes', e.target.value)
+                                    }
+                                    placeholder="Optional"
+                                />
+                            </Field>
+                            <Field
+                                label="Recorded instruction"
+                                required
+                                span
+                                error={form.errors.instruction}
+                            >
+                                <Textarea
+                                    value={form.data.instruction}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'instruction',
+                                            e.target.value,
+                                        )
+                                    }
+                                    maxLength={2000}
+                                />
+                            </Field>
+                            <Field
+                                label="Instruction source"
+                                required
+                                span
+                                error={form.errors.instruction_source}
+                            >
+                                <Input
+                                    value={form.data.instruction_source}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'instruction_source',
+                                            e.target.value,
+                                        )
+                                    }
+                                    maxLength={255}
+                                    placeholder="Who supplied the instruction and when"
+                                />
+                            </Field>
+                            <Field
+                                label="Why this result is not linked to a medicine"
+                                required
+                                span
+                                error={form.errors.unlinked_reason}
+                            >
+                                <Textarea
+                                    value={form.data.unlinked_reason}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'unlinked_reason',
+                                            e.target.value,
+                                        )
+                                    }
+                                    maxLength={2000}
+                                />
+                            </Field>
+                        </>
+                    )}
+                    {step === 2 && (
+                        <div className="sm:col-span-2">
+                            <SummaryRow
+                                label="INR result"
+                                value={form.data.inr_value}
+                            />
+                            <SummaryRow
+                                label="Tested on"
+                                value={formatDateOnly(form.data.tested_on)}
+                            />
+                            <SummaryRow
+                                label="Target range (low)"
+                                value={
+                                    form.data.target_range_low || 'Not supplied'
+                                }
+                            />
+                            <SummaryRow
+                                label="Target range (high)"
+                                value={
+                                    form.data.target_range_high ||
+                                    'Not supplied'
+                                }
+                            />
+                            <SummaryRow
+                                label="Recorded dose"
+                                value={
+                                    form.data.dose_mg
+                                        ? `${form.data.dose_mg} mg`
+                                        : 'Not supplied'
+                                }
+                            />
+                            <SummaryRow
+                                label="Next test"
+                                value={
+                                    form.data.next_test_date
+                                        ? formatDateOnly(
+                                              form.data.next_test_date,
+                                          )
+                                        : 'Not supplied'
+                                }
+                            />
+                            <SummaryRow
+                                label="Instruction"
+                                value={form.data.instruction}
+                            />
+                            <SummaryRow
+                                label="Source"
+                                value={form.data.instruction_source}
+                            />
+                            <SummaryRow
+                                label="Why unlinked"
+                                value={form.data.unlinked_reason}
+                            />
+                            <SummaryRow
+                                label="Notes"
+                                value={form.data.notes || 'None'}
+                            />
+                        </div>
+                    )}
                 </div>
             </form>
         </MedsWizardDialog>
@@ -351,17 +573,20 @@ export function buildSyringeDriverRequest(data: SyringeDriverFormData) {
     };
 }
 
-function SyringeDriverDialog({
+export function SyringeDriverDialog({
     clientId,
     medications,
     witnesses,
     onClose,
+    commandUrl,
 }: {
     clientId: number;
     medications: ChartMedicationOption[];
     witnesses: WitnessOption[];
     onClose: () => void;
+    commandUrl?: string;
 }) {
+    const [requestUuid] = useState(() => crypto.randomUUID());
     // Contents reference the resident's charted medicine by id: the server
     // resolves the name, controlled status and witness requirement from that
     // canonical record, never from free text typed here.
@@ -386,8 +611,11 @@ function SyringeDriverDialog({
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
-        form.transform(buildSyringeDriverRequest);
-        form.post(`/emar/clients/${clientId}/syringe-drivers`, {
+        form.transform((data) => ({
+            ...buildSyringeDriverRequest(data),
+            ...(commandUrl ? { request_uuid: requestUuid } : {}),
+        }));
+        form.post(commandUrl ?? `/emar/clients/${clientId}/syringe-drivers`, {
             preserveScroll: true,
             onSuccess: onClose,
         });
@@ -398,6 +626,7 @@ function SyringeDriverDialog({
             open
             onClose={onClose}
             title="Start syringe driver"
+            formState={form}
             description="Commence a continuous subcutaneous infusion"
             railIcon={Syringe}
             railTitle="Syringe driver"
@@ -460,19 +689,17 @@ function SyringeDriverDialog({
                             placeholder="e.g. 10"
                         />
                     </Field>
-                    <Field
+                    <DateTimeField
+                        compact
+                        id="syringe-commenced-at"
                         label="Commenced at"
-                        required
+                        value={form.data.commenced_at}
+                        onChange={(value) =>
+                            form.setData('commenced_at', value)
+                        }
                         error={form.errors.commenced_at}
-                    >
-                        <Input
-                            type="datetime-local"
-                            value={form.data.commenced_at}
-                            onChange={(e) =>
-                                form.setData('commenced_at', e.target.value)
-                            }
-                        />
-                    </Field>
+                        clearable={false}
+                    />
                     <Field label="Rate">
                         <Input
                             value={form.data.rate}
@@ -530,7 +757,7 @@ function SyringeDriverDialog({
 }
 
 // ── Manage attention alerts ────────────────────────────────────────────────
-function ManageAlertsDialog({
+export function ManageAlertsDialog({
     clientId,
     suppression,
     onClose,
@@ -539,6 +766,7 @@ function ManageAlertsDialog({
     suppression: { suppressed: boolean; reason: string | null };
     onClose: () => void;
 }) {
+    const [section, setSection] = useState(0);
     const form = useForm({
         type: 'warfarin',
         title: '',
@@ -551,8 +779,8 @@ function ManageAlertsDialog({
         basis: '',
     });
 
-    const submit = (e: React.FormEvent) => {
-        e.preventDefault();
+    const submit = (e?: React.FormEvent) => {
+        e?.preventDefault();
         form.post(`/emar/clients/${clientId}/attention-alerts`, {
             preserveScroll: true,
             onSuccess: onClose,
@@ -571,7 +799,12 @@ function ManageAlertsDialog({
             open
             onClose={onClose}
             title="Manage attention alerts"
-            description="Add a chart alert surfaced before any dose is given"
+            formState={{
+                isDirty: form.isDirty || suppressForm.isDirty,
+                processing: form.processing || suppressForm.processing,
+                errors: { ...form.errors, ...suppressForm.errors },
+            }}
+            description="Manage chart warnings and medication reminder settings."
             railIcon={AlertTriangle}
             railTitle="Attention alert"
             railSubtitle="Chart warning"
@@ -582,177 +815,187 @@ function ManageAlertsDialog({
                     blurb: 'Type & message',
                     icon: AlertTriangle,
                 },
+                {
+                    key: 'reminders',
+                    label: 'Reminders',
+                    blurb: 'Medication-admin alerts',
+                    icon: ClipboardCheck,
+                },
             ]}
-            stepIndex={0}
-            onStepClick={() => {}}
+            stepIndex={section}
+            onStepClick={setSection}
+            sequential={false}
             footer={
-                <form onSubmit={submit} className="contents">
-                    <FooterRow
-                        onCancel={onClose}
-                        submitLabel="Add alert"
-                        processing={form.processing}
-                    />
-                </form>
+                <>
+                    <Button
+                        variant="ghost"
+                        onClick={onClose}
+                        disabled={form.processing || suppressForm.processing}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={
+                            section === 0 ? () => submit() : saveSuppression
+                        }
+                        disabled={form.processing || suppressForm.processing}
+                    >
+                        {section === 0 ? 'Add alert' : 'Save setting'}
+                    </Button>
+                </>
             }
         >
             {/* Med-admin alert suppression (1CHART "Disable Med Admin Alerts") — a
                 per-resident, audited setting; suppressing requires a reason. */}
-            <div className="mb-4 rounded-lg border p-3">
-                <div className="flex items-center justify-between gap-3">
-                    <div>
-                        <div className="text-sm font-semibold">
-                            Medication-admin alerts
+            {section === 1 && (
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-3">
+                        <div>
+                            <div className="text-sm font-semibold">
+                                Medication-admin alerts
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                                Suppress med-due reminders for this resident.
+                                Audited.
+                            </div>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                            Suppress med-due reminders for this resident.
-                            Audited.
-                        </div>
-                    </div>
-                    <Segmented
-                        value={
-                            suppressForm.data.suppress_med_admin_alerts
-                                ? 'suppressed'
-                                : 'active'
-                        }
-                        onChange={(v) =>
-                            suppressForm.setData(
-                                'suppress_med_admin_alerts',
-                                v === 'suppressed',
-                            )
-                        }
-                        options={[
-                            { value: 'active', label: 'Active' },
-                            { value: 'suppressed', label: 'Suppressed' },
-                        ]}
-                    />
-                </div>
-                {suppressForm.data.suppress_med_admin_alerts && (
-                    <div className="mt-3 grid gap-3">
-                        <Field
-                            label="Basis"
-                            required
-                            error={suppressForm.errors.basis}
-                        >
-                            <SelectInput
-                                value={suppressForm.data.basis}
-                                onChange={(v) =>
-                                    suppressForm.setData('basis', v)
-                                }
-                                placeholder="Select the decision basis…"
-                                options={[
-                                    {
-                                        value: 'capacity_assessment',
-                                        label: 'Capacity assessment',
-                                    },
-                                    {
-                                        value: 'mdt_decision',
-                                        label: 'MDT decision',
-                                    },
-                                    {
-                                        value: 'clinical_judgement',
-                                        label: 'Clinical judgement',
-                                    },
-                                    {
-                                        value: 'client_preference',
-                                        label: 'Client preference',
-                                    },
-                                ]}
-                            />
-                        </Field>
-                        <Field
-                            label="Reason"
-                            required
-                            error={suppressForm.errors.reason}
-                        >
-                            <Input
-                                value={suppressForm.data.reason}
-                                onChange={(e) =>
-                                    suppressForm.setData(
-                                        'reason',
-                                        e.target.value,
-                                    )
-                                }
-                                placeholder="Why are med-admin alerts being suppressed?"
-                            />
-                        </Field>
-                    </div>
-                )}
-                <div className="mt-3 flex justify-end">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={suppressForm.processing}
-                        onClick={saveSuppression}
-                    >
-                        Save setting
-                    </Button>
-                </div>
-            </div>
-
-            <form onSubmit={submit}>
-                <StepHead
-                    icon={AlertTriangle}
-                    title="Chart alert"
-                    blurb="Prompt-on-open alerts must be acknowledged before recording."
-                />
-                <Field label="Alert type" span>
-                    <TilePicker
-                        value={form.data.type}
-                        onChange={(v) => form.setData('type', v)}
-                        cols={3}
-                        options={[
-                            {
-                                key: 'warfarin',
-                                label: 'Warfarin',
-                                icon: HeartPulse,
-                            },
-                            {
-                                key: 'paper_prescription',
-                                label: 'Paper prescription',
-                                icon: FileText,
-                            },
-                            {
-                                key: 'chart_warning',
-                                label: 'Other',
-                                icon: AlertTriangle,
-                            },
-                        ]}
-                    />
-                </Field>
-                <div className="mt-4 grid grid-cols-1 gap-4">
-                    <Field label="Title" required error={form.errors.title}>
-                        <Input
-                            value={form.data.title}
-                            onChange={(e) =>
-                                form.setData('title', e.target.value)
-                            }
-                            placeholder="e.g. Warfarin — INR monitoring"
-                        />
-                    </Field>
-                    <Field label="Detail">
-                        <Input
-                            value={form.data.detail}
-                            onChange={(e) =>
-                                form.setData('detail', e.target.value)
-                            }
-                            placeholder="Optional detail"
-                        />
-                    </Field>
-                    <Field label="Prompt on chart open">
                         <Segmented
-                            value={form.data.prompt_on_open ? 'yes' : 'no'}
+                            value={
+                                suppressForm.data.suppress_med_admin_alerts
+                                    ? 'suppressed'
+                                    : 'active'
+                            }
                             onChange={(v) =>
-                                form.setData('prompt_on_open', v === 'yes')
+                                suppressForm.setData(
+                                    'suppress_med_admin_alerts',
+                                    v === 'suppressed',
+                                )
                             }
                             options={[
-                                { value: 'yes', label: 'Yes' },
-                                { value: 'no', label: 'No' },
+                                { value: 'active', label: 'Active' },
+                                { value: 'suppressed', label: 'Suppressed' },
+                            ]}
+                        />
+                    </div>
+                    {suppressForm.data.suppress_med_admin_alerts && (
+                        <div className="mt-3 grid gap-3">
+                            <Field
+                                label="Basis"
+                                required
+                                error={suppressForm.errors.basis}
+                            >
+                                <SelectInput
+                                    value={suppressForm.data.basis}
+                                    onChange={(v) =>
+                                        suppressForm.setData('basis', v)
+                                    }
+                                    placeholder="Select the decision basis…"
+                                    options={[
+                                        {
+                                            value: 'capacity_assessment',
+                                            label: 'Capacity assessment',
+                                        },
+                                        {
+                                            value: 'mdt_decision',
+                                            label: 'MDT decision',
+                                        },
+                                        {
+                                            value: 'clinical_judgement',
+                                            label: 'Clinical judgement',
+                                        },
+                                        {
+                                            value: 'client_preference',
+                                            label: 'Client preference',
+                                        },
+                                    ]}
+                                />
+                            </Field>
+                            <Field
+                                label="Reason"
+                                required
+                                error={suppressForm.errors.reason}
+                            >
+                                <Input
+                                    value={suppressForm.data.reason}
+                                    onChange={(e) =>
+                                        suppressForm.setData(
+                                            'reason',
+                                            e.target.value,
+                                        )
+                                    }
+                                    placeholder="Why are med-admin alerts being suppressed?"
+                                />
+                            </Field>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {section === 0 && (
+                <form onSubmit={submit}>
+                    <StepHead
+                        icon={AlertTriangle}
+                        title="Chart alert"
+                        blurb="Prompt-on-open alerts must be acknowledged before recording."
+                    />
+                    <Field label="Alert type" span>
+                        <TilePicker
+                            value={form.data.type}
+                            onChange={(v) => form.setData('type', v)}
+                            cols={3}
+                            options={[
+                                {
+                                    key: 'warfarin',
+                                    label: 'Warfarin',
+                                    icon: HeartPulse,
+                                },
+                                {
+                                    key: 'paper_prescription',
+                                    label: 'Paper prescription',
+                                    icon: FileText,
+                                },
+                                {
+                                    key: 'chart_warning',
+                                    label: 'Other',
+                                    icon: AlertTriangle,
+                                },
                             ]}
                         />
                     </Field>
-                </div>
-            </form>
+                    <div className="mt-4 grid grid-cols-1 gap-4">
+                        <Field label="Title" required error={form.errors.title}>
+                            <Input
+                                value={form.data.title}
+                                onChange={(e) =>
+                                    form.setData('title', e.target.value)
+                                }
+                                placeholder="e.g. Warfarin — INR monitoring"
+                            />
+                        </Field>
+                        <Field label="Detail">
+                            <Input
+                                value={form.data.detail}
+                                onChange={(e) =>
+                                    form.setData('detail', e.target.value)
+                                }
+                                placeholder="Optional detail"
+                            />
+                        </Field>
+                        <Field label="Prompt on chart open">
+                            <Segmented
+                                value={form.data.prompt_on_open ? 'yes' : 'no'}
+                                onChange={(v) =>
+                                    form.setData('prompt_on_open', v === 'yes')
+                                }
+                                options={[
+                                    { value: 'yes', label: 'Yes' },
+                                    { value: 'no', label: 'No' },
+                                ]}
+                            />
+                        </Field>
+                    </div>
+                </form>
+            )}
         </MedsWizardDialog>
     );
 }
@@ -769,17 +1012,13 @@ function VerifyOrderDialog({
     const form = useForm({ rejection_reason: '' });
 
     const verify = (id: number) =>
-        form.post(`/emar/medications/${id}/verify`, {
-            preserveScroll: true,
-            onSuccess: onClose,
-        });
+        router.visit(`/emar/prescriptions?order_id=${id}&action=check`);
     const reject = (e: React.FormEvent) => {
         e.preventDefault();
         if (rejectId)
-            form.post(`/emar/medications/${rejectId}/reject`, {
-                preserveScroll: true,
-                onSuccess: onClose,
-            });
+            router.visit(
+                `/emar/prescriptions?order_id=${rejectId}&action=check&mode=send_back`,
+            );
     };
 
     return (
@@ -787,6 +1026,7 @@ function VerifyOrderDialog({
             open
             onClose={onClose}
             title="Verify orders"
+            formState={form}
             description="Verify or reject medication orders awaiting pharmacy sign-off"
             railIcon={ShieldCheck}
             railTitle="Order verification"
@@ -915,6 +1155,7 @@ function CorrectionsReviewDialog({
             open
             onClose={onClose}
             title="Review corrections"
+            formState={form}
             description="Approve or reject pending corrections to recorded administrations"
             railIcon={ClipboardCheck}
             railTitle="Corrections"

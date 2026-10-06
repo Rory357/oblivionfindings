@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AuditLog;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
 use App\Models\Role;
@@ -10,6 +10,8 @@ use App\Models\SafeguardingConcern;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\HealthSafety\HsEventClosureService;
+use App\Services\HealthSafety\HsEventService;
+use App\Services\HealthSafety\NotifiableEventClassifier;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -282,6 +284,7 @@ class SafeguardingConcernControllerTest extends TestCase
     public function test_safeguarding_store_with_site(): void
     {
         $site = Site::factory()->create();
+        ensureCanonicalHrStaffProfile($this->admin, $site);
 
         $this->actingAs($this->admin)
             ->post('/safeguarding', [
@@ -291,16 +294,44 @@ class SafeguardingConcernControllerTest extends TestCase
                 'site_id' => $site->id,
                 'requires_external_referral' => false,
             ])
-            ->assertRedirect();
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
 
         $this->assertDatabaseHas('safeguarding_concerns', [
             'site_id' => $site->id,
+            'reported_by_user_id' => $this->admin->id,
+            'created_by' => $this->admin->id,
+            'status' => 'reported',
         ]);
+    }
+
+    public function test_safeguarding_store_rejects_a_foreign_site_without_creating_journey_records(): void
+    {
+        ensureCanonicalHrStaffProfile($this->admin);
+        $foreignSite = Site::factory()->create();
+        $concerns = SafeguardingConcern::query()->count();
+        $events = HsEvent::query()->count();
+        $alerts = ControlRoomAlert::query()->count();
+
+        $this->actingAs($this->admin->fresh())
+            ->postJson('/safeguarding', [
+                'concern_type' => 'abuse',
+                'severity' => 'high',
+                'description' => 'Concern outside the approved Site.',
+                'site_id' => $foreignSite->id,
+                'requires_external_referral' => false,
+            ])
+            ->assertForbidden();
+
+        $this->assertSame($concerns, SafeguardingConcern::query()->count());
+        $this->assertSame($events, HsEvent::query()->count());
+        $this->assertSame($alerts, ControlRoomAlert::query()->count());
     }
 
     public function test_safeguarding_store_with_full_details(): void
     {
         $site = Site::factory()->create();
+        ensureCanonicalHrStaffProfile($this->admin, $site);
 
         $this->actingAs($this->admin)
             ->post('/safeguarding', [
@@ -317,13 +348,18 @@ class SafeguardingConcernControllerTest extends TestCase
                 'requires_external_referral' => true,
                 'site_id' => $site->id,
             ])
-            ->assertRedirect();
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
 
         $this->assertDatabaseHas('safeguarding_concerns', [
             'concern_type' => 'exploitation',
             'abuse_category' => 'financial',
             'severity' => 'critical',
             'requires_external_referral' => true,
+            'site_id' => $site->id,
+            'reported_by_user_id' => $this->admin->id,
+            'created_by' => $this->admin->id,
+            'status' => 'reported',
         ]);
     }
 
@@ -545,7 +581,8 @@ class SafeguardingConcernControllerTest extends TestCase
                 'closure_summary' => 'Concern resolved after investigation.',
                 'lessons_learned' => 'Review staff training.',
             ])
-            ->assertRedirect();
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
 
         $concern->refresh();
         $this->assertEquals('closed', $concern->status);
@@ -553,6 +590,34 @@ class SafeguardingConcernControllerTest extends TestCase
         $this->assertEquals('Review staff training.', $concern->lessons_learned);
         $this->assertNotNull($concern->closed_at);
         $this->assertEquals($this->admin->id, $concern->closed_by_user_id);
+    }
+
+    public function test_incomplete_worksafe_decision_cannot_close_the_hs_journey_or_change_the_concern(): void
+    {
+        $concern = SafeguardingConcern::factory()->create(['status' => 'monitoring']);
+        $event = $this->prepareTerminalJourney($concern);
+        $eventBefore = $event->getRawOriginal();
+        $concernBefore = $concern->fresh()->getRawOriginal();
+        $alertBefore = ControlRoomAlert::query()->findOrFail($event->control_room_alert_id)->getRawOriginal();
+        $auditCount = AuditLog::query()->count();
+        $this->assertFalse($event->hasSignedWorksafeDecision());
+        $this->assertFalse($event->worksafe_notifiable);
+
+        try {
+            app(HsEventClosureService::class)->closeEvent(
+                $event,
+                'H&S safeguarding governance completed.',
+                $this->admin->fresh(),
+            );
+            $this->fail('An incomplete WorkSafe decision must prevent H&S closure.');
+        } catch (\DomainException $exception) {
+            $this->assertSame('Record the WorkSafe notifiability decision before closing this event.', $exception->getMessage());
+        }
+
+        $this->assertSame($eventBefore, $event->fresh()->getRawOriginal());
+        $this->assertSame($concernBefore, $concern->fresh()->getRawOriginal());
+        $this->assertSame($alertBefore, ControlRoomAlert::query()->findOrFail($event->control_room_alert_id)->getRawOriginal());
+        $this->assertSame($auditCount, AuditLog::query()->count());
     }
 
     public function test_safeguarding_close_requires_closure_summary(): void
@@ -565,6 +630,27 @@ class SafeguardingConcernControllerTest extends TestCase
     }
 
     private function makeTerminalJourneyReady(SafeguardingConcern $concern): void
+    {
+        $event = $this->prepareTerminalJourney($concern);
+        $actor = $this->admin->fresh();
+        $event = app(HsEventService::class)->recordWorksafeDecision(
+            $event,
+            false,
+            'Assessed as not meeting the WorkSafe notification threshold.',
+            $actor,
+        );
+        $this->assertTrue($event->hasSignedWorksafeDecision());
+        $this->assertSame(NotifiableEventClassifier::DECISION_TREE_VERSION, $event->worksafe_decision_tree_version);
+        $this->assertSame(NotifiableEventClassifier::SOURCE_EFFECTIVE_DATE, $event->worksafe_source_effective_date->toDateString());
+        $this->assertSame($actor->id, $event->worksafe_decided_by_user_id);
+        app(HsEventClosureService::class)->closeEvent(
+            $event,
+            'H&S safeguarding governance completed.',
+            $actor,
+        );
+    }
+
+    private function prepareTerminalJourney(SafeguardingConcern $concern): HsEvent
     {
         $siteId = $concern->site_id ?: Site::factory()->create()->id;
         $concern->forceFill(['site_id' => $siteId])->save();
@@ -606,25 +692,17 @@ class SafeguardingConcernControllerTest extends TestCase
             'worksafe_status' => null,
         ])->save();
         $this->actingAs($actor);
-        app(HsEventClosureService::class)->closeEvent(
-            $event->fresh(),
-            'H&S safeguarding governance completed.',
-            $actor,
-        );
+
+        return $event->fresh();
     }
 
     private function grantHsClosureAuthority(User $actor, ?int $siteId): User
     {
         $role = Role::query()->where('name', 'health_safety_officer')->firstOrFail();
         $actor->roles()->syncWithoutDetaching([$role->id]);
-        if (! HrEmployeeProfile::query()->where('user_id', $actor->id)->exists()) {
-            HrEmployeeProfile::factory()->create([
-                'user_id' => $actor->id,
-                'primary_site_id' => $siteId,
-                'secondary_site_ids' => [],
-                'position_role' => 'health_safety_officer',
-            ]);
-        }
+        ensureCanonicalHrStaffProfile($actor, Site::query()->findOrFail($siteId), [
+            'position_role' => 'health_safety_officer',
+        ]);
 
         return $actor->fresh();
     }

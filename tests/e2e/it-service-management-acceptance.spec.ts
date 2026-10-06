@@ -356,7 +356,19 @@ test.describe('IT & Support end-to-end acceptance', () => {
             .fill(
                 'A support worker needs approved connectivity at the managed site.',
             );
+        await dialog
+            .getByRole('button', { name: 'Continue', exact: true })
+            .click();
+        await expect(dialog).toContainText(
+            'A support worker needs approved connectivity at the managed site.',
+        );
         await dialog.getByRole('button', { name: 'Submit request' }).click();
+        await expect(
+            dialog.getByRole('heading', { name: 'Request saved', exact: true }),
+        ).toBeVisible();
+        await dialog
+            .getByRole('button', { name: 'Back to IT & Support', exact: true })
+            .click();
         await expect(dialog).toBeHidden();
 
         await page.goto('/it?tab=my-tickets');
@@ -383,13 +395,29 @@ test.describe('IT & Support end-to-end acceptance', () => {
                 level: 1,
             }),
         ).toBeVisible();
-        await expect(page.getByText('via email')).toBeVisible();
+        await page
+            .getByRole('link', { name: 'View response and resolution clocks' })
+            .click();
+        const recordHistory = page.getByRole('tabpanel', {
+            name: 'Service levels',
+            exact: true,
+        });
+        await expect(
+            recordHistory.getByText('Source', { exact: true }),
+        ).toBeVisible();
+        await expect(
+            recordHistory.getByText('Email', { exact: true }),
+        ).toBeVisible();
+        await page
+            .getByRole('link', { name: 'View ticket conversation' })
+            .click();
         await expect(
             page.getByText('Requester confirmed the printer is still offline.'),
         ).toBeVisible();
         await expect(
             page.getByText(
                 'Internal technician diagnostic: do not expose to requester.',
+                { exact: true },
             ),
         ).toHaveCount(0);
         await expectNoPageOverflow(page);
@@ -416,6 +444,7 @@ test.describe('IT & Support end-to-end acceptance', () => {
         await expect(
             page.getByText(
                 'Internal technician diagnostic: do not expose to requester.',
+                { exact: true },
             ),
         ).toBeVisible();
 
@@ -448,30 +477,41 @@ test.describe('IT & Support end-to-end acceptance', () => {
                 level: 1,
             }),
         ).toBeVisible();
-        await expect(page.getByText('SEV2', { exact: true })).toBeVisible();
+        await expect(
+            page.getByRole('paragraph').filter({ hasText: /\bSEV2\b/ }),
+        ).toBeVisible();
 
-        await page.goto('/it?tab=provisioning');
+        await page.goto('/it/provisioning');
         await expect(
             page.getByRole('heading', {
-                name: 'Joiner, mover & leaver workflows',
-                level: 2,
+                name: 'Provisioning',
+                level: 1,
             }),
         ).toBeVisible();
+        await page
+            .getByRole('button', { name: 'Lifecycle', exact: true })
+            .click();
         for (const lifecycle of ['Joiner', 'Mover', 'Leaver']) {
             await expect(
                 page.getByText(lifecycle, { exact: true }),
             ).toBeVisible();
         }
+        await page.keyboard.press('Escape');
 
         await page.goto('/it/setup');
-        await page.getByRole('tab', { name: 'API identities' }).click();
+        await page.getByRole('tab', { name: 'API', exact: true }).click();
         await expect(
             page.getByRole('heading', { name: 'API identities', level: 2 }),
         ).toBeVisible();
-        await page.getByRole('button', { name: 'New API identity' }).click();
+        await page
+            .getByRole('button', { name: 'New API identity' })
+            .first()
+            .click();
         await expect(page.getByLabel('Execution account')).toBeVisible();
         await page.getByRole('button', { name: 'Cancel' }).click();
-        await page.getByRole('tab', { name: 'Operations audit' }).click();
+        await page
+            .getByRole('tab', { name: 'Operations', exact: true })
+            .click();
         await expect(
             page.getByRole('heading', { name: 'Email delivery', level: 2 }),
         ).toBeVisible();
@@ -480,7 +520,22 @@ test.describe('IT & Support end-to-end acceptance', () => {
                 `Delivery failed for ${manifest.emailTicket.reference}`,
             ),
         ).toBeVisible();
-        await expect(page.getByText('Mailbox rejected')).toBeVisible();
+        const failedDelivery = page
+            .getByRole('region', { name: 'Email delivery', exact: true })
+            .getByRole('article')
+            .filter({
+                hasText: `Delivery failed for ${manifest.emailTicket.reference}`,
+            });
+        await expect(
+            failedDelivery.getByText(
+                'Provider bounced: The provider rejected delivery. Review the recipient address before retrying.',
+                { exact: true },
+            ),
+        ).toBeVisible();
+        await expect(
+            failedDelivery.getByRole('button', { name: 'Retry delivery' }),
+        ).toBeVisible();
+        await expect(page.getByText('Mailbox rejected')).toHaveCount(0);
 
         await expectNoPageOverflow(page);
         expectNoConsoleErrors(errors);

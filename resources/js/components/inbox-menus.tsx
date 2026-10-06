@@ -232,7 +232,10 @@ export default function InboxMenus({
                         <UnreadBadge count={unreadNotifications} />
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-96">
+                <DropdownMenuContent
+                    align="end"
+                    className="w-96 max-w-[calc(100vw-1rem)]"
+                >
                     <div className="flex items-center justify-between px-1">
                         <DropdownMenuLabel className="text-sm font-semibold">
                             Notifications
@@ -241,7 +244,7 @@ export default function InboxMenus({
                             variant="ghost"
                             size="sm"
                             aria-label="Mark all notifications read"
-                            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground max-md:min-h-[44px]"
                             disabled={!unreadNotifications}
                             onClick={() =>
                                 router.post(
@@ -293,7 +296,7 @@ export default function InboxMenus({
                                 return (
                                     <DropdownMenuItem
                                         key={n.id}
-                                        className="cursor-pointer rounded-md px-3 py-2.5 focus:bg-accent"
+                                        className="cursor-pointer rounded-md px-3 py-2.5 focus:bg-accent max-md:min-h-[44px]"
                                         onSelect={(e) => {
                                             e.preventDefault();
                                             setOpenAnnouncementId(null);
@@ -353,7 +356,7 @@ export default function InboxMenus({
                     <div className="p-1.5">
                         <Link
                             href="/notifications"
-                            className="flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10 dark:text-primary dark:hover:bg-primary/30"
+                            className="flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10 max-md:min-h-[44px] dark:text-primary dark:hover:bg-primary/30"
                         >
                             View All Notifications
                             <ArrowRight className="h-3.5 w-3.5" />
@@ -378,7 +381,10 @@ export default function InboxMenus({
                         />
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-96">
+                <DropdownMenuContent
+                    align="end"
+                    className="w-96 max-w-[calc(100vw-1rem)]"
+                >
                     <div className="flex items-center justify-between px-1">
                         <DropdownMenuLabel className="text-sm font-semibold">
                             Announcements
@@ -386,7 +392,8 @@ export default function InboxMenus({
                         <Button
                             variant="ghost"
                             size="sm"
-                            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                            aria-label="Mark all announcements read"
+                            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground max-md:min-h-[44px]"
                             disabled={!unreadAnnouncements}
                             onClick={() =>
                                 router.post(
@@ -423,7 +430,7 @@ export default function InboxMenus({
                                 return (
                                     <DropdownMenuItem
                                         key={a.id}
-                                        className="cursor-pointer rounded-md px-3 py-2.5 focus:bg-accent"
+                                        className="cursor-pointer rounded-md px-3 py-2.5 focus:bg-accent max-md:min-h-[44px]"
                                         onSelect={(e) => {
                                             e.preventDefault();
                                             setOpenNotifId(null);

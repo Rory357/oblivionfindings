@@ -17,6 +17,7 @@ import {
 import {
     __resetOfflineQueueRuntimeForTests,
     __setOfflineQueueStorageForTests,
+    dismissRejectedOfflineSubmission,
     dismissRejectedOfflineSubmissions,
     EphemeralCredentialQueueError,
     getPendingCount,
@@ -864,7 +865,21 @@ describe('offline queue', () => {
             expect(storage.items()).toHaveLength(0);
         });
 
-        it('does not clear a replayed item when the server answers without a sync envelope', async () => {
+          it('dismisses only one rejected save owned by the current actor', async () => {
+              const rejected = queuedSubmission({ id: 'rejected-one', rejected: true, action: 'medication_followup' });
+              const otherRejected = queuedSubmission({ id: 'rejected-two', rejected: true });
+              const pending = queuedSubmission({ id: 'pending-one' });
+              const anotherActor = queuedSubmission({ id: 'other-actor', actorId: '202', rejected: true });
+              const storage = createStorage([rejected, otherRejected, pending, anotherActor]);
+              __setOfflineQueueStorageForTests(storage);
+              await dismissRejectedOfflineSubmission(pending.id);
+              await dismissRejectedOfflineSubmission(anotherActor.id);
+              expect(storage.items()).toHaveLength(4);
+              await dismissRejectedOfflineSubmission(rejected.id);
+              expect(storage.items().map((item) => item.id)).toEqual([otherRejected.id, pending.id, anotherActor.id]);
+          });
+
+          it('does not clear a replayed item when the server answers without a sync envelope', async () => {
             const storage = createStorage([queuedSubmission()]);
             __setOfflineQueueStorageForTests(storage);
             // axios followed a legacy redirect to an HTML page.

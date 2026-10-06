@@ -329,6 +329,7 @@ export function CdDetailDialog({
 
     return (
         <WizardShell
+            frontline
             open
             onClose={onClose}
             title="Controlled drug detail"

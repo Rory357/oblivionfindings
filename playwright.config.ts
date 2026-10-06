@@ -80,6 +80,8 @@ export default defineConfig({
             testIgnore: [
                 itSecurityDesktopOnlyTestMatch,
                 legacyAppShellVisualTestMatch,
+                // These journeys require their own disposable database/server.
+                /tests[\\/]e2e[\\/]governance[\\/]/,
             ],
             use: {
                 ...devices['Desktop Chrome'],
@@ -119,11 +121,10 @@ export default defineConfig({
         // Without it, `-t public public/index.php` routes every request through
         // Laravel and serves the Inertia shell HTML for `/build/assets/*.css`,
         // which breaks asset loading and produces blank pages in tests.
-        command: `php -S 127.0.0.1:${port} -t public server.php`,
+        command: `php -S 127.0.0.1:${port} -t public ${process.env.VISUAL_FROZEN_NOW ? 'tests/visual/server.php' : 'server.php'}`,
         env: webServerEnv,
         url: `http://127.0.0.1:${port}`,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
     },
 });
-

@@ -21,6 +21,8 @@ use App\Services\ControlRoom\AlertWorklistPresenter;
 use App\Services\ControlRoom\AlertWorkspaceService;
 use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\Incidents\IncidentJourneyService;
+use App\Services\Medication\MedicationErrorReadScope;
+use App\Services\Medication\MedicationErrorSummary;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -384,20 +386,18 @@ class ControlRoomIncidentController extends Controller
                     $user,
                     MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
                 );
-                $sourceQuery = $medicationScope->scopeCanonicalClientMedicationRows(
+                $sourceQuery = app(MedicationErrorReadScope::class)->apply(
                     MedicationError::query()->with([
                         'client.site',
                         'medication' => fn ($query) => $query->withTrashed(),
                     ]),
+                    $user,
                     $readerSiteIds,
                 );
-                if (! $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
-                    $medicationScope->scopeWithoutControlledMedicationRows($sourceQuery);
-                }
                 $source = $sourceQuery->find($data['source_id']);
                 abort_unless($source, 404, 'The requested medication incident source was not found.');
-                $context['title'] = 'Medication Error: '.ucfirst(str_replace('_', ' ', $source->error_type ?? 'Unknown'));
-                $context['description'] = $source->description;
+                $context['title'] = 'Medication error '.$source->reference_number;
+                $context['description'] = MedicationErrorSummary::for($source);
                 $context['normalized_data'] = [
                     'client_medication_id' => $source->client_medication_id,
                     'controlled_drug' => (bool) $source->medication?->controlled_drug,

@@ -8,9 +8,8 @@
  * Built so far: the Alerts tab (in-app, email, push, Follow up, who gets
  * it), Delivery (follow-up, email, push, quiet hours, in-app, after hours
  * and the privacy switch, then Who can't be reached), the message preview
- * and their Overview cards; On-call contacts is in _oncall. The Alert log
- * arrives with its chunk (P11 B2 C6) — until then it isn't shown
- * (hide-unbuilt). */
+ * and their Overview cards; On-call contacts is in _oncall, the Alert log
+ * in _alert-log, and the canonical emergency policy in _emergency. */
 import { DiscardDraftDialog } from '@/components/governance/DiscardDraftDialog';
 import { EntityChip } from '@/components/lists/entity-cells';
 import {
@@ -47,6 +46,7 @@ import {
     ChevronLeft,
     ChevronRight,
     Eye,
+    History,
     Home,
     LockKeyhole,
     Mail,
@@ -163,6 +163,7 @@ export type AlertData = {
     houses: { id: number; name: string }[];
     /** People with a contact gap: Who can't be reached (B2 C5). */
     reachGaps: ReachGap[];
+    logSummary?: { recent: number; open: number };
 };
 
 const G = 'alerts';
@@ -253,6 +254,29 @@ export function AlertsOverview({ q, data }: { q: string; data: AlertData }) {
             title="Alerts & access"
             caption="Who is told, how, and who to call"
             cards={[
+                {
+                    icon: LockKeyhole,
+                    title: 'Emergency access',
+                    lines: [
+                        'Grant length, extensions and repeat-use checks.',
+                        'How access starts, ends and is reviewed.',
+                    ],
+                    cta: 'Review emergency access',
+                    onClick: () => go('alerts', 'emergency'),
+                },
+                {
+                    icon: History,
+                    title: 'Alert log',
+                    lines: [
+                        (data.logSummary?.recent ?? 0) +
+                            ' alerts in the last 3 days · ' +
+                            (data.logSummary?.open ?? 0) +
+                            ' not attended.',
+                        'Who was told, how, and who attended.',
+                    ],
+                    cta: 'Review the alert log',
+                    onClick: () => go('alerts', 'log'),
+                },
                 {
                     icon: Bell,
                     title: 'Alerts',
@@ -1119,6 +1143,37 @@ export function AlertsDelivery({
                             hidden={!link('Alert types sent in-app', 'in-app')}
                             control={counted('inapp')}
                         />
+                        {s.definitions[D]?.pin_unattended && (
+                            <GroupRow
+                                id="dl-pin_unattended"
+                                label="Keep unattended alerts at the top of the bell"
+                                hint="Off by default. Medication follow-up alerts only; shared attendance ends the priority."
+                                state={state('pin_unattended')}
+                                hidden={
+                                    !shown(
+                                        show,
+                                        q,
+                                        'pin_unattended',
+                                        'Keep unattended alerts at the top of the bell',
+                                    )
+                                }
+                                control={
+                                    <OnOff
+                                        id="dl-pin_unattended"
+                                        checked={
+                                            value('pin_unattended') === 'yes'
+                                        }
+                                        disabled={disabled}
+                                        onChange={(v) =>
+                                            edit(
+                                                'pin_unattended',
+                                                v ? 'yes' : 'no',
+                                            )
+                                        }
+                                    />
+                                }
+                            />
+                        )}
                     </SettingGroup>
                     <SettingGroup
                         id="afterhours"
@@ -1404,6 +1459,7 @@ export function MessagePreview({
     ];
     return (
         <WizardShell
+            frontline
             open
             onClose={close}
             title="Message preview"
@@ -1734,6 +1790,7 @@ export function AlertWho({ k, data }: { k: string; data: AlertData }) {
     return (
         <>
             <WizardShell
+                frontline
                 open
                 onClose={onClose}
                 title={`Who gets “${meta.label}”`}
@@ -1991,6 +2048,7 @@ export function AlertWho({ k, data }: { k: string; data: AlertData }) {
                 </WizardStepPane>
             </WizardShell>
             <DiscardDraftDialog
+                frontline
                 open={guard}
                 mode="edit"
                 description="Your changes to who gets this alert haven’t been applied. Closing now loses them."
@@ -2035,7 +2093,9 @@ export function AlertPersonDialog({ k, data }: { k: string; data: AlertData }) {
     };
     return (
         <SettingsModal
+            frontline
             title={`Add a person to “${meta.label}”`}
+            width={720}
             description="They get it for every house they have access to."
             onClose={close}
             footer={

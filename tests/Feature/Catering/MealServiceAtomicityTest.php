@@ -263,7 +263,7 @@ test('wrong Site and mismatched nested scope deny before meal or stock side effe
         ->assertNotFound();
     $this->actingAs($this->stockWorker)
         ->postJson("/sites/{$this->otherStockSite->id}/meal-plan/{$otherEntry->id}/serve")
-        ->assertForbidden();
+        ->assertNotFound();
     expect(fn () => app(MealServiceCommand::class)->serve(
         $this->otherStockSite->id,
         $otherEntry->id,

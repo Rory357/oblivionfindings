@@ -1,5 +1,6 @@
 import { LeaveCalendarRange } from '@/components/hr/leave-calendar-range';
 import { Button } from '@/components/ui/button';
+import { useCompactDateTime } from '@/components/ui/date-time-presentation';
 import {
     Popover,
     PopoverContent,
@@ -20,8 +21,10 @@ export function DatePicker({
     invalid,
     describedBy,
     allowClear = false,
+    disabled = false,
     timeZone = 'Pacific/Auckland',
     trigger,
+    compact: compactOverride,
 }: {
     id: string;
     label: string;
@@ -30,9 +33,13 @@ export function DatePicker({
     invalid?: boolean;
     describedBy?: string;
     allowClear?: boolean;
+    disabled?: boolean;
     timeZone?: string;
     trigger?: React.ReactNode;
+    /** A touch-sized single-line trigger for dense operational forms. */
+    compact?: boolean;
 }) {
+    const compact = useCompactDateTime(compactOverride);
     const [open, setOpen] = useState(false);
     const pickerTrigger = useRef<HTMLButtonElement>(null);
     const pickerSide = usePickerPlacement(open, 390, pickerTrigger);
@@ -49,8 +56,10 @@ export function DatePicker({
                     <Button
                         type="button"
                         id={id}
+                        disabled={disabled}
                         variant="outline"
                         className="time-picker-trigger"
+                        data-compact={compact || undefined}
                         aria-label={`${label}: ${value ? formatDateOnly(value) : 'Choose date'}`}
                         aria-invalid={invalid}
                         aria-describedby={describedBy}
@@ -62,7 +71,9 @@ export function DatePicker({
                             <strong>
                                 {value ? formatDateOnly(value) : 'Choose date'}
                             </strong>
-                            <small>Choose a day on the calendar</small>
+                            {!compact && (
+                                <small>Choose a day on the calendar</small>
+                            )}
                         </span>
                         <ChevronDown className="size-4" />
                     </Button>
@@ -70,6 +81,7 @@ export function DatePicker({
             </PopoverTrigger>
             <PopoverContent
                 className="date-picker-popover"
+                data-compact={compact || undefined}
                 side={pickerSide}
                 align={pickerSide === 'bottom' ? 'start' : 'center'}
                 collisionPadding={16}
