@@ -1027,12 +1027,42 @@ class ForgottenWitnessPinTest extends TestCase
             $this->assertSame(1, $service->expireDue());
             $this->assertSame([$current->id], array_values(array_unique($retrieved)), 'Superseded nominations must never be materialized as expiry candidates.');
             $locks = collect(DB::getQueryLog())->filter(fn ($query) => str_contains($query['query'], 'for update'));
-            foreach (['client_medications' => $currentOrder->id, 'client_medication_administrations' => $currentDose->id,
-                'medication_second_person_confirmations' => $current->id] as $table => $id) {
+            foreach (['client_medications' => $currentOrder->id, 'medication_second_person_confirmations' => $current->id] as $table => $id) {
                 $lockedIds = $locks->filter(fn ($query) => str_starts_with($query['query'], 'select * from `'.$table.'`'))
                     ->map(fn ($query) => (int) $query['bindings'][0])->unique()->values()->all();
                 $this->assertSame([$id], $lockedIds, 'Only the current due '.$table.' row may enter the expiry mutex.');
             }
+            // Saving expiry also locks the current slot's evidence. Its first
+            // binding is the person, whereas the mutex's first binding is the dose.
+            $table = '`client_medication_administrations`';
+            $pointSql = 'select * from '.$table.' where '.$table.'.`id` = ? limit 1 for update';
+            $originalsSql = 'select * from '.$table.' where `client_id` = ? and `client_medication_id` = ?'
+                .' and `scheduled_for` between ? and ? and (`is_correction` = ? or `is_correction` is null)'
+                .' and '.$table.'.`deleted_at` is null order by `id` asc for update';
+            $correctionsSql = 'select * from '.$table.' where `corrected_of_id` in (?) and `is_correction` = ?'
+                .' and '.$table.'.`deleted_at` is null order by `id` asc for update';
+            $dueAt = Carbon::parse($currentDose->getRawOriginal('scheduled_for'), 'UTC')->startOfMinute();
+            $lockCounts = ['point' => 0, 'slot_originals' => 0, 'slot_corrections' => 0];
+            foreach ($locks->filter(fn ($query) => str_contains($query['query'], 'from '.$table)) as $query) {
+                $shape = match ($query['query']) {
+                    $pointSql => 'point',
+                    $originalsSql => 'slot_originals',
+                    $correctionsSql => 'slot_corrections',
+                    default => $this->fail('Unrecognized administration lock query: '.$query['query']),
+                };
+                $expectedBindings = match ($shape) {
+                    'point' => [(int) $currentDose->id],
+                    'slot_originals' => [(int) $currentDose->client_id, (int) $currentOrder->id,
+                        $dueAt->copy()->subSeconds(30)->format('Y-m-d H:i:s'),
+                        $dueAt->copy()->addSeconds(29)->format('Y-m-d H:i:s'), false],
+                    'slot_corrections' => [(int) $currentDose->id, true],
+                };
+                $this->assertSame($expectedBindings, $query['bindings'], 'Administration '.$shape.' locks must target only the current dose or its person/order/minute.');
+                $lockCounts[$shape]++;
+            }
+            $this->assertGreaterThanOrEqual(1, $lockCounts['point'], 'The current administration must enter the expiry mutex.');
+            $this->assertSame(1, $lockCounts['slot_originals']);
+            $this->assertSame($deletedCurrent ? 0 : 1, $lockCounts['slot_corrections']);
             $retrieved = [];
             DB::flushQueryLog();
             $this->assertSame(0, $service->expireDue());
