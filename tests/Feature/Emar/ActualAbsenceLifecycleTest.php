@@ -15,6 +15,7 @@ use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Services\Clients\ClientLeaveWorkflow;
+use App\Services\Medication\DoseSlots\DoseAwaySources;
 use App\Services\Timeline\TimelineEmitter;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
@@ -145,6 +146,94 @@ class ActualAbsenceLifecycleTest extends TestCase
         $before = $this->facts();
         $this->action($leave, ['action' => 'approve'])->assertUnprocessable();
         $this->assertSame($before, $this->facts());
+    }
+
+    #[DataProvider('declinedLeaveCommands')]
+    public function test_declined_leave_http_retains_decision_actor_time_and_profile_attribution_without_actual_absence(bool $initialDecline): void
+    {
+        config(['medications.away.from_leave' => true]);
+        $otherActor = User::factory()->create(['approved_at' => now()]);
+        if ($initialDecline) {
+            $this->actingAs($this->actor)->postJson('/operations/clients/'.$this->client->id.'/leave', [
+                'starts_on' => '2026-06-15', 'ends_on' => '2026-06-20', 'status' => 'declined',
+                'approval_notes' => 'The proposed visit cannot proceed safely.',
+                'approved_by' => $otherActor->id, 'approved_at' => '2026-06-14T07:00:00+12:00',
+            ])->assertRedirect();
+            $leave = ClientLeaveRequest::where('client_id', $this->client->id)->sole();
+        } else {
+            $leave = $this->leave();
+            $this->assertNull($leave->approved_by);
+            $this->assertNull($leave->approved_at);
+            Carbon::setTestNow(now()->addHour());
+            $this->action($leave, ['action' => 'decline', 'approval_notes' => 'The proposed visit cannot proceed safely.',
+                'approved_by' => $otherActor->id, 'approved_at' => '2026-06-14T07:00:00+12:00'])->assertRedirect();
+            $leave->refresh();
+        }
+        $this->assertSame('declined', $leave->status);
+        $this->assertSame($this->actor->id, $leave->approved_by);
+        $this->assertTrue($leave->approved_at->equalTo(now()));
+        $this->assertSame('The proposed visit cannot proceed safely.', $leave->approval_notes);
+        $this->assertSame($initialDecline ? 1 : 2, $leave->version);
+        $this->assertNull($leave->departed_at);
+        $this->assertNull($leave->returned_at);
+        $this->assertNull($leave->withdrawn_at);
+        $this->assertSame([], $leave->allowedActions());
+        $this->assertSame([], app(DoseAwaySources::class)->periods([$this->client->id], '2026-06-15', '2026-06-20')->all());
+        $historyActions = $initialDecline ? ['created'] : ['created', 'decline'];
+        $history = $leave->transitions()->get();
+        $this->assertSame($historyActions, $history->pluck('meta.action')->all());
+        $this->assertSame(array_fill(0, count($historyActions), $this->actor->id), $history->pluck('actor_user_id')->all());
+        $this->assertTrue($history->last()->occurred_at->equalTo($leave->approved_at));
+        $this->assertDatabaseHas('audit_logs', ['action' => 'clientleave.transition', 'user_id' => $this->actor->id,
+            'auditable_type' => $leave->getMorphClass(), 'auditable_id' => $leave->id, 'meta->action' => $historyActions[array_key_last($historyActions)]]);
+        $dto = $this->actingAs($this->actor)->get('/operations/clients/'.$this->client->id)->assertOk()->inertiaProps('leave_excursions.leave.0');
+        $this->assertSame('declined', $dto['status']);
+        $this->assertSame($this->actor->name, $dto['approver']);
+        $this->assertSame($leave->approved_at->toISOString(), $dto['approved_at']);
+        $this->assertSame($leave->approval_notes, $dto['approval_notes']);
+        $this->assertSame([], $dto['allowed_actions']);
+        $this->assertSame($historyActions, array_column($dto['history'], 'action'));
+        $before = $this->facts();
+        $this->action($leave, ['action' => 'depart', 'occurred_at' => '2026-06-15T07:00:00+12:00'])->assertUnprocessable();
+        $this->action($leave, ['action' => 'approve'])->assertUnprocessable();
+        $this->assertSame($before, $this->facts());
+    }
+
+    public static function declinedLeaveCommands(): array
+    {
+        return ['initial declined capture' => [true], 'requested to decline' => [false]];
+    }
+
+    public function test_decline_checks_revision_and_current_authority_before_stamping_a_decision(): void
+    {
+        $leave = $this->leave();
+        $before = $this->facts();
+        $this->action($leave, ['action' => 'decline', 'version' => 99])->assertUnprocessable()->assertJsonValidationErrors('version');
+        $this->assertSame($before, $this->facts());
+        $staleActor = $this->actor->fresh();
+        $this->assertTrue($staleActor->canDo('clients.update'));
+        $permission = Permission::where('key', 'clients.update')->sole();
+        $this->actor->permissionOverrides()->updateExistingPivot($permission->id, ['allowed' => false]);
+        $before = $this->facts();
+        foreach (['create', 'decline'] as $command) {
+            try {
+                if ($command === 'create') {
+                    app(ClientLeaveWorkflow::class)->create($staleActor, $this->client, [
+                        'starts_on' => '2026-06-15', 'ends_on' => '2026-06-20', 'status' => 'declined',
+                    ]);
+                } else {
+                    app(ClientLeaveWorkflow::class)->transition($staleActor, $this->client, $leave,
+                        ['action' => 'decline', 'version' => $leave->version]);
+                }
+                $this->fail('Both declined commands require current Client update authority.');
+            } catch (HttpExceptionInterface $error) {
+                $this->assertSame(403, $error->getStatusCode());
+            }
+            $this->assertSame($before, $this->facts());
+        }
+        $this->assertNull($leave->fresh()->approved_by);
+        $this->assertNull($leave->fresh()->approved_at);
+        $this->assertSame('requested', $leave->fresh()->status);
     }
 
     public function test_an_actual_departure_cannot_be_withdrawn_or_physically_deleted(): void

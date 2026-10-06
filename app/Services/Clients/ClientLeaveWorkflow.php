@@ -37,10 +37,11 @@ final class ClientLeaveWorkflow
         return DB::transaction(function () use ($actor, $client, $input): ClientLeaveRequest {
             [$client, $actor] = $this->lockAuthority($client, $actor);
             $status = $input['status'] ?? 'requested';
+            $decided = in_array($status, ['approved', 'declined'], true);
             $leave = ClientLeaveRequest::create([...$input, 'client_id' => $client->id, 'requested_by' => $actor->id,
                 'status' => $status, 'version' => 1,
-                'approved_by' => $status === 'approved' ? $actor->id : null,
-                'approved_at' => $status === 'approved' ? now() : null]);
+                'approved_by' => $decided ? $actor->id : null,
+                'approved_at' => $decided ? now() : null]);
             $this->record($leave, $client, $actor, 'created', null);
 
             return $leave;
@@ -114,7 +115,8 @@ final class ClientLeaveWorkflow
                 $leave->forceFill(['status' => 'approved', 'approved_at' => now(), 'approved_by' => $actor->id,
                     'approval_notes' => $input['approval_notes'] ?? null]);
             } else {
-                $leave->forceFill(['status' => 'declined', 'approval_notes' => $input['approval_notes'] ?? null]);
+                $leave->forceFill(['status' => 'declined', 'approved_at' => now(), 'approved_by' => $actor->id,
+                    'approval_notes' => $input['approval_notes'] ?? null]);
             }
             $leave->version = ((int) $leave->version) + 1;
             $leave->save();
