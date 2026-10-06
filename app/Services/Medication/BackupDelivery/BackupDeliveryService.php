@@ -72,34 +72,46 @@ class BackupDeliveryService
 
     public function prepare(User $actor, int $siteId, string $day, int $version): MedicationBackupDelivery
     {
+        return $this->prepareArtifact($actor, $siteId, $day, $version);
+    }
+
+    private function prepareArtifact(User $actor, int $siteId, string $day, int $version, bool $scheduled = false): MedicationBackupDelivery
+    {
         if (DB::transactionLevel() !== 0) {
             throw new LogicException('Prepare chart backups only at an outer durable transaction boundary.');
         }
         abort_unless($this->encryption->ready(), 503, 'Strong PDF encryption is not configured.');
         abort_unless($day === now(BackupScheduleClock::TIMEZONE)->toDateString(), 422, 'Prepare the current NZ day; previous days cannot be reconstructed as current charts.');
         $claim = (string) Str::uuid();
-        $oldPath = null;
-        $delivery = DB::transaction(function () use ($actor, $siteId, $day, $version, $claim, &$oldPath) {
+        $previousArtifactToken = null;
+        $delivery = DB::transaction(function () use ($actor, $siteId, $day, $version, $claim, $scheduled, &$previousArtifactToken) {
             $current = $this->access->manager($actor, $siteId);
             $schedule = MedicationBackupSchedule::query()->where('site_id', $siteId)->lockForUpdate()->firstOrFail();
             abort_unless($schedule->version === $version, 409);
+            if ($scheduled) {
+                $this->assertDueSchedule($schedule, $current, $day, $version);
+            }
             $this->recipients($schedule);
             $delivery = MedicationBackupDelivery::query()->where('schedule_id', $schedule->id)->where('nz_date', $day)->lockForUpdate()->first();
-            if ($delivery && in_array($delivery->state, ['ready', 'sent', 'sending', 'uncertain', 'preparing', 'purged'], true)) {
+            // Only the scheduler may rebuild another lead's still-unsent chart under its current approver.
+            $replaceReady = $scheduled && $delivery?->state === 'ready' && $delivery->prepared_by !== $current->id && $delivery->claim_token === null;
+            if ($delivery && ! $replaceReady && in_array($delivery->state, ['ready', 'sent', 'sending', 'uncertain', 'preparing', 'purged'], true)) {
                 return $delivery;
             }
             $delivery ??= new MedicationBackupDelivery(['schedule_id' => $schedule->id, 'site_id' => $siteId, 'nz_date' => $day, 'version' => 0]);
             abort_if($delivery->claim_token !== null && $delivery->exists, 409, 'Previous preparation cleanup is still pending.');
             $oldPath = $delivery->artifact_path;
-            if ($oldPath && Storage::disk('private')->exists($oldPath)) {
-                abort_unless(Storage::disk('private')->delete($oldPath), 503, 'Previous artifact cleanup could not be completed.');
-            }
-            $delivery->forceFill(['state' => 'preparing', 'artifact_path' => null, 'password' => null, 'source_snapshot' => null, 'version' => $delivery->version + 1, 'schedule_version' => $schedule->version, 'prepared_by' => $current->id, 'claim_token' => $claim, 'claimed_at' => now(), 'failure_code' => null, 'expires_at' => now()->addDays($schedule->retention_days)])->saveOrFail();
+            $previousArtifactToken = $oldPath === null ? null : basename($oldPath, '.pdf');
+            abort_if($previousArtifactToken !== null && (! Str::isUuid($previousArtifactToken) || $oldPath !== 'medication-backups/'.$delivery->id.'/'.$previousArtifactToken.'.pdf'), 409, 'The previous protected backup reference could not be verified.');
+            // Keep the prior encrypted artifact, password, source and expiry until replacement publication commits.
+            $delivery->forceFill(['state' => 'preparing', 'version' => $delivery->version + 1, 'schedule_version' => $schedule->version, 'prepared_by' => $oldPath === null ? $current->id : $delivery->prepared_by, 'claim_token' => $claim, 'claimed_at' => now(), 'failure_code' => null, 'expires_at' => $delivery->expires_at ?? now()->addDays($schedule->retention_days)])->saveOrFail();
 
             return $delivery;
         }, 5);
         if ($delivery->claim_token !== $claim) {
-            return $delivery;
+            $this->cleanupReplacedArtifact($delivery);
+
+            return $delivery->fresh();
         }
         $owned = null;
         try {
@@ -108,16 +120,20 @@ class BackupDeliveryService
             $bytes = $this->encryption->encrypt($this->pdf->render($pack), $password);
             $owned = 'medication-backups/'.$delivery->id.'/'.$claim.'.pdf';
             abort_unless(Storage::disk('private')->put($owned, $bytes), 503);
-            DB::transaction(function () use ($actor, $delivery, $pack, $password, $bytes, $owned, $claim): void {
+            DB::transaction(function () use ($actor, $delivery, $pack, $password, $bytes, $owned, $claim, $previousArtifactToken, $scheduled, $day, $version): void {
                 $row = MedicationBackupDelivery::query()->lockForUpdate()->findOrFail($delivery->id);
                 abort_unless($row->state === 'preparing' && $row->claim_token === $claim, 409);
                 $schedule = MedicationBackupSchedule::query()->lockForUpdate()->findOrFail($row->schedule_id);
                 $current = $this->access->manager($actor, $row->site_id);
                 abort_unless($row->schedule_version === $schedule->version, 409, 'The schedule changed while the chart was rendered.');
+                if ($scheduled) {
+                    $this->assertDueSchedule($schedule, $current, $day, $version);
+                }
                 $recipients = $this->recipients($schedule);
                 // Reuses every canonical source/current-authority release check after rendering.
-                $this->packs->release($current, $pack, function () use ($row, $schedule, $current, $pack, $password, $bytes, $owned, $recipients): void {
-                    $row->forceFill(['state' => 'ready', 'source_snapshot' => $pack, 'source_sha256' => hash('sha256', json_encode($pack['_source'], JSON_THROW_ON_ERROR)), 'artifact_path' => $owned, 'artifact_sha256' => hash('sha256', $bytes), 'password' => $password, 'recipient_ids' => array_keys($recipients), 'recipient_sha256' => $this->recipientDigest($recipients), 'claim_token' => null, 'claimed_at' => null, 'expires_at' => now()->addDays($schedule->retention_days), 'version' => $row->version + 1])->saveOrFail();
+                $this->packs->release($current, $pack, function () use ($row, $schedule, $current, $pack, $password, $bytes, $owned, $recipients, $previousArtifactToken): void {
+                    // In ready state the token durably identifies only the previous artifact pending cleanup.
+                    $row->forceFill(['state' => 'ready', 'prepared_by' => $current->id, 'source_snapshot' => $pack, 'source_sha256' => hash('sha256', json_encode($pack['_source'], JSON_THROW_ON_ERROR)), 'artifact_path' => $owned, 'artifact_sha256' => hash('sha256', $bytes), 'password' => $password, 'recipient_ids' => array_keys($recipients), 'recipient_sha256' => $this->recipientDigest($recipients), 'claim_token' => $previousArtifactToken, 'claimed_at' => $previousArtifactToken ? now() : null, 'failure_code' => $previousArtifactToken ? 'waiting_for_previous_backup_cleanup_before_sending' : null, 'expires_at' => now()->addDays($schedule->retention_days), 'version' => $row->version + 1])->saveOrFail();
                     $this->event($row, $current, 'prepared');
                 });
             }, 1);
@@ -136,7 +152,7 @@ class BackupDeliveryService
             }
             throw $exception;
         }
-        $this->deleteUnused($oldPath);
+        $this->cleanupReplacedArtifact($delivery->fresh());
 
         return $delivery->fresh();
     }
@@ -154,6 +170,7 @@ class BackupDeliveryService
             $current = $this->access->manager($actor, $row->site_id);
             abort_unless($row->prepared_by === $current->id, 403);
             abort_unless($row->version === $version && $row->state === 'ready' && $row->expires_at?->isFuture(), 409);
+            abort_unless($row->claim_token === null, 409, 'The previous protected backup is still being cleaned up. Prepare again to retry cleanup before sending.');
             $row->forceFill(['state' => 'sending', 'claim_token' => $token, 'claimed_at' => now(), 'attempt_count' => $row->attempt_count + 1, 'version' => $row->version + 1])->saveOrFail();
             MedicationBackupAttempt::query()->create(['delivery_id' => $row->id, 'token' => $token, 'actor_id' => $current->id, 'state' => 'sending', 'started_at' => now()]);
         }, 1);
@@ -226,6 +243,9 @@ class BackupDeliveryService
 
     public function recoverInterrupted(): int
     {
+        foreach (MedicationBackupDelivery::query()->where('state', 'ready')->whereNotNull('claim_token')->get() as $ready) {
+            $this->cleanupReplacedArtifact($ready);
+        }
         $count = 0;
         foreach (MedicationBackupDelivery::query()->where('state', 'failed')->whereNotNull('claim_token')->get() as $failed) {
             if (Str::isUuid($failed->claim_token) && $this->deleteUnused('medication-backups/'.$failed->id.'/'.$failed->claim_token.'.pdf')) {
@@ -303,7 +323,7 @@ class BackupDeliveryService
             }
             try {
                 $actor = User::query()->findOrFail($schedule->approved_by);
-                $row = $this->prepare($actor, $schedule->site_id, $day, $schedule->version);
+                $row = $this->prepareArtifact($actor, $schedule->site_id, $day, $schedule->version, scheduled: true);
                 if ($row->state === 'ready') {
                     $results['prepared']++;
                     if (config('emar-catalogue-backups.send_enabled', false)) {
@@ -325,9 +345,16 @@ class BackupDeliveryService
     public function dto(MedicationBackupDelivery $row, User $actor): array
     {
         $manager = $actor->canDo('medications.backups.manage');
-        $alive = $row->expires_at?->isFuture() && $row->artifact_path !== null;
+        $alive = $row->expires_at?->isFuture() && $row->artifact_path !== null && in_array($row->state, ['ready', 'sent', 'failed', 'uncertain'], true);
 
-        return ['id' => (int) $row->id, 'site_id' => (int) $row->site_id, 'nz_date' => $row->nz_date, 'state' => $row->state, 'version' => $row->version, 'attempt_count' => $row->attempt_count, 'failure_code' => $row->failure_code, 'created_at' => $row->created_at?->toIso8601String(), 'sent_at' => $row->sent_at?->toIso8601String(), 'expires_at' => $row->expires_at?->toIso8601String(), 'can_send' => $manager && $row->prepared_by === $actor->id && $row->state === 'ready' && $alive && (bool) config('emar-catalogue-backups.send_enabled', false), 'can_retry' => $manager && config('emar-catalogue-backups.send_enabled', false) && $row->state === 'failed' && $row->claim_token === null && $row->nz_date === now(BackupScheduleClock::TIMEZONE)->toDateString(), 'can_download' => (bool) $alive, 'can_reveal' => (bool) $alive];
+        return ['id' => (int) $row->id, 'site_id' => (int) $row->site_id, 'nz_date' => $row->nz_date, 'state' => $row->state, 'version' => $row->version, 'attempt_count' => $row->attempt_count, 'failure_code' => $row->failure_code, 'created_at' => $row->created_at?->toIso8601String(), 'sent_at' => $row->sent_at?->toIso8601String(), 'expires_at' => $row->expires_at?->toIso8601String(), 'can_send' => $manager && $row->prepared_by === $actor->id && $row->state === 'ready' && $row->claim_token === null && $alive && (bool) config('emar-catalogue-backups.send_enabled', false), 'can_retry' => $manager && config('emar-catalogue-backups.send_enabled', false) && $row->state === 'failed' && $row->claim_token === null && $row->nz_date === now(BackupScheduleClock::TIMEZONE)->toDateString(), 'can_download' => (bool) $alive, 'can_reveal' => (bool) $alive];
+    }
+
+    private function assertDueSchedule(MedicationBackupSchedule $schedule, User $actor, string $day, int $version): void
+    {
+        abort_unless($schedule->enabled && $schedule->version === $version && (int) $schedule->approved_by === $actor->id
+            && $day === now(BackupScheduleClock::TIMEZONE)->toDateString()
+            && ! $this->clock->resolve($day, $schedule->local_time)['instant']->isFuture(), 409, 'The backup schedule is no longer approved and due. Reload before preparing.');
     }
 
     private function recipients(MedicationBackupSchedule $schedule): array
@@ -369,6 +396,23 @@ class BackupDeliveryService
             }, 1);
         } catch (Throwable) {
             // Keep the durable sending claim; recovery marks it uncertain, never resends.
+        }
+    }
+
+    private function cleanupReplacedArtifact(MedicationBackupDelivery $row): void
+    {
+        if ($row->state !== 'ready' || ! Str::isUuid($row->claim_token ?? '')) {
+            return;
+        }
+        $path = 'medication-backups/'.$row->id.'/'.$row->claim_token.'.pdf';
+        if (! $this->deleteUnused($path)) {
+            return;
+        }
+        try {
+            MedicationBackupDelivery::query()->whereKey($row->id)->where('state', 'ready')->where('claim_token', $row->claim_token)
+                ->update(['claim_token' => null, 'claimed_at' => null, 'failure_code' => null]);
+        } catch (Throwable) {
+            // Keep the durable cleanup marker; deleting an already absent old file is safe to retry.
         }
     }
 
