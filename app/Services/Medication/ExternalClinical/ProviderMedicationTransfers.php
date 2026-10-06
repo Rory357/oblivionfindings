@@ -229,15 +229,17 @@ final class ProviderMedicationTransfers
 
     private function incoming(Client $client, array $snapshot): array
     {
+        $instantRules = ['bail', 'string', 'regex:/\A\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,6})?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)\z/', 'date'];
+        $offsetMessage = 'Provide an ISO date and time with Z or an explicit UTC offset such as +13:00.';
         $data = Validator::make($snapshot, [
-            'captured_at' => 'required|date|before_or_equal:now', 'person' => 'required|array',
+            'captured_at' => ['required', ...$instantRules, 'before_or_equal:now'], 'person' => 'required|array',
             'person.name' => 'required|string|max:255', 'person.date_of_birth' => 'required|date_format:Y-m-d', 'person.nhi_number' => 'nullable|string|max:20',
-            'medications' => 'present|array|max:100', 'medications.*.prescription' => 'required|array',
+            'medications' => 'present|array|list|max:100', 'medications.*.prescription' => 'required|array',
             'medications.*.prescription.name' => 'required|string|max:255', 'medications.*.prescription.controlled_drug' => 'required|boolean',
-            'medications.*.last_dose' => 'nullable|array', 'medications.*.next_due_at' => 'nullable|date',
-            'allergies' => 'present|array|max:100', 'allergies.*.allergen' => 'required|string|max:255',
+            'medications.*.last_dose' => 'nullable|array', 'medications.*.next_due_at' => ['nullable', ...$instantRules],
+            'allergies' => 'present|array|list|max:100', 'allergies.*.allergen' => 'required|string|max:255',
             'allergies.*.reaction' => 'nullable|string|max:2000', 'allergies.*.severity' => 'nullable|string|max:50', 'allergies.*.notes' => 'nullable|string|max:2000',
-        ])->validate();
+        ], ['captured_at.regex' => $offsetMessage, 'medications.*.next_due_at.regex' => $offsetMessage])->validate();
         if ($client->date_of_birth?->toDateString() !== $data['person']['date_of_birth']
             || mb_strtolower(trim($client->full_name)) !== mb_strtolower(trim($data['person']['name']))
             || (filled($data['person']['nhi_number'] ?? null) && trim((string) $client->nhi_number) !== trim($data['person']['nhi_number']))) {
@@ -248,22 +250,33 @@ final class ProviderMedicationTransfers
         }
         // The portable contract carries only the minimum supported clinical facts.
         $data['person'] = array_intersect_key($data['person'], array_flip(['name', 'date_of_birth', 'nhi_number']));
-        $data['medications'] = array_map(function (array $row): array {
+        $data['medications'] = array_map(function (array $row) use ($instantRules, $offsetMessage): array {
             $prescription = $this->orders->proposedPrescription($row['prescription']);
             $dose = isset($row['last_dose']) ? Validator::make($row['last_dose'], [
-                'given_at' => 'required|date|before_or_equal:now', 'dose_given' => 'required|string|max:100',
+                'given_at' => ['required', ...$instantRules, 'before_or_equal:now'], 'dose_given' => 'required|string|max:100',
                 'source' => 'required|string|max:500',
-            ])->validate() : null;
+            ], ['given_at.regex' => $offsetMessage])->validate() : null;
+            if ($dose !== null) {
+                $dose['given_at'] = $this->utcInstant($dose['given_at']);
+            }
 
             return ['prescription' => $prescription, 'last_dose' => $dose,
-                'next_due_at' => $row['next_due_at'] ?? null, 'verified' => false];
+                'next_due_at' => filled($row['next_due_at'] ?? null) ? $this->utcInstant($row['next_due_at']) : null, 'verified' => false];
         }, $snapshot['medications']);
         $data['allergies'] = array_map(fn (array $row) => array_intersect_key($row, array_flip(['allergen', 'reaction', 'severity', 'notes'])), $data['allergies']);
-        $data['captured_at'] = CarbonImmutable::parse($data['captured_at'])->utc()->toIso8601String();
+        $data['captured_at'] = $this->utcInstant($data['captured_at']);
         $data['limitations'] = ['Unverified provider source. Every medicine and allergy requires internal review.'];
         $data['verified'] = false;
 
         return $data;
+    }
+
+    /** Normalize only validated offset-bearing instants; calendar dates keep their separate contract. */
+    private function utcInstant(string $input): string
+    {
+        $instant = CarbonImmutable::parse($input)->utc();
+
+        return $instant->format($instant->micro === 0 ? 'Y-m-d\TH:i:sP' : 'Y-m-d\TH:i:s.uP');
     }
 
     private function assertFresh(User $actor, Client $client, MedicationProviderTransfer $record): void

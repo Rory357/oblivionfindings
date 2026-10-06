@@ -17,6 +17,7 @@ use Illuminate\Database\DatabaseTransactionsManager;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -32,6 +33,7 @@ final class ProviderMedicationTransferTest extends TestCase
     {
         parent::setUp();
         $this->connectedFixtures();
+        Mail::fake();
     }
 
     protected function tearDown(): void
@@ -89,6 +91,120 @@ final class ProviderMedicationTransferTest extends TestCase
         $order->forceFill(['version' => 2])->saveQuietly();
         $this->postJson('/emar/connected-care/transfers/'.$fresh->id.'/transition', $this->action('review', 1, 'review-2'))->assertUnprocessable();
         $this->assertSame('draft', $fresh->refresh()->status);
+    }
+
+    public static function ambiguousIncomingInstants(): array
+    {
+        return [
+            'capture timestamp' => ['captured_at', 'captured_at'],
+            'last given dose timestamp' => ['medications.0.last_dose.given_at', 'given_at'],
+            'next due timestamp' => ['medications.0.next_due_at', 'medications.0.next_due_at'],
+        ];
+    }
+
+    #[DataProvider('ambiguousIncomingInstants')]
+    public function test_incoming_timestamp_without_offset_is_rejected_before_any_source_facts_persist(string $field, string $error): void
+    {
+        $input = $this->timedTransferInput();
+        data_set($input, 'source_snapshot.'.$field, '2026-10-06 22:00');
+        $this->actingAs($this->manager)->postJson('/emar/connected-care/transfers', $input)->assertUnprocessable()->assertJsonValidationErrors($error);
+        $this->assertDatabaseCount('medication_provider_transfers', 0);
+        $this->assertDatabaseCount('medication_provider_transfer_events', 0);
+        $this->assertDatabaseCount('medication_reconciliations', 0);
+        $this->assertDatabaseCount('client_medications', 0);
+        $this->assertDatabaseCount('medication_allergies', 0);
+        // Rejected source details consume no idempotency key; corrected source can be received.
+        $this->postJson('/emar/connected-care/transfers', $this->timedTransferInput())->assertOk()->assertJsonPath('success', true);
+        $this->assertDatabaseCount('medication_provider_transfers', 1);
+        Mail::assertNothingSent();
+    }
+
+    public static function explicitIncomingInstants(): array
+    {
+        return ['non-UTC offsets' => [false], 'UTC Z timestamps and empty allergy list' => [true]];
+    }
+
+    #[DataProvider('explicitIncomingInstants')]
+    public function test_incoming_instants_normalize_to_utc_in_reviewed_packet_and_reconciliation_while_calendar_dates_stay_dates(bool $z): void
+    {
+        $input = $this->timedTransferInput();
+        if ($z) {
+            $input['source_snapshot']['captured_at'] = '2026-10-06T23:30:00Z';
+            $input['source_snapshot']['medications'][0]['last_dose']['given_at'] = '2026-10-06T23:00:00.125Z';
+            $input['source_snapshot']['medications'][0]['next_due_at'] = '2026-10-07T00:30:00Z';
+            $input['source_snapshot']['allergies'] = [];
+        }
+        $response = $this->actingAs($this->manager)->postJson('/emar/connected-care/transfers', $input)->assertOk();
+        $record = MedicationProviderTransfer::findOrFail($response->json('id'));
+        $expected = [
+            'captured_at' => '2026-10-06T23:30:00+00:00',
+            'medications.0.last_dose.given_at' => '2026-10-06T23:00:00.125000+00:00',
+            'medications.0.next_due_at' => '2026-10-07T00:30:00+00:00',
+            'person.date_of_birth' => $this->person->date_of_birth->toDateString(),
+            'medications.0.prescription.start_date' => '2026-10-07',
+            'medications.0.prescription.end_date' => '2026-10-08',
+        ];
+        foreach ($expected as $field => $value) {
+            $this->assertSame($value, data_get($record->snapshot, $field));
+        }
+        $this->assertFalse($record->snapshot['verified']);
+        $this->assertFalse($record->snapshot['medications'][0]['verified']);
+        $this->assertSame($input['source_snapshot']['allergies'], $record->snapshot['allergies']);
+        $service = app(ProviderMedicationTransfers::class);
+        $service->transition($this->manager, $record->id, $this->action('review', 1, 'review'));
+        $packet = $this->getJson('/emar/connected-care/transfers/'.$record->id.'/packet')->assertOk()->assertHeader('Cache-Control', 'no-store, private');
+        foreach ($expected as $field => $value) {
+            $packet->assertJsonPath('snapshot.'.$field, $value);
+        }
+        $service->transition($this->manager, $record->id, $this->action('receipt', 2, 'receipt'));
+        $service->transition($this->manager, $record->id, $this->action('start_reconciliation', 3, 'reconcile'));
+        $source = $record->fresh()->reconciliation->items()->whereNull('client_medication_id')->sole();
+        $this->assertSame($expected['medications.0.last_dose.given_at'], $source->last_dose_evidence['external']['given_at']);
+        $this->assertSame($expected['medications.0.next_due_at'], $source->source_order['provider_source']['next_due_at']);
+        $this->assertSame('2026-10-07', $source->source_order['provider_source']['prescription']['start_date']);
+        $this->assertSame('2026-10-08', $source->source_order['provider_source']['prescription']['end_date']);
+        $this->assertFalse($source->source_order['verified']);
+        $this->assertDatabaseCount('client_medications', 0);
+        $this->assertDatabaseCount('medication_allergies', 0);
+        Mail::assertNothingSent();
+    }
+
+    public static function keyedIncomingFacts(): array
+    {
+        return [
+            'string-key medicine dictionary' => ['medications', 'medicine-a'],
+            'nonzero numeric-key medicine dictionary' => ['medications', 1],
+            'string-key allergy dictionary' => ['allergies', 'allergy-a'],
+            'nonzero numeric-key allergy dictionary' => ['allergies', 1],
+        ];
+    }
+
+    #[DataProvider('keyedIncomingFacts')]
+    public function test_incoming_fact_dictionaries_are_rejected_before_persistence_or_reconciliation(string $field, string|int $key): void
+    {
+        $input = $this->timedTransferInput();
+        $input['source_snapshot'][$field] = [$key => $input['source_snapshot'][$field][0]];
+        $this->actingAs($this->manager)->postJson('/emar/connected-care/transfers', $input)->assertUnprocessable()->assertJsonValidationErrors($field);
+        $this->assertDatabaseCount('medication_provider_transfers', 0);
+        $this->assertDatabaseCount('medication_provider_transfer_events', 0);
+        $this->assertDatabaseCount('medication_reconciliations', 0);
+        $this->assertDatabaseCount('client_medications', 0);
+        $this->assertDatabaseCount('medication_allergies', 0);
+        $this->postJson('/emar/connected-care/transfers', $this->timedTransferInput())->assertOk()->assertJsonPath('success', true);
+        $this->assertDatabaseCount('medication_provider_transfers', 1);
+        Mail::assertNothingSent();
+    }
+
+    private function timedTransferInput(): array
+    {
+        $input = $this->transferInput('incoming');
+        $input['source_snapshot']['captured_at'] = '2026-10-07T12:30:00+13:00';
+        $input['source_snapshot']['medications'][0]['last_dose'] = ['given_at' => '2026-10-06T19:00:00.125-04:00', 'dose_given' => '10 mg', 'source' => 'Unverified provider medication chart'];
+        $input['source_snapshot']['medications'][0]['next_due_at'] = '2026-10-07T06:15:00+05:45';
+        $input['source_snapshot']['medications'][0]['prescription']['start_date'] = '2026-10-07';
+        $input['source_snapshot']['medications'][0]['prescription']['end_date'] = '2026-10-08';
+
+        return $input;
     }
 
     public function test_incoming_identity_mismatch_is_rejected_before_source_facts_persist(): void
