@@ -17,7 +17,9 @@ use Illuminate\Database\DatabaseTransactionsManager;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -234,6 +236,86 @@ final class ProviderMedicationTransferTest extends TestCase
         $this->assertSame(1, ClientMedication::count());
         $this->assertSame(0, MedicationAllergy::count());
         $this->actingAs($this->manager)->postJson('/emar/connected-care/transfers/'.$record->id.'/transition', $this->action('complete', 4, 'complete'))->assertUnprocessable();
+    }
+
+    public function test_full_accepted_packet_retains_complete_encrypted_reconciliation_evidence_and_blocks_lossy_rollback(): void
+    {
+        Http::fake();
+        Http::preventStrayRequests();
+        $order = $this->chart();
+        $orderBefore = (array) DB::table('client_medications')->where('id', $order->id)->first();
+        $input = $this->transferInput('incoming', 'full-byte-boundary');
+        $allergies = array_map(fn (int $index) => ['allergen' => 'Source allergy '.$index,
+            'reaction' => str_repeat('r', 2000), 'severity' => 'mild', 'notes' => str_repeat('n', 2000)], range(1, 63));
+        $input['source_snapshot']['allergies'] = $allergies;
+        $excess = strlen(json_encode($input['source_snapshot'], JSON_THROW_ON_ERROR)) - 256000;
+        $this->assertGreaterThan(0, $excess);
+        $this->assertLessThan(2000, $excess);
+        $allergies[62]['notes'] = substr($allergies[62]['notes'], 0, 2000 - $excess);
+        $input['source_snapshot']['allergies'] = $allergies;
+        $this->assertSame(256000, strlen(json_encode($input['source_snapshot'], JSON_THROW_ON_ERROR)));
+        $this->assertSame('longtext', Schema::getColumnType('medication_provider_transfer_events', 'evidence'));
+        // The additive widening has run after the original TEXT table was created.
+        $this->assertDatabaseHas('migrations', ['migration' => '2026_10_07_096000_expand_medication_provider_transfer_event_evidence']);
+
+        $oversized = $input;
+        $oversized['source_snapshot']['allergies'][62]['notes'] .= 'n';
+        $this->assertSame(256001, strlen(json_encode($oversized['source_snapshot'], JSON_THROW_ON_ERROR)));
+        $this->actingAs($this->manager)->postJson('/emar/connected-care/transfers', $oversized)->assertUnprocessable()->assertJsonValidationErrors('source_snapshot');
+        $this->assertDatabaseCount('medication_provider_transfers', 0);
+        $this->assertDatabaseCount('medication_provider_transfer_events', 0);
+        $this->assertDatabaseCount('medication_reconciliations', 0);
+        // Correcting the rejected packet can reuse the same request key.
+        $response = $this->postJson('/emar/connected-care/transfers', $input)->assertOk();
+        $record = MedicationProviderTransfer::findOrFail($response->json('id'));
+        $this->assertSame($allergies, $record->snapshot['allergies']);
+        $this->assertFalse($record->snapshot['verified']);
+        $url = '/emar/connected-care/transfers/'.$record->id.'/transition';
+        $this->postJson($url, $this->action('review', 1, 'boundary-review'))->assertOk();
+        $this->postJson($url, $this->action('receipt', 2, 'boundary-receipt'))->assertOk();
+        $start = $this->action('start_reconciliation', 3, 'boundary-reconcile');
+        $this->postJson($url, $start)->assertOk();
+        $record->refresh();
+        $event = $record->events()->where('action', 'start_reconciliation')->sole();
+        $expectedEvidence = ['note' => $start['note'], 'identity_confirmed' => true,
+            'reconciliation_id' => $record->reconciliation_id, 'unverified_allergies' => $allergies];
+        $this->assertSame($expectedEvidence, $event->evidence);
+        $this->assertSame($this->manager->id, $event->actor_id);
+        $this->assertGreaterThan(65535, strlen(json_encode($expectedEvidence, JSON_THROW_ON_ERROR)));
+        $rawEvent = (array) DB::table('medication_provider_transfer_events')->where('id', $event->id)->first();
+        $this->assertGreaterThan(65535, strlen($rawEvent['evidence']));
+        $this->assertStringNotContainsString(str_repeat('n', 2000), $rawEvent['evidence']);
+
+        $this->postJson($url, $start)->assertOk();
+        $this->assertSame($rawEvent, (array) DB::table('medication_provider_transfer_events')->where('id', $event->id)->first());
+        $this->assertSame('reconciliation_started', $record->fresh()->status);
+        $this->assertSame(4, $record->fresh()->version);
+        $this->assertDatabaseCount('medication_provider_transfer_events', 3);
+        $this->assertDatabaseCount('medication_reconciliations', 1);
+        $reconciliation = $record->fresh()->reconciliation;
+        $this->assertSame($this->person->id, $reconciliation->client_id);
+        $source = $reconciliation->items()->whereNull('client_medication_id')->sole();
+        $this->assertSame($record->id, $source->source_order['provider_transfer_id']);
+        $this->assertFalse($source->source_order['verified']);
+        $this->assertDatabaseCount('client_medications', 1);
+        $this->assertSame($orderBefore, (array) DB::table('client_medications')->where('id', $order->id)->first());
+        $this->assertDatabaseCount('medication_allergies', 0);
+        $this->assertDatabaseCount('client_medication_stocks', 0);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $this->assertDatabaseCount('medication_pharmacy_orders', 0);
+        Mail::assertNothingSent();
+        Http::assertNothingSent();
+
+        $migration = require database_path('migrations/2026_10_07_096000_expand_medication_provider_transfer_event_evidence.php');
+        try {
+            $migration->down();
+            $this->fail('Rollback must refuse to truncate retained encrypted handover evidence.');
+        } catch (\RuntimeException $failure) {
+            $this->assertSame('Retain full encrypted provider transfer evidence before reducing storage capacity.', $failure->getMessage());
+        }
+        $this->assertSame('longtext', Schema::getColumnType('medication_provider_transfer_events', 'evidence'));
+        $this->assertSame($rawEvent, (array) DB::table('medication_provider_transfer_events')->where('id', $event->id)->first());
+        $this->assertSame($expectedEvidence, $event->fresh()->evidence);
     }
 
     public function test_transfer_create_and_transition_replays_are_exact_and_do_not_duplicate_reconciliation(): void

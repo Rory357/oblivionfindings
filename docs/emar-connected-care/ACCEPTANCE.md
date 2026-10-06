@@ -37,7 +37,7 @@ No production migrations, live clinical transmissions, invitations, supplier ord
 
 ## Deployment and operational handover
 
-1. Apply the six additive migrations before exposing the new application release or restarting workers. In particular, the external-account marker is used by staff queries. The new permission migration does not grant access to baseline roles. Keep the prior application version available; do not roll back clinical-history tables as a routine code rollback.
+1. Apply the seven additive migrations before exposing the new application release or restarting workers. In particular, the external-account marker is used by staff queries. Migration 096000 expands encrypted provider-transfer event evidence for the full permitted packet size; its rollback refuses to narrow storage while larger evidence remains. The new permission migration does not grant access to baseline roles. Keep the prior application version available; do not roll back clinical-history tables as a routine code rollback.
 2. Assign the exact management/send permissions to approved staff, preserving house, person, employment and controlled-medication checks. Confirm a staff account and a dedicated external account remain isolated.
 3. Configure pharmacy partners from the documented contract. Test signed acceptance/rejection, timeout/unknown, duplicate acknowledgement and delayed acknowledgement in the supplier's approved test environment. Delivery acceptance never counts as physical stock receipt.
 4. Import only licensed catalogue data. Review exact code/name/product strength/form and packaging, publish with an expiry, and verify a medicine binding and revocation. A catalogue image is an aid to identification, never authority to administer.
