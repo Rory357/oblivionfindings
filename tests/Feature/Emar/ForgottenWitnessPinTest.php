@@ -31,9 +31,12 @@ use App\Services\Medication\Recording\RecordingContract;
 use App\Services\Medication\SecondPersonConfirmationPayload;
 use App\Services\Medication\WitnessPinService;
 use App\Services\Medication\WitnessPinSettings;
+use App\Services\Tasks\Providers\MedicationFollowupProvider;
 use Carbon\Carbon;
 use Database\Factories\UserFactory;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Database\Connection;
+use Illuminate\Database\DatabaseTransactionsManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -43,6 +46,8 @@ use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Tests\Support\CommittedFixtureCleanup;
+use Tests\Support\OwnedTestDatabase;
 use Tests\TestCase;
 
 /** PIN-2 attestation: named colleague, exact deadline, current authority and safe replay. */
@@ -728,15 +733,20 @@ class ForgottenWitnessPinTest extends TestCase
         $this->assertSame($wasThere === true ? $witness->id : null, $prnDose->refresh()->witnessed_by);
         $this->assertConfirmationReaders($dose, $expected, $secondStatus, $method);
         $this->actingAs($this->worker)->get('/meds/today')->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->where('prn_recorded_today.0.second_person_confirmation', $expectedPrn));
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('prn_recorded_today.0.second_person_confirmation', $expectedPrn)
+                ->where('prn_recorded_today.0.witness', $wasThere === true ? $witness->name : null));
         $this->actingAs($this->worker)->get('/emar/prn?client_id='.$this->client->id)->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('emar/record/hub')
-                ->where('page.data.0.second_person_confirmation', $expectedPrn));
+                ->where('page.data.0.second_person_confirmation', $expectedPrn)
+                ->where('page.data.0.witness', $wasThere === true ? $witness->name : null));
         $this->legacyRead('/emar/prn?client_id='.$this->client->id)->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('administrations.0.second_person_confirmation', $expectedPrn)
-                ->where('history.data.0.second_person_confirmation', $expectedPrn));
+                ->where('history.data.0.second_person_confirmation', $expectedPrn)
+                ->where('administrations.0.witness', $wasThere === true ? $witness->name : null)
+                ->where('history.data.0.witness', $wasThere === true ? $witness->name : null));
     }
 
     public function test_confirmation_list_queries_are_batched_as_more_doses_are_added(): void
@@ -774,8 +784,400 @@ class ForgottenWitnessPinTest extends TestCase
         $this->record($order, '09:30', $fields, true)->assertOk()
             ->assertJsonPath('administration.second_person_status', RecordingContract::SECOND_VERIFIED)
             ->assertJsonPath('administration.witness_method', WitnessPinService::METHOD)
+            ->assertJsonPath('administration.witness', $witness->name)
             ->assertJsonPath('administration.second_person_confirmation', null);
         $this->assertDatabaseCount('medication_second_person_confirmations', 0);
+
+        $prn = $this->order([], ['is_prn' => true, 'max_per_day' => 4, 'dose_amount' => 1, 'dose_unit' => 'tablet']);
+        $this->actingAs($this->worker)->postJson('/meds/today/prn', [
+            'client_medication_id' => $prn->id, 'reason' => 'Pain',
+            'administered_at' => now()->toIso8601String(), ...$fields,
+        ])->assertOk()->assertJsonPath('administration.witness', $witness->name);
+        $this->assertPrnWitnessReaders($witness->name);
+        $this->assertDatabaseCount('medication_second_person_confirmations', 0);
+    }
+
+    #[DataProvider('correctionAttestationStates')]
+    public function test_approved_corrected_facts_retire_old_work_without_reusing_attestation(string $state): void
+    {
+        [$dose, $nomination, $witness] = $this->nominate();
+        $this->attestationState($nomination, $witness, $state);
+        $original = DB::table('client_medication_administrations')->where('id', $dose->id)->first();
+        $originalNomination = DB::table('medication_second_person_confirmations')->where('id', $nomination->id)->first();
+        [$correction, $lead] = $this->requestCorrection($dose);
+        $uuid = (string) Str::uuid();
+        $url = $this->correctionUrl($correction, 'approve');
+        $this->actingAs($lead)->postJson($url, ['request_uuid' => $uuid])->assertOk()->assertJsonPath('saved', true);
+        $this->postJson($url, ['request_uuid' => $uuid])->assertOk();
+        $correction->refresh();
+        $this->assertSame('approved', $correction->correction_status);
+        $this->assertSame(RecordingContract::SECOND_NOT_CONFIRMED, $correction->second_person_status);
+        $this->assertNull($correction->witness_method);
+        $this->assertNull($correction->witnessed_by);
+        $this->assertNull($correction->witnessed_at);
+        $this->assertTrue($correction->review_required);
+        $this->assertStringContainsString('does not verify the corrected facts', $correction->review_reason);
+        $this->assertEquals($original, DB::table('client_medication_administrations')->where('id', $dose->id)->first());
+        $this->assertEquals($originalNomination, DB::table('medication_second_person_confirmations')->where('id', $nomination->id)->first());
+        $this->assertDatabaseCount('medication_second_person_confirmations', 1);
+        $this->assertCount(0, app(ForgottenWitnessPinService::class)->pendingFor($witness));
+        $this->actingAs($witness)->postJson('/meds/confirmations/'.$nomination->id, ['was_there' => true])->assertNotFound();
+        $this->assertSame(0, MedicationFollowup::query()->where('administration_id', $dose->id)->whereNull('completed_at')->count());
+        $oldWork = MedicationFollowup::query()->where('administration_id', $dose->id)->whereIn('type', ['confirm', 'disputed'])->get();
+        $this->assertNotEmpty($oldWork);
+        foreach ($oldWork as $row) {
+            $this->assertNotNull($row->completed_at);
+            if ($row->state === 'retired') {
+                $this->assertSame(1, $row->events()->where('action', 'source_retired')->count());
+            }
+        }
+        $review = MedicationFollowup::query()->where('source_key', 'dose-review:'.$correction->id)->sole();
+        $this->assertSame('unconfirmed', $review->type);
+        $this->assertNull($review->completed_at);
+        $dto = app(MedicationFollowupService::class)->present($review, $lead);
+        $this->assertTrue($dto['lead']);
+        $this->assertTrue($dto['can_complete']);
+        $this->assertSame($correction->id, $dto['administration_id']);
+        $this->assertContains('medication-followup-'.$review->id,
+            collect((new MedicationFollowupProvider)->authorizedTasks($lead))->pluck('id')->all());
+        $this->actingAs($this->worker)->get('/meds/today')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('schedule.0.recorded.id', $correction->id)
+            ->where('schedule.0.recorded.second_person_status', RecordingContract::SECOND_NOT_CONFIRMED)
+            ->where('schedule.0.recorded.second_person_confirmation', null)
+            ->where('schedule.0.recorded.witness', null));
+        $this->getJson('/emar/clients/'.$this->client->id.'/record/doses/'.$correction->id)->assertOk()
+            ->assertJsonPath('dose.second_person_confirmation', null)
+            ->assertJsonPath('dose.second_person_status', RecordingContract::SECOND_NOT_CONFIRMED)
+            ->assertJsonPath('dose.witness', null);
+        $this->travel(31)->minutes();
+        $this->assertSame(0, app(ForgottenWitnessPinService::class)->expireDue());
+        $this->assertEquals($original, DB::table('client_medication_administrations')->where('id', $dose->id)->first());
+        $this->assertEquals($originalNomination, DB::table('medication_second_person_confirmations')->where('id', $nomination->id)->first());
+        $this->assertSame(1, MedicationFollowup::query()->where('source_key', 'dose-review:'.$correction->id)->count());
+        $this->assertSame(1, MedicationEvent::query()->where('kind', 'correction.approved')->count());
+    }
+
+    #[DataProvider('correctionAttestationStates')]
+    public function test_not_given_correction_retires_confirmation_work_without_replacement(string $state): void
+    {
+        [$dose, $nomination, $witness] = $this->nominate();
+        $this->attestationState($nomination, $witness, $state);
+        $original = DB::table('client_medication_administrations')->where('id', $dose->id)->first();
+        $nominationBefore = DB::table('medication_second_person_confirmations')->where('id', $nomination->id)->first();
+        [$correction, $lead] = $this->requestCorrection($dose, 'withheld');
+        $this->actingAs($lead)->postJson($this->correctionUrl($correction, 'approve'), ['request_uuid' => (string) Str::uuid()])->assertOk();
+        $this->assertNull($correction->refresh()->second_person_status);
+        $this->assertNull($correction->witnessed_by);
+        $this->assertNull($correction->witness_method);
+        $this->assertFalse($correction->review_required);
+        $this->assertSame(0, MedicationFollowup::query()->whereNull('completed_at')->count());
+        $this->assertSame(0, MedicationFollowup::query()->where('administration_id', $correction->id)->count());
+        $this->travel(31)->minutes();
+        $this->assertSame(0, app(ForgottenWitnessPinService::class)->expireDue());
+        $this->assertEquals($original, DB::table('client_medication_administrations')->where('id', $dose->id)->first());
+        $this->assertEquals($nominationBefore, DB::table('medication_second_person_confirmations')->where('id', $nomination->id)->first());
+    }
+
+    public static function correctionAttestationStates(): array
+    {
+        return ['pending' => ['pending'], 'confirmed' => ['confirmed'], 'disputed' => ['disputed'], 'expired' => ['expired']];
+    }
+
+    #[DataProvider('proposalStates')]
+    public function test_pending_and_rejected_corrections_preserve_original_confirmation_work(bool $reject): void
+    {
+        [$dose, $nomination, $witness] = $this->nominate();
+        [$correction, $lead] = $this->requestCorrection($dose);
+        if ($reject) {
+            $this->actingAs($lead)->postJson($this->correctionUrl($correction, 'reject'), [
+                'request_uuid' => (string) Str::uuid(), 'reason' => 'The original time was correct.',
+            ])->assertOk();
+        }
+        $this->assertSame($reject ? 'rejected' : 'pending', $correction->refresh()->correction_status);
+        $old = MedicationFollowup::query()->where('source_key', 'confirm:'.$nomination->id)->sole();
+        $this->assertNull($old->completed_at);
+        $this->assertCount(1, app(ForgottenWitnessPinService::class)->pendingFor($witness));
+        $this->assertDatabaseMissing('medication_followups', ['source_key' => 'dose-review:'.$correction->id]);
+        $this->travel(30)->minutes();
+        $this->assertSame(1, app(ForgottenWitnessPinService::class)->expireDue());
+        $this->assertSame('expired', $nomination->refresh()->status);
+        $this->assertSame('expired', $dose->refresh()->second_person_status);
+    }
+
+    public static function proposalStates(): array
+    {
+        return ['pending' => [false], 'rejected' => [true]];
+    }
+
+    #[DataProvider('correctionAuthorityLoss')]
+    public function test_correction_approval_rechecks_current_authority_without_retiring_work(string $loss): void
+    {
+        [$dose, $nomination] = $this->nominate();
+        [$correction, $lead] = $this->requestCorrection($dose);
+        if ($loss === 'permission') {
+            $this->deny($lead, ['medications.administer.correct']);
+        } elseif ($loss === 'employment') {
+            $lead->hrEmployeeProfile->forceFill(['end_date' => now()->subDay()])->save();
+        } else {
+            $this->client->forceFill(['site_id' => Site::factory()->create(['is_active' => true])->id])->save();
+        }
+        $before = $this->correctionEvidence();
+        $this->actingAs($lead->fresh())->postJson($this->correctionUrl($correction, 'approve'), ['request_uuid' => (string) Str::uuid()])
+            ->assertStatus($loss === 'permission' ? 403 : 404);
+        $this->assertSame($before, $this->correctionEvidence());
+        $this->assertSame('pending', $correction->refresh()->correction_status);
+        $this->assertNull(MedicationFollowup::query()->where('source_key', 'confirm:'.$nomination->id)->sole()->completed_at);
+    }
+
+    public static function correctionAuthorityLoss(): array
+    {
+        return ['permission' => ['permission'], 'employment' => ['employment'], 'site' => ['site']];
+    }
+
+    public function test_correction_audit_failure_rolls_back_retirement_and_new_review_together(): void
+    {
+        [$dose] = $this->nominate();
+        [$correction, $lead] = $this->requestCorrection($dose);
+        $before = $this->correctionEvidence();
+        $recorder = \Mockery::mock(MedicationEventRecorder::class);
+        $recorder->shouldReceive('appendMany')->once()->andThrow(new \RuntimeException('Synthetic correction audit failure.'));
+        $this->app->instance(MedicationEventRecorder::class, $recorder);
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($lead)->postJson($this->correctionUrl($correction, 'approve'), ['request_uuid' => (string) Str::uuid()]);
+            $this->fail('The correction and both workflow changes must roll back.');
+        } catch (\RuntimeException $error) {
+            $this->assertSame('Synthetic correction audit failure.', $error->getMessage());
+        }
+        $this->assertSame($before, $this->correctionEvidence());
+    }
+
+    public function test_expiry_uses_current_correction_evidence_after_an_older_repeatable_read_snapshot(): void
+    {
+        [$dose, $nomination] = $this->nominate();
+        [$correction, $lead] = $this->requestCorrection($dose);
+        $this->withCommittedConfirmationSessions(function (Connection $primary, Connection $writer) use ($dose, $nomination, $correction, $lead): void {
+            $this->assertSame('REPEATABLE-READ', $primary->selectOne('SELECT @@SESSION.transaction_isolation AS isolation_level')->isolation_level);
+            $primary->beginTransaction();
+            $this->assertSame('pending', $primary->table('client_medication_administrations')->where('id', $correction->id)->value('correction_status'));
+            $original = $primary->table('client_medication_administrations')->where('id', $dose->id)->first();
+            $nominationBefore = $primary->table('medication_second_person_confirmations')->where('id', $nomination->id)->first();
+            $default = DB::getDefaultConnection();
+            try {
+                DB::setDefaultConnection($writer->getName());
+                $this->assertSame($writer, DB::connection());
+                $this->assertSame($writer->getPdo(), (new ClientMedicationAdministration)->getConnection()->getPdo());
+                $this->actingAs(User::findOrFail($lead->id))->postJson($this->correctionUrl($correction, 'approve'), [
+                    'request_uuid' => (string) Str::uuid(),
+                ])->assertOk();
+                $this->assertSame(0, $writer->transactionLevel());
+                $this->assertSame('approved', $writer->table('client_medication_administrations')->where('id', $correction->id)->value('correction_status'));
+            } finally {
+                DB::setDefaultConnection($default);
+            }
+            // The ordinary snapshot demonstrably predates committed approval.
+            $this->assertSame('pending', $primary->table('client_medication_administrations')->where('id', $correction->id)->value('correction_status'));
+            $this->assertTrue(ClientMedicationAdministration::query()->whereKey($dose->id)->effectiveClinicalEvidence()->exists());
+            $this->travel(30)->minutes();
+            $this->assertSame(0, app(ForgottenWitnessPinService::class)->expireDue());
+            $this->assertEquals($original, $writer->table('client_medication_administrations')->where('id', $dose->id)->first());
+            $this->assertEquals($nominationBefore, $writer->table('medication_second_person_confirmations')->where('id', $nomination->id)->first());
+            $this->assertSame(0, $writer->table('medication_events')->where('kind', 'second_person.expired')->count());
+            $this->assertSame('retired', $writer->table('medication_followups')->where('source_key', 'confirm:'.$nomination->id)->value('state'));
+            $this->assertNull($writer->table('medication_followups')->where('source_key', 'dose-review:'.$correction->id)->value('completed_at'));
+        });
+    }
+
+    private function withCommittedConfirmationSessions(callable $exercise): void
+    {
+        $primary = DB::connection();
+        $database = $primary->getDatabaseName();
+        $this->assertTrue(app()->environment('testing'));
+        $this->assertSame('mysql', $primary->getDriverName());
+        $this->assertSame(static::$isolatedMysqlDatabase, $database);
+        $this->assertTrue(OwnedTestDatabase::isOwnedBy($database, getmypid()));
+        $this->assertSame($database, $primary->getPdo()->query('SELECT DATABASE()')->fetchColumn());
+        $this->assertSame(1, $primary->transactionLevel());
+        $this->assertTrue($primary->getPdo()->inTransaction());
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+        $name = 'emar_confirmation_correction_writer';
+        $originalConfig = config('database.connections.'.$name);
+        $default = DB::getDefaultConnection();
+        $manager = $this->app['db.transactions'];
+        $writer = null;
+        DB::commit();
+        $productionManager = new DatabaseTransactionsManager;
+        $this->app->instance('db.transactions', $productionManager);
+        $primary->setTransactionManager($productionManager);
+        try {
+            config(['database.connections.'.$name => array_replace($primary->getConfig(), ['name' => $name])]);
+            DB::purge($name);
+            $writer = DB::connection($name);
+            $this->assertSame($name, $writer->getName());
+            $this->assertNotSame($primary->getName(), $writer->getName());
+            $this->assertSame($database, $writer->getPdo()->query('SELECT DATABASE()')->fetchColumn());
+            $this->assertNotSame($primary->getPdo(), $writer->getPdo());
+            $this->assertNotSame($primary->getPdo()->query('SELECT CONNECTION_ID()')->fetchColumn(), $writer->getPdo()->query('SELECT CONNECTION_ID()')->fetchColumn());
+            $exercise($primary, $writer);
+        } finally {
+            DB::setDefaultConnection($default);
+            if ($writer !== null) {
+                while ($writer->transactionLevel() > 0) {
+                    $writer->rollBack();
+                }
+            }
+            DB::purge($name);
+            config(['database.connections.'.$name => $originalConfig]);
+            while ($primary->transactionLevel() > 0) {
+                $primary->rollBack();
+            }
+            $this->app->instance('db.transactions', $manager);
+            $primary->setTransactionManager($manager);
+            $primary->beginTransaction();
+        }
+    }
+
+    private function attestationState(MedicationSecondPersonConfirmation $nomination, User $witness, string $state): void
+    {
+        if ($state === 'expired') {
+            $this->travel(30)->minutes();
+            $this->assertSame(1, app(ForgottenWitnessPinService::class)->expireDue());
+        } elseif ($state !== 'pending') {
+            app(ForgottenWitnessPinService::class)->respond($witness, $nomination->id, $state === 'confirmed');
+        }
+    }
+
+    public function test_a_later_not_given_correction_retires_the_unconfirmed_replacement(): void
+    {
+        [$dose, $nomination] = $this->nominate();
+        [$first, $lead] = $this->requestCorrection($dose);
+        $this->actingAs($lead)->postJson($this->correctionUrl($first, 'approve'), ['request_uuid' => (string) Str::uuid()])->assertOk();
+        $firstReview = MedicationFollowup::query()->where('source_key', 'dose-review:'.$first->id)->sole();
+        [$second, $nextLead] = $this->requestCorrection($first->refresh(), 'withheld');
+        $this->actingAs($nextLead)->postJson($this->correctionUrl($second, 'approve'), ['request_uuid' => (string) Str::uuid()])->assertOk();
+        $this->assertSame('retired', $firstReview->refresh()->state);
+        $this->assertNull($second->refresh()->second_person_status);
+        $this->assertNull($second->witness_method);
+        $this->assertFalse($second->review_required);
+        $this->assertSame('pending', $nomination->refresh()->status);
+        $this->assertSame(0, MedicationFollowup::query()->whereNull('completed_at')->count());
+        $this->assertDatabaseCount('medication_second_person_confirmations', 1);
+    }
+
+    public function test_controlled_correction_keeps_its_existing_witness_and_clinical_guard(): void
+    {
+        $witness = $this->witnessOnShift();
+        $order = $this->order(['09:30'], ['controlled_drug' => true, 'witness_required' => true]);
+        $dose = ClientMedicationAdministration::query()->create([
+            'client_id' => $this->client->id, 'client_medication_id' => $order->id,
+            'administered_by' => $this->worker->id, 'administered_at' => now(),
+            'scheduled_for' => now(), 'status' => 'given', 'dose_given' => '1 tablet',
+            'witnessed_by' => $witness->id, 'witnessed_at' => now(),
+            'witness_method' => WitnessPinService::METHOD,
+            'second_person_kind' => RecordingContract::SECOND_WITNESS,
+            'second_person_status' => RecordingContract::SECOND_VERIFIED,
+        ]);
+        $this->grant($this->worker, ['medications.view', 'medications.administer.correct', 'clients.viewAny',
+            'medications.controlled.view', 'medications.controlled.record']);
+        $this->actingAs($this->worker)->postJson($this->correctionUrl($dose, 'request'), [
+            'request_uuid' => (string) Str::uuid(), 'status' => 'given',
+            'administered_at' => now()->subMinutes(5)->toIso8601String(), 'correction_reason' => 'Changed time',
+        ])->assertUnprocessable()->assertJsonValidationErrors('administered_at');
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+        [$correction, $lead] = $this->requestCorrection($dose, 'given', ['administered_at' => now()->toIso8601String()]);
+        $this->grant($lead, ['medications.controlled.view', 'medications.controlled.record']);
+        $this->actingAs($lead)->postJson($this->correctionUrl($correction, 'approve'), ['request_uuid' => (string) Str::uuid()])->assertOk();
+        $this->assertSame($witness->id, $correction->refresh()->witnessed_by);
+        $this->assertSame(WitnessPinService::METHOD, $correction->witness_method);
+        $this->assertSame(RecordingContract::SECOND_VERIFIED, $correction->second_person_status);
+        $this->assertFalse($correction->review_required);
+        $this->assertDatabaseCount('medication_second_person_confirmations', 0);
+        $this->assertDatabaseCount('medication_followups', 0);
+    }
+
+    public function test_prn_witness_name_queries_are_batched_across_all_three_readers(): void
+    {
+        $witness = $this->witnessOnShift();
+        $this->grant($this->worker, ['medications.view']);
+        $prn = $this->order([], ['is_prn' => true]);
+        foreach ([1, 4, 9] as $count) {
+            while (ClientMedicationAdministration::query()->count() < $count) {
+                ClientMedicationAdministration::query()->create([
+                    'client_id' => $this->client->id, 'client_medication_id' => $prn->id,
+                    'administered_by' => $this->worker->id, 'administered_at' => now(), 'status' => 'given',
+                    'witnessed_by' => $witness->id, 'witnessed_at' => now(),
+                    'witness_method' => WitnessPinService::METHOD, 'second_person_kind' => RecordingContract::SECOND_RULE,
+                    'second_person_status' => RecordingContract::SECOND_VERIFIED,
+                ]);
+            }
+            foreach (['/meds/today' => 'prn_recorded_today', '/emar/prn?client_id='.$this->client->id => 'page.data',
+                'legacy' => 'administrations'] as $url => $property) {
+                DB::flushQueryLog();
+                DB::enableQueryLog();
+                try {
+                    $response = $url === 'legacy' ? $this->legacyRead('/emar/prn?client_id='.$this->client->id)
+                        : $this->actingAs($this->worker)->get($url);
+                    $response->assertOk();
+                    $rows = collect($response->inertiaProps($property));
+                    $this->assertCount($count, $rows);
+                    $this->assertSame([$witness->name], $rows->pluck('witness')->unique()->values()->all());
+                    $witnessQueries = collect(DB::getQueryLog())->filter(fn ($query) => str_starts_with($query['query'], 'select `id`, `name` from `users`')
+                        && str_contains($query['query'], '`users`.`id` in')
+                        && ($query['bindings'] === [$witness->id]
+                            || str_contains($query['query'], '`users`.`id` in ('.$witness->id.')')));
+                    // Hub meters have one board batch plus their paginated PRN
+                    // batch; legacy register and archive also load separately.
+                    $this->assertCount($url === '/meds/today' ? 1 : 2, $witnessQueries,
+                        $url.' must retain a fixed witness-query count as rows grow.');
+                } finally {
+                    DB::disableQueryLog();
+                    DB::flushQueryLog();
+                }
+            }
+        }
+    }
+
+    private function requestCorrection(ClientMedicationAdministration $dose, string $status = 'given', array $overrides = []): array
+    {
+        $this->grant($this->worker, ['medications.view', 'medications.administer.correct', 'clients.viewAny']);
+        $this->actingAs($this->worker)->postJson($this->correctionUrl($dose, 'request'), [
+            'request_uuid' => (string) Str::uuid(), 'status' => $status,
+            'reason' => $status === 'given' ? null : 'Corrected evidence: the medicine was withheld.',
+            'administered_at' => now()->subMinutes(5)->toIso8601String(),
+            'correction_reason' => 'Correct the recorded administration facts.',
+            ...$overrides,
+        ])->assertOk();
+        $correction = ClientMedicationAdministration::query()->where('corrected_of_id', $dose->corrected_of_id ?? $dose->id)
+            ->where('correction_status', 'pending')->sole();
+        $lead = $this->staffAt($this->site, 'Correction lead');
+        $this->onShift($lead, $this->client);
+        $this->grant($lead, ['medications.view', 'medications.administer.correct', 'clients.viewAny', MedicationFollowupService::MANAGE]);
+
+        return [$correction, $lead];
+    }
+
+    private function correctionUrl(ClientMedicationAdministration $dose, string $command): string
+    {
+        return '/emar/clients/'.$this->client->id.'/record/doses/'.$dose->id.'/corrections/'.$command;
+    }
+
+    private function correctionEvidence(): array
+    {
+        return collect(['client_medication_administrations', 'medication_second_person_confirmations',
+            'medication_followups', 'medication_followup_events', 'medication_idempotency_results', 'medication_events', 'audit_logs'])
+            ->mapWithKeys(fn ($table) => [$table => DB::table($table)->orderBy('id')->get()->map(fn ($row) => (array) $row)->all()])->all();
+    }
+
+    private function assertPrnWitnessReaders(string $name): void
+    {
+        $this->grant($this->worker, ['medications.view']);
+        $this->actingAs($this->worker)->get('/meds/today')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('prn_recorded_today.0.witness', $name));
+        $this->get('/emar/prn?client_id='.$this->client->id)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('page.data.0.witness', $name));
+        $this->legacyRead('/emar/prn?client_id='.$this->client->id)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('administrations.0.witness', $name)->where('history.data.0.witness', $name));
     }
 
     #[DataProvider('priorReviewOutcomes')]

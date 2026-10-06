@@ -11,6 +11,11 @@ class SecondPersonConfirmationPayload
 
     public function forAdministration(?ClientMedicationAdministration $administration): array
     {
+        if ($administration?->witnessed_by !== null) {
+            // List readers load actual witnesses in one batch. Never infer a
+            // verified witness from the nominated (still unverified) colleague.
+            $administration->loadMissing('witnessedBy:id,name');
+        }
         $confirmation = null;
         if ($administration && in_array($administration->witness_method, [
             ForgottenWitnessPinService::METHOD,
@@ -31,6 +36,7 @@ class SecondPersonConfirmationPayload
         }
 
         return [
+            'witness' => $administration?->witnessedBy?->name,
             'second_person_kind' => $administration?->second_person_kind,
             'second_person_status' => $administration?->second_person_status,
             'witness_method' => $administration?->witness_method,

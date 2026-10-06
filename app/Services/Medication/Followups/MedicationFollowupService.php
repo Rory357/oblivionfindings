@@ -140,7 +140,7 @@ final class MedicationFollowupService
         if (! ClientMedicationAdministration::query()->effectiveClinicalEvidence()->whereKey($administration->id)->exists()) {
             // Historical evidence remains intact; only outstanding work is retired.
             MedicationFollowup::query()->where('administration_id', $administration->id)
-                ->whereIn('type', ['effect', 'reoffer', 'partial', 'unconfirmed'])
+                ->whereIn('type', ['effect', 'reoffer', 'partial', 'unconfirmed', 'confirm', 'disputed'])
                 ->whereNull('completed_at')->orderBy('id')->lockForUpdate()->get()
                 ->each(fn ($row) => $this->close($row, 0, 'source_retired', [
                     'reason' => 'This administration no longer represents the effective clinical record.',
@@ -252,7 +252,7 @@ final class MedicationFollowupService
                     ->whereColumn('client_medication_administrations.client_id', 'medication_followups.client_id')
                     ->whereColumn('client_medication_administrations.client_medication_id', 'medication_followups.client_medication_id')))
             ->where(fn (Builder $q) => $q->whereNotNull('completed_at')
-                ->orWhereNotIn('type', ['effect', 'reoffer', 'partial', 'unconfirmed'])
+                ->orWhereNotIn('type', ['effect', 'reoffer', 'partial', 'unconfirmed', 'confirm', 'disputed'])
                 ->orWhereHas('administration', fn (Builder $a) => $a->effectiveClinicalEvidence()))
             ->where(fn (Builder $q) => $q->whereNotNull('completed_at')->orWhere('type', '!=', 'effect')
                 ->orWhereDoesntHave('administration.prnEffectiveness', fn (Builder $e) => $e

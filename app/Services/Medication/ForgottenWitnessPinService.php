@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\UserWitnessPin;
 use App\Notifications\MedicationSecondPersonConfirmationNotification;
 use App\Services\AuditLogger;
+use App\Services\CurrentAuthorizationReads;
 use App\Services\Medication\Audit\MedicationEventData;
 use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\Recording\RecordingContract;
@@ -236,6 +237,13 @@ final class ForgottenWitnessPinService
                         $dose = ClientMedicationAdministration::withTrashed()->whereKey($doseSnapshot->id)->lockForUpdate()->firstOrFail();
                         $row = MedicationSecondPersonConfirmation::query()->whereKey($snapshot->id)->lockForUpdate()->firstOrFail();
                         if ($row->status !== MedicationSecondPersonConfirmation::PENDING || $row->due_at->isFuture()) {
+                            return false;
+                        }
+                        // Correction approval owns the same Client/order mutex.
+                        // Preserve the superseded nomination and original facts;
+                        // only effective administrations may gain expiry flags.
+                        $effective = CurrentAuthorizationReads::within(fn (CurrentAuthorizationReads $reads): bool => $reads->query(ClientMedicationAdministration::withTrashed()->whereKey($dose->id)->effectiveClinicalEvidence())->exists());
+                        if (! $effective) {
                             return false;
                         }
                         $dose->setRelation('client', $client);

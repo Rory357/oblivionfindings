@@ -97,7 +97,7 @@ final class MedicationRecordHubController extends Controller
                 ->where('status', 'given')->whereHas('medication', fn ($q) => $q->where('is_prn', true))
                 ->when(! $controlled, fn ($q) => $scope->scopeWithoutControlledMedicationRows($q))->whereBetween('administered_at', [$from, $day->copy()->endOfDay()->utc()])
                 ->when($query, fn ($q) => $q->where(fn ($q) => $q->whereHas('medication', fn ($med) => $med->where('name', 'like', '%'.$query.'%'))->orWhereHas('client', fn ($person) => $person->where('first_name', 'like', '%'.$query.'%')->orWhere('last_name', 'like', '%'.$query.'%'))))
-                ->with(['medication', 'administeredBy:id,name', 'prnEffectiveness', SecondPersonConfirmationPayload::RELATION])->latest('administered_at')->latest('id')->paginate(25)->withQueryString();
+                ->with(['medication', 'administeredBy:id,name', 'witnessedBy:id,name', 'prnEffectiveness', SecondPersonConfirmationPayload::RELATION])->latest('administered_at')->latest('id')->paginate(25)->withQueryString();
             $followups = app(MedicationFollowupService::class)->visibleQuery($actor)->where('type', 'effect')->whereIn('administration_id', $rows->pluck('id'))->get()->keyBy('administration_id');
             $rows->setCollection($rows->getCollection()->map(function ($dose) use ($people, $followups, $actor) {
                 $effect = $dose->prnEffectiveness;

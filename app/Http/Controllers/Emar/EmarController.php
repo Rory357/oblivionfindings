@@ -1748,6 +1748,7 @@ class EmarController extends Controller
             'medication:id,name,dosage,route,max_per_day,indication,controlled_drug,deleted_at',
             'administeredBy:id,name',
             'prnEffectiveness.reviewedByUser:id,name',
+            'witnessedBy:id,name',
             SecondPersonConfirmationPayload::RELATION,
         ];
 

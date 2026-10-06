@@ -1080,6 +1080,14 @@ function FollowupBody({
                 {row.owner?.name ?? (row.lead ? 'House lead' : 'Unassigned')}
             </p>
             {row.why && <p className="text-subtle">{row.why}</p>}
+            {row.lead &&
+                typeof row.context?.reason === 'string' &&
+                row.context.reason.trim() && (
+                    <div className="rounded-lg border border-border bg-muted/30 p-3">
+                        <p className="font-medium">Reason for review</p>
+                        <p className="text-subtle mt-1">{row.context.reason}</p>
+                    </div>
+                )}
         </div>
     );
     const canSave =
