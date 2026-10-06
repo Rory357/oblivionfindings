@@ -429,17 +429,27 @@ final class PharmacyDispatchService
 
     private function event(Client $client, ClientMedication $medication, MedicationPharmacyOrder $order, MedicationPharmacyDispatch $dispatch, ?int $actorId, string $action): void
     {
+        $event = $this->eventData($client, $medication, $order, $dispatch, $actorId, $action);
+        if ($event !== null) {
+            $this->events->append($event);
+        }
+    }
+
+    /** Build captured-site evidence for the caller's final medication audit batch. */
+    public function eventData(Client $client, ClientMedication $medication, MedicationPharmacyOrder $order, MedicationPharmacyDispatch $dispatch, ?int $actorId, string $action): ?MedicationEventData
+    {
         if (! Site::whereKey($dispatch->site_id)->exists()) {
             // Retain factual supplier evidence even if its historical house has been retired.
             AuditLogger::logOrFail('pharmacy.dispatch.'.$action, $dispatch, ['actor_id' => $actorId,
                 'dispatch_id' => $dispatch->id, 'state' => $dispatch->state, 'result_code' => $dispatch->result_code], new Request, systemActor: $actorId === null);
 
-            return;
+            return null;
         }
-        $this->events->append(new MedicationEventData(siteId: (int) $dispatch->site_id, kind: 'pharmacy.dispatch.'.$action,
+
+        return new MedicationEventData(siteId: (int) $dispatch->site_id, kind: 'pharmacy.dispatch.'.$action,
             subjectType: 'pharmacy_supply', subjectId: (string) $order->id, actorId: $actorId, occurredAt: CarbonImmutable::now('UTC'),
             summary: 'Pharmacy delivery status recorded', facts: ['dispatch_id' => $dispatch->id, 'connection_id' => $dispatch->connection_id,
                 'state' => $dispatch->state, 'result_code' => $dispatch->result_code, 'attempt_count' => $dispatch->attempt_count],
-            clientId: $client->trashed() || (int) $client->site_id !== (int) $dispatch->site_id ? null : $client->id, controlled: $this->controlled($medication, $dispatch)));
+            clientId: $client->trashed() || (int) $client->site_id !== (int) $dispatch->site_id ? null : $client->id, controlled: $this->controlled($medication, $dispatch));
     }
 }

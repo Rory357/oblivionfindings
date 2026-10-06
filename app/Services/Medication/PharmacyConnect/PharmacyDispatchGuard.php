@@ -2,8 +2,12 @@
 
 namespace App\Services\Medication\PharmacyConnect;
 
+use App\Models\Client;
+use App\Models\ClientMedication;
 use App\Models\MedicationPharmacyDispatch;
 use App\Models\MedicationPharmacyOrder;
+use App\Models\User;
+use App\Services\Medication\Audit\MedicationEventData;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
@@ -40,11 +44,16 @@ final class PharmacyDispatchGuard
         }
     }
 
-    public function localClosure(MedicationPharmacyOrder $order): void
+    /** @param list<MedicationEventData> $auditEvents Caller appends after all domain writes and the durable receipt. */
+    public function localClosure(MedicationPharmacyOrder $order, Client $client, ClientMedication $medication, User $actor, array &$auditEvents): void
     {
         $dispatch = $this->dispatch($order);
         if ($dispatch?->state === 'queued') {
             $dispatch->forceFill(['state' => 'cancelled', 'result_code' => $dispatch->attempt_count > 0 ? 'local_supply_closed_before_retry' : 'local_supply_closed_before_send'])->save();
+            $event = app(PharmacyDispatchService::class)->eventData($client, $medication, $order, $dispatch, $actor->id, 'cancelled');
+            if ($event !== null) {
+                $auditEvents[] = $event;
+            }
         }
         // Failed/sending/sent/unknown/accepted are retained truthfully. Local closure does not cancel the supplier's order.
     }

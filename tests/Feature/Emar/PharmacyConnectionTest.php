@@ -14,6 +14,7 @@ use App\Models\MedicationPharmacyOrder;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\PharmacyConnect\DispatchPharmacyOrder;
 use App\Services\Medication\PharmacyConnect\PharmacyDispatchService;
 use App\Services\Medication\Stock\MedicationStockService;
@@ -216,13 +217,119 @@ final class PharmacyConnectionTest extends TestCase
     public function test_in_flight_content_is_frozen_but_local_cancellation_stops_queued_dispatch(): void
     {
         $dispatch = $this->queue();
+        $queued = MedicationEvent::where('kind', 'pharmacy.dispatch.queued')->sole();
         $this->actingAs($this->fixture['actor'])->putJson($this->orderUrl(), ['quantity_ordered' => 5])->assertUnprocessable();
-        $this->postJson('/emar/stock/packs/commands', ['action' => 'order_update', 'client_medication_id' => $this->fixture['medication']->id,
-            'request_uuid' => (string) Str::uuid(), 'order_id' => $this->fixture['order']->id, 'next' => 'cancelled', 'reason' => 'Synthetic local cancellation'])->assertOk();
+        [$url, $body] = $this->stopInput($dispatch, true);
+        $this->grant($this->fixture['actor'], 'medications.stock.update', false);
+        $this->postJson($url, $body)->assertForbidden();
+        $this->assertSame('queued', $dispatch->fresh()->state);
+        $this->assertDatabaseCount('medication_events', 1);
+        $this->grant($this->fixture['actor'], 'medications.stock.update', true);
+        $this->postJson($url, $body)->assertOk();
+        $this->postJson($url, $body)->assertOk()->assertJsonPath('duplicate', true);
         $this->assertSame('cancelled', $dispatch->fresh()->state);
         $this->assertSame('local_supply_closed_before_send', $dispatch->fresh()->result_code);
         $this->assertSame(0, $dispatch->fresh()->attempt_count);
+        $event = MedicationEvent::where('kind', 'pharmacy.dispatch.cancelled')->sole();
+        $this->assertSame((int) $dispatch->site_id, $event->site_id);
+        $this->assertSame($this->fixture['client']->id, $event->client_id);
+        $this->assertSame($this->fixture['actor']->id, $event->actor_id);
+        $this->assertSame('pharmacy_supply', $event->subject_type);
+        $this->assertSame((string) $this->fixture['order']->id, $event->subject_id);
+        $expectedFacts = ['dispatch_id' => $dispatch->id, 'connection_id' => $dispatch->connection_id,
+            'state' => 'cancelled', 'result_code' => 'local_supply_closed_before_send', 'attempt_count' => 0];
+        $facts = $event->facts;
+        ksort($expectedFacts);
+        ksort($facts);
+        $this->assertSame($expectedFacts, $facts);
+        $this->assertSame($queued->hash, $event->previous_hash);
+        $this->assertTrue($event->hasValidFingerprint());
+        $stockEvent = MedicationEvent::where('kind', 'stock.order_update')->sole();
+        $this->assertSame($event->hash, $stockEvent->previous_hash);
+        $this->assertSame($stockEvent->hash, DB::table('medication_event_heads')->where('site_id', $event->site_id)->value('hash'));
         app(PharmacyDispatchService::class)->send($dispatch->id);
+        $this->assertSame('10.00', $this->fixture['stock']->fresh()->on_hand);
+        $this->assertNull($this->fixture['order']->fresh()->quantity_received);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $this->assertDatabaseCount('medication_stock_lots', 0);
+        Http::assertNothingSent();
+    }
+
+    public function test_local_closure_after_person_moves_records_cancellation_at_the_captured_dispatch_site(): void
+    {
+        $dispatch = $this->queue();
+        $queued = MedicationEvent::where('kind', 'pharmacy.dispatch.queued')->sole();
+        $newSite = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
+        $this->fixture['client']->update(['site_id' => $newSite->id]);
+        $this->fixture['actor']->hrEmployeeProfile()->firstOrFail()->update(['secondary_site_ids' => [$newSite->id]]);
+        // Closing local supply remains available to the currently authorised stock worker.
+        $this->grant($this->fixture['actor'], 'medications.pharmacy.send', false);
+        [$url, $body] = $this->stopInput($dispatch, true);
+        $this->actingAs($this->fixture['actor']->fresh())->postJson($url, $body)->assertOk();
+        $this->postJson($url, $body)->assertOk()->assertJsonPath('duplicate', true);
+
+        $event = MedicationEvent::where('kind', 'pharmacy.dispatch.cancelled')->sole();
+        $this->assertSame((int) $dispatch->site_id, $event->site_id);
+        $this->assertSame($this->fixture['site']->id, $event->site_id);
+        $this->assertNull($event->client_id);
+        $this->assertSame($this->fixture['actor']->id, $event->actor_id);
+        $this->assertSame('pharmacy_supply', $event->subject_type);
+        $this->assertSame((string) $this->fixture['order']->id, $event->subject_id);
+        $this->assertSame('cancelled', $event->facts['state']);
+        $this->assertSame('local_supply_closed_before_send', $event->facts['result_code']);
+        $this->assertSame(0, $event->facts['attempt_count']);
+        $this->assertSame($queued->hash, $event->previous_hash);
+        $this->assertTrue($event->hasValidFingerprint());
+        $this->assertSame($event->hash, DB::table('medication_event_heads')->where('site_id', $dispatch->site_id)->value('hash'));
+        $this->assertSame(0, MedicationEvent::where('site_id', $newSite->id)->where('kind', 'like', 'pharmacy.dispatch.%')->count());
+        $stockEvent = MedicationEvent::where('kind', 'stock.order_update')->sole();
+        $this->assertSame($newSite->id, $stockEvent->site_id);
+        $this->assertSame($this->fixture['client']->id, $stockEvent->client_id);
+        $evidence = MedicationPharmacyOrder::findOrFail($event->subject_id);
+        $this->assertSame($this->fixture['client']->id, $evidence->client_id);
+        $this->assertSame($this->fixture['medication']->id, $evidence->client_medication_id);
+        $this->getJson($this->orderUrl().'/connection')->assertOk()->assertJsonPath('dispatch.state', 'cancelled');
+        $service = app(PharmacyDispatchService::class);
+        $service->send($dispatch->id);
+        $this->assertSame(['unknown' => 0, 'queued' => 0], $service->recover());
+        $this->assertSame(0, $dispatch->fresh()->attempt_count);
+        $this->assertSame('10.00', $this->fixture['stock']->fresh()->on_hand);
+        $this->assertNull($evidence->quantity_received);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $this->assertDatabaseCount('medication_stock_lots', 0);
+        Http::assertNothingSent();
+    }
+
+    public function test_local_closure_event_failure_rolls_back_dispatch_order_and_durable_receipt(): void
+    {
+        $dispatch = $this->queue();
+        $beforeDispatch = $dispatch->getRawOriginal();
+        $beforeOrder = $this->fixture['order']->fresh()->getRawOriginal();
+        $beforeHead = DB::table('medication_event_heads')->where('site_id', $dispatch->site_id)->first();
+        $beforeAuditCount = DB::table('audit_logs')->count();
+        [$url, $body] = $this->stopInput($dispatch, true);
+        $this->mock(MedicationEventRecorder::class, fn ($mock) => $mock->shouldReceive('appendMany')->once()
+            ->andReturnUsing(function (array $events) use ($dispatch, $body): array {
+                $this->assertSame(['pharmacy.dispatch.cancelled', 'stock.order_update'], array_map(fn ($event) => $event->kind, $events));
+                $this->assertSame('cancelled', $dispatch->fresh()->state);
+                $this->assertSame('cancelled', $this->fixture['order']->fresh()->status);
+                $this->assertTrue(DB::table('medication_idempotency_results')->where('scope', 'emar-p06-command')->where('request_uuid', $body['request_uuid'])->exists());
+                throw new \RuntimeException('Synthetic closure event failure');
+            }));
+        $this->withoutExceptionHandling();
+        try {
+            $this->postJson($url, $body);
+            $this->fail('Local closure must not commit without its pharmacy event.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Synthetic closure event failure', $exception->getMessage());
+        }
+        $this->assertSame($beforeDispatch, $dispatch->fresh()->getRawOriginal());
+        $this->assertSame($beforeOrder, $this->fixture['order']->fresh()->getRawOriginal());
+        $this->assertEquals($beforeHead, DB::table('medication_event_heads')->where('site_id', $dispatch->site_id)->first());
+        $this->assertSame($beforeAuditCount, DB::table('audit_logs')->count());
+        $this->assertDatabaseCount('medication_events', 1);
+        $this->assertDatabaseMissing('medication_idempotency_results', ['scope' => 'emar-p06-command', 'request_uuid' => $body['request_uuid']]);
+        $this->assertSame('10.00', $this->fixture['stock']->fresh()->on_hand);
         Http::assertNothingSent();
     }
 
@@ -383,6 +490,7 @@ final class PharmacyConnectionTest extends TestCase
         $this->assertSame($local ? 'cancelled' : 'draft', $this->fixture['order']->fresh()->status);
         $this->assertSame($commandsBefore + ($local ? 0 : 1), DB::table('medication_pharmacy_dispatch_commands')->where('dispatch_id', $dispatch->id)->count());
         $this->assertSame(1, MedicationEvent::where('kind', $local ? 'stock.order_update' : 'pharmacy.dispatch.cancel')->count());
+        $this->assertSame(0, MedicationEvent::where('kind', 'pharmacy.dispatch.cancelled')->count());
         $this->getJson($this->orderUrl().'/connection')->assertOk()->assertJsonPath('can_retry', false)
             ->assertJsonPath('local_order_closed', $local)->assertJsonPath('dispatch.result_code', $before['result_code'])
             ->assertJsonPath('dispatch.label', $local ? 'Not sent' : 'Sending stopped');
@@ -424,6 +532,18 @@ final class PharmacyConnectionTest extends TestCase
         [$url, $body] = $this->stopInput($dispatch, $local);
         $this->postJson($url, $body)->assertOk();
         $this->postJson($url, $body)->assertOk()->assertJsonPath('duplicate', true);
+        $event = MedicationEvent::where('kind', $local ? 'pharmacy.dispatch.cancelled' : 'pharmacy.dispatch.cancel')->sole();
+        $this->assertSame((int) $dispatch->site_id, $event->site_id);
+        $this->assertSame($this->fixture['actor']->id, $event->actor_id);
+        $this->assertSame('cancelled', $event->facts['state']);
+        $this->assertSame($local ? 'local_supply_closed_before_retry' : 'retry_stopped', $event->facts['result_code']);
+        $this->assertSame(1, $event->facts['attempt_count']);
+        $retryEvent = MedicationEvent::where('kind', 'pharmacy.dispatch.retry')->sole();
+        $this->assertSame($retryEvent->hash, $event->previous_hash);
+        $this->assertTrue($event->hasValidFingerprint());
+        $failedEvent = MedicationEvent::where('kind', 'pharmacy.dispatch.failed')->sole();
+        $this->assertSame('partner_declined_transport', $failedEvent->facts['result_code']);
+        $this->assertSame(1, $failedEvent->facts['attempt_count']);
         $this->getJson($this->orderUrl().'/connection')->assertOk()->assertJsonPath('can_retry', false)
             ->assertJsonPath('dispatch.state', 'cancelled')->assertJsonPath('dispatch.label', 'Sending stopped')
             ->assertJsonPath('dispatch.result_code', $local ? 'local_supply_closed_before_retry' : 'retry_stopped');
