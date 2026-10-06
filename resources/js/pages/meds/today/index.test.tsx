@@ -945,6 +945,64 @@ describe('Meds today (P01 C3)', () => {
         ).toBeInTheDocument();
     });
 
+    it.each(['pending', 'expired'] as const)(
+        'includes named %s second-person tasks without hiding them behind an empty follow-up state',
+        (status) => {
+            render(
+                <MedsToday
+                    {...props({
+                        refusal_follow_ups: [],
+                        prn_follow_ups: [],
+                        second_person_confirmations: [
+                            {
+                                id: 81,
+                                client_id: 1,
+                                client_name: 'Aroha Ngata',
+                                medication_name: 'Ordinary tablets',
+                                due_at: NZ(
+                                    status === 'pending' ? '09:45' : '09:15',
+                                ),
+                                status,
+                                followup_url: '/medication-followups?open=91',
+                            },
+                        ],
+                    })}
+                />,
+            );
+            const tab = screen.getByRole('tab', { name: /^Follow-ups\s*1$/ });
+            fireEvent.click(tab);
+            expect(
+                screen.queryByText('No follow-ups open'),
+            ).not.toBeInTheDocument();
+            const region = screen.getByRole('region', {
+                name: 'Your second-person confirmations',
+            });
+            expect(
+                within(region).getByText('Ordinary tablets'),
+            ).toBeInTheDocument();
+            expect(
+                within(region).getByText(
+                    status === 'pending'
+                        ? 'Not yet verified'
+                        : 'Confirmation overdue',
+                ),
+            ).toBeInTheDocument();
+            expect(
+                within(region).getByRole('link', {
+                    name: 'Review confirmation',
+                }),
+            ).toHaveAttribute('href', '/medication-followups?open=91');
+            expect(
+                screen.getByRole('button', {
+                    name:
+                        'View follow-ups, ' +
+                        (status === 'pending' ? '0' : '1') +
+                        ' overdue',
+                }),
+            ).toBeInTheDocument();
+        },
+    );
+
     it('lists refusal and as-needed follow-ups and records a re-offer from them', () => {
         render(<MedsToday {...props()} />);
 

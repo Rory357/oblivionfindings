@@ -1,9 +1,22 @@
 /* eslint-disable no-restricted-syntax -- Record wizard mirrors the Add-Client modal
  * chrome: styled native controls (type tiles, severity segments, witness chips) on
  * semantic design tokens. */
+import {
+    ActualEventTimeField,
+    actualEventInstant,
+} from '@/components/clinical/actual-event-time-field';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -21,6 +34,7 @@ import {
     WizardSuccessPane,
     type WizardStep,
 } from '@/components/wizard/shell';
+import { formatDateTime, toDatetimeLocal } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import {
     ClientPicker,
@@ -47,7 +61,7 @@ import {
     X,
     Zap,
 } from 'lucide-react';
-import { useState, type ComponentType } from 'react';
+import { useEffect, useState, type ComponentType } from 'react';
 
 type EventForm = {
     client_id: string;
@@ -61,6 +75,8 @@ type EventForm = {
     requires_followup: boolean;
     followup_notes: string;
     attachments: File[];
+    hospital_admission_id?: number;
+    hospital_discharged_at?: string;
 };
 
 const TYPES: {
@@ -81,6 +97,16 @@ const TYPES: {
     { key: 'infection_sign', label: 'Sign of infection', icon: Bug },
     { key: 'behavioural_crisis', label: 'Behavioural crisis', icon: Brain },
     { key: 'mental_health_episode', label: 'Mental health', icon: Brain },
+    {
+        key: 'hospital_admission',
+        label: 'Hospital admission',
+        icon: Stethoscope,
+    },
+    {
+        key: 'hospital_discharge',
+        label: 'Hospital discharge',
+        icon: Stethoscope,
+    },
     { key: 'other', label: 'Other', icon: ClipboardList },
 ];
 
@@ -124,7 +150,9 @@ export type RecordEventDialogProps = {
 };
 
 export function RecordEventDialog(props: RecordEventDialogProps) {
-    return props.open ? <Body {...props} /> : null;
+    return props.open ? (
+        <Body key={props.client?.id ?? 'module'} {...props} />
+    ) : null;
 }
 
 function Body({ onClose, client, onSaved }: RecordEventDialogProps) {
@@ -133,12 +161,24 @@ function Body({ onClose, client, onSaved }: RecordEventDialogProps) {
     const [done, setDone] = useState(false);
     const [stepIndex, setStepIndex] = useState(0);
     const [witnessDraft, setWitnessDraft] = useState('');
+    const [offset, setOffset] = useState('');
+    const [stayEnded, setStayEnded] = useState(false);
+    const [dischargedAt, setDischargedAt] = useState('');
+    const [dischargeOffset, setDischargeOffset] = useState('');
+    const [admissionId, setAdmissionId] = useState('');
+    const [admissions, setAdmissions] = useState<
+        { id: number; occurred_at: string }[]
+    >([]);
+    const [admissionState, setAdmissionState] = useState<
+        'loading' | 'ready' | 'error'
+    >('loading');
+    const [admissionAttempt, setAdmissionAttempt] = useState(0);
 
     const form = useForm<EventForm>({
         client_id: client ? String(client.id) : '',
         event_type: '',
         severity: 'medium',
-        occurred_at: '',
+        occurred_at: toDatetimeLocal(new Date()),
         description: '',
         witnesses: [],
         immediate_action_taken: '',
@@ -149,8 +189,89 @@ function Body({ onClose, client, onSaved }: RecordEventDialogProps) {
     });
     const { data, setData, processing } = form;
     const hsLinked = HS_LINKED.has(data.event_type);
+    const closedStay = data.event_type === 'hospital_admission' && stayEnded;
+    const eventInstant = actualEventInstant(data.occurred_at, offset);
+    const dischargeInstant = actualEventInstant(dischargedAt, dischargeOffset);
+    const selectedAdmission = admissions.find(
+        (item) => String(item.id) === admissionId,
+    );
+    const timeError =
+        !eventInstant || Date.parse(eventInstant) > Date.now()
+            ? 'Choose the actual event time in New Zealand. It cannot be in the future.'
+            : undefined;
+    const dischargeError = !closedStay
+        ? undefined
+        : !dischargeInstant || Date.parse(dischargeInstant) > Date.now()
+          ? 'Choose the actual discharge time in New Zealand. It cannot be in the future.'
+          : eventInstant &&
+              Date.parse(dischargeInstant) < Date.parse(eventInstant)
+            ? 'Discharge must be at or after the actual admission.'
+            : undefined;
+    const admissionError =
+        data.event_type !== 'hospital_discharge'
+            ? undefined
+            : admissionState !== 'ready' || !selectedAdmission
+              ? 'Choose the hospital admission this discharge ends.'
+              : eventInstant &&
+                  Date.parse(eventInstant) <
+                      Date.parse(selectedAdmission.occurred_at)
+                ? 'Discharge must be at or after the actual admission.'
+                : undefined;
+
+    const resetHospital = () => {
+        setStayEnded(false);
+        setDischargedAt('');
+        setDischargeOffset('');
+        setAdmissionId('');
+        setAdmissions([]);
+        setAdmissionState('loading');
+        form.clearErrors('hospital_admission_id', 'hospital_discharged_at');
+    };
+
+    useEffect(() => {
+        if (data.event_type !== 'hospital_discharge' || !data.client_id) return;
+        const abort = new AbortController();
+        fetch('/clients/' + data.client_id + '/clinical/hospital-admissions', {
+            headers: { Accept: 'application/json' },
+            signal: abort.signal,
+        })
+            .then(async (response) => {
+                if (
+                    !response.ok ||
+                    !response.headers
+                        .get('content-type')
+                        ?.includes('application/json')
+                )
+                    throw new Error('Unavailable');
+                const payload: unknown = await response.json();
+                const rows = (payload as { admissions?: unknown })?.admissions;
+                if (
+                    !Array.isArray(rows) ||
+                    !rows.every(
+                        (item) =>
+                            Number.isInteger(item?.id) &&
+                            item.id > 0 &&
+                            typeof item.occurred_at === 'string' &&
+                            Number.isFinite(Date.parse(item.occurred_at)),
+                    )
+                )
+                    throw new Error('Invalid admission response');
+                if (!abort.signal.aborted) {
+                    setAdmissions(rows);
+                    setAdmissionState('ready');
+                }
+            })
+            .catch(() => {
+                if (!abort.signal.aborted) {
+                    setAdmissions([]);
+                    setAdmissionState('error');
+                }
+            });
+        return () => abort.abort();
+    }, [data.client_id, data.event_type, admissionAttempt]);
 
     const choosePatient = (c: ClientResult | null) => {
+        if (String(c?.id ?? '') !== data.client_id) resetHospital();
         setPicked(c);
         setData('client_id', c ? String(c.id) : '');
     };
@@ -173,7 +294,13 @@ function Body({ onClose, client, onSaved }: RecordEventDialogProps) {
     const stepValid = (i: number): boolean => {
         if (i === 0)
             return !!data.client_id && !!data.event_type && !!data.severity;
-        if (i === 1) return data.description.trim().length > 0;
+        if (i === 1)
+            return (
+                data.description.trim().length > 0 &&
+                !timeError &&
+                !dischargeError &&
+                !admissionError
+            );
         if (i === 2)
             return !hsLinked || data.immediate_action_taken.trim().length > 0;
         return true;
@@ -185,6 +312,20 @@ function Body({ onClose, client, onSaved }: RecordEventDialogProps) {
     const back = () => setStepIndex((i) => Math.max(i - 1, 0));
 
     const submit = () => {
+        if (processing) return;
+        const invalidStep = [0, 1, 2].find((i) => !stepValid(i));
+        if (invalidStep !== undefined) {
+            setStepIndex(invalidStep);
+            return;
+        }
+        form.transform((draft) => ({
+            ...draft,
+            occurred_at: eventInstant,
+            ...(closedStay ? { hospital_discharged_at: dischargeInstant } : {}),
+            ...(data.event_type === 'hospital_discharge'
+                ? { hospital_admission_id: Number(admissionId) }
+                : {}),
+        }));
         form.post('/health-clinical/events', {
             forceFormData: true,
             preserveScroll: true,
@@ -194,7 +335,17 @@ function Body({ onClose, client, onSaved }: RecordEventDialogProps) {
                 onSaved?.();
             },
             onError: (errors) =>
-                setStepIndex(errors.immediate_action_taken ? 2 : 1),
+                setStepIndex(
+                    errors.client_id || errors.event_type || errors.severity
+                        ? 0
+                        : Object.keys(errors).some((key) =>
+                                /^(immediate_action_taken|outcome|requires_followup|followup_notes|attachments)/.test(
+                                    key,
+                                ),
+                            )
+                          ? 2
+                          : 1,
+                ),
         });
     };
 
@@ -286,6 +437,21 @@ function Body({ onClose, client, onSaved }: RecordEventDialogProps) {
                 </>
             }
         >
+            {Object.keys(form.errors).length > 0 && (
+                <div
+                    role="alert"
+                    className="rounded-lg border border-status-critical/30 bg-status-critical/5 p-3 text-sm text-status-critical"
+                >
+                    <p className="font-semibold">
+                        The event has not been saved. Check these details:
+                    </p>
+                    <ul className="mt-1 list-inside list-disc">
+                        {Object.entries(form.errors).map(([key, message]) => (
+                            <li key={key}>{message}</li>
+                        ))}
+                    </ul>
+                </div>
+            )}
             {STEPS[stepIndex].key === 'client' ? (
                 <WizardStepPane>
                     <StepHead
@@ -305,7 +471,10 @@ function Body({ onClose, client, onSaved }: RecordEventDialogProps) {
                         <Field label="Event type" required>
                             <TilePicker
                                 value={data.event_type}
-                                onChange={(v) => setData('event_type', v)}
+                                onChange={(v) => {
+                                    if (v !== data.event_type) resetHospital();
+                                    setData('event_type', v);
+                                }}
                                 cols={3}
                                 options={TYPES.map((t) => ({
                                     key: t.key,
@@ -363,6 +532,7 @@ function Body({ onClose, client, onSaved }: RecordEventDialogProps) {
                     <div className="grid gap-4">
                         <Field label="Description" required>
                             <Textarea
+                                aria-label="Description"
                                 rows={4}
                                 value={data.description}
                                 onChange={(e) =>
@@ -371,15 +541,149 @@ function Body({ onClose, client, onSaved }: RecordEventDialogProps) {
                                 placeholder="Describe what happened, in clinical detail."
                             />
                         </Field>
-                        <Field label="Occurred at" hint="leave blank for now">
-                            <Input
-                                type="datetime-local"
-                                value={data.occurred_at}
-                                onChange={(e) =>
-                                    setData('occurred_at', e.target.value)
-                                }
-                            />
-                        </Field>
+                        <ActualEventTimeField
+                            id="clinical-event-occurred-at"
+                            label={
+                                data.event_type === 'hospital_admission'
+                                    ? 'Actually admitted'
+                                    : data.event_type === 'hospital_discharge'
+                                      ? 'Actually discharged'
+                                      : 'When it happened'
+                            }
+                            value={data.occurred_at}
+                            offset={offset}
+                            onChange={(value, nextOffset) => {
+                                setData('occurred_at', value);
+                                setOffset(nextOffset);
+                                form.clearErrors('occurred_at');
+                            }}
+                            error={form.errors.occurred_at || timeError}
+                        />
+                        {data.event_type === 'hospital_admission' && (
+                            <div className="space-y-3 rounded-lg border border-border p-4">
+                                <div className="flex items-center gap-2">
+                                    <Checkbox
+                                        id="clinical-event-stay-ended"
+                                        checked={stayEnded}
+                                        onCheckedChange={(value) => {
+                                            setStayEnded(value === true);
+                                            form.clearErrors(
+                                                'hospital_discharged_at',
+                                            );
+                                        }}
+                                    />
+                                    <Label htmlFor="clinical-event-stay-ended">
+                                        This hospital stay has already ended
+                                    </Label>
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                    Record the actual admission and discharge
+                                    together for a past stay. Only that interval
+                                    is marked away.
+                                </p>
+                                {stayEnded && (
+                                    <ActualEventTimeField
+                                        id="clinical-event-discharged-at"
+                                        label="Actually discharged"
+                                        value={dischargedAt}
+                                        offset={dischargeOffset}
+                                        onChange={(value, nextOffset) => {
+                                            setDischargedAt(value);
+                                            setDischargeOffset(nextOffset);
+                                            form.clearErrors(
+                                                'hospital_discharged_at',
+                                            );
+                                        }}
+                                        error={
+                                            form.errors
+                                                .hospital_discharged_at ||
+                                            dischargeError
+                                        }
+                                    />
+                                )}
+                            </div>
+                        )}
+                        {data.event_type === 'hospital_discharge' && (
+                            <div className="space-y-2 rounded-lg border border-border p-4">
+                                <Label htmlFor="clinical-event-admission">
+                                    Admission being ended
+                                </Label>
+                                {admissionState === 'loading' ? (
+                                    <p
+                                        role="status"
+                                        className="text-sm text-muted-foreground"
+                                    >
+                                        Loading current hospital admissions…
+                                    </p>
+                                ) : admissionState === 'error' ? (
+                                    <div className="space-y-2">
+                                        <p
+                                            role="alert"
+                                            className="text-sm text-status-critical"
+                                        >
+                                            Hospital admissions could not be
+                                            loaded. Your draft is kept.
+                                        </p>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => {
+                                                setAdmissionState('loading');
+                                                setAdmissionAttempt(
+                                                    (n) => n + 1,
+                                                );
+                                            }}
+                                        >
+                                            Try again
+                                        </Button>
+                                    </div>
+                                ) : admissions.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        No open hospital admission is recorded
+                                        for this person. Record the actual
+                                        admission before its discharge.
+                                    </p>
+                                ) : (
+                                    <Select
+                                        value={admissionId}
+                                        onValueChange={(value) => {
+                                            setAdmissionId(value);
+                                            form.clearErrors(
+                                                'hospital_admission_id',
+                                            );
+                                        }}
+                                    >
+                                        <SelectTrigger id="clinical-event-admission">
+                                            <SelectValue placeholder="Choose the admission" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {admissions.map((item) => (
+                                                <SelectItem
+                                                    key={item.id}
+                                                    value={String(item.id)}
+                                                >
+                                                    Admitted{' '}
+                                                    {formatDateTime(
+                                                        item.occurred_at,
+                                                    )}{' '}
+                                                    · record {item.id}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                )}
+                                {(form.errors.hospital_admission_id ||
+                                    admissionError) && (
+                                    <p
+                                        role="alert"
+                                        className="text-sm text-status-critical"
+                                    >
+                                        {form.errors.hospital_admission_id ||
+                                            admissionError}
+                                    </p>
+                                )}
+                            </div>
+                        )}
                         <Field label="Witnesses" hint="staff or others present">
                             <div className="flex flex-col gap-2">
                                 <div className="flex gap-2">
@@ -586,15 +890,45 @@ function Body({ onClose, client, onSaved }: RecordEventDialogProps) {
                                 }
                             />
                             <ReviewRow
-                                label="Occurred at"
+                                label={
+                                    data.event_type === 'hospital_admission'
+                                        ? 'Actually admitted · Pacific/Auckland'
+                                        : data.event_type ===
+                                            'hospital_discharge'
+                                          ? 'Actually discharged · Pacific/Auckland'
+                                          : 'When it happened · Pacific/Auckland'
+                                }
                                 value={
-                                    data.occurred_at
-                                        ? new Date(
-                                              data.occurred_at,
-                                          ).toLocaleString('en-NZ')
-                                        : 'Now'
+                                    eventInstant
+                                        ? formatDateTime(eventInstant) +
+                                          ' · UTC' +
+                                          eventInstant.slice(-6)
+                                        : '—'
                                 }
                             />
+                            {closedStay && (
+                                <ReviewRow
+                                    label="Actually discharged · Pacific/Auckland"
+                                    value={
+                                        formatDateTime(dischargeInstant) +
+                                        ' · UTC' +
+                                        dischargeInstant.slice(-6)
+                                    }
+                                />
+                            )}
+                            {data.event_type === 'hospital_discharge' &&
+                                selectedAdmission && (
+                                    <ReviewRow
+                                        label="Admission being ended"
+                                        value={
+                                            formatDateTime(
+                                                selectedAdmission.occurred_at,
+                                            ) +
+                                            ' · record ' +
+                                            selectedAdmission.id
+                                        }
+                                    />
+                                )}
                         </ReviewCard>
                         <ReviewCard
                             icon={ShieldAlert}

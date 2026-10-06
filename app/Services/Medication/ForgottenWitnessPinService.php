@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\UserWitnessPin;
 use App\Notifications\MedicationSecondPersonConfirmationNotification;
 use App\Services\AuditLogger;
+use App\Services\CurrentAuthorizationReads;
 use App\Services\Medication\Audit\MedicationEventData;
 use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\Recording\RecordingContract;
@@ -40,7 +41,7 @@ final class ForgottenWitnessPinService
     public const REVIEW_EXPIRED = 'second_person_confirmation_expired';
 
     public function __construct(
-        private readonly ControlledMedicationTransportWitnessService $witnesses,
+        private readonly MedicationSecondPersonService $witnesses,
         private readonly WitnessPinService $pins,
         private readonly WitnessPinSettings $settings,
         private readonly MedicationGovernanceScopeService $scope,
@@ -146,6 +147,7 @@ final class ForgottenWitnessPinService
         $rows = MedicationSecondPersonConfirmation::query()
             ->where('nominated_user_id', $actor->id)
             ->where('status', MedicationSecondPersonConfirmation::PENDING)
+            ->withExists(['administration as has_effective_administration' => fn ($query) => $query->effectiveClinicalEvidence()])
             ->with(['administration.client', 'administration.medication', 'nominatedUser:id,name'])
             ->orderBy('due_at')->get();
         $clientIds = $this->access->readableClientIds(
@@ -181,7 +183,7 @@ final class ForgottenWitnessPinService
                 ->where('client_id', $client->id)->lockForUpdate()->firstOrFail();
             $users = $this->scope->lockControlledWitnessUsers([(int) $actor->id]);
             $currentActor = $users->get((int) $actor->id);
-            abort_unless($currentActor->canDo('medications.view') && $currentActor->canDo('medications.controlled.witness'), 403);
+            abort_unless($currentActor->canDo('medications.view') && $currentActor->canDo('medications.administer.record'), 403);
             $profiles = $this->scope->lockCurrentStaffProfilesAtSite($users, [(int) $actor->id], (int) $client->site_id);
             $currentActor->setRelation('hrEmployeeProfile', $profiles->get((int) $actor->id));
             $this->scope->lockCurrentMedicationSite((int) $client->site_id);
@@ -223,6 +225,7 @@ final class ForgottenWitnessPinService
     {
         $count = 0;
         MedicationSecondPersonConfirmation::query()->where('status', MedicationSecondPersonConfirmation::PENDING)
+            ->whereHas('administration', fn ($query) => $query->withTrashed()->effectiveClinicalEvidence())
             ->where('due_at', '<=', now())->orderBy('id')->chunkById(100, function ($rows) use (&$count): void {
                 foreach ($rows as $snapshot) {
                     $count += (int) DB::transaction(function () use ($snapshot): bool {
@@ -235,6 +238,13 @@ final class ForgottenWitnessPinService
                         $dose = ClientMedicationAdministration::withTrashed()->whereKey($doseSnapshot->id)->lockForUpdate()->firstOrFail();
                         $row = MedicationSecondPersonConfirmation::query()->whereKey($snapshot->id)->lockForUpdate()->firstOrFail();
                         if ($row->status !== MedicationSecondPersonConfirmation::PENDING || $row->due_at->isFuture()) {
+                            return false;
+                        }
+                        // Correction approval owns the same Client/order mutex.
+                        // Preserve the superseded nomination and original facts;
+                        // only effective administrations may gain expiry flags.
+                        $effective = CurrentAuthorizationReads::within(fn (CurrentAuthorizationReads $reads): bool => $reads->query(ClientMedicationAdministration::withTrashed()->whereKey($dose->id)->effectiveClinicalEvidence())->exists());
+                        if (! $effective) {
                             return false;
                         }
                         $dose->setRelation('client', $client);
@@ -323,7 +333,7 @@ final class ForgottenWitnessPinService
     private function mayRead(User $actor): bool
     {
         if ($actor->approved_at === null || ! $actor->canDo('medications.view')
-            || ! $actor->canDo('medications.controlled.witness')) {
+            || ! $actor->canDo('medications.administer.record')) {
             return false;
         }
         $day = now()->timezone(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
@@ -345,6 +355,7 @@ final class ForgottenWitnessPinService
             && (int) $row->nominated_user_id !== (int) $dose->administered_by
             && ! $medication->controlled_drug
             && $dose->status === 'given'
-            && ClientMedicationAdministration::query()->whereKey($dose->id)->effectiveClinicalEvidence()->exists();
+            && ($row->getAttribute('has_effective_administration')
+                ?? ClientMedicationAdministration::query()->whereKey($dose->id)->effectiveClinicalEvidence()->exists());
     }
 }

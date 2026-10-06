@@ -2,6 +2,9 @@
 
 namespace Tests\Feature\Emar;
 
+use App\Domain\Clinical\Models\ClinicalEvent;
+use App\Domain\Clinical\Services\ClinicalEventService;
+use App\Domain\Clinical\Services\ClinicalSiteAccessService;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientLeaveRequest;
@@ -15,8 +18,10 @@ use App\Models\RespiteStay;
 use App\Models\ServiceContext;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Clients\ClientLeaveWorkflow;
 use App\Services\EnhancedMarService;
 use App\Services\GuidedRoundService;
+use App\Services\Medication\DoseSlots\DoseAwaySources;
 use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\DoseSlots\OverdueDoses;
@@ -29,6 +34,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -39,8 +45,8 @@ use Tests\TestCase;
  * included. Away reads "Away · reason" everywhere — the respite house named
  * only to a reader who may access its Site — is never due, late, overdue,
  * badged or alerted, and counts on its own. Withdraw the record and the dose
- * is owed again. A recorded outcome always wins. Approved leave is switched
- * off as a source for now.
+ * is owed again. A recorded outcome always wins. Actual approved leave and
+ * paired hospital attendance use the same boundaries in live and fallback reads.
  *
  * Monday 15 June 2026 (NZST, UTC+12); orders entered Friday 12 June.
  */
@@ -234,7 +240,7 @@ class AwayDosesTest extends TestCase
         $this->assertSame(['refused', 'away'], array_column($this->medsToday('2026-06-15'), 'status'));
     }
 
-    public function test_approved_leave_is_not_an_away_source_until_it_is_switched_on(): void
+    public function test_planned_legacy_leave_never_establishes_away_even_when_leave_is_enabled(): void
     {
         ClientLeaveRequest::query()->create([
             'client_id' => $this->aroha->id,
@@ -248,7 +254,218 @@ class AwayDosesTest extends TestCase
         $this->assertSame(['late', 'not_due'], $this->rows('2026-06-15')->pluck('state')->all());
 
         config(['medications.away.from_leave' => true]);
+        $this->assertSame(['late', 'not_due'], $this->rows('2026-06-15')->pluck('state')->all());
+    }
+
+    public function test_actual_leave_uses_departure_and_early_return_everywhere_without_changing_planned_dates(): void
+    {
+        $this->at('2026-06-15 09:30');
+        $leave = $this->leave('2026-06-15T07:00:00+12:00');
+        $reason = 'On leave (since Mon 15 Jun, 7:00 am)';
         $this->assertSame(['away', 'away'], $this->rows('2026-06-15')->pluck('state')->all());
+        $this->assertSame(['source' => 'leave', 'id' => $leave->id], $this->rows('2026-06-15')->first()['away']);
+        $schedule = $this->medsToday('2026-06-15');
+        $this->assertSame(['away', 'away'], array_column($schedule, 'status'));
+        $this->assertSame($reason, $schedule[0]['away_reason']);
+        $this->assertSame(array_fill(0, 2, 'Metformin — Away · '.$reason), collect($this->calendar(
+            '2026-06-15T00:00:00+12:00', '2026-06-16T00:00:00+12:00'))->pluck('title')->all());
+        $this->assertSame([], $this->overdueOn('2026-06-15'));
+        $this->at('2026-06-15 12:30');
+        app(ClientLeaveWorkflow::class)->transition($this->reader, $this->aroha, $leave,
+            ['action' => 'return', 'version' => $leave->version, 'occurred_at' => '2026-06-15T12:00:00+12:00']);
+        $this->assertSame('2026-06-20', $leave->fresh()->ends_on->toDateString());
+        $this->assertSame(['away', 'not_due'], $this->rows('2026-06-15')->pluck('state')->all());
+        $this->assertSame(['away', 'upcoming'], array_column($this->medsToday('2026-06-15'), 'status'));
+        $this->assertFalse(collect($this->calendar('2026-06-18T00:00:00+12:00', '2026-06-19T00:00:00+12:00'))
+            ->contains(fn (array $event): bool => str_contains($event['title'], 'Away')));
+    }
+
+    public function test_actual_departure_does_not_settle_an_earlier_overdue_dose_and_recorded_outcomes_still_win(): void
+    {
+        $this->at('2026-06-15 15:30');
+        $this->leave('2026-06-15T15:00:00+12:00');
+        $this->assertSame(['late', 'away'], $this->rows('2026-06-15')->pluck('state')->all());
+        $this->assertSame(['2026-06-15 08:00'], $this->overdueOn('2026-06-15'));
+        $this->record('2026-06-15 20:00', 'refused');
+        $this->assertSame(['late', 'refused'], $this->rows('2026-06-15')->pluck('state')->all());
+    }
+
+    public function test_canonical_hospital_admission_and_early_discharge_are_live_away_evidence(): void
+    {
+        $this->at('2026-06-15 09:30');
+        $admission = $this->hospital('hospital_admission', '2026-06-15T07:00:00+12:00');
+        $reason = 'In hospital (since Mon 15 Jun, 7:00 am)';
+        $this->assertSame(['away', 'away'], $this->rows('2026-06-15')->pluck('state')->all());
+        $this->assertSame(['source' => 'hospital', 'id' => $admission->id], $this->rows('2026-06-15')->first()['away']);
+        $this->assertSame($reason, $this->medsToday('2026-06-15')[0]['away_reason']);
+        $this->assertSame(array_fill(0, 2, 'Metformin — Away · '.$reason), collect($this->calendar(
+            '2026-06-18T00:00:00+12:00', '2026-06-19T00:00:00+12:00'))->pluck('title')->all());
+        $this->at('2026-06-15 12:30');
+        $this->hospital('hospital_discharge', '2026-06-15T12:00:00+12:00', $admission->id);
+        $this->assertSame(['away', 'not_due'], $this->rows('2026-06-15')->pluck('state')->all());
+        $this->assertSame(['away', 'upcoming'], array_column($this->medsToday('2026-06-15'), 'status'));
+        $this->assertFalse(collect($this->calendar('2026-06-18T00:00:00+12:00', '2026-06-19T00:00:00+12:00'))
+            ->contains(fn (array $event): bool => str_contains($event['title'], 'Away')));
+    }
+
+    #[DataProvider('pairedHistoricalSources')]
+    public function test_paired_historical_absence_before_a_later_closed_stay_ends_away_and_preserves_recorded_priority(string $source): void
+    {
+        $this->at('2026-06-15 21:30');
+        if ($source === 'leave') {
+            $later = $this->leave('2026-06-15T15:00:00+12:00');
+            $workflow = app(ClientLeaveWorkflow::class);
+            $workflow->transition($this->reader, $this->aroha, $later,
+                ['action' => 'return', 'version' => $later->version, 'occurred_at' => '2026-06-15T16:00:00+12:00']);
+            $earlier = $workflow->create($this->reader, $this->aroha,
+                ['starts_on' => '2026-06-15', 'ends_on' => '2026-06-20', 'status' => 'approved']);
+            $historical = $workflow->transition($this->reader, $this->aroha, $earlier,
+                ['action' => 'depart', 'version' => $earlier->version, 'occurred_at' => '2026-06-15T07:00:00+12:00',
+                    'returned_at' => '2026-06-15T12:00:00+12:00']);
+        } else {
+            $later = $this->hospital('hospital_admission', '2026-06-15T15:00:00+12:00');
+            $this->hospital('hospital_discharge', '2026-06-15T16:00:00+12:00', $later->id);
+            $historical = app(ClinicalEventService::class)->record($this->aroha, $this->reader,
+                ['event_type' => 'hospital_admission', 'severity' => 'medium', 'description' => 'Closed historical attendance',
+                    'occurred_at' => '2026-06-15T07:00:00+12:00', 'hospital_discharged_at' => '2026-06-15T12:00:00+12:00']);
+        }
+        $this->assertSame(['away', 'late'], $this->rows('2026-06-15')->pluck('state')->all());
+        $this->assertSame(['source' => $source, 'id' => $historical->id], $this->rows('2026-06-15')->first()['away']);
+        $this->assertSame(['away', 'overdue'], array_column($this->medsToday('2026-06-15'), 'status'));
+        $day = CarbonImmutable::parse('2026-06-15', 'Pacific/Auckland');
+        $periods = app(DoseAwaySources::class)->periods([$this->aroha->id], $day, $day)->get($this->aroha->id);
+        $this->assertSame(['source' => $source, 'id' => $historical->id], DoseAwaySources::refAt($periods, CarbonImmutable::parse('2026-06-15T07:00:00+12:00')->utc()));
+        $this->assertNull(DoseAwaySources::refAt($periods, CarbonImmutable::parse('2026-06-15T12:00:00+12:00')->utc()));
+        $this->assertNull(DoseAwaySources::refAt($periods, CarbonImmutable::now()));
+        $this->record('2026-06-15 08:00', 'refused');
+        $this->assertSame(['refused', 'late'], $this->rows('2026-06-15')->pluck('state')->all());
+        $this->assertSame(['refused', 'overdue'], array_column($this->medsToday('2026-06-15'), 'status'));
+    }
+
+    public static function pairedHistoricalSources(): array
+    {
+        return ['leave' => ['leave'], 'hospital' => ['hospital']];
+    }
+
+    public function test_hospital_does_not_settle_pre_admission_overdue_or_override_a_recorded_refusal(): void
+    {
+        $this->at('2026-06-15 21:30');
+        $this->hospital('hospital_admission', '2026-06-15T15:00:00+12:00');
+        $this->assertSame(['late', 'away'], $this->rows('2026-06-15')->pluck('state')->all());
+        $this->assertSame(['2026-06-15 08:00'], $this->overdueOn('2026-06-15'));
+        $this->record('2026-06-15 20:00', 'refused');
+        $this->assertSame(['late', 'refused'], $this->rows('2026-06-15')->pluck('state')->all());
+        $this->assertSame(['overdue', 'refused'], array_column($this->medsToday('2026-06-15'), 'status'));
+    }
+
+    public function test_house_move_preserves_hospital_absence_and_only_current_site_actor_can_record_discharge(): void
+    {
+        $this->at('2026-06-15 09:30');
+        $admission = $this->hospital('hospital_admission', '2026-06-15T07:00:00+12:00');
+        $original = (array) DB::table('clinical_events')->where('id', $admission->id)->sole();
+        $oldActor = $this->reader;
+        $this->grant('clients.update');
+        $this->actingAs($this->reader)->putJson('/operations/clients/'.$this->aroha->id, [
+            'first_name' => 'Aroha', 'last_name' => 'Ngata', 'status' => 'active', 'site_id' => $this->kowhai->id,
+            'service_context_id' => null, 'room_id' => null, 'key_worker_id' => null, 'house_geofence_id' => null,
+        ])->assertRedirect();
+        $this->aroha->refresh();
+        $this->assertSame($this->kowhai->id, $this->aroha->site_id);
+        $this->assertSame(['away', 'away'], $this->rows('2026-06-15')->pluck('state')->all());
+        $periods = app(DoseAwaySources::class)->periods([$this->aroha->id], '2026-06-15', '2026-06-15')->get($this->aroha->id);
+        $this->assertSame(['source' => 'hospital', 'id' => $admission->id], DoseAwaySources::refAt($periods, CarbonImmutable::parse('2026-06-15T20:00:00+12:00')->utc()));
+        $this->actingAs($oldActor->fresh())->getJson('/clients/'.$this->aroha->id.'/clinical/hospital-admissions')->assertForbidden();
+        $this->postJson('/clients/'.$this->aroha->id.'/clinical/events', ['event_type' => 'hospital_discharge', 'severity' => 'medium',
+            'description' => 'Returned after move', 'occurred_at' => '2026-06-15T09:00:00+12:00', 'hospital_admission_id' => $admission->id])->assertForbidden();
+        $this->assertSame(0, ClinicalEvent::where('hospital_admission_id', $admission->id)->count());
+        $this->reader = $this->staff($this->kowhai, ['clients.viewAssigned', 'medications.view', 'calendar.view', 'clinical.events.record']);
+        $this->aroha->supportWorkers()->attach($this->reader->id);
+        $refs = $this->actingAs($this->reader)->getJson('/clients/'.$this->aroha->id.'/clinical/hospital-admissions')->assertOk()->json('admissions');
+        $this->assertCount(1, $refs);
+        $this->assertSame(['id', 'occurred_at', 'reported_at'], array_keys($refs[0]));
+        $this->assertSame($admission->id, $refs[0]['id']);
+        $this->assertFalse(app(ClinicalSiteAccessService::class)->canAccessEvent($this->reader, $admission));
+        $this->at('2026-06-15 12:30');
+        $discharge = $this->hospital('hospital_discharge', '2026-06-15T12:00:00+12:00', $admission->id);
+        $this->assertSame($this->kowhai->id, $discharge->site_id);
+        $this->assertSame('2026-06-15 00:00:00', $discharge->getRawOriginal('hospital_discharged_at'));
+        $this->assertSame($original, (array) DB::table('clinical_events')->where('id', $admission->id)->sole());
+        $this->assertSame(['away', 'not_due'], $this->rows('2026-06-15')->pluck('state')->all());
+        $this->getJson('/clients/'.$this->aroha->id.'/clinical/hospital-admissions')->assertOk()->assertExactJson(['admissions' => []]);
+    }
+
+    public function test_hospital_source_takes_precedence_then_discharge_restores_ongoing_leave_without_faking_its_return(): void
+    {
+        $this->at('2026-06-15 09:30');
+        $leave = $this->leave('2026-06-15T06:00:00+12:00');
+        $admission = $this->hospital('hospital_admission', '2026-06-15T07:00:00+12:00');
+        $this->assertSame(['source' => 'hospital', 'id' => $admission->id], $this->rows('2026-06-15')->first()['away']);
+        $this->at('2026-06-15 12:30');
+        $this->hospital('hospital_discharge', '2026-06-15T12:00:00+12:00', $admission->id);
+        $this->assertSame(['hospital', 'leave'], $this->rows('2026-06-15')->map(fn (array $row): string => $row['away']['source'])->all());
+        $this->assertNull($leave->fresh()->returned_at);
+        $periods = app(DoseAwaySources::class)->periods([$this->aroha->id], '2026-06-15', '2026-06-15')->get($this->aroha->id);
+        $this->assertSame(['source' => 'leave', 'id' => $leave->id], DoseAwaySources::refAt($periods, CarbonImmutable::parse('2026-06-15T12:00:00+12:00')->utc()));
+    }
+
+    public function test_unknown_hospital_history_and_unrelated_or_impossible_discharge_never_fabricate_presence(): void
+    {
+        $this->at('2026-06-15 09:30');
+        ClinicalEvent::factory()->create(['client_id' => $this->aroha->id, 'site_id' => $this->home->id,
+            'event_type' => 'hospital_admission', 'occurred_at' => Carbon::parse('2026-06-15T07:00:00+12:00')->utc(), 'hospital_admitted_at' => null]);
+        $this->assertSame(['late', 'not_due'], $this->rows('2026-06-15')->pluck('state')->all());
+        $admission = $this->hospital('hospital_admission', '2026-06-15T07:00:00+12:00');
+        $other = Client::factory()->create(['site_id' => $this->home->id]);
+        // Explicit malformed legacy rows must not terminate this person's canonical interval.
+        foreach ([[$other->id, $this->home->id, '08:00'], [$this->aroha->id, $this->kowhai->id, '08:00'],
+            [$this->aroha->id, $this->home->id, '06:00']] as [$clientId, $siteId, $time]) {
+            ClinicalEvent::factory()->create(['client_id' => $clientId, 'site_id' => $siteId, 'event_type' => 'hospital_discharge',
+                'hospital_admission_id' => $admission->id, 'occurred_at' => Carbon::parse('2026-06-15 '.$time, 'Pacific/Auckland')->utc()]);
+        }
+        $this->assertSame(['away', 'away'], $this->rows('2026-06-15')->pluck('state')->all());
+        $periods = app(DoseAwaySources::class)->periods([$this->aroha->id], '2026-06-15', '2026-06-15')->get($this->aroha->id);
+        $this->assertSame(['source' => 'hospital', 'id' => $admission->id], DoseAwaySources::refAt($periods, CarbonImmutable::parse('2026-06-15T20:00:00+12:00')->utc()));
+    }
+
+    #[DataProvider('daylightSavingIntervals')]
+    public function test_actual_leave_half_open_boundaries_match_projection_and_fallback_through_nz_clock_changes(string $date, string $departure, string $return, int $hours): void
+    {
+        // Enter this schedule before its doses become due. A noon edit to the
+        // existing order correctly retains past slots and awaits verification.
+        $this->at(Carbon::parse($date, 'Pacific/Auckland')->subDay()->setTime(12, 0)->toDateTimeString());
+        $order = ClientMedication::query()->create([
+            'client_id' => $this->aroha->id, 'name' => 'Night dose', 'dosage' => '1 tablet',
+            'frequency' => 'Daily', 'dose_times' => ['01:30', '03:30'], 'is_prn' => false,
+            'active' => true, 'state' => 'active', 'start_date' => $date,
+        ]);
+        $this->at($date.' 12:00');
+        $leave = $this->leave($departure);
+        app(ClientLeaveWorkflow::class)->transition($this->reader, $this->aroha, $leave,
+            ['action' => 'return', 'version' => $leave->version, 'occurred_at' => $return]);
+        $this->artisan('emar:generate-dose-slots')->assertSuccessful();
+        $rows = $this->rows($date)->where('client_medication_id', $order->id)->values();
+        $this->assertCount(2, $rows);
+        $this->assertSame(['01:30', '03:30'], $rows->pluck('ordered_time')->all());
+        $this->assertSame([
+            CarbonImmutable::parse($departure)->utc()->toIso8601String(),
+            CarbonImmutable::parse($return)->utc()->toIso8601String(),
+        ], $rows->pluck('due_at')->all());
+        $this->assertSame([false, false], $rows->pluck('order_change_pending')->all());
+        $this->assertSame(['away', 'late'], $rows->pluck('state')->all());
+        $periods = app(DoseAwaySources::class)->periods([$this->aroha->id], $date, $date)->get($this->aroha->id);
+        $this->assertCount(1, $periods);
+        $this->assertSame($hours * 3600, $periods[0]['until']->getTimestamp() - $periods[0]['from']->getTimestamp());
+        $this->assertSame(['source' => 'leave', 'id' => $leave->id], DoseAwaySources::refAt($periods, CarbonImmutable::parse($departure)->utc()));
+        $this->assertNull(DoseAwaySources::refAt($periods, CarbonImmutable::parse($departure)->utc()->subSecond()));
+        $this->assertNull(DoseAwaySources::refAt($periods, CarbonImmutable::parse($return)->utc()));
+    }
+
+    public static function daylightSavingIntervals(): array
+    {
+        return [
+            'spring' => ['2026-09-27', '2026-09-27T01:30:00+12:00', '2026-09-27T03:30:00+13:00', 1],
+            'fall' => ['2027-04-04', '2027-04-04T01:30:00+13:00', '2027-04-04T03:30:00+12:00', 3],
+        ];
     }
 
     public function test_an_away_dose_does_not_hold_a_round_open(): void
@@ -288,6 +505,35 @@ class AwayDosesTest extends TestCase
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────
+
+    private function grant(string $permission): void
+    {
+        $id = Permission::where('key', $permission)->sole()->id;
+        $this->reader->permissionOverrides()->syncWithoutDetaching([$id => ['allowed' => true]]);
+        $this->reader = $this->reader->fresh();
+    }
+
+    private function leave(string $departure): ClientLeaveRequest
+    {
+        $this->grant('clients.update');
+        $workflow = app(ClientLeaveWorkflow::class);
+        $leave = $workflow->create($this->reader, $this->aroha, [
+            'starts_on' => '2026-06-15', 'ends_on' => '2026-06-20', 'status' => 'approved',
+        ]);
+
+        return $workflow->transition($this->reader, $this->aroha, $leave,
+            ['action' => 'depart', 'version' => $leave->version, 'occurred_at' => $departure]);
+    }
+
+    private function hospital(string $type, string $at, ?int $admissionId = null): ClinicalEvent
+    {
+        $this->grant('clinical.events.record');
+
+        return app(ClinicalEventService::class)->record($this->aroha, $this->reader, [
+            'event_type' => $type, 'severity' => 'medium', 'description' => 'Actual hospital attendance',
+            'occurred_at' => $at, 'hospital_admission_id' => $admissionId,
+        ]);
+    }
 
     private function at(string $nz): void
     {

@@ -21,6 +21,10 @@ import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTime, formatTime } from '@/lib/datetime';
 import { emarScopedHref } from '@/lib/emar-navigation';
+import {
+    secondPersonDisplay,
+    type SecondPersonEvidence,
+} from '@/lib/medication-second-person';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
     CalendarDays,
@@ -32,7 +36,7 @@ import {
 import { useState } from 'react';
 
 type View = 'charts' | 'medicines' | 'asneeded';
-type Row = {
+type Row = SecondPersonEvidence & {
     key: string;
     id: number;
     client_id: number;
@@ -495,6 +499,33 @@ export default function MedicationRecordHub(props: Props) {
                                                 width: '1fr',
                                                 cell: (row) =>
                                                     row.by ?? 'Not recorded',
+                                            },
+                                            {
+                                                key: 'second-person',
+                                                label: 'Second-person check',
+                                                width: '1.5fr',
+                                                cell: (row) => {
+                                                    const check =
+                                                        secondPersonDisplay(
+                                                            row,
+                                                        );
+                                                    return check ? (
+                                                        <span>
+                                                            <StatusBadge
+                                                                variant={
+                                                                    check.tone
+                                                                }
+                                                            >
+                                                                {check.label}
+                                                            </StatusBadge>
+                                                            <span className="text-caption mt-1 block">
+                                                                {check.detail}
+                                                            </span>
+                                                        </span>
+                                                    ) : (
+                                                        '—'
+                                                    );
+                                                },
                                             },
                                             {
                                                 key: 'effect',

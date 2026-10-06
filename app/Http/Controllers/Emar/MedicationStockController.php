@@ -52,7 +52,7 @@ final class MedicationStockController extends Controller
         // Existing scope only. The newly approved receive grant is held by
         // automatic approval review and is not silently added here.
         abort_unless($request->user()->canDo('medications.stock.update'), 403);
-        abort_unless(config('medications.stock_lots_enabled', false), 422, 'Stock pack workflows are awaiting integration review.');
+        abort_unless(config('medications.stock_lots_enabled', false), 422, 'Stock pack workflows are disabled for this installation.');
         $action = $request->string('action')->toString();
         $rules = $this->rules($action);
         $data = $request->validate([
@@ -146,7 +146,7 @@ final class MedicationStockController extends Controller
         }
         $stock->setRelation('medication', $med);
         if ($action === 'initialise') {
-            abort_unless(config('medications.stock_lots_enabled', false), 422, 'Pack tracking is awaiting integration review.');
+            abort_unless(config('medications.stock_lots_enabled', false), 422, 'Pack tracking is disabled for this installation.');
             if ($med->controlled_drug) {
                 abort_unless($actor->canDo('medications.controlled.record'), 403);
                 app(ControlledRegisterService::class)->assertPresent($actor, (int) $med->client->site_id, true);

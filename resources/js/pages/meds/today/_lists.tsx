@@ -1,3 +1,4 @@
+import { secondPersonDisplay } from '@/lib/medication-second-person';
 /* Meds today lists share rows and authorised actions between phone cards
  * and desktop tables. Activity remains server-paginated, 10 a page. */
 import { EntityCard } from '@/components/lists/entity-card';
@@ -451,6 +452,25 @@ export function AsNeededView({
                                                     </StatusBadge>
                                                     <MobileMedsFacts
                                                         facts={[
+                                                            ...(secondPersonDisplay(
+                                                                x,
+                                                            )
+                                                                ? [
+                                                                      {
+                                                                          label: 'Second-person check',
+                                                                          value:
+                                                                              secondPersonDisplay(
+                                                                                  x,
+                                                                              )!
+                                                                                  .label +
+                                                                              ' · ' +
+                                                                              secondPersonDisplay(
+                                                                                  x,
+                                                                              )!
+                                                                                  .detail,
+                                                                      },
+                                                                  ]
+                                                                : []),
                                                             {
                                                                 label: 'Medicine',
                                                                 value:
@@ -500,6 +520,7 @@ export function AsNeededView({
                         <Card className="hidden gap-0 divide-y p-0 md:flex">
                             {shownRecorded.map((x) => {
                                 const p = nameOf(clients, x.client_id, '');
+                                const confirmation = secondPersonDisplay(x);
                                 return (
                                     <div
                                         key={x.id}
@@ -536,6 +557,18 @@ export function AsNeededView({
                                                         .filter(Boolean)
                                                         .join(' · ')}
                                                 </span>
+                                                {confirmation && (
+                                                    <span className="text-caption mt-1 block">
+                                                        <StatusBadge
+                                                            variant={
+                                                                confirmation.tone
+                                                            }
+                                                        >
+                                                            {confirmation.label}
+                                                        </StatusBadge>{' '}
+                                                        {confirmation.detail}
+                                                    </span>
+                                                )}
                                             </span>
                                         </span>
                                         <StatusBadge

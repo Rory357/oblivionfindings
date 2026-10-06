@@ -23,6 +23,7 @@ use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationProfileAuditPrivacy;
 use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationRecordSafetyPrivacy;
+use App\Services\Medication\SecondPersonConfirmationPayload;
 use App\Services\Medication\Support\MedicationSupport;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -359,10 +360,10 @@ class PersonMedicationRecordController extends Controller
         if (! $actor->canDo('medications.controlled.view')) {
             $scope->scopeWithoutControlledMedicationRows($query);
         }
-        $dose = (clone $query)->with(['medication', 'administeredBy:id,name', 'witnessedBy:id,name'])->findOrFail($administrationId);
+        $dose = (clone $query)->with(['medication', 'administeredBy:id,name', 'witnessedBy:id,name', SecondPersonConfirmationPayload::RELATION])->findOrFail($administrationId);
         $rootId = $dose->corrected_of_id ?? $dose->id;
-        $chain = (clone $query)->where('client_medication_id', $dose->client_medication_id)->where(fn ($q) => $q->whereKey($rootId)->orWhere('corrected_of_id', $rootId)->orWhere('reoffer_of_id', $rootId))->with(['administeredBy:id,name', 'correctionRequestedBy:id,name', 'correctionApprovedBy:id,name'])->orderBy('id')->get();
-        $map = fn ($row) => ['id' => $row->id, 'medicine' => $row->medication?->name ?? $dose->medication->name, 'status' => $row->status, 'at' => $row->administered_at?->toIso8601String(), 'scheduled_for' => $row->scheduled_for?->toIso8601String(), 'by' => $row->administeredBy?->name, 'dose' => $row->dose_given, 'reason' => $row->reason, 'notes' => $row->notes, 'witness' => $row->witnessedBy?->name, 'is_correction' => (bool) $row->is_correction, 'correction_status' => $row->correction_status, 'correction_reason' => $row->correction_reason, 'requested_by' => $row->correction_requested_by ?? $row->administered_by, 'reviewed_by' => $row->correctionApprovedBy?->name, 'reviewed_at' => $row->correction_approved_at?->toIso8601String(), 'rejection_reason' => $row->correction_rejection_reason, 'glucose' => $row->blood_glucose_level, 'pulse' => $row->pulse_bpm, 'systolic' => $row->blood_pressure_systolic, 'diastolic' => $row->blood_pressure_diastolic];
+        $chain = (clone $query)->where('client_medication_id', $dose->client_medication_id)->where(fn ($q) => $q->whereKey($rootId)->orWhere('corrected_of_id', $rootId)->orWhere('reoffer_of_id', $rootId))->with(['administeredBy:id,name', 'witnessedBy:id,name', 'correctionRequestedBy:id,name', 'correctionApprovedBy:id,name', SecondPersonConfirmationPayload::RELATION])->orderBy('id')->get();
+        $map = fn ($row) => [...app(SecondPersonConfirmationPayload::class)->forAdministration($row), 'id' => $row->id, 'medicine' => $row->medication?->name ?? $dose->medication->name, 'status' => $row->status, 'at' => $row->administered_at?->toIso8601String(), 'scheduled_for' => $row->scheduled_for?->toIso8601String(), 'by' => $row->administeredBy?->name, 'dose' => $row->dose_given, 'reason' => $row->reason, 'notes' => $row->notes, 'witness' => $row->witnessedBy?->name, 'is_correction' => (bool) $row->is_correction, 'correction_status' => $row->correction_status, 'correction_reason' => $row->correction_reason, 'requested_by' => $row->correction_requested_by ?? $row->administered_by, 'reviewed_by' => $row->correctionApprovedBy?->name, 'reviewed_at' => $row->correction_approved_at?->toIso8601String(), 'rejection_reason' => $row->correction_rejection_reason, 'glucose' => $row->blood_glucose_level, 'pulse' => $row->pulse_bpm, 'systolic' => $row->blood_pressure_systolic, 'diastolic' => $row->blood_pressure_diastolic];
 
         return $this->privateJson(['dose' => $map($dose), 'chain' => $chain->map($map)->values()]);
     }

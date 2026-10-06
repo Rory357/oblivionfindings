@@ -53,6 +53,10 @@ import {
     type MedicationScanCapture,
     type MedicationScanVerification,
 } from '@/lib/medication-scan';
+import {
+    secondPersonDisplay,
+    type SecondPersonEvidence,
+} from '@/lib/medication-second-person';
 import { readServerSyncOutcome } from '@/lib/offline-queue';
 import { cn } from '@/lib/utils';
 import axios from 'axios';
@@ -88,6 +92,7 @@ import {
     NoteField,
     ReasonSelect,
     SecondPerson,
+    forgottenPinAvailable,
     formatAmount,
     type AmountState,
     type Errors,
@@ -606,6 +611,9 @@ function RecordDoseForm({
         ? null
         : (req.second_person.kind ??
           (f.amount.mode === 'less' ? 'amount' : null));
+    const forgottenPin =
+        f.second.forgotten === true &&
+        forgottenPinAvailable(req, secondKind, f.second.id);
     const nobodyToConfirm = !req.second_person.anyone_available;
     // Only a medication rule's second person or a smaller amount may go
     // unconfirmed (Q2); a witness or co-signer never can.
@@ -743,7 +751,10 @@ function RecordDoseForm({
             if (secondKind && !unconfirmed) {
                 if (!f.second.id)
                     e.second = `Choose who is ${secondKind === 'witness' ? 'witnessing' : 'confirming'}.`;
-                else if (!/^\d{6}$/.test(f.second.pin))
+                else if (forgottenPin && f.second.present !== true)
+                    e.pin =
+                        'Confirm that your colleague was present for this dose.';
+                else if (!forgottenPin && !/^\d{6}$/.test(f.second.pin))
                     e.pin = 'Enter their 6-digit PIN.';
             }
             if (needsStockQuantity && !(Number(f.stockQuantity) > 0))
@@ -885,7 +896,9 @@ function RecordDoseForm({
             secondKind && !unconfirmed && f.second.id
                 ? {
                       witnessed_by: f.second.id,
-                      witness_credential: f.second.pin,
+                      ...(forgottenPin
+                          ? { second_person_pin_forgotten: true }
+                          : { witness_credential: f.second.pin }),
                   }
                 : secondKind && unconfirmed
                   ? { second_person_unavailable: true }
@@ -1031,7 +1044,7 @@ function RecordDoseForm({
             status === 'duplicate'
         ) {
             const administration = data?.administration as
-                | { id?: number }
+                | ({ id?: number } & SecondPersonEvidence)
                 | undefined;
             onRecorded?.({
                 status: 'recorded',
@@ -1058,6 +1071,15 @@ function RecordDoseForm({
             if (req.witness_override && !f.second.id && givenLike)
                 lines.push(
                     'Recorded under an approved witness override · a house lead must take part in a witnessed count and sign off this dose.',
+                );
+            const secondPerson = administration
+                ? secondPersonDisplay(administration)
+                : null;
+            if (secondPerson)
+                lines.push(secondPerson.label + ' · ' + secondPerson.detail);
+            else if (forgottenPin)
+                lines.push(
+                    'Second-person confirmation is pending. Your colleague must confirm from their own account; this dose is not shown as verified.',
                 );
             if (unconfirmed)
                 lines.push(
@@ -1093,6 +1115,7 @@ function RecordDoseForm({
         scan_verified: 'scan',
         witnessed_by: 'second',
         witness_credential: 'pin',
+        second_person_pin_forgotten: 'pin',
         late_reason: 'lateReason',
         reason: 'reason',
         reason_code: 'reason',
@@ -1976,9 +1999,9 @@ function RecordDoseForm({
                     title="Not recorded — this dose was not saved."
                 >
                     {serverMessage ? `${serverMessage} ` : ''}The chart doesn’t
-                    show this dose. What you entered is kept. Ask a colleague
-                    with current competency to give it, or record a refusal,
-                    withhold or absence.
+                    show this dose. Your draft is kept. Review any message above
+                    or ask the house lead for help completing the record. Record
+                    only what actually happened.
                 </Notice>
             ) : null}
             {phase === 'uncertain' ? (
@@ -2135,19 +2158,26 @@ function RecordDoseForm({
                 {secondKind && !unconfirmed && secondName ? (
                     <ReviewRow
                         label={
-                            secondKind === 'witness'
-                                ? 'Witnessed by'
-                                : secondKind === 'amount'
-                                  ? 'Amount confirmed by'
-                                  : secondKind === 'cosigner'
-                                    ? 'Co-signed by'
-                                    : 'Confirmed by'
+                            forgottenPin
+                                ? 'Confirmation requested from'
+                                : secondKind === 'witness'
+                                  ? 'Witnessed by'
+                                  : secondKind === 'amount'
+                                    ? 'Amount confirmed by'
+                                    : secondKind === 'cosigner'
+                                      ? 'Co-signed by'
+                                      : 'Confirmed by'
                         }
                         value={
                             <span>
                                 {secondName}{' '}
-                                <StatusBadge variant="success" size="sm">
-                                    PIN checked when saved
+                                <StatusBadge
+                                    variant={forgottenPin ? 'warning' : 'info'}
+                                    size="sm"
+                                >
+                                    {forgottenPin
+                                        ? 'Pending their own sign-in'
+                                        : 'PIN checked when saved'}
                                 </StatusBadge>
                             </span>
                         }

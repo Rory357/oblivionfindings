@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\AuthorizationEvidenceLockService;
 use App\Services\CurrentAuthorizationReads;
 use App\Services\Medication\ClientAllergyRecordService;
+use App\Services\Medication\DoseSlots\DoseAwaySources;
 use App\Services\Medication\DoseSlots\DoseOrderTimelineFactory;
 use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
@@ -230,8 +231,16 @@ final class DowntimePackService
             'timing' => $this->boundedEvidence($reads, DB::table('app_settings')->whereIn('key', array_keys(DoseTimingSettings::RANGES))->orderBy('id')->select(['id', 'key', 'value']), count(DoseTimingSettings::RANGES)),
             'respite_stays' => $stays,
             'respite_bookings' => $this->boundedEvidence($reads, DB::table('respite_bookings')->whereIn('id', array_column($stays, 'booking_id'))->orderBy('id')->select(['id', 'location_id', 'deleted_at']), self::MAX_DOSES),
-            'leave' => config('medications.away.from_leave', false)
-                ? $this->boundedEvidence($reads, DB::table('client_leave_requests')->whereIn('client_id', $clientIds)->orderBy('id')->select(['id', 'client_id', 'status', 'starts_on', 'ends_on', 'deleted_at']), self::MAX_DOSES) : [],
+            // Absence follows the person across house moves. Only canonical
+            // presence facts belong here, never historical clinical narratives.
+            'hospital' => $this->boundedEvidence($reads, DB::table('clinical_events')->whereIn('client_id', $clientIds)
+                ->whereIn('event_type', ['hospital_admission', 'hospital_discharge'])->orderBy('id')
+                ->select(['id', 'client_id', 'event_type', 'occurred_at', 'hospital_admitted_at', 'hospital_discharged_at', 'hospital_admission_id', 'deleted_at']), self::MAX_DOSES),
+            'leave_counts' => DoseAwaySources::leaveCounts(),
+            'leave' => DoseAwaySources::leaveCounts()
+                ? $this->boundedEvidence($reads, DB::table('client_leave_requests')->whereIn('client_id', $clientIds)->orderBy('id')
+                    ->select(['id', 'client_id', 'status', 'starts_on', 'ends_on', 'approved_at', 'approved_by', 'departed_at', 'departed_by',
+                        'returned_at', 'returned_by', 'withdrawn_at', 'withdrawn_by', 'version', 'deleted_at']), self::MAX_DOSES) : [],
         ];
     }
 

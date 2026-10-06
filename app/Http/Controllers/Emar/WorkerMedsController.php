@@ -10,6 +10,7 @@ use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
+use App\Models\MedicationFollowup;
 use App\Models\MedicationRefusalFollowup;
 use App\Models\MedicationRound;
 use App\Models\Shift;
@@ -24,6 +25,7 @@ use App\Services\Medication\Audit\MedicationEventData;
 use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\Followups\LegacyEffectFollowupAdapter;
+use App\Services\Medication\ForgottenWitnessPinService;
 use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
@@ -31,6 +33,7 @@ use App\Services\Medication\Recording\DoseRecordingRequirements;
 use App\Services\Medication\Recording\PrnEffectCheckQueue;
 use App\Services\Medication\Recording\RecordingContract;
 use App\Services\Medication\Reporting\MedicationReportAccess;
+use App\Services\Medication\SecondPersonConfirmationPayload;
 use App\Services\Medication\StaffEligibilityRegister;
 use App\Services\MedicationScanVerificationService;
 use App\Services\Timeline\TimelineEmitter;
@@ -254,6 +257,7 @@ class WorkerMedsController extends Controller
                 ? $this->offShiftRows($user, $offShiftClientIds, $date, $now, $includeControlled)
                 : [],
             'refusal_follow_ups' => $this->refusalFollowUps($assignedClientIds, $includeControlled, $now, $timezone),
+            'second_person_confirmations' => $this->secondPersonConfirmations($user, $now),
             'prn_recorded_today' => $this->prnRecordedToday($dayAdministrations, $timezone),
             // Activity is loaded when its tab is open (or asked for by name on
             // a partial reload), so the default board load stays one fixed
@@ -462,6 +466,40 @@ class WorkerMedsController extends Controller
         }
     }
 
+    /** Current named confirmation duties, independent of the board's selected date/person. */
+    private function secondPersonConfirmations(User $user, Carbon $now): array
+    {
+        $rows = app(ForgottenWitnessPinService::class)->pendingFor($user);
+        if ($rows->isEmpty()) {
+            return [];
+        }
+        $followups = MedicationFollowup::query()->where('type', 'confirm')
+            ->whereIn('source_key', $rows->map(fn ($row): string => 'confirm:'.$row->id))
+            ->get(['id', 'source_key', 'client_id', 'client_medication_id', 'administration_id', 'owner_id'])
+            ->keyBy('source_key');
+
+        return $rows->flatMap(function ($row) use ($followups, $now): array {
+            $dose = $row->administration;
+            $followup = $followups->get('confirm:'.$row->id);
+            if ($followup === null || (int) $followup->owner_id !== (int) $row->nominated_user_id
+                || (int) $followup->administration_id !== (int) $dose->id
+                || (int) $followup->client_id !== (int) $dose->client_id
+                || (int) $followup->client_medication_id !== (int) $dose->client_medication_id) {
+                return [];
+            }
+
+            return [[
+                'id' => (int) $row->id,
+                'client_id' => (int) $dose->client_id,
+                'client_name' => $dose->client->full_name,
+                'medication_name' => $dose->medication->name,
+                'due_at' => $row->due_at->toIso8601String(),
+                'status' => $row->due_at->lte($now) ? 'expired' : 'pending',
+                'followup_url' => '/medication-followups?open='.$followup->id,
+            ]];
+        })->values()->all();
+    }
+
     /**
      * As-needed doses recorded this day for the board's people, newest first
      * (Meds today › As-needed: "As-needed doses recorded today").
@@ -493,6 +531,7 @@ class WorkerMedsController extends Controller
                     'by' => $a->administeredBy?->name,
                     'check_at' => $check?->format('g:i a'),
                     'effect_recorded' => (bool) $a->prnEffectiveness,
+                    ...app(SecondPersonConfirmationPayload::class)->forAdministration($a),
                 ];
             })
             ->values()
@@ -1022,8 +1061,7 @@ class WorkerMedsController extends Controller
                 'reoffer_of_id' => $administration->reoffer_of_id,
                 'amount_mode' => $administration->amount_mode,
                 'quantity_given' => $administration->quantity_given,
-                'second_person_kind' => $administration->second_person_kind,
-                'second_person_status' => $administration->second_person_status,
+                ...app(SecondPersonConfirmationPayload::class)->forAdministration($administration),
                 'late_reason' => $administration->late_reason,
             ] : null,
             'medication_error' => $result['medication_error'] ?? null,
@@ -1048,6 +1086,7 @@ class WorkerMedsController extends Controller
                 'status' => $administration->status,
                 'administered_at' => $administration->administered_at?->toIso8601String(),
                 'effect_check_due_at' => $administration->effect_check_due_at?->toIso8601String(),
+                ...app(SecondPersonConfirmationPayload::class)->forAdministration($administration),
             ] : null,
             'medication_error' => $result['medication_error'] ?? null,
             'safety_check' => $result['safety_check'] ?? null,

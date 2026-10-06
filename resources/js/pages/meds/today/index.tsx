@@ -96,6 +96,7 @@ import {
 } from './_schedule';
 import { PrnEffectDialog } from './components/prn-effect-dialog';
 import { RecordedDetailDialog } from './components/recorded-detail-dialog';
+import { SecondPersonFollowups } from './components/second-person-followups';
 import type {
     MedsTodayProps,
     PrnFollowUp,
@@ -168,6 +169,7 @@ export default function MedsToday(props: MedsTodayProps) {
         board_can,
     } = props;
     const offShift = props.off_shift ?? [];
+    const confirmations = props.second_person_confirmations ?? [];
     const refusals = useMemo(
         () => props.refusal_follow_ups ?? [],
         [props.refusal_follow_ups],
@@ -428,9 +430,15 @@ export default function MedsToday(props: MedsTodayProps) {
     const effectOverdue = prn_follow_ups.filter(
         (f) => f.check_due_at && new Date(f.check_due_at).getTime() < nowMs,
     ).length;
-    const followUpsOpen = refusals.length + prn_follow_ups.length;
+    const followUpsOpen =
+        refusals.length + prn_follow_ups.length + confirmations.length;
     const followUpsOverdue =
-        refusals.filter((f) => f.overdue).length + effectOverdue;
+        refusals.filter((f) => f.overdue).length +
+        effectOverdue +
+        confirmations.filter(
+            (f) =>
+                f.status === 'expired' || new Date(f.due_at).getTime() <= nowMs,
+        ).length;
     const helpReasons = [
         ...new Set(
             help.map(
@@ -470,6 +478,7 @@ export default function MedsToday(props: MedsTodayProps) {
     const oldestFollowUp =
         [
             ...refusals.map((f) => f.due_at),
+            ...confirmations.map((f) => f.due_at),
             ...prn_follow_ups.map((f) => f.check_due_at ?? null),
         ]
             .filter((at): at is string => !!at)
@@ -1042,34 +1051,43 @@ export default function MedsToday(props: MedsTodayProps) {
                         />
                     ) : null}
                     {view === 'followups' ? (
-                        <FollowUpsView
-                            refusals={refusals}
-                            effects={prn_follow_ups}
-                            clients={clientById}
-                            nowIso={props.server_now}
-                            canRecordRefusal={(f) =>
-                                canRecordMedication(f.is_controlled) &&
-                                !!refusalTarget(f)
-                            }
-                            canRecordEffect={(f) =>
-                                canRecordMedication(Boolean(f.is_controlled))
-                            }
-                            onReoffer={(f) => {
-                                const target = refusalTarget(f);
-                                if (target)
-                                    open({
-                                        kind: 'dose',
-                                        target,
-                                        mode: 'reoffer',
-                                        rowKey: null,
-                                    });
-                            }}
-                            onEffect={(f) =>
-                                open({ kind: 'effect', followUp: f })
-                            }
-                            chartFor={chartFor}
-                            onContext={onContext}
-                        />
+                        <div className="space-y-5">
+                            <SecondPersonFollowups rows={confirmations} />
+                            {refusals.length ||
+                            prn_follow_ups.length ||
+                            !confirmations.length ? (
+                                <FollowUpsView
+                                    refusals={refusals}
+                                    effects={prn_follow_ups}
+                                    clients={clientById}
+                                    nowIso={props.server_now}
+                                    canRecordRefusal={(f) =>
+                                        canRecordMedication(f.is_controlled) &&
+                                        !!refusalTarget(f)
+                                    }
+                                    canRecordEffect={(f) =>
+                                        canRecordMedication(
+                                            Boolean(f.is_controlled),
+                                        )
+                                    }
+                                    onReoffer={(f) => {
+                                        const target = refusalTarget(f);
+                                        if (target)
+                                            open({
+                                                kind: 'dose',
+                                                target,
+                                                mode: 'reoffer',
+                                                rowKey: null,
+                                            });
+                                    }}
+                                    onEffect={(f) =>
+                                        open({ kind: 'effect', followUp: f })
+                                    }
+                                    chartFor={chartFor}
+                                    onContext={onContext}
+                                />
+                            ) : null}
+                        </div>
                     ) : null}
                     {view === 'stockalerts' ? (
                         <StockTab

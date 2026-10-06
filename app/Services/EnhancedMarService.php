@@ -34,6 +34,7 @@ use App\Services\Medication\MedicationSecondPersonService;
 use App\Services\Medication\Recording\LiveRecordingContext;
 use App\Services\Medication\Recording\RecordingContract;
 use App\Services\Medication\Recording\RecordingContractEnforcer;
+use App\Services\Medication\SecondPersonConfirmationPayload;
 use App\Services\Medication\Stock\MedicationStockService;
 use App\Services\Medication\Stock\TransitStockContext;
 use App\Services\Medication\WitnessPinService;
@@ -150,6 +151,18 @@ class EnhancedMarService
             $now,
         ), auth()->user());
 
+        // Fetch the slot records and their confirmations once, rather than
+        // adding a nomination/user lookup to each scheduled row.
+        [$dayStartUtc, $dayEndUtc] = $this->scheduleService->utcDayWindow($date);
+        $recordedAdministrations = ClientMedicationAdministration::query()
+            ->effectiveClinicalEvidence()
+            ->where('client_id', $client->id)
+            ->whereIn('client_medication_id', $medications->where('is_prn', false)->modelKeys())
+            ->whereBetween('scheduled_for', [$dayStartUtc->subMinute(), $dayEndUtc->addMinute()])
+            ->with(['administeredBy:id,name', 'witnessedBy:id,name', SecondPersonConfirmationPayload::RELATION])
+            ->latest('id')
+            ->get();
+
         foreach ($medications as $medication) {
             // Build scheduled doses for non-PRN medications
             if (! $medication->is_prn) {
@@ -162,6 +175,7 @@ class EnhancedMarService
                         $client,
                         $activeShiftId,
                         $includeControlled,
+                        $recordedAdministrations,
                     );
                     $scheduledRows[] = $row;
                 }
@@ -334,6 +348,7 @@ class EnhancedMarService
         Client $client,
         ?int $activeShiftId,
         bool $includeControlled,
+        Collection $recordedAdministrations,
     ): array {
         // The slot's due time (on the spring-forward day a 02:30 dose is due at 03:00).
         $scheduledFor = $dose['due_at'];
@@ -343,14 +358,9 @@ class EnhancedMarService
         // chart must show what happened last, as the slot outcome does.
         [$slotStartUtc, $slotEndUtc] = $this->scheduleService->utcSlotWindow($scheduledFor);
 
-        $existing = ClientMedicationAdministration::query()
-            ->effectiveClinicalEvidence()
-            ->where('client_id', $client->id)
-            ->where('client_medication_id', $medication->id)
-            ->whereBetween('scheduled_for', [$slotStartUtc, $slotEndUtc])
-            ->with(['administeredBy:id,name', 'witnessedBy:id,name'])
-            ->latest('id')
-            ->first();
+        $existing = $recordedAdministrations->first(fn (ClientMedicationAdministration $administration): bool => (int) $administration->client_medication_id === (int) $medication->id
+            && $this->administrationDateUtc($administration, 'scheduled_for')?->betweenIncluded($slotStartUtc, $slotEndUtc)
+        );
 
         $scheduleState = $this->getScheduleState($dose, $now, $isToday, $existing);
         // The order's dose window (time-critical overrides included).
@@ -485,7 +495,7 @@ class EnhancedMarService
             'administered_by' => $admin->administeredBy?->name,
             'witnessed_by' => $admin->witnessedBy?->name,
             'witnessed_at' => $admin->witnessed_at?->toIso8601String(),
-            'witness_method' => $admin->witness_method,
+            ...app(SecondPersonConfirmationPayload::class)->forAdministration($admin),
             'blood_glucose_level' => $admin->blood_glucose_level,
             'pulse_bpm' => $admin->pulse_bpm,
             'blood_pressure_systolic' => $admin->blood_pressure_systolic,
@@ -597,7 +607,7 @@ class EnhancedMarService
         }
 
         return $query
-            ->with(['medication:id,name,dosage,controlled_drug', 'administeredBy:id,name', 'witnessedBy:id,name'])
+            ->with(['medication:id,name,dosage,controlled_drug', 'administeredBy:id,name', 'witnessedBy:id,name', SecondPersonConfirmationPayload::RELATION])
             ->orderByDesc('administered_at')
             ->orderByDesc('id')
             ->limit(50)
@@ -618,6 +628,7 @@ class EnhancedMarService
                     'scheduled_for' => $scheduledFor?->toIso8601String(),
                     'administered_by' => $administration->administeredBy?->name,
                     'witnessed_by' => $administration->witnessedBy?->name,
+                    ...app(SecondPersonConfirmationPayload::class)->forAdministration($administration),
                     'is_correction' => $administration->is_correction,
                     'correction_reason' => $administration->correction_reason,
                     'controlled_drug' => $administration->medication?->controlled_drug ?? false,

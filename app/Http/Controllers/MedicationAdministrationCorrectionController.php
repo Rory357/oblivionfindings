@@ -12,7 +12,9 @@ use App\Notifications\AppEventNotification;
 use App\Services\Medication\Audit\MedicationEventData;
 use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\Followups\MedicationFollowupService;
+use App\Services\Medication\ForgottenWitnessPinService;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\Recording\RecordingContract;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\UserSiteAccessService;
 use App\Support\EmarUrl;
@@ -90,6 +92,29 @@ class MedicationAdministrationCorrectionController extends Controller
             ];
             if ($round !== null && $lockedCorrection->medication_round_id === null) {
                 $approval['medication_round_id'] = $round->id;
+            }
+            // A nomination/answer attests the original recorded facts. Approval
+            // cannot copy it onto changed facts or silently nominate again.
+            if (! $medication?->controlled_drug && collect([$original, $effectiveAdministration])
+                ->contains(fn (ClientMedicationAdministration $source): bool => in_array($source->witness_method, [
+                    ForgottenWitnessPinService::METHOD,
+                    ForgottenWitnessPinService::CONFIRMED_METHOD,
+                ], true))) {
+                $given = $lockedCorrection->status === 'given';
+                $approval += [
+                    'witnessed_by' => null,
+                    'witnessed_at' => null,
+                    'witness_method' => null,
+                    'second_person_kind' => $given ? $effectiveAdministration->second_person_kind : null,
+                    'second_person_status' => $given ? RecordingContract::SECOND_NOT_CONFIRMED : null,
+                    'review_required' => $given,
+                    'review_reason_key' => $given ? RecordingContract::REVIEW_SECOND_PERSON_NOT_CONFIRMED : null,
+                    'review_reason' => $given
+                        ? 'The original second-person request or answer does not verify the corrected facts. A house or clinical lead must review this corrected dose.'
+                        : null,
+                    'review_flagged_at' => $given ? $approvedAt : null,
+                    'review_flagged_by' => $given ? $user->id : null,
+                ];
             }
             $lockedCorrection->update($approval);
 

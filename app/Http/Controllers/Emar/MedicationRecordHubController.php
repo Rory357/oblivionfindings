@@ -14,6 +14,7 @@ use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationRecordDayService;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\Medication\SecondPersonConfirmationPayload;
 use App\Services\Medication\Support\MedicationSupport;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
@@ -96,7 +97,7 @@ final class MedicationRecordHubController extends Controller
                 ->where('status', 'given')->whereHas('medication', fn ($q) => $q->where('is_prn', true))
                 ->when(! $controlled, fn ($q) => $scope->scopeWithoutControlledMedicationRows($q))->whereBetween('administered_at', [$from, $day->copy()->endOfDay()->utc()])
                 ->when($query, fn ($q) => $q->where(fn ($q) => $q->whereHas('medication', fn ($med) => $med->where('name', 'like', '%'.$query.'%'))->orWhereHas('client', fn ($person) => $person->where('first_name', 'like', '%'.$query.'%')->orWhere('last_name', 'like', '%'.$query.'%'))))
-                ->with(['medication', 'administeredBy:id,name', 'prnEffectiveness'])->latest('administered_at')->latest('id')->paginate(25)->withQueryString();
+                ->with(['medication', 'administeredBy:id,name', 'witnessedBy:id,name', 'prnEffectiveness', SecondPersonConfirmationPayload::RELATION])->latest('administered_at')->latest('id')->paginate(25)->withQueryString();
             $followups = app(MedicationFollowupService::class)->visibleQuery($actor)->where('type', 'effect')->whereIn('administration_id', $rows->pluck('id'))->get()->keyBy('administration_id');
             $rows->setCollection($rows->getCollection()->map(function ($dose) use ($people, $followups, $actor) {
                 $effect = $dose->prnEffectiveness;
@@ -107,6 +108,7 @@ final class MedicationRecordHubController extends Controller
 
                 return $this->identity($people->get($dose->client_id)) + ['key' => 'prn'.$dose->id, 'id' => $dose->id, 'name' => $dose->medication->historicalDisplayName(),
                     'at' => $dose->administered_at->toIso8601String(), 'by' => $dose->administeredBy?->name, 'dose' => $dose->dose_given, 'reason' => $dose->reason,
+                    ...app(SecondPersonConfirmationPayload::class)->forAdministration($dose),
                     'effect_status' => $effect ? 'recorded' : 'pending', 'effect' => $effect ? $effect->effectiveness_label.' · '.($effect->observations ?? '') : ($followup?->due_at ? 'Due '.$followup->due_at->timezone('Pacific/Auckland')->format('j M, g:i a') : 'Time not set'),
                     'can_record' => ! $effect && $actor->canDo('medications.administer.record'), 'href' => '/emar/mar?client_id='.$dose->client_id.'&tab=history&dose_id='.$dose->id];
             }));

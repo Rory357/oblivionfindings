@@ -2,10 +2,13 @@
 
 namespace Tests\Feature\Emar;
 
+use App\Domain\Clinical\Models\ClinicalEvent;
+use App\Domain\Clinical\Services\ClinicalEventService;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\BreakGlassAccessEvent;
 use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
+use App\Models\ClientLeaveRequest;
 use App\Models\ClientMedicalProfile;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
@@ -21,6 +24,7 @@ use App\Models\Role;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Clients\ClientLeaveWorkflow;
 use App\Services\Medication\Downtime\DowntimeAccess;
 use App\Services\Medication\Downtime\DowntimeEvents;
 use App\Services\Medication\Downtime\DowntimePackPdf;
@@ -32,6 +36,8 @@ use App\Services\Medication\EmergencyAccess\EmergencyAccessService;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Database\Connection;
+use Illuminate\Database\DatabaseTransactionsManager;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -42,6 +48,8 @@ use LogicException;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Tests\Support\CommittedFixtureCleanup;
+use Tests\Support\OwnedTestDatabase;
 use Tests\TestCase;
 
 class MedicationDowntimeTest extends TestCase
@@ -870,6 +878,179 @@ class MedicationDowntimeTest extends TestCase
         $this->assertSame(0, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
     }
 
+    public static function changedActualAbsences(): array
+    {
+        return ['hospital admission' => ['hospital_admission'], 'hospital discharge' => ['hospital_discharge'],
+            'leave departure' => ['depart'], 'leave return' => ['return']];
+    }
+
+    #[DataProvider('changedActualAbsences')]
+    public function test_canonical_actual_absence_change_during_render_withholds_the_stale_pack(string $action): void
+    {
+        config(['medications.away.from_leave' => true]);
+        $recorder = $this->absenceRecorder();
+        $admission = $action === 'hospital_discharge' ? $this->recordHospital($recorder) : null;
+        $leave = in_array($action, ['depart', 'return'], true) ? $this->approvedLeave($recorder) : null;
+        if ($action === 'return') {
+            $leave = app(ClientLeaveWorkflow::class)->transition($recorder, $this->client, $leave,
+                ['action' => 'depart', 'version' => $leave->version, 'occurred_at' => '2026-10-03T08:00:00+13:00']);
+        }
+        $before = in_array($action, ['hospital_discharge', 'return'], true) ? 'away' : 'late';
+        $after = $before === 'away' ? 'late' : 'away';
+        $pdf = Mockery::mock(DowntimePackPdf::class);
+        $pdf->shouldReceive('render')->once()->andReturnUsing(function (array $pack) use ($recorder, $action, $admission, $leave, $before, $after): string {
+            $this->assertSame($before, collect($pack['rounds'])->sole()['state']);
+            if ($action === 'hospital_admission') {
+                $created = $this->recordHospital($recorder);
+                $this->assertSame('2026-10-02 19:00:00', $created->getRawOriginal('hospital_admitted_at'));
+            } elseif ($action === 'hospital_discharge') {
+                $created = $this->recordHospital($recorder, 'hospital_discharge', $admission->id);
+                $this->assertSame($admission->id, $created->hospital_admission_id);
+                $this->assertSame('2026-10-02 20:00:00', $created->getRawOriginal('hospital_discharged_at'));
+            } else {
+                $changed = app(ClientLeaveWorkflow::class)->transition($recorder, $this->client, $leave,
+                    ['action' => $action, 'version' => $leave->version,
+                        'occurred_at' => $action === 'depart' ? '2026-10-03T08:00:00+13:00' : '2026-10-03T09:00:00+13:00']);
+                $this->assertSame('2026-10-02 19:00:00', $changed->getRawOriginal('departed_at'));
+                // Departure alone preserves approved status: planned dates and
+                // status cannot fingerprint the actual Away decision.
+                $this->assertSame($action === 'depart' ? 'approved' : 'completed', $changed->status);
+                $this->assertSame('2026-10-05', $changed->ends_on->toDateString());
+            }
+            $fresh = app(DowntimePackService::class)->build($this->lead, $this->site->id, '2026-10-03');
+            $this->assertSame($after, collect($fresh['rounds'])->sole()['state']);
+
+            return '%PDF-sensitive-synthetic-person';
+        });
+        $this->app->instance(DowntimePackPdf::class, $pdf);
+        $response = $this->actingAs($this->lead)->postJson('/emar/downtime/pack', ['site_id' => $this->site->id, 'nz_date' => '2026-10-03']);
+        $response->assertConflict();
+        $this->assertStringNotContainsString('%PDF-sensitive', $response->getContent());
+        $this->assertSame(0, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertDatabaseCount('medication_paper_entries', 0);
+    }
+
+    public function test_unchanged_hospital_absence_after_a_house_move_releases_once_without_historical_narratives(): void
+    {
+        $oldSite = $this->site;
+        $admission = $this->recordHospital($this->absenceRecorder());
+        $newSite = Site::factory()->create(['is_active' => true]);
+        $this->client->update(['site_id' => $newSite->id]);
+        $newReader = $this->staff($newSite, 'team_lead', ['medications.view', 'clients.viewAny', 'medications.reports.view', 'medications.reports.export', 'medications.controlled.view']);
+        $pack = app(DowntimePackService::class)->build($newReader, $newSite->id, '2026-10-03');
+        $this->assertSame('away', collect($pack['rounds'])->sole()['state']);
+        $this->assertSame($admission->id, $pack['_source']['evidence']['hospital'][0]['id']);
+        $this->assertSame($oldSite->id, $admission->site_id);
+        $this->assertArrayNotHasKey('description', $pack['_source']['evidence']['hospital'][0]);
+        $this->assertStringNotContainsString('Synthetic private hospital narrative', json_encode(array_diff_key($pack, ['_source' => true])));
+        $this->assertStringNotContainsString('Synthetic private hospital narrative', view('pdf.medication-downtime-pack', ['pack' => $pack])->render());
+        $this->fakePackRender(static fn () => null);
+        $this->actingAs($newReader)->postJson('/emar/downtime/pack', ['site_id' => $newSite->id, 'nz_date' => '2026-10-03'])
+            ->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        $this->assertSame(1, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
+    }
+
+    public function test_unrelated_clinical_event_during_render_does_not_invalidate_absence_evidence(): void
+    {
+        $recorder = $this->absenceRecorder();
+        $this->fakePackRender(function () use ($recorder): void {
+            app(ClinicalEventService::class)->record($this->client, $recorder, [
+                'event_type' => 'other', 'severity' => 'low', 'description' => 'Synthetic unrelated clinical note',
+                'occurred_at' => '2026-10-03T08:00:00+13:00',
+            ]);
+        });
+        $this->actingAs($this->lead)->postJson('/emar/downtime/pack', ['site_id' => $this->site->id, 'nz_date' => '2026-10-03'])
+            ->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        $this->assertSame(1, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
+    }
+
+    public static function leaveCountPolicies(): array
+    {
+        return ['actual leave enabled' => [true], 'actual leave disabled' => [false]];
+    }
+
+    #[DataProvider('leaveCountPolicies')]
+    public function test_unchanged_actual_leave_policy_releases_the_matching_pack(bool $enabled): void
+    {
+        config(['medications.away.from_leave' => $enabled]);
+        $recorder = $this->absenceRecorder();
+        $leave = $this->approvedLeave($recorder);
+        app(ClientLeaveWorkflow::class)->transition($recorder, $this->client, $leave,
+            ['action' => 'depart', 'version' => $leave->version, 'occurred_at' => '2026-10-03T08:00:00+13:00']);
+        $pack = app(DowntimePackService::class)->build($this->lead, $this->site->id, '2026-10-03');
+        $this->assertSame($enabled ? 'away' : 'late', collect($pack['rounds'])->sole()['state']);
+        $this->assertSame($enabled, $pack['_source']['evidence']['leave_counts']);
+        $this->assertCount($enabled ? 1 : 0, $pack['_source']['evidence']['leave']);
+        $this->fakePackRender(static fn () => null);
+        $this->actingAs($this->lead)->postJson('/emar/downtime/pack', ['site_id' => $this->site->id, 'nz_date' => '2026-10-03'])
+            ->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        $this->assertSame(1, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
+    }
+
+    public function test_leave_rollback_policy_change_during_render_withholds_the_stale_pack(): void
+    {
+        config(['medications.away.from_leave' => true]);
+        // Even an empty leave set must bind the effective projection policy.
+        $this->assertDatabaseCount('client_leave_requests', 0);
+        $this->fakePackRender(fn () => config(['medications.away.from_leave' => false]));
+        $response = $this->actingAs($this->lead)->postJson('/emar/downtime/pack', ['site_id' => $this->site->id, 'nz_date' => '2026-10-03']);
+        $response->assertConflict();
+        $this->assertStringNotContainsString('%PDF-sensitive', $response->getContent());
+        $this->assertSame(0, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
+    }
+
+    public static function newlyCommittedAbsences(): array
+    {
+        return ['hospital admission' => ['hospital'], 'actual leave departure' => ['leave']];
+    }
+
+    #[DataProvider('newlyCommittedAbsences')]
+    public function test_an_older_repeatable_read_snapshot_cannot_be_signed_with_new_actual_absence_evidence(string $source): void
+    {
+        config(['medications.away.from_leave' => true]);
+        $recorder = $this->absenceRecorder();
+        $leave = $source === 'leave' ? $this->approvedLeave($recorder) : null;
+        $this->withCommittedPackSessions(function (Connection $primary, Connection $writer) use ($source, $recorder, $leave): void {
+            $this->assertSame('REPEATABLE-READ', $primary->selectOne('SELECT @@SESSION.transaction_isolation AS isolation_level')->isolation_level);
+            $primary->beginTransaction();
+            $table = $source === 'hospital' ? 'clinical_events' : 'client_leave_requests';
+            $prior = $primary->table($table)->where('client_id', $this->client->id)->orderBy('id')->get()->map(fn (object $row): array => (array) $row)->all();
+            $originalDefault = DB::getDefaultConnection();
+            try {
+                DB::setDefaultConnection($writer->getName());
+                $this->assertSame($writer, DB::connection());
+                $this->assertSame($writer->getPdo(), (new ClinicalEvent)->getConnection()->getPdo());
+                $current = User::findOrFail($recorder->id);
+                $client = Client::findOrFail($this->client->id);
+                if ($source === 'hospital') {
+                    $recorded = $this->recordHospital($current, client: $client);
+                } else {
+                    $recorded = app(ClientLeaveWorkflow::class)->transition($current, $client, ClientLeaveRequest::findOrFail($leave->id),
+                        ['action' => 'depart', 'version' => $leave->version, 'occurred_at' => '2026-10-03T08:00:00+13:00']);
+                }
+                $this->assertSame(0, $writer->transactionLevel());
+                $this->assertSame('2026-10-02 19:00:00', $recorded->getRawOriginal($source === 'hospital' ? 'hospital_admitted_at' : 'departed_at'));
+            } finally {
+                DB::setDefaultConnection($originalDefault);
+            }
+            // This is a genuine committed second-session change which the old
+            // ordinary snapshot cannot see; locking source reads must see it.
+            $this->assertSame($prior, $primary->table($table)->where('client_id', $this->client->id)->orderBy('id')->get()->map(fn (object $row): array => (array) $row)->all());
+            try {
+                app(DowntimePackService::class)->build($this->lead, $this->site->id, '2026-10-03');
+                $this->fail('Older rendered facts cannot receive the current absence digest.');
+            } catch (HttpExceptionInterface $error) {
+                $this->assertSame(409, $error->getStatusCode());
+                $this->assertStringContainsString('complete print snapshot changed', $error->getMessage());
+            }
+            $primary->rollBack();
+            $fresh = app(DowntimePackService::class)->build($this->lead, $this->site->id, '2026-10-03');
+            $this->assertSame('away', collect($fresh['rounds'])->sole()['state']);
+            $this->assertSame(0, MedicationEvent::query()->where('kind', 'export.downtime_pack')->count());
+        });
+    }
+
     public function test_changed_canonical_allergy_reaction_during_render_releases_no_bytes_or_export_event(): void
     {
         $this->assertCanonicalAllergyEditWithheld('reaction', 'Anaphylaxis');
@@ -971,6 +1152,76 @@ class MedicationDowntimeTest extends TestCase
         $this->assertDatabaseMissing('medication_paper_confirmations', ['paper_entry_id' => $entry->id, 'kind' => 'giver']);
         $this->assertDatabaseCount('client_medication_administrations', 0);
         $this->assertSame($before, MedicationEvent::query()->count());
+    }
+
+    private function absenceRecorder(): User
+    {
+        return $this->staff($this->site, 'team_lead', ['clients.update', 'clients.viewAny', 'clinical.events.record']);
+    }
+
+    private function recordHospital(User $recorder, string $type = 'hospital_admission', ?int $admissionId = null, ?Client $client = null): ClinicalEvent
+    {
+        return app(ClinicalEventService::class)->record($client ?? $this->client, $recorder, [
+            'event_type' => $type, 'severity' => 'medium', 'description' => 'Synthetic private hospital narrative',
+            'occurred_at' => $type === 'hospital_admission' ? '2026-10-03T08:00:00+13:00' : '2026-10-03T09:00:00+13:00',
+            'hospital_admission_id' => $admissionId,
+        ]);
+    }
+
+    private function approvedLeave(User $recorder): ClientLeaveRequest
+    {
+        return app(ClientLeaveWorkflow::class)->create($recorder, $this->client, [
+            'starts_on' => '2026-10-03', 'ends_on' => '2026-10-05', 'status' => 'approved',
+            'destination' => 'Synthetic planned visit',
+        ]);
+    }
+
+    private function withCommittedPackSessions(callable $exercise): void
+    {
+        $primary = DB::connection();
+        $database = $primary->getDatabaseName();
+        $this->assertTrue(app()->environment('testing'));
+        $this->assertSame('mysql', $primary->getDriverName());
+        $this->assertSame(static::$isolatedMysqlDatabase, $database);
+        $this->assertTrue(OwnedTestDatabase::isOwnedBy($database, getmypid()));
+        $this->assertSame($database, $primary->getPdo()->query('SELECT DATABASE()')->fetchColumn());
+        $this->assertSame(1, $primary->transactionLevel());
+        $this->assertTrue($primary->getPdo()->inTransaction());
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+        $name = 'emar_downtime_absence_writer';
+        $originalConfig = config('database.connections.'.$name);
+        $default = DB::getDefaultConnection();
+        $manager = $this->app['db.transactions'];
+        $writer = null;
+        DB::commit();
+        $productionManager = new DatabaseTransactionsManager;
+        $this->app->instance('db.transactions', $productionManager);
+        $primary->setTransactionManager($productionManager);
+        try {
+            config(['database.connections.'.$name => array_replace($primary->getConfig(), ['name' => $name])]);
+            DB::purge($name);
+            $writer = DB::connection($name);
+            $this->assertSame('emar_downtime_absence_writer', $writer->getName());
+            $this->assertNotSame($primary->getName(), $writer->getName());
+            $this->assertSame($database, $writer->getPdo()->query('SELECT DATABASE()')->fetchColumn());
+            $this->assertNotSame($primary->getPdo()->query('SELECT CONNECTION_ID()')->fetchColumn(), $writer->getPdo()->query('SELECT CONNECTION_ID()')->fetchColumn());
+            $exercise($primary, $writer);
+        } finally {
+            DB::setDefaultConnection($default);
+            if ($writer !== null) {
+                while ($writer->transactionLevel() > 0) {
+                    $writer->rollBack();
+                }
+            }
+            DB::purge($name);
+            config(['database.connections.'.$name => $originalConfig]);
+            while ($primary->transactionLevel() > 0) {
+                $primary->rollBack();
+            }
+            $this->app->instance('db.transactions', $manager);
+            $primary->setTransactionManager($manager);
+            $primary->beginTransaction();
+        }
     }
 
     private function fakePackRender(callable $duringRender): void

@@ -117,6 +117,9 @@ export interface DoseRequirements {
         rule_sentences: string[];
         anyone_available: boolean;
         may_go_unconfirmed: boolean;
+        forgotten_pin_allowed?: boolean;
+        forgotten_pin_amount_allowed?: boolean;
+        confirm_within_minutes?: number;
         candidates: Candidate[];
     };
     observations: Observation[];

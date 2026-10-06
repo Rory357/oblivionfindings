@@ -299,6 +299,38 @@ export default function InboxMenus({
                                         className="cursor-pointer rounded-md px-3 py-2.5 focus:bg-accent max-md:min-h-[44px]"
                                         onSelect={(e) => {
                                             e.preventDefault();
+                                            const confirmationUrl =
+                                                n.data?.action_url;
+                                            if (
+                                                n.data?.type ===
+                                                    'medication_second_person_confirmation' &&
+                                                typeof confirmationUrl ===
+                                                    'string' &&
+                                                /^\/medication-followups\?open=\d+$/.test(
+                                                    confirmationUrl,
+                                                )
+                                            ) {
+                                                if (isUnread) {
+                                                    router.post(
+                                                        '/inbox/notifications/' +
+                                                            n.id +
+                                                            '/read',
+                                                        {},
+                                                        {
+                                                            preserveScroll: true,
+                                                            onSuccess: () =>
+                                                                router.visit(
+                                                                    confirmationUrl,
+                                                                ),
+                                                        },
+                                                    );
+                                                } else {
+                                                    router.visit(
+                                                        confirmationUrl,
+                                                    );
+                                                }
+                                                return;
+                                            }
                                             setOpenAnnouncementId(null);
                                             setOpenNotifId(n.id);
                                             if (isUnread)

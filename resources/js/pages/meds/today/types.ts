@@ -1,3 +1,4 @@
+import type { SecondPersonEvidence } from '@/lib/medication-second-person';
 import type { MyEligibilityData } from '@/pages/emar/eligibility/_my-eligibility';
 /* Shared types for the worker-facing Meds Today board (`/meds/today`).
  * Shapes mirror the Inertia props served by Emar/WorkerMedsController. */
@@ -57,7 +58,15 @@ export interface RecordedInfo {
     amount_mode?: 'as_ordered' | 'less' | 'more' | null;
     late_reason?: string | null;
     second_person_kind?: 'witness' | 'rule' | 'cosigner' | 'amount' | null;
-    second_person_status?: 'verified' | 'not_confirmed' | null;
+    second_person_status?:
+        | 'verified'
+        | 'not_confirmed'
+        | 'not_verified'
+        | 'disputed'
+        | 'expired'
+        | null;
+    witness_method?: string | null;
+    second_person_confirmation?: import('@/lib/medication-second-person').SecondPersonEvidence['second_person_confirmation'];
     reoffer_of_id?: number | null;
     review_reason_key?: string | null;
 }
@@ -160,7 +169,7 @@ export interface ActivityPage {
 }
 
 /** An as-needed dose recorded today (Meds today › As-needed). */
-export interface PrnRecorded {
+export interface PrnRecorded extends SecondPersonEvidence {
     id: number;
     client_id: number;
     medication_name: string | null;
@@ -311,7 +320,18 @@ export interface NotGivenReasonOption {
     requires_detail: boolean;
 }
 
+export interface SecondPersonFollowUp {
+    id: number;
+    client_id: number;
+    client_name: string;
+    medication_name: string;
+    due_at: string;
+    status: 'pending' | 'expired';
+    followup_url: string;
+}
+
 export interface MedsTodayProps {
+    second_person_confirmations?: SecondPersonFollowUp[];
     guidedRound?: import('@/components/emar/rounds/types').GuidedRound | null;
     /** P11: the worker's own medication eligibility (the "My eligibility" meter). */
     my_eligibility?: MyEligibilityData | null;

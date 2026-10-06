@@ -311,11 +311,15 @@ final class DoseRecordingRequirements
             'witness_override' => $doseOverride === null ? null : ['id' => (int) $doseOverride->id, 'expires_at' => $doseOverride->expires_at->toIso8601String(), 'followup_due_at' => $doseOverride->followup_due_at->toIso8601String()],
             'second_person' => [
                 'kind' => $kind,
-                // PIN-2 remains disabled for this delivery. The own-login
-                // consumer and expiry job retain their stricter qualification policy.
                 'forgotten_pin_allowed' => app(ForgottenWitnessPinService::class)->available()
                     && ! $order->controlled_drug
+                    && ! $order->requiresWitness()
                     && in_array($kind, [RecordingContract::SECOND_RULE, RecordingContract::SECOND_AMOUNT, RecordingContract::SECOND_COSIGNER], true),
+                // Selecting a smaller amount creates the amount confirmation
+                // requirement even when the initial dose has no second-person rule.
+                'forgotten_pin_amount_allowed' => app(ForgottenWitnessPinService::class)->available()
+                    && ! $order->controlled_drug
+                    && ! $order->requiresWitness(),
                 'confirm_within_minutes' => ForgottenWitnessPinService::CONFIRM_WITHIN_MINUTES,
                 'rule_sentences' => $detail && $kind === RecordingContract::SECOND_RULE
                     ? $this->ruleSentences($adminRules, true)

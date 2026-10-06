@@ -10,6 +10,10 @@ import {
     WizardStepPane,
 } from '@/components/wizard/shell';
 import { formatDateTime } from '@/lib/datetime';
+import {
+    secondPersonDisplay,
+    type SecondPersonEvidence,
+} from '@/lib/medication-second-person';
 import axios from 'axios';
 import { ClipboardCheck, History, Info, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
@@ -19,7 +23,7 @@ import { concealedIdentity, SectionCard } from './ui';
 import { useDraftClose } from './use-draft-close';
 import { useRecordJson } from './use-record-json';
 
-type Dose = {
+type Dose = SecondPersonEvidence & {
     key: string;
     id: number;
     medicine: string;
@@ -352,6 +356,7 @@ function DoseDetail({
     const { data, load, reload } = useRecordJson<{ dose: Dose; chain: Dose[] }>(
         `/emar/clients/${clientId}/record/doses/${doseId}`,
     );
+    const confirmation = data ? secondPersonDisplay(data.dose) : null;
     return (
         <WizardShell
             frontline
@@ -394,7 +399,21 @@ function DoseDetail({
                         />
                         <ReviewRow
                             label="Second person"
-                            value={data.dose.witness ?? 'Not recorded'}
+                            value={
+                                confirmation ? (
+                                    <span className="space-y-1">
+                                        <StatusBadge
+                                            variant={confirmation.tone}
+                                            label={confirmation.label}
+                                        />
+                                        <span className="text-subtle block">
+                                            {confirmation.detail}
+                                        </span>
+                                    </span>
+                                ) : (
+                                    (data.dose.witness ?? 'Not recorded')
+                                )
+                            }
                         />
                         <ReviewRow
                             label="Dose readings"
@@ -435,6 +454,12 @@ function DoseDetail({
                                     {row.status} · {formatDateTime(row.at)} ·{' '}
                                     {row.by}
                                 </p>
+                                {secondPersonDisplay(row) && (
+                                    <p className="mt-2">
+                                        {secondPersonDisplay(row)!.label} ·{' '}
+                                        {secondPersonDisplay(row)!.detail}
+                                    </p>
+                                )}
                                 {row.is_correction && (
                                     <p>
                                         Correction {row.correction_status} ·{' '}

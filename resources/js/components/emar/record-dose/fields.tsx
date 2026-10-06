@@ -4,6 +4,7 @@
 import InputError from '@/components/input-error';
 import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Command,
     CommandEmpty,
@@ -547,6 +548,27 @@ export function AmountField({
 export interface SecondState {
     id: number | null;
     pin: string;
+    forgotten?: boolean;
+    present?: boolean;
+}
+
+export function forgottenPinAvailable(
+    req: DoseRequirements,
+    kind: SecondPersonKind | null,
+    colleagueId: number | null,
+): boolean {
+    return (
+        (kind === 'amount'
+            ? req.second_person.forgotten_pin_amount_allowed === true
+            : req.second_person.forgotten_pin_allowed === true) &&
+        (kind === 'rule' || kind === 'amount' || kind === 'cosigner') &&
+        !req.order.controlled &&
+        !req.order.witness_required &&
+        req.second_person.candidates.some(
+            (candidate) =>
+                candidate.id === colleagueId && candidate.can_confirm,
+        )
+    );
 }
 
 const SECOND_TITLE: Record<SecondPersonKind, string> = {
@@ -604,6 +626,8 @@ export function SecondPerson({
         (c) => c.id === value.id,
     );
     const usable = (c: Candidate) => c.can_confirm;
+    const fallbackAvailable = forgottenPinAvailable(req, kind, value.id);
+    const forgotten = fallbackAvailable && value.forgotten === true;
     return (
         <section
             role="group"
@@ -720,20 +744,75 @@ export function SecondPerson({
                     <InputError message={errors.second} />
                 </div>
                 <div data-field="pin">
-                    <WitnessPinInput
-                        id="rd-pin"
-                        value={value.pin}
-                        onChange={(pin) => onChange({ ...value, pin })}
-                        label={
-                            kind === 'witness'
-                                ? 'Witness’s 6-digit PIN'
-                                : 'Their 6-digit PIN'
-                        }
-                        atCupboard={kind === 'witness'}
-                        error={errors.pin}
-                    />
+                    {!forgotten && (
+                        <WitnessPinInput
+                            id="rd-pin"
+                            value={value.pin}
+                            onChange={(pin) => onChange({ ...value, pin })}
+                            label={
+                                kind === 'witness'
+                                    ? 'Witness’s 6-digit PIN'
+                                    : 'Their 6-digit PIN'
+                            }
+                            atCupboard={kind === 'witness'}
+                            error={errors.pin}
+                        />
+                    )}
+                    {fallbackAvailable && (
+                        <Button
+                            type="button"
+                            variant="link"
+                            size="sm"
+                            className="px-0"
+                            onClick={() =>
+                                onChange({
+                                    ...value,
+                                    pin: '',
+                                    forgotten: !forgotten,
+                                    present: false,
+                                })
+                            }
+                        >
+                            {forgotten
+                                ? 'Use their PIN instead'
+                                : 'They forgot their PIN'}
+                        </Button>
+                    )}
                 </div>
             </div>
+            {forgotten && (
+                <Notice
+                    tone="warning"
+                    icon={Users}
+                    title="Second person not yet verified"
+                >
+                    <p>
+                        {chosen?.name} must sign in to their own account and
+                        confirm within{' '}
+                        {req.second_person.confirm_within_minutes ?? 30}{' '}
+                        minutes. Until then, the chart shows confirmation
+                        pending. A disagreement or no reply goes to the house
+                        lead.
+                    </p>
+                    <div className="mt-3 flex items-start gap-2">
+                        <Checkbox
+                            id="rd-second-present"
+                            checked={value.present === true}
+                            onCheckedChange={(checked) =>
+                                onChange({
+                                    ...value,
+                                    present: checked === true,
+                                })
+                            }
+                            aria-invalid={!!errors.pin}
+                        />
+                        <Label htmlFor="rd-second-present">
+                            I confirm {chosen?.name} was present for this dose.
+                        </Label>
+                    </div>
+                    <InputError message={errors.pin} />
+                </Notice>
+            )}
         </section>
     );
 }

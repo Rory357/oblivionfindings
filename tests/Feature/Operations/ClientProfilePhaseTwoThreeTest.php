@@ -107,7 +107,8 @@ it('updates leave status and stamps approver', function () {
 
     $this->actingAs($manager)
         ->put("/operations/clients/{$client->id}/leave/{$leave->id}", [
-            'status' => 'approved',
+            'action' => 'approve',
+            'version' => 1,
             'approval_notes' => 'Confirmed with on-call manager.',
         ])
         ->assertRedirect();

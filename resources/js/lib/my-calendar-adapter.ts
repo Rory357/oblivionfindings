@@ -133,22 +133,52 @@ export function createMyCalendarAdapter(
         exportFilename: 'my-calendar.ics',
         searchPlaceholder: 'Search your calendar…',
         loadItems: async ({ start, end, signal }) => {
-            const params = new URLSearchParams({
-                start: start.toISOString(),
-                end: end.toISOString(),
-            });
-            const response = await fetch(`/my-calendar/events?${params}`, {
-                signal,
-                credentials: 'same-origin',
-                headers: { Accept: 'application/json' },
-            });
-            if (!response.ok) throw new Error('Could not load your calendar.');
-            const events: MyCalendarEvent[] = await response.json();
+            const first = start.getTime();
+            const last = end.getTime();
+            if (
+                !Number.isFinite(first) ||
+                !Number.isFinite(last) ||
+                last <= first
+            ) {
+                throw new Error('Choose a valid calendar period.');
+            }
+            // The shared overdue rail covers 75 days. Keep each feed request
+            // within the medication provider's 62-day limit without dropping
+            // older work or weakening its server-side guard.
+            const maxSpan = 60 * 24 * 60 * 60 * 1000;
+            const events = new Map<string, MyCalendarEvent>();
+            const availability: Record<string, string> = {};
+            for (let cursor = first; cursor < last; cursor += maxSpan) {
+                signal?.throwIfAborted();
+                const params = new URLSearchParams({
+                    start: new Date(cursor).toISOString(),
+                    end: new Date(
+                        Math.min(cursor + maxSpan, last),
+                    ).toISOString(),
+                });
+                const response = await fetch(`/my-calendar/events?${params}`, {
+                    signal,
+                    credentials: 'same-origin',
+                    headers: { Accept: 'application/json' },
+                });
+                if (!response.ok)
+                    throw new Error('Could not load your calendar.');
+                const batch: MyCalendarEvent[] = await response.json();
+                // Spanning entries and date-inclusive rounds may occur in
+                // adjacent responses; their canonical IDs keep one row.
+                for (const event of batch) events.set(event.id, event);
+                Object.assign(
+                    availability,
+                    JSON.parse(
+                        response.headers?.get('X-Calendar-Unavailable') || '{}',
+                    ),
+                );
+            }
             return {
-                events: events.map((event) => myCalendarItem(event, owner)),
-                availability: JSON.parse(
-                    response.headers?.get('X-Calendar-Unavailable') || '{}',
-                ) as Record<string, string>,
+                events: [...events.values()].map((event) =>
+                    myCalendarItem(event, owner),
+                ),
+                availability,
             };
         },
     };

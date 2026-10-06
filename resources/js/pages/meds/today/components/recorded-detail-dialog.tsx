@@ -1,3 +1,4 @@
+import { secondPersonDisplay } from '@/lib/medication-second-person';
 /* Dose details — opened from a row's View (a recorded or not-yet-due dose)
  * or its menu (approved P01 v2 `DoseDetailDialog`). Read-only: corrections
  * stay on the medication record (MAR), which keeps the original and shows
@@ -67,25 +68,18 @@ export function RecordedDetailDialog({
             r ? `${clockTime(r.time)}${r.by ? ` by ${r.by}` : ''}` : '—',
         ],
     ];
-    if (r?.witness)
+    const confirmation = r ? secondPersonDisplay(r) : null;
+    if (confirmation)
         rows.push([
-            r.second_person_kind === 'witness' || row.is_controlled
-                ? 'Witnessed by'
-                : 'Confirmed by',
-            <span key="w" className="inline-flex flex-wrap items-center gap-2">
-                {r.witness}
-                <StatusBadge
-                    variant={
-                        r.second_person_status === 'not_confirmed'
-                            ? 'warning'
-                            : 'success'
-                    }
-                    size="sm"
-                >
-                    {r.second_person_status === 'not_confirmed'
-                        ? 'Not confirmed'
-                        : 'Witness PIN'}
+            'Second-person check',
+            <span
+                key="second-person"
+                className="inline-flex flex-wrap items-center gap-2"
+            >
+                <StatusBadge variant={confirmation.tone} size="sm">
+                    {confirmation.label}
                 </StatusBadge>
+                {confirmation.detail}
             </span>,
         ]);
     if (also.length)
