@@ -72,12 +72,13 @@ class ConnectedMedicationPermissionSeedingTest extends TestCase
         $denied->permissionOverrides()->attach($ids['medications.transfers.manage'], ['allowed' => false]);
 
         $overrideRows = $this->rawRows('permission_user', 'user_id', [$explicit->id, $denied->id]);
-        $customRows = $this->rawRows('role_permission', 'role_id', [$custom->id]);
+        $customRows = $this->rawRows('role_permission', 'role_id', [$custom->id], $ids->values()->all());
         foreach (range(1, 2) as $pass) {
             $this->seed([RbacSeeder::class, OperationsPermissionsSeeder::class, SeedAllPermissionsToAdminSeeder::class]);
             $this->assertSame(0, $admin->permissions()->whereIn('key', self::CAPABILITIES)->count());
             $this->assertSame($overrideRows, $this->rawRows('permission_user', 'user_id', [$explicit->id, $denied->id]));
-            $this->assertSame($customRows, $this->rawRows('role_permission', 'role_id', [$custom->id]));
+            $this->assertSame($customRows, $this->rawRows('role_permission', 'role_id', [$custom->id], $ids->values()->all()));
+            $this->assertSame(['it.request'], $custom->permissions()->whereNotIn('key', self::CAPABILITIES)->pluck('key')->all());
             foreach (self::CAPABILITIES as $key) {
                 $this->assertTrue($explicit->fresh()->canDo($key), 'The explicit user assignment remains '.$key);
             }
@@ -113,9 +114,14 @@ class ConnectedMedicationPermissionSeedingTest extends TestCase
         $this->assertFalse($explicit->fresh()->canDo('medications.pharmacy.send'));
     }
 
-    private function rawRows(string $table, string $column, array $ids): array
+    private function rawRows(string $table, string $column, array $ids, ?array $permissionIds = null): array
     {
-        return DB::table($table)->whereIn($column, $ids)->orderBy($column)->orderBy('permission_id')
+        $query = DB::table($table)->whereIn($column, $ids);
+        if ($permissionIds !== null) {
+            $query->whereIn('permission_id', $permissionIds);
+        }
+
+        return $query->orderBy($column)->orderBy('permission_id')
             ->get()->map(fn ($row) => (array) $row)->all();
     }
 }
