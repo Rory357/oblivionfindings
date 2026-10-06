@@ -14,20 +14,24 @@ Desktop web workflows for one operating organisation across approved houses. The
 
 ## Validation record
 
-- Frontend: 358 tests across 59 files passed on the final source, including request-history discovery and full handover facts. TypeScript and ESLint passed. Production asset build was repeated after the final handover refinement.
-- Pharmacy: 12 feature tests / 108 assertions and 7 focused unit tests / 53 assertions passed.
+- Frontend: 517 tests across 81 files passed, including direct MAR entry, person/date retention, connected-service permissions and chart interactions. TypeScript, ESLint with no warnings and the final production build passed.
+- Pharmacy baseline: 12 feature tests / 108 assertions and 7 focused unit tests / 53 assertions passed. The release suite also covers signed delayed acknowledgement and interrupted-delivery recovery after a person changes house: historical dispatch attribution is retained, with no stock receipt or automatic resend.
 - External access, handovers and existing login/MFA: 45 feature tests / 287 assertions passed with zero failures or skips; 6 focused unit tests / 15 assertions passed.
 - Catalogue: the complete 12-case file passed / 67 assertions. Later shared changes add only the transfer permission to the bounded reconciliation snapshot and reuse already-loaded role evidence; catalogue implementation was unchanged.
 - Catalogue/backup focused units: 20 tests / 61 assertions passed, including a real qpdf AES-256 encrypt/decrypt check, wrong/no-password rejection and safe stale temporary-file cleanup.
-- Backup: all 18 feature tests / 122 assertions passed. A subsequent one-line recipient-limit repair adds a 19th case covering reapproval at capacity, unchanged data on denial, and reapproval after capacity is released; fresh CI must pass this final case before merge.
+- Backup baseline: all 18 feature tests / 122 assertions passed. The release suite includes a 19th case covering recipient reapproval at capacity, unchanged data on denial, and reapproval after capacity is released.
 
-The GitHub medication release job includes all five connected feature files, the existing login/MFA regressions and focused units. It installs qpdf and checks its executable before running the real PDF test; a missing dependency must not silently count as encryption coverage.
+Connected-service permissions must remain explicitly assigned. Dedicated seeding regressions cover fresh/repeated seeding, removal of blanket built-in-role grants, preservation of explicit user/custom-role assignments and deny overrides, and permission-registration replay/rollback. External sign-in also covers the canonical email verification notice and resend route while internal routes remain denied.
+
+The GitHub medication release job includes all six connected feature files, the existing login/email-verification/MFA regressions and focused units. It installs qpdf and checks its executable before running the real PDF test; a missing dependency must not silently count as encryption coverage.
 
 ## Synthetic desktop checks
 
 A separate local preview on port8767 uses fictional people/accounts, isolated database, array mail and blocked stray HTTP. It does not use the production database or the user's other preview.
 
 Verified: compact review wizards and switches; required-step gating; saved disabled NZ backup schedule; saved catalogue source draft; external mailbox/MFA sign-in; named-person chart; submitted request awaiting internal review; external internal-stock denial; minimal account-security navigation; saved outgoing fictional handover draft. Browser verification caught and fixed Fortify's separate MFA redirect and the request-history chart-selection dependency.
+
+MAR access is visible from Meds today and the people list. Connected services exposes the permitted prescriber, handover, pharmacy, medicine-picture and backup destinations, retaining the person for person-specific work. The chart keeps allergy warnings visible, places day/week controls beside its secondary tabs, collapses follow-ups into a labelled summary, and opens medicine details directly. NZ dose-window formatting replaces raw timestamp slicing; the misleading Now marker beside future doses is removed. The full synthetic chart fits in the checked desktop viewport without page-width overflow.
 
 No production migrations, live clinical transmissions, invitations, supplier orders, recipient grants or deployment were performed.
 

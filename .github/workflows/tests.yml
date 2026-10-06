@@ -189,12 +189,14 @@ jobs:
           tests/Feature/It/ItTicketTriageTest.php
           tests/Feature/Incidents/IncidentJourneyPresenterTest.php
           tests/Feature/FrontlineLifecycleDemoSeederReplayTest.php
+          tests/Feature/Emar/ConnectedMedicationPermissionSeedingTest.php
           tests/Feature/Emar/PharmacyConnectionTest.php
           tests/Feature/Emar/ExternalClinicalAccessTest.php
           tests/Feature/Emar/ProviderMedicationTransferTest.php
           tests/Feature/Emar/MedicineCatalogueWorkflowTest.php
           tests/Feature/Emar/MedicationBackupDeliveryTest.php
           tests/Feature/Auth/AuthenticationTest.php
+          tests/Feature/Auth/EmailVerificationTest.php
           tests/Feature/Auth/TwoFactorChallengeTest.php
           tests/Feature/Settings/TwoFactorAuthenticationTest.php
           tests/Unit/Medication/PharmacyConnect/PharmacyProtocolTest.php

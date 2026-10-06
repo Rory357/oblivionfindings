@@ -17,6 +17,7 @@ use App\Services\Medication\ExternalClinical\ExternalClinicalProposals;
 use App\Services\Medication\MedicationOrderLifecycleService;
 use Carbon\Carbon;
 use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Database\DatabaseTransactionsManager;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -181,6 +182,32 @@ final class ExternalClinicalAccessTest extends TestCase
         Notification::assertSentTo($created, ResetPassword::class);
         $this->actingAs($this->manager)->postJson('/emar/connected-care/clinicians', [...$data, 'email' => $this->manager->email])->assertUnprocessable();
         $this->assertFalse($this->manager->refresh()->external_clinical_account);
+    }
+
+    public function test_unverified_external_sign_in_opens_canonical_notice_and_resend_but_no_internal_routes(): void
+    {
+        Notification::fake();
+        $user = User::factory()->unverified()->withoutTwoFactor()->create([
+            'role' => 'external_clinician', 'external_clinical_account' => true,
+        ]);
+
+        $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password'])
+            ->assertRedirect('/clinical-portal')->assertSessionHasNoErrors();
+        $this->assertAuthenticatedAs($user);
+        $this->get('/clinical-portal')->assertRedirect(route('verification.notice'));
+        $this->get(route('verification.notice'))->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('auth/verify-email')
+                ->where('auth.user.role', 'external_clinician')->where('auth.can', [])
+                ->missing('auth.unreadMessageCount')->missing('auth.portalClients')->missing('notifications'));
+        $this->from(route('verification.notice'))->post(route('verification.send'))
+            ->assertRedirect(route('verification.notice'))->assertSessionHas('status', 'verification-link-sent');
+        Notification::assertSentTo($user, VerifyEmail::class);
+        $this->assertFalse($user->fresh()->hasVerifiedEmail());
+        $this->getJson('/clinical-portal')->assertForbidden()
+            ->assertJson(['message' => 'Verify your email before opening clinical records.']);
+        foreach (['/dashboard', '/my-day', '/emar', '/clients', '/settings/access', '/portal'] as $uri) {
+            $this->getJson($uri)->assertForbidden();
+        }
     }
 
     public function test_external_login_ignores_internal_intended_destination(): void

@@ -43,6 +43,8 @@ it('keeps PHP and browser CI in bounded crash safe shards', function () {
         ->and($release['run'] ?? '')->toStartWith('php vendor/bin/pest ')
         ->toContain('tests/Feature/Emar/PackLedgerIntegrationTest.php')
         ->toContain('tests/Feature/Emar/MedicationHistoricalRecoveryTest.php')
+        ->toContain('tests/Feature/Emar/ConnectedMedicationPermissionSeedingTest.php')
+        ->toContain('tests/Feature/Auth/EmailVerificationTest.php')
         ->toContain('--log-junit storage/logs/emar-release-gates.xml')
         ->and((string) $phpunit->xpath('/phpunit/php/ini[@name="memory_limit"]')[0]['value'])->toBe('1024M');
 

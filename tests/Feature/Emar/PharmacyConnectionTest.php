@@ -249,6 +249,73 @@ final class PharmacyConnectionTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_delayed_ack_after_person_moves_retains_the_dispatch_audit_site_without_applying_or_duplicating_acceptance(): void
+    {
+        $dispatch = $this->queue();
+        app(PharmacyDispatchService::class)->send($dispatch->id);
+        $newSite = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
+        $this->fixture['client']->update(['site_id' => $newSite->id]);
+
+        $this->ack($dispatch, valid: false)->assertUnauthorized();
+        $this->ack($dispatch)->assertOk()->assertJsonPath('applied', false)->assertJsonPath('code', 'snapshot_or_connection_changed');
+        $event = MedicationEvent::where('kind', 'pharmacy.dispatch.acknowledged')
+            ->where('subject_id', (string) $this->fixture['order']->id)->sole();
+        $this->assertSame((int) $dispatch->site_id, (int) $event->site_id);
+        $this->assertSame((int) $this->fixture['site']->id, (int) $event->site_id);
+        // The person now belongs to another house; the historical event cannot link their current chart.
+        $this->assertNull($event->client_id);
+        $this->assertSame($dispatch->id, $event->facts['dispatch_id']);
+        $this->assertSame('pharmacy_supply', $event->subject_type);
+        $evidence = MedicationPharmacyOrder::findOrFail($event->subject_id);
+        $this->assertSame($this->fixture['client']->id, $evidence->client_id);
+        $this->assertSame($this->fixture['medication']->id, $evidence->client_medication_id);
+        $this->assertSame('accepted', $dispatch->fresh()->state);
+        $this->assertSame('submitted', $this->fixture['order']->fresh()->status);
+        $this->assertSame('10.00', $this->fixture['stock']->fresh()->on_hand);
+        $this->assertNull($this->fixture['order']->fresh()->quantity_received);
+        $this->assertSame(0, MedicationEvent::where('site_id', $newSite->id)->where('kind', 'like', 'pharmacy.dispatch.%')->count());
+
+        $this->ack($dispatch)->assertOk()->assertJsonPath('duplicate', true)->assertJsonPath('applied', false);
+        $this->assertSame(1, MedicationEvent::where('kind', 'pharmacy.dispatch.acknowledged')->count());
+        $this->assertDatabaseCount('medication_pharmacy_acknowledgments', 1);
+        Http::assertSentCount(1);
+
+        // Current house authorization can inspect the same supply record and its historical delivery evidence.
+        $this->fixture['actor']->hrEmployeeProfile()->firstOrFail()->update(['secondary_site_ids' => [$newSite->id]]);
+        $this->actingAs($this->fixture['actor']->fresh())->getJson($this->orderUrl().'/connection')->assertOk()
+            ->assertJsonPath('dispatch.id', $dispatch->id)->assertJsonPath('dispatch.uuid', $dispatch->uuid)
+            ->assertJsonPath('dispatch.state', 'accepted')->assertJsonPath('dispatch.acknowledgment_applied', false);
+    }
+
+    public function test_recovery_after_person_moves_keeps_unknown_delivery_at_the_dispatch_audit_site_without_resending(): void
+    {
+        $dispatch = $this->queue();
+        $dispatch->forceFill(['state' => 'sending', 'claim_token' => (string) Str::uuid(),
+            'sending_at' => now()->subMinutes(10), 'attempt_count' => 1])->save();
+        $newSite = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
+        $this->fixture['client']->update(['site_id' => $newSite->id]);
+
+        $service = app(PharmacyDispatchService::class);
+        $this->assertSame(['unknown' => 1, 'queued' => 0], $service->recover());
+        $event = MedicationEvent::where('kind', 'pharmacy.dispatch.unknown')
+            ->where('subject_id', (string) $this->fixture['order']->id)->sole();
+        $this->assertSame((int) $dispatch->site_id, (int) $event->site_id);
+        $this->assertSame((int) $this->fixture['site']->id, (int) $event->site_id);
+        $this->assertNull($event->client_id);
+        $this->assertSame($dispatch->id, $event->facts['dispatch_id']);
+        $this->assertSame('unknown', $dispatch->fresh()->state);
+        $this->assertSame('worker_interrupted_delivery_unknown', $dispatch->fresh()->result_code);
+        $this->assertNull($dispatch->fresh()->claim_token);
+        $this->assertSame('draft', $this->fixture['order']->fresh()->status);
+        $this->assertSame('10.00', $this->fixture['stock']->fresh()->on_hand);
+        $this->assertSame(0, MedicationEvent::where('site_id', $newSite->id)->where('kind', 'like', 'pharmacy.dispatch.%')->count());
+
+        $this->assertSame(['unknown' => 0, 'queued' => 0], $service->recover());
+        $this->assertSame(1, MedicationEvent::where('kind', 'pharmacy.dispatch.unknown')->count());
+        $this->assertSame(1, $dispatch->fresh()->attempt_count);
+        Http::assertNothingSent();
+    }
+
     private function queue(): MedicationPharmacyDispatch
     {
         $this->actingAs($this->fixture['actor'])->postJson($this->orderUrl().'/dispatch', $this->sendInput())

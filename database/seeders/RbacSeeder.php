@@ -38,6 +38,13 @@ class RbacSeeder extends Seeder
         'fleet.maintenance.configure',
         'assets.telemetry.history',
         'medications.controlled.manage',
+        // Connected services require explicit assignment, never a blanket admin grant.
+        'medications.pharmacy.connect.manage',
+        'medications.pharmacy.send',
+        'medications.external.manage',
+        'medications.transfers.manage',
+        'medications.catalogue.manage',
+        'medications.backups.manage',
     ];
 
     public function run(): void
