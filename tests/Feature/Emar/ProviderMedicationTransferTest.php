@@ -231,13 +231,22 @@ final class ProviderMedicationTransferTest extends TestCase
         $transfer = $service->create($this->manager, $this->transferInput());
         $this->assertSame('Rash', $transfer->snapshot['allergies'][0]['reaction']);
         $service->transition($this->manager, $transfer->id, $this->action('review', 1, 'review'));
+        $primary = DB::connection();
+        $this->assertTrue(app()->environment('testing'));
+        $this->assertSame('mysql', $primary->getPdo()->getAttribute(\PDO::ATTR_DRIVER_NAME));
+        $this->assertSame('127.0.0.1', $primary->getConfig('host'));
+        $this->assertGreaterThan(0, getmypid());
+        $this->assertContains($primary->getDatabaseName(), [
+            'oblivion_findings_codex_test_'.getmypid(),
+            'emar_connected_external_20261007_'.getmypid(),
+        ]);
+        $this->assertSame(self::$isolatedMysqlDatabase, $primary->getDatabaseName());
+        $this->assertSame($primary->getDatabaseName(), $primary->selectOne('SELECT DATABASE() AS owned_database')->owned_database);
         $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         DB::commit();
-        $primary = DB::connection();
         $connectionName = 'external_transfer_allergy_writer';
         $connectionConfig = config('database.connections.'.DB::getDefaultConnection());
         $this->assertSame('127.0.0.1', $connectionConfig['host']);
-        $this->assertStringStartsWith('emar_connected_external_20261007_', $primary->getDatabaseName());
         $connectionConfig['name'] = $connectionName;
         config(['database.connections.'.$connectionName => $connectionConfig]);
         $writer = DB::connection($connectionName);
