@@ -201,6 +201,10 @@ function AvailableRecord({
                             <RecordDoseLaunch
                                 clientId={person.id}
                                 personName={person.preferred}
+                                asNeeded={
+                                    location.tab === 'chart' &&
+                                    activeView === 'asneeded'
+                                }
                             />
                         </>
                     }

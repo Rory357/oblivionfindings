@@ -652,9 +652,16 @@ export function MarTab({
                             onRecord={(id) => recorder.recordAsNeeded(id)}
                         />
                         {day.prn.rows.length === 0 && day.prn.hidden === 0 ? (
-                            <p className="text-caption text-muted-foreground">
-                                No as-needed medicines for {personName}.
-                            </p>
+                            <EmptyState
+                                icon={Pill}
+                                variant="compact"
+                                title={`No as-needed medicines for ${personName}`}
+                                description={
+                                    isToday
+                                        ? 'An as-needed dose needs a current medication order. Ask the medication lead to check the order if a medicine is missing.'
+                                        : 'No as-needed medicines are listed for this day. Return to today to see current orders.'
+                                }
+                            />
                         ) : null}
                     </CardContent>
                 </Card>
