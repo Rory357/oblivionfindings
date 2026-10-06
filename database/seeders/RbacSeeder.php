@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Medication\Reporting\MedicationReportingPermissions;
 use Illuminate\Database\Seeder;
 
 class RbacSeeder extends Seeder
@@ -293,6 +294,12 @@ class RbacSeeder extends Seeder
             ['key' => 'medications.orders.manage', 'description' => 'Create/update medication orders', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.orders.verify', 'description' => 'Verify medication orders before administration', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.settings.manage', 'description' => 'Manage facility medication administration rules', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.pharmacy.connect.manage', 'description' => 'Manage approved pharmacy connections', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.pharmacy.send', 'description' => 'Send pharmacy supply orders', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.external.manage', 'description' => 'Manage named external clinician access', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.transfers.manage', 'description' => 'Manage provider medication handovers', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.catalogue.manage', 'description' => 'Manage licensed medicine image sources', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.backups.manage', 'description' => 'Manage protected medication backups', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.followups.manage', 'description' => 'Manage medication follow-ups and lead sign-offs', 'group' => 'medications', 'module' => 'Clinical'],
             // P11 B2 Q3. Grant migration: 2026_10_02_100000_grant_medication_alert_and_settings_keys.
             ['key' => 'medications.alerts.manage_house', 'description' => 'Choose alert extras, quiet hours and the on-call contact for your own houses', 'group' => 'medications', 'module' => 'Clinical'],
@@ -1097,6 +1104,6 @@ class RbacSeeder extends Seeder
                     }
                 }
             });
-        \App\Services\Medication\Reporting\MedicationReportingPermissions::install();
+        MedicationReportingPermissions::install();
     }
 }

@@ -53,6 +53,12 @@ class ClinicalPermissionsSeeder extends Seeder
             // Medication verification and administration-rule governance
             ['key' => 'medications.orders.verify', 'description' => 'Verify medication orders before administration', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.settings.manage', 'description' => 'Manage facility medication administration rules', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.pharmacy.connect.manage', 'description' => 'Manage approved pharmacy connections', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.pharmacy.send', 'description' => 'Send pharmacy supply orders', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.external.manage', 'description' => 'Manage named external clinician access', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.transfers.manage', 'description' => 'Manage provider medication handovers', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.catalogue.manage', 'description' => 'Manage licensed medicine image sources', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.backups.manage', 'description' => 'Manage protected medication backups', 'group' => 'medications', 'module' => 'Clinical'],
         ];
 
         $allPermissions = [];

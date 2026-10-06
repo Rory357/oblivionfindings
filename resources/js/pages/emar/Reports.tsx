@@ -10,7 +10,10 @@ import {
     OpsStatCard,
 } from '@/components/ops-stat-card';
 import { PageHero, type PageHeroStat } from '@/components/page';
-import { PageHeaderPrimaryButton } from '@/components/page/page-header';
+import {
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+} from '@/components/page/page-header';
 import {
     EntityFilter,
     ShiftContextMenu,
@@ -57,6 +60,7 @@ import {
     XAxis,
     YAxis,
 } from 'recharts';
+import { useConnectedAccess } from './connected/_entry-points';
 
 type ClientOption = { id: number; name: string };
 /**
@@ -225,6 +229,7 @@ const fmtDate = (iso: string | null) =>
         : '—';
 
 export default function Reports(props: Props) {
+    const connectedAccess = useConnectedAccess();
     const breadcrumbs = useEmarBreadcrumbs();
     const {
         filters,
@@ -506,6 +511,14 @@ export default function Reports(props: Props) {
                     stats={heroStats}
                     actions={
                         <>
+                            {connectedAccess.reportsView &&
+                                connectedAccess.reportsExport && (
+                                    <PageHeaderGlassButton asChild>
+                                        <a href="/emar/backups">
+                                            Protected backups
+                                        </a>
+                                    </PageHeaderGlassButton>
+                                )}
                             <PageHeaderPrimaryButton asChild icon={Download}>
                                 <a
                                     href={exportUrl(

@@ -76,6 +76,7 @@ use App\Jobs\SyncResourceCalendarsJob;
 use App\Jobs\SyncWorkCalendarsJob;
 use App\Models\MedicationIdempotencyResult;
 use App\Services\Fleet\FinanceReviewNotices;
+use App\Services\Medication\PharmacyConnect\PharmacyDispatchService;
 use App\Services\MedicationAlertService;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Inspiring;
@@ -990,3 +991,8 @@ Illuminate\Support\Facades\Schedule::command('emar:support-review-delivery')->ev
 app(Schedule::class)->command('emar:expire-emergency-access')->everyMinute()->onOneServer()->withoutOverlapping()->name('medication.emergency-access.expiry');
 // A 30-minute attestation window expires even if nobody opens its notification.
 app(Schedule::class)->command('emar:expire-second-person-confirmations')->everyMinute()->withoutOverlapping()->onOneServer();
+
+// Connected medication transports remain disabled until deployment configuration is approved.
+app(Schedule::class)->call(fn () => app(PharmacyDispatchService::class)->recover())
+    ->name('emar-pharmacy-dispatch-recovery')->everyMinute()->withoutOverlapping()->onOneServer();
+app(Schedule::class)->command('medications:chart-backups')->everyMinute()->withoutOverlapping()->onOneServer();

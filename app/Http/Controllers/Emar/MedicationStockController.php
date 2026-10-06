@@ -16,6 +16,7 @@ use App\Services\Medication\Controlled\ControlledRegisterService;
 use App\Services\Medication\Followups\MedicationFollowupService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
+use App\Services\Medication\PharmacyConnect\PharmacyDispatchGuard;
 use App\Services\Medication\Stock\MedicationStockService;
 use App\Services\Medication\Stock\StockReadPayload;
 use App\Support\Medication\MedicationStockQuantity as Qty;
@@ -200,8 +201,10 @@ final class MedicationStockController extends Controller
             $next = $data['next'];
             if (in_array($next, ['cancelled', 'closed_short'], true)) {
                 PharmacySupplyRules::assertClosure($order->status, $next, $data['reason'] ?? '');
+                app(PharmacyDispatchGuard::class)->localClosure($order);
                 $order->forceFill(['status' => $next, 'closed_by' => $actor->id, 'closed_at' => now(), 'closure_reason' => $data['reason']])->save();
             } elseif ($next === 'contacted') {
+                app(PharmacyDispatchGuard::class)->assertManualContact($order);
                 if ($order->status !== 'draft' || empty($data['communication_method']) || trim((string) ($data['communication_reference'] ?? '')) === '') {
                     throw new InvalidArgumentException('Record how the pharmacy was contacted and the source or reference. Saving here does not send this order.');
                 }

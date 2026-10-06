@@ -38,6 +38,7 @@ import {
     X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { MedicinePicture } from '../catalogue/_medicine-picture';
 import {
     CountReview,
     CountWizard,
@@ -594,6 +595,9 @@ export default function StockHub({
                                 cell: (item) => (
                                     <div>
                                         <State value={item.state} />
+                                        <MedicinePicture
+                                            medicationId={item.id}
+                                        />
                                         {item.expired_packs > 0 && (
                                             <p className="text-caption">
                                                 {item.expired_packs} expired{' '}

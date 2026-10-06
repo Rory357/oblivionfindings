@@ -23,7 +23,8 @@ import {
     ShieldCheck,
     Truck,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { PharmacyDispatch } from '../pharmacy/_dispatch';
 import { useStockCommand } from './_requests';
 import type { ItemDetail, StockCount, StockItem, SupplyOrder } from './_types';
 
@@ -181,7 +182,7 @@ export function NewSupplyOrder({
     );
 }
 export function SupplyOrderDialog({
-    order,
+    order: suppliedOrder,
     canManage,
     onReceive,
     onClose,
@@ -193,9 +194,48 @@ export function SupplyOrderDialog({
     onClose: () => void;
     onSaved: () => void;
 }) {
+    const [currentOrder, setCurrentOrder] = useState<SupplyOrder | null>(null);
+    const [orderError, setOrderError] = useState(false);
+    const [orderRefresh, setOrderRefresh] = useState(0);
+    const order = currentOrder ?? suppliedOrder;
+    useEffect(() => {
+        const controller = new AbortController();
+        fetch(
+            '/emar/stock/packs/medicine/' + suppliedOrder.client_medication_id,
+            {
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json' },
+                signal: controller.signal,
+            },
+        )
+            .then(async (response) => {
+                if (!response.ok) throw new Error('unavailable');
+                return response.json() as Promise<ItemDetail>;
+            })
+            .then((item) => {
+                const fresh = item.orders?.find(
+                    (row) => row.id === suppliedOrder.id,
+                );
+                setCurrentOrder(fresh ?? null);
+                setOrderError(!fresh);
+            })
+            .catch((error) => {
+                if (error.name !== 'AbortError') {
+                    setCurrentOrder(null);
+                    setOrderError(true);
+                }
+            });
+        return () => controller.abort();
+    }, [suppliedOrder.id, suppliedOrder.client_medication_id, orderRefresh]);
     const [next, setNext] = useState<
         'contacted' | 'dispensed' | 'cancelled' | 'closed_short' | null
     >(null);
+    const refreshOrder = useCallback(() => {
+        setCurrentOrder(null);
+        setNext(null);
+        setOrderError(false);
+        setOrderRefresh((n) => n + 1);
+    }, []);
     const [method, setMethod] = useState('');
     const [reference, setReference] = useState('');
     const [dispensed, setDispensed] = useState('');
@@ -246,7 +286,7 @@ export function SupplyOrderDialog({
                         >
                             Close
                         </Button>
-                        {next && (
+                        {currentOrder && next && (
                             <Button
                                 variant={dangerous ? 'destructive' : 'default'}
                                 disabled={command.saving}
@@ -279,13 +319,25 @@ export function SupplyOrderDialog({
                         value={order.closure_reason}
                     />
                 </ReviewCard>
+                <PharmacyDispatch
+                    orderId={order.id}
+                    onSaved={onSaved}
+                    onStatusChanged={refreshOrder}
+                />
+                {!currentOrder && (
+                    <SettingsNotice role="note">
+                        {orderError
+                            ? 'This order is unavailable in the current stock view. Close and refresh before continuing.'
+                            : 'Refreshing the current pharmacy order…'}
+                    </SettingsNotice>
+                )}
                 <Errors values={command.errors} />
                 <SettingsNotice role="note">
                     {closed
                         ? 'This order is closed and read only. Its received supply and history are retained.'
                         : 'A saved supply record does not prove the pharmacy received it. Record the communication source and what the pharmacy actually dispensed.'}
                 </SettingsNotice>
-                {!closed && canManage && !order.controlled && (
+                {currentOrder && !closed && canManage && !order.controlled && (
                     <>
                         <div className="flex flex-wrap gap-2">
                             {order.status === 'draft' && (

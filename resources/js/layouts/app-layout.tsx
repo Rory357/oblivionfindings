@@ -1,6 +1,9 @@
+import { Button } from '@/components/ui/button';
 import AppLayoutTemplate from '@/layouts/app/app-sidebar-layout';
 import StaffPageShell from '@/layouts/staff-page-shell';
+import type { SharedData } from '@/types';
 import { type BreadcrumbItem } from '@/types';
+import { Link, router, usePage } from '@inertiajs/react';
 import { type ReactNode } from 'react';
 
 type Experience = 'default' | 'staff';
@@ -49,6 +52,30 @@ export default function AppLayout({
     header,
     contentClassName,
 }: AppLayoutProps) {
+    const { auth } = usePage<SharedData>().props;
+    if (auth?.user?.role === 'external_clinician') {
+        return (
+            <main className="min-h-screen bg-background p-5 text-foreground">
+                <div className="mx-auto max-w-5xl space-y-5">
+                    <header className="flex items-center justify-between border-b border-border pb-4">
+                        <Link
+                            href="/clinical-portal"
+                            className="text-lg font-semibold"
+                        >
+                            Clinical portal
+                        </Link>
+                        <Button
+                            variant="outline"
+                            onClick={() => router.post('/logout')}
+                        >
+                            Sign out
+                        </Button>
+                    </header>
+                    {children}
+                </div>
+            </main>
+        );
+    }
     if (experience === 'staff') {
         return (
             <StaffPageShell

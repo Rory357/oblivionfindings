@@ -111,6 +111,12 @@ jobs:
         if: matrix.suite == 'foundation'
         run: npx vitest run resources/js/components/today-retirement.test.tsx
 
+      - name: Check medication desktop types and workflows
+        if: matrix.suite == 'foundation'
+        run: |
+          npx tsc --noEmit
+          npx vitest run resources/js/pages/emar resources/js/lib/emar-navigation.test.ts resources/js/pages/settings/profile.test.tsx
+
       - name: Copy Environment File
         run: cp .env.example .env
 
@@ -140,9 +146,17 @@ jobs:
           --shard-count=${{ matrix.shard_count }}
           --batch-size=${{ matrix.batch_size }}
 
-      - name: Pack stock and historical recovery release gates
+      - name: Install protected-backup PDF verifier
+        if: matrix.suite == 'emar-release'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y qpdf
+          test -x /usr/bin/qpdf
+
+      - name: Medication and connected-care release gates
         if: matrix.suite == 'emar-release'
         env:
+          EMAR_BACKUP_QPDF_PATH: /usr/bin/qpdf
           APP_ENV: testing
           DB_CONNECTION: mysql
           DB_HOST: 127.0.0.1
@@ -175,6 +189,21 @@ jobs:
           tests/Feature/It/ItTicketTriageTest.php
           tests/Feature/Incidents/IncidentJourneyPresenterTest.php
           tests/Feature/FrontlineLifecycleDemoSeederReplayTest.php
+          tests/Feature/Emar/PharmacyConnectionTest.php
+          tests/Feature/Emar/ExternalClinicalAccessTest.php
+          tests/Feature/Emar/ProviderMedicationTransferTest.php
+          tests/Feature/Emar/MedicineCatalogueWorkflowTest.php
+          tests/Feature/Emar/MedicationBackupDeliveryTest.php
+          tests/Feature/Auth/AuthenticationTest.php
+          tests/Feature/Auth/TwoFactorChallengeTest.php
+          tests/Feature/Settings/TwoFactorAuthenticationTest.php
+          tests/Unit/Medication/PharmacyConnect/PharmacyProtocolTest.php
+          tests/Unit/Medication/ExternalClinicalPrescriptionTest.php
+          tests/Unit/Medication/ExternalClinicalTwoFactorResponseTest.php
+          tests/Unit/Medication/ExternalClinicalWitnessSecretTest.php
+          tests/Unit/Medication/CatalogueDatasetTest.php
+          tests/Unit/Medication/BackupScheduleClockTest.php
+          tests/Unit/Medication/BackupPdfEncryptionTest.php
           --log-junit storage/logs/emar-release-gates.xml
 
       - name: Retain medication gate results

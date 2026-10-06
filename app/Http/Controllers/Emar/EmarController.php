@@ -56,6 +56,7 @@ use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationRoundGenerationService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\Medication\PharmacyConnect\PharmacyDispatchGuard;
 use App\Services\Medication\RoundTemplateCatalogue;
 use App\Services\Medication\SecondPersonConfirmationPayload;
 use App\Services\Medication\Settings\MedicationSettingsStore;
@@ -6681,6 +6682,7 @@ class EmarController extends Controller
                 }
 
                 unset($payload['expiry_date']);
+                app(PharmacyDispatchGuard::class)->assertContentEditable($lockedOrder, $payload);
                 $lockedOrder->update($payload);
 
                 return redirect()->back();
@@ -6798,6 +6800,7 @@ class EmarController extends Controller
 
                 // New pack orders require the explicit communication/dispense/receipt workflow.
                 // Replay above still returns evidence from a previously completed legacy request.
+                app(PharmacyDispatchGuard::class)->assertManualAdvance($lockedOrder);
                 $packStock = ClientMedicationStock::where('client_medication_id', $medication->id)->lockForUpdate()->first();
                 $packStock?->rejectScalarWrite('status');
                 $updateData = ['status' => $nextStatus];

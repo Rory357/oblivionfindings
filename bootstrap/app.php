@@ -8,6 +8,7 @@ use App\Http\Middleware\AuthenticateMonitoringCollector;
 use App\Http\Middleware\EnforceSessionTimeout;
 use App\Http\Middleware\EnforceTwoFactorPolicy;
 use App\Http\Middleware\EnsureAccountStillApproved;
+use App\Http\Middleware\EnsureExternalClinicalIsolation;
 use App\Http\Middleware\EnsureItApiAbility;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsureRole;
@@ -16,10 +17,11 @@ use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\PreventSearchIndexing;
 use App\Http\Middleware\ProtectItDraftResponses;
 use App\Http\Middleware\ProtectVendorVaultResponses;
-use App\Support\Medication\ScrubNestedWitnessSecrets;
 use App\Http\Middleware\RecordItApiRequest;
 use App\Http\Middleware\RoleScope;
 use App\Http\Middleware\TraceItTicketCreation;
+use App\Support\Medication\ScrubNestedWitnessSecrets;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -60,6 +62,7 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleAppearance::class,
             EnforceSessionTimeout::class,
             EnsureAccountStillApproved::class,
+            EnsureExternalClinicalIsolation::class,
             EnforceTwoFactorPolicy::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
@@ -70,6 +73,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(prepend: [
             ThrottleRequests::class.':api',
         ]);
+
+        $middleware->api(append: [EnsureExternalClinicalIsolation::class]);
+        $middleware->appendToPriorityList(AuthenticatesRequests::class, EnsureExternalClinicalIsolation::class);
 
         $middleware->alias([
             'role' => EnsureRole::class,
@@ -113,6 +119,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'read_back_witness_credential',
             'cd_witness_credential',
             'witness_credential',
+            'witness_pin',
             'second_witness_credential',
             'witness_1_credential',
             'witness_2_credential',

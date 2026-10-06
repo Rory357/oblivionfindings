@@ -33,11 +33,19 @@ import {
  */
 export interface EmarNavigationPermissions {
     medications?: {
+        pharmacyConnectManage?: boolean;
+        pharmacySend?: boolean;
+        externalManage?: boolean;
+        transfersManage?: boolean;
+        catalogueManage?: boolean;
+        backupsManage?: boolean;
+        reportsView?: boolean;
+        reportsExport?: boolean;
+        settingsManage?: boolean;
         view?: boolean;
         administerRecord?: boolean;
         ordersManage?: boolean;
         ordersVerify?: boolean;
-        settingsManage?: boolean;
         alertsManageHouse?: boolean;
         witnessPinReset?: boolean;
         /** Server-supplied scoped emergency-policy access, when available. */
@@ -47,8 +55,6 @@ export interface EmarNavigationPermissions {
         controlledRecord?: boolean;
         controlledWitness?: boolean;
         auditView?: boolean;
-        reportsExport?: boolean;
-        reportsView?: boolean;
         auditExport?: boolean;
         breakGlass?: boolean;
     };
@@ -319,7 +325,11 @@ export const EMAR_HUBS: EmarHub[] = [
         key: 'orders',
         label: 'Orders & reviews',
         icon: FileText,
-        visible: hasLeadCapability,
+        visible: any(
+            hasLeadCapability,
+            flag('externalManage'),
+            flag('transfersManage'),
+        ),
         views: [
             {
                 key: 'prescriptions',
@@ -355,6 +365,19 @@ export const EMAR_HUBS: EmarHub[] = [
                 href: '/emar/reviews',
                 icon: Stethoscope,
                 visible: view,
+            },
+            {
+                key: 'connected-care',
+                label: 'Connected care',
+                href: '/emar/connected-care',
+                icon: Stethoscope,
+                visible: (can) =>
+                    view(can) &&
+                    Boolean(
+                        meds(can).externalManage ||
+                        meds(can).transfersManage ||
+                        meds(can).ordersManage,
+                    ),
             },
         ],
     },
@@ -518,13 +541,27 @@ export const EMAR_HUBS: EmarHub[] = [
                 icon: FileText,
                 visible: reportsView,
             },
+            {
+                key: 'backups',
+                label: 'Protected backups',
+                href: '/emar/backups',
+                icon: Lock,
+                visible: all(view, reportsView, flag('reportsExport')),
+            },
         ],
     },
     {
         key: 'settings',
         label: 'Settings',
         icon: Settings,
-        visible: settingsAccess,
+        visible: any(
+            settingsAccess,
+            flag('catalogueManage'),
+            flag('backupsManage'),
+            flag('pharmacyConnectManage'),
+            flag('externalManage'),
+            flag('transfersManage'),
+        ),
         ownRail: true,
         views: [
             {
@@ -573,6 +610,22 @@ export const EMAR_HUBS: EmarHub[] = [
                 aliases: ['/emar/settings#history'],
                 icon: History,
                 visible: settingsReader,
+            },
+            {
+                key: 'connections',
+                label: 'Connected services',
+                href: '/emar/connections',
+                aliases: ['/emar/pharmacy-connections', '/emar/catalogue'],
+                icon: Settings,
+                visible: (can) =>
+                    view(can) &&
+                    Boolean(
+                        meds(can).pharmacyConnectManage ||
+                        meds(can).catalogueManage ||
+                        meds(can).backupsManage ||
+                        meds(can).externalManage ||
+                        meds(can).transfersManage,
+                    ),
             },
         ],
     },

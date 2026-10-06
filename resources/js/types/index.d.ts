@@ -50,6 +50,15 @@ export interface AuthPermissions {
         manageRecurring?: boolean;
     };
     medications?: {
+        pharmacyConnectManage?: boolean;
+        pharmacySend?: boolean;
+        externalManage?: boolean;
+        transfersManage?: boolean;
+        catalogueManage?: boolean;
+        backupsManage?: boolean;
+        reportsView?: boolean;
+        reportsExport?: boolean;
+        settingsManage?: boolean;
         view?: boolean;
         ordersManage?: boolean;
         breakGlass?: boolean;

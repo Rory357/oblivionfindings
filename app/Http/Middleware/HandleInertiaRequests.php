@@ -87,6 +87,22 @@ class HandleInertiaRequests extends Middleware
 
     public function share(Request $request): array
     {
+        $external = $request->user();
+        if ($external instanceof User && $external->isExternalClinicianAccount()) {
+            return [
+                ...parent::share($request),
+                'name' => config('app.name'),
+                'auth' => [
+                    'user' => ['id' => $external->id, 'name' => $external->name, 'email' => $external->email, 'role' => 'external_clinician'],
+                    'can' => [],
+                ],
+                'flash' => [
+                    'success' => fn () => $request->session()->get('success'),
+                    'error' => fn () => $request->session()->get('error'),
+                    'warning' => fn () => $request->session()->get('warning'),
+                ],
+            ];
+        }
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
 
         $user = $request->user();
@@ -491,7 +507,7 @@ class HandleInertiaRequests extends Middleware
      * Permission map bust — bump when permission shape/keys change so
      * stale caches from previous deploys are ignored.
      */
-    protected const PERMISSIONS_CACHE_VERSION = 'v10';
+    protected const PERMISSIONS_CACHE_VERSION = 'v11';
 
     /**
      * Get user permissions, deduped per-request via `once()` and cached
@@ -604,6 +620,12 @@ class HandleInertiaRequests extends Middleware
             'medications' => [
                 'view' => $user->canDo('medications.view'),
                 'ordersManage' => $user->canDo('medications.orders.manage'),
+                'pharmacyConnectManage' => $user->canDo('medications.pharmacy.connect.manage'),
+                'pharmacySend' => $user->canDo('medications.pharmacy.send'),
+                'externalManage' => $user->canDo('medications.external.manage'),
+                'transfersManage' => $user->canDo('medications.transfers.manage'),
+                'catalogueManage' => $user->canDo('medications.catalogue.manage'),
+                'backupsManage' => $user->canDo('medications.backups.manage'),
                 // Navigation only (lib/emar-navigation.ts: lead hubs and the
                 // Settings entry). Not an authority — every medication route
                 // and action re-checks its own permission on the server.

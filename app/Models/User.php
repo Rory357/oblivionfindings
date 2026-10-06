@@ -101,6 +101,7 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return [
             'email_verified_at' => 'datetime',
+            'external_clinical_account' => 'boolean',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
             'approved_at' => 'datetime',
@@ -148,8 +149,9 @@ class User extends Authenticatable implements MustVerifyEmail
     public function scopeStaff($query)
     {
         return $query
-            ->whereDoesntHave('roles', fn ($q) => $q->whereIn('name', ['client', 'next_of_kin']))
-            ->whereNotIn('role', ['client', 'next_of_kin']);
+            ->whereDoesntHave('roles', fn ($q) => $q->whereIn('name', ['client', 'next_of_kin', 'external_clinician']))
+            ->whereNotIn('role', ['client', 'next_of_kin', 'external_clinician'])
+            ->where('external_clinical_account', false);
     }
 
     public function getProfilePhotoUrlAttribute(): ?string
@@ -202,6 +204,7 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         if (
             ! $this->exists
+            || $this->isExternalClinicianAccount()
             || ! $client->exists
             || ! $this->hasRole('client', 'next_of_kin')
             || ($reads ? $reads->query($this->hrEmployeeProfile()->withTrashed()->getQuery()) : $this->hrEmployeeProfile()->withTrashed())->exists()
@@ -401,8 +404,30 @@ class User extends Authenticatable implements MustVerifyEmail
             ->exists();
     }
 
+    /** Revoked accounts keep their dedicated external identity. */
+    public function isExternalClinicianAccount(): bool
+    {
+        return (bool) $this->external_clinical_account
+            || $this->role === 'external_clinician'
+            || ($this->relationLoaded('roles')
+                ? $this->roles->contains('name', 'external_clinician')
+                : ($this->exists && $this->roles()->where('name', 'external_clinician')->exists()));
+    }
+
+    protected static function booted(): void
+    {
+        static::updating(function (self $user): void {
+            if ((bool) $user->getOriginal('external_clinical_account') && ! $user->external_clinical_account) {
+                throw new \LogicException('An external clinical account cannot become an internal account.');
+            }
+        });
+    }
+
     public function canDo(string $permissionKey): bool
     {
+        if ($this->isExternalClinicianAccount()) {
+            return false;
+        }
         $permissionKeys = $this->permissionLookupKeys($permissionKey);
 
         if ($this->relationLoaded('permissionOverrides')
@@ -534,6 +559,6 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function canBeImpersonated(): bool
     {
-        return ! $this->hasRole('admin');
+        return ! $this->isExternalClinicianAccount() && ! $this->hasRole('admin');
     }
 }

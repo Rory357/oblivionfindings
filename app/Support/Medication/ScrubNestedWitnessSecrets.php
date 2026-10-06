@@ -17,6 +17,7 @@ final class ScrubNestedWitnessSecrets
     /** Witness secrets that may appear inside arrays. Mirrors the dontFlash entries. */
     public const KEYS = [
         'witness_credential',
+        'witness_pin',
         'second_witness_credential',
         'witness_1_credential',
         'witness_2_credential',
