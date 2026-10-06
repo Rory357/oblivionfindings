@@ -57,6 +57,7 @@ use App\Services\Medication\MedicationRoundGenerationService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Medication\RoundTemplateCatalogue;
+use App\Services\Medication\SecondPersonConfirmationPayload;
 use App\Services\Medication\Settings\MedicationSettingsStore;
 use App\Services\Medication\Stock\MedicationStockService;
 use App\Services\Medication\Stock\StockManagementReadPayload;
@@ -750,7 +751,7 @@ class EmarController extends Controller
             'administered_by' => $administration?->administeredBy?->name,
             'witnessed_by' => $administration?->witnessedBy?->name,
             'witnessed_at' => $administration?->witnessed_at?->toIso8601String(),
-            'witness_method' => $administration?->witness_method,
+            ...app(SecondPersonConfirmationPayload::class)->forAdministration($administration),
             'notes' => $administration?->notes,
             'reason' => $administration?->reason,
             'reason_code' => $administration?->reason_code,
@@ -1319,6 +1320,7 @@ class EmarController extends Controller
                 });
             },
             'medications.administrations.attachments.uploadedBy:id,name',
+            'medications.administrations.'.SecondPersonConfirmationPayload::RELATION,
         ];
 
         // Default the resident server-side so the MAR chart opens straight onto a
@@ -1461,6 +1463,7 @@ class EmarController extends Controller
                 'administrations.administeredBy:id,name',
                 'administrations.witnessedBy:id,name',
                 'administrations.attachments.uploadedBy:id,name',
+                'administrations.'.SecondPersonConfirmationPayload::RELATION,
             ])->get();
 
         $scheduled = $medications->where('is_prn', false)->values();
@@ -1745,6 +1748,7 @@ class EmarController extends Controller
             'medication:id,name,dosage,route,max_per_day,indication,controlled_drug,deleted_at',
             'administeredBy:id,name',
             'prnEffectiveness.reviewedByUser:id,name',
+            SecondPersonConfirmationPayload::RELATION,
         ];
 
         // The register — recent PRN-given administrations within the window
@@ -1990,6 +1994,7 @@ class EmarController extends Controller
             'given_time' => $at ? $at->copy()->timezone($timezone)->format('H:i') : null,
             'given_date' => $at ? $at->copy()->timezone($timezone)->format('j M') : null,
             'given_by' => $a->administeredBy?->name,
+            ...app(SecondPersonConfirmationPayload::class)->forAdministration($a),
             'mar_url' => $this->marUrlFor($a->client_id),
             'baseline' => array_filter([
                 'blood_glucose_level' => $a->blood_glucose_level,
@@ -3131,6 +3136,7 @@ class EmarController extends Controller
                 'client:id,first_name,last_name,site_id',
                 'client.site:id,name',
                 'round:id,name',
+                SecondPersonConfirmationPayload::RELATION,
             ])
             ->latest('administered_at')
             ->limit(150)
@@ -3149,6 +3155,7 @@ class EmarController extends Controller
                 'round_name' => $a->round?->name,
                 'staff' => $a->administeredBy?->name,
                 'witnessed_by' => $a->witnessedBy?->name,
+                ...app(SecondPersonConfirmationPayload::class)->forAdministration($a),
                 'blood_glucose_level' => $a->blood_glucose_level !== null ? (float) $a->blood_glucose_level : null,
                 'pulse_bpm' => $a->pulse_bpm,
                 'reason' => $a->reason,

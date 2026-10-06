@@ -152,6 +152,14 @@ class ClientPolicy
             && $this->canAccessClientSite($user, $client, self::SITE_SCOPE_BYPASS_PERMISSIONS);
     }
 
+    public function updateFromCurrentEvidence(User $user, Client $client, CurrentAuthorizationReads $reads): bool
+    {
+        $reads->assertActive();
+
+        return $user->canDo('clients.update')
+            && $this->canAccessClientSite($user, $client, self::SITE_SCOPE_BYPASS_PERMISSIONS, $reads);
+    }
+
     public function delete(User $user, Client $client): bool
     {
         return $user->canDo('clients.delete')

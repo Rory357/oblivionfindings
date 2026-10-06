@@ -910,18 +910,18 @@ class MedicationFollowupWorkflowTest extends TestCase
         $this->assertDatabaseCount('medication_prn_effectiveness', 0);
     }
 
-    public function test_confirmation_affordance_requires_named_witness_authority_instead_of_recording_permission(): void
+    public function test_confirmation_affordance_requires_named_ordinary_administration_authority(): void
     {
         [$dose] = $this->effect();
         $nominee = $this->staff();
         $this->onShift($nominee);
-        $this->deny($nominee, ['medications.administer.record']);
-        $this->grant($nominee, ['medications.controlled.witness']);
+        $this->grant($nominee, ['medications.administer.record']);
+        $this->deny($nominee, ['medications.controlled.witness']);
         $row = DB::transaction(fn () => $this->work()->ensureForSource('confirm', 123, $this->client,
             $dose->medication, $dose, $nominee->id, now()->addMinutes(30), ['nomination_id' => 123]));
         $this->actingAs($nominee)->getJson('/medication-followups/'.$row->id)->assertOk()->assertJsonPath('can_complete', true);
         $this->actingAs($this->worker)->getJson('/medication-followups/'.$row->id)->assertOk()->assertJsonPath('can_complete', false);
-        $this->deny($nominee, ['medications.controlled.witness']);
+        $this->deny($nominee, ['medications.administer.record']);
         $this->actingAs($nominee)->getJson('/medication-followups/'.$row->id)->assertOk()->assertJsonPath('can_complete', false);
     }
 

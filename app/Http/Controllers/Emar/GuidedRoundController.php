@@ -13,6 +13,7 @@ use App\Services\MarScheduleService;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\Medication\SecondPersonConfirmationPayload;
 use App\Services\Timeline\TimelineEmitter;
 use App\Support\Medication\MedicationStockQuantity;
 use Illuminate\Http\Request;
@@ -300,6 +301,7 @@ class GuidedRoundController extends Controller
                         'status' => $admin->status,
                         'administered_at' => $admin->administered_at?->toIso8601String(),
                         'round_id' => $round->id,
+                        ...app(SecondPersonConfirmationPayload::class)->forAdministration($admin),
                     ],
                     'safety_check' => $result['safety_check'] ?? null,
                 ],

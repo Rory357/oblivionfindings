@@ -168,6 +168,7 @@ class ShiftClinicalController extends Controller
                 'max:5000',
             ],
             'outcome' => ['nullable', 'string', 'max:5000'],
+            'hospital_admission_id' => ['required_if:event_type,hospital_discharge', 'nullable', 'integer', 'min:1'],
             'requires_followup' => ['nullable', 'boolean'],
             'followup_notes' => ['nullable', 'string', 'max:2000'],
         ]);
@@ -190,12 +191,22 @@ class ShiftClinicalController extends Controller
                 'id' => $event->id,
                 'event_type' => $event->event_type->value,
                 'occurred_at' => $event->occurred_at->toISOString(),
+                'hospital_admission_id' => $event->hospital_admission_id,
                 'requires_followup' => $event->requires_followup,
                 'shift_id' => $event->shift_id,
             ], 201);
         }
 
         return back()->with('success', 'Clinical event recorded successfully.');
+    }
+
+    public function hospitalAdmissions(Request $request, Shift $shift)
+    {
+        $this->authorizeShiftAccess($request, $shift);
+        $shift->loadMissing('client');
+        abort_unless($shift->client, 422, 'Shift has no associated client.');
+
+        return response()->json(['admissions' => $this->eventService->openHospitalAdmissions($shift->client, $request->user())->values()]);
     }
 
     /**

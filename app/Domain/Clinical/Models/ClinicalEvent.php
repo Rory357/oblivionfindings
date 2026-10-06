@@ -11,10 +11,12 @@ use App\Models\HsEvent;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\OverdueDoseAlerts;
 use Database\Factories\Clinical\ClinicalEventFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -51,6 +53,9 @@ class ClinicalEvent extends Model
         'status',
         'reviewed_by',
         'reviewed_at',
+        'hospital_admitted_at',
+        'hospital_discharged_at',
+        'hospital_admission_id',
     ];
 
     protected $casts = [
@@ -61,9 +66,29 @@ class ClinicalEvent extends Model
         'requires_followup' => 'boolean',
         'followup_completed_at' => 'datetime',
         'reviewed_at' => 'datetime',
+        'hospital_admitted_at' => 'datetime',
+        'hospital_discharged_at' => 'datetime',
+        'hospital_admission_id' => 'integer',
     ];
 
+    protected static function booted(): void
+    {
+        $resync = static function (self $event): void {
+            if (in_array($event->getAttributes()['event_type'] ?? null, ['hospital_admission', 'hospital_discharge'], true)
+                && ($event->hospital_admitted_at !== null || ($event->hospital_discharged_at !== null && $event->hospital_admission_id !== null))) {
+                OverdueDoseAlerts::queueAfterCommit((int) $event->client_id);
+            }
+        };
+        static::saved($resync);
+        static::deleted($resync);
+    }
+
     // ── Relationships ────────────────────────────────────────────────────
+
+    public function hospitalDischarges(): HasMany
+    {
+        return $this->hasMany(self::class, 'hospital_admission_id')->where('event_type', ClinicalEventType::HospitalDischarge->value);
+    }
 
     public function client(): BelongsTo
     {

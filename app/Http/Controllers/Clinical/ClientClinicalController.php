@@ -99,9 +99,17 @@ class ClientClinicalController extends Controller
                 'event_type' => $event->event_type->value,
                 'occurred_at' => $event->occurred_at->toISOString(),
                 'requires_followup' => $event->requires_followup,
+                'hospital_admission_id' => $event->hospital_admission_id,
             ], 201);
         }
 
         return back()->with('success', 'Clinical event recorded successfully.');
+    }
+
+    public function hospitalAdmissions(Request $request, Client $client)
+    {
+        $this->authorize('view', $client);
+
+        return response()->json(['admissions' => $this->eventService->openHospitalAdmissions($client, $request->user())->values()]);
     }
 }

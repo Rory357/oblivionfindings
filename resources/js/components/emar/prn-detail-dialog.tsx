@@ -1,3 +1,8 @@
+import { StatusBadge } from '@/components/ui/status-badge';
+import {
+    secondPersonDisplay,
+    type SecondPersonEvidence,
+} from '@/lib/medication-second-person';
 /* Read-only PRN administration detail — opened from a register row (click or
  * the right-click "View details" action). Built on the Add-Client WizardShell
  * chrome (rail + sectioned panes + footer Options bar) so it matches every
@@ -40,7 +45,7 @@ export type PrnEffectivenessDetail = {
 };
 
 /** One PRN-given administration row (the `prn()` register payload). */
-export type PrnAdministration = {
+export type PrnAdministration = SecondPersonEvidence & {
     id: number;
     client_id: number;
     client_name: string;
@@ -115,6 +120,7 @@ export function PrnDetailDialog({
 }) {
     const [section, setSection] = useState(0);
     const eff = admin.effectiveness_detail;
+    const confirmation = secondPersonDisplay(admin);
     const reviewDue = !eff;
     const baseline = admin.baseline ?? {};
     const hasBaseline = Object.values(baseline).some(
@@ -245,6 +251,21 @@ export function PrnDetailDialog({
                     <ReviewCard icon={ClipboardCheck} title="This dose">
                         <ReviewRow label="Time given" value={givenAt} />
                         <ReviewRow label="Given by" value={admin.given_by} />
+                        {confirmation && (
+                            <ReviewRow
+                                label="Second-person check"
+                                value={
+                                    <span className="inline-flex flex-wrap items-center gap-2">
+                                        <StatusBadge
+                                            variant={confirmation.tone}
+                                        >
+                                            {confirmation.label}
+                                        </StatusBadge>
+                                        {confirmation.detail}
+                                    </span>
+                                }
+                            />
+                        )}
                         <ReviewRow label="Today's count" value={todayCount} />
                     </ReviewCard>
                     {hasBaseline ? (

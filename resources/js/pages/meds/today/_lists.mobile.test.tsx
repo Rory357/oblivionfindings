@@ -383,6 +383,45 @@ describe('phone medication lists', () => {
         expect(props.onRecord).not.toHaveBeenCalled();
     });
 
+    it.each([
+        ['pending', 'Second-person confirmation pending'],
+        ['disputed', 'Confirmation disputed'],
+        ['expired', 'Confirmation overdue'],
+    ] as const)(
+        'shows %s second-person evidence in the desktop as-needed list',
+        (status, label) => {
+            const props = asNeededProps();
+            const { container } = render(
+                <AsNeededView
+                    {...props}
+                    recorded={[
+                        {
+                            ...recorded,
+                            second_person_confirmation: {
+                                id: 90,
+                                status,
+                                nominated_name: 'Ben Taylor',
+                                due_at: '2026-04-30T10:00:00+12:00',
+                            },
+                        },
+                    ]}
+                />,
+            );
+            const desktop = container.querySelector(
+                '[data-slot="card"].md\\:flex',
+            )!;
+            expect(
+                within(desktop as HTMLElement).getByText(label),
+            ).toBeInTheDocument();
+            expect(
+                within(desktop as HTMLElement).queryByText(
+                    'Witness PIN verified',
+                ),
+            ).not.toBeInTheDocument();
+            expect(props.onRecord).not.toHaveBeenCalled();
+        },
+    );
+
     it('shows recorded PRN dose, reason, author and effect-check time without offering to record it again', () => {
         const props = asNeededProps();
         render(<AsNeededView {...props} />);

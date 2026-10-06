@@ -2,6 +2,7 @@
 
 namespace App\Services\Medication\DoseSlots;
 
+use App\Domain\Clinical\Models\ClinicalEvent;
 use App\Models\ClientLeaveRequest;
 use App\Models\RespiteStay;
 use App\Models\User;
@@ -22,16 +23,14 @@ use Illuminate\Support\Collection;
  *   are never read: a confirmed booking not yet checked in is not away, and
  *   an early discharge ends Away there and then. Respite at the person's own
  *   Site, or with no Site recorded, is not away;
- * - approved client leave, on its NZ days — switched OFF
- *   (medications.away.from_leave) until leave records approval, return and
- *   withdrawal with times (Main, 3 Oct).
+ * - approved leave after its recorded actual departure, until actual return;
+ * - a canonical hospital admission until its linked actual discharge.
+ * Planned leave dates and legacy hospital types never establish presence.
  *
  * A dose due before the away period began is owed, overdue included: Away
  * never settles a dose whose window ended before the person left.
  * Excursions and outings are not away (the medicines go with the person).
- * Hospital stays are deferred until the clinical event types for admission
- * and discharge exist; a third source is one more entry in sql() and
- * reasons().
+ * Hospital takes precedence over respite and leave when valid periods overlap.
  *
  * Away is read live, never stored: withdraw or change the record and the dose
  * is owed again, evaluated normally. A recorded outcome always wins. Lists
@@ -44,16 +43,18 @@ final class DoseAwaySources
 
     public const RESPITE = 'respite';
 
+    public const HOSPITAL = 'hospital';
+
     /** Leave that says the person is away: approved, or approved and since completed. */
     public const LEAVE_STATUSES = ['approved', 'completed'];
 
     /** A respite stay that has been checked in (an admitted-only stay hasn't). */
     public const STAY_STATUSES = ['active', 'extended', 'on_leave', 'discharged'];
 
-    /** Approved leave as an away source (off by default; see config/medications.php). */
+    /** Compatibility opt-out; only explicit actual evidence ever counts. */
     public static function leaveCounts(): bool
     {
-        return (bool) config('medications.away.from_leave', false);
+        return (bool) config('medications.away.from_leave', true);
     }
 
     /**
@@ -69,6 +70,16 @@ final class DoseAwaySources
         $leave = "'".implode("','", self::LEAVE_STATUSES)."'";
 
         return [
+            'away_hospital_id' => "SELECT h.id FROM clinical_events h JOIN clients hc ON hc.id = h.client_id
+                WHERE h.client_id = s.client_id AND h.deleted_at IS NULL
+                  AND h.event_type = 'hospital_admission' AND h.hospital_admitted_at IS NOT NULL
+                  AND h.hospital_admitted_at = h.occurred_at AND h.hospital_admitted_at <= s.due_at
+                  AND NOT EXISTS (SELECT 1 FROM clinical_events d WHERE d.hospital_admission_id = h.id
+                    AND d.client_id = h.client_id AND d.deleted_at IS NULL
+                    AND d.event_type = 'hospital_discharge' AND d.hospital_discharged_at IS NOT NULL
+                    AND d.hospital_discharged_at = d.occurred_at
+                    AND d.hospital_discharged_at >= h.hospital_admitted_at AND d.hospital_discharged_at <= s.due_at)
+                ORDER BY h.hospital_admitted_at, h.id LIMIT 1",
             'away_respite_id' => "SELECT st.id FROM respite_stays st
                 JOIN respite_bookings rb ON rb.id = st.booking_id
                 JOIN clients rc ON rc.id = st.client_id
@@ -81,8 +92,10 @@ final class DoseAwaySources
             'away_leave_id' => self::leaveCounts()
                 ? "SELECT l.id FROM client_leave_requests l
                     WHERE l.client_id = s.client_id AND l.deleted_at IS NULL AND l.status IN ({$leave})
-                      AND l.starts_on <= s.nz_date AND l.ends_on >= s.nz_date
-                    ORDER BY l.starts_on, l.id LIMIT 1"
+                      AND l.approved_at IS NOT NULL AND l.approved_by IS NOT NULL AND l.withdrawn_at IS NULL
+                      AND l.departed_at IS NOT NULL AND l.departed_at <= s.due_at
+                      AND (l.returned_at IS NULL OR l.returned_at > s.due_at)
+                    ORDER BY l.departed_at, l.id LIMIT 1"
                 : 'SELECT NULL',
         ];
     }
@@ -105,7 +118,7 @@ final class DoseAwaySources
     public static function refOf(object|array $row): ?array
     {
         $row = (array) $row;
-        foreach ([self::RESPITE => 'away_respite_id', self::LEAVE => 'away_leave_id'] as $source => $column) {
+        foreach ([self::HOSPITAL => 'away_hospital_id', self::RESPITE => 'away_respite_id', self::LEAVE => 'away_leave_id'] as $source => $column) {
             if (($row[$column] ?? null) !== null) {
                 return ['source' => $source, 'id' => (int) $row[$column]];
             }
@@ -118,7 +131,7 @@ final class DoseAwaySources
      * The reason each away ref reads as after "Away · ", for $viewer:
      * "Respite at Kōwhai House (since Mon 15 Jun, 3:05 pm)" — the house named
      * only to a reader who may access that Site, else "Respite at another
-     * house" — or "On leave (until Tue 16 Jun)". Batch-loaded; only the
+     * house" — or "On leave (since Mon 15 Jun, 7:00 am)". Batch-loaded; only the
      * surfaces that show the words ask for them.
      *
      * @param  iterable<array{source: string, id: int}|null>  $refs
@@ -126,7 +139,7 @@ final class DoseAwaySources
      */
     public function reasons(iterable $refs, ?User $viewer): array
     {
-        $ids = [self::LEAVE => [], self::RESPITE => []];
+        $ids = [self::LEAVE => [], self::RESPITE => [], self::HOSPITAL => []];
         foreach ($refs as $ref) {
             if ($ref !== null && isset($ids[$ref['source']])) {
                 $ids[$ref['source']][$ref['id']] = true;
@@ -134,6 +147,14 @@ final class DoseAwaySources
         }
 
         $reasons = [];
+        if ($ids[self::HOSPITAL] !== []) {
+            ClinicalEvent::query()->whereKey(array_keys($ids[self::HOSPITAL]))->get(['id', 'hospital_admitted_at'])
+                ->each(function (ClinicalEvent $event) use (&$reasons): void {
+                    $since = $event->getRawOriginal('hospital_admitted_at');
+                    $reasons[self::HOSPITAL.':'.$event->id] = 'In hospital'.($since === null ? '' : ' (since '
+                        .CarbonImmutable::parse((string) $since, 'UTC')->setTimezone(self::timezone())->format('D j M, g:i a').')');
+                });
+        }
         if ($ids[self::RESPITE] !== []) {
             $visibleSites = $viewer === null
                 ? []
@@ -156,10 +177,11 @@ final class DoseAwaySources
         if ($ids[self::LEAVE] !== []) {
             ClientLeaveRequest::query()
                 ->whereKey(array_keys($ids[self::LEAVE]))
-                ->get(['id', 'ends_on'])
+                ->get(['id', 'departed_at', 'returned_at'])
                 ->each(function (ClientLeaveRequest $leave) use (&$reasons): void {
-                    $until = $leave->ends_on?->toDateString();
-                    $reasons[self::LEAVE.':'.$leave->id] = 'On leave'.($until === null ? '' : ' (until '.CarbonImmutable::parse($until, self::timezone())->format('D j M').')');
+                    $since = $leave->getRawOriginal('departed_at');
+                    $reasons[self::LEAVE.':'.$leave->id] = 'On leave'.($since === null ? '' : ' (since '
+                        .CarbonImmutable::parse((string) $since, 'UTC')->setTimezone(self::timezone())->format('D j M, g:i a').')');
                 });
         }
 
@@ -182,6 +204,24 @@ final class DoseAwaySources
         $dayStart = CarbonImmutable::parse($from, $timezone)->utc();
         $dayEnd = CarbonImmutable::parse($to, $timezone)->addDay()->utc();
         $periods = [];
+
+        ClinicalEvent::query()->join('clients as hc', 'hc.id', '=', 'clinical_events.client_id')
+            ->whereIn('clinical_events.client_id', $clientIds)
+            ->where('event_type', 'hospital_admission')->whereNotNull('hospital_admitted_at')
+            ->whereColumn('hospital_admitted_at', 'occurred_at')->where('hospital_admitted_at', '<', $dayEnd)
+            ->with('hospitalDischarges')->orderBy('hospital_admitted_at')->orderBy('clinical_events.id')
+            ->get(['clinical_events.*'])->each(function (ClinicalEvent $admission) use (&$periods, $dayStart): void {
+                $end = $admission->hospitalDischarges->filter(fn (ClinicalEvent $d): bool => (int) $d->client_id === (int) $admission->client_id
+                    && $d->hospital_discharged_at !== null
+                    && $d->getRawOriginal('hospital_discharged_at') === $d->getRawOriginal('occurred_at')
+                    && $d->hospital_discharged_at->greaterThanOrEqualTo($admission->hospital_admitted_at))
+                    ->sortBy(fn (ClinicalEvent $d): string => (string) $d->getRawOriginal('occurred_at'))->first();
+                $until = $end ? CarbonImmutable::parse((string) $end->getRawOriginal('occurred_at'), 'UTC') : null;
+                if ($until === null || $until->greaterThan($dayStart)) {
+                    $periods[(int) $admission->client_id][] = ['source' => self::HOSPITAL, 'id' => (int) $admission->id,
+                        'from' => CarbonImmutable::parse((string) $admission->getRawOriginal('hospital_admitted_at'), 'UTC'), 'until' => $until];
+                }
+            });
 
         RespiteStay::query()
             ->join('respite_bookings as rb', 'rb.id', '=', 'respite_stays.booking_id')
@@ -213,16 +253,18 @@ final class DoseAwaySources
             ClientLeaveRequest::query()
                 ->whereIn('client_id', $clientIds)
                 ->whereIn('status', self::LEAVE_STATUSES)
-                ->where('starts_on', '<=', $to)
-                ->where('ends_on', '>=', $from)
-                ->orderBy('starts_on')->orderBy('id')
-                ->get(['id', 'client_id', 'starts_on', 'ends_on'])
-                ->each(function (ClientLeaveRequest $leave) use (&$periods, $timezone): void {
+                ->whereNotNull('approved_at')->whereNotNull('approved_by')->whereNull('withdrawn_at')
+                ->whereNotNull('departed_at')->where('departed_at', '<', $dayEnd)
+                ->where(fn ($q) => $q->whereNull('returned_at')->orWhere('returned_at', '>', $dayStart))
+                ->orderBy('departed_at')->orderBy('id')
+                ->get(['id', 'client_id', 'departed_at', 'returned_at'])
+                ->each(function (ClientLeaveRequest $leave) use (&$periods): void {
                     $periods[(int) $leave->client_id][] = [
                         'source' => self::LEAVE,
                         'id' => (int) $leave->id,
-                        'from' => CarbonImmutable::parse($leave->starts_on->toDateString(), $timezone)->utc(),
-                        'until' => CarbonImmutable::parse($leave->ends_on->toDateString(), $timezone)->addDay()->utc(),
+                        'from' => CarbonImmutable::parse((string) $leave->getRawOriginal('departed_at'), 'UTC'),
+                        'until' => $leave->getRawOriginal('returned_at') === null ? null
+                            : CarbonImmutable::parse((string) $leave->getRawOriginal('returned_at'), 'UTC'),
                     ];
                 });
         }
@@ -231,7 +273,7 @@ final class DoseAwaySources
     }
 
     /**
-     * The first period (respite before leave, as the projection) a dose due
+     * The first period (hospital, respite, then leave, as the projection) a dose due
      * at $dueAt falls in.
      *
      * @param  list<array{source: string, id: int, from: CarbonImmutable, until: CarbonImmutable|null}>  $periods
@@ -239,7 +281,7 @@ final class DoseAwaySources
      */
     public static function refAt(array $periods, CarbonImmutable $dueAt): ?array
     {
-        foreach ([self::RESPITE, self::LEAVE] as $source) {
+        foreach ([self::HOSPITAL, self::RESPITE, self::LEAVE] as $source) {
             foreach ($periods as $period) {
                 if ($period['source'] === $source
                     && $dueAt->greaterThanOrEqualTo($period['from'])

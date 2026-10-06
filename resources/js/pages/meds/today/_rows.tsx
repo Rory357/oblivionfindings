@@ -1,3 +1,4 @@
+import { secondPersonDisplay } from '@/lib/medication-second-person';
 /* Meds today (P01 C3) — one scheduled dose as a row: the state badge and
  * its plain lines, the medicine cell, the row's main action, and the one
  * MenuItem[] that feeds the kebab, right-click and Shift+F10 (LIST_STYLE_GUIDE
@@ -338,28 +339,18 @@ export function DoseStateCell({
                         .join(' · ')}
                 </Line>,
             );
-        if (r.witness && r.second_person_status !== 'not_confirmed') {
-            const what =
-                r.second_person_kind === 'amount'
-                    ? 'Different amount confirmed by'
-                    : r.second_person_kind === 'witness' || row.is_controlled
-                      ? 'Witnessed by'
-                      : 'Confirmed by';
+        const confirmation = secondPersonDisplay(r);
+        if (confirmation)
             lines.push(
-                <Line key="w">
-                    <Users
-                        className="mt-0.5 size-3 shrink-0"
-                        aria-hidden="true"
-                    />{' '}
-                    {what} {r.witness} (witness PIN)
-                </Line>,
-            );
-        }
-        if (r.second_person_status === 'not_confirmed')
-            lines.push(
-                <Line key="nc" tone="warning">
-                    Not confirmed by a second person · follow-up for the house
-                    lead
+                <Line
+                    key="second-person"
+                    tone={
+                        confirmation.tone === 'success'
+                            ? undefined
+                            : confirmation.tone
+                    }
+                >
+                    {confirmation.label} · {confirmation.detail}
                 </Line>,
             );
         if (r.amount_mode === 'less' && r.dose_given)

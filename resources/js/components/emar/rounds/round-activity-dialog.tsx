@@ -1,3 +1,5 @@
+import { StatusBadge } from '@/components/ui/status-badge';
+import { secondPersonDisplay } from '@/lib/medication-second-person';
 /* eslint-disable no-restricted-syntax -- detail rows are a custom definition list
    inside a Dialog, not standalone Cards. All colours are semantic tokens. */
 import { ClientAvatar } from '@/components/meds/board-bits';
@@ -47,8 +49,12 @@ export default function RoundActivityDialog({
     item: ActivityItem;
     onClose: () => void;
 }) {
+    const confirmation = secondPersonDisplay({
+        ...item,
+        witness: item.witnessed_by,
+    });
     const chips = [
-        item.witnessed_by ? `Witness: ${item.witnessed_by}` : null,
+        confirmation ? confirmation.label : null,
         item.blood_glucose_level != null
             ? `BG ${item.blood_glucose_level} mmol/L`
             : null,
@@ -116,7 +122,23 @@ export default function RoundActivityDialog({
                             label="Scheduled for"
                             value={fmt(item.scheduled_for)}
                         />
-                        <Row label="Witness" value={item.witnessed_by} />
+                        <Row
+                            label="Second person"
+                            value={
+                                confirmation ? (
+                                    <span>
+                                        <StatusBadge
+                                            variant={confirmation.tone}
+                                        >
+                                            {confirmation.label}
+                                        </StatusBadge>
+                                        <span className="text-subtle mt-1 block">
+                                            {confirmation.detail}
+                                        </span>
+                                    </span>
+                                ) : null
+                            }
+                        />
                         <Row
                             label="Blood glucose"
                             value={

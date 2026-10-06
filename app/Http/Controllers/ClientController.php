@@ -100,8 +100,11 @@ use App\Services\ConsentValidationService;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use App\Services\Fleet\TransportRequestService;
 use App\Services\HealthSafety\HsModuleSummaryService;
+use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\DoseSlots\ClientCalendarDoses;
+use App\Services\Medication\DoseSlots\DoseAwaySources;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\MedicationProfileAuditPrivacy;
 use App\Services\Medication\MedicationTimelineVisibilityService;
 use App\Services\NotificationService;
 use App\Services\Queclink\LocateNowService;
@@ -928,13 +931,13 @@ class ClientController extends Controller
                 })
                 ->values() : null,
             'audit_history' => $sectionAccess['audit']
-                ? app(\App\Services\Medication\MedicationProfileAuditPrivacy::class)->apply(AuditLog::query(), $request->user(), $client)
+                ? app(MedicationProfileAuditPrivacy::class)->apply(AuditLog::query(), $request->user(), $client)
                     ->where('client_id', $client->id)
                     ->with('user:id,name,email')
                     ->orderByDesc('created_at')
                     ->limit(200)
                     ->get()
-                    ->reject(fn ($log) => ! $canViewControlledMedication && app(\App\Services\Medication\MedicationProfileAuditPrivacy::class)->containsControlledSnapshot($log->meta))
+                    ->reject(fn ($log) => ! $canViewControlledMedication && app(MedicationProfileAuditPrivacy::class)->containsControlledSnapshot($log->meta))
                     ->values()
                     ->map(fn ($log) => [
                         'id' => $log->id,
@@ -972,7 +975,7 @@ class ClientController extends Controller
             'leave_excursions' => $sectionAccess['daily_living'] ? [
                 'leave' => ClientLeaveRequest::query()
                     ->where('client_id', $client->id)
-                    ->with(['requester:id,name', 'approver:id,name'])
+                    ->with(['requester:id,name', 'approver:id,name', 'transitions'])
                     ->orderByDesc('starts_on')
                     ->limit(50)
                     ->get()
@@ -989,6 +992,20 @@ class ClientController extends Controller
                         'approver' => $l->approver?->name,
                         'approved_at' => $l->approved_at?->toISOString(),
                         'approval_notes' => $l->approval_notes,
+                        'version' => (int) $l->version,
+                        'departed_at' => $l->departed_at?->toISOString(),
+                        'departed_by' => $l->departed_by,
+                        'returned_at' => $l->returned_at?->toISOString(),
+                        'returned_by' => $l->returned_by,
+                        'withdrawn_at' => $l->withdrawn_at?->toISOString(),
+                        'withdrawn_by' => $l->withdrawn_by,
+                        'withdrawal_reason' => $l->withdrawal_reason,
+                        'allowed_actions' => $l->allowedActions($request->user()?->can('update', $client) ?? false),
+                        'medication_away_enabled' => DoseAwaySources::leaveCounts(),
+                        'history' => $l->transitions->map(fn ($event) => [
+                            'action' => $event->meta['action'], 'occurred_at' => $event->occurred_at->toISOString(),
+                            'actor_id' => $event->actor_user_id, 'version' => $event->meta['version'], 'reason' => $event->meta['reason'] ?? null,
+                        ])->values(),
                     ])
                     ->values(),
                 'excursions' => ClientExcursionRequest::query()
@@ -2993,7 +3010,9 @@ class ClientController extends Controller
     private function syncClientMedicalProfile(Client $client, array $medical): void
     {
         $canonical = $client->medicalProfile()->whereNotNull('allergies_canonical_at')->exists();
-        if ($canonical) app(\App\Services\Medication\ClientAllergyRecordService::class)->guardLegacyEdit($client, $medical['allergies'] ?? []);
+        if ($canonical) {
+            app(ClientAllergyRecordService::class)->guardLegacyEdit($client, $medical['allergies'] ?? []);
+        }
         $medicalFilled = collect($medical)->contains(
             fn ($v) => is_array($v) ? count($v) > 0 : (filled($v) && $v !== false && $v !== '0')
         );

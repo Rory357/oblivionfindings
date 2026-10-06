@@ -10,6 +10,7 @@ use App\Models\Site;
 use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\SecondPersonConfirmationPayload;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -153,7 +154,7 @@ class GuidedRoundService
         }
 
         $records = $administrationQuery
-            ->with(['administeredBy:id,name', 'witnessedBy:id,name'])
+            ->with(['administeredBy:id,name', 'witnessedBy:id,name', SecondPersonConfirmationPayload::RELATION])
             ->orderBy('id')
             ->get();
         // A refusal that was offered again (P01 re-offer) is history: the
@@ -357,6 +358,10 @@ class GuidedRoundService
                 },
                 'away_reason' => $admin === null ? ($it['away_reason'] ?? null) : null,
                 'witnessed_by' => $admin['witnessed_by'] ?? null,
+                'second_person_kind' => $admin['second_person_kind'] ?? null,
+                'second_person_status' => $admin['second_person_status'] ?? null,
+                'witness_method' => $admin['witness_method'] ?? null,
+                'second_person_confirmation' => $admin['second_person_confirmation'] ?? null,
                 'blood_glucose_level' => $admin['blood_glucose_level'] ?? null,
                 'pulse_bpm' => $admin['pulse_bpm'] ?? null,
                 'reason' => $admin['reason'] ?? null,
@@ -460,6 +465,7 @@ class GuidedRoundService
                 'medication.client.site:id,name',
                 'administeredBy:id,name',
                 'witnessedBy:id,name',
+                SecondPersonConfirmationPayload::RELATION,
             ])
             ->get()
             ->map(function (ClientMedicationAdministration $administration): ?array {
@@ -550,6 +556,7 @@ class GuidedRoundService
                 'administered_at' => $administration->administered_at?->toIso8601String(),
                 'administered_by' => $administration->administeredBy?->name,
                 'witnessed_by' => $administration->witnessedBy?->name,
+                ...app(SecondPersonConfirmationPayload::class)->forAdministration($administration),
                 'blood_glucose_level' => $administration->blood_glucose_level !== null
                     ? (float) $administration->blood_glucose_level
                     : null,

@@ -1,5 +1,45 @@
 # eMAR implementation and verification status
 
+## Remaining workflows and 1CHART comparison — 6 October 2026
+
+This current checkpoint supersedes earlier deferred-feature and pending-main statements below. PR #16 was merged into main at 411de15ec75279306f25394f160c0085cd1e9866. The following completion is on codex/emar-remaining-workflows-20261006 until its own reviewed integration finishes.
+
+The forgotten second-person PIN route is now connected to the recording dialog for eligible ordinary medicines. It records a nomination, not a verified witness, and requires confirmation in the nominated colleague's own account. Pending, confirmed, disputed and expired outcomes are visible across scheduled/PRN records, MAR, rounds and history. Browser verification found and corrected an ordinary confirmation path that incorrectly required controlled-drug permission; controlled-drug witnessing remains unchanged. Named confirmation work is also included in Meds today follow-ups, and its notification opens the canonical review directly. Controlled medicines and explicit witness requirements retain their existing PIN requirements.
+
+Client leave now has approval, actual departure, actual return and planned withdrawal actions with retained history, current authority and revision checks. Approval alone never suppresses a dose. Actual hospital admission and paired discharge use the same Away calculation, including after a house move; full historical clinical details retain their access boundary. Recorded medication outcomes take precedence, earlier overdue doses remain actionable, and a return ends only that absence. Date/time entry and review show explicit offsets for New Zealand clock changes.
+
+Pack stock, forgotten-PIN confirmation and actual-leave Away are enabled in source defaults, with separate installation overrides. Existing stock still requires an explicit counted opening. No historical absence was inferred or backfilled. No production environment, database or deployment has been changed.
+
+### Verification and remaining integration gates
+
+Final desktop asset build (app-Dm88giB-.js, 4m 21s), full TypeScript and scoped lint/formatting passed. The broad eMAR frontend run passed 463 tests across 76 files; subsequent complete affected-file runs cover the final wizard width and disabled-installation wording changes. The complete record-dose file passed 21 tests after the retained-draft denial-message repair, and both complete confirmation entry-point files passed 30 tests. These overlapping runs are not added together.
+
+Final local backend acceptance passes **220 distinct cases / 3,336 assertions across ten complete files**. The latest ordinary-authority and frontline-projection run passed ForgottenWitnessPinTest 37 / 738 and MedicationFollowupWorkflowTest 59 / 605, with actual exit zero and no failures, errors or skips. The eight unchanged passing files contribute 124 / 1,993; the superseded Forgotten run is not added. Earlier failed absence-fixture results remain retained as failed evidence. Final evidence: `storage/logs/emar-ordinary-confirmation-authority-acceptance-20261006-evidence.json`, SHA256 `CC5B11E35C6CBADFE4B34483924E7289498AAE007B83F433109652775DBB78AA`. All frozen source/test/runtime hashes matched, and the exact owned disposable test database and processes were verified absent.
+
+The calendar entry-point check found that the shared overdue rail requests 75 days while each medication feed request is limited to 62. The personal-calendar adapter now splits long periods into contiguous 60-day requests, deduplicates spanning entries and retains failures from any source/window. No history is truncated and the server guard is unchanged. All seven complete adapter tests pass, including the New Zealand clock change, spanning shifts and partial/failing responses. This frontend-only correction was independently reviewed outside the frozen backend run. The final rebuilt desktop calendar loaded its month and overdue summary without the medication-unavailable warning; the expected new asset was served and browser error/warning logs were empty.
+
+Synthetic desktop verification used the isolated completion worktree at http://127.0.0.1:8767 and newly created fictional records only. Actual leave approval/departure/return and paired hospital admission/discharge saved through the UI. Before departure, all doses remained due; after departure, only the covered doses became Away; an early return restored later doses; hospital admission then correctly covered its own interval. A recorded dose retained its outcome throughout. An ordinary second-person nomination saved and remained explicitly unverified. The final build showed it in the nominated colleague’s Meds today queue with its deadline and canonical review link. The colleague confirmed through their own account; the chart then named them as confirmed in their own account, and the pending count became zero. The notification shortcut also reopened that saved confirmation directly. Browser console errors/warnings were absent. Fresh CI and normal reviewed main integration remain required for this candidate. No production deployment is claimed.
+
+### Does this cover all of 1CHART?
+
+No. Public vendor documentation supports substantial overlap, not full feature parity. The supported-living structure makes sense: person-owned medicines and stock, house/shift context, staff eligibility, medication charts and rounds, as-needed outcomes, controlled-drug records, reviews, escalation and retained evidence. This is a software/workflow assessment, not clinical certification.
+
+| Capability | Local eMAR position | Public 1CHART reference |
+| --- | --- | --- |
+| MAR, administration, PRN follow-up, reviews and countersigning | Implemented core workflows, with permission and competency checks | [Product overview](https://toniq.nz/products/1chart/) |
+| Connected pharmacy orders and medicine/chart exchange | Internal pharmacy-order tracking and receipts exist; no Toniq transmission connector was found. The local order UI explicitly says no pharmacy order is transmitted. | [Medicines re-order](https://toniq.zendesk.com/hc/en-nz/articles/7926794030351-Enable-the-Medicines-Re-order-Option), [patient export](https://toniq.zendesk.com/hc/en-nz/articles/7926808398991-Exporting-Patient-to-1CHART) |
+| Maintained medicine pill pictures and brand/generic reference | Uploaded stock photographs exist; a maintained vendor medicine-picture catalogue was not found. An NZULM code field alone is not a connected catalogue. | [Product overview](https://toniq.nz/products/1chart/) |
+| External prescriber/practice access | Internal order entry, source evidence and independent checks exist; no external practice connection was found. | [Prescriber access](https://toniq.zendesk.com/hc/en-nz/articles/12640169630863-Enable-new-prescriber-s-access-to-patients-in-my-care-facility) |
+| Chart transfer between separate providers/facilities | Internal house movement, reconciliation and hospital absence do not provide external chart exchange. | [Transfer between 1CHART facilities](https://toniq.zendesk.com/hc/en-nz/articles/7926859875983-Transferring-Patient-From-1C-to-Another-1C-Facility) |
+| Automatic protected backup chart emails | Authorised downtime chart export exists; scheduled protected chart-email delivery was not found. | [Automated email backup](https://toniq.zendesk.com/hc/en-nz/articles/6849284302735-Automated-Email-Backup) |
+
+The comparison uses public product/help material, not a logged-in vendor acceptance test. Features advertised for the separate Toniq Dispensary product, including its NZ electronic prescribing connections, are not automatically attributed to 1CHART. External exchange would need the relevant supported API, vendor agreement and authorised service credentials; none has been fabricated or activated. Mobile-phone work is outside this project's agreed desktop-web scope.
+
+---
+
+The sections below are historical checkpoints and retain the decisions and evidence applicable at their recorded stage.
+
+
 ## Emergency policy concurrency and request recovery — 6 October 2026
 
 New emergency-access grants now take the same settings revision lock as policy saves, after locking the current people, profiles and house, and read the current policy under lock. Reason, duration and second-person requirements are revalidated against that snapshot before the grant commits, including when no policy has yet been stored. Existing grants and their extensions keep their recorded policy.

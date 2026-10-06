@@ -349,7 +349,7 @@ final class MedicationFollowupService
         $manage = $actor->canDo(self::MANAGE);
         $canComplete = $row->type === 'confirm'
             ? (int) $row->owner_id === (int) $actor->id && $actor->approved_at !== null
-                && $actor->canDo('medications.view') && $actor->canDo('medications.controlled.witness') && $this->staff->isCurrent($actor)
+                && $actor->canDo('medications.view') && $actor->canDo('medications.administer.record') && $this->staff->isCurrent($actor)
             : ($lead ? $manage : (($shift !== null || (int) $row->owner_id === (int) $actor->id)
                 && $this->clinicalScope->hasOrdinaryPersonAccess($actor, $row->client, $shift)
                 || $this->clinicalScope->hasCurrentGrant($actor, $row->client)) && $actor->canDo('medications.administer.record'));

@@ -9,6 +9,7 @@ use App\Services\Medication\Support\SupportRecordingGuard;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ClientMedicationAdministration extends Model
@@ -16,6 +17,8 @@ class ClientMedicationAdministration extends Model
     use AuditableChanges;
     use HasFactory;
     use SoftDeletes;
+
+    protected $hidden = ['secondPersonConfirmation'];
 
     /**
      * P01 foundation C3: every write that can change a dose's effective
@@ -263,6 +266,12 @@ class ClientMedicationAdministration extends Model
     public function witnessedBy()
     {
         return $this->belongsTo(User::class, 'witnessed_by');
+    }
+
+    public function secondPersonConfirmation(): HasOne
+    {
+        return $this->hasOne(MedicationSecondPersonConfirmation::class, 'administration_id')
+            ->select(['id', 'administration_id', 'nominated_user_id', 'status', 'due_at']);
     }
 
     public function correctionRequestedBy()

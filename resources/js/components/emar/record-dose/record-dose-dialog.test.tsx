@@ -241,6 +241,190 @@ describe('RecordDoseDialog (P01)', () => {
         expect(await screen.findByText('Recorded')).toBeInTheDocument();
     });
 
+    it.each([
+        { status: 403, data: { message: 'Your access changed.' } },
+        { status: 404, data: { message: '' } },
+    ])(
+        'retains a denied draft without suggesting a different clinical outcome ($status)',
+        async ({ status, data }) => {
+            submitMock.mockRejectedValueOnce({
+                isAxiosError: true,
+                response: { status, data },
+            });
+            submitMock.mockResolvedValueOnce({
+                status: 'processed',
+                data: { administration: { id: 9 } },
+            });
+            open(requirements());
+            await screen.findByText('Losartan 50mg');
+            fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+            fireEvent.click(
+                await screen.findByRole('button', { name: /^Given/ }),
+            );
+            fireEvent.change(
+                screen.getByRole('textbox', {
+                    name: 'What happened (optional)',
+                }),
+                { target: { value: 'Synthetic dose note kept for retry.' } },
+            );
+            fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+            fireEvent.click(
+                screen.getByRole('button', { name: /^record outcome$/i }),
+            );
+            const notice = await screen.findByRole('alert');
+            expect(notice).toHaveTextContent('Your draft is kept.');
+            expect(notice).toHaveTextContent(
+                'Record only what actually happened.',
+            );
+            expect(notice).not.toHaveTextContent(
+                'Ask a colleague with current competency to give it',
+            );
+            expect(notice).not.toHaveTextContent('record a refusal');
+            if (status === 403)
+                expect(notice).toHaveTextContent('Your access changed.');
+            expect(
+                screen.getByText('Synthetic dose note kept for retry.'),
+            ).toBeInTheDocument();
+            fireEvent.click(
+                screen.getByRole('button', { name: /^record outcome$/i }),
+            );
+            expect(await screen.findByText('Recorded')).toBeInTheDocument();
+            expect(submitMock).toHaveBeenCalledTimes(2);
+            expect(submitMock.mock.calls[1][1]).toEqual(
+                submitMock.mock.calls[0][1],
+            );
+        },
+    );
+
+    async function openForgottenPin(
+        req: DoseRequirements = requirements({
+            second_person: {
+                kind: 'rule',
+                rule_sentences: [],
+                anyone_available: true,
+                may_go_unconfirmed: false,
+                candidates: [{ id: 5, name: 'Mere Kahu', can_confirm: true }],
+                forgotten_pin_allowed: true,
+                confirm_within_minutes: 30,
+            },
+        }),
+    ) {
+        open(req);
+        await screen.findByText('Losartan 50mg');
+        fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+        fireEvent.click(await screen.findByRole('button', { name: /^Given/ }));
+        fireEvent.click(screen.getByRole('combobox', { name: /Confirmed by/ }));
+        fireEvent.click(
+            await screen.findByRole('option', { name: /Mere Kahu/ }),
+        );
+    }
+
+    it('keeps separate confirmation pending, omits the PIN and requires the colleague to have been present', async () => {
+        submitMock.mockResolvedValue({
+            status: 'processed',
+            data: {
+                administration: {
+                    id: 90,
+                    second_person_status: 'not_verified',
+                    witness_method: 'pin_forgotten',
+                    second_person_confirmation: {
+                        id: 11,
+                        status: 'pending',
+                        nominated_name: 'Mere Kahu',
+                        due_at: '2026-10-06T02:00:00Z',
+                    },
+                },
+            },
+        });
+        await openForgottenPin();
+        fireEvent.change(screen.getByLabelText(/Their 6-digit PIN/), {
+            target: { value: '123456' },
+        });
+        fireEvent.click(
+            screen.getByRole('button', { name: 'They forgot their PIN' }),
+        );
+        expect(
+            screen.queryByLabelText(/Their 6-digit PIN/),
+        ).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+        expect(
+            screen.getByText(
+                'Confirm that your colleague was present for this dose.',
+            ),
+        ).toBeInTheDocument();
+        expect(submitMock).not.toHaveBeenCalled();
+        fireEvent.click(
+            screen.getByRole('checkbox', {
+                name: 'I confirm Mere Kahu was present for this dose.',
+            }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+        expect(
+            await screen.findByText('Pending their own sign-in'),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText('PIN checked when saved'),
+        ).not.toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', { name: /^record outcome$/i }),
+        );
+        await waitFor(() => expect(submitMock).toHaveBeenCalledOnce());
+        expect(submitMock.mock.calls[0][1]).toMatchObject({
+            witnessed_by: 5,
+            second_person_pin_forgotten: true,
+        });
+        expect(submitMock.mock.calls[0][1]).not.toHaveProperty(
+            'witness_credential',
+        );
+        expect(submitMock.mock.calls[0][1]).not.toHaveProperty(
+            'second_person_unavailable',
+        );
+        expect(submitMock.mock.calls[0][2]).toMatchObject({
+            allowQueueWhenOffline: false,
+        });
+        expect(
+            await screen.findByText(
+                /Second-person confirmation pending · Awaiting Mere/,
+            ),
+        ).toBeInTheDocument();
+    });
+
+    it('clears the forgotten mode when returning to PIN entry', async () => {
+        await openForgottenPin();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'They forgot their PIN' }),
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Use their PIN instead' }),
+        );
+        expect(screen.getByLabelText(/Their 6-digit PIN/)).toHaveValue('');
+        fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+        expect(
+            screen.getByText('Enter their 6-digit PIN.'),
+        ).toBeInTheDocument();
+        expect(submitMock).not.toHaveBeenCalled();
+    });
+
+    it('does not offer forgotten-PIN mode when the server has not allowed it', async () => {
+        await openForgottenPin(
+            requirements({
+                second_person: {
+                    kind: 'rule',
+                    rule_sentences: [],
+                    anyone_available: true,
+                    may_go_unconfirmed: false,
+                    candidates: [
+                        { id: 5, name: 'Mere Kahu', can_confirm: true },
+                    ],
+                    forgotten_pin_allowed: false,
+                },
+            }),
+        );
+        expect(
+            screen.queryByRole('button', { name: 'They forgot their PIN' }),
+        ).not.toBeInTheDocument();
+    });
+
     it('keeps "given" closed while a block applies but a refusal stays open', async () => {
         open(
             requirements({

@@ -16,6 +16,7 @@ use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationCompetencyRestrictionRules;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\SecondPersonConfirmationPayload;
 use App\Services\Medication\WitnessPinService;
 use App\Services\UserSiteAccessService;
 use App\Support\EmarUrl;
@@ -76,6 +77,7 @@ class MedsBoardPayloadService
                     'witnessedBy:id,name',
                     'medication:id,client_id,name,dosage,route,is_prn,controlled_drug,witness_required',
                     'prnEffectiveness:id,client_medication_administration_id',
+                    SecondPersonConfirmationPayload::RELATION,
                 ])
                 ->orderBy('id')
                 ->get();
@@ -310,8 +312,7 @@ class MedsBoardPayloadService
             'dose_given' => $administration->dose_given,
             'amount_mode' => $administration->amount_mode,
             'late_reason' => $administration->late_reason,
-            'second_person_kind' => $administration->second_person_kind,
-            'second_person_status' => $administration->second_person_status,
+            ...app(SecondPersonConfirmationPayload::class)->forAdministration($administration),
             'reoffer_of_id' => $administration->reoffer_of_id !== null ? (int) $administration->reoffer_of_id : null,
             'review_reason_key' => $administration->review_reason_key,
         ];
@@ -359,6 +360,7 @@ class MedsBoardPayloadService
                 'medication:id,client_id,name,is_prn,controlled_drug',
                 'administeredBy:id,name',
                 'witnessedBy:id,name',
+                SecondPersonConfirmationPayload::RELATION,
             ])
             ->orderByDesc('administered_at')
             ->orderByDesc('id');
@@ -368,6 +370,8 @@ class MedsBoardPayloadService
         return $query->paginate(10)->withQueryString()->through(function (ClientMedicationAdministration $a) use ($timezone, $today): array {
             $at = $this->rawUtcInstant($a, 'administered_at')->setTimezone($timezone);
             $isPrn = (bool) ($a->medication?->is_prn ?? false);
+            $secondPerson = app(SecondPersonConfirmationPayload::class)->forAdministration($a);
+            $confirmationStatus = $secondPerson['second_person_confirmation']['status'] ?? null;
             $outcome = match ($a->status) {
                 'given' => $a->reoffer_of_id !== null ? 'Given after re-offer' : ($isPrn ? 'Given (as needed)' : 'Given'),
                 'refused' => $a->reoffer_of_id !== null ? 'Refused again' : 'Refused',
@@ -380,8 +384,14 @@ class MedsBoardPayloadService
                 $a->status === 'given' && filled($a->dose_given) && ! in_array($a->amount_mode, ['less', 'more'], true)
                     ? $a->dose_given.($a->amount_mode === 'as_ordered' && ! $isPrn ? ' as ordered' : '')
                     : null,
-                $a->witnessedBy?->name ?($a->second_person_kind === 'witness' || $a->medication?->controlled_drug ? 'Witnessed by ' : 'Confirmed by ').$a->witnessedBy->name : null,
+                $a->witnessedBy?->name ? ($a->second_person_kind === 'witness' || $a->medication?->controlled_drug ? 'Witnessed by ' : 'Confirmed by ').$a->witnessedBy->name : null,
                 $a->second_person_status === 'not_confirmed' ? 'Not confirmed by a second person' : null,
+                match ($confirmationStatus) {
+                    'pending' => 'Awaiting the named colleague’s confirmation',
+                    'disputed' => 'Colleague disputed being there',
+                    'expired' => 'Colleague did not confirm in time',
+                    default => null,
+                },
                 $a->amount_mode === 'less' ? 'Less than ordered: '.$a->dose_given : null,
                 $a->amount_mode === 'more' ? 'More than ordered: '.$a->dose_given : null,
                 $a->late_reason ? 'Outside the dose window' : null,
@@ -408,6 +418,7 @@ class MedsBoardPayloadService
                 'status' => $a->status,
                 'outcome' => $outcome,
                 'by' => $a->administeredBy?->name,
+                ...$secondPerson,
                 'detail' => $detail === [] ? null : implode(' · ', $detail),
             ];
         });

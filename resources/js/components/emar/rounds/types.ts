@@ -1,3 +1,4 @@
+import type { SecondPersonEvidence } from '@/lib/medication-second-person';
 /* Shared types for the redesigned eMAR Medication Rounds page (`/emar/rounds`).
  * Shapes mirror EmarController@rounds + GuidedRoundService. */
 import type { WitnessPinStatus } from '@/lib/witness-pin';
@@ -10,7 +11,7 @@ export type RoundStatus =
     | string;
 
 /** One scheduled dose in a round — powers the Chart matrix and audit timeline. */
-export interface RoundCell {
+export interface RoundCell extends SecondPersonEvidence {
     resident_id: number;
     resident_name: string;
     site_id: number | null;
@@ -70,7 +71,7 @@ export interface Resident {
     site_name: string | null;
 }
 
-export interface RoundItemAdministration {
+export interface RoundItemAdministration extends SecondPersonEvidence {
     id: number;
     status: string;
     reason: string | null;
@@ -179,7 +180,7 @@ export interface GuidedRound {
     selected_progress?: RoundProgress;
 }
 
-export interface ActivityItem {
+export interface ActivityItem extends SecondPersonEvidence {
     id: number;
     status: string;
     medication_id: number | null;

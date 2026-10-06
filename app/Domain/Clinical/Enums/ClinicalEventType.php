@@ -13,6 +13,8 @@ enum ClinicalEventType: string
     case InfectionSign = 'infection_sign';
     case BehaviouralCrisis = 'behavioural_crisis';
     case MentalHealthEpisode = 'mental_health_episode';
+    case HospitalAdmission = 'hospital_admission';
+    case HospitalDischarge = 'hospital_discharge';
     case Other = 'other';
 
     public function label(): string
@@ -27,6 +29,8 @@ enum ClinicalEventType: string
             self::InfectionSign => 'Sign of Infection',
             self::BehaviouralCrisis => 'Behavioural Crisis',
             self::MentalHealthEpisode => 'Mental Health Episode',
+            self::HospitalAdmission => 'Hospital admission',
+            self::HospitalDischarge => 'Hospital discharge',
             self::Other => 'Other Clinical Event',
         };
     }
