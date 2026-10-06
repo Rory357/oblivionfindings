@@ -124,6 +124,10 @@ test.describe('operations rostering a11y smoke', () => {
         await loginAsStaff(page);
         await page.goto('/operations/rostering?week=2026-05-11&site_id=9001');
         await page.getByTestId('rostering-suggest-assignments').click();
+        // The request redirects before the suggestions page can be checked.
+        await page.waitForURL(
+            /\/operations\/rostering\/suggestions\/\d+(?:\?|$)/,
+        );
         await expect(page.getByTestId('roster-suggestions-page')).toBeVisible();
 
         await expectNoBlockingAxeViolations(page);
