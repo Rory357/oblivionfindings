@@ -31,18 +31,18 @@ The Settings reader also admits the dedicated pharmacy connection manager withou
 
 | State | Meaning and UI action |
 | --- | --- |
-| `queued` | Waiting to send; Stop before sending is allowed. No contact evidence exists yet. |
+| `queued` | A first send or explicitly requested retry is waiting. Stop prevents that pending attempt; earlier delivery evidence is retained. |
 | `sending` | A worker has claimed this send. Do not offer another send or supplier cancellation. |
 | `sent` | The configured endpoint returned 2xx. Await an authenticated pharmacy response; this does not prove acceptance. |
 | `accepted` | Signed pharmacy evidence accepted this exact dispatched snapshot. Physical stock still needs a counted receipt. |
 | `rejected` | Signed pharmacy evidence declined this snapshot. Preserve it and create a corrected new supply order when appropriate. |
 | `failed` | A definitive non-delivery or a recorded pharmacy check confirms no receipt. Retry only if enabled by current authority and the partner’s agreed idempotency support. |
 | `unknown` | Timeout, redirect, ambiguous HTTP result, worker crash, or commit uncertainty. Contact the pharmacy; do not resend automatically. |
-| `cancelled` | Delivery was stopped before any outbound request, or authorization/snapshot was revoked during preflight. Create a newly checked supply order if needed. |
+| `cancelled` | Further sending was stopped, or authorization/snapshot was revoked during preflight. Earlier attempts and their factual result remain visible; this does not cancel a supplier order. Create a newly checked supply order if needed. |
 
 The unknown-resolution form must explicitly say “I checked with the pharmacy and they confirmed they did not receive this order” and require the call/secure-message reference. Saving that check changes the dispatch to `failed`; it never sends automatically and never records pharmacy acceptance. A signed later acknowledgment remains authoritative if it contradicts that manual check. Retry preserves the original dispatch UUID as the partner idempotency key.
 
-The Stop action only stops `queued`/`failed` dispatches. Local supply cancellation/close-short remains available under existing rules and does not cancel an order already at the pharmacy. Show “This closes our supply record. Contact the pharmacy separately to cancel their order.” when external delivery is sending/sent/accepted/unknown. Physical receipt and dispensing evidence remain under existing Stock/CD workflows. Content changes are frozen while an external order is in flight. A timeout cannot be relabeled as manual contact without first resolving its delivery.
+The Stop action only stops `queued`/`failed` dispatches. Stopping a failed dispatch retains its original failure reason; stopping a queued retry is distinguished from stopping its first send. Local supply cancellation/close-short stops a pending queued attempt but leaves an existing failed delivery and its reason unchanged. Local closure remains available under existing rules and does not cancel an order already at the pharmacy. Show “This closes our supply record. Contact the pharmacy separately to cancel their order.” when external delivery is sending/sent/accepted/unknown. Physical receipt and dispensing evidence remain under existing Stock/CD workflows. Content changes are frozen while an external order is in flight. A timeout cannot be relabeled as manual contact without first resolving its delivery.
 
 The HTTP 2xx result records secure-message contact evidence and changes draft→submitted. A signed accepted receipt may record submitted→confirmed, including timeout recovery with proven contact; it never dispenses or receives stock. Delayed acknowledgments after a person/medicine/connection change are retained as supplier evidence with `acknowledgment_applied:false`; they do not change clinical supply status. Later dispensing/receipt states never regress.
 

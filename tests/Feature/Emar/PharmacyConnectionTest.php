@@ -19,10 +19,12 @@ use App\Services\Medication\PharmacyConnect\PharmacyDispatchService;
 use App\Services\Medication\Stock\MedicationStockService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 final class PharmacyConnectionTest extends TestCase
@@ -218,6 +220,22 @@ final class PharmacyConnectionTest extends TestCase
         $this->postJson('/emar/stock/packs/commands', ['action' => 'order_update', 'client_medication_id' => $this->fixture['medication']->id,
             'request_uuid' => (string) Str::uuid(), 'order_id' => $this->fixture['order']->id, 'next' => 'cancelled', 'reason' => 'Synthetic local cancellation'])->assertOk();
         $this->assertSame('cancelled', $dispatch->fresh()->state);
+        $this->assertSame('local_supply_closed_before_send', $dispatch->fresh()->result_code);
+        $this->assertSame(0, $dispatch->fresh()->attempt_count);
+        app(PharmacyDispatchService::class)->send($dispatch->id);
+        Http::assertNothingSent();
+    }
+
+    public function test_explicitly_stopping_the_first_queue_retains_before_send_wording_and_request_replay(): void
+    {
+        $dispatch = $this->queue();
+        [$url, $body] = $this->stopInput($dispatch, false);
+        $this->postJson($url, $body)->assertOk()->assertJsonPath('dispatch.state', 'cancelled')
+            ->assertJsonPath('dispatch.result_code', 'stopped_before_send');
+        $this->postJson($url, $body)->assertOk()->assertJsonPath('duplicate', true);
+        $this->assertSame(0, $dispatch->fresh()->attempt_count);
+        $this->assertSame('draft', $this->fixture['order']->fresh()->status);
+        $this->assertDatabaseCount('medication_pharmacy_dispatch_commands', 1);
         app(PharmacyDispatchService::class)->send($dispatch->id);
         Http::assertNothingSent();
     }
@@ -314,6 +332,117 @@ final class PharmacyConnectionTest extends TestCase
         $this->assertSame(1, MedicationEvent::where('kind', 'pharmacy.dispatch.unknown')->count());
         $this->assertSame(1, $dispatch->fresh()->attempt_count);
         Http::assertNothingSent();
+    }
+
+    public static function failedDeliveryStops(): array
+    {
+        return ['declined local closure' => [false, true], 'declined explicit stop' => [false, false],
+            'confirmed non-receipt local closure' => [true, true], 'confirmed non-receipt explicit stop' => [true, false]];
+    }
+
+    #[DataProvider('failedDeliveryStops')]
+    public function test_closing_or_stopping_failed_delivery_retains_factual_failure_and_cannot_resend(bool $resolved, bool $local): void
+    {
+        Http::swap(new Factory);
+        Http::preventStrayRequests();
+        $attempts = 0;
+        Http::fake(function () use ($resolved, &$attempts) {
+            $attempts++;
+            if ($resolved) {
+                throw new ConnectionException('Synthetic uncertain transport');
+            }
+
+            return Http::response('Synthetic definitive refusal', 422);
+        });
+        $dispatch = $this->queue();
+        $service = app(PharmacyDispatchService::class);
+        $service->send($dispatch->id);
+        if ($resolved) {
+            $this->assertSame('unknown', $dispatch->fresh()->state);
+            $this->postJson($this->dispatchUrl($dispatch).'/resolve', ['request_uuid' => (string) Str::uuid(),
+                'expected_state' => 'unknown', 'confirmed_not_received' => true, 'reference' => 'SYNTHETIC-NON-RECEIPT'])->assertOk();
+        }
+        $dispatch->refresh();
+        $this->assertSame('failed', $dispatch->state);
+        $this->assertSame($resolved ? 'pharmacy_confirmed_not_received' : 'partner_declined_transport', $dispatch->result_code);
+        $before = $dispatch->getRawOriginal();
+        $commandsBefore = DB::table('medication_pharmacy_dispatch_commands')->where('dispatch_id', $dispatch->id)->count();
+        [$url, $body] = $this->stopInput($dispatch, $local);
+        $this->grant($this->fixture['actor'], 'medications.stock.update', false);
+        $this->postJson($url, $body)->assertForbidden();
+        $this->assertSame($before, $dispatch->fresh()->getRawOriginal());
+        $this->assertSame('draft', $this->fixture['order']->fresh()->status);
+        $this->grant($this->fixture['actor'], 'medications.stock.update', true);
+        $this->postJson($url, $body)->assertOk();
+        $this->postJson($url, $body)->assertOk()->assertJsonPath('duplicate', true);
+
+        $after = $dispatch->fresh()->getRawOriginal();
+        $changed = $local ? [] : ['state' => true, 'updated_at' => true];
+        $this->assertSame(array_diff_key($before, $changed), array_diff_key($after, $changed));
+        $this->assertSame($local ? 'failed' : 'cancelled', $after['state']);
+        $this->assertSame($local ? 'cancelled' : 'draft', $this->fixture['order']->fresh()->status);
+        $this->assertSame($commandsBefore + ($local ? 0 : 1), DB::table('medication_pharmacy_dispatch_commands')->where('dispatch_id', $dispatch->id)->count());
+        $this->assertSame(1, MedicationEvent::where('kind', $local ? 'stock.order_update' : 'pharmacy.dispatch.cancel')->count());
+        $this->getJson($this->orderUrl().'/connection')->assertOk()->assertJsonPath('can_retry', false)
+            ->assertJsonPath('local_order_closed', $local)->assertJsonPath('dispatch.result_code', $before['result_code'])
+            ->assertJsonPath('dispatch.label', $local ? 'Not sent' : 'Sending stopped');
+        $this->postJson($this->dispatchUrl($dispatch).'/retry', ['request_uuid' => (string) Str::uuid(), 'expected_state' => $after['state']])
+            ->assertConflict()->assertJsonPath('code', $local ? 'supply_not_sendable' : 'retry_not_safe');
+        $service->send($dispatch->id);
+        $this->assertSame(['unknown' => 0, 'queued' => 0], $service->recover());
+        $this->assertSame(1, $attempts);
+        if (! $resolved) {
+            Http::assertSentCount(1);
+        }
+        $this->assertSame(1, $dispatch->fresh()->attempt_count);
+        $this->assertSame('10.00', $this->fixture['stock']->fresh()->on_hand);
+        $this->assertNull($this->fixture['order']->fresh()->quantity_received);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $this->assertDatabaseCount('medication_stock_lots', 0);
+    }
+
+    public static function queuedRetryStops(): array
+    {
+        return ['local closure' => [true], 'explicit stop' => [false]];
+    }
+
+    #[DataProvider('queuedRetryStops')]
+    public function test_stopping_a_queued_retry_is_truthful_and_never_starts_another_attempt(bool $local): void
+    {
+        Http::swap(new Factory);
+        Http::preventStrayRequests();
+        Http::fake(['https://pharmacy.example.test/orders' => Http::response('Synthetic definitive refusal', 422)]);
+        $dispatch = $this->queue();
+        $service = app(PharmacyDispatchService::class);
+        $service->send($dispatch->id);
+        $retry = ['request_uuid' => (string) Str::uuid(), 'expected_state' => 'failed'];
+        $this->postJson($this->dispatchUrl($dispatch).'/retry', $retry)->assertAccepted();
+        $this->postJson($this->dispatchUrl($dispatch).'/retry', $retry)->assertAccepted()->assertJsonPath('duplicate', true);
+        $dispatch->refresh();
+        $this->assertSame('queued', $dispatch->state);
+        $this->assertSame(1, $dispatch->attempt_count);
+        [$url, $body] = $this->stopInput($dispatch, $local);
+        $this->postJson($url, $body)->assertOk();
+        $this->postJson($url, $body)->assertOk()->assertJsonPath('duplicate', true);
+        $this->getJson($this->orderUrl().'/connection')->assertOk()->assertJsonPath('can_retry', false)
+            ->assertJsonPath('dispatch.state', 'cancelled')->assertJsonPath('dispatch.label', 'Sending stopped')
+            ->assertJsonPath('dispatch.result_code', $local ? 'local_supply_closed_before_retry' : 'retry_stopped');
+        $service->send($dispatch->id);
+        $this->assertSame(['unknown' => 0, 'queued' => 0], $service->recover());
+        $this->assertSame(1, $dispatch->fresh()->attempt_count);
+        $this->assertSame('10.00', $this->fixture['stock']->fresh()->on_hand);
+        $this->assertNull($this->fixture['order']->fresh()->quantity_received);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $this->assertDatabaseCount('medication_stock_lots', 0);
+        Http::assertSentCount(1);
+    }
+
+    private function stopInput(MedicationPharmacyDispatch $dispatch, bool $local): array
+    {
+        return $local ? ['/emar/stock/packs/commands', ['action' => 'order_update',
+            'client_medication_id' => $this->fixture['medication']->id, 'request_uuid' => (string) Str::uuid(),
+            'order_id' => $this->fixture['order']->id, 'next' => 'cancelled', 'reason' => 'Synthetic local closure']]
+            : [$this->dispatchUrl($dispatch).'/cancel', ['request_uuid' => (string) Str::uuid(), 'expected_state' => $dispatch->state]];
     }
 
     private function queue(): MedicationPharmacyDispatch

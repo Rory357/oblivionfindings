@@ -221,7 +221,9 @@ final class PharmacyDispatchService
                 if (! in_array($dispatch->state, ['queued', 'failed'], true)) {
                     throw new PharmacyConnectionException('supplier_cancellation_required', 'This order may have reached the pharmacy. Contact them; stopping this record cannot cancel their order.', 409);
                 }
-                $dispatch->forceFill(['state' => 'cancelled', 'result_code' => 'stopped_before_send'])->save();
+                $resultCode = $dispatch->state === 'failed' ? $dispatch->result_code
+                    : ($dispatch->attempt_count > 0 ? 'retry_stopped' : 'stopped_before_send');
+                $dispatch->forceFill(['state' => 'cancelled', 'result_code' => $resultCode])->save();
             } elseif ($action === 'resolve') {
                 if ($dispatch->state !== 'unknown' || ($data['confirmed_not_received'] ?? false) !== true || trim((string) ($data['reference'] ?? '')) === '') {
                     throw new PharmacyConnectionException('resolution_required', 'Record the pharmacy check confirming they did not receive this order.', 409);

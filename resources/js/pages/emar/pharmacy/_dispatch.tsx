@@ -260,7 +260,7 @@ export function PharmacyDispatch({
                                 disabled={command.busy || command.uncertain}
                                 onClick={() => startAction('cancel')}
                             >
-                                Stop before sending
+                                Stop sending
                             </Button>
                         )}
                     </div>
@@ -293,7 +293,7 @@ export function PharmacyDispatch({
                         : action === 'retry'
                           ? 'Retry this delivery?'
                           : action === 'cancel'
-                            ? 'Stop this delivery?'
+                            ? 'Stop further sending?'
                             : 'Record confirmed non-receipt?'
                 }
                 description={
@@ -302,7 +302,7 @@ export function PharmacyDispatch({
                         : action === 'retry'
                           ? 'Retry the same dispatch using its original delivery identifier. The current order and permissions will be checked again.'
                           : action === 'cancel'
-                            ? 'This only stops a delivery that has not been sent. It cannot cancel a supplier’s accepted order.'
+                            ? 'This stops further sending or retries from this record. Earlier delivery attempts stay in its history. Contact the pharmacy separately to cancel an order they received.'
                             : 'This records the pharmacy’s confirmed non-receipt. It does not send the order again.'
                 }
                 confirmText={

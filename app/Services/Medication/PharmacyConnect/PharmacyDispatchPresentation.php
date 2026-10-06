@@ -10,7 +10,7 @@ final class PharmacyDispatchPresentation
     public const LABELS = [
         'queued' => 'Waiting to send', 'sending' => 'Sending', 'sent' => 'Sent — awaiting pharmacy response',
         'accepted' => 'Pharmacy accepted', 'rejected' => 'Pharmacy declined', 'failed' => 'Not sent',
-        'unknown' => 'Delivery unknown — check with pharmacy', 'cancelled' => 'Stopped before sending',
+        'unknown' => 'Delivery unknown — check with pharmacy', 'cancelled' => 'Sending stopped',
     ];
 
     public function connection(MedicationPharmacyConnection $connection): array

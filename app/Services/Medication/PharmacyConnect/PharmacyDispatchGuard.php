@@ -43,10 +43,10 @@ final class PharmacyDispatchGuard
     public function localClosure(MedicationPharmacyOrder $order): void
     {
         $dispatch = $this->dispatch($order);
-        if ($dispatch && in_array($dispatch->state, ['queued', 'failed'], true)) {
-            $dispatch->forceFill(['state' => 'cancelled', 'result_code' => 'local_supply_closed_before_send'])->save();
+        if ($dispatch?->state === 'queued') {
+            $dispatch->forceFill(['state' => 'cancelled', 'result_code' => $dispatch->attempt_count > 0 ? 'local_supply_closed_before_retry' : 'local_supply_closed_before_send'])->save();
         }
-        // Sending/sent/unknown/accepted are retained truthfully. Local closure does not cancel the supplier's order.
+        // Failed/sending/sent/unknown/accepted are retained truthfully. Local closure does not cancel the supplier's order.
     }
 
     private function dispatch(MedicationPharmacyOrder $order): ?MedicationPharmacyDispatch

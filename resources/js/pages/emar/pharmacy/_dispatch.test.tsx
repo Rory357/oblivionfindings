@@ -27,7 +27,7 @@ const status = (state: string) => ({
     dispatch: { id: 9, state, label: state, attempt_count: 1 },
     can_send: false,
     can_retry: state === 'failed',
-    can_cancel: state === 'queued',
+    can_cancel: ['queued', 'failed'].includes(state),
     can_resolve_unknown: state === 'unknown',
 });
 beforeEach(() => {
@@ -36,7 +36,8 @@ beforeEach(() => {
 });
 it.each([
     ['failed', 'Review retry', 'Retry delivery', 'retry'],
-    ['queued', 'Stop before sending', 'Stop delivery', 'cancel'],
+    ['queued', 'Stop sending', 'Stop delivery', 'cancel'],
+    ['failed', 'Stop sending', 'Stop delivery', 'cancel'],
 ])(
     'sends only accepted command fields for %s',
     async (state, open, confirm, path) => {
@@ -68,8 +69,9 @@ it('uses a fresh command key when retry is followed by cancellation', async () =
         await screen.findByRole('button', { name: 'Review retry' }),
     );
     fireEvent.click(screen.getByRole('button', { name: 'Retry delivery' }));
+    await screen.findByText('queued');
     fireEvent.click(
-        await screen.findByRole('button', { name: 'Stop before sending' }),
+        await screen.findByRole('button', { name: 'Stop sending' }),
     );
     fireEvent.click(screen.getByRole('button', { name: 'Stop delivery' }));
     await waitFor(() => expect(axios.request).toHaveBeenCalledTimes(2));
