@@ -53,11 +53,13 @@ export default function EditTimesheetDialog({
     onOpenChange,
     timesheet,
     clients,
+    canEdit = false,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     timesheet: EditTimesheetRow | null;
     clients: ClientOption[];
+    canEdit?: boolean;
 }) {
     const [submitting, setSubmitting] = useState(false);
 
@@ -100,11 +102,12 @@ export default function EditTimesheetDialog({
 
     if (!timesheet) return null;
 
-    const editable = ['draft', 'returned'].includes(timesheet.status);
+    const editable =
+        canEdit && ['draft', 'returned'].includes(timesheet.status);
     const shiftLinked = !!timesheet.shift;
 
     const save = () => {
-        if (!editable) return;
+        if (!editable || submitting || form.processing) return;
         form.put(updateTimesheet.url(timesheet.id), {
             preserveScroll: true,
             onSuccess: (page) => {
@@ -114,6 +117,7 @@ export default function EditTimesheetDialog({
     };
 
     const submitForApproval = () => {
+        if (!editable || submitting || form.processing) return;
         setSubmitting(true);
         router.post(
             submitTimesheet.url(timesheet.id),
@@ -142,7 +146,7 @@ export default function EditTimesheetDialog({
                     <DialogDescription className="text-left text-xs">
                         {editable
                             ? 'Adjust the hours, breaks and allowances, then save — or submit for approval when it’s ready.'
-                            : 'Only draft or returned timesheets can be edited. Use the list actions for workflow steps.'}
+                            : 'Editing is unavailable for this record in the current view. Your entries are retained. Close and refresh the list to check its status and your access.'}
                     </DialogDescription>
                 </DialogHeader>
 
