@@ -262,6 +262,120 @@ class TimesheetCommandIntegrityTest extends TestCase
         $this->assertSame($before, $this->state());
     }
 
+    public function test_existing_manage_alias_role_can_create_another_current_workers_shift_timesheet_at_root(): void
+    {
+        $actor = $this->actor(['timesheets.create', 'hr.time.manage']);
+        $shift = $this->onBehalfShiftForAlias();
+        $this->assertNotSame($actor->id, $shift->user_id);
+        $this->assertTrue($actor->canDo('timesheets.manageAny'));
+        $this->assertFalse($actor->roles()->whereHas('permissions', fn ($query) => $query->where('key', 'timesheets.manageAny'))->exists());
+        $this->commitFixtures();
+        $before = $this->state();
+        $source = $shift->fresh()->getRawOriginal();
+        $response = $this->actingAs($actor)->postJson('/operations/timesheets', $this->body([
+            'mode' => 'shift', 'shift_id' => $shift->id, 'submit' => false,
+        ]))->assertOk();
+        $receipt = $response->json('timesheet_result');
+        $row = Timesheet::findOrFail($response->json('timesheet_id'));
+        $this->assertSame($actor->id, $receipt['actor_id']);
+        $this->assertSame($actor->id, $row->created_by);
+        $this->assertSame($this->worker->id, $receipt['user_id']);
+        $this->assertSame($this->worker->id, $row->user_id);
+        $this->assertSame($shift->id, $receipt['shift_id']);
+        $this->assertSame($this->client->id, $receipt['client_id']);
+        $this->assertSame($this->site->id, $receipt['effective_site_id']);
+        $this->assertSame('create', $receipt['action']);
+        $this->assertSame('draft', $receipt['status']);
+        $this->assertTrue($receipt['changed']);
+        $this->assertSame('saved', $receipt['outcome']);
+        $this->assertFalse($receipt['submit_requested']);
+        $this->assertNull($row->submitted_by);
+        $this->assertNull($row->submitted_at);
+        $this->assertSame($this->worker->name, $row->staff_name_snapshot);
+        $values = ['work_date' => '2026-10-07', 'starts_at' => '2026-10-06T20:00:00.000Z', 'ends_at' => '2026-10-07T00:00:00.000Z',
+            'break_minutes' => 0, 'mileage_km' => '0.00', 'allowance_notes' => null, 'public_holiday' => false,
+            'notes' => Str::trim($this->body()['notes']), 'is_residential_billable' => false, 'manual' => null, 'activity_items' => null];
+        $this->assertSame(hash('sha256', json_encode($values, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_LINE_TERMINATORS | JSON_THROW_ON_ERROR)), $receipt['values_hash']);
+        $after = $this->state();
+        $this->assertCount(count($before['timesheets']) + 1, $after['timesheets']);
+        foreach (['timesheet_client_allocations', 'hr_time_entries', 'hr_payroll_source_uses', 'billing_entries'] as $table) {
+            $this->assertSame($before[$table], $after[$table]);
+        }
+        $this->assertSame($source, $shift->fresh()->getRawOriginal());
+        $this->assertSame(0, DB::transactionLevel());
+        $this->assertFalse(DB::connection()->getPdo()->inTransaction());
+    }
+
+    public function test_current_manage_alias_deny_blocks_on_behalf_creation_after_an_independent_commit_despite_primed_rr(): void
+    {
+        $actor = $this->actor(['timesheets.create', 'timesheets.manageAny']);
+        $permission = Permission::firstOrCreate(['key' => 'hr.time.manage'], ['description' => 'Manage time alias', 'group' => 'timesheets', 'module' => 'Operations']);
+        $actor->permissionOverrides()->attach($permission->id, ['allowed' => true]);
+        $shift = $this->onBehalfShiftForAlias();
+        $this->assertNotSame($actor->id, $shift->user_id);
+        $this->assertTrue($actor->roles()->whereHas('permissions', fn ($query) => $query->where('key', 'timesheets.manageAny'))->exists());
+        $this->commitFixtures();
+        $writer = $this->writer();
+        DB::beginTransaction();
+        try {
+            $staleActor = $actor->fresh()->load(['roles.permissions', 'permissionOverrides', 'hrEmployeeProfile']);
+            $oldState = $this->state();
+            $oldSource = $shift->fresh()->getRawOriginal();
+            $oldAllowed = DB::table('permission_user')->where('permission_id', $permission->id)->where('user_id', $actor->id)->value('allowed');
+            $this->assertTrue((bool) $oldAllowed);
+            $this->assertTrue($staleActor->canDo('timesheets.manageAny'));
+            $this->assertSame(1, $writer->table('permission_user')->where('permission_id', $permission->id)->where('user_id', $actor->id)->update(['allowed' => false]));
+            $this->assertSame(0, $writer->transactionLevel());
+            $this->assertFalse($writer->getPdo()->inTransaction());
+            $this->assertFalse((bool) $writer->table('permission_user')->where('permission_id', $permission->id)->where('user_id', $actor->id)->value('allowed'));
+            $currentActor = User::on('timesheet_command_writer')->findOrFail($actor->id)
+                ->setConnection('timesheet_command_writer');
+            $this->assertSame('timesheet_command_writer', $currentActor->getConnectionName());
+            $this->assertSame($writer->getPdo(), $currentActor->getConnection()->getPdo());
+            $this->assertSame($writer->getPdo(), $currentActor->permissionOverrides()->getQuery()->getConnection()->getPdo());
+            $this->assertSame($writer->getPdo(), $currentActor->roles()->getQuery()->getConnection()->getPdo());
+            $this->assertNotSame(DB::connection()->getPdo(), $currentActor->getConnection()->getPdo());
+            $this->assertFalse($currentActor->canDo('timesheets.manageAny'));
+            $this->assertSame($oldAllowed, DB::table('permission_user')->where('permission_id', $permission->id)->where('user_id', $actor->id)->value('allowed'));
+            $this->assertTrue($staleActor->canDo('timesheets.manageAny'));
+            $this->assertSame($oldState, $this->state());
+            $before = $this->state($writer);
+            try {
+                app(TimesheetCreationService::class)->create($staleActor, $this->body([
+                    'mode' => 'shift', 'shift_id' => $shift->id, 'submit' => false,
+                ]));
+                $this->fail('The current manage alias deny must prevent creating another worker\'s timesheet.');
+            } catch (HttpException $exception) {
+                $this->assertSame(403, $exception->getStatusCode());
+            }
+            $this->assertSame(1, DB::transactionLevel());
+            $this->assertTrue(DB::connection()->getPdo()->inTransaction());
+        } finally {
+            DB::rollBack();
+        }
+        $this->assertSame($before, $this->state($writer));
+        $this->assertSame($oldSource, $shift->fresh()->getRawOriginal());
+        $this->assertFalse((bool) $writer->table('permission_user')->where('permission_id', $permission->id)->where('user_id', $actor->id)->value('allowed'));
+        Queue::assertNothingPushed();
+        Notification::assertNothingSent();
+        $this->assertFalse(session()->has('timesheet_result'));
+    }
+
+    private function onBehalfShiftForAlias(): Shift
+    {
+        $shift = Shift::factory()->create(['user_id' => $this->worker->id, 'client_id' => $this->client->id,
+            'site_id' => $this->site->id, 'service_context_id' => $this->client->service_context_id,
+            'starts_at' => '2026-10-06 20:00:00', 'ends_at' => '2026-10-07 00:00:00', 'actual_starts_at' => '2026-10-06 20:00:00',
+            'actual_ends_at' => '2026-10-07 00:00:00', 'expected_break_minutes' => 0, 'is_sleepover' => false, 'is_on_call' => false,
+            'status' => 'completed', 'created_by' => $this->worker->id]);
+        HrAttendanceSession::create(['user_id' => $this->worker->id, 'shift_id' => $shift->id,
+            'site_id' => $this->site->id, 'clock_in_at' => $shift->starts_at, 'clock_out_at' => $shift->ends_at,
+            'break_minutes' => 0, 'status' => 'closed', 'source' => 'manual',
+            'created_by' => $this->worker->id, 'closed_by' => $this->worker->id]);
+
+        return $shift;
+    }
+
     public function test_create_and_optional_submit_denial_rolls_back_the_entire_new_draft(): void
     {
         $this->worker->roles()->first()->permissions()->detach(Permission::where('key', 'timesheets.submit')->value('id'));

@@ -48,7 +48,7 @@ class TimesheetCreationService
 
                 $ownerId = $shift?->user_id ?? $actor->id;
                 $users = $this->authorization->lockForUsers([$actor->id, $ownerId], [
-                    'timesheets.create', 'timesheets.submit', 'timesheets.manageAny',
+                    'timesheets.create', 'timesheets.submit', 'timesheets.manageAny', 'hr.time.manage',
                 ]);
                 $lockedActor = $users->get((int) $actor->id);
                 $owner = $users->get((int) $ownerId);
