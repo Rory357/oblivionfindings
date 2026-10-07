@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import {
     collectConsoleErrors,
     expectNoConsoleErrors,
+    expectPostRedirect,
     gotoMyDay,
     loginAsChecklistWorker,
     loginAsClockInCandidateWorker,
@@ -141,6 +142,8 @@ test.describe('timesheet approval readiness workflows', () => {
     test('manager can bulk approve submitted timesheets with stable selectors', async ({
         page,
     }) => {
+        // Fixture setup and the redirected read share the case budget.
+        test.setTimeout(60_000);
         const consoleErrors = collectConsoleErrors(page);
 
         await loginAsStaff(page);
@@ -156,11 +159,15 @@ test.describe('timesheet approval readiness workflows', () => {
         await page
             .getByTestId('approvals-decision-notes')
             .fill('Playwright readiness approval.');
-        await page.getByTestId('approvals-bulk-approve').click();
+        await expectPostRedirect(
+            page,
+            /^\/operations\/timesheets\/bulk-approve$/,
+            () => page.getByTestId('approvals-bulk-approve').click(),
+        );
 
         await expect(
             page.getByText(/Selected timesheets approved/i).first(),
-        ).toBeVisible();
+        ).toBeVisible({ timeout: 30_000 });
         expectNoConsoleErrors(consoleErrors);
     });
 

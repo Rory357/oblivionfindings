@@ -384,6 +384,25 @@ export async function loginAsStaff(page: Page) {
     await loginAs(page, email, password);
 }
 
+/** Keep the command response separate from the redirected page budget.
+ * CI uses one PHP worker; the verified POST must still finish within 10s. */
+export async function expectPostRedirect(
+    page: Page,
+    pathname: RegExp,
+    click: () => Promise<unknown>,
+) {
+    const [response] = await Promise.all([
+        page.waitForResponse(
+            (response) =>
+                response.request().method() === 'POST' &&
+                pathname.test(new URL(response.url()).pathname),
+            { timeout: 10_000 },
+        ),
+        click(),
+    ]);
+    expect(response.status()).toBe(302);
+}
+
 export async function publishCurrentWeek(
     page: Page,
     target: { week: string; siteId: number } = ROSTERING_DEMO_PUBLISH_TARGET,
@@ -393,13 +412,25 @@ export async function publishCurrentWeek(
     );
 
     await expect(page.getByTestId('rostering-publish-panel')).toBeVisible();
-    await page.getByTestId('rostering-review-publish').click();
+    await expectPostRedirect(
+        page,
+        /^\/operations\/rostering\/periods\/\d+\/review$/,
+        () => page.getByTestId('rostering-review-publish').click(),
+    );
 
-    await expect(page.getByTestId('publish-review-page')).toBeVisible();
+    await expect(page.getByTestId('publish-review-page')).toBeVisible({
+        timeout: 30_000,
+    });
     await expect(page.getByTestId('publish-review-confirm')).toBeEnabled();
-    await page.getByTestId('publish-review-confirm').click();
+    await expectPostRedirect(
+        page,
+        /^\/operations\/rostering\/periods\/\d+\/publish$/,
+        () => page.getByTestId('publish-review-confirm').click(),
+    );
 
-    await expect(page).toHaveURL(/\/operations\/rostering(?:\?|$)/);
+    await expect(page).toHaveURL(/\/operations\/rostering(?:\?|$)/, {
+        timeout: 30_000,
+    });
     await expect(page.getByTestId('rostering-publish-panel')).toContainText(
         /published/i,
     );

@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import {
     collectConsoleErrors,
     expectNoConsoleErrors,
+    expectPostRedirect,
     loginAsStaff,
     resetRosteringReadinessFixtures,
     ROSTERING_DEMO_SUGGESTION_TARGET,
@@ -34,8 +35,16 @@ test.describe('operations rostering — suggestions flow', () => {
         await expect(
             page.getByTestId('rostering-suggest-assignments'),
         ).toBeEnabled();
-        await page.getByTestId('rostering-suggest-assignments').click();
+        await expectPostRedirect(
+            page,
+            /^\/operations\/rostering\/auto-schedule$/,
+            () => page.getByTestId('rostering-suggest-assignments').click(),
+        );
 
+        await expect(page).toHaveURL(
+            /\/operations\/rostering\/suggestions\/\d+(?:\?|$)/,
+            { timeout: 30_000 },
+        );
         await expect(page.getByTestId('roster-suggestions-page')).toBeVisible();
         await expect(page.getByTestId('suggestion-accept').first()).toBeEnabled(
             {
