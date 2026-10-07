@@ -96,6 +96,7 @@ export type ConnectedProps = {
     transfers: Transfer[];
     can: {
         manage_access: boolean;
+        revoke_identity?: boolean;
         manage_orders: boolean;
         transfer: boolean;
         export: boolean;

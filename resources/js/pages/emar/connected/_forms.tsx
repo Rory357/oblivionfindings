@@ -324,14 +324,20 @@ export function RevokeAccess({
     const [saved, setSaved] = useState(false);
     return (
         <ReviewWizard
-            title="Revoke access"
-            description={name}
+            title={
+                kind === 'clinicians'
+                    ? 'Withdraw prescriber identity'
+                    : 'Revoke access'
+            }
+            description={kind === 'clinicians' ? name + ' · All houses' : name}
             onClose={onClose}
             busy={command.busy}
             error={command.error}
             disabled={command.uncertain}
             saved={saved}
-            saveLabel="Revoke access"
+            saveLabel={
+                kind === 'clinicians' ? 'Withdraw identity' : 'Revoke access'
+            }
             onSave={async () => {
                 if (
                     await command.run(

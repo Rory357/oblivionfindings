@@ -100,10 +100,10 @@ final class ExternalClinicalAccess
     {
         $submitted = MedicationExternalClinician::query()->findOrFail($id);
         $this->internal($actor, (int) ($input['client_id'] ?? 0), function (Client $client, User $locked) use ($id, $input) {
+            // Identity withdrawal disables every named-person grant across all houses.
+            // Historical verification and one-house access cannot authorize that global action.
+            abort_unless($this->canRevokeIdentity($locked), 403, 'Clinical identity withdrawal requires current access management and explicit access to all sites.');
             $profile = MedicationExternalClinician::query()->whereKey($id)->lockForUpdate()->firstOrFail();
-            // Do not reveal or revoke an unrelated clinician through a forged id.
-            abort_unless((int) $profile->verified_by === (int) $locked->id
-                || MedicationExternalGrant::query()->where('clinician_id', $id)->where('client_id', $client->id)->exists(), 404);
             if ($profile->revoked_at !== null) {
                 return;
             }
@@ -112,6 +112,14 @@ final class ExternalClinicalAccess
             // Marker and approval are retained: auth remains usable for password/logout only.
             AuditLogger::logOrFail('medications.external.identity_revoked', $profile, ['actor_id' => $locked->id, 'client_id' => $client->id]);
         }, [(int) $submitted->user_id]);
+    }
+
+    /** Call mutations with the current locked actor; the page uses the same permission rule. */
+    public function canRevokeIdentity(User $actor): bool
+    {
+        return $actor->canDo('medications.external.manage')
+            && collect(MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS)
+                ->contains(fn (string $permission) => $actor->canDo($permission));
     }
 
     public function profile(User $actor): MedicationExternalClinician

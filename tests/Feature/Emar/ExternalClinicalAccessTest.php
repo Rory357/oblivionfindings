@@ -4,7 +4,10 @@ namespace Tests\Feature\Emar;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Http\Responses\LoginResponse;
+use App\Models\AuditLog;
 use App\Models\Client;
+use App\Models\MedicationExternalClinician;
+use App\Models\MedicationExternalGrant;
 use App\Models\MedicationExternalProposal;
 use App\Models\MedicationOrderRevision;
 use App\Models\Permission;
@@ -24,10 +27,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Fortify\Contracts\TwoFactorLoginResponse;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\CommittedFixtureCleanup;
 use Tests\Support\ExternalClinicalFixtures;
 use Tests\TestCase;
@@ -129,10 +134,194 @@ final class ExternalClinicalAccessTest extends TestCase
 
     public function test_identity_revocation_keeps_internal_isolation(): void
     {
+        $this->manager = $this->allowGlobalIdentityWithdrawal($this->manager, 'clinical.accessAllSites');
         app(ExternalClinicalAccess::class)->revokeIdentity($this->manager, $this->identity->id, ['client_id' => $this->person->id, 'reason' => 'Identity withdrawn']);
         $this->actingAs($this->clinician)->getJson('/clinical-portal?client_id='.$this->person->id)->assertForbidden();
         $this->getJson('/dashboard')->assertForbidden();
         $this->assertTrue($this->clinician->refresh()->external_clinical_account);
+    }
+
+    public static function siteScopedIdentityManagers(): array
+    {
+        return [
+            'original one-house verifier' => ['verifier'],
+            'another one-house manager with current grant' => ['manager'],
+            'former verifier moved to another house' => ['former_verifier'],
+        ];
+    }
+
+    #[DataProvider('siteScopedIdentityManagers')]
+    public function test_site_scoped_managers_cannot_withdraw_a_global_identity(string $kind): void
+    {
+        Notification::fake();
+        Mail::fake();
+        $actor = $kind === 'manager' ? $this->connectedStaff() : $this->manager;
+        $client = $this->person;
+        if ($kind === 'former_verifier') {
+            $newSite = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
+            $client = Client::factory()->create(['site_id' => $newSite->id, 'service_context_id' => $this->person->service_context_id, 'status' => 'active']);
+            $actor->hrEmployeeProfile->forceFill(['primary_site_id' => $newSite->id, 'secondary_site_ids' => []])->save();
+            $actor = $actor->fresh();
+        }
+        $identity = $this->identity->fresh()->getRawOriginal();
+        $grant = $this->grant->fresh()->getRawOriginal();
+        $this->actingAs($actor)->get('/emar/connected-care?client_id='.$client->id)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('can.manage_access', true)->where('can.revoke_identity', false));
+        $this->postJson('/emar/connected-care/clinicians/'.$this->identity->id.'/revoke', [
+            'client_id' => $client->id, 'reason' => 'Requested identity withdrawal',
+        ])->assertForbidden();
+        $this->assertSame($identity, $this->identity->fresh()->getRawOriginal());
+        $this->assertSame($grant, $this->grant->fresh()->getRawOriginal());
+        $this->assertSame(0, AuditLog::query()->where('action', 'medications.external.identity_revoked')->count());
+        $this->actingAs($this->clinician)->get('/clinical-portal?client_id='.$this->person->id)->assertOk();
+
+        $this->actingAs($actor)->postJson('/emar/connected-care/grants/'.$this->grant->id.'/revoke', [
+            'reason' => 'Withdraw this person access only',
+        ])->assertStatus($kind === 'former_verifier' ? 404 : 200);
+        $this->assertSame($identity, $this->identity->fresh()->getRawOriginal());
+        if ($kind === 'former_verifier') {
+            $this->assertSame($grant, $this->grant->fresh()->getRawOriginal());
+        } else {
+            $this->assertNotNull($this->grant->fresh()->revoked_at);
+            $this->assertSame($actor->id, $this->grant->fresh()->revoked_by);
+            $this->assertSame(1, AuditLog::query()->where('action', 'medications.external.access_revoked')->count());
+        }
+        Notification::assertNothingSent();
+        Mail::assertNothingSent();
+    }
+
+    public static function globalIdentityManagers(): array
+    {
+        return [
+            'clinical all-sites, never granted' => ['clinical.accessAllSites', false],
+            'site all-sites, never granted' => ['sites.viewAll', false],
+            'clinical all-sites, multi-house identity' => ['clinical.accessAllSites', true],
+            'site all-sites, multi-house identity' => ['sites.viewAll', true],
+        ];
+    }
+
+    #[DataProvider('globalIdentityManagers')]
+    public function test_explicit_current_all_sites_manager_can_withdraw_never_granted_and_multi_house_identities(string $permission, bool $multiHouse): void
+    {
+        Notification::fake();
+        Mail::fake();
+        $actor = $this->allowGlobalIdentityWithdrawal($this->connectedStaff(), $permission);
+        $profile = $this->identity;
+        if ($multiHouse) {
+            $otherSite = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
+            $otherPerson = Client::factory()->create(['site_id' => $otherSite->id, 'service_context_id' => $this->person->service_context_id, 'status' => 'active']);
+            $this->actingAs($actor)->postJson('/emar/connected-care/grants', [
+                'client_id' => $otherPerson->id, 'clinician_id' => $profile->id, 'purpose' => 'Explicit review for another house',
+                'expires_at' => now()->addDays(7)->toIso8601String(), 'can_propose' => true, 'include_controlled' => false,
+            ])->assertSuccessful();
+            $this->assertNotSame($actor->id, $profile->verified_by);
+            $this->actingAs($this->clinician)->get('/clinical-portal')->assertOk()
+                ->assertInertia(fn (Assert $page) => $page->has('people', 2));
+        } else {
+            $creator = $this->connectedStaff();
+            $response = $this->actingAs($creator)->postJson('/emar/connected-care/clinicians', [
+                'client_id' => $this->person->id, 'name' => 'Dr Never Granted', 'email' => 'never-granted-fictional@example.test',
+                'provider_name' => 'Fictional reviewed practice', 'registration_authority' => 'Fictional clinical register',
+                'registration_number' => 'FICTIONAL-NEVER-GRANTED', 'identity_evidence' => 'Fictional independently reviewed identity',
+                'identity_confirmed' => true, 'expires_at' => now()->addDays(90)->toIso8601String(),
+            ])->assertSuccessful();
+            $profile = MedicationExternalClinician::query()->findOrFail($response->json('id'));
+            $this->assertSame(0, $profile->grants()->count());
+            $this->assertSame($creator->id, $profile->verified_by);
+            $this->assertNotSame($actor->id, $profile->verified_by);
+            $this->actingAs($creator)->get('/emar/connected-care?client_id='.$this->person->id)->assertOk()
+                ->assertInertia(fn (Assert $page) => $page->where('can.revoke_identity', false)
+                    ->where('clinicians', fn ($rows) => collect($rows)->contains('id', $profile->id)));
+            $this->actingAs($this->manager)->get('/emar/connected-care?client_id='.$this->person->id)->assertOk()
+                ->assertInertia(fn (Assert $page) => $page->where('can.revoke_identity', false)
+                    ->where('clinicians', fn ($rows) => ! collect($rows)->contains('id', $profile->id)));
+        }
+        $grants = MedicationExternalGrant::query()->orderBy('id')->get()->map->getRawOriginal()->all();
+        $verifiedBy = $profile->verified_by;
+        $user = $profile->user;
+        $this->actingAs($actor)->get('/emar/connected-care?client_id='.$this->person->id)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('can.manage_access', true)->where('can.revoke_identity', true)
+                ->where('clinicians', fn ($rows) => collect($rows)->contains('id', $profile->id)));
+        $this->postJson('/emar/connected-care/clinicians/'.$profile->id.'/revoke', [
+            'client_id' => $this->person->id, 'reason' => 'Identity approval withdrawn across all houses',
+        ])->assertSuccessful()->assertJsonPath('success', true)->assertJsonPath('id', $profile->id);
+        $fresh = $profile->fresh();
+        $this->assertNotNull($fresh->revoked_at);
+        $this->assertSame($actor->id, $fresh->revoked_by);
+        $this->assertSame($verifiedBy, $fresh->verified_by);
+        $this->assertSame('Identity approval withdrawn across all houses', $fresh->revoke_reason);
+        $this->assertSame($grants, MedicationExternalGrant::query()->orderBy('id')->get()->map->getRawOriginal()->all());
+        $audit = AuditLog::query()->where('action', 'medications.external.identity_revoked')->sole();
+        $this->assertSame($actor->id, $audit->user_id);
+        $this->assertSame($profile->id, $audit->auditable_id);
+        $this->actingAs($user)->getJson('/clinical-portal')->assertForbidden();
+        $this->getJson('/dashboard')->assertForbidden();
+        $this->assertTrue($user->fresh()->external_clinical_account);
+        Notification::assertNothingSent();
+        Mail::assertNothingSent();
+    }
+
+    public static function withdrawnIdentityAuthority(): array
+    {
+        return [
+            'clinical all-sites allowance removed' => ['clinical.accessAllSites', 'clinical.accessAllSites'],
+            'site all-sites allowance removed' => ['sites.viewAll', 'sites.viewAll'],
+            'action removed with clinical all-sites' => ['clinical.accessAllSites', 'medications.external.manage'],
+            'action removed with site all-sites' => ['sites.viewAll', 'medications.external.manage'],
+        ];
+    }
+
+    #[DataProvider('withdrawnIdentityAuthority')]
+    public function test_identity_withdrawal_rechecks_current_authority_instead_of_cached_allowances(string $globalPermission, string $removed): void
+    {
+        $actor = $this->allowGlobalIdentityWithdrawal($this->manager, $globalPermission)->load(['permissionOverrides', 'roles.permissions']);
+        $this->assertTrue(app(ExternalClinicalAccess::class)->canRevokeIdentity($actor));
+        $permission = Permission::query()->where('key', $removed)->sole();
+        $this->assertSame(1, DB::table('permission_user')->where('user_id', $actor->id)->where('permission_id', $permission->id)->update(['allowed' => false]));
+        // The submitted request actor deliberately still contains the earlier allow evidence.
+        $this->assertTrue(app(ExternalClinicalAccess::class)->canRevokeIdentity($actor));
+        $identity = $this->identity->fresh()->getRawOriginal();
+        $grant = $this->grant->fresh()->getRawOriginal();
+        $this->actingAs($actor->fresh())->get('/emar/connected-care?client_id='.$this->person->id)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('can.revoke_identity', false));
+        $this->actingAs($actor)->postJson('/emar/connected-care/clinicians/'.$this->identity->id.'/revoke', [
+            'client_id' => $this->person->id, 'reason' => 'Withdraw using stale permission evidence',
+        ])->assertForbidden();
+        $this->assertSame($identity, $this->identity->fresh()->getRawOriginal());
+        $this->assertSame($grant, $this->grant->fresh()->getRawOriginal());
+        $this->assertSame(0, AuditLog::query()->where('action', 'medications.external.identity_revoked')->count());
+    }
+
+    public static function unavailableGlobalIdentityManagerScope(): array
+    {
+        return ['employment ended' => ['employment'], 'current person site archived' => ['site']];
+    }
+
+    #[DataProvider('unavailableGlobalIdentityManagerScope')]
+    public function test_global_identity_permission_does_not_bypass_current_staff_and_person_site_guards(string $unavailable): void
+    {
+        $actor = $this->allowGlobalIdentityWithdrawal($this->manager, 'clinical.accessAllSites');
+        if ($unavailable === 'employment') {
+            $actor->hrEmployeeProfile->forceFill(['is_active' => false])->save();
+        } else {
+            $this->site->forceFill(['archived' => true, 'archived_at' => now()])->save();
+        }
+        $identity = $this->identity->fresh()->getRawOriginal();
+        $grant = $this->grant->fresh()->getRawOriginal();
+        $this->actingAs($actor)->postJson('/emar/connected-care/clinicians/'.$this->identity->id.'/revoke', [
+            'client_id' => $this->person->id, 'reason' => 'Withdraw without current staff and person scope',
+        ])->assertNotFound();
+        $this->assertSame($identity, $this->identity->fresh()->getRawOriginal());
+        $this->assertSame($grant, $this->grant->fresh()->getRawOriginal());
+        $this->assertSame(0, AuditLog::query()->where('action', 'medications.external.identity_revoked')->count());
+    }
+
+    private function allowGlobalIdentityWithdrawal(User $actor, string $permission): User
+    {
+        $definition = Permission::firstOrCreate(['key' => $permission], ['description' => 'Explicit synthetic all-sites authority', 'group' => 'clinical']);
+        $actor->permissionOverrides()->syncWithoutDetaching([$definition->id => ['allowed' => true]]);
+
+        return $actor->fresh();
     }
 
     public function test_grant_revocation_expiry_identity_expiry_and_site_move_deny_direct_identifiers(): void

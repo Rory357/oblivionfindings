@@ -281,7 +281,7 @@ export default function ConnectedCare(props: ConnectedProps) {
                                     },
                                 ]}
                                 open={
-                                    props.can.manage_access
+                                    props.can.revoke_identity
                                         ? (c) =>
                                               !c.revoked_at &&
                                               setRevoke({
@@ -296,7 +296,10 @@ export default function ConnectedCare(props: ConnectedProps) {
                                 Prescribers use the separate clinical portal
                                 after mailbox verification and two-factor setup.
                                 Creating an identity does not send an invitation
-                                or grant access to anyone’s chart.
+                                or grant access to anyone’s chart. Withdrawing
+                                an identity ends access across all houses and
+                                requires organisation-wide authority. Use named
+                                access above to stop access for one person.
                             </SettingsNotice>
                         </>
                     )}

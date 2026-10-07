@@ -286,6 +286,32 @@ export function ReviewWizard({
     success?: string;
     successDetail?: string;
 }) {
+    const [returnTarget] = useState(() => {
+        if (typeof document === 'undefined') return null;
+        const active = document.activeElement;
+        if (
+            !(active instanceof HTMLElement) ||
+            active === document.body ||
+            active === document.documentElement
+        )
+            return null;
+        // A menu item unmounts after opening the wizard. Keep its persistent
+        // trigger so cancellation returns to the same record in the table.
+        const menu = active.closest('[role="menu"]');
+        const triggerId = menu?.getAttribute('aria-labelledby');
+        return (triggerId && document.getElementById(triggerId)) || active;
+    });
+    const discarded = useRef(false);
+    const restoreFocus = (event: Event) => {
+        if (
+            returnTarget?.isConnected &&
+            !returnTarget.closest('[hidden], [inert], [aria-hidden="true"]') &&
+            !returnTarget.matches(':disabled, [aria-disabled="true"]')
+        ) {
+            event.preventDefault();
+            returnTarget.focus({ preventScroll: true });
+        }
+    };
     const [step, setStep] = useState(0);
     const [discard, setDiscard] = useState(false);
     const close = () => {
@@ -299,6 +325,7 @@ export function ReviewWizard({
             <WizardShell
                 open
                 onClose={close}
+                onCloseAutoFocus={restoreFocus}
                 title={title}
                 description={description}
                 railIcon={ClipboardCheck}
@@ -411,7 +438,13 @@ export function ReviewWizard({
             <ConfirmDialog
                 open={discard}
                 onClose={() => setDiscard(false)}
-                onConfirm={onClose}
+                onConfirm={() => {
+                    discarded.current = true;
+                    onClose();
+                }}
+                onCloseAutoFocus={(event) => {
+                    if (discarded.current) restoreFocus(event);
+                }}
                 title="Discard this draft?"
                 description="Your unsaved changes will be lost."
                 confirmText="Discard draft"

@@ -43,12 +43,15 @@ final class MedicationExternalClinicalController extends Controller
         $selected = $request->integer('client_id') ? $this->records->client($actor, $request->integer('client_id')) : null;
         $selectedIds = $selected ? [$selected->id] : $ids;
         $canAccess = $actor->canDo('medications.external.manage');
+        $canRevokeIdentity = $this->external->canRevokeIdentity($actor);
         $canOrders = $actor->canDo('medications.orders.manage');
         $canTransfer = $actor->canDo('medications.transfers.manage');
         $grantPage = $canAccess ? MedicationExternalGrant::with(['clinician.user', 'client'])->whereIn('client_id', $selectedIds)->orderByDesc('id')->paginate(100, ['*'], 'grants_page') : null;
         $grants = $grantPage?->getCollection() ?? collect();
-        $profilePage = $canAccess ? MedicationExternalClinician::with('user')->where(fn ($q) => $q->where('verified_by', $actor->id)
-            ->orWhereHas('grants', fn ($g) => $g->whereIn('client_id', $selectedIds)))->orderByDesc('id')->paginate(100, ['*'], 'clinicians_page') : null;
+        $profilePage = $canAccess ? MedicationExternalClinician::with('user')
+            ->when(! $canRevokeIdentity, fn ($q) => $q->where(fn ($q) => $q->where('verified_by', $actor->id)
+                ->orWhereHas('grants', fn ($g) => $g->whereIn('client_id', $selectedIds))))
+            ->orderByDesc('id')->paginate(100, ['*'], 'clinicians_page') : null;
         $profiles = $profilePage?->getCollection() ?? collect();
         $proposalPage = $canOrders ? MedicationExternalProposal::with(['clinician.user', 'client'])->whereIn('client_id', $selectedIds)
             ->when(! $actor->canDo('medications.controlled.view'), fn ($q) => $q->where('controlled', false))->orderByDesc('id')->paginate(100, ['*'], 'proposals_page') : null;
@@ -69,7 +72,7 @@ final class MedicationExternalClinicalController extends Controller
                 'active' => $this->grantAvailability($g) === 'ready', 'availability' => $this->grantAvailability($g)])->all(),
             'proposals' => $proposals->map(fn ($p) => $this->proposal($p))->all(),
             'transfers' => $transfers->map(fn ($t) => $this->transfer($t))->all(),
-            'can' => ['manage_access' => $canAccess, 'manage_orders' => $canOrders, 'transfer' => $canTransfer, 'export' => $actor->canDo('medications.reports.export')],
+            'can' => ['manage_access' => $canAccess, 'revoke_identity' => $canRevokeIdentity, 'manage_orders' => $canOrders, 'transfer' => $canTransfer, 'export' => $actor->canDo('medications.reports.export')],
             'witnesses' => $canOrders ? $this->scope->prescriptionWitnessStaffPicker($sites, $actor->id)->all() : [],
             'pagination' => ['clinicians' => $this->pageMeta($profilePage), 'grants' => $this->pageMeta($grantPage),
                 'proposals' => $this->pageMeta($proposalPage), 'transfers' => $this->pageMeta($transferPage)],
