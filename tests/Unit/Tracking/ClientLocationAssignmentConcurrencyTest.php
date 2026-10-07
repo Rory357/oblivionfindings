@@ -91,6 +91,7 @@ class ClientLocationAssignmentConcurrencyTest extends CommittedDatabaseTestCase
     {
         extract(ClientLocationWorkspaceFixture::make(assignedOnly: true));
         $this->actingAs($actor);
+        $queueBefore = Queue::pushedJobs();
         $other = DB::connection('zone_interleaving');
         $attempted = false;
         $afterRead = function () use ($other, $client, $actor, &$attempted): void {
@@ -130,7 +131,7 @@ class ClientLocationAssignmentConcurrencyTest extends CommittedDatabaseTestCase
         } catch (AuthorizationException|HttpException $error) {
             $this->assertSame(403, $error instanceof AuthorizationException ? ($error->status() ?? 403) : $error->getStatusCode());
         }
-        Queue::assertNothingPushed();
+        $this->assertSame($queueBefore, Queue::pushedJobs());
         Http::assertNothingSent();
     }
 }

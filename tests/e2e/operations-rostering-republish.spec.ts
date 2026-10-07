@@ -52,17 +52,27 @@ test.describe('operations rostering — republish flow', () => {
                 response.request().method() === 'PUT',
         );
         const savedShiftResponse = page.waitForResponse(
-            (response) =>
-                new URL(response.url()).pathname ===
-                    '/operations/shifts/9101' &&
-                response.request().method() === 'GET' &&
-                response.request().redirectedFrom()?.method() === 'PUT' &&
-                new URL(response.request().redirectedFrom()!.url()).pathname ===
-                    '/operations/shifts/9101' &&
-                response.request().headers()['x-inertia'] === 'true' &&
-                (response.headers()['content-type'] ?? '').includes(
-                    'application/json',
-                ),
+            async (response) => {
+                const request = response.request();
+                if (
+                    new URL(response.url()).pathname !==
+                        '/operations/shifts/9101' ||
+                    request.method() !== 'GET' ||
+                    response.status() !== 200 ||
+                    response.headers()['x-inertia'] !== 'true' ||
+                    !(response.headers()['content-type'] ?? '').includes(
+                        'application/json',
+                    ) ||
+                    request.redirectedFrom()?.method() !== 'PUT'
+                ) {
+                    return false;
+                }
+
+                return (
+                    request.redirectedFrom() ===
+                    (await updateResponse).request()
+                );
+            },
             { timeout: 30_000 },
         );
         await editDialog
