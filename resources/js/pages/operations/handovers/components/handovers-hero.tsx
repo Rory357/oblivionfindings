@@ -1,7 +1,13 @@
-/* Governance PageHero for Shift Handovers: greeting + week range, status badges,
- * four stats, and a footer strip with the week navigator (left) and search +
- * searchable filters (right). */
-import { PageHero } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderViewToggle,
+} from '@/components/page';
 import {
     EntityFilter,
     WeekPicker,
@@ -9,23 +15,21 @@ import {
     formatWeekRange,
     weekNumberISO,
 } from '@/components/rostering';
-import { Button } from '@/components/ui/button';
+import { formatDateTimeInZone } from '@/lib/datetime';
 import {
     ArrowLeftRight,
     CalendarRange,
-    ChevronDown,
     ChevronLeft,
     ChevronRight,
-    Clock,
+    GitBranch,
     LayoutGrid,
+    ListChecks,
     Plus,
     Search,
-    ShieldAlert,
-    Users,
+    X,
 } from 'lucide-react';
-import { type ComponentProps, useRef, useState } from 'react';
-
-import type { Catalogue, Filters } from './shared';
+import { useRef, useState, type ReactNode } from 'react';
+import type { Catalogue, Filters, StatusTab, ViewMode } from './shared';
 import { clientName } from './shared';
 
 export type HeroCounts = {
@@ -34,237 +38,304 @@ export type HeroCounts = {
     submitted: number;
     acknowledged: number;
     openIncoming: number;
-    incidents: number;
 };
-
-function WeekNavButton({ children, ...rest }: ComponentProps<'button'>) {
-    return (
-        <button
-            type="button"
-            {...rest}
-            className="inline-flex items-center gap-1 rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 px-2.5 py-1.5 text-xs font-medium text-primary-foreground/90 transition-colors hover:bg-primary-foreground/20"
-        >
-            {children}
-        </button>
-    );
-}
-
 export function HandoversHero({
-    firstName,
     weekStart,
     counts,
     search,
     onSearch,
     filters,
-    onFilters,
+    onFilter,
     catalogue,
     onNewHandover,
     onWeekChange,
     canCreate,
+    onStatus,
+    rail,
+    evidence,
+    onSearchSubmit,
+    view,
+    onView,
+    hasFilters,
+    onClear,
+    loading,
+    rangeLabel,
+    readNotice,
 }: {
-    firstName: string;
     weekStart: Date;
     counts: HeroCounts;
     search: string;
     onSearch: (value: string) => void;
     filters: Filters;
-    onFilters: (next: Filters) => void;
+    onFilter: (next: Partial<Filters>) => void;
     catalogue: Catalogue;
     onNewHandover: () => void;
     onWeekChange: (week: Date) => void;
     canCreate: boolean;
+    onStatus: (status: StatusTab) => void;
+    rail?: ReactNode;
+    evidence: { checked_at: string; timezone: string };
+    onSearchSubmit: () => void;
+    view: ViewMode;
+    onView: (view: ViewMode) => void;
+    hasFilters: boolean;
+    onClear: () => void;
+    loading: boolean;
+    rangeLabel: string;
+    readNotice: string | null;
 }) {
     const [pickerOpen, setPickerOpen] = useState(false);
     const weekBtnRef = useRef<HTMLButtonElement>(null);
-
     const range = formatWeekRange(weekStart);
-    const prevWeek = addDaysWP(weekStart, -7);
-    const nextWeek = addDaysWP(weekStart, 7);
-    const fmtDay = (d: Date) =>
-        d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
-    const rangeShort = `${fmtDay(weekStart)} – ${fmtDay(range.end)}`;
-    const pending = counts.submitted;
+    // Keep a selected, now-unavailable filter visible without resolving its identity.
+    const options = (
+        items: { id: number; name: string; description?: string | null }[],
+        selected: number | null,
+        label: string,
+    ) =>
+        selected !== null && !items.some((item) => item.id === selected)
+            ? [
+                  ...items,
+                  { id: selected, name: `Selected ${label} unavailable` },
+              ]
+            : items;
 
-    const title = (
-        <span>
-            <span className="text-primary-foreground/80">
-                Kia ora {firstName}, this week's handovers —{' '}
-            </span>
-            <span className="underline decoration-primary-foreground/40 underline-offset-4">
-                {fmtDay(weekStart)} → {fmtDay(range.end)}
-            </span>
-        </span>
-    );
-
-    const description = `${counts.total} handover${counts.total === 1 ? '' : 's'} across ${catalogue.sites.length} houses. ${
-        pending > 0 ? `${pending} awaiting acknowledgement` : 'All caught up'
-    }${counts.openIncoming > 0 ? `, ${counts.openIncoming} with an open incoming shift` : ''}.`;
-
-    const meta = [
-        {
-            icon: CalendarRange,
-            label: `Wk ${weekNumberISO(weekStart)} · Mon–Sun`,
-        },
-        { icon: LayoutGrid, label: `${catalogue.sites.length} houses` },
-        { icon: Users, label: `${catalogue.staff.length} staff on roster` },
+    const fmt = (date: Date) =>
+        date.toLocaleDateString('en-NZ', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+        });
+    const stats: [StatusTab, string, number, string][] = [
+        [
+            'all',
+            'Recorded handovers',
+            counts.total,
+            'Matching week, search and people filters',
+        ],
+        ['draft', 'Drafts', counts.draft, 'Not submitted'],
+        ['submitted', 'Awaiting', counts.submitted, 'Submitted handovers'],
+        [
+            'acknowledged',
+            'Acknowledged',
+            counts.acknowledged,
+            'Recorded acknowledgements',
+        ],
     ];
-
-    const badges: {
-        icon: typeof Clock;
-        tone: 'warning' | 'critical' | 'default';
-        label: string;
-    }[] = [];
-    if (pending > 0)
-        badges.push({
-            icon: Clock,
-            tone: 'warning',
-            label: `${pending} awaiting sign-off`,
-        });
-    if (counts.openIncoming > 0)
-        badges.push({
-            icon: ShieldAlert,
-            tone: 'critical',
-            label: `${counts.openIncoming} open incoming`,
-        });
-    if (counts.incidents > 0)
-        badges.push({
-            icon: ShieldAlert,
-            tone: 'default',
-            label: `${counts.incidents} incident${counts.incidents === 1 ? '' : 's'} noted`,
-        });
-
-    const stats = [
-        { label: 'Total', value: counts.total },
-        { label: 'Submitted', value: counts.submitted },
-        { label: "Ack'd", value: counts.acknowledged },
-        {
-            label: 'Pending',
-            value: pending,
-            tone: (pending > 0 ? 'warning' : 'neutral') as
-                | 'warning'
-                | 'neutral',
-        },
-    ];
-
-    const footer = (
-        <div className="flex flex-col gap-3 py-3 lg:flex-row lg:items-center lg:justify-between">
-            {/* Week navigator */}
-            <div className="flex items-center gap-1.5">
-                <WeekNavButton
-                    onClick={() => onWeekChange(prevWeek)}
-                    aria-label={`Previous week, week ${weekNumberISO(prevWeek)}`}
-                >
-                    <ChevronLeft className="h-3.5 w-3.5" />
-                    Wk {weekNumberISO(prevWeek)}
-                </WeekNavButton>
-                {/* eslint-disable-next-line no-restricted-syntax -- segmented week-stepper on dark hero; not a shadcn Button. */}
-                <button
-                    ref={weekBtnRef}
-                    type="button"
-                    onClick={() => setPickerOpen((v) => !v)}
-                    aria-haspopup="dialog"
-                    aria-expanded={pickerOpen}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-primary-foreground/25 bg-primary-foreground/15 px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/25"
-                >
-                    <CalendarRange className="h-3.5 w-3.5" />
-                    Wk {weekNumberISO(weekStart)} · {rangeShort} · pick week
-                    <ChevronDown className="h-3 w-3" />
-                </button>
-                <WeekNavButton
-                    onClick={() => onWeekChange(nextWeek)}
-                    aria-label={`Next week, week ${weekNumberISO(nextWeek)}`}
-                >
-                    Wk {weekNumberISO(nextWeek)}
-                    <ChevronRight className="h-3.5 w-3.5" />
-                </WeekNavButton>
-                {pickerOpen ? (
-                    <WeekPicker
-                        selectedWeekStart={weekStart}
-                        anchorRef={weekBtnRef}
-                        onSelect={(d) => onWeekChange(d)}
-                        onClose={() => setPickerOpen(false)}
-                        showContextMenu={false}
-                    />
-                ) : null}
-            </div>
-
-            {/* Search + filters */}
-            <div className="flex flex-wrap items-center gap-2">
-                <div className="relative">
-                    <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-primary-foreground/60" />
-                    <input
-                        value={search}
-                        onChange={(e) => onSearch(e.target.value)}
-                        placeholder="Search handovers, clients, staff…"
-                        aria-label="Search handovers"
-                        className="h-9 w-[210px] rounded-lg border border-primary-foreground/25 bg-primary-foreground/15 pr-3 pl-8 text-xs text-primary-foreground transition-all placeholder:text-primary-foreground/55 focus:w-[260px] focus:bg-primary-foreground/25 focus:outline-none"
-                    />
-                </div>
-                <EntityFilter
-                    onDark
-                    label="Staff"
-                    allLabel="All staff"
-                    pluralLabel="staff"
-                    items={catalogue.staff.map((s) => ({
-                        id: s.id,
-                        name: s.name,
-                        description: s.email,
-                    }))}
-                    value={filters.staff}
-                    onChange={(v) => onFilters({ ...filters, staff: v })}
-                />
-                <EntityFilter
-                    onDark
-                    label="Client"
-                    allLabel="All clients"
-                    items={catalogue.clients.map((c) => ({
-                        id: c.id,
-                        name: clientName(c),
-                    }))}
-                    value={filters.client}
-                    onChange={(v) => onFilters({ ...filters, client: v })}
-                />
-                <EntityFilter
-                    onDark
-                    label="House"
-                    allLabel="All houses"
-                    items={catalogue.sites.map((s) => ({
-                        id: s.id,
-                        name: s.name,
-                    }))}
-                    value={filters.site}
-                    onChange={(v) => onFilters({ ...filters, site: v })}
-                />
-            </div>
-        </div>
-    );
-
     return (
-        <PageHero
-            category="ops"
-            icon={ArrowLeftRight}
-            title={title}
-            description={description}
-            meta={meta}
-            badges={badges}
-            stats={stats}
-            actions={
-                canCreate ? (
-                    <Button onClick={onNewHandover}>
-                        <Plus className="mr-1.5 h-4 w-4" />
-                        New handover
-                    </Button>
-                ) : undefined
-            }
-            footer={footer}
-        >
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-primary-foreground/70 uppercase">
-                <span className="relative flex h-2 w-2">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-success opacity-70 motion-reduce:animate-none" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
-                </span>
-                Live · synced just now
-            </div>
-        </PageHero>
+        <>
+            <PageHeader
+                variant="index"
+                frontline
+                title="Handovers"
+                icon={ArrowLeftRight}
+                subline={`${fmt(weekStart)} → ${fmt(range.end)} · ${evidence.timezone} · Review recorded handovers and incoming responsibilities`}
+                actions={
+                    <>
+                        <form
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                onSearchSubmit();
+                            }}
+                            className="w-full min-w-0 basis-full sm:w-auto sm:flex-1 sm:basis-auto"
+                        >
+                            <fieldset
+                                disabled={loading}
+                                className="flex min-w-0 flex-wrap gap-2"
+                            >
+                                <PageHeaderSearch
+                                    value={search}
+                                    onChange={onSearch}
+                                    placeholder="Search handovers, people or staff"
+                                    className="min-w-0"
+                                />
+                                <PageHeaderGlassButton
+                                    type="submit"
+                                    icon={Search}
+                                >
+                                    Search
+                                </PageHeaderGlassButton>
+                            </fieldset>
+                        </form>
+                        {canCreate ? (
+                            <PageHeaderPrimaryButton
+                                icon={Plus}
+                                onClick={onNewHandover}
+                                disabled={loading}
+                            >
+                                New handover
+                            </PageHeaderPrimaryButton>
+                        ) : null}
+                    </>
+                }
+                meters={
+                    <div className="grid w-full min-w-0 grid-cols-2 gap-2 xl:grid-cols-4">
+                        {stats.map(([key, label, value, caption]) => (
+                            <PageHeaderMeterBlock
+                                key={key}
+                                label={label}
+                                ariaLabel={
+                                    key === 'submitted'
+                                        ? 'View awaiting acknowledgement'
+                                        : `View ${label.toLowerCase()}`
+                                }
+                                onClick={() => {
+                                    if (!loading) onStatus(key);
+                                }}
+                            >
+                                <PageHeaderMeterBig>{value}</PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    {caption}
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                        ))}
+                    </div>
+                }
+                filters={
+                    <fieldset
+                        disabled={loading}
+                        className="flex w-full min-w-0 flex-wrap items-center justify-between gap-3"
+                    >
+                        <div className="flex flex-wrap items-center gap-2">
+                            <PageHeaderGlassButton
+                                icon={ChevronLeft}
+                                onClick={() =>
+                                    onWeekChange(addDaysWP(weekStart, -7))
+                                }
+                                aria-label="Previous week"
+                            >
+                                Previous
+                            </PageHeaderGlassButton>
+                            <PageHeaderGlassButton
+                                ref={weekBtnRef}
+                                icon={CalendarRange}
+                                onClick={() => setPickerOpen(!pickerOpen)}
+                                aria-haspopup="dialog"
+                                aria-expanded={pickerOpen}
+                            >
+                                Week {weekNumberISO(weekStart)} · Choose week
+                            </PageHeaderGlassButton>
+                            <PageHeaderGlassButton
+                                icon={ChevronRight}
+                                onClick={() =>
+                                    onWeekChange(addDaysWP(weekStart, 7))
+                                }
+                                aria-label="Next week"
+                            >
+                                Next
+                            </PageHeaderGlassButton>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <EntityFilter
+                                onDark
+                                label="Staff"
+                                allLabel="All staff"
+                                pluralLabel="staff"
+                                items={options(
+                                    catalogue.staff.map((s) => ({
+                                        id: s.id,
+                                        name: s.name,
+                                        description: s.email,
+                                    })),
+                                    filters.staff,
+                                    'staff member',
+                                )}
+                                value={filters.staff}
+                                onChange={(staff) => onFilter({ staff })}
+                            />
+                            <EntityFilter
+                                onDark
+                                label="Client"
+                                allLabel="All clients"
+                                items={options(
+                                    catalogue.clients.map((c) => ({
+                                        id: c.id,
+                                        name: clientName(c),
+                                    })),
+                                    filters.client,
+                                    'client',
+                                )}
+                                value={filters.client}
+                                onChange={(client) => onFilter({ client })}
+                            />
+                            <EntityFilter
+                                onDark
+                                label="Site"
+                                allLabel="All sites"
+                                items={options(
+                                    catalogue.sites.map((s) => ({
+                                        id: s.id,
+                                        name: s.name,
+                                    })),
+                                    filters.site,
+                                    'site',
+                                )}
+                                value={filters.site}
+                                onChange={(site) => onFilter({ site })}
+                            />
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <PageHeaderViewToggle
+                                value={view}
+                                onChange={onView}
+                                ariaLabel="Handover display"
+                                options={[
+                                    {
+                                        value: 'cards',
+                                        label: 'Cards',
+                                        icon: LayoutGrid,
+                                    },
+                                    {
+                                        value: 'list',
+                                        label: 'List',
+                                        icon: ListChecks,
+                                    },
+                                    {
+                                        value: 'board',
+                                        label: 'Board',
+                                        icon: GitBranch,
+                                    },
+                                ]}
+                            />
+                            {hasFilters ? (
+                                <PageHeaderGlassButton
+                                    icon={X}
+                                    onClick={onClear}
+                                >
+                                    Clear filters
+                                </PageHeaderGlassButton>
+                            ) : null}
+                        </div>
+                        <p
+                            className="text-caption w-full text-band-foreground!"
+                            role="status"
+                        >
+                            {loading
+                                ? 'Updating handovers…'
+                                : (readNotice ?? rangeLabel)}{' '}
+                            · Counts cover all matching records across every
+                            page · Updated{' '}
+                            {formatDateTimeInZone(
+                                evidence.checked_at,
+                                evidence.timezone,
+                            )}
+                        </p>
+                    </fieldset>
+                }
+                rail={rail}
+            />
+            {pickerOpen ? (
+                <WeekPicker
+                    selectedWeekStart={weekStart}
+                    anchorRef={weekBtnRef}
+                    onSelect={(d) => {
+                        onWeekChange(d);
+                        setPickerOpen(false);
+                    }}
+                    onClose={() => setPickerOpen(false)}
+                    showContextMenu={false}
+                />
+            ) : null}
+        </>
     );
 }

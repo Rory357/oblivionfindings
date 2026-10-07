@@ -1,6 +1,7 @@
 import type { HandoverWorkerNotes } from '@/components/handover-person-notes';
 /* Shared types, helpers and small UI primitives for the Shift Handovers page. */
 import { avatarHueStyle } from '@/components/rostering/avatar-hue';
+import { toDateInput } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 
 export type HandoverStatus = 'draft' | 'submitted' | 'acknowledged';
@@ -204,9 +205,13 @@ export function humanizeRole(role: string | null | undefined): string | null {
         .join(' ');
 }
 
-export function fmtTime(iso: string | null | undefined): string {
+export function fmtTime(
+    iso: string | null | undefined,
+    timeZone?: string,
+): string {
     if (!iso) return '--:--';
     return new Date(iso).toLocaleTimeString('en-NZ', {
+        ...(timeZone ? { timeZone } : {}),
         hour: '2-digit',
         minute: '2-digit',
         hour12: false,
@@ -215,9 +220,10 @@ export function fmtTime(iso: string | null | undefined): string {
 
 export function fmtShiftRange(
     shift: HandoverShift | CatalogueShift | null | undefined,
+    timeZone?: string,
 ): string {
     if (!shift) return '';
-    return `${fmtTime(shift.starts_at)}–${fmtTime(shift.ends_at)}`;
+    return `${fmtTime(shift.starts_at, timeZone)}–${fmtTime(shift.ends_at, timeZone)}`;
 }
 
 export function relTime(iso: string | null | undefined): string {
@@ -239,6 +245,16 @@ export function relTime(iso: string | null | undefined): string {
 export function handoverDate(h: Handover): Date {
     const iso = h.outgoing_shift?.starts_at ?? h.created_at;
     return iso ? new Date(iso) : new Date();
+}
+
+/** Calendar carrier for read-only grouping; never feed this value back into a shift write. */
+export function handoverCalendarDate(h: Handover, timeZone?: string): Date {
+    if (!timeZone) return handoverDate(h);
+    const key = toDateInput(
+        h.outgoing_shift?.starts_at ?? h.created_at,
+        timeZone,
+    );
+    return key ? new Date(`${key}T12:00:00`) : new Date(Number.NaN);
 }
 
 export function statusLabel(status: string): string {
