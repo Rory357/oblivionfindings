@@ -26,9 +26,13 @@ class BackupEmailSender
                 $connection = $snapshot['connection'];
                 $provider = $snapshot['provider'];
                 // Advisory reads never refresh; require only the credentials the next preparation needs.
-                $credentials = $connection->needsRefresh()
+                $refreshRequired = $connection->needsRefresh();
+                $credentials = $refreshRequired
                     ? [$connection->getRefreshToken(), config("services.{$provider}.client_id"), config("services.{$provider}.client_secret")]
                     : [$connection->getAccessToken()];
+                if ($refreshRequired && $provider === 'microsoft') {
+                    $credentials[] = config('services.microsoft.tenant');
+                }
                 foreach ($credentials as $credential) {
                     if (! is_string($credential) || trim($credential) === '') {
                         throw new MailNotSubmitted('backup_email_mailbox_not_ready');

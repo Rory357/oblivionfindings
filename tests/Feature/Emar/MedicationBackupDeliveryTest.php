@@ -1315,12 +1315,14 @@ class MedicationBackupDeliveryTest extends TestCase
         $bytes = Storage::disk('private')->get($row->artifact_path);
         $orderBefore = $this->order->fresh()->getRawOriginal();
         config(['mail.default' => 'smtp', 'emar-catalogue-backups.send_enabled' => true,
-            'services.'.$provider.'.client_id' => 'synthetic-client', 'services.'.$provider.'.client_secret' => 'synthetic-client-secret']);
+            'services.'.$provider.'.client_id' => 'synthetic-client', 'services.'.$provider.'.client_secret' => 'synthetic-client-secret',
+            'services.microsoft.tenant' => 'synthetic-directory']);
         $refreshes = 0;
         $submissions = 0;
         Http::fake(function ($request) use ($provider, $failure, &$refreshes, &$submissions) {
             if (str_contains($request->url(), 'oauth2')) {
                 $refreshes++;
+                $this->assertSame($provider === 'google' ? 'https://oauth2.googleapis.com/token' : 'https://login.microsoftonline.com/synthetic-directory/oauth2/v2.0/token', $request->url());
                 $this->assertSame('synthetic-refresh', $request['refresh_token']);
 
                 return Http::response(['access_token' => 'rotated-synthetic-access', 'refresh_token' => 'rotated-synthetic-refresh',

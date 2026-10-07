@@ -361,7 +361,8 @@ function backupEmailAssertOAuthReadiness(ItMailboxConnection $connection, bool $
 test('OAuth backup readiness rejects locally unavailable refresh prerequisites', function (string $provider, string $expiry, string $missing) {
     $this->freezeTime();
     $connection = backupEmailSavedOAuth($provider);
-    config(["services.{$provider}.client_id" => 'synthetic-client', "services.{$provider}.client_secret" => 'synthetic-client-secret']);
+    config(["services.{$provider}.client_id" => 'synthetic-client', "services.{$provider}.client_secret" => 'synthetic-client-secret',
+        'services.microsoft.tenant' => $provider === 'microsoft' ? 'synthetic-directory' : null]);
     $connection->update(['token_expires_at' => match ($expiry) {
         'expired' => now()->subMinute(),
         'near' => now()->addMinutes(4),
@@ -396,7 +397,8 @@ test('OAuth backup readiness rejects locally unavailable refresh prerequisites',
 test('OAuth backup readiness accepts refreshable tokens and allows replacement of blank access tokens', function (string $provider, string $expiry) {
     $this->freezeTime();
     $connection = backupEmailSavedOAuth($provider);
-    config(["services.{$provider}.client_id" => 'synthetic-client', "services.{$provider}.client_secret" => 'synthetic-client-secret']);
+    config(["services.{$provider}.client_id" => 'synthetic-client', "services.{$provider}.client_secret" => 'synthetic-client-secret',
+        'services.microsoft.tenant' => $provider === 'microsoft' ? 'synthetic-directory' : null]);
     $connection->update(['access_token' => '', 'token_expires_at' => match ($expiry) {
         'expired' => now()->subMinute(),
         'near' => now()->addMinutes(4),
@@ -413,7 +415,7 @@ test('OAuth backup readiness needs no unused refresh credentials for a usable cu
     if ($corruptRefresh) {
         DB::table('it_mailbox_connections')->where('id', $connection->id)->update(['refresh_token' => 'malformed-synthetic-encrypted-token']);
     }
-    config(["services.{$provider}.client_id" => null, "services.{$provider}.client_secret" => []]);
+    config(["services.{$provider}.client_id" => null, "services.{$provider}.client_secret" => [], 'services.microsoft.tenant' => null]);
 
     backupEmailAssertOAuthReadiness($connection, true);
 })->with(['google', 'microsoft'])->with([false, true]);
@@ -422,7 +424,37 @@ test('OAuth backup readiness rejects unusable current access tokens and preserve
     $this->freezeTime();
     $connection = backupEmailSavedOAuth($provider);
     $connection->update(['access_token' => $access, 'token_expires_at' => now()->addMinutes(6)]);
-    config(["services.{$provider}.client_id" => 'synthetic-client', "services.{$provider}.client_secret" => 'synthetic-client-secret']);
+    config(["services.{$provider}.client_id" => 'synthetic-client', "services.{$provider}.client_secret" => 'synthetic-client-secret',
+        'services.microsoft.tenant' => $provider === 'microsoft' ? 'synthetic-directory' : null]);
 
     backupEmailAssertOAuthReadiness($connection, false);
 })->with(['google', 'microsoft'])->with(['empty' => [''], 'whitespace' => [" \t "], 'null' => [null]]);
+
+test('Microsoft backup readiness rejects an unavailable refresh endpoint directory', function (string $expiry, mixed $directory) {
+    $this->freezeTime();
+    $connection = backupEmailSavedOAuth('microsoft');
+    config(['services.microsoft.client_id' => 'synthetic-client', 'services.microsoft.client_secret' => 'synthetic-client-secret',
+        'services.microsoft.tenant' => $directory]);
+    $connection->update(['token_expires_at' => match ($expiry) {
+        'expired' => now()->subMinute(),
+        'near' => now()->addMinutes(4),
+        'unknown' => null,
+    }]);
+
+    backupEmailAssertOAuthReadiness($connection, false);
+})->with([
+    'expired missing directory' => ['expired', null],
+    'near expiry empty directory' => ['near', ''],
+    'unknown expiry whitespace directory' => ['unknown', " \t "],
+    'expired non-string directory' => ['expired', []],
+]);
+
+test('Microsoft backup readiness accepts refresh endpoint directory aliases', function (string $directory) {
+    $this->freezeTime();
+    $connection = backupEmailSavedOAuth('microsoft');
+    config(['services.microsoft.client_id' => 'synthetic-client', 'services.microsoft.client_secret' => 'synthetic-client-secret',
+        'services.microsoft.tenant' => $directory]);
+    $connection->update(['token_expires_at' => now()->subMinute()]);
+
+    backupEmailAssertOAuthReadiness($connection, true);
+})->with(['common', 'organizations']);
