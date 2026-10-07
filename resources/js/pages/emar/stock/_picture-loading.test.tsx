@@ -109,9 +109,12 @@ describe('Stock pictures load for the opened medicine', () => {
                 expect.objectContaining({ signal: expect.any(AbortSignal) }),
             );
             expect(
-                screen.getByText('A picture alone does not confirm a dose.', {
-                    exact: false,
-                }),
+                await screen.findByText(
+                    'A picture alone does not confirm a dose.',
+                    {
+                        exact: false,
+                    },
+                ),
             ).toBeVisible();
             const pictureSignal = vi.mocked(axios.get).mock.calls[0][1]?.signal;
             fireEvent.click(

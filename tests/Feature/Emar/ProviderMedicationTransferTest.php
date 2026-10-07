@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\ClientMedicalProfile;
 use App\Models\ClientMedication;
 use App\Models\MedicationAllergy;
+use App\Models\MedicationDoseSlot;
 use App\Models\MedicationProviderTransfer;
 use App\Models\MedicationProviderTransferEvent;
 use App\Models\MedicationReconciliation;
@@ -163,12 +164,87 @@ final class ProviderMedicationTransferTest extends TestCase
         $source = $record->fresh()->reconciliation->items()->whereNull('client_medication_id')->sole();
         $this->assertSame($expected['medications.0.last_dose.given_at'], $source->last_dose_evidence['external']['given_at']);
         $this->assertSame($expected['medications.0.next_due_at'], $source->source_order['provider_source']['next_due_at']);
+        $this->assertSame($expected['medications.0.next_due_at'], $source->next_dose_at->utc()->toIso8601String());
+        $this->get('/emar/prescriptions?view=reconciliation')->assertOk()
+            ->assertInertia(fn (Assert $p) => $p->component('emar/Orders')->has('reconciliations', 1)
+                ->where('reconciliations.0.items.0.id', $source->id)
+                ->where('reconciliations.0.items.0.next_dose_at', '2026-10-07T00:30:00.000000Z')
+                ->where('reconciliations.0.items.0.source_order.verified', false)
+                ->where('reconciliations.0.items.0.last_dose_evidence.source', 'unverified_provider')
+                ->where('reconciliations.0.items.0.last_dose_evidence.external.given_at', $expected['medications.0.last_dose.given_at']));
         $this->assertSame('2026-10-07', $source->source_order['provider_source']['prescription']['start_date']);
         $this->assertSame('2026-10-08', $source->source_order['provider_source']['prescription']['end_date']);
         $this->assertFalse($source->source_order['verified']);
         $this->assertDatabaseCount('client_medications', 0);
         $this->assertDatabaseCount('medication_allergies', 0);
         Mail::assertNothingSent();
+    }
+
+    public function test_provider_review_times_map_to_their_source_items_without_replacing_canonical_doses_or_bypassing_signoff(): void
+    {
+        Http::fake();
+        Http::preventStrayRequests();
+        $order = $this->chart(['name' => 'Internal chart medicine']);
+        $slot = MedicationDoseSlot::create(['client_id' => $this->person->id, 'client_medication_id' => $order->id,
+            'nz_date' => '2026-10-07', 'ordered_time' => '15:00', 'due_at' => now()->addHours(2), 'generated_at' => now()]);
+        $orderBefore = (array) DB::table('client_medications')->where('id', $order->id)->first();
+        $slotBefore = (array) DB::table('medication_dose_slots')->where('id', $slot->id)->first();
+        $input = $this->timedTransferInput();
+        $input['source_snapshot']['medications'][] = ['prescription' => $this->prescription(['name' => 'No provider dose time']),
+            'last_dose' => null, 'next_due_at' => null];
+        $input['source_snapshot']['medications'][] = ['prescription' => $this->prescription(['name' => 'Third source medicine', 'dosage' => '20 mg']),
+            'last_dose' => ['given_at' => '2026-10-06T22:45:00Z', 'dose_given' => '20 mg', 'source' => 'Named provider record'],
+            'next_due_at' => '2026-10-07T14:45:00+13:00'];
+        $response = $this->actingAs($this->manager)->postJson('/emar/connected-care/transfers', $input)->assertOk();
+        $record = MedicationProviderTransfer::findOrFail($response->json('id'));
+        $url = '/emar/connected-care/transfers/'.$record->id.'/transition';
+        $this->postJson($url, $this->action('review', 1, 'mixed-review'))->assertOk();
+        $this->postJson($url, $this->action('receipt', 2, 'mixed-receipt'))->assertOk();
+        $this->postJson($url, $this->action('start_reconciliation', 3, 'mixed-reconcile'))->assertOk();
+        $record->refresh();
+        $reconciliation = $record->reconciliation;
+        $this->assertNull($reconciliation->signed_off_at);
+        $canonical = $reconciliation->items()->where('client_medication_id', $order->id)->sole();
+        $this->assertSame('2026-10-07T02:00:00+00:00', $canonical->next_dose_at->utc()->toIso8601String());
+        $this->assertSame('Internal chart medicine', $canonical->medicine_name);
+        $this->assertSame('not_recorded', $canonical->last_dose_evidence['source']);
+        $this->assertArrayNotHasKey('provider_source', $canonical->source_order);
+        $sourceItems = $reconciliation->items()->whereNull('client_medication_id')->orderBy('id')->get();
+        $this->assertCount(3, $sourceItems);
+        foreach ($sourceItems as $index => $item) {
+            $source = $record->snapshot['medications'][$index];
+            $this->assertEquals($source, $item->source_order['provider_source']);
+            $this->assertSame($source['prescription']['name'], $item->medicine_name);
+            $this->assertSame($source['prescription']['controlled_drug'], $item->controlled);
+            $this->assertFalse($item->source_order['verified']);
+            $this->assertSame($record->id, $item->source_order['provider_transfer_id']);
+            $this->assertSame('unverified_provider', $item->last_dose_evidence['source']);
+            $this->assertEquals($source['last_dose'], $item->last_dose_evidence['external']);
+            $this->assertSame($source['next_due_at'], $item->next_dose_at?->utc()->toIso8601String());
+            $this->assertSame('Unverified provider source: '.json_encode($source, JSON_THROW_ON_ERROR), $item->notes);
+        }
+        $this->assertSame($input['source_snapshot']['allergies'], $record->events()->where('action', 'start_reconciliation')->sole()->evidence['unverified_allergies']);
+        $this->get('/emar/prescriptions?view=reconciliation')->assertOk()
+            ->assertInertia(fn (Assert $p) => $p->has('reconciliations.0.items', 4)
+                ->where('reconciliations.0.items.0.id', $canonical->id)
+                ->where('reconciliations.0.items.0.next_dose_at', '2026-10-07T02:00:00.000000Z')
+                ->where('reconciliations.0.items.1.next_dose_at', '2026-10-07T00:30:00.000000Z')
+                ->where('reconciliations.0.items.2.next_dose_at', null)
+                ->where('reconciliations.0.items.3.next_dose_at', '2026-10-07T01:45:00.000000Z'));
+        $this->postJson('/emar/reconciliations/'.$reconciliation->id.'/sign-off')->assertUnprocessable();
+        $this->postJson($url, $this->action('complete', 4, 'mixed-complete'))->assertUnprocessable();
+        $this->assertNull($reconciliation->fresh()->signed_off_at);
+        $this->assertSame('reconciliation_started', $record->fresh()->status);
+        $this->assertDatabaseCount('client_medications', 1);
+        $this->assertDatabaseCount('medication_dose_slots', 1);
+        $this->assertSame($orderBefore, (array) DB::table('client_medications')->where('id', $order->id)->first());
+        $this->assertSame($slotBefore, (array) DB::table('medication_dose_slots')->where('id', $slot->id)->first());
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertDatabaseCount('medication_allergies', 0);
+        $this->assertDatabaseCount('client_medication_stocks', 0);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        Mail::assertNothingSent();
+        Http::assertNothingSent();
     }
 
     public static function keyedIncomingFacts(): array

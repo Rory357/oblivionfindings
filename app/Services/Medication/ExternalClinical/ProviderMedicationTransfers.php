@@ -131,7 +131,10 @@ final class ProviderMedicationTransfers
                     foreach ($unlinked as $index => $item) {
                         $row = $record->snapshot['medications'][$index];
                         $item->forceFill(['source_order' => ['provider_transfer_id' => $record->id, 'verified' => false, 'provider_source' => $row],
-                            'last_dose_evidence' => ['source' => 'unverified_provider', 'provider_transfer_id' => $record->id, 'external' => $row['last_dose'] ?? null]])->save();
+                            'last_dose_evidence' => ['source' => 'unverified_provider', 'provider_transfer_id' => $record->id, 'external' => $row['last_dose'] ?? null],
+                            // Seed the review/query deadline, retaining the provider's
+                            // unverified provenance above; this creates no dose slot.
+                            'next_dose_at' => filled($row['next_due_at'] ?? null) ? CarbonImmutable::parse($row['next_due_at'])->utc() : null])->save();
                     }
                     $record->reconciliation_id = $reconciliation->id;
                     $record->status = 'reconciliation_started';
