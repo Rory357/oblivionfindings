@@ -1359,9 +1359,12 @@ class MedicationSettingsController extends Controller
     private function roundTemplatePayload(User $actor, bool $canTemplates, bool $canRead): array
     {
         $manageable = $canTemplates ? $this->roundTemplates->manageableSiteIds($actor) : [];
+        $catalogue = $canRead
+            ? $this->roundTemplates->rowsAndStaff($actor)
+            : ['rows' => [], 'staff' => $canTemplates ? $this->roundTemplates->staffPicker($actor) : collect()];
 
         return [
-            'roundTemplates' => $canRead ? $this->roundTemplates->rows($actor) : [],
+            'roundTemplates' => $catalogue['rows'],
             'templateAccess' => [
                 'read' => $canRead,
                 'manage' => $canTemplates,
@@ -1374,7 +1377,7 @@ class MedicationSettingsController extends Controller
                     ->map(fn (Site $site): array => ['id' => (int) $site->id, 'name' => (string) $site->name])
                     ->all(),
             ],
-            'templateStaff' => $canTemplates ? $this->roundTemplates->staffPicker($actor)->all() : [],
+            'templateStaff' => $canTemplates ? $catalogue['staff']->all() : [],
         ];
     }
 
