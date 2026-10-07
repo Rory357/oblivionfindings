@@ -21,6 +21,7 @@ use App\Domain\Monitoring\Services\RuntimeEnvelopeHandlerRegistry;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Jobs\RefreshWorkforceEligibility;
 use App\Models\AuditLog;
 use App\Models\Permission;
 use App\Models\Site;
@@ -795,10 +796,13 @@ it('authorises the freshly locked dead letter instead of a stale caller model', 
     $access = Mockery::mock(SecurityDevicesAccessService::class);
     $access->shouldReceive('accessibleSiteIds')->once()->with($actor)->andReturn([$allowedSite->id]);
 
+    $queueBaseline = Queue::pushedJobs();
+    expect(array_keys($queueBaseline))->toBe([RefreshWorkforceEligibility::class]);
+
     expect(fn () => (new MonitoringReplayService(app(RuntimeEnvelopeCodec::class), $access, app(MonitoringEnvelopeConsumer::class)))
         ->replay($actor, $letter, 'Use locked scope'))
         ->toThrow(AuthorizationException::class, 'outside your access scope');
-    Queue::assertNothingPushed();
+    expect(Queue::pushedJobs())->toBe($queueBaseline);
 });
 
 it('redispatches one durable replay intent and blocks discard while it is pending', function () {

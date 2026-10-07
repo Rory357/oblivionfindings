@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\RefreshWorkforceEligibility;
 use App\Jobs\SyncResourceCalendarsJob;
 use App\Models\CalendarSyncMapping;
 use App\Models\Role;
@@ -312,11 +313,15 @@ test('manual sync rejects a mapping for a site that is no longer operational', f
         'ical_feed_token' => str_repeat('a', 48),
         'is_active' => true,
     ]);
-    $this->actingAs(calSyncAdmin())
+    $admin = calSyncAdmin();
+    $queueBaseline = Queue::pushedJobs();
+    expect(array_keys($queueBaseline))->toBe([RefreshWorkforceEligibility::class]);
+
+    $this->actingAs($admin)
         ->post('/settings/calendar-sync/sync-now', ['mapping_id' => $mapping->id])
         ->assertForbidden();
 
-    Queue::assertNothingPushed();
+    expect(Queue::pushedJobs())->toBe($queueBaseline);
 });
 
 test('feed reset conceals mappings for sites that are no longer operational', function (string $state) {

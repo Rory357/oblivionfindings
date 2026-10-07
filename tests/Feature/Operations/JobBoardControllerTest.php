@@ -3,6 +3,7 @@
 namespace Tests\Feature\Operations;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Jobs\RefreshWorkforceEligibility;
 use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\CoverageReservation;
@@ -16,6 +17,7 @@ use App\Models\ShiftSignalOutbox;
 use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\User;
+use App\Models\WorkforceEligibilityRecheck;
 use App\Notifications\AppEventNotification;
 use App\Services\Eligibility\AssignmentEligibilityDecision;
 use App\Services\Eligibility\EligibilityResult;
@@ -24,6 +26,7 @@ use App\Services\ShiftStaffEligibilityService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia as Assert;
 use Mockery\MockInterface;
 use Tests\TestCase;
@@ -573,11 +576,17 @@ class JobBoardControllerTest extends TestCase
     public function test_approve_exception_is_safe_503_with_zero_side_effects_then_retry_and_replay_are_serialized(): void
     {
         Notification::fake();
+        Queue::fake([RefreshWorkforceEligibility::class]);
         $position = $this->positionForShift($this->shiftForSite(), [
             'status' => 'claimed',
             'claimed_by' => $this->worker->id,
             'claimed_at' => now(),
         ]);
+        $queueBaseline = Queue::pushedJobs();
+        $refreshBaseline = Queue::pushed(RefreshWorkforceEligibility::class)->all();
+        $recheckBaseline = WorkforceEligibilityRecheck::query()->orderBy('id')->get()->map->getRawOriginal()->all();
+        $shiftRecheckVersion = WorkforceEligibilityRecheck::query()->where('source_type', 'shifts')->where('source_id', $position->shift_id)->value('source_version');
+        $this->assertNotNull($shiftRecheckVersion);
         $baseline = [
             'audit' => AuditLog::query()->count(),
             'timeline' => TimelineEvent::query()->count(),
@@ -585,14 +594,16 @@ class JobBoardControllerTest extends TestCase
             'outbox' => ShiftSignalOutbox::query()->count(),
         ];
         $attempt = 0;
-        $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock) use (&$attempt): void {
-            $mock->shouldReceive('evaluate')->twice()->andReturnUsing(function () use (&$attempt) {
-                if (++$attempt === 1) {
-                    throw new \RuntimeException('private eligibility provider detail');
-                }
+        $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock) use (&$attempt, $position): void {
+            $mock->shouldReceive('evaluate')->twice()
+                ->withArgs(fn (Shift $shift, User $user): bool => (int) $shift->id === (int) $position->shift_id && (int) $user->id === (int) $this->worker->id)
+                ->andReturnUsing(function () use (&$attempt) {
+                    if (++$attempt === 1) {
+                        throw new \RuntimeException('private eligibility provider detail');
+                    }
 
-                return $this->eligibleResult();
-            });
+                    return $this->eligibleResult();
+                });
         });
 
         $this->actingAs($this->manager)
@@ -619,10 +630,23 @@ class JobBoardControllerTest extends TestCase
         $this->assertSame($baseline['reservations'], CoverageReservation::query()->count());
         $this->assertSame($baseline['outbox'], ShiftSignalOutbox::query()->count());
         Notification::assertNothingSent();
+        $this->assertSame($queueBaseline, Queue::pushedJobs());
+        $this->assertSame($recheckBaseline, WorkforceEligibilityRecheck::query()->orderBy('id')->get()->map->getRawOriginal()->all());
 
         $this->actingAs($this->manager)
             ->post(route('operations.job_board.approve', $position))
             ->assertSessionHas('success');
+
+        $this->assertSame(2, $attempt);
+        $refreshes = array_slice(Queue::pushed(RefreshWorkforceEligibility::class)->all(), count($refreshBaseline));
+        $this->assertCount(1, $refreshes);
+        $recheck = WorkforceEligibilityRecheck::query()->where('source_type', 'shifts')->where('source_id', $position->shift_id)->firstOrFail();
+        $this->assertSame((int) $shiftRecheckVersion + 1, $recheck->source_version);
+        $this->assertSame([(int) $position->shift_id], $recheck->shift_ids);
+        $this->assertSame((int) $recheck->id, $refreshes[0]->recheckId);
+        $this->assertSame($recheck->source_version, $refreshes[0]->sourceVersion);
+        $approvedQueueBaseline = Queue::pushedJobs();
+        $approvedRecheckBaseline = WorkforceEligibilityRecheck::query()->orderBy('id')->get()->map->getRawOriginal()->all();
 
         $this->actingAs($this->manager)
             ->postJson(route('operations.job_board.approve', $position))
@@ -643,6 +667,8 @@ class JobBoardControllerTest extends TestCase
             ->where('type', 'shift_replacement_approved')
             ->count());
         Notification::assertSentToTimes($this->worker, AppEventNotification::class, 1);
+        $this->assertSame($approvedQueueBaseline, Queue::pushedJobs());
+        $this->assertSame($approvedRecheckBaseline, WorkforceEligibilityRecheck::query()->orderBy('id')->get()->map->getRawOriginal()->all());
     }
 
     public function test_approve_hard_block_is_422_and_warning_state_remains_advisory(): void

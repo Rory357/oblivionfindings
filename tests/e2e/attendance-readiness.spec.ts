@@ -80,6 +80,8 @@ test.describe('attendance readiness workflows', () => {
     test('checklist task ticks and handover are submitted with clock out', async ({
         page,
     }, testInfo) => {
+        // Fixture setup, login and the atomic save share CI's single PHP worker.
+        test.setTimeout(60_000);
         const consoleErrors = collectConsoleErrors(page);
 
         await loginAsChecklistWorker(page, testInfo);
@@ -106,7 +108,14 @@ test.describe('attendance readiness workflows', () => {
             .fill('Checklist completed during atomic clock-out test.');
         const submit = dialog.getByTestId('end-shift-submit');
         await expect(submit).toBeEnabled();
+        const clockOutResponse = page.waitForResponse(
+            (response) =>
+                new URL(response.url()).pathname === '/attendance/clock-out' &&
+                response.request().method() === 'POST',
+            { timeout: 30_000 },
+        );
         await submit.click();
+        expect((await clockOutResponse).status()).toBe(302);
 
         await expect(
             page.getByRole('button', { name: 'Clock in', exact: true }),

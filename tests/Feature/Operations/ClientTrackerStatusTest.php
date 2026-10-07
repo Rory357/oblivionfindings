@@ -2,6 +2,7 @@
 
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
+use App\Jobs\RefreshWorkforceEligibility;
 use App\Models\Asset;
 use App\Models\FleetTelemetryEvent;
 use App\Services\Tracking\ClientTrackerStatusService;
@@ -15,6 +16,8 @@ it('preserves panic evidence without coercing missing or malformed states to a r
     Http::preventStrayRequests();
     Queue::fake();
     extract(ClientLocationWorkspaceFixture::make());
+    $queueBaseline = Queue::pushedJobs();
+    expect(array_keys($queueBaseline))->toBe([RefreshWorkforceEligibility::class]);
     $this->actingAs($actor);
     foreach ([null, false, true, 'false', 'yes', 2] as $state) {
         $device->update(['meta' => ['panic_active' => $state]]);
@@ -30,13 +33,15 @@ it('preserves panic evidence without coercing missing or malformed states to a r
             ->where('location.tracker.panic_active', false)
             ->where('location.tracker.panic_acknowledged_at', $ack));
     Http::assertNothingSent();
-    Queue::assertNothingPushed();
+    expect(Queue::pushedJobs())->toBe($queueBaseline);
 });
 
 it('only presents motion with a valid report in the current collection period', function () {
     Http::preventStrayRequests();
     Queue::fake();
     extract(ClientLocationWorkspaceFixture::make());
+    $queueBaseline = Queue::pushedJobs();
+    expect(array_keys($queueBaseline))->toBe([RefreshWorkforceEligibility::class]);
     $this->actingAs($actor);
     $time = now()->subMinute()->startOfSecond()->toISOString();
     foreach (['moving' => 'moving', 'motion' => 'moving', 'rest' => 'stationary', 'stationary' => 'stationary', 'false' => null] as $raw => $expected) {
@@ -52,13 +57,15 @@ it('only presents motion with a valid report in the current collection period', 
         expect(app(ClientTrackerStatusService::class)->read($actor, $client)['motion_status'])->toBeNull();
     }
     Http::assertNothingSent();
-    Queue::assertNothingPushed();
+    expect(Queue::pushedJobs())->toBe($queueBaseline);
 });
 
 it('bounds fall and movement reports to the assigned device and collection window without inventing a sensor state', function () {
     Http::preventStrayRequests();
     Queue::fake();
     extract(ClientLocationWorkspaceFixture::make());
+    $queueBaseline = Queue::pushedJobs();
+    expect(array_keys($queueBaseline))->toBe([RefreshWorkforceEligibility::class]);
     $service = app(ClientTrackerStatusService::class);
     $empty = ['motion_status' => null, 'motion_reported_at' => null, 'fall_report_type' => null, 'fall_reported_at' => null];
     expect($service->read($actor, $client))->toBe($empty);
@@ -74,7 +81,7 @@ it('bounds fall and movement reports to the assigned device and collection windo
         'payload' => [], 'source' => 'synthetic-test', 'occurred_at' => now()->subMinute(),
     ]));
     expect($service->read($actor, $client))->toBe($empty);
-    $asset = Asset::factory()->create(['site_id' => $site->id]);
+    $asset = Asset::factory()->create(['site_id' => $site->id, 'created_by_user_id' => $actor->id, 'updated_by_user_id' => $actor->id]);
     $time = now()->subMinutes(5)->startOfSecond();
     $report = FleetTelemetryEvent::query()->create([
         'asset_id' => $asset->id, 'device_id' => $device->id, 'vendor' => 'synthetic',
@@ -95,5 +102,5 @@ it('bounds fall and movement reports to the assigned device and collection windo
     $assignment->update(['collection_started_at' => now()]);
     expect($service->read($actor, $client))->toBe($empty);
     Http::assertNothingSent();
-    Queue::assertNothingPushed();
+    expect(Queue::pushedJobs())->toBe($queueBaseline);
 });
