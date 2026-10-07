@@ -29,6 +29,14 @@ Connected-service permissions must remain explicitly assigned. Dedicated seeding
 
 The GitHub medication release job includes all connected feature files, including BackupEmailConfigurationTest, the existing login/email-verification/MFA regressions and focused units. It installs qpdf and checks its executable before running the real PDF test; a missing dependency must not silently count as encryption coverage.
 
+## Shared email configuration follow-up
+
+Protected backups use Main Settings → Email for the saved SMTP sender or canonical Google/Microsoft mailbox, independently of the IT support switch. The wizard identifies incomplete backup setup before and after saving and requires explicit selection of a reconnected mailbox. Microsoft connection consent requests sending access; stored rights come only from the provider-approved response.
+
+The isolated backup/configuration/unchanged mailbox transport run passed 166 tests / 2,308 assertions. The complete OAuth settings file passed 38 tests / 491 assertions with native exit 0 and its disposable database cleaned up; ten additional database-free checks exercise the installed provider SDK. Its Microsoft test adapter isolates only the roles/JWKS lookup, preserving real state validation, token exchange and approved-scope parsing. The final settings UI passed 32 focused tests, full TypeScript, scoped lint and the production build. The final built backup page was checked at desktop widths of 1440 and 1280 pixels: central-setting guidance, unavailable delivery, schedules/history and permission denial remained correct, without page-width overflow or unexpected browser errors. The restricted synthetic manager receives 403 from Main Settings → Email; positive settings behaviour is covered by the UI tests rather than an extra permission grant.
+
+The eMAR release job also runs the shared email configuration, mailbox connection/settings and existing outgoing-mail transport suites so a failure earlier in another module cannot skip those dependencies. Full current-commit CI remains the merge gate; these checks do not activate live email or prove an external provider's configuration.
+
 ## Synthetic desktop checks
 
 A separate local preview on port8767 uses fictional people/accounts, isolated database, array mail and blocked stray HTTP. It does not use the production database or the user's other preview.

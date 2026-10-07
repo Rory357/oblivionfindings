@@ -259,6 +259,8 @@ class EscalateUnresolvedEligibilityJobTest extends TestCase
             [
                 'status' => 'expired',
                 'evidence_type' => 'manual',
+                'valid_from' => now()->subYear(),
+                'expires_at' => now()->subDay(),
                 'last_checked_at' => now(),
                 'next_check_at' => now()->addDay(),
             ],

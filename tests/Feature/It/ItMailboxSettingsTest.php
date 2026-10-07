@@ -377,10 +377,15 @@ function itSettingsFakeOAuthProvider(string $provider, mixed $granted, array &$h
     Socialite::shouldReceive('driver')->once()->with($provider)->andReturnUsing(function () use ($provider, $client) {
         $arguments = [request(), 'synthetic-client', 'synthetic-client-secret', route('settings.it-mailbox.callback', $provider)];
         if ($provider === 'microsoft') {
-            $driver = Mockery::mock(MicrosoftProvider::class, $arguments)->makePartial();
-            // ID-token/JWKS verification is outside this scope test; token exchange,
-            // state verification, identity mapping and approvedScopes parsing remain real.
-            $driver->shouldReceive('getRoles')->andReturn([]);
+            $driver = new class(...$arguments) extends MicrosoftProvider
+            {
+                // Isolate role/JWKS lookup while retaining the installed SDK's real
+                // state check, token exchange, identity mapping and grant parser.
+                public function getRoles(): array
+                {
+                    return [];
+                }
+            };
         } else {
             $driver = new GoogleProvider(...$arguments);
         }

@@ -48,13 +48,16 @@ async function openClientProfileFromMyDay(page: Page) {
     await expect(careAction).toHaveAttribute('href', /\/clients\/\d+$/);
     await careAction.click();
 
-    await expect(page).toHaveURL(/\/clients\/\d+(?:\?.*)?$/);
+    await page.waitForURL(/\/clients\/\d+(?:\?.*)?$/, { timeout: 30_000 });
     await expect(
         page.getByRole('heading', { name: 'Playwright Meds', level: 1 }),
     ).toBeVisible();
 }
 
 test.describe('canonical client profile care readiness', () => {
+    // Fixture setup, sign-in and canonical redirects precede the care/axe checks.
+    // CI traces show correct results arriving at the previous whole-test limit.
+    test.setTimeout(60_000);
     test.beforeEach(async ({ context }) => {
         resetMedicationReadinessFixtures();
         await context.setOffline(false);
