@@ -334,3 +334,95 @@ test('crossing OAuth refresh threshold during a batch never submits a refresh re
     expect($calls)->toBe(1)->and($connection->fresh()->getRefreshToken())->toBe('synthetic-refresh');
     Http::assertSentCount(1);
 })->with(['google', 'microsoft']);
+
+/** Assert advisory readiness without rotating credentials, locking rows or contacting a provider. */
+function backupEmailAssertOAuthReadiness(ItMailboxConnection $connection, bool $ready): void
+{
+    $connectionBefore = $connection->fresh()->getRawOriginal();
+    $settingsBefore = AppSetting::where('key', EmailConfiguration::KEY)->sole()->getRawOriginal();
+    $depth = DB::transactionLevel();
+    $queries = [];
+    DB::listen(function ($query) use (&$queries) {
+        $queries[] = strtolower($query->sql);
+    });
+
+    expect(app(BackupEmailSender::class)->readiness())->toBe([
+        'email_ready' => $ready, 'email_capture_mode' => null,
+        'email_reason' => $ready ? null : 'Review the saved email provider and sender in Main Settings → Email.',
+        'email_source' => 'saved',
+    ])->and(DB::transactionLevel())->toBe($depth);
+    expect(implode(' ', $queries))->not->toContain('for update', 'for share');
+    expect(array_filter($queries, fn (string $sql): bool => (bool) preg_match('/^\s*(insert|update|delete|replace|alter|create|drop|truncate|begin|start transaction|commit|rollback|savepoint|release savepoint)\b/', $sql)))->toBe([]);
+    expect($connection->fresh()->getRawOriginal())->toBe($connectionBefore)
+        ->and(AppSetting::where('key', EmailConfiguration::KEY)->sole()->getRawOriginal())->toBe($settingsBefore);
+    Http::assertNothingSent();
+}
+
+test('OAuth backup readiness rejects locally unavailable refresh prerequisites', function (string $provider, string $expiry, string $missing) {
+    $this->freezeTime();
+    $connection = backupEmailSavedOAuth($provider);
+    config(["services.{$provider}.client_id" => 'synthetic-client', "services.{$provider}.client_secret" => 'synthetic-client-secret']);
+    $connection->update(['token_expires_at' => match ($expiry) {
+        'expired' => now()->subMinute(),
+        'near' => now()->addMinutes(4),
+        'unknown' => null,
+    }]);
+    match ($missing) {
+        'missing refresh' => $connection->update(['refresh_token' => null]),
+        'blank refresh' => $connection->update(['refresh_token' => " \t "]),
+        'corrupt refresh' => DB::table('it_mailbox_connections')->where('id', $connection->id)->update(['refresh_token' => 'malformed-synthetic-encrypted-token']),
+        'missing client id' => config(["services.{$provider}.client_id" => null]),
+        'blank client id' => config(["services.{$provider}.client_id" => " \t "]),
+        'malformed client id' => config(["services.{$provider}.client_id" => []]),
+        'missing client secret' => config(["services.{$provider}.client_secret" => null]),
+        'blank client secret' => config(["services.{$provider}.client_secret" => " \t "]),
+        'malformed client secret' => config(["services.{$provider}.client_secret" => []]),
+    };
+
+    backupEmailAssertOAuthReadiness($connection, false);
+})->with(['google', 'microsoft'])->with([
+    'expired missing refresh' => ['expired', 'missing refresh'],
+    'near expiry blank refresh' => ['near', 'blank refresh'],
+    'unknown expiry missing refresh' => ['unknown', 'missing refresh'],
+    'expired corrupt refresh' => ['expired', 'corrupt refresh'],
+    'unknown expiry missing client id' => ['unknown', 'missing client id'],
+    'near expiry blank client id' => ['near', 'blank client id'],
+    'expired malformed client id' => ['expired', 'malformed client id'],
+    'unknown expiry missing client secret' => ['unknown', 'missing client secret'],
+    'near expiry blank client secret' => ['near', 'blank client secret'],
+    'expired malformed client secret' => ['expired', 'malformed client secret'],
+]);
+
+test('OAuth backup readiness accepts refreshable tokens and allows replacement of blank access tokens', function (string $provider, string $expiry) {
+    $this->freezeTime();
+    $connection = backupEmailSavedOAuth($provider);
+    config(["services.{$provider}.client_id" => 'synthetic-client', "services.{$provider}.client_secret" => 'synthetic-client-secret']);
+    $connection->update(['access_token' => '', 'token_expires_at' => match ($expiry) {
+        'expired' => now()->subMinute(),
+        'near' => now()->addMinutes(4),
+        'unknown' => null,
+    }]);
+
+    backupEmailAssertOAuthReadiness($connection, true);
+})->with(['google', 'microsoft'])->with(['expired', 'near', 'unknown']);
+
+test('OAuth backup readiness needs no unused refresh credentials for a usable current token', function (string $provider, bool $corruptRefresh) {
+    $this->freezeTime();
+    $connection = backupEmailSavedOAuth($provider);
+    $connection->update(['refresh_token' => null, 'token_expires_at' => now()->addMinutes(6)]);
+    if ($corruptRefresh) {
+        DB::table('it_mailbox_connections')->where('id', $connection->id)->update(['refresh_token' => 'malformed-synthetic-encrypted-token']);
+    }
+    config(["services.{$provider}.client_id" => null, "services.{$provider}.client_secret" => []]);
+
+    backupEmailAssertOAuthReadiness($connection, true);
+})->with(['google', 'microsoft'])->with([false, true]);
+
+test('OAuth backup readiness rejects unusable current access tokens and preserves the null connection guard', function (string $provider, ?string $access) {
+    $this->freezeTime();
+    $connection = backupEmailSavedOAuth($provider);
+    $connection->update(['access_token' => $access, 'token_expires_at' => now()->addMinutes(6)]);
+    config(["services.{$provider}.client_id" => 'synthetic-client', "services.{$provider}.client_secret" => 'synthetic-client-secret']);
+
+    backupEmailAssertOAuthReadiness($connection, false);
+})->with(['google', 'microsoft'])->with(['empty' => [''], 'whitespace' => [" \t "], 'null' => [null]]);

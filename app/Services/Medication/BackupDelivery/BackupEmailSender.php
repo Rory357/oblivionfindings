@@ -21,7 +21,20 @@ class BackupEmailSender
         $source = AppSetting::query()->useWritePdo()->where('key', EmailConfiguration::KEY)->exists() ? 'saved' : 'server';
         $capture = $this->captureMode();
         try {
-            $this->snapshot(false);
+            $snapshot = $this->snapshot(false);
+            if (isset($snapshot['connection'])) {
+                $connection = $snapshot['connection'];
+                $provider = $snapshot['provider'];
+                // Advisory reads never refresh; require only the credentials the next preparation needs.
+                $credentials = $connection->needsRefresh()
+                    ? [$connection->getRefreshToken(), config("services.{$provider}.client_id"), config("services.{$provider}.client_secret")]
+                    : [$connection->getAccessToken()];
+                foreach ($credentials as $credential) {
+                    if (! is_string($credential) || trim($credential) === '') {
+                        throw new MailNotSubmitted('backup_email_mailbox_not_ready');
+                    }
+                }
+            }
             $reason = null;
         } catch (\Throwable) {
             $reason = $capture !== null
