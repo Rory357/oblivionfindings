@@ -84,6 +84,9 @@ class EscalateUnresolvedEligibilityJobTest extends TestCase
         $shift = $this->makeFutureBlockedShift();
         $this->createEligibilitySignal($shift, now()->subHours(12)); // 12h ago, threshold is 24h
 
+        // Arrangement may emit a separate eligibility-review notice; measure this job only.
+        Notification::fake();
+
         (new EscalateUnresolvedEligibilityJob(thresholdHours: 24))
             ->handle(app(ShiftStaffEligibilityService::class), app(ShiftSignalService::class));
 
@@ -132,6 +135,9 @@ class EscalateUnresolvedEligibilityJobTest extends TestCase
 
         // Unassign the staff.
         $shift->update(['user_id' => null, 'status' => 'draft']);
+
+        // Arrangement may emit a separate eligibility-review notice; measure this job only.
+        Notification::fake();
 
         (new EscalateUnresolvedEligibilityJob(thresholdHours: 24))
             ->handle(app(ShiftStaffEligibilityService::class), app(ShiftSignalService::class));
