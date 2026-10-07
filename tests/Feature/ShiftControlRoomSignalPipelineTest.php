@@ -722,8 +722,12 @@ class ShiftControlRoomSignalPipelineTest extends TestCase
         $serviceContext = $attributes['service_context'] ?? ServiceContext::factory()->create();
         $staff = array_key_exists('user_id', $attributes)
             ? null
-            : ($attributes['staff'] ?? User::factory()->create());
+            : ($attributes['staff'] ?? User::factory()->frontlineWorker()->create());
         $creator = $attributes['creator'] ?? User::factory()->create();
+
+        if ($staff) {
+            ensureCanonicalHrStaffProfile($staff, $site, ['start_date' => '2020-01-01']);
+        }
 
         unset($attributes['site'], $attributes['client'], $attributes['service_context'], $attributes['staff'], $attributes['creator']);
 

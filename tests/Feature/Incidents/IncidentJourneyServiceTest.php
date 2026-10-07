@@ -2450,6 +2450,7 @@ class IncidentJourneyServiceTest extends TestCase
             'handover_status',
         ]);
 
+        $alertCountBefore = ControlRoomAlert::query()->count();
         $exception = null;
         try {
             app(IncidentJourneyService::class)->ensureForSubmittedIncident($incident, $actor);
@@ -2462,7 +2463,7 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertSame($incidentBefore, $incident->fresh()->only(array_keys($incidentBefore)));
         $this->assertEquals($alertBefore, $alert->fresh()->only(array_keys($alertBefore)));
         $this->assertSame($directBefore, $directEvent->fresh()->only(array_keys($directBefore)));
-        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertDatabaseCount('control_room_alerts', $alertCountBefore);
         $this->assertDatabaseCount('client_incidents', 1);
         $this->assertDatabaseCount('hs_events', 1);
     }

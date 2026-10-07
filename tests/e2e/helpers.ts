@@ -410,7 +410,10 @@ export async function publishCurrentWeek(
     await expect(page.getByTestId('publish-review-confirm')).toBeEnabled();
     await page.getByTestId('publish-review-confirm').click();
 
-    await expect(page).toHaveURL(/\/operations\/rostering(?:\?|$)/);
+    // Publishing redirects through the governed roster read on CI's single PHP worker.
+    await page.waitForURL(/\/operations\/rostering(?:\?|$)/, {
+        timeout: 30_000,
+    });
     await expect(page.getByTestId('rostering-publish-panel')).toContainText(
         /published/i,
     );

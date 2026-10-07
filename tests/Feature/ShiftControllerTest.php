@@ -625,9 +625,9 @@ class ShiftControllerTest extends TestCase
             'outbox' => ShiftSignalOutbox::query()->count(),
         ];
         $attempt = 0;
-        // Failed preview, then the retry's preview plus the locked re-decision.
+        // Failed preview, then the retry's preview, locked re-decision, and committed Workforce observation.
         $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock) use (&$attempt): void {
-            $mock->shouldReceive('evaluate')->times(3)->andReturnUsing(function () use (&$attempt) {
+            $mock->shouldReceive('evaluate')->times(4)->andReturnUsing(function () use (&$attempt) {
                 if (++$attempt === 1) {
                     throw new \RuntimeException('private eligibility infrastructure detail');
                 }
@@ -692,10 +692,10 @@ class ShiftControllerTest extends TestCase
         $this->giveAdminCurrentHrProfile();
         $shift = $this->assignmentBoundaryShift();
         $warning = 'Would exceed the weekly fatigue warning threshold.';
-        // Warning preview, then preview plus locked re-decision for both the
-        // refused scheduler override and the admin override.
+        // Warning preview, then preview plus locked re-decision for both overrides,
+        // followed by the committed Workforce observation after the admin succeeds.
         $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock) use ($warning): void {
-            $mock->shouldReceive('evaluate')->times(5)->andReturn(
+            $mock->shouldReceive('evaluate')->times(6)->andReturn(
                 $this->assignmentEligibilityResult(warnings: [$warning]),
             );
         });
@@ -1449,8 +1449,9 @@ class ShiftControllerTest extends TestCase
         StaffAvailability::query()->create([
             'user_id' => $this->staff->id,
             'day_of_week' => Carbon::SUNDAY,
-            'starts_at' => '00:00:00',
-            'ends_at' => '23:59:59',
+            'starts_at' => '23:00:00',
+            'ends_at' => '03:00:00',
+            'ends_next_day' => true,
         ]);
         $shift = Shift::factory()->create([
             'client_id' => $this->client->id,

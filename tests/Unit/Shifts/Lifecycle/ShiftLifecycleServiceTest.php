@@ -205,9 +205,10 @@ class ShiftLifecycleServiceTest extends TestCase
             'user_id' => null,
         ]);
         $this->makeCurrentAtSite($assignee, Site::query()->findOrFail($shift->site_id));
+        // The locked assignment gateway and the committed Workforce observation each evaluate once.
         $this->mock(ShiftStaffEligibilityService::class, function ($mock): void {
             $mock->shouldReceive('evaluate')
-                ->once()
+                ->twice()
                 ->andReturn(EligibilityResult::fromChecks([]));
         });
 
@@ -247,8 +248,9 @@ class ShiftLifecycleServiceTest extends TestCase
             'overrideable' => true,
             'message' => 'Current turnaround evidence needs acknowledgement.',
         ]]);
+        // The locked assignment gateway and the committed Workforce observation each evaluate once.
         $this->mock(ShiftStaffEligibilityService::class, function ($mock) use ($currentWarning): void {
-            $mock->shouldReceive('evaluate')->once()->andReturn($currentWarning);
+            $mock->shouldReceive('evaluate')->twice()->andReturn($currentWarning);
         });
 
         app(ShiftLifecycleService::class)->assign($shift, $actor, $assignee, [

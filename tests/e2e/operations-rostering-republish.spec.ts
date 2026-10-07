@@ -92,7 +92,10 @@ test.describe('operations rostering — republish flow', () => {
         );
         await page.getByRole('button', { name: /Re-publish/i }).click();
         expect((await republishResponse).status()).toBe(302);
-        await expect(page).toHaveURL(/\/operations\/rostering(?:\?|$)/);
+        // Publishing redirects through the governed roster read on CI's single PHP worker.
+        await page.waitForURL(/\/operations\/rostering(?:\?|$)/, {
+            timeout: 30_000,
+        });
         await expect(publishPanel).toContainText(/published/i);
         await expect(publishPanel).not.toContainText(/changed after publish/i);
 

@@ -79,26 +79,19 @@ final class FrozenVisualRuntimeTest extends TestCase
 
     public function test_environment_database_url_cannot_redirect_the_disposable_database(): void
     {
-        $before = $_ENV;
-        $_ENV = array_replace($_ENV, [
-            'APP_ENV' => 'testing',
-            'DB_CONNECTION' => 'mysql',
-            'DB_DATABASE' => FrozenVisualRuntime::DATABASE,
+        $this->withHttpEnvironment([
+            ...$this->visualEnvironment(),
             'DB_URL' => 'mysql://example.invalid/another_database',
-            'VISUAL_FROZEN_NOW' => '2026-10-05T00:00:00Z',
-            'VISUAL_RANDOM_SEED' => '20261005',
-        ]);
-
-        try {
-            FrozenVisualRuntime::configureFromEnvironment();
-            self::fail('A database URL override was accepted.');
-        } catch (InvalidArgumentException $exception) {
-            self::assertStringContainsString('database URL override', $exception->getMessage());
-            self::assertFalse(Carbon::hasTestNow());
-            self::assertFalse(CarbonImmutable::hasTestNow());
-        } finally {
-            $_ENV = $before;
-        }
+        ], function (): void {
+            try {
+                FrozenVisualRuntime::configureFromEnvironment();
+                self::fail('A database URL override was accepted.');
+            } catch (InvalidArgumentException $exception) {
+                self::assertStringContainsString('database URL override', $exception->getMessage());
+                self::assertFalse(Carbon::hasTestNow());
+                self::assertFalse(CarbonImmutable::hasTestNow());
+            }
+        });
     }
 
     #[DataProvider('invalidContexts')]
