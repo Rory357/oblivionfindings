@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Fortify\Fortify;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -97,12 +98,191 @@ class MedicationBackupDeliveryTest extends TestCase
         $first = $this->prepare($schedule);
         $second = $this->prepare($schedule);
         $this->assertSame($first->id, $second->id);
+        $this->assertSame($first->getRawOriginal(), $second->getRawOriginal());
         $this->assertSame('ready', $first->state);
         $this->assertCount(1, Storage::disk('private')->allFiles());
         $this->assertStringNotContainsString('Fictional backup medicine', $first->getRawOriginal('source_snapshot'));
         $this->assertNotSame($first->password, $first->getRawOriginal('password'));
         $this->assertStringNotContainsString('artifact_path', json_encode(app(BackupDeliveryService::class)->dto($first, $this->lead)));
         $this->assertDatabaseCount('medication_backup_attempts', 0);
+        Mail::assertNothingSent();
+    }
+
+    public static function staleOwnedReadyBackups(): array
+    {
+        $cases = [];
+        foreach (['schedule', 'recipients', 'clinical source', 'missing artifact', 'corrupted artifact'] as $change) {
+            $cases[$change.' through explicit prepare'] = [$change, false];
+            $cases[$change.' through due scheduler'] = [$change, true];
+        }
+
+        return $cases;
+    }
+
+    #[DataProvider('staleOwnedReadyBackups')]
+    public function test_stale_owned_ready_backup_rebuilds_before_its_only_submission(string $change, bool $scheduled): void
+    {
+        $schedule = $this->schedule();
+        $row = $this->prepare($schedule);
+        $before = $row->getRawOriginal();
+        $oldPath = $row->artifact_path;
+        $bytes = Storage::disk('private')->get($oldPath);
+        $service = app(BackupDeliveryService::class);
+        $recipientIds = [$this->recipient->id];
+        $mailboxes = [$this->recipient->email];
+        if ($change === 'schedule') {
+            $schedule = $service->schedule($this->lead, $this->site->id, $schedule->version, ['local_time' => '08:00', 'enabled' => true, 'retention_days' => 10]);
+        } elseif ($change === 'recipients') {
+            $second = $this->staff($this->site, false);
+            $schedule = $service->approveRecipient($this->lead, $schedule->id, $schedule->version, $second->id, true);
+            $recipientIds[] = $second->id;
+            $mailboxes[] = $second->email;
+        } elseif ($change === 'clinical source') {
+            $this->order->forceFill(['dosage' => '20 mg from current canonical chart'])->saveQuietly();
+        } elseif ($change === 'missing artifact') {
+            Storage::disk('private')->delete($oldPath);
+        } else {
+            Storage::disk('private')->put($oldPath, '%PDF-FICTIONAL-CORRUPTED');
+        }
+        // The new artifact is rendered outside the claim transaction; prior metadata
+        // stays recoverable until a newly checked replacement is published.
+        $pdf = Mockery::mock(DowntimePackPdf::class);
+        $pdf->shouldReceive('render')->once()->andReturnUsing(function (array $pack) use ($row, $before, $bytes, $change): string {
+            $preparing = $row->fresh();
+            $this->assertSame('preparing', $preparing->state);
+            foreach (['artifact_path', 'artifact_sha256', 'password', 'source_snapshot', 'source_sha256', 'recipient_ids', 'recipient_sha256', 'expires_at', 'prepared_by'] as $field) {
+                $this->assertSame($before[$field], $preparing->getRawOriginal($field));
+            }
+            if (! in_array($change, ['missing artifact', 'corrupted artifact'], true)) {
+                $this->assertSame($bytes, Storage::disk('private')->get($preparing->artifact_path));
+            }
+            $this->assertSame($this->lead->name, $pack['printed_by']);
+            $this->assertSame($change === 'clinical source' ? '20 mg from current canonical chart' : '10 mg', $pack['_source']['evidence']['orders'][0]['dosage']);
+
+            return '%PDF-1.7 fictional fresh replacement';
+        });
+        $this->app->instance(DowntimePackPdf::class, $pdf);
+        config(['emar-catalogue-backups.send_enabled' => true]);
+        $transport = Mockery::mock(BackupMailTransport::class);
+        $transport->shouldReceive('send')->once()->with($mailboxes, '%PDF-PROTECTED-FICTIONAL', '2026-10-07');
+        $this->app->instance(BackupMailTransport::class, $transport);
+        $service = app(BackupDeliveryService::class);
+        if ($scheduled) {
+            $this->assertSame(['prepared' => 1, 'sent' => 1, 'failed' => 0, 'disabled' => 0], $service->dispatchDue());
+        } else {
+            $this->actingAs($this->lead)->postJson('/emar/backups/sites/'.$this->site->id.'/prepare', ['version' => $schedule->version, 'nz_date' => '2026-10-07'])->assertOk()->assertJsonPath('state', 'ready');
+            $this->assertDatabaseCount('medication_backup_attempts', 0);
+            $prepared = $row->fresh();
+            $this->postJson('/emar/backups/deliveries/'.$row->id.'/send', ['version' => $prepared->version])->assertOk()->assertJsonPath('state', 'sent');
+        }
+        $fresh = $row->fresh();
+        $this->assertSame('sent', $fresh->state);
+        $this->assertSame($row->id, $fresh->id);
+        $this->assertSame($schedule->version, $fresh->schedule_version);
+        $this->assertSame($recipientIds, $fresh->recipient_ids);
+        $this->assertSame($this->lead->id, $fresh->prepared_by);
+        $this->assertNotSame($oldPath, $fresh->artifact_path);
+        $this->assertFalse(Storage::disk('private')->exists($oldPath));
+        $this->assertSame([$fresh->artifact_path], Storage::disk('private')->allFiles());
+        $this->assertNull($fresh->claim_token);
+        $this->assertSame(1, $fresh->attempt_count);
+        $this->assertSame('sent', MedicationBackupAttempt::query()->sole()->state);
+        $this->assertSame($this->lead->id, MedicationBackupAttempt::query()->sole()->actor_id);
+        $this->assertSame([$this->lead->id, $this->lead->id], DB::table('medication_events')->where('kind', 'backup.prepared')->where('subject_id', (string) $row->id)->orderBy('sequence')->pluck('actor_id')->map(fn ($id) => (int) $id)->all());
+        $sent = $fresh->getRawOriginal();
+        $this->assertSame(['prepared' => 0, 'sent' => 0, 'failed' => 0, 'disabled' => 0], $service->dispatchDue());
+        $this->assertSame($sent, $row->fresh()->getRawOriginal());
+        $this->assertDatabaseCount('medication_backup_deliveries', 1);
+        $this->assertDatabaseCount('medication_backup_attempts', 1);
+        Mail::assertNothingSent();
+    }
+
+    public function test_owned_expired_ready_backup_can_refresh_on_the_same_25_hour_nz_day(): void
+    {
+        $this->openDurableBoundary();
+        Carbon::setTestNow(Carbon::parse('2026-04-05 00:05', 'Pacific/Auckland')->utc());
+        foreach ([$this->lead, $this->recipient] as $actor) {
+            $actor->forceFill(['approved_at' => now()->subDay(), 'email_verified_at' => now()->subDay()])->saveQuietly();
+        }
+        $this->order->forceFill(['start_date' => '2026-04-01', 'verified_at' => now()->subDay()])->saveQuietly();
+        $service = app(BackupDeliveryService::class);
+        $schedule = $service->schedule($this->lead, $this->site->id, 0, ['local_time' => '23:10', 'enabled' => true, 'retention_days' => 1]);
+        $schedule = $service->approveRecipient($this->lead, $schedule->id, $schedule->version, $this->recipient->id, true);
+        $row = $service->prepare($this->lead, $this->site->id, '2026-04-05', $schedule->version);
+        $oldPath = $row->artifact_path;
+        $this->assertSame('2026-04-05T11:05:00+00:00', $row->expires_at->utc()->toIso8601String());
+        Carbon::setTestNow(Carbon::parse('2026-04-05 23:10', 'Pacific/Auckland')->utc());
+        $this->assertSame($row->nz_date, now('Pacific/Auckland')->toDateString());
+        $this->assertTrue($row->expires_at->isPast());
+        $this->actingAs($this->lead)->get('/emar/backups/deliveries/'.$row->id.'/download')->assertNotFound();
+        $this->postJson('/emar/backups/sites/'.$this->site->id.'/prepare', ['version' => $schedule->version, 'nz_date' => '2026-04-05'])->assertOk()->assertJsonPath('state', 'ready');
+        $fresh = $row->fresh();
+        $this->assertSame($row->id, $fresh->id);
+        $this->assertTrue($fresh->expires_at->isFuture());
+        $this->assertNotSame($oldPath, $fresh->artifact_path);
+        $this->assertFalse(Storage::disk('private')->exists($oldPath));
+        $this->assertSame([$fresh->artifact_path], Storage::disk('private')->allFiles());
+        $this->assertSame(1, $schedule->fresh()->retention_days);
+        $this->assertDatabaseCount('medication_backup_deliveries', 1);
+        $this->assertDatabaseCount('medication_backup_attempts', 0);
+        Mail::assertNothingSent();
+    }
+
+    public static function unrelatedRecipientChanges(): array
+    {
+        return ['last approval revoked' => ['revoked', 404, 422],
+            'unrelated recipient employment ended' => ['inactive', 403, 403],
+            'unrelated verified mailbox changed' => ['mailbox', 409, 409]];
+    }
+
+    #[DataProvider('unrelatedRecipientChanges')]
+    public function test_retained_chart_reads_require_the_current_reader_without_using_unrelated_recipient_authority(string $change, int $readDenied, int $submissionDenied): void
+    {
+        $schedule = $this->schedule();
+        $service = app(BackupDeliveryService::class);
+        $invalid = $this->recipient;
+        if ($change !== 'revoked') {
+            $invalid = $this->staff($this->site, false);
+            $schedule = $service->approveRecipient($this->lead, $schedule->id, $schedule->version, $invalid->id, true);
+        }
+        $row = $this->prepare($schedule);
+        $raw = $row->getRawOriginal();
+        $bytes = Storage::disk('private')->get($row->artifact_path);
+        if ($change === 'revoked') {
+            $schedule = $service->approveRecipient($this->lead, $schedule->id, $schedule->version, $invalid->id, false);
+        } elseif ($change === 'inactive') {
+            $invalid->hrEmployeeProfile->forceFill(['is_active' => false])->saveQuietly();
+        } else {
+            $invalid->forceFill(['email' => 'unrelated-changed-fictional@example.test'])->saveQuietly();
+        }
+        foreach ($change === 'revoked' ? [$this->lead] : [$this->lead, $this->recipient] as $reader) {
+            $this->actingAs($reader)->get('/emar/backups/deliveries/'.$row->id.'/download')->assertOk()
+                ->assertHeader('Cache-Control', 'no-store, private')->assertContent($bytes);
+            $authenticator = new Google2FA;
+            $secret = $authenticator->generateSecretKey();
+            $reader->forceFill(['two_factor_secret' => Fortify::currentEncrypter()->encrypt($secret), 'two_factor_confirmed_at' => now()])->saveQuietly();
+            $this->postJson('/emar/backups/deliveries/'.$row->id.'/password', ['password' => 'fictional-secret', 'verification_code' => $authenticator->getCurrentOtp($secret)])
+                ->assertOk()->assertHeader('Cache-Control', 'no-store, private')->assertJsonPath('password', $row->password);
+        }
+        $this->actingAs($invalid)->get('/emar/backups/deliveries/'.$row->id.'/download')->assertStatus($readDenied);
+        $this->postJson('/emar/backups/deliveries/'.$row->id.'/password', ['password' => 'fictional-secret', 'verification_code' => '123456'])
+            ->assertStatus($readDenied)->assertJsonMissingPath('password');
+        // This exception is for an individually authorized retained reader only;
+        // all active recipients must still be eligible before preparing or sending.
+        $this->actingAs($this->lead)->postJson('/emar/backups/sites/'.$this->site->id.'/prepare', ['version' => $schedule->version, 'nz_date' => '2026-10-07'])->assertStatus($submissionDenied);
+        $this->assertSame($raw, $row->fresh()->getRawOriginal());
+        config(['emar-catalogue-backups.send_enabled' => true]);
+        $transport = Mockery::mock(BackupMailTransport::class);
+        $transport->shouldNotReceive('send');
+        $this->app->instance(BackupMailTransport::class, $transport);
+        $this->postJson('/emar/backups/deliveries/'.$row->id.'/send', ['version' => $row->version])->assertStatus($change === 'revoked' ? 409 : $submissionDenied);
+        $fresh = $row->fresh();
+        $this->assertSame('failed', $fresh->state);
+        $this->assertSame('not_submitted', $fresh->failure_code);
+        $this->assertRetainedArtifact($fresh, $raw, $bytes);
+        $this->assertSame('failed', MedicationBackupAttempt::query()->sole()->state);
+        $this->assertDatabaseCount('medication_backup_deliveries', 1);
+        $this->assertDatabaseCount('medication_backup_attempts', 1);
         Mail::assertNothingSent();
     }
 
@@ -145,6 +325,11 @@ class MedicationBackupDeliveryTest extends TestCase
                 $this->assertNotSame($approval['email_sha256'], app(BackupDeliveryAccess::class)->emailHash($this->recipient));
             }
 
+            $this->actingAs($this->lead)->get('/emar/backups')->assertOk()
+                ->assertInertia(fn (Assert $p) => $p->component('emar/backups/index')
+                    ->where('schedules.0.version', $schedule->version)
+                    ->where('schedules.0.recipients.0.user_id', $this->recipient->id)
+                    ->where('schedules.0.recipients.0.status', 'approved'));
             // Exercise actual retained ciphertext and personal MFA, not a cached old encrypter.
             $this->assertSame($password, $row->fresh()->password);
             $this->actingAs($this->recipient)->get('/emar/backups/deliveries/'.$row->id.'/download')
@@ -201,6 +386,8 @@ class MedicationBackupDeliveryTest extends TestCase
             if ($changed) {
                 $this->recipient->forceFill(['email' => 'changed-fictional@example.test'])->saveQuietly();
             }
+            $this->actingAs($this->lead)->get('/emar/backups')->assertOk()
+                ->assertInertia(fn (Assert $p) => $p->where('schedules.0.recipients.0.status', 'review_required'));
             $this->actingAs($this->recipient)->get('/emar/backups/deliveries/'.$row->id.'/download')->assertConflict();
             $this->postJson('/emar/backups/deliveries/'.$row->id.'/password', ['password' => 'fictional-secret', 'verification_code' => '123456'])
                 ->assertConflict()->assertJsonMissingPath('password');
@@ -538,7 +725,7 @@ class MedicationBackupDeliveryTest extends TestCase
 
     public static function cleanupRetries(): array
     {
-        return ['scheduled recovery' => ['recovery'], 'explicit preparation' => ['prepare']];
+        return ['scheduled recovery' => ['recovery'], 'explicit preparation' => ['prepare'], 'explicit stale preparation after cleanup' => ['prepare_stale']];
     }
 
     #[DataProvider('cleanupRetries')]
@@ -574,13 +761,24 @@ class MedicationBackupDeliveryTest extends TestCase
         if ($retry === 'recovery') {
             $this->assertSame(0, app(BackupDeliveryService::class)->recoverInterrupted());
         } else {
+            if ($retry === 'prepare_stale') {
+                $schedule = app(BackupDeliveryService::class)->schedule($this->lead, $row->site_id, $schedule->version, ['local_time' => '08:00', 'enabled' => true, 'retention_days' => 7]);
+            }
             $again = app(BackupDeliveryService::class)->prepare($this->lead, $row->site_id, $row->nz_date, $schedule->version);
             $this->assertSame($replacement->id, $again->id);
         }
         $fresh = $row->fresh();
         $this->assertNull($fresh->claim_token);
         $this->assertNull($fresh->failure_code);
-        $this->assertRetainedArtifact($fresh, $published, $bytes);
+        if ($retry === 'prepare_stale') {
+            $this->assertSame($schedule->version, $fresh->schedule_version);
+            $this->assertNotSame($published['artifact_path'], $fresh->artifact_path);
+            $this->assertFalse($disk->exists($published['artifact_path']));
+            $this->assertDatabaseCount('medication_backup_deliveries', 1);
+            $this->assertDatabaseCount('medication_backup_attempts', 1);
+        } else {
+            $this->assertRetainedArtifact($fresh, $published, $bytes);
+        }
         $this->assertFalse($disk->exists($oldPath));
         $this->assertTrue($disk->exists('unrelated.txt'));
         $this->assertCount(2, $disk->allFiles());

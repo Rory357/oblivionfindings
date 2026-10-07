@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use LogicException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Throwable;
 
 class BackupDeliveryService
@@ -91,10 +92,17 @@ class BackupDeliveryService
             if ($scheduled) {
                 $this->assertDueSchedule($schedule, $current, $day, $version);
             }
-            $this->recipients($schedule);
+            $recipients = $this->recipients($schedule);
             $delivery = MedicationBackupDelivery::query()->where('schedule_id', $schedule->id)->where('nz_date', $day)->lockForUpdate()->first();
-            // Only the scheduler may rebuild another lead's still-unsent chart under its current approver.
-            $replaceReady = $scheduled && $delivery?->state === 'ready' && $delivery->prepared_by !== $current->id && $delivery->claim_token === null;
+            // An author can refresh their own stale unsent chart. Only the scheduler
+            // may replace another author's chart under the current due approver.
+            $replaceReady = $delivery?->state === 'ready' && $delivery->claim_token === null
+                && ($scheduled || $delivery->prepared_by === $current->id)
+                && ($delivery->prepared_by !== $current->id || $delivery->schedule_version !== $schedule->version
+                    || $delivery->recipient_ids !== array_keys($recipients)
+                    || ! $this->access->recipientDigestMatches($recipients, (string) $delivery->recipient_sha256)
+                    || ! $delivery->expires_at?->isFuture() || ! $this->artifactMatches($delivery)
+                    || ! $this->readySourceIsCurrent($current, $delivery));
             if ($delivery && ! $replaceReady && in_array($delivery->state, ['ready', 'sent', 'sending', 'uncertain', 'preparing', 'purged'], true)) {
                 return $delivery;
             }
@@ -109,9 +117,16 @@ class BackupDeliveryService
             return $delivery;
         }, 5);
         if ($delivery->claim_token !== $claim) {
+            $cleanupPending = $delivery->state === 'ready' && $delivery->claim_token !== null;
             $this->cleanupReplacedArtifact($delivery);
+            $fresh = $delivery->fresh();
+            if ($cleanupPending && $fresh->state === 'ready' && $fresh->claim_token === null) {
+                // Cleanup can unblock a stale ready row; recheck current authority
+                // and freshness before returning or publishing a replacement.
+                return $this->prepareArtifact($actor, $siteId, $day, $version, $scheduled);
+            }
 
-            return $delivery->fresh();
+            return $fresh;
         }
         $owned = null;
         try {
@@ -229,8 +244,12 @@ class BackupDeliveryService
             $expected = $this->access->complete($current, $row->site_id);
             $manager = $current->canDo('medications.backups.manage');
             $schedule = MedicationBackupSchedule::query()->lockForUpdate()->findOrFail($row->schedule_id);
-            $recipients = $this->recipients($schedule);
-            abort_unless($manager || isset($recipients[$current->id]), 404);
+            if (! $manager) {
+                $approval = $schedule->recipients()->where('user_id', $current->id)->whereNull('revoked_at')->lockForUpdate()->first();
+                abort_unless($approval !== null, 404);
+                $recipient = $this->access->recipient($current, $row->site_id);
+                abort_unless($this->access->emailHashMatches($recipient, $approval->email_sha256), 409, 'A recipient mailbox changed. Review the recipient again.');
+            }
             // A move removes access to that person's historical chart even for this old house.
             $pack = $row->source_snapshot;
             abort_if(is_array($pack) && ($pack['controlled_pages_included'] ?? false) && ! $current->canDo('medications.controlled.view'), 404);
@@ -348,6 +367,28 @@ class BackupDeliveryService
         $alive = $row->expires_at?->isFuture() && $row->artifact_path !== null && in_array($row->state, ['ready', 'sent', 'failed', 'uncertain'], true);
 
         return ['id' => (int) $row->id, 'site_id' => (int) $row->site_id, 'nz_date' => $row->nz_date, 'state' => $row->state, 'version' => $row->version, 'attempt_count' => $row->attempt_count, 'failure_code' => $row->failure_code, 'created_at' => $row->created_at?->toIso8601String(), 'sent_at' => $row->sent_at?->toIso8601String(), 'expires_at' => $row->expires_at?->toIso8601String(), 'can_send' => $manager && $row->prepared_by === $actor->id && $row->state === 'ready' && $row->claim_token === null && $alive && (bool) config('emar-catalogue-backups.send_enabled', false), 'can_retry' => $manager && config('emar-catalogue-backups.send_enabled', false) && $row->state === 'failed' && $row->claim_token === null && $row->nz_date === now(BackupScheduleClock::TIMEZONE)->toDateString(), 'can_download' => (bool) $alive, 'can_reveal' => (bool) $alive];
+    }
+
+    private function artifactMatches(MedicationBackupDelivery $row): bool
+    {
+        return $row->artifact_path !== null && Storage::disk('private')->exists($row->artifact_path)
+            && hash_equals((string) $row->artifact_sha256, hash('sha256', Storage::disk('private')->get($row->artifact_path)));
+    }
+
+    private function readySourceIsCurrent(User $actor, MedicationBackupDelivery $row): bool
+    {
+        try {
+            // No export event or transport: reuse still needs the canonical source gate.
+            $this->packs->release($actor, $row->source_snapshot, static function (): void {});
+        } catch (HttpExceptionInterface $exception) {
+            if ($exception->getStatusCode() !== 409) {
+                throw $exception; // Current authority/ownership denials never grant replacement.
+            }
+
+            return false;
+        }
+
+        return true;
     }
 
     private function assertDueSchedule(MedicationBackupSchedule $schedule, User $actor, string $day, int $version): void
