@@ -2,6 +2,7 @@
 
 namespace App\Services\Eligibility\Rules;
 
+use App\Domain\Hr\Services\HrFatiguePolicySettings;
 use App\Models\Shift;
 use App\Models\User;
 use App\Services\Eligibility\LocalWorkTimeSegmenter;
@@ -10,7 +11,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 
 /**
- * Enforces fatigue / safe-rostering thresholds from config('hr.fatigue').
+ * Enforces current HR-owned fatigue thresholds, with deployment defaults.
  *
  * Sub-checks:
  *   fatigue_daily       — max hours in a single calendar day
@@ -41,7 +42,7 @@ class FatigueRule implements EligibilityRuleInterface
      */
     protected array $userShiftsMemo = [];
 
-    public function __construct(private readonly LocalWorkTimeSegmenter $segments) {}
+    public function __construct(private readonly LocalWorkTimeSegmenter $segments, private readonly HrFatiguePolicySettings $policies) {}
 
     /**
      * Single entry point required by interface — returns the first failing sub-check.
@@ -78,21 +79,22 @@ class FatigueRule implements EligibilityRuleInterface
 
         $candidateDays = $this->segments->byDay($startsAt, $endsAt);
         $candidateWeeks = $this->segments->byWeek($startsAt, $endsAt);
+        $policy = $this->policies->values();
 
         return [
-            $this->checkDailyHours($user, $candidateDays, $shift->id),
-            $this->checkWeeklyHours($user, $candidateWeeks, $shift->id),
-            $this->checkMinRestGap($user, $startsAt, $endsAt, $shift->id),
-            $this->checkConsecutiveDays($user, array_keys($candidateDays), $shift->id),
+            $this->checkDailyHours($user, $candidateDays, $shift->id, $policy),
+            $this->checkWeeklyHours($user, $candidateWeeks, $shift->id, $policy),
+            $this->checkMinRestGap($user, $startsAt, $endsAt, $shift->id, $policy),
+            $this->checkConsecutiveDays($user, array_keys($candidateDays), $shift->id, $policy),
         ];
     }
 
     /**
      * Daily hours: total hours on each calendar day the shift spans must not exceed the max.
      */
-    protected function checkDailyHours(User $user, array $candidateDays, ?int $ignoreShiftId): array
+    protected function checkDailyHours(User $user, array $candidateDays, ?int $ignoreShiftId, ?array $policy = null): array
     {
-        $maxDaily = (float) config('hr.fatigue.max_hours_per_day', 12);
+        $maxDaily = ($policy ?? $this->policies->values())['max_hours_per_day'];
         $existingDays = $this->existingHoursByDay($user->id, $ignoreShiftId);
 
         foreach ($candidateDays as $localDate => $candidateHours) {
@@ -118,10 +120,11 @@ class FatigueRule implements EligibilityRuleInterface
     /**
      * Weekly hours: total hours in the ISO week must not exceed max (block) / warning threshold.
      */
-    protected function checkWeeklyHours(User $user, array $candidateWeeks, ?int $ignoreShiftId): array
+    protected function checkWeeklyHours(User $user, array $candidateWeeks, ?int $ignoreShiftId, ?array $policy = null): array
     {
-        $maxWeekly = (float) config('hr.fatigue.max_hours_per_week', 50);
-        $warningWeekly = (float) config('hr.fatigue.warning_threshold_weekly', 40);
+        $policy ??= $this->policies->values();
+        $maxWeekly = $policy['max_hours_per_week'];
+        $warningWeekly = $policy['warning_threshold_weekly'];
         $existingWeeks = $this->existingHoursByWeek($user->id, $ignoreShiftId);
         $totals = [];
 
@@ -160,9 +163,9 @@ class FatigueRule implements EligibilityRuleInterface
      * Min rest gap: the gap between this shift and the nearest adjacent shift must
      * meet the configured minimum rest hours.
      */
-    protected function checkMinRestGap(User $user, CarbonInterface $startsAt, CarbonInterface $endsAt, ?int $ignoreShiftId): array
+    protected function checkMinRestGap(User $user, CarbonInterface $startsAt, CarbonInterface $endsAt, ?int $ignoreShiftId, ?array $policy = null): array
     {
-        $minRestHours = (float) config('hr.fatigue.min_rest_between_shifts_hours', 10);
+        $minRestHours = ($policy ?? $this->policies->values())['min_rest_between_shifts_hours'];
 
         $query = Shift::query()
             ->where('user_id', $user->id)
@@ -214,9 +217,9 @@ class FatigueRule implements EligibilityRuleInterface
      * Consecutive days: count how many consecutive calendar days the user would have
      * a shift, including the current shift's date. Warn at the configured max.
      */
-    protected function checkConsecutiveDays(User $user, array $candidateDays, ?int $ignoreShiftId): array
+    protected function checkConsecutiveDays(User $user, array $candidateDays, ?int $ignoreShiftId, ?array $policy = null): array
     {
-        $maxConsecutive = (int) config('hr.fatigue.max_consecutive_days', 7);
+        $maxConsecutive = ($policy ?? $this->policies->values())['max_consecutive_days'];
         $occupied = array_fill_keys(array_keys($this->existingHoursByDay($user->id, $ignoreShiftId)), true);
         foreach ($candidateDays as $candidateDay) {
             $occupied[$candidateDay] = true;

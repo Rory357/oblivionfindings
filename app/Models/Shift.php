@@ -118,6 +118,12 @@ class Shift extends Model
         return $this->belongsTo(Client::class);
     }
 
+    /** Unverified booking links are quarantined too; they cannot become duties. */
+    public function scopeEmployeeDuties(Builder $query): Builder
+    {
+        return $query->whereNull($query->qualifyColumn('respite_booking_id'));
+    }
+
     public function site()
     {
         return $this->belongsTo(Site::class);

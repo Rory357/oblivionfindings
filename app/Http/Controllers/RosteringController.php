@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
+use App\Domain\Hr\Services\HrFatiguePolicySettings;
 use App\Domain\Hr\Services\HrLeaveAccessService;
 use App\Domain\Hr\Services\LeaveService;
 use App\Domain\Rostering\AutoSchedule\RosterSuggestionService;
@@ -24,7 +25,11 @@ use App\Models\ShiftSeries;
 use App\Models\Site;
 use App\Models\StaffTimeOff;
 use App\Models\User;
+use App\Services\Eligibility\WorkforceEligibilityRefresh;
+use App\Services\Eligibility\WorkforceEligibilityRefreshAccess;
+use App\Services\Eligibility\WorkforceEligibilityRefreshPresenter;
 use App\Services\Operations\ShiftSeriesPresenter;
+use App\Services\Operations\WorkforcePreferences;
 use App\Services\ShiftCoverageService;
 use App\Services\ShiftStaffEligibilityService;
 use App\Services\UserSiteAccessService;
@@ -53,6 +58,7 @@ class RosteringController extends Controller
         abort_unless($auth && $auth->canDo('rostering.viewAny'), 403);
 
         $canManageAny = $auth->canDo('shifts.manageAny');
+        $fatiguePolicy = app(HrFatiguePolicySettings::class)->values();
         $availabilityCapabilities = [
             'view_any' => $canManageAny || $auth->canDo('staff.viewAny') || $auth->canDo('staff.availability.updateAny'),
             'update_any' => $auth->canDo('staff.availability.updateAny'),
@@ -298,14 +304,15 @@ class RosteringController extends Controller
                 foreach (($grouped->get($u->id) ?? collect()) as $s) {
                     $start = $s->starts_at->copy()->max($weekStart);
                     $end = $s->ends_at->copy()->min($weekEnd);
-                    $mins = max(0, $end->diffInMinutes($start));
+                    $mins = max(0, $start->diffInMinutes($end));
                     $hrs += $mins / 60.0;
                 }
                 $capacity[] = [
                     'user_id' => $u->id,
                     'name' => $u->name,
                     'hours' => round($hrs, 2),
-                    'warn' => $hrs >= 50 ? 'high' : ($hrs >= 40 ? 'medium' : null),
+                    'warn' => $hrs >= $fatiguePolicy['max_hours_per_week']
+                        ? 'high' : ($hrs >= $fatiguePolicy['warning_threshold_weekly'] ? 'medium' : null),
                 ];
             }
         }
@@ -568,6 +575,9 @@ class RosteringController extends Controller
         return inertia('operations/rostering/index', [
             'canManageAny' => $canManageAny,
             'availabilityCapabilities' => $availabilityCapabilities,
+            'capacityPlanningReferenceHours' => $fatiguePolicy['warning_threshold_weekly'],
+            'workforcePreferences' => app(WorkforcePreferences::class)->for($auth),
+            'eligibilityFreshness' => $this->eligibilityFreshness($shifts, $auth),
             'workerTimezone' => (string) config('app.worker_timezone', 'Pacific/Auckland'),
             'canApproveLeave' => $canApproveLeave,
             'canPublishRoster' => $auth->canDo('rostering.publish'),
@@ -915,6 +925,23 @@ class RosteringController extends Controller
             ])->values(),
             'upcomingLeave' => $upcomingLeave->all(),
         ];
+    }
+
+    /** Observations are scoped independently of the existing roster listing. */
+    private function eligibilityFreshness(Collection $displayedShifts, User $actor): array
+    {
+        if (! $actor->isApproved() || $displayedShifts->isEmpty()) {
+            return [];
+        }
+        $query = app(WorkforceEligibilityRefreshAccess::class)->shifts(
+            app(WorkforceEligibilityRefresh::class)->duties(), $actor,
+        );
+        $presenter = app(WorkforceEligibilityRefreshPresenter::class);
+
+        return $query->whereIn('shifts.id', $displayedShifts->modelKeys())
+            ->with('client:id,site_id')->get()
+            ->mapWithKeys(fn (Shift $shift): array => [(int) $shift->id => $presenter->present($shift, $actor)])
+            ->all();
     }
 
     public function conflicts(RosteringConflictsRequest $request)

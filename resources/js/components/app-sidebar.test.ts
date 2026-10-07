@@ -570,3 +570,16 @@ describe('finance sidebar highlighting', () => {
         ).toEqual([]);
     });
 });
+
+it('shows a single Workforce settings entry only with roster access', () => {
+    expect(
+        buildNavSearchCatalog({ can: { rostering: { viewAny: true } } }).filter(
+            (item) => item.href === '/operations/workforce-settings',
+        ),
+    ).toHaveLength(1);
+    expect(
+        buildNavSearchCatalog({
+            can: { staff: { availabilityUpdateSelf: true } },
+        }).some((item) => item.href === '/operations/workforce-settings'),
+    ).toBe(false);
+});

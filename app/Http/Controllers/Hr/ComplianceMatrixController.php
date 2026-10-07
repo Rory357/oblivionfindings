@@ -314,11 +314,15 @@ class ComplianceMatrixController extends Controller
                 return;
             }
 
-            $entry = HrComplianceMatrix::query()
+            HrComplianceMatrix::query()
                 ->where('requirement_id', $requirement->id)
                 ->where('role', $validated['role'])
                 ->where('site_type', $siteType)
-                ->delete();
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()->each(function (HrComplianceMatrix $entry): void {
+                    abort_unless($entry->delete() === true, 409, 'Matrix entry could not be removed.');
+                });
         }, 3);
 
         $message = $validated['action'] === 'assign'
