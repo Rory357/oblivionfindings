@@ -3,11 +3,13 @@
 namespace App\Services;
 
 use App\Events\CoverageSupplyAdded;
+use App\Models\Client;
 use App\Models\CoverageReservation;
 use App\Models\Shift;
 use App\Models\ShiftOpenPosition;
 use App\Models\SiteCoverageRequirement;
 use App\Models\User;
+use App\Services\Operations\WorkforceMutationGuard;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -41,19 +43,20 @@ class CoverageReservationService
         $windowEndsAt = $this->utcInstant($windowEndsAt);
         $this->assertActorCanReserveAtSite($actor, $siteId, $coverageRequirementId);
 
-        return DB::transaction(function () use ($actor, $siteId, $windowStartsAt, $windowEndsAt, $coverageRequirementId, $roleKey, $meta, $ttlMinutes) {
+        return $this->currentReservationMutation(function (CurrentAuthorizationReads $reads) use ($actor, $siteId, $windowStartsAt, $windowEndsAt, $coverageRequirementId, $roleKey, $meta, $ttlMinutes) {
+            $this->assertActorCanReserveAtSite($actor, $siteId, $coverageRequirementId, $reads);
             $this->expireStaleReservations();
             if ($coverageRequirementId) {
                 SiteCoverageRequirement::query()->lockForUpdate()->find($coverageRequirementId);
             }
-            $window = $this->findCoverageWindow($siteId, $windowStartsAt, $windowEndsAt, $coverageRequirementId);
+            $window = $this->findCoverageWindow($siteId, $windowStartsAt, $windowEndsAt, $coverageRequirementId, current: true);
             if (! $window) {
                 throw ValidationException::withMessages([
                     'coverage' => 'That coverage gap is no longer active.',
                 ]);
             }
 
-            $active = CoverageReservation::query()
+            $active = $reads->query(CoverageReservation::query()
                 ->where('status', self::STATUS_ACTIVE)
                 ->where('site_id', $siteId)
                 ->when(
@@ -66,7 +69,7 @@ class CoverageReservationService
                 ->where('reserved_by_user_id', $actor->id)
                 ->where('reason', 'quick_fill')
                 ->when($roleKey, fn ($query) => $query->where('role_key', $roleKey), fn ($query) => $query->whereNull('role_key'))
-                ->first();
+                ->orderBy('id'))->first();
 
             if ($active) {
                 $active->update([
@@ -77,10 +80,10 @@ class CoverageReservationService
                     ]),
                 ]);
 
-                return $active->fresh();
+                return $reads->query(CoverageReservation::query()->whereKey($active->id))->firstOrFail();
             }
 
-            $remainingSlots = $this->availableSlotsForWindow($window, $roleKey);
+            $remainingSlots = $this->availableSlotsForWindow($window, $roleKey, $reads);
             if ($remainingSlots <= 0) {
                 throw ValidationException::withMessages([
                     'coverage' => 'Another scheduler has already reserved the remaining coverage for this window.',
@@ -233,28 +236,29 @@ class CoverageReservationService
 
     public function reserveForAssignment(Shift $shift, User $actor, string $reason = 'assignment'): ?CoverageReservation
     {
-        $coverage = $this->coverage->coverageStatusForShift($shift);
-        if (! $coverage || ($coverage['unfilled_after_open_shifts'] ?? 0) <= 0) {
-            return null;
-        }
+        return $this->currentReservationMutation(function (CurrentAuthorizationReads $reads) use ($shift, $actor, $reason): ?CoverageReservation {
+            $shift = Shift::query()->lockForUpdate()->findOrFail($shift->id);
+            $shift->setRelation('client', $reads->query(Client::query()->whereKey($shift->client_id))->first());
+            $coverage = $this->coverage->coverageStatusForShift($shift, current: true);
+            if (! $coverage || ($coverage['unfilled_after_open_shifts'] ?? 0) <= 0) {
+                return null;
+            }
 
-        $siteId = $this->siteAccess->shiftSiteId($shift);
-        abort_unless(
-            $siteId !== null && $siteId === (int) $coverage['site_id'],
-            403,
-            UserSiteAccessService::DEFAULT_MESSAGE,
-        );
-        $this->assertActorCanReserveAtSite(
-            $actor,
-            $siteId,
-            ! empty($coverage['rule_id']) ? (int) $coverage['rule_id'] : null,
-        );
-
-        return DB::transaction(function () use ($shift, $actor, $reason, $coverage) {
+            $siteId = $this->siteAccess->shiftSiteId($shift);
+            abort_unless(
+                $siteId !== null && $siteId === (int) $coverage['site_id'],
+                403,
+                UserSiteAccessService::DEFAULT_MESSAGE,
+            );
+            $this->assertActorCanReserveAtSite(
+                $actor,
+                $siteId,
+                ! empty($coverage['rule_id']) ? (int) $coverage['rule_id'] : null,
+                $reads,
+            );
             $this->expireStaleReservations();
-            Shift::query()->lockForUpdate()->find($shift->id);
 
-            $remaining = $this->availableSlotsForWindow($coverage, null);
+            $remaining = $this->availableSlotsForWindow($coverage, null, $reads);
             if ($remaining <= 0) {
                 throw ValidationException::withMessages([
                     'coverage' => 'Another scheduler has already filled this coverage window.',
@@ -300,13 +304,14 @@ class CoverageReservationService
                 ->map(fn ($role) => is_string($role) ? trim($role) : null)
                 ->first(fn (?string $role) => $role !== null && $role !== '');
 
-        return DB::transaction(function () use ($actor, $siteId, $windowStartsAt, $windowEndsAt, $coverageRequirementId, $roleKey, $reason) {
+        return $this->currentReservationMutation(function (CurrentAuthorizationReads $reads) use ($actor, $siteId, $windowStartsAt, $windowEndsAt, $coverageRequirementId, $roleKey, $reason) {
+            $this->assertActorCanReserveAtSite($actor, $siteId, $coverageRequirementId, $reads);
             $this->expireStaleReservations();
             if ($coverageRequirementId) {
                 SiteCoverageRequirement::query()->lockForUpdate()->find($coverageRequirementId);
             }
 
-            $window = $this->findCoverageWindow($siteId, $windowStartsAt, $windowEndsAt, $coverageRequirementId);
+            $window = $this->findCoverageWindow($siteId, $windowStartsAt, $windowEndsAt, $coverageRequirementId, current: true);
             if (! $window) {
                 return null;
             }
@@ -324,7 +329,7 @@ class CoverageReservationService
             }
 
             $reservationRoleKey = $hasRoleGap ? $roleKey : null;
-            $active = CoverageReservation::query()
+            $active = $reads->query(CoverageReservation::query()
                 ->where('status', self::STATUS_ACTIVE)
                 ->where('site_id', $siteId)
                 ->when(
@@ -337,7 +342,7 @@ class CoverageReservationService
                 ->where('reserved_by_user_id', $actor->id)
                 ->where('reason', $reason)
                 ->when($reservationRoleKey, fn ($query) => $query->where('role_key', $reservationRoleKey), fn ($query) => $query->whereNull('role_key'))
-                ->first();
+                ->orderBy('id'))->first();
 
             if ($active) {
                 $active->update([
@@ -348,10 +353,10 @@ class CoverageReservationService
                     ]),
                 ]);
 
-                return $active->fresh();
+                return $reads->query(CoverageReservation::query()->whereKey($active->id))->firstOrFail();
             }
 
-            $remainingSlots = $this->availableSlotsForWindow($window, $reservationRoleKey);
+            $remainingSlots = $this->availableSlotsForWindow($window, $reservationRoleKey, $reads);
             if ($remainingSlots <= 0) {
                 throw ValidationException::withMessages([
                     'coverage' => 'Another scheduler has already filled or reserved this coverage window.',
@@ -390,7 +395,7 @@ class CoverageReservationService
     /**
      * @param array<string, mixed> $window
      */
-    protected function availableSlotsForWindow(array $window, ?string $roleKey): int
+    protected function availableSlotsForWindow(array $window, ?string $roleKey, ?CurrentAuthorizationReads $reads = null): int
     {
         $activeReservations = CoverageReservation::query()
             ->where('status', self::STATUS_ACTIVE)
@@ -402,8 +407,10 @@ class CoverageReservationService
             )
             ->where('window_starts_at', $this->utcInstant($window['starts_at']))
             ->where('window_ends_at', $this->utcInstant($window['ends_at']))
-            ->when($roleKey, fn ($query) => $query->where('role_key', $roleKey))
-            ->count();
+            ->when($roleKey, fn ($query) => $query->where('role_key', $roleKey));
+        $activeReservations = $reads
+            ? $reads->query($activeReservations->orderBy('id'))->get()->count()
+            : $activeReservations->count();
 
         $roleShortagePool = ($window['planned_role_shortages'] ?? []) !== []
             ? ($window['planned_role_shortages'] ?? [])
@@ -424,26 +431,33 @@ class CoverageReservationService
         CarbonInterface $windowStartsAt,
         CarbonInterface $windowEndsAt,
         ?int $coverageRequirementId = null,
+        bool $current = false,
     ): ?array {
-        return $this->coverage->findCoverageWindow($siteId, $windowStartsAt, $windowEndsAt, $coverageRequirementId);
+        return $this->coverage->findCoverageWindow($siteId, $windowStartsAt, $windowEndsAt, $coverageRequirementId, current: $current);
     }
 
     protected function assertActorCanReserveAtSite(
         User $actor,
         int $siteId,
         ?int $coverageRequirementId,
+        ?CurrentAuthorizationReads $reads = null,
     ): void {
-        $this->siteAccess->assertCanAccessSiteId($actor, $siteId, ['reports.viewAny']);
+        if ($reads) {
+            // The Site bypass must use the same current actor/RBAC evidence as its Site rows.
+            $actor = app(AuthorizationEvidenceLockService::class)->lockForUserWithoutWaiting($actor, ['reports.viewAny']);
+            abort_unless(in_array($siteId, $this->siteAccess->accessibleSiteIds($actor, ['reports.viewAny'], $reads), true),
+                403, UserSiteAccessService::DEFAULT_MESSAGE);
+        } else {
+            $this->siteAccess->assertCanAccessSiteId($actor, $siteId, ['reports.viewAny']);
+        }
 
         if (! $coverageRequirementId) {
             return;
         }
 
+        $rule = SiteCoverageRequirement::query()->whereKey($coverageRequirementId)->where('site_id', $siteId);
         abort_unless(
-            SiteCoverageRequirement::query()
-                ->whereKey($coverageRequirementId)
-                ->where('site_id', $siteId)
-                ->exists(),
+            $reads ? $reads->query($rule)->first() !== null : $rule->exists(),
             403,
             UserSiteAccessService::DEFAULT_MESSAGE,
         );
@@ -468,6 +482,16 @@ class CoverageReservationService
         });
 
         return $matchingSlot['slot_key'] ?? null;
+    }
+
+    private function currentReservationMutation(callable $mutation): mixed
+    {
+        return DB::transaction(function () use ($mutation): mixed {
+            // Capacity writers share planning/lifecycle's governing first lock.
+            app(WorkforceMutationGuard::class)->lock();
+
+            return CurrentAuthorizationReads::within($mutation);
+        });
     }
 
     private function utcInstant(mixed $value): CarbonInterface

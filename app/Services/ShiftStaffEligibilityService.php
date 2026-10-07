@@ -64,7 +64,7 @@ class ShiftStaffEligibilityService
         $checks[] = $complianceCheck;
 
         $checks = array_merge($checks, $this->checkCoverageRoles($shift, $user));
-        $checks[] = $this->checkOverfill($shift, $user);
+        $checks[] = $this->checkOverfill($shift, $user, $workload);
 
         // ── New rule classes ───────────────────────────────────────────
 
@@ -413,9 +413,11 @@ class ShiftStaffEligibilityService
         return [array_merge(self::pass('coverage_roles'), $base)];
     }
 
-    protected function checkOverfill(Shift $shift, User $user): array
+    protected function checkOverfill(Shift $shift, User $user, ?PreparedShiftWorkload $workload = null): array
     {
-        $coverageStatus = $this->coverage->coverageStatusForShift($shift);
+        $coverageStatus = $workload?->currentEvidence !== null
+            ? $this->coverage->coverageStatusForShift($shift, current: true)
+            : $this->coverage->coverageStatusForShift($shift);
 
         $wouldOverfill = $coverageStatus
             && ! ($coverageStatus['allow_overstaffing'] ?? true)

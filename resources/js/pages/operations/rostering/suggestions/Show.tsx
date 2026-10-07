@@ -19,6 +19,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import {
     formatDateOnly,
@@ -27,7 +28,7 @@ import {
 } from '@/lib/datetime';
 import { useI18n } from '@/lib/i18n';
 import { Head, router } from '@inertiajs/react';
-import { Check, Send, Wand2, X } from 'lucide-react';
+import { Check, RefreshCw, Send, Wand2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 type SuggestionRun = {
@@ -50,6 +51,8 @@ type SuggestionRun = {
     expires_at: string | null;
     failure_message: string | null;
     is_expired: boolean;
+    can?: { apply_accepted: boolean };
+    urls?: { apply_accepted: string | null };
 };
 
 type Suggestion = {
@@ -58,6 +61,16 @@ type Suggestion = {
     rank: number;
     score: number;
     status: string;
+    current_source?: {
+        status: 'available' | 'unavailable';
+        reason: string | null;
+    };
+    can?: { accept: boolean; dismiss: boolean; apply: boolean };
+    urls?: {
+        accept: string | null;
+        dismiss: string | null;
+        apply: string | null;
+    };
     reasons: Record<string, number | string | null>;
     eligibility_snapshot: {
         warning_reasons?: string[];
@@ -79,31 +92,79 @@ type Props = {
     run: SuggestionRun;
     suggestions: Suggestion[];
     worker_timezone?: string;
+    suggestion_visibility?: {
+        basis: 'current_canonical_run_site';
+        recorded_count: number;
+        visible_count: number;
+        withheld_count: number;
+    };
 };
 
-export default function Show({
+export default function Show(props: Props) {
+    return <SuggestionRunPage key={props.run.id} {...props} />;
+}
+
+function SuggestionRunPage({
     run,
     suggestions,
     worker_timezone = WORKER_TIMEZONE,
+    suggestion_visibility,
 }: Props) {
     const { t } = useI18n();
     const isGenerating = run.status === 'pending' || run.status === 'running';
     const canApply = !run.is_expired && run.status === 'completed';
     const hasAccepted = suggestions.some((item) => item.status === 'accepted');
     const [processing, setProcessing] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    const [refreshError, setRefreshError] = useState(false);
+    const busy = processing || refreshing;
+    const blocked = busy || refreshError;
+    const missingCapabilities =
+        !run.can ||
+        !run.urls ||
+        suggestions.some((item) => !item.can || !item.urls);
+    const canApplyAccepted = Boolean(
+        canApply &&
+        hasAccepted &&
+        run.can?.apply_accepted &&
+        run.urls?.apply_accepted,
+    );
+    const refresh = () => {
+        if (busy) return;
+        setRefreshing(true);
+        setRefreshError(false);
+        router.reload({
+            only: [
+                'run',
+                'suggestions',
+                'worker_timezone',
+                'suggestion_visibility',
+            ],
+            onError: () => setRefreshError(true),
+            onCancel: () => setRefreshError(true),
+            onFinish: () => setRefreshing(false),
+        });
+    };
 
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
 
     useEffect(() => {
-        if (!isGenerating) return;
+        if (!isGenerating || blocked) return;
 
         const interval = window.setInterval(() => {
-            router.reload({ only: ['run', 'suggestions', 'worker_timezone'] });
+            router.reload({
+                only: [
+                    'run',
+                    'suggestions',
+                    'worker_timezone',
+                    'suggestion_visibility',
+                ],
+            });
         }, 5000);
 
         return () => window.clearInterval(interval);
-    }, [isGenerating]);
+    }, [isGenerating, blocked]);
 
     const rosterHref = `/operations/rostering?week=${run.week_start}${
         run.site ? `&site_id=${run.site.id}` : ''
@@ -115,9 +176,10 @@ export default function Show({
             if (statusFilter !== 'all' && suggestion.status !== statusFilter)
                 return false;
             if (q) {
-                const hay = `${suggestion.candidate?.name ?? ''} ${
-                    suggestion.shift?.client ?? ''
-                } ${suggestion.shift?.site ?? ''}`.toLowerCase();
+                const hay =
+                    `${suggestion.candidate?.name ?? ''} ${suggestion.candidate?.email ?? ''} ${
+                        suggestion.shift?.client ?? ''
+                    } ${suggestion.shift?.site ?? ''}`.toLowerCase();
                 if (!hay.includes(q)) return false;
             }
             return true;
@@ -137,7 +199,12 @@ export default function Show({
         () => [
             { value: 'all', label: 'All statuses' },
             ...Array.from(
-                new Set(suggestions.map((suggestion) => suggestion.status)),
+                new Set(
+                    [
+                        statusFilter,
+                        ...suggestions.map((suggestion) => suggestion.status),
+                    ].filter((status) => status !== 'all'),
+                ),
             )
                 .sort()
                 .map((status) => ({
@@ -148,14 +215,14 @@ export default function Show({
                     ),
                 })),
         ],
-        [suggestions, t],
+        [suggestions, statusFilter, t],
     );
 
     const applyAccepted = () => {
-        if (!canApply || !hasAccepted || processing) return;
+        if (!canApplyAccepted || blocked || !run.urls?.apply_accepted) return;
         setProcessing(true);
         router.post(
-            `/operations/rostering/suggestions/${run.id}/apply-accepted`,
+            run.urls.apply_accepted,
             {},
             { preserveScroll: true, onFinish: () => setProcessing(false) },
         );
@@ -165,10 +232,11 @@ export default function Show({
         suggestion: Suggestion,
         action: 'accept' | 'dismiss' | 'apply',
     ) => {
-        if (!canApply || processing) return;
+        const url = suggestion.urls?.[action];
+        if (blocked || !suggestion.can?.[action] || !url) return;
         setProcessing(true);
         router.post(
-            `/operations/rostering/suggestions/${suggestion.id}/${action}`,
+            url,
             {},
             { preserveScroll: true, onFinish: () => setProcessing(false) },
         );
@@ -194,7 +262,10 @@ export default function Show({
 
     const openShifts = run.totals.open_shifts ?? 0;
     const suggestedShifts = run.totals.suggested_shifts ?? 0;
-    const suggestionCount = run.totals.suggestion_count ?? suggestions.length;
+    const suggestionCount =
+        run.totals.suggestion_count ??
+        suggestion_visibility?.recorded_count ??
+        suggestions.length;
 
     const header = (
         <PageHeader
@@ -221,7 +292,7 @@ export default function Show({
                     />
                     <PageHeaderPrimaryButton
                         icon={Send}
-                        disabled={!canApply || !hasAccepted || processing}
+                        disabled={!canApplyAccepted || blocked}
                         className="disabled:pointer-events-none disabled:opacity-50"
                         onClick={applyAccepted}
                         data-test="suggestions-apply-accepted"
@@ -237,7 +308,7 @@ export default function Show({
                 <>
                     {openShifts > 0 ? (
                         <PageHeaderMeterBlock
-                            label="Candidate coverage"
+                            label="Recorded candidate coverage"
                             ariaLabel="Back to the roster week"
                             href={rosterHref}
                         >
@@ -247,7 +318,8 @@ export default function Show({
                                     <>
                                         {suggestedShifts} of {openShifts}
                                         <br />
-                                        open shifts have candidates
+                                        open shifts had candidates when
+                                        generated
                                     </>
                                 }
                             />
@@ -262,7 +334,7 @@ export default function Show({
                             {suggestionCount}
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            candidates ranked across {suggestedShifts}{' '}
+                            recorded candidates across {suggestedShifts}{' '}
                             {suggestedShifts === 1 ? 'shift' : 'shifts'}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
@@ -304,6 +376,54 @@ export default function Show({
 
             <PageLayout hero={header}>
                 <div className="space-y-4" data-test="roster-suggestions-page">
+                    <div className="flex flex-wrap items-start justify-between gap-3 rounded-lg border p-4">
+                        <div className="min-w-0 space-y-1 text-sm">
+                            <p>
+                                Accept selects a choice. Apply assigns the
+                                worker after current staffing checks.
+                            </p>
+                            <p className="text-muted-foreground">
+                                Apply accepted checks all accepted choices in
+                                this run, including those outside the current
+                                filter. Rankings and totals reflect when the run
+                                was generated.
+                            </p>
+                            <p
+                                className="text-muted-foreground"
+                                data-test="suggestion-visible-count"
+                            >
+                                {shownSuggestions.length} shown by this filter ·{' '}
+                                {suggestion_visibility
+                                    ? `${suggestion_visibility.visible_count} currently visible of ${suggestion_visibility.recorded_count} recorded suggestions.`
+                                    : `${suggestions.length} loaded suggestions.`}
+                                {suggestion_visibility &&
+                                suggestion_visibility.withheld_count > 0
+                                    ? ` ${suggestion_visibility.withheld_count} no longer have a visible duty in this run.`
+                                    : ''}
+                            </p>
+                        </div>
+                        <Button
+                            variant="outline"
+                            className="min-h-[44px] shrink-0"
+                            disabled={busy}
+                            onClick={refresh}
+                        >
+                            <RefreshCw className="mr-2 size-4" />
+                            {refreshing ? 'Refreshing…' : 'Reload suggestions'}
+                        </Button>
+                    </div>
+                    {missingCapabilities ? (
+                        <p className="text-sm text-muted-foreground">
+                            Reload suggestions to check which actions are
+                            currently available.
+                        </p>
+                    ) : null}
+                    {refreshError ? (
+                        <p role="alert" className="text-sm text-destructive">
+                            Suggestions could not be refreshed. The list may be
+                            out of date. Try reloading again.
+                        </p>
+                    ) : null}
                     {isGenerating ? (
                         <Card>
                             <CardHeader className="pb-2">
@@ -339,11 +459,10 @@ export default function Show({
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="text-sm text-muted-foreground">
-                                {run.failure_message ??
-                                    t(
-                                        'rostering.suggestions.failed_fallback',
-                                        'Generate a fresh run before applying assignments.',
-                                    )}
+                                {t(
+                                    'rostering.suggestions.failed_fallback',
+                                    'Generate a fresh run before applying assignments.',
+                                )}
                             </CardContent>
                         </Card>
                     ) : null}
@@ -355,10 +474,12 @@ export default function Show({
                             <CardContent className="p-4 text-sm text-muted-foreground">
                                 {search.trim() !== '' || statusFilter !== 'all'
                                     ? 'No suggestions match your search or filter.'
-                                    : t(
-                                          'rostering.suggestions.none',
-                                          'No suggestions were generated for this run.',
-                                      )}
+                                    : suggestion_visibility?.withheld_count
+                                      ? 'No recorded suggestions are currently visible for this run. Return to the roster to generate new suggestions.'
+                                      : t(
+                                            'rostering.suggestions.none',
+                                            'No suggestions were generated for this run.',
+                                        )}
                             </CardContent>
                         </Card>
                     ) : null}
@@ -397,6 +518,18 @@ export default function Show({
                                                     ),
                                                 )}
                                             </CardDescription>
+                                            <p className="text-sm text-muted-foreground">
+                                                {shift?.site ??
+                                                    'Site unavailable'}
+                                                {shift?.current_staff
+                                                    ? ` · Assigned to ${shift.current_staff}`
+                                                    : ''}
+                                            </p>
+                                            {shift?.service_context ? (
+                                                <p className="text-sm text-muted-foreground">
+                                                    {shift.service_context}
+                                                </p>
+                                            ) : null}
                                         </CardHeader>
                                         <CardContent className="space-y-2">
                                             {shiftSuggestions.map(
@@ -407,9 +540,9 @@ export default function Show({
                                                         data-status={
                                                             suggestion.status
                                                         }
-                                                        className="flex flex-col gap-3 rounded-md border p-3 md:flex-row md:items-center md:justify-between"
+                                                        className="flex min-w-0 flex-col gap-3 rounded-md border p-3 lg:flex-row lg:items-start lg:justify-between"
                                                     >
-                                                        <div className="space-y-1">
+                                                        <div className="min-w-0 space-y-1 break-words">
                                                             <div className="flex flex-wrap items-center gap-2">
                                                                 <span className="font-medium">
                                                                     {suggestion
@@ -417,7 +550,7 @@ export default function Show({
                                                                         ?.name ??
                                                                         t(
                                                                             'rostering.suggestions.candidate',
-                                                                            'Candidate',
+                                                                            'Worker unavailable',
                                                                         )}
                                                                 </span>
                                                                 <Badge variant="outline">
@@ -438,27 +571,23 @@ export default function Show({
                                                                         suggestion.score
                                                                     }
                                                                 </Badge>
-                                                                <Badge
-                                                                    variant={
-                                                                        suggestion.status ===
-                                                                        'accepted'
-                                                                            ? 'default'
-                                                                            : suggestion.status ===
-                                                                                'dismissed'
-                                                                              ? 'destructive'
-                                                                              : 'outline'
+                                                                <StatusBadge
+                                                                    status={
+                                                                        suggestion.status
                                                                     }
-                                                                >
-                                                                    {t(
+                                                                    label={t(
                                                                         `rostering.suggestions.status.${suggestion.status}`,
-                                                                        suggestion.status,
+                                                                        suggestion.status.replace(
+                                                                            /_/g,
+                                                                            ' ',
+                                                                        ),
                                                                     )}
-                                                                </Badge>
+                                                                />
                                                             </div>
                                                             <div className="text-sm text-muted-foreground">
                                                                 {t(
-                                                                    'rostering.suggestions.weekly_hours',
-                                                                    'Weekly hours',
+                                                                    'rostering.suggestions.recorded_weekly_hours',
+                                                                    'Weekly hours when generated',
                                                                 )}
                                                                 :{' '}
                                                                 {suggestion
@@ -490,6 +619,17 @@ export default function Show({
                                                                     0}
                                                             </div>
                                                             {suggestion
+                                                                .current_source
+                                                                ?.reason ? (
+                                                                <p className="text-sm text-muted-foreground">
+                                                                    {
+                                                                        suggestion
+                                                                            .current_source
+                                                                            .reason
+                                                                    }
+                                                                </p>
+                                                            ) : null}
+                                                            {suggestion
                                                                 .eligibility_snapshot
                                                                 .warning_reasons
                                                                 ?.length ? (
@@ -503,10 +643,16 @@ export default function Show({
                                                         <div className="flex flex-wrap gap-2">
                                                             <Button
                                                                 size="sm"
+                                                                className="min-h-[44px]"
                                                                 variant="outline"
                                                                 disabled={
-                                                                    !canApply ||
-                                                                    processing
+                                                                    blocked ||
+                                                                    !suggestion
+                                                                        .can
+                                                                        ?.accept ||
+                                                                    !suggestion
+                                                                        .urls
+                                                                        ?.accept
                                                                 }
                                                                 onClick={() =>
                                                                     postSuggestion(
@@ -524,10 +670,16 @@ export default function Show({
                                                             </Button>
                                                             <Button
                                                                 size="sm"
+                                                                className="min-h-[44px]"
                                                                 variant="outline"
                                                                 disabled={
-                                                                    !canApply ||
-                                                                    processing
+                                                                    blocked ||
+                                                                    !suggestion
+                                                                        .can
+                                                                        ?.dismiss ||
+                                                                    !suggestion
+                                                                        .urls
+                                                                        ?.dismiss
                                                                 }
                                                                 onClick={() =>
                                                                     postSuggestion(
@@ -544,9 +696,15 @@ export default function Show({
                                                             </Button>
                                                             <Button
                                                                 size="sm"
+                                                                className="min-h-[44px]"
                                                                 disabled={
-                                                                    !canApply ||
-                                                                    processing
+                                                                    blocked ||
+                                                                    !suggestion
+                                                                        .can
+                                                                        ?.apply ||
+                                                                    !suggestion
+                                                                        .urls
+                                                                        ?.apply
                                                                 }
                                                                 onClick={() =>
                                                                     postSuggestion(

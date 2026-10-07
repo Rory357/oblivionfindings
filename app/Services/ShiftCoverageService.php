@@ -2,15 +2,19 @@
 
 namespace App\Services;
 
+use App\Models\Client;
 use App\Models\CoverageGapAcknowledgement;
 use App\Models\CoverageReservation;
 use App\Models\Shift;
 use App\Models\ShiftSeries;
 use App\Models\SiteCoverageRequirement;
+use App\Services\Operations\WorkforceMutationGuard;
 use App\Services\ShiftSignalService;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class ShiftCoverageService
 {
@@ -49,11 +53,22 @@ class ShiftCoverageService
         CarbonInterface $rangeEnd,
         ?int $siteId = null,
         int $sliceMinutes = self::DEFAULT_SLICE_MINUTES,
+        bool $current = false,
     ): array {
         // Weekly rule clocks are worker-local; supplied boundaries retain their exact instants.
         $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
         $rangeStart = $rangeStart->copy()->timezone($timezone);
         $rangeEnd = $rangeEnd->copy()->timezone($timezone);
+
+        if ($current) {
+            $this->lockCurrentCoverage();
+
+            return CurrentAuthorizationReads::within(function ($reads) use ($rangeStart, $rangeEnd, $siteId, $sliceMinutes): array {
+                $windows = $this->computeRangeCoverage($rangeStart, $rangeEnd, $siteId, $sliceMinutes, $reads);
+
+                return $this->attachCoverageLifecycleMetadata($windows, $reads);
+            });
+        }
 
         $memoKey = implode('|', [
             $siteId ?? 'all',
@@ -87,12 +102,13 @@ class ShiftCoverageService
         CarbonInterface $rangeEnd,
         ?int $siteId = null,
         int $sliceMinutes = self::DEFAULT_SLICE_MINUTES,
+        ?CurrentAuthorizationReads $reads = null,
     ): array {
         // DATETIME boundaries use UTC; recurring DATE predicates below remain local dates.
         $queryStart = $rangeStart->copy()->utc();
         $queryEnd = $rangeEnd->copy()->utc();
 
-        $rules = SiteCoverageRequirement::query()
+        $rules = $this->currentCoverageQuery(SiteCoverageRequirement::query()
             ->with([
                 'site:id,name,type',
                 'site.clients:id,first_name,last_name,site_id',
@@ -103,15 +119,14 @@ class ShiftCoverageService
             ->when($siteId, fn ($query) => $query->where('site_id', $siteId))
             ->orderBy('site_id')
             ->orderBy('day_of_week')
-            ->orderBy('starts_time')
-            ->get();
+            ->orderBy('starts_time'), $reads)->get();
 
         if ($rules->isEmpty()) {
             return [];
         }
 
         $siteIds = $rules->pluck('site_id')->filter()->unique()->values()->all();
-        $reservations = CoverageReservation::query()
+        $reservations = $this->currentCoverageQuery(CoverageReservation::query()
             ->where('status', CoverageReservationService::STATUS_ACTIVE)
             ->whereIn('site_id', $siteIds)
             ->where('window_starts_at', '<', $queryEnd)
@@ -119,16 +134,24 @@ class ShiftCoverageService
             ->where(function ($query) {
                 $query->whereNull('expires_at')
                     ->orWhere('expires_at', '>', now());
-            })
-            ->get();
-        $series = ShiftSeries::query()
+            }), $reads)->get();
+        $seriesQuery = ShiftSeries::query()
             ->with([
                 'client:id,first_name,last_name,site_id',
                 'staff:id,name',
                 'site:id,name,type',
                 'serviceContext:id,name,type',
-            ])
-            ->withCount([
+            ]);
+
+        if ($reads) {
+            // Aggregate select subqueries are ordinary reads. Derive the same
+            // metadata from explicitly current, ordered occurrence rows instead.
+            $seriesQuery->with(['shifts' => fn ($query) => $query
+                ->select(['id', 'shift_series_id', 'user_id', 'starts_at'])
+                ->whereNotIn('status', ['completed', 'cancelled'])
+                ->where('ends_at', '>=', $queryStart)]);
+        } else {
+            $seriesQuery->withCount([
                 'shifts as active_occurrences_count' => fn ($query) => $query
                     ->whereNotIn('status', ['completed', 'cancelled'])
                     ->where('ends_at', '>=', $queryStart),
@@ -137,21 +160,31 @@ class ShiftCoverageService
                     ->whereNull('user_id')
                     ->where('ends_at', '>=', $queryStart),
             ])
-            ->withMin([
-                'shifts as next_starts_at' => fn ($query) => $query
-                    ->whereNotIn('status', ['completed', 'cancelled'])
-                    ->where('ends_at', '>=', $queryStart),
-            ], 'starts_at')
+                ->withMin([
+                    'shifts as next_starts_at' => fn ($query) => $query
+                        ->whereNotIn('status', ['completed', 'cancelled'])
+                        ->where('ends_at', '>=', $queryStart),
+                ], 'starts_at');
+        }
+
+        $series = $this->currentCoverageQuery($seriesQuery
             ->where('start_date', '<=', $rangeEnd->toDateString())
             ->where(function ($query) use ($rangeStart) {
                 $query->whereNull('end_date')
                     ->orWhere('end_date', '>=', $rangeStart->toDateString());
             })
             ->where('status', '!=', 'cancelled')
-            ->when($siteIds !== [], fn ($query) => $query->whereIn('site_id', $siteIds))
-            ->get();
+            ->when($siteIds !== [], fn ($query) => $query->whereIn('site_id', $siteIds)), $reads)->get();
+        if ($reads) {
+            foreach ($series as $row) {
+                $row->active_occurrences_count = $row->shifts->count();
+                $row->open_occurrences_count = $row->shifts->whereNull('user_id')->count();
+                $row->next_starts_at = $row->shifts->min('starts_at');
+                $row->unsetRelation('shifts');
+            }
+        }
 
-        $shifts = Shift::query()
+        $shifts = $this->currentCoverageQuery(Shift::query()
             ->with([
                 'client:id,first_name,last_name,site_id',
                 'staff:id,name',
@@ -170,8 +203,7 @@ class ShiftCoverageService
                         $fallback->whereNull('site_id')
                             ->whereHas('client', fn ($clientQuery) => $clientQuery->whereIn('site_id', $siteIds));
                     });
-            })
-            ->get();
+            }), $reads)->get();
 
         $results = [];
         foreach ($rules as $rule) {
@@ -252,14 +284,22 @@ class ShiftCoverageService
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function coverageForShift(Shift $shift, int $sliceMinutes = self::DEFAULT_SLICE_MINUTES): array
+    public function coverageForShift(Shift $shift, int $sliceMinutes = self::DEFAULT_SLICE_MINUTES, bool $current = false): array
     {
+        if ($current) {
+            $this->lockCurrentCoverage();
+            $shift = clone $shift;
+            if (! $shift->site_id && $shift->client_id) {
+                $client = CurrentAuthorizationReads::within(fn ($reads) => $reads->query(Client::query()->whereKey($shift->client_id))->first());
+                $shift->setRelation('client', $client);
+            }
+        }
         $siteId = $this->siteIdForShift($shift);
         if (! $siteId || ! $shift->starts_at || ! $shift->ends_at) {
             return [];
         }
 
-        return collect($this->buildRangeCoverage($shift->starts_at, $shift->ends_at, $siteId, $sliceMinutes))
+        return collect($this->buildRangeCoverage($shift->starts_at, $shift->ends_at, $siteId, $sliceMinutes, $current))
             ->filter(fn (array $window) => $this->intervalsOverlap(
                 $shift->starts_at,
                 $shift->ends_at,
@@ -270,9 +310,9 @@ class ShiftCoverageService
             ->all();
     }
 
-    public function coverageStatusForShift(Shift $shift): ?array
+    public function coverageStatusForShift(Shift $shift, bool $current = false): ?array
     {
-        $windows = $this->coverageForShift($shift);
+        $windows = $current ? $this->coverageForShift($shift, current: true) : $this->coverageForShift($shift);
         if ($windows === []) {
             return null;
         }
@@ -340,11 +380,13 @@ class ShiftCoverageService
         CarbonInterface $windowStart,
         CarbonInterface $windowEnd,
         ?int $coverageRequirementId = null,
+        bool $current = false,
     ): ?array {
         return collect($this->buildRangeCoverage(
             $windowStart,
             $windowEnd,
             $siteId,
+            current: $current,
         ))->first(function (array $window) use ($windowStart, $windowEnd, $coverageRequirementId) {
             if ($coverageRequirementId && (int) ($window['rule_id'] ?? 0) !== (int) $coverageRequirementId) {
                 return false;
@@ -676,7 +718,7 @@ class ShiftCoverageService
      * @param array<int, array<string, mixed>> $windows
      * @return array<int, array<string, mixed>>
      */
-    protected function attachCoverageLifecycleMetadata(array $windows): array
+    protected function attachCoverageLifecycleMetadata(array $windows, ?CurrentAuthorizationReads $reads = null): array
     {
         if ($windows === []) {
             return [];
@@ -694,13 +736,12 @@ class ShiftCoverageService
             })
             ->values();
 
-        $acknowledgements = CoverageGapAcknowledgement::query()
+        $acknowledgements = $this->currentCoverageQuery(CoverageGapAcknowledgement::query()
             ->with('actor:id,name')
             ->whereIn('site_id', $windows->pluck('site_id')->map(fn ($siteId) => (int) $siteId)->unique()->all())
             ->whereIn('coverage_window_key', $windows->pluck('coverage_window_key')->all())
             ->whereNull('cleared_at')
-            ->orderBy('created_at')
-            ->get()
+            ->orderBy('created_at'), $reads)->get()
             ->keyBy('coverage_window_key');
 
         return $windows
@@ -954,6 +995,37 @@ class ShiftCoverageService
             'rule_drift' => $ruleDrift->all(),
             'orphan_series' => $orphanSeries->all(),
         ];
+    }
+
+    private function lockCurrentCoverage(): void
+    {
+        if (DB::transactionLevel() < 1 || ! DB::connection()->getPdo()->inTransaction()) {
+            throw new \LogicException('Current coverage requires a physical mutation transaction.');
+        }
+        // Same governing first lock as planning, lifecycle and reservations.
+        app(WorkforceMutationGuard::class)->lock();
+    }
+
+    /** Every decision input and eager relation stays on the same current read scope. */
+    private function currentCoverageQuery(Builder $query, ?CurrentAuthorizationReads $reads): Builder
+    {
+        if (! $reads) {
+            return $query;
+        }
+
+        $eagerLoads = [];
+        foreach ($query->getEagerLoads() as $name => $constraint) {
+            $eagerLoads[$name] = static function ($relation) use ($constraint, $reads): void {
+                $constraint($relation);
+                // Eloquent eager constraints receive a Relation, not its builder.
+                $related = $relation->getRelated();
+                $reads->query($relation->getQuery())->orderBy($related->qualifyColumn($related->getKeyName()));
+            };
+        }
+        $query->setEagerLoads($eagerLoads);
+        $model = $query->getModel();
+
+        return $reads->query($query)->orderBy($model->qualifyColumn($model->getKeyName()));
     }
 
     protected function siteIdForShift(Shift $shift): ?int

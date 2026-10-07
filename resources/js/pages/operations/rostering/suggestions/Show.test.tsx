@@ -38,13 +38,19 @@ vi.mock('@/components/page', () => {
         PageHeader: ({
             actions,
             subline,
+            meters,
+            filters,
         }: {
             actions: ReactNode;
             subline: string;
+            meters: ReactNode;
+            filters: ReactNode;
         }) => (
             <>
                 <p>{subline}</p>
                 {actions}
+                {meters}
+                {filters}
             </>
         ),
         PageHeaderPrimaryButton: ({
@@ -56,8 +62,43 @@ vi.mock('@/components/page', () => {
                 {children}
             </Button>
         ),
-        PageHeaderSearch: () => null,
-        PageHeaderFilterSelect: () => null,
+        PageHeaderSearch: ({
+            value,
+            onChange,
+            placeholder,
+        }: {
+            value: string;
+            onChange: (value: string) => void;
+            placeholder: string;
+        }) => (
+            <input
+                aria-label="Search suggestions"
+                placeholder={placeholder}
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+            />
+        ),
+        PageHeaderFilterSelect: ({
+            value,
+            onChange,
+            options,
+        }: {
+            value: string;
+            onChange: (value: string) => void;
+            options: { value: string; label: string }[];
+        }) => (
+            <select
+                aria-label="Suggestion status"
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+            >
+                {options.map((option) => (
+                    <option key={option.value} value={option.value}>
+                        {option.label}
+                    </option>
+                ))}
+            </select>
+        ),
         PageHeaderMeterBig: Content,
         PageHeaderMeterBlock: Content,
         PageHeaderMeterCaption: Content,
@@ -80,6 +121,11 @@ const fixture: ComponentProps<typeof Show> = {
         expires_at: null,
         failure_message: null,
         is_expired: false,
+        can: { apply_accepted: true },
+        urls: {
+            apply_accepted:
+                '/operations/rostering/suggestions/17/apply-accepted',
+        },
     },
     suggestions: [
         {
@@ -88,6 +134,13 @@ const fixture: ComponentProps<typeof Show> = {
             rank: 1,
             score: 80,
             status: 'suggested',
+            current_source: { status: 'available', reason: null },
+            can: { accept: true, dismiss: true, apply: true },
+            urls: {
+                accept: '/operations/rostering/suggestions/23/accept',
+                dismiss: '/operations/rostering/suggestions/23/dismiss',
+                apply: '/operations/rostering/suggestions/23/apply',
+            },
             reasons: {},
             eligibility_snapshot: {},
             candidate: { id: 3, name: 'Fixture worker' },
@@ -154,17 +207,32 @@ describe('roster suggestion save sequencing', () => {
         ).toBeDisabled();
     });
 
-    it('keeps expired runs blocked even when an accepted suggestion exists', () => {
+    it('keeps expired assignments blocked while retaining authorised dismissal', () => {
         render(
             <Show
                 {...acceptedProps()}
                 run={{ ...fixture.run, is_expired: true }}
+                suggestions={acceptedProps().suggestions.map((item) => ({
+                    ...item,
+                    can: { accept: false, dismiss: true, apply: false },
+                    urls: {
+                        accept: null,
+                        dismiss: item.urls!.dismiss,
+                        apply: null,
+                    },
+                }))}
             />,
         );
-        for (const name of ['Accept', 'Dismiss', 'Apply', 'Apply accepted']) {
+        for (const name of ['Accept', 'Apply', 'Apply accepted']) {
             expect(screen.getByRole('button', { name })).toBeDisabled();
         }
         expect(post).not.toHaveBeenCalled();
+        const dismiss = screen.getByRole('button', { name: 'Dismiss' });
+        expect(dismiss).toBeEnabled();
+        fireEvent.click(dismiss);
+        expect(post.mock.calls[0][0]).toBe(
+            '/operations/rostering/suggestions/23/dismiss',
+        );
     });
 });
 
@@ -225,7 +293,12 @@ describe('suggestion duty times', () => {
         try {
             act(() => vi.advanceTimersByTime(5000));
             expect(reload).toHaveBeenCalledWith({
-                only: ['run', 'suggestions', 'worker_timezone'],
+                only: [
+                    'run',
+                    'suggestions',
+                    'worker_timezone',
+                    'suggestion_visibility',
+                ],
             });
             view.rerender(<Show {...timedProps('UTC')} />);
             expect(screen.getByText(/Roster suggestions ·/)).toHaveTextContent(
@@ -270,4 +343,288 @@ describe('suggestion duty times', () => {
         ).toBeDisabled();
         expect(post).not.toHaveBeenCalled();
     });
+});
+
+describe('suggestion source visibility and current actions', () => {
+    beforeEach(() => {
+        post.mockReset();
+        reload.mockReset();
+    });
+    const visibleProps: ComponentProps<typeof Show> = {
+        ...fixture,
+        run: {
+            ...fixture.run,
+            totals: {
+                open_shifts: 4,
+                suggested_shifts: 2,
+                suggestion_count: 3,
+            },
+        },
+        suggestion_visibility: {
+            basis: 'current_canonical_run_site',
+            recorded_count: 3,
+            visible_count: 1,
+            withheld_count: 2,
+        },
+        suggestions: fixture.suggestions.map((item) => ({
+            ...item,
+            candidate: {
+                ...item.candidate!,
+                email: 'fixture.worker@example.test',
+            },
+            reasons: { weekly_hours: 12, site_familiarity: 2 },
+            shift: {
+                ...item.shift!,
+                service_context: 'Supported living',
+                current_staff: 'Current worker',
+            },
+        })),
+    };
+
+    it('distinguishes filtered visible and recorded counts and searches an authorised email', () => {
+        render(<Show {...visibleProps} />);
+        expect(screen.getByText(/1 shown by this filter/)).toHaveTextContent(
+            '1 currently visible of 3 recorded suggestions. 2 no longer have a visible duty',
+        );
+        expect(screen.getByText(/recorded candidates across 2/)).toBeVisible();
+        const input = screen.getByRole('textbox', {
+            name: 'Search suggestions',
+        });
+        fireEvent.change(input, {
+            target: { value: 'fixture.worker@example.test' },
+        });
+        expect(screen.getByText(/1 shown by this filter/)).toBeVisible();
+        fireEvent.change(input, { target: { value: 'No match' } });
+        expect(screen.getByText(/0 shown by this filter/)).toHaveTextContent(
+            '1 currently visible of 3',
+        );
+        expect(
+            screen.getByText('No suggestions match your search or filter.'),
+        ).toBeVisible();
+        expect(screen.getByText(/recorded candidates across 2/)).toBeVisible();
+    });
+
+    it('explains withheld choices instead of claiming nothing was generated', () => {
+        render(
+            <Show
+                {...visibleProps}
+                suggestions={[]}
+                suggestion_visibility={{
+                    ...visibleProps.suggestion_visibility!,
+                    visible_count: 0,
+                    withheld_count: 3,
+                }}
+            />,
+        );
+        expect(
+            screen.getByText(/No recorded suggestions are currently visible/),
+        ).toBeVisible();
+        expect(
+            screen.queryByText('No suggestions were generated for this run.'),
+        ).toBeNull();
+        expect(
+            screen.getByRole('button', { name: 'Apply accepted' }),
+        ).toBeDisabled();
+        expect(post).not.toHaveBeenCalled();
+    });
+
+    it('preserves readable source facts and recorded hours without promising current availability', () => {
+        render(
+            <Show
+                {...visibleProps}
+                suggestions={visibleProps.suggestions.map((item) => ({
+                    ...item,
+                    candidate: null,
+                    current_source: {
+                        status: 'unavailable',
+                        reason: 'The suggested worker is no longer available. Reload or generate new suggestions.',
+                    },
+                    can: { accept: true, dismiss: true, apply: false },
+                    urls: { ...item.urls!, apply: null },
+                }))}
+            />,
+        );
+        expect(screen.getByText('Worker unavailable')).toBeVisible();
+        expect(screen.getByText('Supported living')).toBeVisible();
+        expect(screen.getByText(/Assigned to Current worker/)).toBeVisible();
+        expect(
+            screen.getByText(/Weekly hours when generated/),
+        ).toHaveTextContent('12');
+        expect(
+            screen.getByText(/The suggested worker is no longer available/),
+        ).toBeVisible();
+        expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Dismiss' })).toBeEnabled();
+    });
+
+    it('does not invent action permissions or endpoints from an older payload', () => {
+        render(
+            <Show
+                {...acceptedProps()}
+                run={{ ...fixture.run, can: undefined, urls: undefined }}
+                suggestions={acceptedProps().suggestions.map((item) => ({
+                    ...item,
+                    can: undefined,
+                    urls: undefined,
+                }))}
+            />,
+        );
+        for (const name of ['Accept', 'Dismiss', 'Apply', 'Apply accepted']) {
+            const button = screen.getByRole('button', { name });
+            expect(button).toBeDisabled();
+            fireEvent.click(button);
+        }
+        expect(post).not.toHaveBeenCalled();
+        expect(
+            screen.getByRole('button', { name: 'Reload suggestions' }),
+        ).toBeEnabled();
+    });
+
+    it('uses the current action URL and disables only the denied row action', () => {
+        render(
+            <Show
+                {...fixture}
+                suggestions={fixture.suggestions.map((item) => ({
+                    ...item,
+                    can: { accept: false, dismiss: true, apply: true },
+                    urls: {
+                        ...item.urls!,
+                        accept: null,
+                        apply: '/operations/rostering/suggestions/23/apply?from=run',
+                    },
+                }))}
+            />,
+        );
+        expect(screen.getByRole('button', { name: 'Accept' })).toBeDisabled();
+        fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+        expect(post.mock.calls[0][0]).toBe(
+            '/operations/rostering/suggestions/23/apply?from=run',
+        );
+    });
+
+    it('reloads all visibility context together and offers retry after a read failure', () => {
+        render(<Show {...acceptedProps()} />);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Reload suggestions' }),
+        );
+        expect(reload).toHaveBeenCalledWith(
+            expect.objectContaining({
+                only: [
+                    'run',
+                    'suggestions',
+                    'worker_timezone',
+                    'suggestion_visibility',
+                ],
+            }),
+        );
+        expect(
+            screen.getByRole('button', { name: 'Apply accepted' }),
+        ).toBeDisabled();
+        act(() => {
+            reload.mock.calls[0][0].onError({ message: 'Read failed' });
+            reload.mock.calls[0][0].onFinish();
+        });
+        expect(screen.getByRole('alert')).toHaveTextContent(
+            'could not be refreshed',
+        );
+        expect(
+            screen.getByRole('button', { name: 'Apply accepted' }),
+        ).toBeDisabled();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Reload suggestions' }),
+        );
+        act(() => reload.mock.calls[1][0].onFinish());
+        expect(screen.queryByRole('alert')).toBeNull();
+        expect(reload).toHaveBeenCalledTimes(2);
+        expect(post).not.toHaveBeenCalled();
+    });
+
+    it('stops polling during a command and resets transient state for another run', () => {
+        vi.useFakeTimers();
+        const view = render(
+            <Show {...fixture} run={{ ...fixture.run, status: 'running' }} />,
+        );
+        try {
+            fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+            act(() => vi.advanceTimersByTime(5000));
+            expect(reload).not.toHaveBeenCalled();
+            view.rerender(
+                <Show
+                    {...acceptedProps()}
+                    run={{
+                        ...fixture.run,
+                        id: 18,
+                        urls: {
+                            apply_accepted:
+                                '/operations/rostering/suggestions/18/apply-accepted',
+                        },
+                    }}
+                />,
+            );
+            const apply = screen.getByRole('button', {
+                name: 'Apply accepted',
+            });
+            expect(apply).toBeEnabled();
+            fireEvent.click(apply);
+            expect(post.mock.calls[1][0]).toBe(
+                '/operations/rostering/suggestions/18/apply-accepted',
+            );
+            act(() => post.mock.calls[0][2].onFinish());
+            expect(apply).toBeDisabled();
+        } finally {
+            view.unmount();
+            vi.useRealTimers();
+        }
+    });
+
+    it('uses a safe failure explanation without rendering stored technical detail', () => {
+        render(
+            <Show
+                {...fixture}
+                run={{
+                    ...fixture.run,
+                    status: 'failed',
+                    failure_message: 'SQLSTATE private-source-sentinel',
+                }}
+            />,
+        );
+        expect(
+            screen.getByText(
+                'Generate a fresh run before applying assignments.',
+            ),
+        ).toBeVisible();
+        expect(screen.queryByText(/private-source-sentinel/)).toBeNull();
+    });
+});
+
+it('keeps the selected status clear when a refresh changes every matching row', () => {
+    const props = acceptedProps();
+    const view = render(<Show {...props} />);
+    fireEvent.change(
+        screen.getByRole('combobox', { name: 'Suggestion status' }),
+        { target: { value: 'accepted' } },
+    );
+    view.rerender(
+        <Show
+            {...props}
+            suggestions={props.suggestions.map((item) => ({
+                ...item,
+                status: 'applied',
+            }))}
+        />,
+    );
+    expect(
+        screen.getByRole('combobox', { name: 'Suggestion status' }),
+    ).toHaveValue('accepted');
+    expect(
+        screen.getByRole('option', { name: 'accepted' }),
+    ).toBeInTheDocument();
+    expect(
+        screen.getByText('No suggestions match your search or filter.'),
+    ).toBeVisible();
+    fireEvent.change(
+        screen.getByRole('combobox', { name: 'Suggestion status' }),
+        { target: { value: 'all' } },
+    );
+    expect(screen.getByText('Fixture worker')).toBeVisible();
 });

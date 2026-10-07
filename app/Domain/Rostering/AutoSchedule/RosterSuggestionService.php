@@ -153,7 +153,11 @@ class RosterSuggestionService
             $shifts = $this->openShiftsQuery((int) $run->site_id, $weekStart, $weekEnd)
                 ->with(['client:id,first_name,last_name,site_id', 'site:id,name'])
                 ->orderBy('starts_at')
-                ->get();
+                ->get()
+                ->filter(fn (Shift $shift) => $shift->site && (int) $shift->site->id === (int) $run->site_id
+                    && ($shift->client_id === null || ($shift->client
+                        && (int) $shift->client->id === (int) $shift->client_id
+                        && (int) $shift->client->site_id === (int) $run->site_id)));
 
             $currentCandidates = $this->currentSiteCandidates((int) $run->site_id);
             $context = new RosterSuggestionContext($run, $actor, $shifts);
@@ -208,12 +212,13 @@ class RosterSuggestionService
 
     private function openShiftsQuery(int $siteId, CarbonInterface $weekStart, CarbonInterface $weekEnd): Builder
     {
-        return Shift::query()
+        return $this->siteAccess->applyShiftIntegrityScope(Shift::query()
+            ->employeeDuties()
             ->where('site_id', $siteId)
             ->whereNull('user_id')
             ->where('status', '!=', 'cancelled')
             ->where('starts_at', '<', $weekEnd->copy()->utc())
-            ->where('ends_at', '>', $weekStart->copy()->utc());
+            ->where('ends_at', '>', $weekStart->copy()->utc()));
     }
 
     /** @return Collection<int, User> */
