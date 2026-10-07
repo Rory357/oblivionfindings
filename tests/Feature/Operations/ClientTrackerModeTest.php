@@ -74,6 +74,8 @@ class ClientTrackerModeTest extends TestCase
         $f['input'] = ['access_fingerprint' => $f['fingerprint'], 'mode' => 'live', 'profile_id' => $f['profiles']['live']->id,
             'it_change_id' => $change->id, 'reason' => 'Synthetic agreed live tracking review.', 'impact_acknowledged' => true, 'idempotency_key' => (string) Str::uuid()];
 
+        Queue::fake(); // Observe tracker mode actions after every staff and Site fixture.
+
         return $f;
     }
 

@@ -191,6 +191,8 @@ class FleetRealtimePrivacyTest extends TestCase
             'payload' => ['latitude' => -36.8485, 'longitude' => 174.7633],
         ]);
 
+        Queue::fake(); // Observe privacy checks after the staff, Site and client fixtures.
+
         $this->assertTrue(ConsentValidationService::isValidTrackingConsent($consent, $client));
         $this->assertFalse(ConsentValidationService::isValidResidentLocationConsent($consent, $client));
         $authorizer = app(FleetRealtimeAuthorizationService::class);

@@ -14,11 +14,14 @@ use Illuminate\Support\Facades\Queue;
 
 function offlineDetectionState(): FleetVehicleStateSnapshot
 {
-    return FleetVehicleStateSnapshot::query()->create([
+    $state = FleetVehicleStateSnapshot::query()->create([
         'asset_id' => Asset::factory()->vehicle()->create()->id,
         'status' => 'online',
         'last_seen_at' => now()->subMinutes(20),
     ]);
+    Queue::fake(); // Observe offline detection after the vehicle's staff and Site fixtures.
+
+    return $state;
 }
 
 beforeEach(function () {

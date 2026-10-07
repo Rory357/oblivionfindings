@@ -15,6 +15,7 @@ it('preserves panic evidence without coercing missing or malformed states to a r
     Http::preventStrayRequests();
     Queue::fake();
     extract(ClientLocationWorkspaceFixture::make());
+    Queue::fake(); // Observe tracker reads after the staff, Site and client fixtures.
     $this->actingAs($actor);
     foreach ([null, false, true, 'false', 'yes', 2] as $state) {
         $device->update(['meta' => ['panic_active' => $state]]);
@@ -37,6 +38,7 @@ it('only presents motion with a valid report in the current collection period', 
     Http::preventStrayRequests();
     Queue::fake();
     extract(ClientLocationWorkspaceFixture::make());
+    Queue::fake(); // Observe tracker reads after the staff, Site and client fixtures.
     $this->actingAs($actor);
     $time = now()->subMinute()->startOfSecond()->toISOString();
     foreach (['moving' => 'moving', 'motion' => 'moving', 'rest' => 'stationary', 'stationary' => 'stationary', 'false' => null] as $raw => $expected) {
@@ -59,6 +61,9 @@ it('bounds fall and movement reports to the assigned device and collection windo
     Http::preventStrayRequests();
     Queue::fake();
     extract(ClientLocationWorkspaceFixture::make());
+    $otherDevice = Device::factory()->tracking()->create();
+    $asset = Asset::factory()->create(['site_id' => $site->id]);
+    Queue::fake(); // Observe every tracker read after all device and staff fixtures.
     $service = app(ClientTrackerStatusService::class);
     $empty = ['motion_status' => null, 'motion_reported_at' => null, 'fall_report_type' => null, 'fall_reported_at' => null];
     expect($service->read($actor, $client))->toBe($empty);
@@ -68,13 +73,11 @@ it('bounds fall and movement reports to the assigned device and collection windo
             'payload' => [], 'source' => 'synthetic-test', 'occurred_at' => $excluded,
         ]));
     }
-    $otherDevice = Device::factory()->tracking()->create();
     DeviceEvent::withoutEvents(fn () => DeviceEvent::query()->create([
         'device_id' => $otherDevice->id, 'event_type' => 'fall_detected', 'severity' => 'critical',
         'payload' => [], 'source' => 'synthetic-test', 'occurred_at' => now()->subMinute(),
     ]));
     expect($service->read($actor, $client))->toBe($empty);
-    $asset = Asset::factory()->create(['site_id' => $site->id]);
     $time = now()->subMinutes(5)->startOfSecond();
     $report = FleetTelemetryEvent::query()->create([
         'asset_id' => $asset->id, 'device_id' => $device->id, 'vendor' => 'synthetic',

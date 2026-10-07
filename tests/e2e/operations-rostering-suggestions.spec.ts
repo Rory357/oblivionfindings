@@ -35,7 +35,14 @@ test.describe('operations rostering — suggestions flow', () => {
             page.getByTestId('rostering-suggest-assignments'),
         ).toBeEnabled();
         await page.getByTestId('rostering-suggest-assignments').click();
-
+        // Wait for the completed governed request and redirect before checking
+        // the page; the CI trace records both taking over ten seconds together.
+        await page.waitForURL(
+            /\/operations\/rostering\/suggestions\/\d+(?:\?|$)/,
+            {
+                timeout: 30_000,
+            },
+        );
         await expect(page.getByTestId('roster-suggestions-page')).toBeVisible();
         await expect(page.getByTestId('suggestion-accept').first()).toBeEnabled(
             {

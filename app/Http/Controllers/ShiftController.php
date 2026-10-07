@@ -1454,6 +1454,9 @@ class ShiftController extends Controller
                         app(CoverageReservationService::class)->release($reservation);
 
                         return back()
+                            ->withErrors([
+                                'user_id' => trim('Review and acknowledge the eligibility warnings before saving this shift. '.implode(' ', $eligibility?->warnings ?? [])),
+                            ])
                             ->with('eligibility_result', $eligibility?->toArray() ?? [])
                             ->with('assignment_warnings', $eligibility?->warnings ?? [])
                             ->withInput();
@@ -1846,7 +1849,7 @@ class ShiftController extends Controller
             }
 
             if ($request->filled('override_reason') || $eligibility->hasWarnings()) {
-                \App\Models\ShiftEligibilityOverride::create([
+                ShiftEligibilityOverride::create([
                     'shift_id' => $shift->id,
                     'user_id' => $assignee->id,
                     'overridden_by' => $auth->id,

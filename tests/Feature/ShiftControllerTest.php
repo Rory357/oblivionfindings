@@ -625,9 +625,9 @@ class ShiftControllerTest extends TestCase
             'outbox' => ShiftSignalOutbox::query()->count(),
         ];
         $attempt = 0;
-        // Failed preview, then the retry's preview plus the locked re-decision.
+        // Failed preview, then the retry's preview, locked re-decision, and committed Workforce observation.
         $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock) use (&$attempt): void {
-            $mock->shouldReceive('evaluate')->times(3)->andReturnUsing(function () use (&$attempt) {
+            $mock->shouldReceive('evaluate')->times(4)->andReturnUsing(function () use (&$attempt) {
                 if (++$attempt === 1) {
                     throw new \RuntimeException('private eligibility infrastructure detail');
                 }
@@ -692,10 +692,10 @@ class ShiftControllerTest extends TestCase
         $this->giveAdminCurrentHrProfile();
         $shift = $this->assignmentBoundaryShift();
         $warning = 'Would exceed the weekly fatigue warning threshold.';
-        // Warning preview, then preview plus locked re-decision for both the
-        // refused scheduler override and the admin override.
+        // Warning preview, then preview plus locked re-decision for both overrides,
+        // followed by the committed Workforce observation after the admin succeeds.
         $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock) use ($warning): void {
-            $mock->shouldReceive('evaluate')->times(5)->andReturn(
+            $mock->shouldReceive('evaluate')->times(6)->andReturn(
                 $this->assignmentEligibilityResult(warnings: [$warning]),
             );
         });
@@ -1123,6 +1123,144 @@ class ShiftControllerTest extends TestCase
         $this->assertSame($baselineReservations, CoverageReservation::query()->count());
     }
 
+    public function test_update_warning_returns_actionable_inertia_errors_without_saving_the_draft(): void
+    {
+        $start = now()->addWeek()->setTime(9, 0);
+        $shift = Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $this->staff->id,
+            'starts_at' => $start,
+            'ends_at' => $start->copy()->addHours(4),
+            'location' => 'Original location',
+            'status' => 'scheduled',
+        ]);
+        $task = $shift->tasks()->create(['label' => 'Original task', 'sort_order' => 0]);
+        $payload = [
+            'client_id' => $this->client->id,
+            'starts_at' => $start->copy()->addHour()->toIso8601String(),
+            'ends_at' => $start->copy()->addHours(5)->toIso8601String(),
+            'location' => 'Unsaved draft location',
+            'status' => 'scheduled',
+            'tasks' => [['id' => $task->id, 'label' => 'Unsaved task', 'scheduled_time' => '11:00']],
+        ];
+        $reservation = CoverageReservation::create([
+            'site_id' => $this->site->id,
+            'shift_id' => $shift->id,
+            'reserved_by_user_id' => $this->admin->id,
+            'reservation_token' => 'update-warning-'.$shift->id,
+            'status' => 'active',
+            'reason' => 'shift_update',
+            'window_starts_at' => $payload['starts_at'],
+            'window_ends_at' => $payload['ends_at'],
+            'expires_at' => now()->addMinutes(5),
+        ]);
+        $payload['coverage_reservation_token'] = $reservation->reservation_token;
+        $shiftBefore = $shift->fresh()->getRawOriginal();
+        $taskBefore = $task->fresh()->getRawOriginal();
+        $timelineBefore = TimelineEvent::query()->count();
+        $outboxBefore = ShiftSignalOutbox::query()->count();
+        $overridesBefore = ShiftEligibilityOverride::query()->count();
+        $warnings = ['Would exceed the weekly fatigue warning threshold.', 'Minimum rest between shifts is below the preferred interval.'];
+        $eligibility = $this->assignmentEligibilityResult(warnings: $warnings);
+        $message = 'Review and acknowledge the eligibility warnings before saving this shift. '.implode(' ', $warnings);
+        Notification::fake();
+        $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock) use ($eligibility): void {
+            $mock->shouldReceive('evaluate')->once()->andReturn($eligibility);
+        });
+
+        $this->actingAs($this->admin)
+            ->from('/operations/shifts')
+            ->withHeader('X-Inertia', 'true')
+            ->put(route('operations.shifts.update', $shift), $payload)
+            ->assertStatus(303)
+            ->assertRedirect('/operations/shifts')
+            ->assertSessionHasErrors(['user_id' => $message])
+            ->assertSessionHas('eligibility_result', $eligibility->toArray())
+            ->assertSessionHas('assignment_warnings', $warnings)
+            ->assertSessionHasInput('location', 'Unsaved draft location')
+            ->assertSessionHasInput('tasks.0.label', 'Unsaved task')
+            ->assertSessionMissing('success');
+
+        $this->assertSame($shiftBefore, $shift->fresh()->getRawOriginal());
+        $this->assertSame($taskBefore, $task->fresh()->getRawOriginal());
+        $this->assertSame($timelineBefore, TimelineEvent::query()->count());
+        $this->assertSame($outboxBefore, ShiftSignalOutbox::query()->count());
+        $this->assertSame($overridesBefore, ShiftEligibilityOverride::query()->count());
+        $this->assertSame('released', $reservation->fresh()->status);
+        Notification::assertNothingSent();
+
+        $this->withoutHeader('X-Inertia')->get('/operations/shifts')->assertInertia(fn ($page) => $page
+            ->where('errors.user_id', $message)
+        );
+    }
+
+    public function test_update_warning_acknowledgement_still_requires_authority_and_a_reason(): void
+    {
+        $start = now()->addWeek()->setTime(9, 0);
+        $shift = Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $this->staff->id,
+            'starts_at' => $start,
+            'ends_at' => $start->copy()->addHours(4),
+            'location' => 'Original location',
+            'status' => 'scheduled',
+        ]);
+        $this->staff->permissionOverrides()->syncWithoutDetaching([
+            Permission::where('key', 'shifts.manageAny')->firstOrFail()->id => ['allowed' => true],
+            Permission::where('key', 'shifts.overrideEligibility')->firstOrFail()->id => ['allowed' => false],
+        ]);
+        $payload = [
+            'client_id' => $this->client->id,
+            'starts_at' => $start->copy()->addHour()->toIso8601String(),
+            'ends_at' => $start->copy()->addHours(5)->toIso8601String(),
+            'location' => 'Reviewed location',
+            'status' => 'scheduled',
+            'override_acknowledged' => true,
+        ];
+        $shiftBefore = $shift->fresh()->getRawOriginal();
+        $overridesBefore = ShiftEligibilityOverride::query()->count();
+        Notification::fake();
+        $warning = 'Would exceed the weekly fatigue warning threshold.';
+        $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock) use ($warning): void {
+            // Three update decisions, then the committed observation of the successful update.
+            $mock->shouldReceive('evaluate')->times(4)->andReturn($this->assignmentEligibilityResult(warnings: [$warning]));
+        });
+
+        $this->actingAs($this->admin)
+            ->from('/operations/shifts')
+            ->put(route('operations.shifts.update', $shift), $payload)
+            ->assertRedirect('/operations/shifts')
+            ->assertSessionHasErrors(['override_reason' => 'A reason is required when overriding eligibility warnings.']);
+        $this->assertSame($shiftBefore, $shift->fresh()->getRawOriginal());
+        $this->assertSame($overridesBefore, ShiftEligibilityOverride::query()->count());
+        Notification::assertNothingSent();
+
+        $reason = 'Duty manager reviewed fatigue and confirmed safe cover arrangements.';
+        $payload['override_reason'] = $reason;
+        $this->actingAs($this->staff->fresh())
+            ->put(route('operations.shifts.update', $shift), $payload)
+            ->assertForbidden();
+        $this->assertSame($shiftBefore, $shift->fresh()->getRawOriginal());
+        $this->assertSame($overridesBefore, ShiftEligibilityOverride::query()->count());
+        Notification::assertNothingSent();
+
+        $this->actingAs($this->admin)
+            ->put(route('operations.shifts.update', $shift), $payload)
+            ->assertSessionHas('success');
+        $this->assertSame('Reviewed location', $shift->fresh()->location);
+        $this->assertTrue($shift->fresh()->starts_at->equalTo($start->copy()->addHour()));
+        $this->assertSame($overridesBefore + 1, ShiftEligibilityOverride::query()->count());
+        $override = ShiftEligibilityOverride::query()->where('shift_id', $shift->id)->sole();
+        $this->assertSame($this->admin->id, $override->overridden_by);
+        $this->assertSame($this->staff->id, $override->user_id);
+        $this->assertSame($reason, $override->override_reason);
+        $this->assertSame(['fatigue_weekly'], $override->rules_overridden);
+    }
+
     public function test_update_prevents_modifying_completed_shift(): void
     {
         $shift = Shift::factory()->completed()->create([
@@ -1449,8 +1587,9 @@ class ShiftControllerTest extends TestCase
         StaffAvailability::query()->create([
             'user_id' => $this->staff->id,
             'day_of_week' => Carbon::SUNDAY,
-            'starts_at' => '00:00:00',
-            'ends_at' => '23:59:59',
+            'starts_at' => '23:00:00',
+            'ends_at' => '03:00:00',
+            'ends_next_day' => true,
         ]);
         $shift = Shift::factory()->create([
             'client_id' => $this->client->id,

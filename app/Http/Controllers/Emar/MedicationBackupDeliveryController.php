@@ -10,6 +10,7 @@ use App\Models\Site;
 use App\Services\AuthorizationEvidenceLockService;
 use App\Services\Medication\BackupDelivery\BackupDeliveryAccess;
 use App\Services\Medication\BackupDelivery\BackupDeliveryService;
+use App\Services\Medication\BackupDelivery\BackupEmailSender;
 use App\Services\Medication\BackupDelivery\BackupPdfEncryption;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\UserSiteAccessService;
@@ -44,8 +45,8 @@ class MedicationBackupDeliveryController extends Controller
             'sites' => Site::query()->whereIn('id', $allowedIds)->where('is_active', true)->where('archived', false)->get(['id', 'name'])->toArray(),
             'schedules' => $schedules->map(fn ($s) => ['id' => (int) $s->id, 'site_id' => (int) $s->site_id, 'timezone' => $s->timezone, 'local_time' => $s->local_time, 'enabled' => $s->enabled, 'version' => $s->version, 'retention_days' => $s->retention_days, 'recipients' => $s->recipients->map(fn ($r) => ['user_id' => (int) $r->user_id, 'name' => $r->user?->name, 'email' => $manager ? $r->user?->email : null, 'status' => $r->revoked_at ? 'revoked' : ($r->user?->email_verified_at && $this->access->emailHashMatches($r->user, $r->email_sha256) ? 'approved' : 'review_required')])->all()])->all(),
             'recipient_candidates' => [], 'deliveries_meta' => ['current_page' => $deliveries->currentPage(), 'last_page' => $deliveries->lastPage(), 'total' => $deliveries->total()], 'deliveries' => $deliveries->getCollection()->map(fn ($d) => $this->backups->dto($d, $actor))->all(),
-            'readiness' => ['encryption_ready' => $ready, 'send_enabled' => (bool) config('emar-catalogue-backups.send_enabled', false), 'reason' => ! $ready ? 'Configure a reviewed qpdf executable for AES-256 backups.' : (! config('emar-catalogue-backups.send_enabled', false) ? 'Email delivery is disabled until the owner approves the transport.' : null)],
-            'can_manage' => $manager, 'notice' => 'Whole-house charts are encrypted with AES-256. Passwords are available separately after your own password and personal authenticator check. A submission with an unknown result is never resent automatically.',
+            'readiness' => array_merge(app(BackupEmailSender::class)->readiness(), ['encryption_ready' => $ready, 'send_enabled' => (bool) config('emar-catalogue-backups.send_enabled', false), 'reason' => ! $ready ? 'Configure a reviewed qpdf executable for AES-256 backups.' : (! config('emar-catalogue-backups.send_enabled', false) ? 'Email delivery is disabled until the owner approves the transport.' : null)]),
+            'can_view_email_settings' => $actor->canDo('settings.access.manage'), 'can_manage' => $manager, 'notice' => 'Whole-house charts are encrypted with AES-256. Passwords are available separately after your own password and personal authenticator check. A submission with an unknown result is never resent automatically.',
         ]);
     }
 

@@ -5,6 +5,7 @@ namespace Tests\Unit\Operations;
 use App\Models\Client;
 use App\Models\Shift;
 use App\Models\ShiftSignal;
+use App\Models\ShiftSignalOutbox;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\ControlRoom\ControlRoomNotificationService;
@@ -41,6 +42,9 @@ class ShiftSignalServiceTest extends TestCase
             'status' => 'scheduled',
         ]);
 
+        $signalCountBefore = ShiftSignal::query()->count();
+        $outboxCountBefore = ShiftSignalOutbox::query()->count();
+
         $service = app(ShiftSignalService::class);
 
         $first = $service->emitForShift(
@@ -62,8 +66,8 @@ class ShiftSignalServiceTest extends TestCase
         );
 
         $this->assertSame($first->id, $second->id);
-        $this->assertSame(1, ShiftSignal::query()->count());
-        $this->assertDatabaseCount('shift_signal_outbox', 1);
+        $this->assertSame($signalCountBefore + 1, ShiftSignal::query()->count());
+        $this->assertDatabaseCount('shift_signal_outbox', $outboxCountBefore + 1);
         $this->assertDatabaseHas('control_room_signals', [
             'signal_type_code' => 'shift_no_show',
         ]);

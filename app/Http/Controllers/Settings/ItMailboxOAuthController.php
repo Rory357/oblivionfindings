@@ -20,8 +20,9 @@ use Laravel\Socialite\Facades\Socialite;
  * hourly PollItMailboxJob uses to read the support inbox.
  *
  * Scope note: markRead WRITES (Graph isRead / Gmail label removal), so the
- * consent is Mail.ReadWrite(.Shared) and gmail.modify — read-only scopes
- * cannot silence a message for the next poll.
+ * consent includes Mail.ReadWrite(.Shared) and gmail.modify — read-only scopes
+ * cannot silence a message for the next poll. Microsoft also requests Mail.Send
+ * and Mail.Send.Shared for the shared outgoing email settings.
  */
 class ItMailboxOAuthController extends Controller
 {
@@ -41,6 +42,8 @@ class ItMailboxOAuthController extends Controller
             'openid', 'email', 'profile', 'offline_access',
             'https://graph.microsoft.com/Mail.ReadWrite',
             'https://graph.microsoft.com/Mail.ReadWrite.Shared',
+            'https://graph.microsoft.com/Mail.Send',
+            'https://graph.microsoft.com/Mail.Send.Shared',
         ],
     ];
 
@@ -61,6 +64,8 @@ class ItMailboxOAuthController extends Controller
         // Force a refresh token from Google.
         if ($provider === ItMailboxConnection::PROVIDER_GOOGLE) {
             $socialite->with(['access_type' => 'offline', 'prompt' => 'consent']);
+        } else {
+            $socialite->with(['prompt' => 'consent']);
         }
 
         return $socialite->redirect();
@@ -75,6 +80,7 @@ class ItMailboxOAuthController extends Controller
             // NOT stateless: redirect() stored a state token in the session, so the
             // callback verifies it (guards against OAuth login-CSRF / code injection).
             $oauthUser = Socialite::driver($driver)
+                ->scopes(self::SCOPES[$provider])
                 ->redirectUrl($this->callbackUrl($provider))
                 ->user();
         } catch (\Throwable) {
@@ -98,7 +104,7 @@ class ItMailboxOAuthController extends Controller
                 'access_token' => $oauthUser->token,
                 'refresh_token' => $oauthUser->refreshToken,
                 'token_expires_at' => $oauthUser->expiresIn ? now()->addSeconds($oauthUser->expiresIn) : null,
-                'scopes' => self::SCOPES[$provider],
+                'scopes' => $this->approvedScopes($oauthUser->approvedScopes ?? null),
                 'account_email' => $oauthUser->getEmail(),
                 'account_name' => $oauthUser->getName(),
                 'last_error' => null,
@@ -135,6 +141,21 @@ class ItMailboxOAuthController extends Controller
 
         return redirect()->route('settings.it-mailbox')
             ->with('success', ucfirst($provider).' support mailbox disconnected.');
+    }
+
+    /** The installed Socialite providers derive approvedScopes from the token response. */
+    private function approvedScopes(mixed $scopes): array
+    {
+        if (! is_array($scopes) || ! array_is_list($scopes)) {
+            return [];
+        }
+        foreach ($scopes as $scope) {
+            if (! is_string($scope) || strlen($scope) > 2048 || preg_match('/[\x00-\x20\x7f]/', $scope)) {
+                return [];
+            }
+        }
+
+        return array_values(array_unique(array_filter($scopes, static fn (string $scope): bool => $scope !== '')));
     }
 
     private function driver(string $provider): string

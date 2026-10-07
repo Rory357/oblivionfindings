@@ -71,7 +71,12 @@ type Props = {
         encryption_ready: boolean;
         send_enabled: boolean;
         reason: string | null;
+        email_ready?: boolean;
+        email_capture_mode?: 'array' | 'log' | null;
+        email_reason?: string | null;
+        email_source?: 'saved' | 'server';
     };
+    can_view_email_settings?: boolean;
     can_manage: boolean;
     notice: string;
     deliveries_meta?: {
@@ -165,9 +170,32 @@ export default function Backups(props: Props) {
                 },
             ]}
         >
-            {props.readiness.reason && (
-                <SettingsNotice>{props.readiness.reason}</SettingsNotice>
+            {(props.readiness.reason || props.readiness.email_reason) && (
+                <SettingsNotice>
+                    {props.readiness.reason && <p>{props.readiness.reason}</p>}
+                    {props.readiness.email_reason && (
+                        <p>{props.readiness.email_reason}</p>
+                    )}
+                </SettingsNotice>
             )}
+            <SettingsNotice role="note">
+                <p>
+                    Email provider and sender are configured in Main Settings →
+                    Email. Manage house schedules, approved recipients and
+                    backup protection here.
+                </p>
+                {props.readiness.email_source === 'server' && (
+                    <p>
+                        No shared email settings are saved; server mail settings
+                        apply.
+                    </p>
+                )}
+                {props.can_view_email_settings && (
+                    <Button asChild variant="link" size="sm">
+                        <Link href="/settings/email">Open email settings</Link>
+                    </Button>
+                )}
+            </SettingsNotice>
             <SettingsNotice>
                 {props.notice ||
                     'Passwords are never included in the email. Each recipient must still have current access to the complete chart when it is prepared and sent.'}
@@ -351,16 +379,18 @@ export default function Backups(props: Props) {
                                     Show password securely
                                 </Button>
                             )}
-                            {delivery.can_send && (
-                                <Button onClick={() => setAction('send')}>
-                                    Review email delivery
-                                </Button>
-                            )}
-                            {delivery.can_retry && (
-                                <Button onClick={() => setAction('retry')}>
-                                    Review retry
-                                </Button>
-                            )}
+                            {delivery.can_send &&
+                                props.readiness.email_ready !== false && (
+                                    <Button onClick={() => setAction('send')}>
+                                        Review email delivery
+                                    </Button>
+                                )}
+                            {delivery.can_retry &&
+                                props.readiness.email_ready !== false && (
+                                    <Button onClick={() => setAction('retry')}>
+                                        Review retry
+                                    </Button>
+                                )}
                         </>
                     }
                 >

@@ -615,15 +615,19 @@ export function CreateShiftDialog({
         const startsAt = form.data.starts_at;
         const endsAt = form.data.ends_at;
 
+        // A pending or stale preview must never authorise a different edit.
+        if (eligTimer.current) clearTimeout(eligTimer.current);
+        eligAbort.current?.abort();
+        setEligPreview(null);
+
         if (!userId || !startsAt || !endsAt) {
             setEligPreview(null);
             setEligLoading(false);
             return;
         }
 
-        if (eligTimer.current) clearTimeout(eligTimer.current);
+        setEligLoading(true);
         eligTimer.current = setTimeout(async () => {
-            eligAbort.current?.abort();
             const controller = new AbortController();
             eligAbort.current = controller;
             setEligLoading(true);
@@ -738,6 +742,9 @@ export function CreateShiftDialog({
             form.put(updateShift.url(initialShift.id), {
                 preserveScroll: true,
                 onSuccess: () => onClose(),
+                // Availability can change after the preview. Keep the draft
+                // and show the server errors while checking the latest result.
+                onError: () => fetchEligibility(),
             });
             return;
         }
@@ -884,6 +891,7 @@ export function CreateShiftDialog({
             goNext();
             return;
         }
+        if (form.processing || eligLoading) return;
         if (isEdit && eligibilityStatus?.status === 'blocked') {
             return;
         }
@@ -1891,7 +1899,9 @@ export function CreateShiftDialog({
                                 {cur.key === 'review' ? (
                                     <button
                                         type="submit"
-                                        disabled={form.processing}
+                                        disabled={
+                                            form.processing || eligLoading
+                                        }
                                         className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-3.5 py-2 text-xs font-semibold text-primary-fill-foreground transition-colors hover:bg-primary-fill/90 disabled:cursor-not-allowed disabled:opacity-70"
                                     >
                                         {form.processing ? (

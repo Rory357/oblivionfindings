@@ -123,6 +123,25 @@ class RoundTemplateCatalogue
      */
     public function rows(User $user): array
     {
+        return $this->rowsWithStaff($user, $this->staffPicker($user));
+    }
+
+    /**
+     * One governed staff read supplies both default names and editing choices.
+     * The result belongs to this call; later calls read current staff again.
+     *
+     * @return array{rows: list<array<string, mixed>>, staff: Collection<int, array{id: int, name: string, site_ids: list<int>}>}
+     */
+    public function rowsAndStaff(User $user): array
+    {
+        $staff = $this->staffPicker($user);
+
+        return ['rows' => $this->rowsWithStaff($user, $staff), 'staff' => $staff];
+    }
+
+    /** @param Collection<int, array{id: int, name: string, site_ids: list<int>}> $staff */
+    private function rowsWithStaff(User $user, Collection $staff): array
+    {
         $templates = $this->visibleQuery($user)
             ->with(['site:id,name', 'serviceContext:id,site_id', 'serviceContext.site:id,name', 'retiredBy:id,name'])
             ->orderBy('scheduled_time')
@@ -141,7 +160,7 @@ class RoundTemplateCatalogue
         $timezone = config('app.worker_timezone', 'Pacific/Auckland');
         // A default staff member is named only when they work at a house this
         // person can see (the same governed list the template picker offers).
-        $staff = $this->staffPicker($user)->keyBy(fn (array $person): int => (int) $person['id']);
+        $staff = $staff->keyBy(fn (array $person): int => (int) $person['id']);
 
         return $templates->map(function (MedicationRoundTemplate $template) use ($user, $manageable, $latest, $todaysRounds, $canCount, $includeControlled, $timezone, $staff): array {
             $round = $todaysRounds->get($template->id);

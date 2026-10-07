@@ -39,6 +39,7 @@ class ClientLocateDeliveryTest extends CommittedDatabaseTestCase
     public function test_withdrawal_after_provider_enqueue_releases_no_command_and_fails_the_linked_lifecycle_atomically(): void
     {
         $f = ClientLocateFixture::awaitingDelivery();
+        Queue::fake(); // Observe delivery denial after the staff, Site and client fixtures.
         $f['consent']->update(['status' => 'withdrawn', 'withdrawn_at' => now()]);
         $this->assertSame(['+SACK:GTHBD,8020090100,09CF$'], $this->frame($f));
         $this->assertSame('failed', $f['pending']->fresh()->status);
