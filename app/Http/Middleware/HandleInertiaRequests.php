@@ -326,6 +326,17 @@ class HandleInertiaRequests extends Middleware
 
                     return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
                 },
+                'eligibility_result' => function () use ($request) {
+                    $outcome = $request->session()->get('shift_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id
+                        ? $request->session()->get('eligibility_result') : null;
+                },
+                'shift_result' => function () use ($request) {
+                    $outcome = $request->session()->get('shift_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
                 'timesheet_payroll_adjustment_result' => function () use ($request) {
                     $outcome = $request->session()->get('timesheet_payroll_adjustment_result');
 
@@ -528,7 +539,7 @@ class HandleInertiaRequests extends Middleware
      * Permission map bust — bump when permission shape/keys change so
      * stale caches from previous deploys are ignored.
      */
-    protected const PERMISSIONS_CACHE_VERSION = 'v11';
+    protected const PERMISSIONS_CACHE_VERSION = 'v12';
 
     /**
      * Get user permissions, deduped per-request via `once()` and cached
@@ -601,6 +612,7 @@ class HandleInertiaRequests extends Middleware
                 'create' => $user->canDo('shifts.create'),
                 'update' => $user->canDo('shifts.update'),
                 'manageAny' => $user->canDo('shifts.manageAny'),
+                'overrideEligibility' => $user->canDo('shifts.overrideEligibility'),
                 'tasksUpdateSelf' => $user->canDo('shifts.tasks.updateSelf'),
             ],
 

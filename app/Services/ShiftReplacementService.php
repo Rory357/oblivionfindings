@@ -377,24 +377,39 @@ class ShiftReplacementService
         int $assignedUserId,
         User $actor,
         ?AssignmentEligibilityDecision $eligibilityDecision = null,
+        ?array $currentEvidence = null,
     ): void {
-        $this->siteAccess->assertCanAccessShift($actor, $shift, ['reports.viewAny']);
-        $replacement = $this->activeForShift($shift);
+        // Internal opt-in from the planning command's locked current tuple.
+        // Every default caller keeps the original access/read algorithms.
+        if ($currentEvidence === null) {
+            $this->siteAccess->assertCanAccessShift($actor, $shift, ['reports.viewAny']);
+        } else {
+            if (DB::transactionLevel() < 1 || ($currentEvidence['shift'] ?? null) !== $shift
+                || ($currentEvidence['actor'] ?? null) !== $actor
+                || (int) ($currentEvidence['staff']->id ?? 0) !== $assignedUserId) {
+                throw new \LogicException('Current replacement evidence must belong to this planning transaction.');
+            }
+        }
+        $replacement = $currentEvidence === null ? $this->activeForShift($shift) : $currentEvidence['replacement'];
         if (! $replacement) {
             return;
         }
 
-        $replacement->loadMissing(['shift.client:id,first_name,last_name,site_id', 'requester:id,name', 'openPosition']);
+        if ($currentEvidence === null) {
+            $replacement->loadMissing(['shift.client:id,first_name,last_name,site_id', 'requester:id,name', 'openPosition']);
+        }
         $this->assertReplacementStillActionable($shift);
 
-        $replacementUser = User::query()->find($assignedUserId);
+        $replacementUser = $currentEvidence === null ? User::query()->find($assignedUserId) : $currentEvidence['staff'];
         if (! $replacementUser) {
             throw ValidationException::withMessages([
                 'replacement' => 'The assigned staff member is no longer available.',
             ]);
         }
 
-        $this->assertStaffEligibleForShiftSite($shift, $replacementUser);
+        if ($currentEvidence === null) {
+            $this->assertStaffEligibleForShiftSite($shift, $replacementUser);
+        }
         $eligibilityDecision = $this->currentAssignmentDecision(
             $shift,
             $replacementUser,
@@ -412,27 +427,52 @@ class ShiftReplacementService
             return;
         }
 
-        $replacement->update([
+        $saved = $replacement->update([
             'status' => self::APPROVED,
             'replacement_user_id' => $assignedUserId,
             'approved_by' => $actor->id,
             'approved_at' => now(),
         ]);
+        if ($currentEvidence !== null) {
+            abort_unless($saved === true, 409, 'The replacement request was not saved. No Shift changes were applied.');
+            $stored = ShiftReplacementRequest::query()->whereKey($replacement->id)->lockForUpdate()->first();
+            abort_unless($stored && $stored->status === self::APPROVED && (int) $stored->replacement_user_id === $assignedUserId
+                && (int) $stored->approved_by === (int) $actor->id && $stored->approved_at?->equalTo($replacement->approved_at),
+                409, 'The replacement request was not saved. No Shift changes were applied.');
+            $replacement->setRelation('replacementStaff', $replacementUser);
+        }
 
         if ($replacement->openPosition && in_array($replacement->openPosition->status, ['open', 'claimed'], true)) {
-            $replacement->openPosition->update([
+            $positionSaved = $replacement->openPosition->update([
                 'claimed_by' => $assignedUserId,
                 'claimed_at' => $replacement->openPosition->claimed_at ?? now(),
                 'approved_by' => $actor->id,
                 'approved_at' => now(),
                 'status' => 'filled',
             ]);
+            if ($currentEvidence !== null) {
+                $stored = ShiftOpenPosition::query()->whereKey($replacement->openPosition->id)->lockForUpdate()->first();
+                abort_unless($positionSaved === true && $stored && $stored->status === 'filled' && (int) $stored->claimed_by === $assignedUserId
+                    && (int) $stored->approved_by === (int) $actor->id && $stored->claimed_at?->equalTo($replacement->openPosition->claimed_at)
+                    && $stored->approved_at?->equalTo($replacement->openPosition->approved_at),
+                    409, 'The replacement position was not saved. No Shift changes were applied.');
+            }
         }
 
-        $this->cancelOtherPositionsForShift($shift->id, $replacement->openPosition?->id);
+        if ($currentEvidence === null) {
+            $this->cancelOtherPositionsForShift($shift->id, $replacement->openPosition?->id);
+        } else {
+            $ids = $currentEvidence['positions']->filter(fn ($position) => in_array($position->status, ['open', 'claimed'], true)
+                && (int) $position->id !== (int) $replacement->openPosition?->id)->pluck('id')->all();
+            // Same bulk cancellation effect, over the current integrity cohort.
+            ShiftOpenPosition::query()->whereIn('id', $ids)->update(['status' => 'cancelled']);
+            $stored = ShiftOpenPosition::query()->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get();
+            abort_unless($stored->count() === count($ids) && $stored->every(fn ($position) => $position->status === 'cancelled'),
+                409, 'Replacement positions were not cancelled. No Shift changes were applied.');
+        }
 
         $this->logTimelineEvent(
-            $replacement->fresh(['shift.client', 'requester', 'currentStaff', 'replacementStaff']),
+            $currentEvidence === null ? $replacement->fresh(['shift.client', 'requester', 'currentStaff', 'replacementStaff']) : $replacement,
             'shift_replacement_approved',
             $actor,
             'Replacement approved',

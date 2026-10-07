@@ -1,4 +1,30 @@
-import { router, useForm } from '@inertiajs/react';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
+import {
+    TimePicker,
+    displayTime,
+} from '@/components/fleet-assets/maintenance/time-picker';
+import { RecordPicker } from '@/components/people-locations/record-picker';
+import {
+    ReviewCard,
+    ReviewRow,
+    WizardShell,
+    WizardStepPane,
+    WizardSuccessPane,
+} from '@/components/wizard/shell';
+import {
+    WORKER_TIMEZONE,
+    formatDateOnly,
+    formatDurationMinutes,
+} from '@/lib/datetime';
+import {
+    shiftInputInstant,
+    shiftWallInput,
+    shiftWeekday,
+} from '@/lib/workforce-time-input';
+import type { SharedData } from '@/types';
+import type { FormDataConvertible, Page } from '@inertiajs/core';
+import { router, useForm, usePage } from '@inertiajs/react';
 import {
     CalendarClock,
     Check,
@@ -15,10 +41,15 @@ import {
     Sparkles,
     Trash,
     Users,
-    X,
     type LucideIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { shiftSaveProjection } from './shift-save-values';
+import {
+    UNKNOWN_SHIFT_SAVE,
+    useShiftSaveCommand,
+    type ShiftSaveSource,
+} from './use-shift-save-command';
 
 import { EligibilityAlertBanner } from '@/components/eligibility/eligibility-alert-banner';
 import {
@@ -32,24 +63,13 @@ import {
 import { Button as GuardrailButton } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import {
     SHIFT_TYPES,
     SHIFT_TYPE_ACCENT_CLASSES,
     type ShiftTypeKey,
 } from '@/lib/shift-types';
 import { cn } from '@/lib/utils';
-import {
-    eligibility_preview as eligibilityPreview,
-    store as storeShift,
-    update as updateShift,
-} from '@/routes/operations/shifts';
+import { eligibility_preview as eligibilityPreview } from '@/routes/operations/shifts';
 import { store as storeShiftSeries } from '@/routes/operations/shifts/series';
-import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 
 type Client = {
     id: number;
@@ -112,6 +132,9 @@ const LICENCE_ENDORSEMENTS = [
 ] as const;
 
 export type EditableShift = {
+    worker_timezone?: string;
+    actor_id?: number;
+    source?: ShiftSaveSource;
     id: number;
     starts_at: string;
     ends_at: string;
@@ -134,6 +157,7 @@ export type EditableShift = {
         id: number;
         label: string;
         scheduled_time?: string | null;
+        can_edit?: boolean;
     }>;
 };
 
@@ -141,6 +165,7 @@ type ShiftDialogTask = {
     id?: number;
     label: string;
     scheduled_time: string | null;
+    can_edit?: boolean;
 };
 
 type EligibilityPreview = {
@@ -152,6 +177,8 @@ type EligibilityPreview = {
 };
 
 type Props = {
+    workerTimezone?: string;
+    canOverrideEligibility?: boolean;
     open: boolean;
     onClose: () => void;
     clients: Client[];
@@ -178,64 +205,219 @@ type Props = {
     initialShift?: EditableShift | null;
 };
 
-function weekdayFromDatetime(value: string | null | undefined): Weekday {
-    const parsed = value ? new Date(value) : new Date();
-    const day = parsed.getDay();
-    const map: Record<number, Weekday> = {
-        0: 'sun',
-        1: 'mon',
-        2: 'tue',
-        3: 'wed',
-        4: 'thu',
-        5: 'fri',
-        6: 'sat',
-    };
-    return map[day] ?? 'mon';
-}
-
-function toLocalDatetimeInput(value: string | null | undefined): string {
-    if (!value) return '';
-    // Fast path only for "naive" local datetime strings (no timezone suffix) —
-    // anything with a Z or ±HH:MM offset must go through Date so we render the
-    // user's local wall time, not the UTC time-of-day.
-    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(value)) {
-        return value.slice(0, 16);
+/** Refuse incomplete current-record responses instead of silently clearing fields. */
+export function isCurrentEditableShift(
+    value: unknown,
+    id: number,
+    actor: number,
+): value is EditableShift {
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+        return false;
+    const shift = value as EditableShift;
+    const positive = (entry: unknown) =>
+        typeof entry === 'number' && Number.isSafeInteger(entry) && entry > 0;
+    const nullableId = (entry: unknown) => entry === null || positive(entry);
+    const optionalText = (entry: unknown) =>
+        entry === null || typeof entry === 'string';
+    const instant = (entry: unknown) =>
+        typeof entry === 'string' &&
+        /(?:Z|[+-]\d{2}:\d{2})$/.test(entry) &&
+        Number.isFinite(Date.parse(entry));
+    const source = shift.source;
+    if (
+        !source ||
+        !positive(actor) ||
+        !positive(id) ||
+        shift.id !== id ||
+        shift.actor_id !== actor ||
+        source.shift_id !== id ||
+        !['draft', 'scheduled'].includes(shift.status) ||
+        source.status !== shift.status ||
+        !nullableId(source.client_id) ||
+        !nullableId(source.site_id) ||
+        !shift.site ||
+        !positive(shift.site.id) ||
+        typeof shift.site.name !== 'string' ||
+        (source.site_id !== null && source.site_id !== shift.site.id) ||
+        !nullableId(source.user_id) ||
+        !nullableId(source.service_context_id) ||
+        !nullableId(source.shift_series_id) ||
+        !instant(shift.starts_at) ||
+        !instant(shift.ends_at) ||
+        typeof shift.worker_timezone !== 'string' ||
+        typeof shift.shift_type !== 'string' ||
+        !optionalText(shift.location) ||
+        !optionalText(shift.notes) ||
+        !optionalText(shift.required_licence_class) ||
+        !nullableId(shift.service_context_id) ||
+        shift.service_context_id !== source.service_context_id ||
+        typeof shift.is_sleepover !== 'boolean' ||
+        typeof shift.is_on_call !== 'boolean' ||
+        typeof shift.is_lone_worker !== 'boolean' ||
+        !(
+            shift.expected_break_minutes === null ||
+            (Number.isSafeInteger(shift.expected_break_minutes) &&
+                Number(shift.expected_break_minutes) >= 0)
+        ) ||
+        !Array.isArray(shift.coverage_roles) ||
+        !shift.coverage_roles.every((role) => typeof role === 'string') ||
+        !Array.isArray(shift.required_licence_endorsements) ||
+        !shift.required_licence_endorsements.every(
+            (item) => typeof item === 'string',
+        ) ||
+        !(shift.client === null
+            ? source.client_id === null
+            : shift.client?.id === source.client_id) ||
+        !(shift.staff === null
+            ? source.user_id === null
+            : shift.staff?.id === source.user_id) ||
+        !Array.isArray(shift.tasks) ||
+        !shift.tasks.every(
+            (task) =>
+                task &&
+                positive(task.id) &&
+                typeof task.label === 'string' &&
+                optionalText(task.scheduled_time) &&
+                typeof task.can_edit === 'boolean',
+        )
+    )
+        return false;
+    try {
+        new Intl.DateTimeFormat('en', {
+            timeZone: shift.worker_timezone,
+        }).format();
+    } catch {
+        return false;
     }
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return '';
-    const yyyy = parsed.getFullYear();
-    const mm = String(parsed.getMonth() + 1).padStart(2, '0');
-    const dd = String(parsed.getDate()).padStart(2, '0');
-    const hh = String(parsed.getHours()).padStart(2, '0');
-    const min = String(parsed.getMinutes()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+    return true;
 }
 
-// `<input type="datetime-local">` emits naive wall time like
-// "2026-05-30T09:00". The server's Carbon::parse() reads that as UTC, so
-// we convert through a Date (which interprets naive strings as local) and
-// emit an ISO string with the offset Carbon can normalise correctly.
-function localDatetimeInputToIso(
-    value: string | null | undefined,
-): string | null {
-    if (!value || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) return null;
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return null;
-    return d.toISOString();
+export function CreateShiftDialog(props: Props) {
+    const { open, onClose } = props;
+    const page = usePage<SharedData & { workerTimezone?: string }>();
+    const actor = Number(page.props.auth.user?.id ?? 0);
+    const [openingActor, setOpeningActor] = useState<number | null>(
+        props.open ? actor : null,
+    );
+    const id = props.initialShift?.id;
+    useEffect(() => {
+        if (!open) setOpeningActor(null);
+        else if (openingActor === null) setOpeningActor(actor);
+        else if (actor <= 0 || openingActor !== actor) onClose();
+    }, [open, onClose, openingActor, actor]);
+    const [loaded, setLoaded] = useState<EditableShift | null>(null);
+    const [loadError, setLoadError] = useState('');
+    const [attempt, setAttempt] = useState(0);
+    useEffect(() => {
+        setLoaded(null);
+        setLoadError('');
+        if (!props.open || !id || actor <= 0 || openingActor !== actor) return;
+        const controller = new AbortController();
+        fetch(`/operations/shifts/${id}/editable`, {
+            signal: controller.signal,
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        })
+            .then(async (response) => {
+                if (!response.ok)
+                    throw new Error(
+                        'The current shift could not be loaded. Your access or this record may have changed.',
+                    );
+                return response.json() as Promise<EditableShift>;
+            })
+            .then((shift) => {
+                if (!controller.signal.aborted) {
+                    if (!isCurrentEditableShift(shift, id, actor))
+                        throw new Error(
+                            'The returned shift does not match. Retry loading this record.',
+                        );
+                    setLoaded(shift);
+                }
+            })
+            .catch((error) => {
+                if (!controller.signal.aborted)
+                    setLoadError(
+                        error instanceof Error
+                            ? error.message
+                            : 'The shift could not be loaded.',
+                    );
+            });
+        return () => controller.abort();
+    }, [props.open, id, attempt, actor, openingActor]);
+    if (
+        !props.open ||
+        actor <= 0 ||
+        (openingActor !== null && openingActor !== actor)
+    )
+        return null;
+    if (id && (!loaded || loaded.id !== id || loaded.actor_id !== actor))
+        return (
+            <WizardShell
+                open
+                onClose={props.onClose}
+                title="Load shift for editing"
+                description="Retrieve the current saved shift before editing."
+                railIcon={CalendarClock}
+                railTitle="Edit shift"
+                railSub={`Shift #${id}`}
+                steps={[
+                    {
+                        key: 'load',
+                        label: 'Load saved shift',
+                        blurb: 'Preserve current details',
+                        icon: CalendarClock,
+                    },
+                ]}
+                stepIndex={0}
+                onStepClick={() => {}}
+                footerStart={
+                    <GuardrailButton variant="outline" onClick={props.onClose}>
+                        Cancel
+                    </GuardrailButton>
+                }
+            >
+                <WizardStepPane>
+                    {loadError ? (
+                        <div className="space-y-3">
+                            <p role="alert">{loadError}</p>
+                            <GuardrailButton
+                                onClick={() => setAttempt((n) => n + 1)}
+                            >
+                                Retry loading shift
+                            </GuardrailButton>
+                        </div>
+                    ) : (
+                        <p role="status" className="flex items-center gap-2">
+                            <Loader2 className="size-4 animate-spin" />
+                            Loading saved shift details…
+                        </p>
+                    )}
+                </WizardStepPane>
+            </WizardShell>
+        );
+    return (
+        <ShiftDialogForm
+            {...props}
+            key={String(actor) + ':' + String(id ?? 'new')}
+            initialShift={id ? loaded : null}
+            workerTimezone={
+                loaded?.worker_timezone ??
+                props.workerTimezone ??
+                page.props.workerTimezone
+            }
+            canOverrideEligibility={
+                props.canOverrideEligibility ??
+                Boolean(page.props.auth?.can?.shifts?.overrideEligibility)
+            }
+        />
+    );
 }
 
-function defaultStartForToday(): string {
-    const d = new Date();
-    d.setHours(9, 0, 0, 0);
-    return toLocalDatetimeInput(d.toISOString());
-}
-function defaultEndForToday(): string {
-    const d = new Date();
-    d.setHours(17, 0, 0, 0);
-    return toLocalDatetimeInput(d.toISOString());
-}
-
-export function CreateShiftDialog({
+function ShiftDialogForm({
     open,
     onClose,
     clients,
@@ -255,13 +437,34 @@ export function CreateShiftDialog({
     defaultRepeatWeekly = false,
     defaultRepeatEndDate = null,
     initialShift = null,
+    workerTimezone = WORKER_TIMEZONE,
+    canOverrideEligibility = false,
 }: Props) {
     const isEdit = !!initialShift;
+    const actorId = Number(usePage<SharedData>().props.auth.user?.id ?? 0);
+    const command = useShiftSaveCommand(
+        `${actorId}:${initialShift?.id ?? 'new'}`,
+    );
+    const [seriesUnknown, setSeriesUnknown] = useState(false);
+    const uncertain = command.outcome?.status === 'unknown' || seriesUnknown;
+    const toLocalDatetimeInput = (value?: string | null) =>
+        shiftWallInput(value, workerTimezone);
+    const defaultStartForToday = () =>
+        `${shiftWallInput(new Date().toISOString(), workerTimezone).slice(0, 10)}T09:00`;
+    const defaultEndForToday = () =>
+        `${shiftWallInput(new Date().toISOString(), workerTimezone).slice(0, 10)}T17:00`;
+    const weekdayFromDatetime = (value?: string | null) =>
+        shiftWeekday(value, workerTimezone);
+    const [saved, setSaved] = useState('');
+    const [saveError, setSaveError] = useState('');
+    const [seriesBusy, setSeriesBusy] = useState(false);
+    const [discardOpen, setDiscardOpen] = useState(false);
     const initialClient = useMemo(() => {
         if (initialShift?.client?.id) {
             const found = clients.find((c) => c.id === initialShift.client?.id);
             if (found) return found;
         }
+        if (initialShift) return null;
         if (defaultClientId) {
             const found = clients.find(
                 (c) => String(c.id) === String(defaultClientId),
@@ -275,7 +478,7 @@ export function CreateShiftDialog({
             if (found) return found;
         }
         return clients[0] ?? null;
-    }, [clients, defaultClientId, defaultSiteId, initialShift?.client?.id]);
+    }, [clients, defaultClientId, defaultSiteId, initialShift]);
 
     // Every client lives at a site — the location field follows it (the
     // coordinator can still type a custom location for community shifts).
@@ -286,13 +489,14 @@ export function CreateShiftDialog({
         client_id: (initialShift?.client?.id ?? initialClient?.id ?? '') as
             | number
             | '',
-        service_context_id: (initialShift?.service_context_id ??
-            initialClient?.service_context_id ??
-            defaultServiceContextId ??
-            '') as number | '',
-        user_id: (initialShift?.staff?.id ?? defaultUserId ?? '') as
-            | number
-            | '',
+        service_context_id: (initialShift
+            ? (initialShift.service_context_id ?? '')
+            : (initialClient?.service_context_id ??
+              defaultServiceContextId ??
+              '')) as number | '',
+        user_id: (initialShift
+            ? (initialShift.staff?.id ?? '')
+            : (defaultUserId ?? '')) as number | '',
         starts_at:
             toLocalDatetimeInput(initialShift?.starts_at ?? defaultStartsAt) ||
             defaultStartForToday(),
@@ -315,7 +519,9 @@ export function CreateShiftDialog({
         expected_break_minutes:
             initialShift?.expected_break_minutes != null
                 ? String(initialShift.expected_break_minutes)
-                : '30',
+                : initialShift
+                  ? ''
+                  : '30',
         // Hydrate from initialShift in edit mode so submitting doesn't wipe
         // existing coverage roles / tasks on the server. We keep the task id
         // for existing rows so syncShiftTasks updates them in place instead of
@@ -332,6 +538,7 @@ export function CreateShiftDialog({
             id: t.id,
             label: t.label,
             scheduled_time: t.scheduled_time ?? null,
+            can_edit: t.can_edit,
         })) ?? []) as ShiftDialogTask[],
         repeat_weekly: defaultRepeatWeekly,
         repeat_end_date: (defaultRepeatEndDate ?? '') as string,
@@ -487,11 +694,13 @@ export function CreateShiftDialog({
         ]);
     }
     function setTask(i: number, label: string) {
+        if (form.data.tasks[i]?.can_edit === false) return;
         const next = [...form.data.tasks];
         next[i] = { ...next[i], label };
         form.setData('tasks', next);
     }
     function setTaskScheduled(i: number, scheduled_time: string | null) {
+        if (form.data.tasks[i]?.can_edit === false) return;
         const next = [...form.data.tasks];
         next[i] = { ...next[i], scheduled_time };
         form.setData('tasks', next);
@@ -500,6 +709,7 @@ export function CreateShiftDialog({
         return form.data.starts_at?.slice(11, 16) || '09:00';
     }
     function removeTask(i: number) {
+        if (form.data.tasks[i]?.can_edit === false) return;
         form.setData(
             'tasks',
             form.data.tasks.filter((_, idx) => idx !== i),
@@ -528,58 +738,45 @@ export function CreateShiftDialog({
 
     const durationLabel = useMemo(() => {
         try {
-            const a = new Date(form.data.starts_at).getTime();
-            const b = new Date(form.data.ends_at).getTime();
-            if (a && b && b > a) return `${((b - a) / 3_600_000).toFixed(1)}h`;
+            const a = Date.parse(
+                shiftInputInstant(
+                    form.data.starts_at,
+                    workerTimezone,
+                    initialShift?.starts_at,
+                ),
+            );
+            const b = Date.parse(
+                shiftInputInstant(
+                    form.data.ends_at,
+                    workerTimezone,
+                    initialShift?.ends_at,
+                ),
+            );
+            if (a && b && b > a) return formatDurationMinutes((b - a) / 60_000);
         } catch {
             // fallthrough
         }
         return '—';
-    }, [form.data.starts_at, form.data.ends_at]);
+    }, [
+        form.data.starts_at,
+        form.data.ends_at,
+        workerTimezone,
+        initialShift?.starts_at,
+        initialShift?.ends_at,
+    ]);
 
     const summary = useMemo(() => {
-        const start = form.data.starts_at
-            ? new Date(form.data.starts_at)
-            : null;
-        const day = start
-            ? start.toLocaleDateString('en-NZ', {
-                  weekday: 'short',
-                  day: 'numeric',
-                  month: 'short',
-              })
-            : 'No date';
-        const time = start
-            ? start.toLocaleTimeString('en-NZ', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  hour12: false,
-              })
-            : '—';
+        const day = formatDateOnly(form.data.starts_at.slice(0, 10), 'No date');
+        const time = displayTime(form.data.starts_at.slice(11, 16));
         const client = clients.find(
             (c) => c.id === Number(form.data.client_id),
         );
         const name = client
             ? `${client.first_name} ${client.last_name}`.trim()
             : 'No client';
-        let recurringSuffix = '';
-        if (form.data.repeat_weekly && form.data.repeat_end_date) {
-            const startDate = new Date(form.data.starts_at);
-            const endDate = new Date(form.data.repeat_end_date);
-            if (
-                !Number.isNaN(startDate.getTime()) &&
-                !Number.isNaN(endDate.getTime())
-            ) {
-                const weeks = Math.max(
-                    1,
-                    Math.round(
-                        (endDate.getTime() - startDate.getTime()) /
-                            (7 * 86_400_000),
-                    ),
-                );
-                const count = weeks * form.data.repeat_by_weekday.length;
-                recurringSuffix = ` · ~${count} shifts`;
-            }
-        }
+        const recurringSuffix = form.data.repeat_weekly
+            ? ' · Weekly series'
+            : '';
         return `${day} · ${time} · ${durationLabel} · ${name}${recurringSuffix}`;
     }, [form.data, clients, durationLabel]);
 
@@ -593,6 +790,19 @@ export function CreateShiftDialog({
     );
     const [eligLoading, setEligLoading] = useState(false);
     const [overrideOpen, setOverrideOpen] = useState(false);
+    const [eligError, setEligError] = useState('');
+    const savingRef = useRef(false);
+    const initialDraft = useRef(JSON.stringify(form.data));
+    const busy = form.processing || seriesBusy || command.pending;
+    const closeSafely = () => {
+        if (busy || command.busy.current || savingRef.current) return;
+        if (
+            !saved &&
+            (uncertain || JSON.stringify(form.data) !== initialDraft.current)
+        )
+            setDiscardOpen(true);
+        else onClose();
+    };
     const eligAbort = useRef<AbortController | null>(null);
     const eligTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -605,12 +815,16 @@ export function CreateShiftDialog({
     const overrideWarnings = eligPreview?.overrideable_warnings?.length
         ? eligPreview.overrideable_warnings
         : eligibilityWarnings.map((message) => ({
-              rule: 'unknown',
+              rule: 'information',
               message,
-              overrideable: true,
+              overrideable: false,
           }));
 
     const fetchEligibility = useCallback(() => {
+        eligAbort.current?.abort();
+        if (eligTimer.current) clearTimeout(eligTimer.current);
+        setEligPreview(null);
+        setEligError('');
         const userId = form.data.user_id;
         const startsAt = form.data.starts_at;
         const endsAt = form.data.ends_at;
@@ -626,6 +840,7 @@ export function CreateShiftDialog({
             return;
         }
 
+        if (eligTimer.current) clearTimeout(eligTimer.current);
         setEligLoading(true);
         eligTimer.current = setTimeout(async () => {
             const controller = new AbortController();
@@ -635,8 +850,18 @@ export function CreateShiftDialog({
             try {
                 const query: Record<string, string | string[]> = {
                     user_id: String(userId),
-                    starts_at: localDatetimeInputToIso(startsAt) ?? startsAt,
-                    ends_at: localDatetimeInputToIso(endsAt) ?? endsAt,
+                    client_id: String(form.data.client_id),
+                    service_context_id: String(form.data.service_context_id),
+                    starts_at: shiftInputInstant(
+                        startsAt,
+                        workerTimezone,
+                        initialShift?.starts_at,
+                    ),
+                    ends_at: shiftInputInstant(
+                        endsAt,
+                        workerTimezone,
+                        initialShift?.ends_at,
+                    ),
                 };
 
                 const siteId =
@@ -671,13 +896,23 @@ export function CreateShiftDialog({
                 const data = (await res.json()) as EligibilityPreview;
                 if (!controller.signal.aborted) setEligPreview(data);
             } catch {
-                if (!controller.signal.aborted) setEligPreview(null);
+                if (!controller.signal.aborted) {
+                    setEligPreview(null);
+                    setEligError(
+                        'Eligibility preview is unavailable. Check the entered times and retry. Saving still runs the required checks.',
+                    );
+                }
             } finally {
                 if (!controller.signal.aborted) setEligLoading(false);
             }
         }, 500);
     }, [
         form.data.user_id,
+        form.data.client_id,
+        form.data.service_context_id,
+        workerTimezone,
+        initialShift?.starts_at,
+        initialShift?.ends_at,
         form.data.starts_at,
         form.data.ends_at,
         form.data.shift_type,
@@ -699,112 +934,263 @@ export function CreateShiftDialog({
         };
     }, [fetchEligibility, open]);
 
-    function submitForm(overrideReason?: string) {
-        // Round-trip the current URL so the server's redirect after save
-        // lands the user back on the same week / filter combo instead of
-        // resetting to the default index. Also convert the local
-        // <input type="datetime-local"> values to an ISO string with the
-        // browser's timezone offset — Carbon::parse() on the server then
-        // stores the correct UTC instant. Otherwise the naive local time
-        // is interpreted as UTC and the saved shift drifts by the user's
-        // offset (e.g. NZST shifts get pushed 12 hours into the future).
-        form.transform((data) => {
-            const payload = {
-                ...data,
-                starts_at:
-                    localDatetimeInputToIso(data.starts_at) ?? data.starts_at,
-                ends_at: localDatetimeInputToIso(data.ends_at) ?? data.ends_at,
-                return_to:
-                    typeof window !== 'undefined'
-                        ? window.location.pathname + window.location.search
-                        : data.return_to,
-                override_acknowledged: Boolean(overrideReason),
-                override_reason: overrideReason ?? '',
-            };
-
-            if (
-                !isEdit &&
-                !data.required_licence_class &&
-                data.required_licence_endorsements.length === 0
-            ) {
-                const {
-                    required_licence_class: _class,
-                    required_licence_endorsements: _endorsements,
-                    ...ordinaryShift
-                } = payload;
-                return ordinaryShift;
+    function showSaveErrors(errors: Record<string, string>) {
+        const map: Record<string, string> = {
+            start_date: 'starts_at',
+            starts_time: 'starts_at',
+            ends_time: 'ends_at',
+            end_date: 'repeat_end_date',
+            by_weekday: 'repeat_by_weekday',
+        };
+        const mapped = Object.fromEntries(
+            Object.entries(errors).map(([key, value]) => [
+                map[key] ?? key,
+                value,
+            ]),
+        );
+        for (const [key, value] of Object.entries(mapped))
+            form.setError(key as keyof typeof form.data, value);
+        const keys = Object.keys(mapped);
+        const step: WizStepKey = keys.some((k) =>
+            /^(client|user|location|service_context|coverage_roles|required_licence)/.test(
+                k,
+            ),
+        )
+            ? 'people'
+            : keys.some((k) => /^(starts_at|ends_at|expected_break)/.test(k))
+              ? 'schedule'
+              : keys.some((k) => /^repeat_(end|by)/.test(k))
+                ? 'repeat'
+                : keys.some((k) => /^tasks/.test(k))
+                  ? 'tasks'
+                  : 'review';
+        jumpTo(step);
+        setSaveError(
+            Object.values(mapped).join(' ') ||
+                'The shift was not saved. Review the details and retry.',
+        );
+        // Recheck after a rejected save without losing the entered values.
+        fetchEligibility();
+    }
+    useEffect(() => {
+        const result = command.outcome;
+        if (!result) return;
+        if (result.status === 'confirmed') {
+            setSaveError('');
+            setSaved(
+                result.receipt.changed
+                    ? isEdit
+                        ? 'Your shift changes were saved.'
+                        : 'The shift was created.'
+                    : 'The saved shift already matches these details.',
+            );
+            return;
+        }
+        if (result.status === 'rejected' && Object.keys(result.errors).length) {
+            showSaveErrors(result.errors);
+        } else {
+            setSaveError(result.message);
+            if (result.status === 'rejected' && result.eligibility) {
+                setEligPreview(result.eligibility);
+                setEligError('');
+                jumpTo('review');
             }
+        }
+        // Consume each response once; subsequent field edits stay under user control.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [command.outcome]);
 
-            return payload;
-        });
-        if (isEdit && initialShift) {
-            // Edit mode: PUT to update; recurring options don't apply.
-            form.put(updateShift.url(initialShift.id), {
-                preserveScroll: true,
-                onSuccess: () => onClose(),
-                // Availability can change after the preview. Keep the draft
-                // and show the server errors while checking the latest result.
-                onError: () => fetchEligibility(),
-            });
+    // Recurring creation keeps its existing separate endpoint and response.
+    // Its persistence contract is outside the single-Shift receipt.
+    function confirmedSeries(page: Page) {
+        const flash = page.props.flash as
+            | { success?: string; error?: string }
+            | undefined;
+        if (
+            !flash?.error &&
+            typeof flash?.success === 'string' &&
+            /^Recurring shifts created \(\d+\)\.$/.test(flash.success)
+        ) {
+            setSaved(flash.success);
+            setSaveError('');
+        } else {
+            setSeriesUnknown(true);
+            setSaveError(UNKNOWN_SHIFT_SAVE);
+        }
+    }
+    function submitForm(overrideReason?: string) {
+        if (
+            savingRef.current ||
+            command.busy.current ||
+            command.held.current ||
+            busy ||
+            eligLoading ||
+            saved ||
+            uncertain
+        )
+            return;
+        for (const step of WIZ_STEPS) {
+            if (!validateStep(step.key)) {
+                setStepIndex(WIZ_STEPS.indexOf(step));
+                return;
+            }
+        }
+        setSaveError('');
+        eligAbort.current?.abort();
+        if (eligTimer.current) clearTimeout(eligTimer.current);
+        setEligLoading(false);
+        form.clearErrors();
+        if (isEdit || !form.data.repeat_weekly) {
+            try {
+                const values = shiftSaveProjection({
+                    ...form.data,
+                    starts_at: shiftInputInstant(
+                        form.data.starts_at,
+                        workerTimezone,
+                        initialShift?.starts_at,
+                    ),
+                    ends_at: shiftInputInstant(
+                        form.data.ends_at,
+                        workerTimezone,
+                        initialShift?.ends_at,
+                    ),
+                });
+                const siteId =
+                    selectedClient?.site_id ??
+                    (initialShift?.source?.client_id === values.client_id
+                        ? initialShift?.site?.id
+                        : null);
+                if (!siteId || (isEdit && !initialShift?.source)) {
+                    setSaveError(
+                        'The current site could not be confirmed. Reload this shift or choose a person with a permitted site. Your entries are kept here.',
+                    );
+                    return;
+                }
+                const payload: Record<string, FormDataConvertible> = {
+                    ...values,
+                    tasks:
+                        values.tasks?.map((task) =>
+                            task.id === null
+                                ? {
+                                      label: task.label,
+                                      scheduled_time: task.scheduled_time,
+                                  }
+                                : task,
+                        ) ?? undefined,
+                    coverage_rule_id: form.data.coverage_rule_id || undefined,
+                    coverage_reservation_token:
+                        form.data.coverage_reservation_token || undefined,
+                    return_to:
+                        window.location.pathname + window.location.search,
+                    override_acknowledged: Boolean(overrideReason),
+                    override_reason: overrideReason ?? '',
+                };
+                if (
+                    !isEdit &&
+                    !values.required_licence_class &&
+                    values.required_licence_endorsements.length === 0
+                ) {
+                    delete payload.required_licence_class;
+                    delete payload.required_licence_endorsements;
+                }
+                void command.submit(
+                    {
+                        actorId,
+                        source: initialShift?.source ?? null,
+                        siteId,
+                        values,
+                    },
+                    payload,
+                );
+            } catch (error) {
+                setSaveError(
+                    error instanceof Error
+                        ? error.message
+                        : 'Check the shift details before saving.',
+                );
+            }
             return;
         }
-        if (!form.data.repeat_weekly) {
-            form.post(storeShift.url(), {
-                preserveScroll: true,
-                onSuccess: () => onClose(),
-            });
-            return;
-        }
+        savingRef.current = true;
+        let seriesResponded = false;
+        const callbacks = {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: (page: Page) => {
+                seriesResponded = true;
+                confirmedSeries(page);
+            },
+            onError: (errors: Record<string, string>) => {
+                seriesResponded = true;
+                showSaveErrors(errors);
+            },
+            onFinish: () => {
+                savingRef.current = false;
+                setSeriesBusy(false);
+                if (!seriesResponded) {
+                    setSeriesUnknown(true);
+                    setSaveError(UNKNOWN_SHIFT_SAVE);
+                }
+            },
+        };
         // Recurring series
         const starts = form.data.starts_at;
         const ends = form.data.ends_at;
         const startDate = starts?.slice(0, 10);
         const startsTime = starts?.slice(11, 16);
         const endsTime = ends?.slice(11, 16);
-        router.post(
-            storeShiftSeries.url(),
-            {
-                client_id: form.data.client_id,
-                service_context_id: form.data.service_context_id,
-                user_id: form.data.user_id || null,
-                start_date: startDate,
-                end_date: form.data.repeat_end_date || startDate,
-                by_weekday: form.data.repeat_by_weekday,
-                starts_time: startsTime,
-                ends_time: endsTime,
-                location: form.data.location,
-                notes: form.data.notes,
-                status: form.data.status,
-                shift_type: form.data.shift_type,
-                is_sleepover: form.data.is_sleepover,
-                is_on_call: form.data.is_on_call,
-                is_lone_worker: form.data.is_lone_worker,
-                expected_break_minutes:
-                    form.data.expected_break_minutes || null,
-                tasks: form.data.tasks.filter((t) => t.label.trim() !== ''),
-                coverage_rule_id: form.data.coverage_rule_id || undefined,
-                coverage_roles: form.data.coverage_roles,
-                ...(form.data.required_licence_class ||
-                form.data.required_licence_endorsements.length
-                    ? {
-                          required_licence_class:
-                              form.data.required_licence_class || null,
-                          required_licence_endorsements:
-                              form.data.required_licence_endorsements,
-                      }
-                    : {}),
-                coverage_reservation_token:
-                    form.data.coverage_reservation_token || undefined,
-                return_to:
-                    typeof window !== 'undefined'
-                        ? window.location.pathname + window.location.search
-                        : undefined,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => onClose(),
-            },
-        );
+        setSeriesBusy(true);
+        try {
+            router.post(
+                storeShiftSeries.url(),
+                {
+                    client_id: form.data.client_id,
+                    service_context_id: form.data.service_context_id,
+                    user_id: form.data.user_id || null,
+                    timezone: workerTimezone,
+                    start_date: startDate,
+                    end_date: form.data.repeat_end_date || startDate,
+                    by_weekday: form.data.repeat_by_weekday,
+                    starts_time: startsTime,
+                    ends_time: endsTime,
+                    location: form.data.location,
+                    notes: form.data.notes,
+                    status: form.data.status,
+                    shift_type: form.data.shift_type,
+                    is_sleepover: form.data.is_sleepover,
+                    is_on_call: form.data.is_on_call,
+                    is_lone_worker: form.data.is_lone_worker,
+                    expected_break_minutes:
+                        form.data.expected_break_minutes || null,
+                    tasks: form.data.tasks.filter((t) => t.label.trim() !== ''),
+                    coverage_rule_id: form.data.coverage_rule_id || undefined,
+                    coverage_roles: form.data.coverage_roles,
+                    ...(form.data.required_licence_class ||
+                    form.data.required_licence_endorsements.length
+                        ? {
+                              required_licence_class:
+                                  form.data.required_licence_class || null,
+                              required_licence_endorsements:
+                                  form.data.required_licence_endorsements,
+                          }
+                        : {}),
+                    coverage_reservation_token:
+                        form.data.coverage_reservation_token || undefined,
+                    return_to:
+                        typeof window !== 'undefined'
+                            ? window.location.pathname + window.location.search
+                            : undefined,
+                },
+                {
+                    ...callbacks,
+                },
+            );
+        } catch {
+            savingRef.current = false;
+            setSeriesBusy(false);
+            setSeriesUnknown(true);
+            setSaveError(UNKNOWN_SHIFT_SAVE);
+        }
     }
 
     // Per-step client-side gates — the server stays authoritative; these only
@@ -815,16 +1201,49 @@ export function CreateShiftDialog({
             errs.client_id = 'Choose a client';
         }
         if (key === 'schedule') {
-            if (!form.data.starts_at) errs.starts_at = 'Start time is required';
-            if (!form.data.ends_at) errs.ends_at = 'End time is required';
-            if (
-                form.data.starts_at &&
-                form.data.ends_at &&
-                new Date(form.data.ends_at).getTime() <=
-                    new Date(form.data.starts_at).getTime()
-            ) {
-                errs.ends_at = 'End must be after the start';
+            try {
+                shiftInputInstant(
+                    form.data.starts_at,
+                    workerTimezone,
+                    initialShift?.starts_at,
+                );
+            } catch (error) {
+                errs.starts_at =
+                    error instanceof Error
+                        ? error.message
+                        : 'Check the start date and time.';
             }
+            try {
+                shiftInputInstant(
+                    form.data.ends_at,
+                    workerTimezone,
+                    initialShift?.ends_at,
+                );
+            } catch (error) {
+                errs.ends_at =
+                    error instanceof Error
+                        ? error.message
+                        : 'Check the end date and time.';
+            }
+            if (
+                !errs.starts_at &&
+                !errs.ends_at &&
+                Date.parse(
+                    shiftInputInstant(
+                        form.data.ends_at,
+                        workerTimezone,
+                        initialShift?.ends_at,
+                    ),
+                ) <=
+                    Date.parse(
+                        shiftInputInstant(
+                            form.data.starts_at,
+                            workerTimezone,
+                            initialShift?.starts_at,
+                        ),
+                    )
+            )
+                errs.ends_at = 'End must be after the start';
         }
         if (key === 'repeat' && form.data.repeat_weekly) {
             if (form.data.repeat_by_weekday.length === 0) {
@@ -857,12 +1276,7 @@ export function CreateShiftDialog({
         let have = 0;
         if (form.data.shift_type) have++;
         if (form.data.client_id) have++;
-        if (
-            form.data.starts_at &&
-            form.data.ends_at &&
-            new Date(form.data.ends_at).getTime() >
-                new Date(form.data.starts_at).getTime()
-        ) {
+        if (form.data.starts_at && form.data.ends_at && durationLabel !== '—') {
             have++;
         }
         if (
@@ -881,17 +1295,26 @@ export function CreateShiftDialog({
         form.data.repeat_weekly,
         form.data.repeat_by_weekday,
         form.data.repeat_end_date,
+        durationLabel,
     ]);
 
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
+        if (
+            busy ||
+            saved ||
+            uncertain ||
+            command.busy.current ||
+            savingRef.current
+        )
+            return;
         // On every step except review, the primary action advances the
         // wizard — this also keeps Cmd/Ctrl+Enter working per step.
         if (cur.key !== 'review') {
             goNext();
             return;
         }
-        if (form.processing || eligLoading) return;
+        if (eligLoading) return;
         if (isEdit && eligibilityStatus?.status === 'blocked') {
             return;
         }
@@ -900,6 +1323,15 @@ export function CreateShiftDialog({
             eligibilityStatus?.status === 'warnings' &&
             eligibilityWarnings.length > 0
         ) {
+            if (
+                eligPreview?.overrideable_warnings?.length &&
+                !canOverrideEligibility
+            ) {
+                setSaveError(
+                    'An authorised coordinator must review these eligibility warnings before saving.',
+                );
+                return;
+            }
             setOverrideOpen(true);
             return;
         }
@@ -908,152 +1340,149 @@ export function CreateShiftDialog({
 
     return (
         <>
-            <Dialog open={open} onOpenChange={(o) => (!o ? onClose() : null)}>
-                <DialogContent
-                    className="flex h-[min(820px,92vh)] !w-full !max-w-[min(96vw,1080px)] flex-col gap-0 overflow-hidden !rounded-2xl !p-0 md:flex-row [&>button]:hidden"
-                    onInteractOutside={(e) => e.preventDefault()}
-                >
-                    <VisuallyHidden.Root>
-                        <DialogTitle>
-                            {isEdit
-                                ? `Edit shift #${initialShift?.id}`
-                                : 'Create shift'}
-                        </DialogTitle>
-                        <DialogDescription>
-                            {isEdit
-                                ? 'Update the schedule, staff, tasks or notes for this shift.'
-                                : 'Schedule an appointment or rostered shift. Add tasks and optionally repeat weekly.'}
-                        </DialogDescription>
-                    </VisuallyHidden.Root>
-
-                    {/* Stepper rail */}
-                    <aside className="hidden w-[248px] shrink-0 flex-col border-r border-border bg-muted/30 p-4 md:flex">
-                        <div className="mb-4 flex items-center gap-2.5">
-                            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 text-primary">
-                                <CalendarClock className="h-4.5 w-4.5" />
-                            </span>
-                            <div className="min-w-0">
-                                <h2 className="text-sm font-bold">
-                                    {isEdit ? 'Edit shift' : 'Create shift'}
-                                </h2>
-                                <div className="truncate text-[11.5px] text-muted-foreground">
-                                    {isEdit
-                                        ? `Shift #${initialShift?.id}`
-                                        : 'Roster a new shift'}
-                                </div>
-                            </div>
-                        </div>
-                        <div className="flex flex-1 flex-col gap-1">
-                            {WIZ_STEPS.map((s, i) => {
-                                const Icon = s.icon;
-                                const active = i === stepIndex;
-                                const done = i < stepIndex;
-                                return (
-                                    <GuardrailButton
-                                        unstyled
-                                        key={s.key}
-                                        type="button"
-                                        onClick={() => {
-                                            setStepErrors({});
-                                            setStepIndex(i);
-                                        }}
-                                        className={cn(
-                                            'flex items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors',
-                                            active
-                                                ? 'bg-primary-fill/10'
-                                                : 'hover:bg-muted',
-                                        )}
-                                    >
-                                        <span
-                                            className={cn(
-                                                'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
-                                                active
-                                                    ? 'bg-primary-fill text-primary-fill-foreground'
-                                                    : done
-                                                      ? 'bg-status-success-bg text-status-success'
-                                                      : 'bg-muted text-muted-foreground',
-                                            )}
-                                        >
-                                            {done ? (
-                                                <Check className="h-3.5 w-3.5" />
-                                            ) : (
-                                                <Icon className="h-3.5 w-3.5" />
-                                            )}
-                                        </span>
-                                        <span className="min-w-0">
-                                            <span className="block text-[13px] leading-tight font-semibold">
-                                                {s.label}
-                                            </span>
-                                            <span className="block text-[11px] text-muted-foreground">
-                                                {s.blurb}
-                                            </span>
-                                        </span>
-                                    </GuardrailButton>
-                                );
-                            })}
-                        </div>
-                        <GuardrailCard
-                            unstyled
-                            className="mt-3 rounded-lg border border-border bg-card p-3"
+            <WizardShell
+                open={open}
+                onClose={closeSafely}
+                title={
+                    isEdit ? `Edit shift #${initialShift?.id}` : 'Create shift'
+                }
+                description="Plan a supported-living duty, staff, times and care tasks."
+                railIcon={CalendarClock}
+                railTitle={isEdit ? 'Edit shift' : 'Create shift'}
+                railSub={workerTimezone}
+                steps={WIZ_STEPS}
+                stepIndex={stepIndex}
+                onStepClick={(index) => {
+                    if (!busy) {
+                        setStepErrors({});
+                        setStepIndex(index);
+                    }
+                }}
+                pct={readinessPct}
+                pctLabel="Required details"
+                maxWidth="min(94vw, 1080px)"
+                maxHeight="min(88vh, 820px)"
+                footerStart={
+                    <div className="flex items-center gap-2">
+                        <GuardrailButton
+                            type="button"
+                            variant="outline"
+                            className="frontline-hit"
+                            onClick={closeSafely}
+                            disabled={busy}
                         >
-                            <div className="flex items-center justify-between text-[11.5px] font-semibold">
-                                <span>Shift readiness</span>
-                                <span className="tabular-nums">
-                                    {readinessPct}%
-                                </span>
-                            </div>
-                            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
-                                <div
-                                    className="h-full rounded-full bg-primary transition-all"
-                                    style={{ width: `${readinessPct}%` }}
-                                />
-                            </div>
-                        </GuardrailCard>
-                    </aside>
-
-                    {/* Main panel */}
-                    <form
-                        data-shifts-create
-                        onSubmit={handleSubmit}
-                        className="flex min-w-0 flex-1 flex-col"
+                            Cancel
+                        </GuardrailButton>
+                        {stepIndex > 0 && (
+                            <GuardrailButton
+                                type="button"
+                                variant="ghost"
+                                className="frontline-hit"
+                                onClick={goBack}
+                                disabled={busy}
+                            >
+                                <ChevronLeft className="size-4" />
+                                Back
+                            </GuardrailButton>
+                        )}
+                    </div>
+                }
+                footerEnd={
+                    <GuardrailButton
+                        type="submit"
+                        form="workforce-shift-form"
+                        className="frontline-hit"
+                        disabled={
+                            busy ||
+                            uncertain ||
+                            (cur.key === 'review' && eligLoading)
+                        }
                     >
-                        <header className="flex items-center justify-between border-b border-border px-5 py-3">
-                            <div className="text-[12.5px] text-muted-foreground">
-                                Step {stepIndex + 1} of {WIZ_STEPS.length} ·{' '}
-                                <b className="text-foreground">{cur.label}</b>
-                            </div>
-                            <div className="flex shrink-0 items-center gap-2">
-                                <span className="hidden items-center gap-1 rounded-md border border-border px-1.5 py-1 text-[10.5px] text-muted-foreground sm:inline-flex">
-                                    <kbd className="font-sans font-semibold">
-                                        ⌘
-                                    </kbd>
-                                    <kbd className="font-sans font-semibold">
-                                        ↵
-                                    </kbd>
-                                    <span>to continue</span>
-                                </span>
+                        {busy ? (
+                            <>
+                                <Loader2 className="size-4 animate-spin" />
+                                Saving…
+                            </>
+                        ) : cur.key === 'review' ? (
+                            isEdit ? (
+                                'Save changes'
+                            ) : (
+                                'Create shift'
+                            )
+                        ) : (
+                            <>
+                                Continue
+                                <ChevronRight className="size-4" />
+                            </>
+                        )}
+                    </GuardrailButton>
+                }
+                success={
+                    saved ? (
+                        <WizardSuccessPane
+                            title={
+                                isEdit
+                                    ? 'Shift updated'
+                                    : form.data.repeat_weekly
+                                      ? 'Recurring shifts created'
+                                      : 'Shift created'
+                            }
+                            blurb={saved}
+                            actions={
                                 <GuardrailButton
-                                    unstyled
-                                    type="button"
+                                    className="frontline-hit"
                                     onClick={onClose}
-                                    aria-label="Close dialog"
-                                    className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
                                 >
-                                    <X className="h-4.5 w-4.5" />
+                                    Done
+                                </GuardrailButton>
+                            }
+                        />
+                    ) : undefined
+                }
+            >
+                <form
+                    id="workforce-shift-form"
+                    data-shifts-create
+                    onSubmit={handleSubmit}
+                >
+                    <WizardStepPane>
+                        {uncertain && (
+                            <div
+                                className="mb-4 space-y-2 rounded-lg border border-status-warning/40 bg-status-warning-bg p-3"
+                                role="status"
+                            >
+                                <p>
+                                    Check the saved roster before making another
+                                    attempt. This draft stays open while you
+                                    check.
+                                </p>
+                                <GuardrailButton
+                                    asChild
+                                    variant="outline"
+                                    className="frontline-hit"
+                                >
+                                    <a
+                                        href="/operations/rostering?tab=shifts"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        Open roster to check
+                                    </a>
                                 </GuardrailButton>
                             </div>
-                        </header>
-                        <div className="h-[3px] shrink-0 bg-muted">
-                            <div
-                                className="h-full bg-primary transition-all"
-                                style={{
-                                    width: `${((stepIndex + 1) / WIZ_STEPS.length) * 100}%`,
-                                }}
-                            />
-                        </div>
-
-                        {/* Body */}
-                        <div className="flex-1 overflow-y-auto px-6 py-4">
+                        )}
+                        {saveError && (
+                            <p
+                                role="alert"
+                                className="mb-4 rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical"
+                            >
+                                {saveError}
+                            </p>
+                        )}
+                        <fieldset
+                            disabled={busy || uncertain}
+                            className="min-w-0 space-y-4"
+                        >
                             {lockedContext ? (
                                 <LockedContextCard context={lockedContext} />
                             ) : null}
@@ -1107,6 +1536,32 @@ export function CreateShiftDialog({
                                             title="Staff eligibility warnings"
                                         />
                                     ) : null}
+                                    <p className="text-xs text-muted-foreground">
+                                        Advisory preview
+                                        {form.data.repeat_weekly
+                                            ? ' for the first occurrence only'
+                                            : ''}
+                                        . The complete proposal is checked again
+                                        when saved.
+                                    </p>
+                                    {eligError && (
+                                        <div className="space-y-2">
+                                            <p
+                                                role="status"
+                                                className="text-sm text-muted-foreground"
+                                            >
+                                                {eligError}
+                                            </p>
+                                            <GuardrailButton
+                                                type="button"
+                                                variant="outline"
+                                                className="frontline-hit"
+                                                onClick={fetchEligibility}
+                                            >
+                                                Retry eligibility check
+                                            </GuardrailButton>
+                                        </div>
+                                    )}
                                 </GuardrailCard>
                             ) : null}
 
@@ -1155,30 +1610,24 @@ export function CreateShiftDialog({
                                 <Section first icon={Users} title="Who & where">
                                     <div className="grid gap-3 sm:grid-cols-2">
                                         <div>
-                                            <Label
-                                                htmlFor="csd-client"
-                                                required
-                                            >
-                                                Client
+                                            <Label required>
+                                                Person supported
                                             </Label>
-                                            <select
-                                                id="csd-client"
-                                                className="select"
-                                                value={form.data.client_id}
-                                                onChange={(e) =>
-                                                    selectClient(e.target.value)
-                                                }
-                                            >
-                                                {clients.map((c) => (
-                                                    <option
-                                                        key={c.id}
-                                                        value={c.id}
-                                                    >
-                                                        {c.first_name}{' '}
-                                                        {c.last_name}
-                                                    </option>
-                                                ))}
-                                            </select>
+                                            <RecordPicker
+                                                label="Person supported"
+                                                value={String(
+                                                    form.data.client_id,
+                                                )}
+                                                onChange={selectClient}
+                                                disabled={busy || uncertain}
+                                                options={clients.map((c) => ({
+                                                    value: String(c.id),
+                                                    label: `${c.first_name} ${c.last_name}`.trim(),
+                                                    description: siteNameFor(
+                                                        c.site_id,
+                                                    ),
+                                                }))}
+                                            />
                                             {selectedClient ? (
                                                 <ServiceContextHint
                                                     client={selectedClient}
@@ -1204,7 +1653,7 @@ export function CreateShiftDialog({
                                             </Label>
                                             <input
                                                 id="csd-location"
-                                                className="input"
+                                                className="input min-h-[44px]"
                                                 value={form.data.location}
                                                 onChange={(e) =>
                                                     form.setData(
@@ -1229,43 +1678,39 @@ export function CreateShiftDialog({
                                         </div>
 
                                         <div className="sm:col-span-2">
-                                            <Label htmlFor="csd-staff">
-                                                Staff
-                                            </Label>
-                                            <select
-                                                id="csd-staff"
-                                                className="select"
-                                                value={form.data.user_id}
-                                                onChange={(e) =>
+                                            <Label>Staff</Label>
+                                            <RecordPicker
+                                                label="Staff"
+                                                value={String(
+                                                    form.data.user_id,
+                                                )}
+                                                disabled={busy || uncertain}
+                                                onChange={(value) =>
                                                     form.setData(
                                                         'user_id',
-                                                        e.target.value === ''
+                                                        value === ''
                                                             ? ''
-                                                            : (Number(
-                                                                  e.target
-                                                                      .value,
-                                                              ) as number),
+                                                            : Number(value),
                                                     )
                                                 }
-                                            >
-                                                <option value="">
-                                                    Unassigned (create an open
-                                                    shift)
-                                                </option>
-                                                {staff.map((s) => (
-                                                    <option
-                                                        key={s.id}
-                                                        value={s.id}
-                                                    >
-                                                        {s.name}
-                                                    </option>
-                                                ))}
-                                            </select>
+                                                options={[
+                                                    {
+                                                        value: '',
+                                                        label: 'Open shift (unassigned)',
+                                                    },
+                                                    ...staff.map((person) => ({
+                                                        value: String(
+                                                            person.id,
+                                                        ),
+                                                        label: person.name,
+                                                    })),
+                                                ]}
+                                            />
                                             {!form.data.user_id ? (
                                                 <p className="mt-1 text-xs text-muted-foreground">
-                                                    Leave blank to publish as an
-                                                    open shift — staff can be
-                                                    assigned later from
+                                                    An unassigned shift is saved
+                                                    as a draft. Assign staff or
+                                                    publish it later from
                                                     Rostering.
                                                 </p>
                                             ) : null}
@@ -1291,7 +1736,7 @@ export function CreateShiftDialog({
                                                     </Label>
                                                     <select
                                                         id="csd-licence-class"
-                                                        className="select"
+                                                        className="select min-h-[44px]"
                                                         value={
                                                             form.data
                                                                 .required_licence_class
@@ -1353,7 +1798,7 @@ export function CreateShiftDialog({
                                                                             )
                                                                         }
                                                                         className={cn(
-                                                                            'min-h-9 rounded-md border px-2.5 text-xs font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                                                                            'frontline-tap rounded-md border px-2.5 text-xs font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                                                                             selected
                                                                                 ? 'border-primary bg-primary/10 text-primary'
                                                                                 : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground',
@@ -1402,6 +1847,7 @@ export function CreateShiftDialog({
                                     }
                                 >
                                     <ScheduleStrip
+                                        workerTimezone={workerTimezone}
                                         startsAt={form.data.starts_at}
                                         endsAt={form.data.ends_at}
                                         breakMinutes={
@@ -1422,9 +1868,16 @@ export function CreateShiftDialog({
                                         duration={durationLabel}
                                     />
                                     <div className="mt-3">
-                                        <Label required>Publish as</Label>
+                                        <Label required>Save as</Label>
                                         <StatusPicker
-                                            value={form.data.status}
+                                            value={
+                                                form.data.user_id
+                                                    ? form.data.status
+                                                    : 'draft'
+                                            }
+                                            canSchedule={Boolean(
+                                                form.data.user_id,
+                                            )}
                                             onChange={(v) =>
                                                 form.setData('status', v)
                                             }
@@ -1482,7 +1935,7 @@ export function CreateShiftDialog({
                                                                     )
                                                                 }
                                                                 className={[
-                                                                    'h-8 min-w-[44px] rounded-md px-3 text-xs font-semibold tabular-nums transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                                                                    'frontline-hit h-8 min-w-[44px] rounded-md px-3 text-xs font-semibold tabular-nums transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                                                                     active
                                                                         ? 'bg-primary-fill text-primary-fill-foreground shadow-sm'
                                                                         : 'border border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/5',
@@ -1508,18 +1961,20 @@ export function CreateShiftDialog({
                                                     <Label htmlFor="csd-rep-end">
                                                         Repeat end date
                                                     </Label>
-                                                    <input
+                                                    <DatePicker
                                                         id="csd-rep-end"
-                                                        type="date"
-                                                        className="input"
+                                                        label="Repeat end date"
                                                         value={
                                                             form.data
                                                                 .repeat_end_date
                                                         }
-                                                        onChange={(e) =>
+                                                        timeZone={
+                                                            workerTimezone
+                                                        }
+                                                        onChange={(date) =>
                                                             form.setData(
                                                                 'repeat_end_date',
-                                                                e.target.value,
+                                                                date,
                                                             )
                                                         }
                                                     />
@@ -1567,7 +2022,7 @@ export function CreateShiftDialog({
                                                         unstyled
                                                         type="button"
                                                         onClick={addTask}
-                                                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/5"
+                                                        className="frontline-hit inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/5"
                                                     >
                                                         <Plus className="h-3.5 w-3.5" />{' '}
                                                         Add
@@ -1588,92 +2043,118 @@ export function CreateShiftDialog({
                                             ) : (
                                                 <ul className="space-y-1.5">
                                                     {form.data.tasks.map(
-                                                        (t, i) => (
-                                                            <li
-                                                                key={i}
-                                                                className="grid gap-2 rounded-lg border border-border/70 bg-background p-2 sm:grid-cols-[auto,minmax(0,1fr),auto,auto] sm:items-center"
-                                                            >
-                                                                <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground tabular-nums">
-                                                                    {i + 1}
-                                                                </span>
-                                                                <input
-                                                                    className="input min-w-0"
-                                                                    placeholder={`Task ${i + 1}`}
-                                                                    value={
-                                                                        t.label
-                                                                    }
-                                                                    onChange={(
-                                                                        e,
-                                                                    ) =>
-                                                                        setTask(
-                                                                            i,
-                                                                            e
-                                                                                .target
-                                                                                .value,
-                                                                        )
-                                                                    }
-                                                                />
-                                                                <label className="inline-flex h-9 items-center gap-2 rounded-md border border-border px-2 text-xs whitespace-nowrap text-muted-foreground">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        className="h-4 w-4 rounded border-border"
-                                                                        checked={
-                                                                            !!t.scheduled_time
-                                                                        }
-                                                                        onChange={(
-                                                                            e,
-                                                                        ) =>
-                                                                            setTaskScheduled(
-                                                                                i,
-                                                                                e
-                                                                                    .target
-                                                                                    .checked
-                                                                                    ? defaultTaskScheduledTime()
-                                                                                    : null,
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                    <span>
-                                                                        Specific
-                                                                        time
-                                                                    </span>
-                                                                </label>
-                                                                {t.scheduled_time ? (
-                                                                    <input
-                                                                        type="time"
-                                                                        aria-label={`Task ${i + 1} scheduled time`}
-                                                                        className="input h-9 w-full sm:w-[7.5rem]"
-                                                                        value={
-                                                                            t.scheduled_time
-                                                                        }
-                                                                        onChange={(
-                                                                            e,
-                                                                        ) =>
-                                                                            setTaskScheduled(
-                                                                                i,
-                                                                                e
-                                                                                    .target
-                                                                                    .value ||
-                                                                                    null,
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                ) : null}
-                                                                <GuardrailButton
-                                                                    unstyled
-                                                                    type="button"
-                                                                    onClick={() =>
-                                                                        removeTask(
-                                                                            i,
-                                                                        )
-                                                                    }
-                                                                    className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-                                                                    aria-label={`Remove task ${i + 1}`}
+                                                        (t, i) =>
+                                                            t.can_edit ===
+                                                            false ? (
+                                                                <li
+                                                                    key={`protected-${t.id}`}
+                                                                    className="rounded-lg border border-border bg-muted/25 p-3"
                                                                 >
-                                                                    <Trash className="h-4 w-4" />
-                                                                </GuardrailButton>
-                                                            </li>
-                                                        ),
+                                                                    <p className="text-sm font-medium">
+                                                                        {
+                                                                            t.label
+                                                                        }
+                                                                    </p>
+                                                                    <p className="text-xs text-muted-foreground">
+                                                                        Linked
+                                                                        care
+                                                                        task
+                                                                        {t.scheduled_time
+                                                                            ? ` · ${displayTime(t.scheduled_time)}`
+                                                                            : ''}
+                                                                        .
+                                                                        Managed
+                                                                        in its
+                                                                        source
+                                                                        record.
+                                                                    </p>
+                                                                </li>
+                                                            ) : (
+                                                                <li
+                                                                    key={
+                                                                        t.id ??
+                                                                        `new-${i}`
+                                                                    }
+                                                                    className="grid gap-2 rounded-lg border border-border/70 bg-background p-2 sm:grid-cols-[auto,minmax(0,1fr),auto,auto] sm:items-center"
+                                                                >
+                                                                    <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground tabular-nums">
+                                                                        {i + 1}
+                                                                    </span>
+                                                                    <input
+                                                                        className="input min-h-[44px] min-w-0"
+                                                                        placeholder={`Task ${i + 1}`}
+                                                                        aria-label={`Task ${i + 1} label`}
+                                                                        value={
+                                                                            t.label
+                                                                        }
+                                                                        onChange={(
+                                                                            e,
+                                                                        ) =>
+                                                                            setTask(
+                                                                                i,
+                                                                                e
+                                                                                    .target
+                                                                                    .value,
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                    <label className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-border px-2 text-xs whitespace-nowrap text-muted-foreground">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            className="h-4 w-4 rounded border-border"
+                                                                            checked={
+                                                                                !!t.scheduled_time
+                                                                            }
+                                                                            onChange={(
+                                                                                e,
+                                                                            ) =>
+                                                                                setTaskScheduled(
+                                                                                    i,
+                                                                                    e
+                                                                                        .target
+                                                                                        .checked
+                                                                                        ? defaultTaskScheduledTime()
+                                                                                        : null,
+                                                                                )
+                                                                            }
+                                                                        />
+                                                                        <span>
+                                                                            Specific
+                                                                            time
+                                                                        </span>
+                                                                    </label>
+                                                                    {t.scheduled_time ? (
+                                                                        <TimePicker
+                                                                            id={`csd-task-time-${i}`}
+                                                                            label={`Task ${i + 1} scheduled time`}
+                                                                            value={
+                                                                                t.scheduled_time
+                                                                            }
+                                                                            onChange={(
+                                                                                time,
+                                                                            ) =>
+                                                                                setTaskScheduled(
+                                                                                    i,
+                                                                                    time,
+                                                                                )
+                                                                            }
+                                                                        />
+                                                                    ) : null}
+                                                                    <GuardrailButton
+                                                                        unstyled
+                                                                        type="button"
+                                                                        onClick={() =>
+                                                                            removeTask(
+                                                                                i,
+                                                                            )
+                                                                        }
+                                                                        className="frontline-hit inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                                        aria-label={`Remove task ${i + 1}`}
+                                                                    >
+                                                                        <Trash className="h-4 w-4" />
+                                                                    </GuardrailButton>
+                                                                </li>
+                                                            ),
                                                     )}
                                                 </ul>
                                             )}
@@ -1735,108 +2216,193 @@ export function CreateShiftDialog({
                                             </div>
                                         </div>
 
-                                        <dl className="grid gap-x-6 gap-y-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-2">
-                                            <ReviewRow
-                                                label="Shift type"
-                                                value={
-                                                    SHIFT_TYPES.find(
-                                                        (t) =>
-                                                            t.key ===
-                                                            form.data
-                                                                .shift_type,
-                                                    )?.label ??
-                                                    form.data.shift_type
-                                                }
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            <ReviewCard
+                                                icon={LayoutGrid}
+                                                title="Shift details"
                                                 onEdit={() => jumpTo('type')}
-                                            />
-                                            <ReviewRow
-                                                label="Client"
-                                                value={
-                                                    selectedClient
-                                                        ? `${selectedClient.first_name} ${selectedClient.last_name}`.trim()
-                                                        : '—'
-                                                }
-                                                onEdit={() => jumpTo('people')}
-                                            />
-                                            <ReviewRow
-                                                label="Staff"
-                                                value={
-                                                    selectedStaff?.name ??
-                                                    'Open shift (unassigned)'
-                                                }
-                                                onEdit={() => jumpTo('people')}
-                                            />
-                                            <ReviewRow
-                                                label="Driving requirement"
-                                                value={
-                                                    form.data
-                                                        .required_licence_class ||
-                                                    form.data
-                                                        .required_licence_endorsements
-                                                        .length
-                                                        ? [
-                                                              form.data
-                                                                  .required_licence_class
-                                                                  ? `Class ${form.data.required_licence_class}`
-                                                                  : null,
-                                                              form.data
-                                                                  .required_licence_endorsements
-                                                                  .length
-                                                                  ? `${form.data.required_licence_endorsements.join(', ')} endorsement${form.data.required_licence_endorsements.length === 1 ? '' : 's'}`
-                                                                  : null,
-                                                          ]
-                                                              .filter(Boolean)
-                                                              .join(' · ')
-                                                        : 'None'
-                                                }
-                                                onEdit={() => jumpTo('people')}
-                                            />
-                                            <ReviewRow
-                                                label="Location"
-                                                value={
-                                                    form.data.location || '—'
-                                                }
-                                                onEdit={() => jumpTo('people')}
-                                            />
-                                            <ReviewRow
-                                                label="Schedule"
-                                                value={`${form.data.starts_at.replace('T', ' ')} → ${form.data.ends_at.replace('T', ' ')} · ${durationLabel}`}
-                                                onEdit={() =>
-                                                    jumpTo('schedule')
-                                                }
-                                            />
-                                            <ReviewRow
-                                                label="Break · publish"
-                                                value={`${form.data.expected_break_minutes || 0} min · ${form.data.status === 'draft' ? 'Draft' : 'Scheduled'}`}
-                                                onEdit={() =>
-                                                    jumpTo('schedule')
-                                                }
-                                            />
-                                            {!isEdit ? (
+                                            >
                                                 <ReviewRow
-                                                    label="Repeat"
+                                                    label="Type"
                                                     value={
-                                                        form.data.repeat_weekly
-                                                            ? `Weekly on ${form.data.repeat_by_weekday.map((d) => WEEKDAY_LABEL[d]).join(', ')} until ${form.data.repeat_end_date || '—'}`
-                                                            : 'One-off shift'
+                                                        SHIFT_TYPES.find(
+                                                            (type) =>
+                                                                type.key ===
+                                                                form.data
+                                                                    .shift_type,
+                                                        )?.label ??
+                                                        form.data.shift_type
                                                     }
+                                                />
+                                                <ReviewRow
+                                                    label="Lone / remote worker"
+                                                    value={
+                                                        form.data.is_lone_worker
+                                                            ? 'Yes'
+                                                            : 'No'
+                                                    }
+                                                />
+                                                <ReviewRow
+                                                    label="Sleepover"
+                                                    value={
+                                                        form.data.is_sleepover
+                                                            ? 'Yes'
+                                                            : 'No'
+                                                    }
+                                                />
+                                                <ReviewRow
+                                                    label="On call"
+                                                    value={
+                                                        form.data.is_on_call
+                                                            ? 'Yes'
+                                                            : 'No'
+                                                    }
+                                                />
+                                            </ReviewCard>
+                                            <ReviewCard
+                                                icon={Users}
+                                                title="People and location"
+                                                onEdit={() => jumpTo('people')}
+                                            >
+                                                <ReviewRow
+                                                    label="Person supported"
+                                                    value={
+                                                        selectedClient
+                                                            ? `${selectedClient.first_name} ${selectedClient.last_name}`
+                                                            : 'Choose a person'
+                                                    }
+                                                />
+                                                <ReviewRow
+                                                    label="Staff"
+                                                    value={
+                                                        selectedStaff?.name ??
+                                                        (form.data.user_id
+                                                            ? `Staff #${form.data.user_id}`
+                                                            : 'Open shift (unassigned)')
+                                                    }
+                                                />
+                                                <ReviewRow
+                                                    label="Location"
+                                                    value={form.data.location}
+                                                />
+                                                <ReviewRow
+                                                    label="Driving"
+                                                    value={
+                                                        [
+                                                            form.data
+                                                                .required_licence_class
+                                                                ? `Class ${form.data.required_licence_class}`
+                                                                : '',
+                                                            form.data.required_licence_endorsements.join(
+                                                                ', ',
+                                                            ),
+                                                        ]
+                                                            .filter(Boolean)
+                                                            .join(' · ') ||
+                                                        'No requirement'
+                                                    }
+                                                />
+                                                <ReviewRow
+                                                    label="Coverage roles"
+                                                    value={
+                                                        form.data.coverage_roles.join(
+                                                            ', ',
+                                                        ) || 'None selected'
+                                                    }
+                                                />
+                                            </ReviewCard>
+                                            <ReviewCard
+                                                icon={Clock}
+                                                title="Schedule"
+                                                onEdit={() =>
+                                                    jumpTo('schedule')
+                                                }
+                                            >
+                                                <ReviewRow
+                                                    label="Start"
+                                                    value={`${formatDateOnly(form.data.starts_at.slice(0, 10))} · ${displayTime(form.data.starts_at.slice(11, 16))}`}
+                                                />
+                                                <ReviewRow
+                                                    label="End"
+                                                    value={`${formatDateOnly(form.data.ends_at.slice(0, 10))} · ${displayTime(form.data.ends_at.slice(11, 16))}`}
+                                                />
+                                                <ReviewRow
+                                                    label="Timezone"
+                                                    value={workerTimezone}
+                                                />
+                                                <ReviewRow
+                                                    label="Duration"
+                                                    value={durationLabel}
+                                                />
+                                                <ReviewRow
+                                                    label="Break"
+                                                    value={
+                                                        form.data
+                                                            .expected_break_minutes ===
+                                                        ''
+                                                            ? 'Not set'
+                                                            : `${form.data.expected_break_minutes} min`
+                                                    }
+                                                />
+                                                <ReviewRow
+                                                    label="Status"
+                                                    value={
+                                                        form.data.user_id &&
+                                                        form.data.status ===
+                                                            'scheduled'
+                                                            ? 'Scheduled'
+                                                            : 'Draft'
+                                                    }
+                                                />
+                                            </ReviewCard>
+                                            {!isEdit && (
+                                                <ReviewCard
+                                                    icon={Repeat}
+                                                    title="Repeat"
                                                     onEdit={() =>
                                                         jumpTo('repeat')
                                                     }
-                                                />
-                                            ) : null}
-                                            <ReviewRow
-                                                label="Tasks · notes"
-                                                value={`${
-                                                    form.data.tasks.filter(
-                                                        (t) =>
-                                                            t.label.trim() !==
-                                                            '',
-                                                    ).length
-                                                } task${form.data.tasks.filter((t) => t.label.trim() !== '').length === 1 ? '' : 's'}${form.data.notes ? ' · has handover notes' : ''}`}
+                                                >
+                                                    <ReviewRow
+                                                        label="Schedule"
+                                                        value={
+                                                            form.data
+                                                                .repeat_weekly
+                                                                ? `Weekly on ${form.data.repeat_by_weekday.map((day) => WEEKDAY_LABEL[day]).join(', ')} until ${formatDateOnly(form.data.repeat_end_date)}`
+                                                                : 'One-off shift'
+                                                        }
+                                                    />
+                                                </ReviewCard>
+                                            )}
+                                            <ReviewCard
+                                                icon={Pencil}
+                                                title="Tasks and notes"
                                                 onEdit={() => jumpTo('tasks')}
-                                            />
-                                        </dl>
+                                                span
+                                            >
+                                                {form.data.tasks
+                                                    .filter((task) =>
+                                                        task.label.trim(),
+                                                    )
+                                                    .map((task, index) => (
+                                                        <ReviewRow
+                                                            key={
+                                                                task.id ??
+                                                                `new-${index}`
+                                                            }
+                                                            label={`Task ${index + 1}${task.can_edit === false ? ' · linked' : ''}`}
+                                                            value={`${task.label}${task.scheduled_time ? ` · ${displayTime(task.scheduled_time)}` : ''}`}
+                                                        />
+                                                    ))}
+                                                <ReviewRow
+                                                    label="Handover notes"
+                                                    value={
+                                                        form.data.notes ||
+                                                        'No notes'
+                                                    }
+                                                />
+                                            </ReviewCard>
+                                        </div>
 
                                         {Object.keys(form.errors).length > 0 ? (
                                             <div className="rounded-lg border border-status-critical/35 bg-status-critical-bg p-3 text-xs">
@@ -1870,74 +2436,27 @@ export function CreateShiftDialog({
                                     </div>
                                 </Section>
                             ) : null}
-                        </div>
-
-                        {/* Footer */}
-                        <footer className="flex items-center justify-between gap-2 border-t border-border bg-muted/30 px-5 py-3.5">
-                            <div>
-                                {stepIndex > 0 ? (
-                                    <GuardrailButton
-                                        unstyled
-                                        type="button"
-                                        onClick={goBack}
-                                        className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold text-muted-foreground hover:bg-accent hover:text-foreground"
-                                    >
-                                        <ChevronLeft className="h-4 w-4" />
-                                        Back
-                                    </GuardrailButton>
-                                ) : null}
-                            </div>
-                            <div className="flex shrink-0 items-center gap-2">
-                                <GuardrailButton
-                                    unstyled
-                                    type="button"
-                                    onClick={onClose}
-                                    className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
-                                >
-                                    Cancel
-                                </GuardrailButton>
-                                {cur.key === 'review' ? (
-                                    <button
-                                        type="submit"
-                                        disabled={
-                                            form.processing || eligLoading
-                                        }
-                                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-3.5 py-2 text-xs font-semibold text-primary-fill-foreground transition-colors hover:bg-primary-fill/90 disabled:cursor-not-allowed disabled:opacity-70"
-                                    >
-                                        {form.processing ? (
-                                            <>
-                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                Saving…
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Check className="h-3.5 w-3.5" />
-                                                {isEdit
-                                                    ? 'Save changes'
-                                                    : 'Create shift'}
-                                            </>
-                                        )}
-                                    </button>
-                                ) : (
-                                    <button
-                                        type="submit"
-                                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-3.5 py-2 text-xs font-semibold text-primary-fill-foreground transition-colors hover:bg-primary-fill/90"
-                                    >
-                                        Continue
-                                        <ChevronRight className="h-4 w-4" />
-                                    </button>
-                                )}
-                            </div>
-                        </footer>
-                    </form>
-                </DialogContent>
-            </Dialog>
+                        </fieldset>
+                    </WizardStepPane>
+                </form>
+            </WizardShell>
+            <ConfirmDialog
+                open={discardOpen}
+                onClose={() => setDiscardOpen(false)}
+                onConfirm={onClose}
+                title="Discard this shift draft?"
+                description="Your unsaved changes will be lost."
+                confirmText="Discard draft"
+                cancelText="Keep editing"
+            />
             <OverrideConfirmationDialog
+                confirmLabel="Confirm and save"
+                processingLabel="Saving…"
                 open={overrideOpen}
                 onOpenChange={setOverrideOpen}
                 warnings={overrideWarnings}
                 staffName={selectedStaff?.name}
-                processing={form.processing}
+                processing={busy}
                 onConfirm={(reason) => {
                     setOverrideOpen(false);
                     submitForm(reason);
@@ -2010,35 +2529,6 @@ function FieldError({ message }: { message?: string }) {
     return <p className="mt-1 text-xs text-status-critical">{message}</p>;
 }
 
-function ReviewRow({
-    label,
-    value,
-    onEdit,
-}: {
-    label: string;
-    value: string;
-    onEdit: () => void;
-}) {
-    return (
-        <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-                <dt className="text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase">
-                    {label}
-                </dt>
-                <dd className="mt-0.5 text-[13px] text-foreground">{value}</dd>
-            </div>
-            <GuardrailButton
-                unstyled
-                type="button"
-                onClick={onEdit}
-                className="shrink-0 rounded-md px-1.5 py-0.5 text-xs font-medium text-primary hover:bg-primary/5"
-            >
-                Edit
-            </GuardrailButton>
-        </div>
-    );
-}
-
 function ShiftTypePicker({
     value,
     onChange,
@@ -2099,68 +2589,78 @@ function ScheduleStrip({
     onEndsAtChange,
     onBreakChange,
     duration,
+    workerTimezone,
 }: {
     startsAt: string;
     endsAt: string;
     breakMinutes: string;
-    onStartsAtChange: (v: string) => void;
-    onEndsAtChange: (v: string) => void;
-    onBreakChange: (v: string) => void;
+    onStartsAtChange: (value: string) => void;
+    onEndsAtChange: (value: string) => void;
+    onBreakChange: (value: string) => void;
     duration: string;
+    workerTimezone: string;
 }) {
     return (
-        <div className="grid items-end gap-2 sm:grid-cols-[1fr_auto_1fr_140px]">
-            <div>
-                <Label htmlFor="csd-start" required>
-                    Start
-                </Label>
-                <input
-                    id="csd-start"
-                    type="datetime-local"
-                    className="input"
-                    value={startsAt}
-                    onChange={(e) => onStartsAtChange(e.target.value)}
-                />
-            </div>
-            <div className="flex flex-col items-center pb-1">
-                <div className="text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase">
-                    Duration
+        <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+                All dates and times use {workerTimezone}. Duration: {duration}.
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                    <Label required>Start</Label>
+                    <DatePicker
+                        id="csd-start-date"
+                        label="Start date"
+                        value={startsAt.slice(0, 10)}
+                        timeZone={workerTimezone}
+                        onChange={(date) =>
+                            onStartsAtChange(
+                                `${date}T${startsAt.slice(11, 16) || '09:00'}`,
+                            )
+                        }
+                    />
+                    <TimePicker
+                        id="csd-start-time"
+                        label="Start time"
+                        value={startsAt.slice(11, 16)}
+                        onChange={(time) =>
+                            onStartsAtChange(`${startsAt.slice(0, 10)}T${time}`)
+                        }
+                    />
                 </div>
-                <div className="mt-1 flex items-center gap-1.5">
-                    <div className="h-[3px] w-6 rounded-full bg-primary/30" />
-                    <div className="rounded-full bg-primary-fill px-2.5 py-0.5 text-xs font-semibold text-primary-fill-foreground tabular-nums">
-                        {duration}
-                    </div>
-                    <div className="h-[3px] w-6 rounded-full bg-primary/30" />
+                <div className="space-y-2">
+                    <Label required>End</Label>
+                    <DatePicker
+                        id="csd-end-date"
+                        label="End date"
+                        value={endsAt.slice(0, 10)}
+                        timeZone={workerTimezone}
+                        onChange={(date) =>
+                            onEndsAtChange(
+                                `${date}T${endsAt.slice(11, 16) || '17:00'}`,
+                            )
+                        }
+                    />
+                    <TimePicker
+                        id="csd-end-time"
+                        label="End time"
+                        value={endsAt.slice(11, 16)}
+                        onChange={(time) =>
+                            onEndsAtChange(`${endsAt.slice(0, 10)}T${time}`)
+                        }
+                    />
                 </div>
             </div>
             <div>
-                <Label htmlFor="csd-end" required>
-                    End
-                </Label>
-                <input
-                    id="csd-end"
-                    type="datetime-local"
-                    className="input"
-                    value={endsAt}
-                    onChange={(e) => onEndsAtChange(e.target.value)}
-                />
-            </div>
-            <div>
-                <Label htmlFor="csd-break">
-                    Break{' '}
-                    <span className="font-normal text-muted-foreground">
-                        (min)
-                    </span>
-                </Label>
+                <Label htmlFor="csd-break">Break (minutes)</Label>
                 <input
                     id="csd-break"
                     type="number"
                     min={0}
                     max={720}
-                    className="input"
+                    className="input min-h-[44px]"
                     value={breakMinutes}
-                    onChange={(e) => onBreakChange(e.target.value)}
+                    onChange={(event) => onBreakChange(event.target.value)}
                 />
             </div>
         </div>
@@ -2169,9 +2669,11 @@ function ScheduleStrip({
 
 function StatusPicker({
     value,
+    canSchedule,
     onChange,
 }: {
     value: 'draft' | 'scheduled';
+    canSchedule: boolean;
     onChange: (v: 'draft' | 'scheduled') => void;
 }) {
     const options = [
@@ -2185,7 +2687,9 @@ function StatusPicker({
             key: 'scheduled' as const,
             label: 'Scheduled',
             icon: CheckCircle2,
-            hint: 'Publish to the worker.',
+            hint: canSchedule
+                ? 'Publish to the worker.'
+                : 'Assign a staff member first.',
         },
     ];
     return (
@@ -2199,6 +2703,7 @@ function StatusPicker({
                         key={o.key}
                         type="button"
                         onClick={() => onChange(o.key)}
+                        disabled={o.key === 'scheduled' && !canSchedule}
                         aria-pressed={active}
                         className={[
                             'flex items-start gap-2 rounded-lg border p-2.5 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
@@ -2250,7 +2755,7 @@ function Toggle({
             aria-label={ariaLabel}
             onClick={() => onChange(!value)}
             className={[
-                'relative h-5 w-9 rounded-full transition',
+                'frontline-hit relative h-5 w-9 rounded-full transition',
                 value ? 'bg-primary' : 'bg-muted',
             ].join(' ')}
         >

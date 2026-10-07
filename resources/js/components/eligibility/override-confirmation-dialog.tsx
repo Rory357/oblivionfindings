@@ -25,6 +25,8 @@ interface OverrideConfirmationDialogProps {
     staffName?: string;
     onConfirm: (reason: string) => void;
     processing?: boolean;
+    confirmLabel?: string;
+    processingLabel?: string;
 }
 
 export function OverrideConfirmationDialog({
@@ -34,6 +36,8 @@ export function OverrideConfirmationDialog({
     staffName,
     onConfirm,
     processing = false,
+    confirmLabel = 'Override & Assign',
+    processingLabel = 'Assigning...',
 }: OverrideConfirmationDialogProps) {
     const [reason, setReason] = useState('');
     const [touched, setTouched] = useState(false);
@@ -125,7 +129,7 @@ export function OverrideConfirmationDialog({
                         Cancel
                     </Button>
                     <Button onClick={handleConfirm} disabled={!canSubmit}>
-                        {processing ? 'Assigning...' : 'Override & Assign'}
+                        {processing ? processingLabel : confirmLabel}
                     </Button>
                 </DialogFooter>
             </DialogContent>
