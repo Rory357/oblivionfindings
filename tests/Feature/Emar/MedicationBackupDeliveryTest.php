@@ -11,6 +11,7 @@ use App\Models\MedicationBackupSchedule;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\BackupDelivery\BackupDeliveryAccess;
 use App\Services\Medication\BackupDelivery\BackupDeliveryService;
 use App\Services\Medication\BackupDelivery\BackupMailTransport;
 use App\Services\Medication\BackupDelivery\BackupPdfEncryption;
@@ -21,6 +22,7 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Mail\Message;
 use Illuminate\Mail\SentMessage;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
@@ -102,6 +104,177 @@ class MedicationBackupDeliveryTest extends TestCase
         $this->assertStringNotContainsString('artifact_path', json_encode(app(BackupDeliveryService::class)->dto($first, $this->lead)));
         $this->assertDatabaseCount('medication_backup_attempts', 0);
         Mail::assertNothingSent();
+    }
+
+    public static function mailboxApprovalKeys(): array
+    {
+        return [
+            'current raw key' => [false, false],
+            'current base64 key' => [true, false],
+            'retained previous raw key' => [false, true],
+            'retained previous base64 key' => [true, true],
+        ];
+    }
+
+    #[DataProvider('mailboxApprovalKeys')]
+    public function test_unchanged_mailbox_approvals_and_prepared_recipient_digest_survive_current_or_retained_keys(bool $base64, bool $rotate): void
+    {
+        $beforeKey = (string) config('app.key');
+        $beforePrevious = config('app.previous_keys', []);
+        $oldBytes = str_repeat('a', 32);
+        $oldKey = $base64 ? 'base64:'.base64_encode($oldBytes) : $oldBytes;
+        $newBytes = str_repeat('b', 32);
+        $newKey = 'base64:'.base64_encode($newBytes);
+        try {
+            $this->useBackupKeys($oldKey);
+            $this->assertSame($oldBytes, app('encrypter')->getKey());
+            $authenticator = new Google2FA;
+            $secret = $authenticator->generateSecretKey();
+            $this->recipient->forceFill(['two_factor_secret' => Fortify::currentEncrypter()->encrypt($secret), 'two_factor_confirmed_at' => now()])->saveQuietly();
+            $schedule = $this->schedule();
+            $approval = $schedule->recipients()->sole()->getRawOriginal();
+            $row = $this->prepare($schedule);
+            $raw = $row->getRawOriginal();
+            $password = $row->password;
+            $bytes = Storage::disk('private')->get($row->artifact_path);
+            $this->assertSame(hash_hmac('sha256', mb_strtolower(trim($this->recipient->email)), $oldKey), $approval['email_sha256']);
+            $this->assertSame(hash_hmac('sha256', json_encode([$this->recipient->id => $this->recipient->email], JSON_THROW_ON_ERROR), $oldKey), $raw['recipient_sha256']);
+            if ($rotate) {
+                $this->useBackupKeys($newKey, [$oldKey]);
+                $this->assertSame([$newBytes, $oldBytes], app('encrypter')->getAllKeys());
+                $this->assertNotSame($approval['email_sha256'], app(BackupDeliveryAccess::class)->emailHash($this->recipient));
+            }
+
+            // Exercise actual retained ciphertext and personal MFA, not a cached old encrypter.
+            $this->assertSame($password, $row->fresh()->password);
+            $this->actingAs($this->recipient)->get('/emar/backups/deliveries/'.$row->id.'/download')
+                ->assertOk()->assertHeader('Cache-Control', 'no-store, private')->assertContent($bytes);
+            $code = $authenticator->getCurrentOtp($secret);
+            $this->postJson('/emar/backups/deliveries/'.$row->id.'/password', ['password' => 'fictional-secret', 'verification_code' => $code])
+                ->assertOk()->assertJsonPath('password', $password);
+            $prepared = app(BackupDeliveryService::class)->prepare($this->lead, $this->site->id, '2026-10-07', $schedule->version);
+            $this->assertSame($row->id, $prepared->id);
+            $this->assertSame($raw, $prepared->getRawOriginal());
+            $this->assertSame($approval, $schedule->recipients()->sole()->getRawOriginal());
+            $this->assertSame($schedule->version, $schedule->fresh()->version);
+
+            config(['emar-catalogue-backups.send_enabled' => true]);
+            $transport = Mockery::mock(BackupMailTransport::class);
+            $transport->shouldReceive('send')->once()->with([$this->recipient->email], $bytes, '2026-10-07');
+            $this->app->instance(BackupMailTransport::class, $transport);
+            $sent = app(BackupDeliveryService::class)->send($this->lead, $row->id, $row->version);
+            $this->assertSame('sent', $sent->state);
+            $this->assertSame($raw['recipient_sha256'], $sent->getRawOriginal('recipient_sha256'));
+            $this->assertSame($raw['password'], $sent->getRawOriginal('password'));
+            $this->assertDatabaseCount('medication_backup_deliveries', 1);
+            $this->assertDatabaseCount('medication_backup_attempts', 1);
+            $this->assertSame('sent', MedicationBackupAttempt::query()->sole()->state);
+            $this->assertDatabaseCount('medication_backup_step_up_uses', 1);
+            Mail::assertNothingSent();
+        } finally {
+            $this->useBackupKeys($beforeKey, $beforePrevious);
+        }
+    }
+
+    public static function mailboxRotationDenials(): array
+    {
+        return [
+            'previous key not retained' => [false],
+            'verified mailbox genuinely changed with previous key retained' => [true],
+        ];
+    }
+
+    #[DataProvider('mailboxRotationDenials')]
+    public function test_rotated_key_does_not_authorize_changed_mailbox_or_unretained_approval(bool $changed): void
+    {
+        $beforeKey = (string) config('app.key');
+        $beforePrevious = config('app.previous_keys', []);
+        $oldKey = 'base64:'.base64_encode(str_repeat('a', 32));
+        try {
+            $this->useBackupKeys($oldKey);
+            $schedule = $this->schedule();
+            $row = $this->prepare($schedule);
+            $approval = $schedule->recipients()->sole()->getRawOriginal();
+            $raw = $row->getRawOriginal();
+            $bytes = Storage::disk('private')->get($row->artifact_path);
+            $this->useBackupKeys('base64:'.base64_encode(str_repeat('b', 32)), $changed ? [$oldKey] : []);
+            if ($changed) {
+                $this->recipient->forceFill(['email' => 'changed-fictional@example.test'])->saveQuietly();
+            }
+            $this->actingAs($this->recipient)->get('/emar/backups/deliveries/'.$row->id.'/download')->assertConflict();
+            $this->postJson('/emar/backups/deliveries/'.$row->id.'/password', ['password' => 'fictional-secret', 'verification_code' => '123456'])
+                ->assertConflict()->assertJsonMissingPath('password');
+            $this->actingAs($this->lead)->postJson('/emar/backups/sites/'.$this->site->id.'/prepare', ['version' => $schedule->version, 'nz_date' => '2026-10-07'])->assertConflict();
+            $this->assertSame($raw, $row->fresh()->getRawOriginal());
+            $this->assertSame($approval, $schedule->recipients()->sole()->getRawOriginal());
+            config(['emar-catalogue-backups.send_enabled' => true]);
+            $transport = Mockery::mock(BackupMailTransport::class);
+            $transport->shouldNotReceive('send');
+            $this->app->instance(BackupMailTransport::class, $transport);
+            $this->postJson('/emar/backups/deliveries/'.$row->id.'/send', ['version' => $row->version])->assertConflict();
+            $fresh = $row->fresh();
+            $this->assertSame('failed', $fresh->state);
+            $this->assertSame('not_submitted', $fresh->failure_code);
+            $this->assertSame($raw['artifact_path'], $fresh->getRawOriginal('artifact_path'));
+            $this->assertSame($raw['password'], $fresh->getRawOriginal('password'));
+            $this->assertSame($bytes, Storage::disk('private')->get($raw['artifact_path']));
+            $this->assertSame('failed', MedicationBackupAttempt::query()->sole()->state);
+            Mail::assertNothingSent();
+        } finally {
+            $this->useBackupKeys($beforeKey, $beforePrevious);
+        }
+    }
+
+    public function test_unretained_prepared_recipient_digest_is_rejected_even_when_mailbox_approval_uses_current_key(): void
+    {
+        $beforeKey = (string) config('app.key');
+        $beforePrevious = config('app.previous_keys', []);
+        $currentKey = 'base64:'.base64_encode(str_repeat('b', 32));
+        $oldKey = 'base64:'.base64_encode(str_repeat('a', 32));
+        try {
+            $this->useBackupKeys($currentKey);
+            $schedule = $this->schedule();
+            $approval = $schedule->recipients()->sole()->getRawOriginal();
+            $this->useBackupKeys($oldKey, [$currentKey]);
+            $row = $this->prepare($schedule);
+            $preparedDigest = $row->getRawOriginal('recipient_sha256');
+            $this->useBackupKeys($currentKey);
+            $access = app(BackupDeliveryAccess::class);
+            $this->assertTrue($access->emailHashMatches($this->recipient, $approval['email_sha256']));
+            $this->assertFalse($access->recipientDigestMatches([$this->recipient->id => $this->recipient->email], $preparedDigest));
+            config(['emar-catalogue-backups.send_enabled' => true]);
+            $transport = Mockery::mock(BackupMailTransport::class);
+            $transport->shouldNotReceive('send');
+            $this->app->instance(BackupMailTransport::class, $transport);
+            $this->actingAs($this->lead)->postJson('/emar/backups/deliveries/'.$row->id.'/send', ['version' => $row->version])->assertConflict();
+            $this->assertSame('failed', $row->fresh()->state);
+            $this->assertSame('not_submitted', $row->fresh()->failure_code);
+            $this->assertSame($preparedDigest, $row->fresh()->getRawOriginal('recipient_sha256'));
+            $this->assertSame($approval, $schedule->recipients()->sole()->getRawOriginal());
+            $this->assertSame('failed', MedicationBackupAttempt::query()->sole()->state);
+            Mail::assertNothingSent();
+        } finally {
+            $this->useBackupKeys($beforeKey, $beforePrevious);
+        }
+    }
+
+    public function test_mailbox_hash_verification_rejects_blank_and_unmatched_configured_keys(): void
+    {
+        $beforeKey = (string) config('app.key');
+        $beforePrevious = config('app.previous_keys', []);
+        try {
+            config(['app.key' => '', 'app.previous_keys' => ['']]);
+            $access = app(BackupDeliveryAccess::class);
+            $recipients = [$this->recipient->id => $this->recipient->email];
+            $this->assertFalse($access->emailHashMatches($this->recipient, hash_hmac('sha256', mb_strtolower(trim($this->recipient->email)), '')));
+            $this->assertFalse($access->recipientDigestMatches($recipients, hash_hmac('sha256', json_encode($recipients, JSON_THROW_ON_ERROR), '')));
+            config(['app.key' => str_repeat('b', 32), 'app.previous_keys' => ['', str_repeat('a', 32)]]);
+            $this->assertFalse($access->emailHashMatches($this->recipient, str_repeat('0', 64)));
+            $this->assertFalse($access->recipientDigestMatches($recipients, str_repeat('0', 64)));
+            Mail::assertNothingSent();
+        } finally {
+            $this->useBackupKeys($beforeKey, $beforePrevious);
+        }
     }
 
     public function test_unverified_or_foreign_recipient_cannot_be_approved(): void
@@ -788,6 +961,13 @@ class MedicationBackupDeliveryTest extends TestCase
             $connection->setEventDispatcher($dispatcher);
             $this->assertTrue($triggered, 'The regression must reach an actual native delivery update.');
         }
+    }
+
+    private function useBackupKeys(string $key, array $previous = []): void
+    {
+        config(['app.key' => $key, 'app.previous_keys' => $previous]);
+        $this->app->forgetInstance('encrypter');
+        Crypt::clearResolvedInstance('encrypter');
     }
 
     private function staff(Site $site, bool $manager): User

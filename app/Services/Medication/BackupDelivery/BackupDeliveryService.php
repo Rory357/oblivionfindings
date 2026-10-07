@@ -184,7 +184,7 @@ class BackupDeliveryService
                 $current = $this->access->manager($actor, $row->site_id);
                 abort_unless($row->prepared_by === $current->id && $row->schedule_version === $schedule->version, 409);
                 $recipients = $this->recipients($schedule);
-                abort_unless($row->recipient_ids === array_keys($recipients) && hash_equals($row->recipient_sha256, $this->recipientDigest($recipients)), 409);
+                abort_unless($row->recipient_ids === array_keys($recipients) && $this->access->recipientDigestMatches($recipients, $row->recipient_sha256), 409);
                 $pack = $row->source_snapshot;
                 abort_unless(is_array($pack) && $row->artifact_path && Storage::disk('private')->exists($row->artifact_path), 409);
                 $bytes = Storage::disk('private')->get($row->artifact_path);
@@ -366,7 +366,7 @@ class BackupDeliveryService
         $result = [];
         foreach ($rows as $row) {
             $user = $this->access->recipient(User::query()->findOrFail($row->user_id), $schedule->site_id);
-            abort_unless(hash_equals($row->email_sha256, $this->access->emailHash($user)), 409, 'A recipient mailbox changed. Review the recipient again.');
+            abort_unless($this->access->emailHashMatches($user, $row->email_sha256), 409, 'A recipient mailbox changed. Review the recipient again.');
             $result[(int) $user->id] = $user->email;
         }
 
@@ -375,7 +375,7 @@ class BackupDeliveryService
 
     private function recipientDigest(array $recipients): string
     {
-        return hash_hmac('sha256', json_encode($recipients, JSON_THROW_ON_ERROR), (string) config('app.key'));
+        return $this->access->recipientDigest($recipients);
     }
 
     private function event(MedicationBackupDelivery $row, User $actor, string $action): void

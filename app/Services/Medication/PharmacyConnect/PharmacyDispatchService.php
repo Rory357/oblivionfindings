@@ -148,7 +148,7 @@ final class PharmacyDispatchService
             // The outer transaction deliberately has ONE attempt; nested scope never retries HTTP.
             DB::transaction(function () use ($dispatchId, $claim, &$outboundStarted): void {
                 $snapshot = MedicationPharmacyDispatch::findOrFail($dispatchId);
-                $actor = User::find($snapshot->requested_by);
+                $actor = User::find($this->authorisingActorId($snapshot));
                 $order = MedicationPharmacyOrder::find($snapshot->pharmacy_order_id);
                 if (! $actor || ! $order) {
                     throw new PharmacyConnectionException('authority_revoked', 'Ordering authority is no longer current.');
@@ -249,7 +249,8 @@ final class PharmacyDispatchService
             $client = Client::withTrashed()->whereKey($snapshot->client_id)->lockForUpdate()->firstOrFail();
             $medication = ClientMedication::withTrashed()->whereKey($snapshot->client_medication_id)->where('client_id', $client->id)->lockForUpdate()->firstOrFail();
             $order = MedicationPharmacyOrder::whereKey($snapshot->pharmacy_order_id)->where('client_id', $client->id)->where('client_medication_id', $medication->id)->lockForUpdate()->firstOrFail();
-            $senderCurrent = $this->currentSender((int) $snapshot->requested_by, $client, $medication);
+            $senderId = $this->authorisingActorId($snapshot, currentRead: true);
+            $senderCurrent = $this->currentSender($senderId, $client, $medication);
             $site = Site::withTrashed()->whereKey($client->site_id)->lockForUpdate()->firstOrFail();
             $siteCurrent = ! $site->trashed() && $site->is_active && ! $site->archived && $site->archived_at === null;
             $connection = MedicationPharmacyConnection::whereKey($submittedConnection->id)->lockForUpdate()->firstOrFail();
@@ -282,7 +283,7 @@ final class PharmacyDispatchService
                     // A signed receipt also resolves a timeout. It proves actual contact.
                     $order->forceFill(['status' => 'submitted', 'submitted_at' => $order->submitted_at ?? now(),
                         'communication_method' => 'secure_message', 'communication_reference' => $dispatch->uuid,
-                        'communication_recorded_by' => $dispatch->requested_by, 'communication_recorded_at' => $order->communication_recorded_at ?? now()])->save();
+                        'communication_recorded_by' => $senderId, 'communication_recorded_at' => $order->communication_recorded_at ?? now()])->save();
                     $order->forceFill(['status' => 'confirmed', 'confirmed_at' => now()])->save();
                     $applied = true;
                     $code = 'pharmacy_acceptance_recorded';
@@ -364,6 +365,21 @@ final class PharmacyDispatchService
     {
         abort_if($this->controlled($medication, $dispatch)
             && (! $actor->canDo('medications.controlled.view') || ! $actor->canDo('medications.controlled.record')), 404);
+    }
+
+    /** Successful retry receipts retain the new authoriser without rewriting the original request. */
+    private function authorisingActorId(MedicationPharmacyDispatch $dispatch, bool $currentRead = false): int
+    {
+        $query = MedicationPharmacyDispatchCommand::where('dispatch_id', $dispatch->id)
+            ->where('action', 'retry')->orderByDesc('id');
+        if ($currentRead) {
+            // ACK holds the canonical person lock; bypass any older transaction snapshot.
+            $query->lockForUpdate();
+        }
+        // A worker reads after claiming sending, when no new retry receipt can be added.
+        $retryActorId = $query->value('actor_id');
+
+        return (int) ($retryActorId ?? $dispatch->requested_by);
     }
 
     private function currentSender(int $actorId, Client $client, ClientMedication $medication): bool

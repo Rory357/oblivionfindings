@@ -65,4 +65,31 @@ class BackupDeliveryAccess
     {
         return hash_hmac('sha256', mb_strtolower(trim($user->email)), (string) config('app.key'));
     }
+
+    public function emailHashMatches(User $user, string $approvedHash): bool
+    {
+        return $this->matchesConfiguredKeyHash($approvedHash, mb_strtolower(trim($user->email)));
+    }
+
+    public function recipientDigest(array $recipients): string
+    {
+        return hash_hmac('sha256', json_encode($recipients, JSON_THROW_ON_ERROR), (string) config('app.key'));
+    }
+
+    public function recipientDigestMatches(array $recipients, string $preparedHash): bool
+    {
+        return $this->matchesConfiguredKeyHash($preparedHash, json_encode($recipients, JSON_THROW_ON_ERROR));
+    }
+
+    private function matchesConfiguredKeyHash(string $approvedHash, string $value): bool
+    {
+        // Persisted HMACs use the literal configured key, including base64:. Only encryption decodes it.
+        foreach ([(string) config('app.key'), ...config('app.previous_keys', [])] as $key) {
+            if (is_string($key) && $key !== '' && hash_equals($approvedHash, hash_hmac('sha256', $value, $key))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

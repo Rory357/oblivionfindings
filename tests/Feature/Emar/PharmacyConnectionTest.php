@@ -142,6 +142,204 @@ final class PharmacyConnectionTest extends TestCase
         $this->assertSame(1, $dispatch->fresh()->attempt_count); // Saving either command sends nothing.
     }
 
+    public static function originalSenderChanges(): array
+    {
+        return ['original employment ended' => ['employment', false],
+            'original sending permission revoked' => ['permission', false],
+            'retry delivery remains uncertain' => ['permission', true]];
+    }
+
+    #[DataProvider('originalSenderChanges')]
+    public function test_current_retry_authoriser_sends_and_acknowledges_without_rewriting_original_request(string $revocation, bool $uncertain): void
+    {
+        Http::swap(new Factory);
+        Http::preventStrayRequests();
+        $attempts = [];
+        Http::fake(function ($request) use (&$attempts, $uncertain) {
+            $attempts[] = ['key' => $request->header('Idempotency-Key'), 'uuid' => $request['dispatch_uuid']];
+            if (count($attempts) === 1) {
+                return Http::response('Synthetic definitive refusal', 422);
+            }
+            if ($uncertain) {
+                throw new ConnectionException('Synthetic uncertain retry');
+            }
+
+            return Http::response('Synthetic successful retry', 202);
+        });
+        $dispatch = $this->queue();
+        $retainedKeys = array_flip(['requested_by', 'uuid', 'request_uuid', 'site_id', 'snapshot', 'snapshot_fingerprint', 'partner_fingerprint']);
+        $retained = array_intersect_key($dispatch->getRawOriginal(), $retainedKeys);
+        $service = app(PharmacyDispatchService::class);
+        $service->send($dispatch->id);
+        $this->assertSame('failed', $dispatch->fresh()->state);
+        $this->revokeSender($this->fixture['actor'], $revocation);
+        $replacement = $this->replacementSender();
+        $retry = ['request_uuid' => (string) Str::uuid(), 'expected_state' => 'failed'];
+        $this->actingAs($replacement)->postJson($this->dispatchUrl($dispatch).'/retry', $retry)->assertAccepted();
+        $this->postJson($this->dispatchUrl($dispatch).'/retry', $retry)->assertAccepted()->assertJsonPath('duplicate', true);
+        $this->assertSame(1, count($attempts));
+        $this->assertDatabaseCount('medication_pharmacy_dispatch_commands', 1);
+        $this->assertDatabaseHas('medication_pharmacy_dispatch_commands', ['dispatch_id' => $dispatch->id,
+            'request_uuid' => $retry['request_uuid'], 'action' => 'retry', 'actor_id' => $replacement->id]);
+        $service->send($dispatch->id);
+        $service->send($dispatch->id);
+        $this->assertSame($uncertain ? 'unknown' : 'sent', $dispatch->fresh()->state);
+        $this->assertSame(2, $dispatch->fresh()->attempt_count);
+        $this->assertSame(2, count($attempts));
+        $this->assertSame(array_fill(0, 2, ['key' => [$dispatch->uuid], 'uuid' => $dispatch->uuid]), $attempts);
+        $this->assertSame($retained, array_intersect_key($dispatch->fresh()->getRawOriginal(), $retainedKeys));
+        $sent = MedicationEvent::where('kind', $uncertain ? 'pharmacy.dispatch.unknown' : 'pharmacy.dispatch.sent')->sole();
+        $this->assertSame($replacement->id, $sent->actor_id);
+        $this->assertSame($dispatch->site_id, $sent->site_id);
+        $this->assertSame($this->fixture['actor']->id, MedicationEvent::where('kind', 'pharmacy.dispatch.queued')->sole()->actor_id);
+        $this->assertSame($this->fixture['actor']->id, MedicationEvent::where('kind', 'pharmacy.dispatch.failed')->sole()->actor_id);
+        $this->assertSame($replacement->id, MedicationEvent::where('kind', 'pharmacy.dispatch.retry')->sole()->actor_id);
+        $this->postJson($this->dispatchUrl($dispatch).'/retry', $retry)->assertAccepted()->assertJsonPath('duplicate', true);
+        $service->recover();
+        $service->send($dispatch->id);
+        $this->assertSame(2, count($attempts));
+        if ($uncertain) {
+            $this->postJson($this->dispatchUrl($dispatch).'/retry', ['request_uuid' => (string) Str::uuid(),
+                'expected_state' => 'unknown'])->assertConflict()->assertJsonPath('code', 'retry_not_safe');
+        }
+        $this->ack($dispatch)->assertOk()->assertJsonPath('applied', true);
+        $this->ack($dispatch)->assertOk()->assertJsonPath('duplicate', true)->assertJsonPath('applied', true);
+        $this->assertSame('confirmed', $this->fixture['order']->fresh()->status);
+        $this->assertSame($replacement->id, $this->fixture['order']->fresh()->communication_recorded_by);
+        $this->assertSame($retained, array_intersect_key($dispatch->fresh()->getRawOriginal(), $retainedKeys));
+        $this->assertDatabaseCount('medication_pharmacy_acknowledgments', 1);
+        $this->assertDatabaseCount('medication_pharmacy_dispatch_commands', 1);
+        $this->assertSame(2, count($attempts));
+        $this->assertSame('10.00', $this->fixture['stock']->fresh()->on_hand);
+        $this->assertNull($this->fixture['order']->fresh()->quantity_received);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $this->assertDatabaseCount('medication_stock_lots', 0);
+    }
+
+    public static function retrySenderChanges(): array
+    {
+        return ['retry employment ended' => ['employment'], 'retry sending permission revoked' => ['permission']];
+    }
+
+    #[DataProvider('retrySenderChanges')]
+    public function test_retry_authoriser_revoked_before_worker_prevents_send_even_if_original_requester_is_current(string $revocation): void
+    {
+        Http::swap(new Factory);
+        Http::preventStrayRequests();
+        Http::fake(['https://pharmacy.example.test/orders' => Http::response('Synthetic definitive refusal', 422)]);
+        $dispatch = $this->queue();
+        $service = app(PharmacyDispatchService::class);
+        $service->send($dispatch->id);
+        $replacement = $this->replacementSender();
+        $retry = ['request_uuid' => (string) Str::uuid(), 'expected_state' => 'failed'];
+        $this->actingAs($replacement)->postJson($this->dispatchUrl($dispatch).'/retry', $retry)->assertAccepted();
+        $this->revokeSender($replacement, $revocation);
+        $service->send($dispatch->id);
+        $service->send($dispatch->id);
+        $service->recover();
+        Http::assertSentCount(1);
+        $this->assertSame('cancelled', $dispatch->fresh()->state);
+        $this->assertSame('authority_or_snapshot_revoked', $dispatch->fresh()->result_code);
+        $this->assertSame($this->fixture['actor']->id, $dispatch->fresh()->requested_by);
+        $this->assertSame('draft', $this->fixture['order']->fresh()->status);
+        $this->ack($dispatch)->assertOk()->assertJsonPath('applied', false)->assertJsonPath('code', 'snapshot_or_connection_changed');
+        $this->assertSame('draft', $this->fixture['order']->fresh()->status);
+        $this->assertNull($this->fixture['order']->fresh()->communication_recorded_by);
+        $this->assertDatabaseCount('medication_pharmacy_dispatch_commands', 1);
+        $this->assertSame('10.00', $this->fixture['stock']->fresh()->on_hand);
+        $this->assertNull($this->fixture['order']->fresh()->quantity_received);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $this->assertDatabaseCount('medication_stock_lots', 0);
+    }
+
+    public function test_acknowledgment_rechecks_retry_authoriser_after_send_without_falling_back_to_current_original_requester(): void
+    {
+        Http::swap(new Factory);
+        Http::preventStrayRequests();
+        Http::fake(['https://pharmacy.example.test/orders' => Http::sequence()->push('Synthetic refusal', 422)->push('Synthetic retry', 202)]);
+        $dispatch = $this->queue();
+        $service = app(PharmacyDispatchService::class);
+        $service->send($dispatch->id);
+        $replacement = $this->replacementSender();
+        $this->actingAs($replacement)->postJson($this->dispatchUrl($dispatch).'/retry', ['request_uuid' => (string) Str::uuid(), 'expected_state' => 'failed'])->assertAccepted();
+        $service->send($dispatch->id);
+        $this->assertSame('sent', $dispatch->fresh()->state);
+        $this->assertSame($replacement->id, $this->fixture['order']->fresh()->communication_recorded_by);
+        $this->revokeSender($replacement, 'permission');
+        $this->ack($dispatch)->assertOk()->assertJsonPath('applied', false)->assertJsonPath('code', 'snapshot_or_connection_changed');
+        $this->ack($dispatch)->assertOk()->assertJsonPath('duplicate', true)->assertJsonPath('applied', false);
+        $this->assertSame('submitted', $this->fixture['order']->fresh()->status);
+        $this->assertSame($replacement->id, $this->fixture['order']->fresh()->communication_recorded_by);
+        $this->assertSame($this->fixture['actor']->id, $dispatch->fresh()->requested_by);
+        $this->assertDatabaseCount('medication_pharmacy_acknowledgments', 1);
+        Http::assertSentCount(2);
+        $this->assertSame('10.00', $this->fixture['stock']->fresh()->on_hand);
+        $this->assertNull($this->fixture['order']->fresh()->quantity_received);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $this->assertDatabaseCount('medication_stock_lots', 0);
+    }
+
+    public function test_latest_successful_retry_authoriser_survives_earlier_command_replay_and_failed_new_retry(): void
+    {
+        Http::swap(new Factory);
+        Http::preventStrayRequests();
+        Http::fake(['https://pharmacy.example.test/orders' => Http::sequence()->push('Synthetic refusal', 422)
+            ->push('Synthetic second refusal', 422)->push('Synthetic final retry', 202)]);
+        $dispatch = $this->queue();
+        $service = app(PharmacyDispatchService::class);
+        $service->send($dispatch->id);
+        $first = $this->replacementSender();
+        $firstRetry = ['request_uuid' => (string) Str::uuid(), 'expected_state' => 'failed'];
+        $this->actingAs($first)->postJson($this->dispatchUrl($dispatch).'/retry', $firstRetry)->assertAccepted();
+        $service->send($dispatch->id);
+        $this->assertSame('failed', $dispatch->fresh()->state);
+        $latest = $this->replacementSender();
+        $latestRetry = ['request_uuid' => (string) Str::uuid(), 'expected_state' => 'failed'];
+        $this->actingAs($latest)->postJson($this->dispatchUrl($dispatch).'/retry', $latestRetry)->assertAccepted();
+        $this->actingAs($first)->postJson($this->dispatchUrl($dispatch).'/retry', $firstRetry)->assertAccepted()->assertJsonPath('duplicate', true);
+        $this->postJson($this->dispatchUrl($dispatch).'/retry', ['request_uuid' => (string) Str::uuid(),
+            'expected_state' => 'queued'])->assertConflict()->assertJsonPath('code', 'retry_not_safe');
+        $this->revokeSender($first, 'permission');
+        $service->send($dispatch->id);
+        $service->send($dispatch->id);
+        $this->assertSame('sent', $dispatch->fresh()->state);
+        $this->assertSame($latest->id, MedicationEvent::where('kind', 'pharmacy.dispatch.sent')->sole()->actor_id);
+        $this->assertSame([$this->fixture['actor']->id, $first->id], MedicationEvent::where('kind', 'pharmacy.dispatch.failed')->orderBy('id')->pluck('actor_id')->all());
+        $this->assertSame([$first->id, $latest->id], DB::table('medication_pharmacy_dispatch_commands')->where('dispatch_id', $dispatch->id)->orderBy('id')->pluck('actor_id')->all());
+        $this->assertSame($this->fixture['actor']->id, $dispatch->fresh()->requested_by);
+        $this->assertSame($this->fixture['site']->id, $dispatch->fresh()->site_id);
+        $this->assertSame(3, $dispatch->fresh()->attempt_count);
+        $this->ack($dispatch)->assertOk()->assertJsonPath('applied', true);
+        $this->assertSame($latest->id, $this->fixture['order']->fresh()->communication_recorded_by);
+        Http::assertSentCount(3);
+        Http::assertSent(fn ($request) => $request->header('Idempotency-Key') === [$dispatch->uuid] && $request['dispatch_uuid'] === $dispatch->uuid);
+        $this->assertSame('10.00', $this->fixture['stock']->fresh()->on_hand);
+        $this->assertNull($this->fixture['order']->fresh()->quantity_received);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $this->assertDatabaseCount('medication_stock_lots', 0);
+    }
+
+    private function replacementSender(): User
+    {
+        $actor = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        HrEmployeeProfile::factory()->create(['user_id' => $actor->id, 'primary_site_id' => $this->fixture['site']->id,
+            'secondary_site_ids' => [], 'is_active' => true, 'start_date' => now()->subMonth(), 'end_date' => null]);
+        foreach (['medications.view', 'medications.stock.update', 'medications.pharmacy.send'] as $key) {
+            $this->grant($actor, $key, true);
+        }
+
+        return $actor;
+    }
+
+    private function revokeSender(User $actor, string $revocation): void
+    {
+        if ($revocation === 'employment') {
+            $actor->hrEmployeeProfile()->firstOrFail()->update(['is_active' => false]);
+        } else {
+            $this->grant($actor, 'medications.pharmacy.send', false);
+        }
+    }
+
     public function test_revoked_sender_and_changed_patient_snapshot_never_send(): void
     {
         $dispatch = $this->queue();
