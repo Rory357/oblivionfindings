@@ -20,12 +20,14 @@ describe('timesheets index presentation helpers', () => {
         expect(
             canEditTimesheetRow({
                 can_edit: true,
+                can_update: true,
                 attendance_session_id: 42,
             }),
         ).toBe(false);
         expect(
             canEditTimesheetRow({
                 can_edit: true,
+                can_update: true,
                 attendance_session_id: null,
             }),
         ).toBe(true);
@@ -41,6 +43,7 @@ const row: TimesheetRow = {
     status: 'submitted',
     can_mutate: true,
     can_edit: true,
+    can_update: true,
     staff: { id: 7, name: 'Hemi' },
 };
 it('does not expose review actions without the exact record review capability', () => {
@@ -48,7 +51,12 @@ it('does not expose review actions without the exact record review capability', 
         menuItemsFor({ ...row, can_approve: false }).map((item) => item.id),
     ).not.toContain('approve');
     expect(
-        menuItemsFor({ ...row, can_approve: true }).map((item) => item.id),
+        menuItemsFor({
+            ...row,
+            can_approve: true,
+            can_return: true,
+            can_reject: true,
+        }).map((item) => item.id),
     ).toEqual(expect.arrayContaining(['approve', 'return', 'reject']));
 });
 it('uses only the permitted canonical HR link and hides unavailable source links', () => {
@@ -71,9 +79,13 @@ it('never offers unimplemented export, reassignment or payment actions as workin
         'rejected',
         'archived',
     ]) {
-        const ids = menuItemsFor({ ...row, status, can_approve: true }).map(
-            (item) => item.id,
-        );
+        const ids = menuItemsFor({
+            ...row,
+            status,
+            can_approve: true,
+            can_return: true,
+            can_reject: true,
+        }).map((item) => item.id);
         for (const id of [
             'pdf',
             'duplicate',
@@ -96,4 +108,23 @@ it('uses the explicitly labelled worker timezone across midnight', () => {
         formatTimesheetTime('2026-10-05T01:00:00Z', 'Pacific/Auckland'),
     ).toContain('2:00 pm');
     expect(formatTimesheetTime('bad', 'Pacific/Auckland')).toBe('—');
+});
+
+it('does not let broad record mutation imply the exact update or submit grant', () => {
+    const draft = {
+        ...row,
+        status: 'draft',
+        can_edit: true,
+        can_update: false,
+        can_submit: false,
+    };
+    expect(canEditTimesheetRow(draft)).toBe(false);
+    expect(menuItemsFor(draft).map((item) => item.id)).not.toEqual(
+        expect.arrayContaining(['edit', 'submit']),
+    );
+    expect(
+        menuItemsFor({ ...draft, can_update: true, can_submit: true }).map(
+            (item) => item.id,
+        ),
+    ).toEqual(expect.arrayContaining(['edit', 'submit']));
 });

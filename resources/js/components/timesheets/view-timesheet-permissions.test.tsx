@@ -1,10 +1,13 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import ViewTimesheetDialog, {
     type ViewTimesheetRow,
 } from './view-timesheet-dialog';
 const { post } = vi.hoisted(() => ({ post: vi.fn() }));
-vi.mock('@inertiajs/react', () => ({ router: { post } }));
+vi.mock('@inertiajs/react', () => ({
+    router: { post },
+    usePage: () => ({ props: { auth: { user: { id: 7 }, can: {} } } }),
+}));
 const row: ViewTimesheetRow = {
     id: 51,
     work_date: '2026-10-05',
@@ -57,7 +60,7 @@ it('withholds draft submission when a refreshed caller explicitly denies it', ()
         screen.queryByRole('button', { name: 'Submit for approval' }),
     ).toBeNull();
 });
-it('retains the permitted scoped direct-view draft submission path', () => {
+it('retains the permitted scoped direct-view draft submission path', async () => {
     render(
         <ViewTimesheetDialog
             open
@@ -68,5 +71,51 @@ it('retains the permitted scoped direct-view draft submission path', () => {
     fireEvent.click(
         screen.getByRole('button', { name: 'Submit for approval' }),
     );
+    expect(post).not.toHaveBeenCalled();
+    fireEvent.click(
+        screen.getByRole('button', { name: 'Submit for approval' }),
+    );
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
     expect(post.mock.calls[0][0]).toBe('/operations/timesheets/51/submit');
+});
+
+it('describes the synthetic no-client fallback without inventing an individual allocation', () => {
+    const { rerender } = render(
+        <ViewTimesheetDialog
+            open
+            onOpenChange={() => {}}
+            timesheet={{
+                ...row,
+                client_allocations: [
+                    { client_id: 0, hours: 1.25, allocation_method: 'single' },
+                ],
+            }}
+        />,
+    );
+    expect(
+        screen.getByText('Not allocated to an individual client'),
+    ).toBeTruthy();
+    expect(screen.queryByText('Client #0')).toBeNull();
+    expect(screen.queryByText('single')).toBeNull();
+    expect(screen.queryByText(/100%/)).toBeNull();
+    rerender(
+        <ViewTimesheetDialog
+            open
+            onOpenChange={() => {}}
+            timesheet={{
+                ...row,
+                client_allocations: [
+                    {
+                        client_id: 4,
+                        client_name: 'Aroha',
+                        hours: 1.25,
+                        allocation_method: 'single',
+                    },
+                ],
+            }}
+        />,
+    );
+    expect(screen.getByText('Aroha')).toBeTruthy();
+    expect(screen.getByText(/100%/)).toBeTruthy();
+    expect(screen.getByText('single')).toBeTruthy();
 });

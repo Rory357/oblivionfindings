@@ -41,10 +41,26 @@ export default function FlashToaster() {
     const errors = props.errors;
     // Shift Notes owns confirmation in its command dialog after matching the
     // committed receipt. A generic redirect message must not bypass that check.
+    const rawSuccess = asToastText(flash?.success);
+    const timesheetDialogOwnsResult =
+        ['operations/timesheets/index', 'operations/rostering/index'].includes(
+            page.component,
+        ) &&
+        [
+            'Timesheet created.',
+            'Timesheet updated.',
+            'Timesheet submitted.',
+            'Timesheet updated and resubmitted.',
+            'Timesheet approved.',
+            'Timesheet already approved.',
+            'Timesheet rejected.',
+            'Timesheet returned for changes.',
+        ].includes(rawSuccess ?? '');
     const success =
-        page.component === 'operations/shift-notes/Index'
+        page.component === 'operations/shift-notes/Index' ||
+        timesheetDialogOwnsResult
             ? null
-            : asToastText(flash?.success);
+            : rawSuccess;
     const error = asToastText(flash?.error);
     const warning = asToastText(flash?.warning);
     const info = asToastText(flash?.info);

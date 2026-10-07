@@ -30,6 +30,7 @@ class TimesheetHrSyncService
         Timesheet $timesheet,
         ?HrTimeEntry $preparedEntry = null,
         bool $payrollBoundaryPrepared = false,
+        ?array $currentSnapshot = null,
     ): void {
         if ($timesheet->status !== 'approved') {
             return;
@@ -43,7 +44,11 @@ class TimesheetHrSyncService
             throw new \LogicException('Prepared Timesheet HR sync requires an active transaction.');
         }
 
-        DB::transaction(function () use ($timesheet, $preparedEntry, $payrollBoundaryPrepared): void {
+        if ($currentSnapshot !== null && ! $payrollBoundaryPrepared) {
+            throw new \LogicException('Current Timesheet snapshot requires the prepared command boundary.');
+        }
+
+        DB::transaction(function () use ($timesheet, $preparedEntry, $payrollBoundaryPrepared, $currentSnapshot): void {
             if ($payrollBoundaryPrepared) {
                 $lockedTimesheet = $timesheet;
                 $entry = $preparedEntry;
@@ -70,16 +75,21 @@ class TimesheetHrSyncService
                 ]);
             }
 
-            $lockedTimesheet->load([
-                'user.hrEmployeeProfile',
-                'shift.site:id,name',
-                'shift.client:id,first_name,last_name,site_id',
-                'shift.serviceContext:id,name',
-                'client:id,first_name,last_name',
-            ]);
-            $lockedTimesheet
-                ->forceFill($this->snapshots->snapshotForTimesheet($lockedTimesheet))
-                ->saveQuietly();
+            if ($currentSnapshot === null) {
+                $lockedTimesheet->load([
+                    'user.hrEmployeeProfile',
+                    'shift.site:id,name',
+                    'shift.client:id,first_name,last_name,site_id',
+                    'shift.serviceContext:id,name',
+                    'client:id,first_name,last_name',
+                ]);
+                $lockedTimesheet
+                    ->forceFill($this->snapshots->snapshotForTimesheet($lockedTimesheet))
+                    ->saveQuietly();
+            } else {
+                // The prepared command supplies its currently locked source snapshot.
+                $lockedTimesheet->forceFill($currentSnapshot)->saveQuietly();
+            }
 
             $this->assertPayableInterval($lockedTimesheet);
             $rate = $this->rateResolver->resolve($lockedTimesheet);

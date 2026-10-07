@@ -19,6 +19,7 @@ use App\Services\Operations\TimesheetReconciliationService;
 use App\Services\ShiftOperationalSnapshotService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -34,6 +35,7 @@ class TimesheetApprovalService
         private readonly AlternativeHolidayService $alternativeHolidays,
         private readonly AuthorizationEvidenceLockService $authorizationEvidence,
         private readonly UserSiteAccessService $siteAccess,
+        private readonly TimesheetCommandEvidence $commandEvidence,
     ) {}
 
     /** Save allocation work without altering clock evidence, or submit it atomically. */
@@ -50,19 +52,25 @@ class TimesheetApprovalService
                 $this->lockPayrollRunsForWorkDates([$locked->work_date], $submit ? 'submitted' : 'updated');
                 $this->assertSubmittable($locked, $submit ? 'submitted' : 'updated');
                 $allocationService = app(TimesheetAllocationService::class);
-                $allocationService->assertRevision($locked, $expectedRevision);
-                $normal = $allocationService->validate($locked, $actor, $rows, $submit);
-                $allocationService->persist($locked, $normal);
+                $allocationService->assertRevision($locked, $expectedRevision, true);
+                $normal = $allocationService->validate($locked, $actor, $rows, $submit, $this->commandEvidence->allocationCandidates($locked));
+                $allocationService->persist($locked, $normal, true);
                 if ($submit) {
                     $this->reconciliation->assertWorkflowAllowed($locked, 'submitted');
-                    $locked->forceFill($this->submittedFields($actor))->save();
+                    $locked->forceFill($this->submittedFields($actor));
+                    $locked = $this->commandEvidence->save($locked);
                 }
                 AuditLogger::logOrFail($submit ? 'timesheet.submit' : 'timesheet.allocations-saved', $locked, [
                     'actor_id' => $actor->id, 'allocation_count' => count($normal),
                 ]);
 
-                return new TimesheetWorkflowResult($locked->fresh() ?? $locked, true);
+                return new TimesheetWorkflowResult($this->commandEvidence->persisted($locked, ['status', 'submitted_by', 'submitted_at', 'approved_by', 'approved_at', 'decision_notes', 'returned_by', 'returned_at', 'returned_notes']), true, (int) $actor->id);
             }, attempts: 3);
+        } catch (QueryException $exception) {
+            if (($exception->errorInfo[1] ?? null) === 3572) {
+                throw ValidationException::withMessages(['timesheet' => 'Current timesheet evidence is busy. Refresh and try again.']);
+            }
+            throw $exception;
         } catch (ValidationException $exception) {
             $this->persistReconciliationBlockAfterRollback($timesheet, $exception);
             throw $exception;
@@ -79,16 +87,23 @@ class TimesheetApprovalService
                 $this->lockPayrollRunsForWorkDates([$locked->work_date], 'submitted');
 
                 $this->assertSubmittable($locked, 'submitted');
-                app(TimesheetAllocationService::class)->assertSavedSplitComplete($locked, $actor);
+                app(TimesheetAllocationService::class)->assertSavedSplitComplete($locked, $actor, $this->commandEvidence->allocationCandidates($locked));
                 $this->reconciliation->assertWorkflowAllowed($locked, 'submitted');
 
-                $locked->forceFill($this->submittedFields($actor))->save();
+                $locked->forceFill($this->submittedFields($actor));
+                $locked = $this->commandEvidence->save($locked);
 
                 return new TimesheetWorkflowResult(
-                    $locked->fresh(['shift.client']) ?? $locked,
+                    $this->commandEvidence->persisted($locked, ['status', 'submitted_by', 'submitted_at', 'approved_by', 'approved_at', 'decision_notes', 'returned_by', 'returned_at', 'returned_notes']),
                     true,
+                    (int) $actor->id,
                 );
             });
+        } catch (QueryException $exception) {
+            if (($exception->errorInfo[1] ?? null) === 3572) {
+                throw ValidationException::withMessages(['timesheet' => 'Current timesheet evidence is busy. Refresh and try again.']);
+            }
+            throw $exception;
         } catch (ValidationException $exception) {
             $this->persistReconciliationBlockAfterRollback($timesheet, $exception);
 
@@ -121,17 +136,24 @@ class TimesheetApprovalService
                 $this->assertSubmittable($locked, 'updated');
                 $originalClientId = $this->clientId($locked);
 
+                $updates = $this->commandEvidence->editable($locked, $updates);
                 $locked->fill($updates);
-                $locked->save();
+                $locked = $this->commandEvidence->save($locked);
 
                 $this->invalidateChangedManualAllocations($locked, $originalClientId);
                 $this->reconciliation->reconcile($locked->fresh() ?? $locked);
 
                 return new TimesheetWorkflowResult(
-                    $locked->fresh(['shift.client']) ?? $locked,
+                    $this->commandEvidence->persisted($locked, [...array_keys($updates), 'status', 'submitted_by', 'submitted_at', 'approved_by', 'approved_at', 'decision_notes', 'returned_by', 'returned_at', 'returned_notes']),
                     true,
+                    (int) $actor->id,
                 );
             });
+        } catch (QueryException $exception) {
+            if (($exception->errorInfo[1] ?? null) === 3572) {
+                throw ValidationException::withMessages(['timesheet' => 'Current timesheet evidence is busy. Refresh and try again.']);
+            }
+            throw $exception;
         } catch (ValidationException $exception) {
             $this->persistReconciliationBlockAfterRollback($timesheet, $exception);
 
@@ -161,22 +183,29 @@ class TimesheetApprovalService
                 $this->assertSubmittable($locked, 'resubmitted');
                 $originalClientId = $this->clientId($locked);
 
+                $updates = $this->commandEvidence->editable($locked, $updates);
                 $locked->fill($updates);
-                $locked->save();
+                $locked = $this->commandEvidence->save($locked);
 
                 $this->invalidateChangedManualAllocations($locked, $originalClientId);
 
-                app(TimesheetAllocationService::class)->assertSavedSplitComplete($locked, $actor);
+                app(TimesheetAllocationService::class)->assertSavedSplitComplete($locked, $actor, $this->commandEvidence->allocationCandidates($locked));
                 $this->reconciliation->assertWorkflowAllowed($locked->fresh() ?? $locked, 'submitted');
 
                 $locked->forceFill($this->submittedFields($actor));
-                $locked->save();
+                $locked = $this->commandEvidence->save($locked);
 
                 return new TimesheetWorkflowResult(
-                    $locked->fresh(['shift.client']) ?? $locked,
+                    $this->commandEvidence->persisted($locked, [...array_keys($updates), 'status', 'submitted_by', 'submitted_at', 'approved_by', 'approved_at', 'decision_notes', 'returned_by', 'returned_at', 'returned_notes']),
                     true,
+                    (int) $actor->id,
                 );
             });
+        } catch (QueryException $exception) {
+            if (($exception->errorInfo[1] ?? null) === 3572) {
+                throw ValidationException::withMessages(['timesheet' => 'Current timesheet evidence is busy. Refresh and try again.']);
+            }
+            throw $exception;
         } catch (ValidationException $exception) {
             $this->persistReconciliationBlockAfterRollback($timesheet, $exception);
 
@@ -198,8 +227,9 @@ class TimesheetApprovalService
 
                 if ($locked->status === 'approved') {
                     return new TimesheetWorkflowResult(
-                        $locked->fresh(['shift.client']) ?? $locked,
+                        $this->commandEvidence->persisted($locked, ['status', 'submitted_by', 'submitted_at', 'approved_by', 'approved_at', 'decision_notes', 'returned_by', 'returned_at', 'returned_notes']),
                         false,
+                        (int) $actor->id,
                     );
                 }
 
@@ -222,24 +252,34 @@ class TimesheetApprovalService
                     'approved_by' => $actor->id,
                     'approved_at' => now(),
                     'decision_notes' => $decisionNotes,
-                ])->save();
+                ]);
+                $locked = $this->commandEvidence->save($locked);
 
                 $this->syncApprovedTimesheet($locked, $linkedEntry);
 
                 try {
                     $this->alternativeHolidays->accrueForTimesheet($locked->fresh() ?? $locked);
                 } catch (\Throwable $exception) {
-                    Log::warning('Alternative holiday accrual failed for approved timesheet', [
-                        'timesheet_id' => $locked->id,
-                        'error' => $exception->getMessage(),
-                    ]);
+                    try {
+                        Log::warning('Alternative holiday accrual failed for approved timesheet', [
+                            'timesheet_id' => $locked->id,
+                            'error' => $exception->getMessage(),
+                        ]);
+                    } catch (\Throwable) {
+                    }
                 }
 
                 return new TimesheetWorkflowResult(
-                    $locked->fresh(['shift.client']) ?? $locked,
+                    $this->commandEvidence->persisted($locked, ['status', 'submitted_by', 'submitted_at', 'approved_by', 'approved_at', 'decision_notes', 'returned_by', 'returned_at', 'returned_notes']),
                     true,
+                    (int) $actor->id,
                 );
             });
+        } catch (QueryException $exception) {
+            if (($exception->errorInfo[1] ?? null) === 3572) {
+                throw ValidationException::withMessages(['timesheet' => 'Current timesheet evidence is busy. Refresh and try again.']);
+            }
+            throw $exception;
         } catch (ValidationException $exception) {
             $this->persistReconciliationBlockAfterRollback($timesheet, $exception);
 
@@ -257,8 +297,9 @@ class TimesheetApprovalService
 
                 if ($locked->status !== 'submitted') {
                     return new TimesheetWorkflowResult(
-                        $locked->fresh(['shift.client']) ?? $locked,
+                        $this->commandEvidence->persisted($locked, ['status', 'submitted_by', 'submitted_at', 'approved_by', 'approved_at', 'decision_notes', 'returned_by', 'returned_at', 'returned_notes']),
                         false,
+                        (int) $actor->id,
                     );
                 }
 
@@ -274,13 +315,20 @@ class TimesheetApprovalService
                     'approved_by' => null,
                     'approved_at' => null,
                     'decision_notes' => null,
-                ])->save();
+                ]);
+                $locked = $this->commandEvidence->save($locked);
 
                 return new TimesheetWorkflowResult(
-                    $locked->fresh(['shift.client']) ?? $locked,
+                    $this->commandEvidence->persisted($locked, ['status', 'submitted_by', 'submitted_at', 'approved_by', 'approved_at', 'decision_notes', 'returned_by', 'returned_at', 'returned_notes']),
                     true,
+                    (int) $actor->id,
                 );
             });
+        } catch (QueryException $exception) {
+            if (($exception->errorInfo[1] ?? null) === 3572) {
+                throw ValidationException::withMessages(['timesheet' => 'Current timesheet evidence is busy. Refresh and try again.']);
+            }
+            throw $exception;
         } catch (ValidationException $exception) {
             $this->persistReconciliationBlockAfterRollback($timesheet, $exception);
 
@@ -298,8 +346,9 @@ class TimesheetApprovalService
 
                 if ($locked->status !== 'submitted') {
                     return new TimesheetWorkflowResult(
-                        $locked->fresh(['shift.client']) ?? $locked,
+                        $this->commandEvidence->persisted($locked, ['status', 'submitted_by', 'submitted_at', 'approved_by', 'approved_at', 'decision_notes', 'returned_by', 'returned_at', 'returned_notes']),
                         false,
+                        (int) $actor->id,
                     );
                 }
 
@@ -312,13 +361,20 @@ class TimesheetApprovalService
                     'approved_by' => $actor->id,
                     'approved_at' => now(),
                     'decision_notes' => $notes,
-                ])->save();
+                ]);
+                $locked = $this->commandEvidence->save($locked);
 
                 return new TimesheetWorkflowResult(
-                    $locked->fresh(['shift.client']) ?? $locked,
+                    $this->commandEvidence->persisted($locked, ['status', 'submitted_by', 'submitted_at', 'approved_by', 'approved_at', 'decision_notes', 'returned_by', 'returned_at', 'returned_notes']),
                     true,
+                    (int) $actor->id,
                 );
             });
+        } catch (QueryException $exception) {
+            if (($exception->errorInfo[1] ?? null) === 3572) {
+                throw ValidationException::withMessages(['timesheet' => 'Current timesheet evidence is busy. Refresh and try again.']);
+            }
+            throw $exception;
         } catch (ValidationException $exception) {
             $this->persistReconciliationBlockAfterRollback($timesheet, $exception);
 
@@ -366,9 +422,17 @@ class TimesheetApprovalService
 
     protected function lock(Timesheet $timesheet): Timesheet
     {
-        return Timesheet::query()
-            ->lockForUpdate()
-            ->findOrFail($timesheet->id);
+        $locked = Timesheet::query()->lockForUpdate()->findOrFail($timesheet->id);
+        foreach (['user_id', 'client_id', 'shift_id', 'site_id', 'shift_site_id'] as $field) {
+            if (! array_key_exists($field, $timesheet->getAttributes())) {
+                continue;
+            }
+            $before = $timesheet->getAttribute($field);
+            $after = $locked->getAttribute($field);
+            abort_unless($before === null ? $after === null : ($after !== null && (int) $before === (int) $after), 403);
+        }
+
+        return $locked;
     }
 
     protected function lockApplicationPayrollMutex(): void
@@ -397,6 +461,7 @@ class TimesheetApprovalService
             'timesheets.manageAny',
             'hr.time.manage',
         ]);
+        abort_unless($lockedActor->isApproved(), 403);
         abort_unless(
             $lockedActor->canDo('timesheets.approve')
                 || $lockedActor->canDo('timesheets.manageAny'),
@@ -417,7 +482,7 @@ class TimesheetApprovalService
             ]);
         abort_unless($profile && $this->isCurrentReviewProfile($profile), 403);
 
-        $siteId = $this->siteAccess->timesheetSiteId($timesheet);
+        $siteId = (int) $this->commandEvidence->current($timesheet)['site']->id;
         $site = Site::query()
             ->active()
             ->notArchived()
@@ -443,6 +508,7 @@ class TimesheetApprovalService
         );
 
         $lockedActor->setRelation('hrEmployeeProfile', $profile);
+        $this->commandEvidence->current($timesheet);
 
         return $lockedActor;
     }
@@ -468,6 +534,7 @@ class TimesheetApprovalService
             'hr.time.manage',
         ]);
 
+        abort_unless($lockedActor->isApproved(), 403);
         $hasRequiredPermission = match ($command) {
             'submit' => $lockedActor->canDo('timesheets.submit'),
             'update' => $lockedActor->canDo('timesheets.update'),
@@ -524,6 +591,7 @@ class TimesheetApprovalService
         );
 
         $lockedActor->setRelation('hrEmployeeProfile', $profile);
+        $this->commandEvidence->current($timesheet);
 
         return $lockedActor;
     }
@@ -571,7 +639,7 @@ class TimesheetApprovalService
             $lockedShift = Shift::query()
                 ->whereKey($timesheet->shift_id)
                 ->lockForUpdate()
-                ->first(['id', 'client_id', 'site_id', 'user_id']);
+                ->first();
             abort_unless(
                 $lockedShift
                     && $clients->has((int) $lockedShift->client_id)
@@ -694,7 +762,7 @@ class TimesheetApprovalService
         if ((int) $timesheet->user_id === (int) $actor->id) {
             abort(403, 'You cannot approve your own timesheet.');
         }
-        app(TimesheetAllocationService::class)->assertSavedSplitComplete($timesheet, $actor);
+        app(TimesheetAllocationService::class)->assertSavedSplitComplete($timesheet, $actor, $persistReconciliation ? $this->commandEvidence->allocationCandidates($timesheet) : null);
 
         if ($timesheet->linkedShiftIsCancelled()) {
             abort(422, 'Timesheets linked to cancelled shifts cannot be approved.');
@@ -762,21 +830,7 @@ class TimesheetApprovalService
 
     protected function syncApprovedTimesheet(Timesheet $timesheet, ?HrTimeEntry $lockedEntry): void
     {
-        // Use `load` (not `loadMissing`) for relations that may have been
-        // partially eager-loaded by site access checks before approval.
-        $timesheet->loadMissing([
-            'user.hrEmployeeProfile',
-        ]);
-        $timesheet->load([
-            'shift.site:id,name',
-            'shift.client:id,first_name,last_name,site_id',
-            'shift.serviceContext:id,name',
-            'shift.staff:id,name',
-            'client:id,first_name,last_name',
-            'staff:id,name',
-        ]);
-
-        $snapshot = $this->snapshots->snapshotForTimesheet($timesheet);
+        $snapshot = $this->commandEvidence->snapshot($timesheet);
 
         $timesheet->forceFill([
             'shift_site_id' => $snapshot['shift_site_id'] ?? $timesheet->shift_site_id,
@@ -790,7 +844,7 @@ class TimesheetApprovalService
             'coverage_roles_snapshot' => $snapshot['coverage_roles_snapshot'] ?? $timesheet->coverage_roles_snapshot ?? [],
         ])->saveQuietly();
 
-        $freshTimesheet = $timesheet->fresh();
+        $freshTimesheet = $this->commandEvidence->persisted($timesheet, array_keys($snapshot));
         $missingSnapshotFields = array_keys(array_filter([
             'client_name_snapshot' => blank($freshTimesheet?->client_name_snapshot),
             'staff_name_snapshot' => blank($freshTimesheet?->staff_name_snapshot),
@@ -803,8 +857,14 @@ class TimesheetApprovalService
             ]);
         }
 
-        $this->hrSync->syncToHr($freshTimesheet, $lockedEntry, true);
-        $this->billing->generateFromTimesheet($freshTimesheet);
+        $this->hrSync->syncToHr($freshTimesheet, $lockedEntry, true, $snapshot);
+        $this->billing->generateFromTimesheet($freshTimesheet, [
+            'site_id' => $freshTimesheet->shift_site_id, 'site_name_snapshot' => $freshTimesheet->shift_site_name_snapshot,
+            'location_snapshot' => $freshTimesheet->shift_location_snapshot,
+            'service_context_name_snapshot' => $freshTimesheet->service_context_name_snapshot,
+            'client_name_snapshot' => $freshTimesheet->client_name_snapshot, 'staff_name_snapshot' => $freshTimesheet->staff_name_snapshot,
+            'shift_type_snapshot' => $freshTimesheet->shift_type_snapshot,
+        ]);
     }
 
     protected function persistReconciliationBlockAfterRollback(Timesheet $timesheet, ValidationException $exception): void

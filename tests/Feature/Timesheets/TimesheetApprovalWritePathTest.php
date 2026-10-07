@@ -156,13 +156,29 @@ class TimesheetApprovalWritePathTest extends TestCase
             // syncToHr now also receives the locked entry and a lock flag.
             $mock->shouldReceive('syncToHr')
                 ->times($times)
-                ->withArgs(fn ($timesheet): bool => $timesheet instanceof Timesheet);
+                ->withArgs(function ($timesheet, $entry, $prepared, $snapshot): bool {
+                    $this->assertInstanceOf(Timesheet::class, $timesheet);
+                    $this->assertNull($entry);
+                    $this->assertTrue($prepared);
+                    $this->assertSame($timesheet->shift_site_id, $snapshot['shift_site_id']);
+                    $this->assertSame($timesheet->client_name_snapshot, $snapshot['client_name_snapshot']);
+                    $this->assertSame($timesheet->staff_name_snapshot, $snapshot['staff_name_snapshot']);
+
+                    return true;
+                });
         });
 
         $this->mock(BillingService::class, function ($mock) use ($times): void {
             $mock->shouldReceive('generateFromTimesheet')
                 ->times($times)
-                ->with(Mockery::type(Timesheet::class))
+                ->withArgs(function ($timesheet, $snapshot): bool {
+                    $this->assertInstanceOf(Timesheet::class, $timesheet);
+                    $this->assertSame($timesheet->shift_site_id, $snapshot['site_id']);
+                    $this->assertSame($timesheet->client_name_snapshot, $snapshot['client_name_snapshot']);
+                    $this->assertSame($timesheet->staff_name_snapshot, $snapshot['staff_name_snapshot']);
+
+                    return true;
+                })
                 ->andReturn(new Collection);
         });
     }

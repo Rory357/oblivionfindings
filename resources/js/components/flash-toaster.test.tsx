@@ -48,3 +48,22 @@ it('preserves success notifications on other modules', () => {
     render(<FlashToaster />);
     expect(success).toHaveBeenCalledWith('Site saved.');
 });
+
+it.each(['operations/timesheets/index', 'operations/rostering/index'])(
+    'leaves single Timesheet results to their matching dialog on %s',
+    (component) => {
+        page.component = component;
+        page.props.flash = { success: 'Timesheet updated.' };
+        render(<FlashToaster />);
+        expect(success).not.toHaveBeenCalled();
+    },
+);
+it.each(['Selected timesheets approved.', 'Timesheet archived.'])(
+    'preserves separate Timesheet catalogue and bulk feedback: %s',
+    (message) => {
+        page.component = 'operations/timesheets/index';
+        page.props.flash = { success: message };
+        render(<FlashToaster />);
+        expect(success).toHaveBeenCalledWith(message);
+    },
+);

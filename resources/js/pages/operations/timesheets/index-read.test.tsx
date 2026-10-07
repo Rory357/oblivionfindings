@@ -43,6 +43,7 @@ const row: TimesheetRow = {
     can_mutate: true,
     can_approve: true,
     can_edit: true,
+    can_update: true,
     staff: { id: 7, name: 'Hemi' },
     client: { id: 4, first_name: 'Aroha', last_name: 'Example' },
     total_hours: 7.5,
@@ -212,4 +213,50 @@ it('retains the captured edit record but removes its edit permission after fresh
     );
     expect(edit.mock.lastCall?.[0].canEdit).toBe(false);
     expect(edit.mock.lastCall?.[0].timesheet).toBe(draft);
+});
+
+it('distinguishes recorded manual activities from linked shift task completion', () => {
+    const { rerender } = render(
+        <TimesheetsIndex
+            {...props}
+            timesheets={{
+                data: [
+                    {
+                        ...row,
+                        activity_items: ['Team training'],
+                        tasks_total: 1,
+                        tasks_completed: 1,
+                    },
+                ],
+            }}
+        />,
+    );
+    expect(
+        within(screen.getByLabelText('Timesheet 51')).getByText(
+            'Activity items: 1 recorded',
+        ),
+    ).toBeTruthy();
+    expect(screen.getByText('1 activity item')).toBeTruthy();
+    expect(screen.queryByText(/Recorded shift tasks/)).toBeNull();
+    rerender(
+        <TimesheetsIndex
+            {...props}
+            timesheets={{
+                data: [
+                    {
+                        ...row,
+                        shift_id: 17,
+                        tasks_total: 2,
+                        tasks_completed: 1,
+                    },
+                ],
+            }}
+        />,
+    );
+    expect(
+        within(screen.getByLabelText('Timesheet 51')).getByText(
+            'Recorded shift tasks: 1/2',
+        ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Activity items:/)).toBeNull();
 });

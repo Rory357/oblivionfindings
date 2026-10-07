@@ -1,6 +1,5 @@
 import { PageHeaderRail } from '@/components/page';
 import PageShell from '@/components/page-shell';
-import { ReasonDialog } from '@/components/reason-dialog';
 import type { RosterTabItem } from '@/components/rostering/tab-strip';
 import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
 import CreateTimesheetDialog, {
@@ -11,6 +10,11 @@ import CreateTimesheetDialog, {
 import EditTimesheetDialog, {
     type EditTimesheetRow,
 } from '@/components/timesheets/edit-timesheet-dialog';
+import {
+    TimesheetActionDialog,
+    type TimesheetReviewAction,
+} from '@/components/timesheets/timesheet-action-dialog';
+import { timesheetEditContext } from '@/components/timesheets/timesheet-wizard';
 import TimesheetsHero, {
     type TimesheetsHeroSummary,
 } from '@/components/timesheets/timesheets-hero';
@@ -88,6 +92,7 @@ type Props = {
     availableShifts: ShiftOption[];
     canApprove: boolean;
     canCreate: boolean;
+    canSubmit?: boolean;
 };
 
 const TABS: Array<{
@@ -116,9 +121,16 @@ export const needsApprovalBadgeClassName =
     'border-status-warning/30 bg-status-warning-bg text-[10px] text-status-warning';
 
 export function canEditTimesheetRow(
-    row: Pick<TimesheetRow, 'can_edit' | 'attendance_session_id'>,
+    row: Pick<
+        TimesheetRow,
+        'can_edit' | 'can_update' | 'attendance_session_id'
+    >,
 ): boolean {
-    return Boolean(row.can_edit && row.attendance_session_id == null);
+    return Boolean(
+        row.can_edit &&
+        row.can_update === true &&
+        row.attendance_session_id == null,
+    );
 }
 
 export function formatTimesheetTime(iso: string, timezone = WORKER_TIMEZONE) {
@@ -130,6 +142,13 @@ export function formatTimesheetTime(iso: string, timezone = WORKER_TIMEZONE) {
         minute: '2-digit',
     }).format(date);
 }
+function hasLinkedShift(row: TimesheetRow): boolean {
+    return (row.shift_id ?? row.shift?.id ?? null) !== null;
+}
+function recordedActivityCount(row: TimesheetRow): number {
+    return hasLinkedShift(row) ? 0 : (row.activity_items?.length ?? 0);
+}
+
 function fmtDate(iso: string) {
     return formatDateOnly(iso?.slice(0, 10));
 }
@@ -271,7 +290,11 @@ function HoverPopover({
                             ) : null}
                         </div>
                     ) : null}
-                    {(t.tasks_total ?? 0) > 0 ? (
+                    {recordedActivityCount(t) > 0 ? (
+                        <div className="text-[11.5px]">
+                            Activity items: {recordedActivityCount(t)} recorded
+                        </div>
+                    ) : hasLinkedShift(t) && (t.tasks_total ?? 0) > 0 ? (
                         <div>
                             <div className="mb-1 flex items-center justify-between">
                                 <span className="text-[11.5px] font-medium">
@@ -352,33 +375,35 @@ export function menuItemsFor(t: TimesheetRow): MenuItem[] {
                 label: 'Edit hours & breaks',
                 icon: Pencil,
             });
-        if (['draft', 'returned'].includes(t.status))
+        if (['draft', 'returned'].includes(t.status) && t.can_submit === true)
             items.push({
                 id: 'submit',
                 label: 'Submit for approval',
                 icon: Send,
             });
-        if (t.status === 'submitted' && t.can_approve)
-            items.push(
-                {
+        if (t.status === 'submitted') {
+            if (t.can_approve)
+                items.push({
                     id: 'approve',
                     label: 'Approve',
                     icon: CheckCircle2,
                     tone: 'success',
-                },
-                {
+                });
+            if (t.can_return)
+                items.push({
                     id: 'return',
                     label: 'Return for changes',
                     icon: RotateCcw,
                     tone: 'warning',
-                },
-                {
+                });
+            if (t.can_reject)
+                items.push({
                     id: 'reject',
                     label: 'Reject',
                     icon: XCircle,
                     tone: 'danger',
-                },
-            );
+                });
+        }
         if (!t.archived_at && ['paid', 'rejected'].includes(t.status))
             items.push({
                 id: 'archive',
@@ -559,6 +584,7 @@ export default function TimesheetsIndex({
     availableShifts,
     canApprove,
     canCreate,
+    canSubmit = false,
 }: Props) {
     const reads = useTimesheetFilters({
         tab: filters.tab ?? 'all',
@@ -582,7 +608,7 @@ export default function TimesheetsIndex({
     const [viewing, setViewing] = useState<TimesheetRow | null>(null);
     const [editing, setEditing] = useState<TimesheetRow | null>(null);
     const [reasonTarget, setReasonTarget] = useState<{
-        action: 'reject' | 'return';
+        action: TimesheetReviewAction;
         row: TimesheetRow;
     } | null>(null);
     const [createOpen, setCreateOpen] = useState(false);
@@ -650,10 +676,15 @@ export default function TimesheetsIndex({
         (row) => row.id === reasonTarget?.row.id,
     );
     const reasonAllowed = Boolean(
-        canApprove &&
-        currentReason?.can_approve &&
-        currentReason.can_mutate &&
-        currentReason.status === 'submitted',
+        currentReason?.can_mutate &&
+        (reasonTarget?.action === 'submit'
+            ? currentReason.can_submit === true
+            : canApprove &&
+              (reasonTarget?.action === 'approve'
+                  ? currentReason.can_approve === true
+                  : reasonTarget?.action === 'reject'
+                    ? currentReason.can_reject === true
+                    : currentReason.can_return === true)),
     );
 
     function toggleApprovalSelection(id: number, checked: boolean) {
@@ -737,24 +768,10 @@ export default function TimesheetsIndex({
                 if (row.staff_profile_url) router.visit(row.staff_profile_url);
                 return;
             case 'submit':
-                router.post(
-                    `/operations/timesheets/${row.id}/submit`,
-                    {},
-                    { preserveScroll: true },
-                );
-                return;
             case 'approve':
-                router.post(
-                    `/operations/timesheets/${row.id}/approve`,
-                    {},
-                    { preserveScroll: true },
-                );
-                return;
             case 'return':
-                setReasonTarget({ action: 'return', row });
-                return;
             case 'reject':
-                setReasonTarget({ action: 'reject', row });
+                setReasonTarget({ action: id, row });
                 return;
             case 'archive':
                 router.post(
@@ -989,13 +1006,19 @@ export default function TimesheetsIndex({
                                     {row.sleepover ? ' · Sleepover' : ''}
                                     {row.on_call ? ' · On call' : ''}
                                 </p>
-                                {(row.tasks_total ?? 0) > 0 && (
+                                {recordedActivityCount(row) > 0 ? (
+                                    <p className="text-subtle">
+                                        Activity items:{' '}
+                                        {recordedActivityCount(row)} recorded
+                                    </p>
+                                ) : hasLinkedShift(row) &&
+                                  (row.tasks_total ?? 0) > 0 ? (
                                     <p className="text-subtle">
                                         Recorded shift tasks:{' '}
                                         {row.tasks_completed ?? 0}/
                                         {row.tasks_total}
                                     </p>
-                                )}
+                                ) : null}
                                 {row.returned_notes &&
                                     row.status === 'returned' && (
                                         <p className="text-sm text-status-critical">
@@ -1090,7 +1113,9 @@ export default function TimesheetsIndex({
                                         Shift / activity
                                     </th>
                                     <th className="px-2 py-2.5">Hours</th>
-                                    <th className="px-2 py-2.5">Tasks</th>
+                                    <th className="px-2 py-2.5">
+                                        Tasks / activities
+                                    </th>
                                     <th className="px-2 py-2.5">Status</th>
                                     <th className="py-2.5 pr-4 text-right">
                                         Actions
@@ -1293,7 +1318,21 @@ export default function TimesheetsIndex({
                                                 </div>
                                             </td>
                                             <td className="w-[120px] px-2 py-3">
-                                                {(t.tasks_total ?? 0) > 0 ? (
+                                                {recordedActivityCount(t) >
+                                                0 ? (
+                                                    <span className="text-[11px] text-muted-foreground">
+                                                        {recordedActivityCount(
+                                                            t,
+                                                        )}{' '}
+                                                        activity{' '}
+                                                        {recordedActivityCount(
+                                                            t,
+                                                        ) === 1
+                                                            ? 'item'
+                                                            : 'items'}
+                                                    </span>
+                                                ) : hasLinkedShift(t) &&
+                                                  (t.tasks_total ?? 0) > 0 ? (
                                                     <div className="flex items-center gap-1.5">
                                                         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                                                             <div
@@ -1440,10 +1479,7 @@ export default function TimesheetsIndex({
                     currentViewed.can_mutate &&
                     currentViewed.status === 'submitted',
                 )}
-                canSubmit={Boolean(
-                    currentViewed?.can_mutate &&
-                    currentViewed.status === 'draft',
-                )}
+                canSubmit={Boolean(currentViewed?.can_submit === true)}
             />
             <EditTimesheetDialog
                 open={!!editing}
@@ -1451,10 +1487,14 @@ export default function TimesheetsIndex({
                 canEdit={Boolean(
                     currentEdited &&
                     canEditTimesheetRow(currentEdited) &&
+                    timesheetEditContext(editing) ===
+                        timesheetEditContext(currentEdited) &&
                     ['draft', 'returned'].includes(currentEdited.status),
                 )}
                 onOpenChange={(o) => !o && setEditing(null)}
                 clients={clients}
+                workerTimezone={evidence.timezone}
+                canSubmit={currentEdited?.can_resubmit === true}
             />
             <CreateTimesheetDialog
                 open={createOpen}
@@ -1463,49 +1503,19 @@ export default function TimesheetsIndex({
                 clients={clients}
                 sites={sites}
                 initialShiftId={initialShiftId}
+                canCreate={canCreate}
+                canSubmit={canSubmit}
+                workerTimezone={evidence.timezone}
             />
-            <ReasonDialog
-                open={reasonTarget !== null}
-                onClose={() => setReasonTarget(null)}
-                title={
-                    reasonTarget?.action === 'reject'
-                        ? 'Reject timesheet?'
-                        : 'Return for changes?'
-                }
-                description={
-                    !reasonAllowed
-                        ? 'This action is no longer available in the current records. Your reason is retained; close and refresh to check access.'
-                        : reasonTarget?.action === 'reject'
-                          ? 'The staff member will see this timesheet as rejected, with your reason.'
-                          : 'The timesheet goes back to the staff member to fix and resubmit.'
-                }
-                label={
-                    reasonTarget?.action === 'reject'
-                        ? 'Reason for rejection'
-                        : 'What needs changing?'
-                }
-                confirmLabel={
-                    reasonTarget?.action === 'reject'
-                        ? 'Reject timesheet'
-                        : 'Return to staff'
-                }
-                destructive={reasonTarget?.action === 'reject'}
-                onConfirm={(reason, done) => {
-                    if (!reasonTarget || !reasonAllowed) {
-                        done();
-                        return;
-                    }
-                    const { action, row } = reasonTarget;
-                    router.post(
-                        `/operations/timesheets/${row.id}/${action}`,
-                        action === 'reject'
-                            ? { decision_notes: reason }
-                            : { returned_notes: reason },
-                        { preserveScroll: true },
-                    );
-                    setReasonTarget(null);
-                }}
-            />
+            {reasonTarget && (
+                <TimesheetActionDialog
+                    open
+                    action={reasonTarget.action}
+                    record={currentReason ?? reasonTarget.row}
+                    canAct={reasonAllowed}
+                    onOpenChange={(open) => !open && setReasonTarget(null)}
+                />
+            )}
         </AppLayout>
     );
 }

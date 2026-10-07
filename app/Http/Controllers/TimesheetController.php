@@ -6,6 +6,8 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Shifts\Timesheets\TimesheetAllocationService;
 use App\Domain\Shifts\Timesheets\TimesheetApprovalService;
+use App\Domain\Shifts\Timesheets\TimesheetCommandReceipt;
+use App\Domain\Shifts\Timesheets\TimesheetCreationService;
 use App\Models\Client;
 use App\Models\Shift;
 use App\Models\Site;
@@ -14,12 +16,13 @@ use App\Models\TimesheetAmendment;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\NotificationService;
-use App\Services\Operations\TimesheetReconciliationService;
 use App\Services\ShiftOperationalSnapshotService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -285,7 +288,8 @@ class TimesheetController extends Controller
             'heroSummary' => $heroSummary, 'workerTimezone' => $this->workerTimezone(),
             'isOwnOnlyView' => ! $auth->canDo('timesheets.manageAny') && ! $approvalQueue,
             'clients' => $clients, 'sites' => $sites, 'staff' => $staff, 'availableShifts' => $availableShifts,
-            'canApprove' => $canApprove, 'canCreate' => $auth->canDo('timesheets.create'),
+            'canApprove' => $canApprove, 'canCreate' => $auth->isApproved() && $auth->canDo('timesheets.create'),
+            'canSubmit' => $auth->isApproved() && $auth->canDo('timesheets.submit'),
         ]);
     }
 
@@ -307,6 +311,18 @@ class TimesheetController extends Controller
         $data['can_mutate'] = $canMutate;
         $data['can_approve'] = $canMutate && $canReview;
         $data['can_edit'] = $canMutate && $ts->attendance_session_id === null;
+        $actor = auth()->user();
+        $approved = $actor && $actor->isApproved();
+        $owns = $actor && ((int) $ts->user_id === (int) $actor->id || $actor->canDo('timesheets.manageAny'));
+        $draft = in_array($ts->status, ['draft', 'returned'], true) && ! $ts->is_protected_from_changes && ! $ts->linkedShiftIsCancelled();
+        $data['can_update'] = $canMutate && $approved && $owns && $draft && $ts->attendance_session_id === null && $actor->canDo('timesheets.update');
+        $data['can_submit'] = $canMutate && $approved && $owns && $draft && $actor->canDo('timesheets.submit');
+        $data['can_resubmit'] = $data['can_update'] && $data['can_submit'];
+        $reviewable = $canMutate && $approved && $canReview && $ts->status === 'submitted' && ! $ts->is_protected_from_changes;
+        $data['can_approve'] = $reviewable && (int) $ts->user_id !== (int) $actor?->id;
+        $data['can_reject'] = $reviewable;
+        $data['can_return'] = $reviewable;
+
         $profileLink = $this->staffProfileLinks[(int) $ts->user_id] ?? ['employee_profile_id' => null, 'profile_url' => null];
         $data['staff_employee_profile_id'] = $profileLink['employee_profile_id'];
         $data['staff_profile_url'] = $profileLink['profile_url'];
@@ -645,6 +661,7 @@ class TimesheetController extends Controller
      */
     public function store(Request $request)
     {
+        $rootEntry = $this->commandReceipt()->begin($request);
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('timesheets.create'), 403);
 
@@ -678,141 +695,43 @@ class TimesheetController extends Controller
             'tasks.*.completed' => ['boolean'],
         ]);
 
-        $mode = $data['mode'];
-        $userId = $auth->id;
-        $shiftId = $data['shift_id'] ?? null;
-        $linkedShift = null;
-
-        if ($mode === 'shift') {
-            $linkedShift = Shift::findOrFail($shiftId);
-            $this->siteAccess()->assertCanAccessShift(
-                $auth,
-                $linkedShift,
-                [],
-                'You are not authorized to create timesheets for that site.',
-            );
-            if (! $auth->canDo('timesheets.manageAny') && $linkedShift->user_id !== $auth->id) {
-                abort(403);
-            }
-            // Open / unassigned shifts have no `user_id`; default the timesheet
-            // owner to the authenticated user so the row still has a valid
-            // owner. Managers picking an open shift implicitly claim the
-            // timesheet for themselves.
-            $userId = $linkedShift->user_id ?? $auth->id;
-            $data['client_id'] = $linkedShift->client_id;
-
-            if (Timesheet::query()
-                ->where('shift_id', $linkedShift->id)
-                ->where('user_id', $userId)
-                ->exists()) {
-                $message = 'A timesheet already exists for this shift and staff member.';
-
+        try {
+            $result = app(TimesheetCreationService::class)->create($auth, $data);
+        } catch (ValidationException $exception) {
+            $duplicate = $exception->errors()['shift_id'][0] ?? null;
+            if ($duplicate === 'A timesheet already exists for this shift and staff member.') {
                 if ($request->expectsJson()) {
-                    return response()->json([
-                        'message' => $message,
-                        'errors' => ['shift_id' => [$message]],
-                    ], 422);
+                    return response()->json(['message' => $duplicate, 'errors' => $exception->errors()], 422);
                 }
 
-                return back()->with('error', $message)->withInput();
+                return back()->with('error', $duplicate)->withInput();
             }
+            throw $exception;
         }
-
-        // Manual mode: client_id is optional. When provided, enforce site access.
-        if (! empty($data['client_id'])) {
-            $this->siteAccess()->assertCanAccessClientId(
-                $auth,
-                (int) $data['client_id'],
-                [],
-                'You are not authorized to create timesheets for that site.',
-            );
-        } elseif (($data['site_id'] ?? null) !== null) {
-            $this->siteAccess()->assertCanAccessSiteId(
-                $auth,
-                (int) $data['site_id'],
-                [],
-                'You are not authorized to create timesheets for that site.',
-            );
-        }
-
-        $clientForSnapshot = $data['client_id'] ?? null;
-        $snapshot = $clientForSnapshot
-            ? $this->draftSnapshot((int) $clientForSnapshot, $linkedShift, $auth, $data['notes'] ?? null)
-            : $this->manualSnapshot($auth, $data['activity_type'] ?? null, $data['site_id'] ?? null);
-
-        $timesheet = Timesheet::create([
-            'user_id' => $userId,
-            'client_id' => $data['client_id'] ?? null,
-            'shift_id' => $shiftId,
-            'activity_type' => $mode === 'manual' ? ($data['activity_type'] ?? null) : null,
-            'activity_items' => $mode === 'manual' ? ($data['activity_items'] ?? []) : null,
-            'site_id' => $data['site_id'] ?? null,
-            'shift_site_id' => $snapshot['site_id'] ?? null,
-            'shift_service_context_id' => $snapshot['service_context_id'] ?? null,
-            'work_date' => $data['work_date'],
-            'starts_at' => $data['starts_at'],
-            'ends_at' => $data['ends_at'],
-            'break_minutes' => (int) ($data['break_minutes'] ?? $linkedShift?->expected_break_minutes ?? 0),
-            'mileage_km' => $data['mileage_km'] ?? null,
-            'sleepover' => $linkedShift ? (bool) $linkedShift->is_sleepover : (bool) ($data['sleepover'] ?? false),
-            'on_call' => $linkedShift ? (bool) $linkedShift->is_on_call : (bool) ($data['on_call'] ?? false),
-            'allowance_notes' => $data['allowance_notes'] ?? null,
-            'public_holiday' => (bool) ($data['public_holiday'] ?? false),
-            'notes' => $data['notes'] ?? null,
-            'is_residential_billable' => (bool) ($data['is_residential_billable'] ?? false),
-            'shift_site_name_snapshot' => $snapshot['site_name'] ?? null,
-            'shift_location_snapshot' => $snapshot['location'] ?? null,
-            'service_context_name_snapshot' => $snapshot['service_context_name'] ?? null,
-            'client_name_snapshot' => $snapshot['client_name'] ?? null,
-            'staff_name_snapshot' => $snapshot['staff_name'] ?? $auth->name,
-            'shift_type_snapshot' => $snapshot['shift_type'] ?? ($mode === 'manual' ? ($data['activity_type'] ?? 'manual') : 'standard'),
-            'coverage_roles_snapshot' => $snapshot['coverage_roles'] ?? [],
-            'status' => 'draft',
-            'created_by' => $auth->id,
+        $timesheet = $result->timesheet;
+        $this->notifyTimesheetAfterCommit($auth, 'created', $timesheet, [
+            'event_key' => 'timesheets.created', 'title' => 'Timesheet created',
+            'url' => url('/operations/timesheets?view='.$timesheet->id), 'target_user_ids' => [$timesheet->user_id],
         ]);
-
-        if ($mode === 'shift') {
-            app(TimesheetReconciliationService::class)->reconcile($timesheet);
-        }
-
-        $timesheet->load(['shift.client']);
-        $client = $timesheet->shift?->client ?? $timesheet->client;
-
-        app(NotificationService::class)->notifyCrud($request->user(), 'created', 'timesheet', $timesheet, $client, [
-            'event_key' => 'timesheets.created',
-            'title' => 'Timesheet created',
-            'url' => url("/operations/timesheets?view={$timesheet->id}"),
-            'target_user_ids' => [$timesheet->user_id],
-        ]);
-
-        // If the dialog's "Submit for approval" button was clicked, transition
-        // straight to submitted so the worker doesn't have to chase a second
-        // route from the dialog.
         if (! empty($data['submit'])) {
-            try {
-                $this->timesheetApprovals()->submit($timesheet, $auth);
-                app(NotificationService::class)->notifyCrud($auth, 'submitted', 'timesheet', $timesheet, $client, [
-                    'event_key' => 'timesheets.submitted',
-                    'title' => 'Timesheet submitted for approval',
-                    'url' => url("/operations/timesheets?view={$timesheet->id}"),
-                    'include_entity_user' => false,
-                ]);
-            } catch (ValidationException $e) {
-                return back()->withErrors($e->errors());
-            }
-        }
-
-        if ($request->expectsJson()) {
-            return response()->json([
-                'success' => true,
-                'timesheet_id' => $timesheet->id,
-                'message' => 'Timesheet created.',
+            $this->notifyTimesheetAfterCommit($auth, 'submitted', $timesheet, [
+                'event_key' => 'timesheets.submitted', 'title' => 'Timesheet submitted for approval',
+                'url' => url('/operations/timesheets?view='.$timesheet->id), 'include_entity_user' => false,
             ]);
         }
+        $receipt = $this->commandReceipt()->committed($rootEntry, 'create', $result, ! empty($data['submit']));
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true, 'timesheet_id' => $timesheet->id, 'message' => 'Timesheet created.',
+                ...($receipt === null ? [] : ['timesheet_result' => $receipt]),
+            ]);
+        }
+        $response = redirect()->route('operations.timesheets.index', ['view' => $timesheet->id])->with('success', 'Timesheet created.');
+        if ($receipt !== null) {
+            $response->with('timesheet_result', $receipt);
+        }
 
-        return redirect()
-            ->route('operations.timesheets.index', ['view' => $timesheet->id])
-            ->with('success', 'Timesheet created.');
+        return $response;
     }
 
     /**
@@ -908,6 +827,7 @@ class TimesheetController extends Controller
 
     public function update(Request $request, Timesheet $timesheet)
     {
+        $rootEntry = $this->commandReceipt()->begin($request);
         $auth = $request->user();
         abort_unless($auth, 403);
         $this->assertCanEditTimesheet($auth, $timesheet);
@@ -1016,23 +936,22 @@ class TimesheetController extends Controller
             'coverage_roles_snapshot' => $snapshot['coverage_roles'] ?? $snapshotFallback?->coverage_roles_snapshot ?? [],
         ]);
 
+        $receipt = $this->commandReceipt()->committed($rootEntry, 'update', $result);
         $timesheet = $result->timesheet;
 
-        $timesheet->load(['shift.client']);
-        $client = $timesheet->shift?->client;
-
-        app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'timesheet', $timesheet, $client, [
+        $this->notifyTimesheetAfterCommit($auth, 'updated', $timesheet, [
             'event_key' => 'timesheets.updated',
             'title' => 'Timesheet updated',
             'url' => url("/operations/timesheets/{$timesheet->id}/edit"),
             'target_user_ids' => [$timesheet->user_id],
         ]);
 
-        return redirect()->back()->with('success', 'Timesheet updated.');
+        return $this->withTimesheetReceipt(redirect()->back()->with('success', 'Timesheet updated.'), $receipt);
     }
 
     public function submit(Request $request, Timesheet $timesheet)
     {
+        $rootEntry = $this->commandReceipt()->begin($request);
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('timesheets.submit'), 403);
 
@@ -1061,18 +980,17 @@ class TimesheetController extends Controller
         );
 
         $result = $this->timesheetApprovals()->submit($timesheet, $auth);
+        $receipt = $this->commandReceipt()->committed($rootEntry, 'submit', $result);
         $submittedTimesheet = $result->timesheet;
 
-        $client = $submittedTimesheet->shift?->client;
-
-        app(NotificationService::class)->notifyCrud($auth, 'submitted', 'timesheet', $submittedTimesheet, $client, [
+        $this->notifyTimesheetAfterCommit($auth, 'submitted', $submittedTimesheet, [
             'event_key' => 'timesheets.submitted',
             'title' => 'Timesheet submitted for approval',
             'url' => url("/operations/timesheets/{$submittedTimesheet->id}/edit"),
             'include_entity_user' => false,
         ]);
 
-        return redirect()->back()->with('success', 'Timesheet submitted.');
+        return $this->withTimesheetReceipt(redirect()->back()->with('success', 'Timesheet submitted.'), $receipt);
     }
 
     /**
@@ -1086,6 +1004,7 @@ class TimesheetController extends Controller
      */
     public function resubmit(Request $request, Timesheet $timesheet)
     {
+        $rootEntry = $this->commandReceipt()->begin($request);
         $auth = $request->user();
         abort_unless(
             $auth && $auth->canDo('timesheets.update') && $auth->canDo('timesheets.submit'),
@@ -1210,22 +1129,22 @@ class TimesheetController extends Controller
             'shift_type_snapshot' => $snapshot['shift_type'] ?? $snapshotFallback?->shift_type_snapshot ?? 'standard',
             'coverage_roles_snapshot' => $snapshot['coverage_roles'] ?? $snapshotFallback?->coverage_roles_snapshot ?? [],
         ]);
+        $receipt = $this->commandReceipt()->committed($rootEntry, 'resubmit', $result);
         $submittedTimesheet = $result->timesheet;
 
-        $client = $submittedTimesheet->shift?->client;
-
-        app(NotificationService::class)->notifyCrud($auth, 'submitted', 'timesheet', $submittedTimesheet, $client, [
+        $this->notifyTimesheetAfterCommit($auth, 'submitted', $submittedTimesheet, [
             'event_key' => 'timesheets.submitted',
             'title' => 'Timesheet updated and resubmitted',
             'url' => url("/operations/timesheets/{$submittedTimesheet->id}/edit"),
             'include_entity_user' => false,
         ]);
 
-        return redirect()->back()->with('success', 'Timesheet updated and resubmitted.');
+        return $this->withTimesheetReceipt(redirect()->back()->with('success', 'Timesheet updated and resubmitted.'), $receipt);
     }
 
     public function approve(Request $request, Timesheet $timesheet)
     {
+        $rootEntry = $this->commandReceipt()->begin($request);
         $auth = $request->user();
         abort_unless($this->canReviewTimesheets($auth), 403);
         $this->assertCanMutateTimesheet($auth, $timesheet);
@@ -1241,26 +1160,26 @@ class TimesheetController extends Controller
             return back()->withErrors($exception->errors());
         }
 
+        $receipt = $this->commandReceipt()->committed($rootEntry, 'approve', $result);
         /** @var Timesheet $approvedTimesheet */
         $approvedTimesheet = $result->timesheet;
 
         if (! $result->changed) {
-            return redirect()->back()->with('success', 'Timesheet already approved.');
+            return $this->withTimesheetReceipt(redirect()->back()->with('success', 'Timesheet already approved.'), $receipt);
         }
 
-        $client = $approvedTimesheet->shift?->client;
-
-        app(NotificationService::class)->notifyCrud($auth, 'approved', 'timesheet', $approvedTimesheet, $client, [
+        $this->notifyTimesheetAfterCommit($auth, 'approved', $approvedTimesheet, [
             'event_key' => 'timesheets.approved',
             'title' => 'Timesheet approved',
             'url' => url("/operations/timesheets/{$approvedTimesheet->id}/edit"),
         ]);
 
-        return redirect()->back()->with('success', 'Timesheet approved.');
+        return $this->withTimesheetReceipt(redirect()->back()->with('success', 'Timesheet approved.'), $receipt);
     }
 
     public function reject(Request $request, Timesheet $timesheet)
     {
+        $rootEntry = $this->commandReceipt()->begin($request);
         $auth = $request->user();
         abort_unless($this->canReviewTimesheets($auth), 403);
         abort_unless($timesheet->status === 'submitted', 403);
@@ -1281,21 +1200,23 @@ class TimesheetController extends Controller
         }
 
         $result = $this->timesheetApprovals()->reject($timesheet, $auth, $decisionNotes);
+        $receipt = $this->commandReceipt()->committed($rootEntry, 'reject', $result);
         $rejectedTimesheet = $result->timesheet;
 
-        $client = $rejectedTimesheet->shift?->client;
+        if ($result->changed) {
+            $this->notifyTimesheetAfterCommit($auth, 'rejected', $rejectedTimesheet, [
+                'event_key' => 'timesheets.rejected',
+                'title' => 'Timesheet rejected',
+                'url' => url("/operations/timesheets/{$rejectedTimesheet->id}/edit"),
+            ]);
+        }
 
-        app(NotificationService::class)->notifyCrud($auth, 'rejected', 'timesheet', $rejectedTimesheet, $client, [
-            'event_key' => 'timesheets.rejected',
-            'title' => 'Timesheet rejected',
-            'url' => url("/operations/timesheets/{$rejectedTimesheet->id}/edit"),
-        ]);
-
-        return redirect()->back()->with('success', 'Timesheet rejected.');
+        return $this->withTimesheetReceipt(redirect()->back()->with('success', 'Timesheet rejected.'), $receipt);
     }
 
     public function returnForChanges(Request $request, Timesheet $timesheet)
     {
+        $rootEntry = $this->commandReceipt()->begin($request);
         $auth = $request->user();
         abort_unless($this->canReviewTimesheets($auth), 403);
         abort_unless($timesheet->status === 'submitted', 403);
@@ -1316,17 +1237,18 @@ class TimesheetController extends Controller
         }
 
         $result = $this->timesheetApprovals()->returnForChanges($timesheet, $auth, $returnedNotes);
+        $receipt = $this->commandReceipt()->committed($rootEntry, 'return', $result);
         $returnedTimesheet = $result->timesheet;
 
-        $client = $returnedTimesheet->shift?->client;
+        if ($result->changed) {
+            $this->notifyTimesheetAfterCommit($auth, 'returned', $returnedTimesheet, [
+                'event_key' => 'timesheets.returned',
+                'title' => 'Timesheet returned for changes',
+                'url' => url("/operations/timesheets/{$returnedTimesheet->id}/edit"),
+            ]);
+        }
 
-        app(NotificationService::class)->notifyCrud($auth, 'returned', 'timesheet', $returnedTimesheet, $client, [
-            'event_key' => 'timesheets.returned',
-            'title' => 'Timesheet returned for changes',
-            'url' => url("/operations/timesheets/{$returnedTimesheet->id}/edit"),
-        ]);
-
-        return redirect()->back()->with('success', 'Timesheet returned for changes.');
+        return $this->withTimesheetReceipt(redirect()->back()->with('success', 'Timesheet returned for changes.'), $receipt);
     }
 
     /**
@@ -1525,5 +1447,34 @@ class TimesheetController extends Controller
         $this->siteAccess()->applyTimesheetScope($query, $auth, []);
 
         return $query->exists();
+    }
+
+    private function commandReceipt(): TimesheetCommandReceipt
+    {
+        return app(TimesheetCommandReceipt::class);
+    }
+
+    private function withTimesheetReceipt($response, ?array $receipt)
+    {
+        if ($receipt !== null) {
+            $response->with('timesheet_result', $receipt);
+        }
+
+        return $response;
+    }
+
+    private function notifyTimesheetAfterCommit(User $actor, string $action, Timesheet $timesheet, array $options): void
+    {
+        $model = clone $timesheet;
+        DB::afterCommit(function () use ($actor, $action, $model, $options): void {
+            try {
+                app(NotificationService::class)->notifyCrud($actor, $action, 'timesheet', $model, $model->shift?->client ?? $model->client, $options);
+            } catch (\Throwable $exception) {
+                try {
+                    Log::warning('Timesheet notification failed after commit', ['timesheet_id' => $model->id, 'action' => $action, 'exception_class' => $exception::class]);
+                } catch (\Throwable) {
+                }
+            }
+        });
     }
 }

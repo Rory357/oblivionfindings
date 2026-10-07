@@ -3,7 +3,6 @@
  * computed avatar hues, white glyphs on solid status dots — the established
  * avatar/timeline idiom). All status colours are semantic tokens, per
  * design_styles/DESIGN_TOKENS.md. */
-import { ReasonDialog } from '@/components/reason-dialog';
 import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -38,10 +37,22 @@ import {
     XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
+import {
+    TimesheetActionDialog,
+    type TimesheetReviewAction,
+} from './timesheet-action-dialog';
 
 export type ViewTimesheetRow = {
     id: number;
+    client_id?: number | null;
+    user_id?: number;
+    shift_id?: number | null;
     can_mutate?: boolean;
+    can_update?: boolean;
+    can_submit?: boolean;
+    can_resubmit?: boolean;
+    can_reject?: boolean;
+    can_return?: boolean;
     can_approve?: boolean;
     can_edit?: boolean;
     attendance_session_id?: number | null;
@@ -202,15 +213,14 @@ export default function ViewTimesheetDialog({
     canApprove?: boolean;
     canSubmit?: boolean;
 }) {
-    const [busy, setBusy] = useState(false);
-    const [reasonAction, setReasonAction] = useState<
-        'reject' | 'return' | null
-    >(null);
+    const [reasonAction, setReasonAction] =
+        useState<TimesheetReviewAction | null>(null);
 
     if (!timesheet) return null;
     const t = timesheet;
     const maySubmit =
-        (canSubmit ?? Boolean(t.can_mutate)) && t.status === 'draft';
+        (canSubmit ?? Boolean(t.can_submit ?? t.can_mutate)) &&
+        ['draft', 'returned'].includes(t.status);
     const mayReview = canApprove && t.status === 'submitted';
     const hours = (t.total_hours ?? t.hours ?? 0) as number;
     const tagPills: string[] = [];
@@ -223,17 +233,6 @@ export default function ViewTimesheetDialog({
         (s, a) => s + (a.minutes ?? (a.hours ? a.hours * 60 : 0)),
         0,
     );
-
-    function call(method: 'post', url: string, data: Record<string, any> = {}) {
-        const permitted = url.endsWith('/submit') ? maySubmit : mayReview;
-        if (!permitted || busy) return;
-        setBusy(true);
-        router[method](url, data, {
-            preserveScroll: true,
-            onFinish: () => setBusy(false),
-            onSuccess: () => onOpenChange(false),
-        });
-    }
 
     const shiftCtxName =
         typeof t.shift?.service_context === 'string'
@@ -324,7 +323,7 @@ export default function ViewTimesheetDialog({
                                 </div>
                                 <div className="mt-3 flex items-center justify-between rounded-lg bg-status-info-bg px-3 py-2.5 text-[12.5px]">
                                     <span className="font-medium">
-                                        Billable hours
+                                        Recorded hours
                                     </span>
                                     <span className="text-base font-bold text-primary tabular-nums">
                                         {hours.toFixed(2)}h
@@ -429,6 +428,7 @@ export default function ViewTimesheetDialog({
                                     </SectionTitle>
                                     <div className="mt-3 space-y-2">
                                         {allocations.map((a) => {
+                                            const hasClient = a.client_id > 0;
                                             const aHours =
                                                 a.hours ??
                                                 (a.minutes
@@ -446,26 +446,34 @@ export default function ViewTimesheetDialog({
                                                     : 100;
                                             return (
                                                 <div key={a.client_id}>
-                                                    <div className="flex items-center justify-between text-[12.5px]">
-                                                        <span className="truncate font-medium">
-                                                            {a.client_name ??
-                                                                `Client #${a.client_id}`}
+                                                    <div className="flex flex-wrap items-center justify-between gap-2 text-[12.5px]">
+                                                        <span className="font-medium">
+                                                            {hasClient
+                                                                ? (a.client_name ??
+                                                                  `Client #${a.client_id}`)
+                                                                : 'Not allocated to an individual client'}
                                                         </span>
                                                         <span className="text-muted-foreground tabular-nums">
                                                             {aHours.toFixed(2)}h
-                                                            · {pct}%
+                                                            {hasClient
+                                                                ? ` · ${pct}%`
+                                                                : ''}
                                                         </span>
                                                     </div>
-                                                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
-                                                        <div
-                                                            className="h-full rounded-full bg-primary"
-                                                            style={{
-                                                                width:
-                                                                    pct + '%',
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    {a.allocation_method ? (
+                                                    {hasClient && (
+                                                        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
+                                                            <div
+                                                                className="h-full rounded-full bg-primary"
+                                                                style={{
+                                                                    width:
+                                                                        pct +
+                                                                        '%',
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                    {hasClient &&
+                                                    a.allocation_method ? (
                                                         <div className="mt-0.5 text-[10.5px] tracking-wider text-muted-foreground uppercase">
                                                             {
                                                                 a.allocation_method
@@ -673,7 +681,7 @@ export default function ViewTimesheetDialog({
                     </div>
                 </div>
 
-                <footer className="shrink-0 border-t border-border bg-background p-3.5">
+                <footer className="shrink-0 border-t border-border bg-background p-3.5 [&_button]:min-h-[44px]">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex flex-wrap items-center gap-2">
                             <Button
@@ -698,7 +706,7 @@ export default function ViewTimesheetDialog({
                                         onClick={() =>
                                             setReasonAction('reject')
                                         }
-                                        disabled={busy}
+                                        disabled={reasonAction !== null}
                                     >
                                         <XCircle className="h-4 w-4" /> Reject
                                     </Button>
@@ -709,7 +717,7 @@ export default function ViewTimesheetDialog({
                                         onClick={() =>
                                             setReasonAction('return')
                                         }
-                                        disabled={busy}
+                                        disabled={reasonAction !== null}
                                     >
                                         <RotateCcw className="h-4 w-4" /> Return
                                         for changes
@@ -718,13 +726,9 @@ export default function ViewTimesheetDialog({
                                         size="sm"
                                         className="gap-1.5"
                                         onClick={() =>
-                                            call(
-                                                'post',
-                                                `/operations/timesheets/${t.id}/approve`,
-                                                {},
-                                            )
+                                            setReasonAction('approve')
                                         }
-                                        disabled={busy}
+                                        disabled={reasonAction !== null}
                                     >
                                         <CheckCircle2 className="h-4 w-4" />{' '}
                                         Approve
@@ -735,14 +739,8 @@ export default function ViewTimesheetDialog({
                                 <Button
                                     size="sm"
                                     className="gap-1.5"
-                                    onClick={() =>
-                                        call(
-                                            'post',
-                                            `/operations/timesheets/${t.id}/submit`,
-                                            {},
-                                        )
-                                    }
-                                    disabled={busy}
+                                    onClick={() => setReasonAction('submit')}
+                                    disabled={reasonAction !== null}
                                 >
                                     <Send className="h-4 w-4" /> Submit for
                                     approval
@@ -759,49 +757,24 @@ export default function ViewTimesheetDialog({
                 </footer>
             </DialogContent>
 
-            <ReasonDialog
-                open={reasonAction !== null}
-                onClose={() => setReasonAction(null)}
-                title={
-                    reasonAction === 'reject'
-                        ? 'Reject timesheet?'
-                        : 'Return for changes?'
-                }
-                description={
-                    !mayReview
-                        ? 'This action is no longer available. Your reason is retained; close and refresh the record to check access.'
-                        : reasonAction === 'reject'
-                          ? 'The staff member will see this timesheet as rejected, with your reason.'
-                          : 'The timesheet goes back to the staff member to fix and resubmit.'
-                }
-                label={
-                    reasonAction === 'reject'
-                        ? 'Reason for rejection'
-                        : 'What needs changing?'
-                }
-                confirmLabel={
-                    reasonAction === 'reject'
-                        ? 'Reject timesheet'
-                        : 'Return to staff'
-                }
-                destructive={reasonAction === 'reject'}
-                onConfirm={(reason, done) => {
-                    if (!mayReview || busy) {
-                        done();
-                        return;
+            {reasonAction && (
+                <TimesheetActionDialog
+                    open
+                    action={reasonAction}
+                    record={t}
+                    canAct={
+                        reasonAction === 'submit'
+                            ? maySubmit
+                            : mayReview &&
+                              (reasonAction === 'reject'
+                                  ? t.can_reject !== false
+                                  : reasonAction === 'return'
+                                    ? t.can_return !== false
+                                    : t.can_approve !== false)
                     }
-                    if (reasonAction === 'reject') {
-                        call('post', `/operations/timesheets/${t.id}/reject`, {
-                            decision_notes: reason,
-                        });
-                    } else {
-                        call('post', `/operations/timesheets/${t.id}/return`, {
-                            returned_notes: reason,
-                        });
-                    }
-                    setReasonAction(null);
-                }}
-            />
+                    onOpenChange={(next) => !next && setReasonAction(null)}
+                />
+            )}
         </Dialog>
     );
 }

@@ -5,7 +5,8 @@ const { put, post } = vi.hoisted(() => ({ put: vi.fn(), post: vi.fn() }));
 vi.mock('@inertiajs/react', async () => {
     const React = await import('react');
     return {
-        router: { post },
+        router: { post, put },
+        usePage: () => ({ props: { auth: { user: { id: 7 }, can: {} } } }),
         useForm: (initial: Record<string, unknown>) => {
             const [data, setData] = React.useState(initial);
             return {
@@ -47,12 +48,11 @@ it('retains entered edit values when current permission disappears', () => {
             onOpenChange={() => {}}
         />,
     );
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to hours' }));
     fireEvent.change(screen.getByDisplayValue('Original draft'), {
         target: { value: 'Unsaved explanation' },
     });
-    expect(
-        screen.getByRole('button', { name: 'Save' }),
-    ).toBeTruthy();
+    expect(screen.getByDisplayValue('Unsaved explanation')).toBeEnabled();
     rerender(
         <EditTimesheetDialog
             open
@@ -63,9 +63,7 @@ it('retains entered edit values when current permission disappears', () => {
         />,
     );
     expect(screen.getByDisplayValue('Unsaved explanation')).toBeDisabled();
-    expect(
-        screen.queryByRole('button', { name: 'Save' }),
-    ).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
     expect(
         screen.queryByRole('button', { name: 'Submit for approval' }),
     ).toBeNull();
