@@ -6,16 +6,30 @@ use App\Domain\It\Services\ItMailboxPollState;
 use App\Http\Controllers\Settings\ItMailboxSettingsController;
 use App\Http\Requests\Settings\UpdateItMailboxRequest;
 use App\Jobs\PollItMailboxJob;
+use App\Mail\MailNotSubmitted;
+use App\Mail\SupportMailboxSender;
+use App\Models\AppSetting;
 use App\Models\ItInboundEmail;
 use App\Models\ItMailboxConnection;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\EmailConfiguration;
+use App\Services\Medication\BackupDelivery\BackupEmailSender;
+use App\Services\Medication\BackupDelivery\BackupMailTransport;
 use Database\Seeders\RbacSeeder;
+use GuzzleHttp\Client as GuzzleClient;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Middleware;
+use GuzzleHttp\Psr7\Response as GuzzleResponse;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Socialite\Facades\Socialite;
+use SocialiteProviders\Google\Provider as GoogleProvider;
+use SocialiteProviders\Microsoft\Provider as MicrosoftProvider;
 
 /*
  * E6a — the support-mailbox connect/disconnect backend (mirrors the
@@ -148,8 +162,10 @@ test('the OAuth callback stores a connected mailbox row', function () {
     $oauthUser->token = 'live-access';
     $oauthUser->refreshToken = 'live-refresh';
     $oauthUser->expiresIn = 3600;
+    $oauthUser->approvedScopes = ['https://graph.microsoft.com/Mail.ReadWrite'];
 
     Socialite::shouldReceive('driver')->with('microsoft')->andReturnSelf();
+    Socialite::shouldReceive('scopes')->andReturnSelf();
     Socialite::shouldReceive('redirectUrl')->andReturnSelf();
     Socialite::shouldReceive('user')->andReturn($oauthUser);
 
@@ -240,7 +256,9 @@ test('OAuth reconnect clears authentication failure and invalidates stale worker
     $oauthUser->token = 'synthetic-reconnected';
     $oauthUser->refreshToken = 'synthetic-refresh';
     $oauthUser->expiresIn = 3600;
+    $oauthUser->approvedScopes = ['https://graph.microsoft.com/Mail.ReadWrite'];
     Socialite::shouldReceive('driver')->with('microsoft')->andReturnSelf();
+    Socialite::shouldReceive('scopes')->andReturnSelf();
     Socialite::shouldReceive('redirectUrl')->andReturnSelf();
     Socialite::shouldReceive('user')->andReturn($oauthUser);
     $this->actingAs($this->admin)->get('/settings/it-mailbox/callback/microsoft')->assertRedirect(route('settings.it-mailbox'));
@@ -338,4 +356,177 @@ test('a mailbox verification rate limit preserves configuration and applies its 
     expect($connection->fresh()->poll_claim_token)->toBeNull();
     expect($connection->fresh()->last_poll_attempt_at)->toBeNull();
     expect($connection->fresh()->next_poll_at->timestamp)->toBeGreaterThanOrEqual(now()->addSeconds(179)->timestamp);
+});
+
+/** Exercise the installed token-response parser with an entirely synthetic Guzzle queue. */
+function itSettingsFakeOAuthProvider(string $provider, mixed $granted, array &$history): void
+{
+    $token = ['access_token' => 'synthetic-consent-access', 'refresh_token' => 'synthetic-consent-refresh', 'expires_in' => 3600];
+    if ($granted !== null) {
+        $token['scope'] = $granted;
+    }
+    $identity = $provider === 'microsoft'
+        ? ['id' => 'synthetic-user', 'displayName' => 'Synthetic Account', 'userPrincipalName' => 'admin@example.test']
+        : ['sub' => 'synthetic-user', 'name' => 'Synthetic Account', 'email' => 'admin@example.test', 'picture' => null];
+    $handler = HandlerStack::create(new MockHandler([
+        new GuzzleResponse(200, ['Content-Type' => 'application/json'], json_encode($token, JSON_THROW_ON_ERROR)),
+        new GuzzleResponse(200, ['Content-Type' => 'application/json'], json_encode($identity, JSON_THROW_ON_ERROR)),
+    ]));
+    $handler->push(Middleware::history($history));
+    $client = new GuzzleClient(['handler' => $handler]);
+    Socialite::shouldReceive('driver')->once()->with($provider)->andReturnUsing(function () use ($provider, $client) {
+        $arguments = [request(), 'synthetic-client', 'synthetic-client-secret', route('settings.it-mailbox.callback', $provider)];
+        if ($provider === 'microsoft') {
+            $driver = Mockery::mock(MicrosoftProvider::class, $arguments)->makePartial();
+            // ID-token/JWKS verification is outside this scope test; token exchange,
+            // state verification, identity mapping and approvedScopes parsing remain real.
+            $driver->shouldReceive('getRoles')->andReturn([]);
+        } else {
+            $driver = new GoogleProvider(...$arguments);
+        }
+
+        return $driver->setHttpClient($client);
+    });
+}
+
+test('connection consent requests sending rights without changing existing recorded grants', function (string $provider) {
+    config(["services.{$provider}.client_id" => 'synthetic-client', "services.{$provider}.client_secret" => 'synthetic-client-secret']);
+    $recorded = $provider === 'microsoft' ? ['Mail.ReadWrite', 'Mail.ReadWrite.Shared'] : ['https://www.googleapis.com/auth/gmail.readonly'];
+    $connection = itSettingsConnection(['provider' => $provider, 'scopes' => $recorded])->fresh();
+    $before = $connection->getRawOriginal();
+    $history = [];
+    Socialite::shouldReceive('driver')->once()->with($provider)->andReturnUsing(function () use ($provider, &$history) {
+        $class = $provider === 'microsoft' ? MicrosoftProvider::class : GoogleProvider::class;
+        $handler = HandlerStack::create(new MockHandler([]));
+        $handler->push(Middleware::history($history));
+
+        return (new $class(request(), 'synthetic-client', 'synthetic-secret', route('settings.it-mailbox.callback', $provider)))
+            ->setHttpClient(new GuzzleClient(['handler' => $handler]));
+    });
+    $response = $this->actingAs($this->admin)->get("/settings/it-mailbox/connect/{$provider}")->assertRedirect();
+    parse_str(parse_url($response->headers->get('Location'), PHP_URL_QUERY), $query);
+    expect($query['prompt'])->toBe('consent')->and($query['state'])->toBeString()->not->toBe('');
+    $scopes = explode(' ', $query['scope']);
+    if ($provider === 'microsoft') {
+        expect($scopes)->toContain('https://graph.microsoft.com/Mail.ReadWrite', 'https://graph.microsoft.com/Mail.ReadWrite.Shared',
+            'https://graph.microsoft.com/Mail.Send', 'https://graph.microsoft.com/Mail.Send.Shared', 'offline_access');
+    } else {
+        expect($scopes)->toContain('https://www.googleapis.com/auth/gmail.modify')
+            ->and($query['access_type'])->toBe('offline');
+    }
+    expect($connection->fresh()->getRawOriginal())->toBe($before)->and($history)->toBe([]);
+    Http::assertNothingSent();
+})->with(['microsoft', 'google']);
+
+test('callback records actual provider grants and sending eligibility without a requested-scope fallback',
+    function (string $provider, mixed $granted, ?string $mailbox, array $expected, bool $eligible) {
+        $existing = itSettingsConnection(['provider' => $provider, 'mailbox_email' => $mailbox, 'scopes' => ['legacy-read-only']]);
+        $history = [];
+        itSettingsFakeOAuthProvider($provider, $granted, $history);
+        $this->actingAs($this->admin)->withSession(['state' => 'synthetic-consent-state'])
+            ->get("/settings/it-mailbox/callback/{$provider}?state=synthetic-consent-state&code=synthetic-code")
+            ->assertRedirect(route('settings.it-mailbox'))->assertSessionHasNoErrors();
+        $connection = $existing->fresh();
+        expect($connection->scopes)->toBe($expected)
+            ->and($connection->configuration_version)->toBe(2)
+            ->and($connection->mailbox_email)->toBe($mailbox)
+            ->and($connection->access_token)->toBe('synthetic-consent-access')
+            ->and(SupportMailboxSender::configurationIssue($connection, $provider) === null)->toBe($eligible)
+            ->and($history)->toHaveCount(2);
+        expect($history[0]['request']->getMethod())->toBe('POST')
+            ->and($history[1]['request']->getMethod())->toBe('GET')
+            ->and($history[1]['request']->getHeaderLine('Authorization'))->toBe('Bearer synthetic-consent-access');
+        parse_str((string) $history[0]['request']->getBody(), $exchange);
+        expect($exchange['code'])->toBe('synthetic-code');
+        if ($provider === 'microsoft') {
+            expect(explode(' ', $exchange['scope']))->toContain('https://graph.microsoft.com/Mail.Send', 'https://graph.microsoft.com/Mail.Send.Shared');
+        }
+        Http::assertNothingSent();
+    })->with([
+        'own Microsoft send consent' => ['microsoft', 'Mail.ReadWrite Mail.Send', null, ['Mail.ReadWrite', 'Mail.Send'], true],
+        'shared Microsoft send consent' => ['microsoft', 'Mail.ReadWrite.Shared Mail.Send.Shared', 'support@example.test', ['Mail.ReadWrite.Shared', 'Mail.Send.Shared'], true],
+        'own consent cannot authorize a shared sender' => ['microsoft', 'Mail.ReadWrite Mail.Send', 'support@example.test', ['Mail.ReadWrite', 'Mail.Send'], false],
+        'legacy Microsoft read consent' => ['microsoft', 'Mail.ReadWrite Mail.ReadWrite.Shared', null, ['Mail.ReadWrite', 'Mail.ReadWrite.Shared'], false],
+        'missing provider scope evidence' => ['microsoft', null, null, [], false],
+        'scope dictionary is not granted-list evidence' => ['microsoft', ['granted' => 'Mail.Send'], null, [], false],
+        'nonstring scope is invalid evidence' => ['microsoft', ['Mail.Send', false], null, [], false],
+        'control characters are invalid scope evidence' => ['microsoft', ["Mail.Send\nMail.ReadWrite"], null, [], false],
+        'Google modify retains sending eligibility' => ['google', 'openid https://www.googleapis.com/auth/gmail.modify', null, ['openid', 'https://www.googleapis.com/auth/gmail.modify'], true],
+        'Google read only remains ineligible' => ['google', 'https://www.googleapis.com/auth/gmail.readonly', null, ['https://www.googleapis.com/auth/gmail.readonly'], false],
+    ]);
+
+test('Microsoft reconnect requires central mailbox reselection before protected backup submission', function (?string $mailbox, string $grant) {
+    config(['mail.default' => 'smtp', 'emar-catalogue-backups.send_enabled' => true]);
+    $connection = itSettingsConnection(['mailbox_email' => $mailbox, 'scopes' => ['Mail.ReadWrite', 'Mail.ReadWrite.Shared']])->fresh();
+    AppSetting::create(['key' => EmailConfiguration::KEY, 'value' => [
+        'configuration_version' => 1, 'provider' => 'microsoft', 'from_name' => 'Approved Sender', 'from_address' => 'ignored@example.test',
+        'it_support' => ['enabled' => false, 'connection_id' => $connection->id, 'connection_version' => 1, 'connection_scope_hash' => $connection->mailboxScopeHash()],
+    ]]);
+    expect(app(BackupEmailSender::class)->readiness()['email_ready'])->toBeFalse();
+    $history = [];
+    itSettingsFakeOAuthProvider('microsoft', $grant, $history);
+    $this->actingAs($this->admin)->withSession(['state' => 'synthetic-consent-state'])
+        ->get('/settings/it-mailbox/callback/microsoft?state=synthetic-consent-state&code=synthetic-code')
+        ->assertRedirect(route('settings.it-mailbox'))->assertSessionHasNoErrors();
+    $connection->refresh();
+    expect($connection->configuration_version)->toBe(2)
+        ->and($connection->mailbox_email)->toBe($mailbox)
+        ->and(SupportMailboxSender::configurationIssue($connection, 'microsoft'))->toBeNull()
+        ->and(app(BackupEmailSender::class)->readiness()['email_ready'])->toBeFalse();
+    expect(fn () => app(BackupMailTransport::class)->send(['approved@example.test'], '%PDF-PROTECTED-SYNTHETIC', '2026-10-07'))
+        ->toThrow(MailNotSubmitted::class);
+    Http::assertNothingSent();
+
+    $this->putJson('/settings/email', [
+        'expected_actor_id' => $this->admin->id, 'expected_version' => 1, 'provider' => 'microsoft', 'smtp_host' => null,
+        'smtp_port' => 587, 'smtp_encryption' => 'tls', 'smtp_username' => null, 'smtp_password' => null, 'clear_smtp_password' => false,
+        'from_address' => null, 'from_name' => 'Approved Sender', 'support_enabled' => false,
+        'support_connection_id' => $connection->id, 'support_connection_version' => 2, 'public_reply_mode' => 'link_only',
+    ])->assertOk();
+    expect(app(BackupEmailSender::class)->readiness()['email_ready'])->toBeTrue();
+    Http::fake(['graph.microsoft.com/*' => Http::response([], 202)]);
+    app(BackupMailTransport::class)->send(['approved@example.test'], '%PDF-PROTECTED-SYNTHETIC', '2026-10-07');
+    Http::assertSentCount(1);
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && str_ends_with($request->url(), '/me/sendMail')
+        && str_contains(base64_decode($request->body(), true), 'From: Approved Sender <'.$connection->mailboxEmail().'>'));
+    expect($history)->toHaveCount(2);
+})->with([
+    'connected account' => [null, 'Mail.ReadWrite Mail.Send'],
+    'approved shared mailbox' => ['support@example.test', 'Mail.ReadWrite.Shared Mail.Send.Shared'],
+]);
+
+test('OAuth state mismatch cannot persist token or consent evidence', function () {
+    $connection = itSettingsConnection(['scopes' => ['Mail.ReadWrite']])->fresh();
+    $before = $connection->getRawOriginal();
+    $history = [];
+    itSettingsFakeOAuthProvider('microsoft', 'Mail.Send', $history);
+    $this->actingAs($this->admin)->withSession(['state' => 'synthetic-approved-state'])
+        ->get('/settings/it-mailbox/callback/microsoft?state=wrong-state&code=synthetic-code')
+        ->assertRedirect(route('settings.it-mailbox'))->assertSessionHasErrors('microsoft');
+    expect($connection->fresh()->getRawOriginal())->toBe($before)->and($history)->toBe([]);
+    Http::assertNothingSent();
+});
+
+test('callback rechecks secret management permission after the provider returns', function () {
+    $connection = itSettingsConnection(['scopes' => ['Mail.ReadWrite']])->fresh();
+    $before = $connection->getRawOriginal();
+    $oauthUser = (new Laravel\Socialite\Two\User)->map(['email' => 'admin@example.test', 'name' => 'Synthetic Account']);
+    $oauthUser->token = 'synthetic-access';
+    $oauthUser->refreshToken = 'synthetic-refresh';
+    $oauthUser->expiresIn = 3600;
+    $oauthUser->approvedScopes = ['Mail.Send'];
+    Socialite::shouldReceive('driver')->with('microsoft')->andReturnSelf();
+    Socialite::shouldReceive('scopes')->andReturnSelf();
+    Socialite::shouldReceive('redirectUrl')->andReturnSelf();
+    Socialite::shouldReceive('user')->andReturnUsing(function () use ($oauthUser) {
+        $permission = Permission::where('key', 'integrations.manage_secrets')->sole();
+        $this->admin->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => false]]);
+
+        return $oauthUser;
+    });
+    $this->actingAs($this->admin)->get('/settings/it-mailbox/callback/microsoft')->assertForbidden();
+    expect($connection->fresh()->getRawOriginal())->toBe($before);
+    $this->assertDatabaseMissing('audit_logs', ['action' => 'settings.it_mailbox.connected']);
+    Http::assertNothingSent();
 });

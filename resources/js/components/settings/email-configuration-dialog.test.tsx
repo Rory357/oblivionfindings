@@ -203,6 +203,52 @@ describe('email settings save confirmation and recovery', () => {
         );
     });
 
+    it('explicitly adopts a reconnected mailbox version before saving', async () => {
+        const current = {
+            ...initial,
+            connections: [{ ...connection, configuration_version: 2 }],
+        };
+        vi.mocked(axios.put).mockResolvedValue({
+            data: {
+                data: {
+                    ...current,
+                    settings: {
+                        ...current.settings,
+                        configuration_version: 3,
+                        support_connection_version: 2,
+                    },
+                },
+            },
+        });
+        setup(current);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Go to Sender identity' }),
+        );
+        expect(
+            screen.getByText('Mailbox connection changed'),
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Use current mailbox' }),
+        );
+        expect(
+            screen.queryByText('Mailbox connection changed'),
+        ).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Go to Review' }));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Save email settings' }),
+        );
+        await screen.findByText('Email settings saved');
+        expect(axios.put).toHaveBeenCalledWith(
+            '/settings/email',
+            expect.objectContaining({
+                support_connection_id: connection.id,
+                support_connection_version: 2,
+                from_address: connection.mailbox_email,
+            }),
+            expect.anything(),
+        );
+    });
+
     it('keeps a connected mailbox sender read-only', () => {
         setup();
         fireEvent.click(

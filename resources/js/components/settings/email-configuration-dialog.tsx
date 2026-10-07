@@ -822,6 +822,44 @@ export function EmailConfigurationDialog({
                                             settings.
                                         </p>
                                     )}
+                                {selected &&
+                                    selected.configuration_version !==
+                                        draft.support_connection_version && (
+                                        <Alert>
+                                            <AlertTitle>
+                                                Mailbox connection changed
+                                            </AlertTitle>
+                                            <AlertDescription>
+                                                <p>
+                                                    Review{' '}
+                                                    {selected.mailbox_email ??
+                                                        'this mailbox'}{' '}
+                                                    and use its current
+                                                    connection before saving.
+                                                </p>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={
+                                                        !selected.connected
+                                                    }
+                                                    onClick={() =>
+                                                        setDraft((current) => ({
+                                                            ...current,
+                                                            support_connection_version:
+                                                                selected.configuration_version,
+                                                            from_address:
+                                                                selected.mailbox_email ??
+                                                                current.from_address,
+                                                        }))
+                                                    }
+                                                >
+                                                    Use current mailbox
+                                                </Button>
+                                            </AlertDescription>
+                                        </Alert>
+                                    )}
                                 {selected?.sending_issue &&
                                     draft.provider !== 'smtp' && (
                                         <Alert>
