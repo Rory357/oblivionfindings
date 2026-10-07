@@ -9,10 +9,12 @@ import {
 } from '@/components/page';
 import { EntityFilter, WeekPicker } from '@/components/rostering';
 import { formatDateOnly, formatDateTimeInZone } from '@/lib/datetime';
+import { Link } from '@inertiajs/react';
 import {
     CalendarRange,
     ChevronLeft,
     ChevronRight,
+    ClipboardCheck,
     FileText,
     Plus,
     Search,
@@ -48,6 +50,7 @@ export default function TimesheetsHero({
     clients,
     staff,
     canCreate,
+    canReviewAdjustments = false,
     ownOnly,
     loading,
     onCreateTimesheet,
@@ -69,6 +72,7 @@ export default function TimesheetsHero({
     clients: Choice[];
     staff: Choice[];
     canCreate: boolean;
+    canReviewAdjustments?: boolean;
     ownOnly: boolean;
     loading: boolean;
     onCreateTimesheet: () => void;
@@ -147,6 +151,16 @@ export default function TimesheetsHero({
                                 </PageHeaderGlassButton>
                             </fieldset>
                         </form>
+                        {canReviewAdjustments && (
+                            <PageHeaderGlassButton
+                                asChild
+                                icon={ClipboardCheck}
+                            >
+                                <Link href="/operations/timesheets/payroll-adjustments">
+                                    Payroll adjustments
+                                </Link>
+                            </PageHeaderGlassButton>
+                        )}
                         {canCreate && (
                             <PageHeaderPrimaryButton
                                 icon={Plus}

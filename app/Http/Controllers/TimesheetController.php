@@ -8,13 +8,14 @@ use App\Domain\Shifts\Timesheets\TimesheetAllocationService;
 use App\Domain\Shifts\Timesheets\TimesheetApprovalService;
 use App\Domain\Shifts\Timesheets\TimesheetCommandReceipt;
 use App\Domain\Shifts\Timesheets\TimesheetCreationService;
+use App\Domain\Shifts\Timesheets\TimesheetPayrollAdjustmentReceipt;
+use App\Domain\Shifts\Timesheets\TimesheetPayrollAdjustmentService;
 use App\Models\Client;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\TimesheetAmendment;
 use App\Models\User;
-use App\Services\AuditLogger;
 use App\Services\NotificationService;
 use App\Services\ShiftOperationalSnapshotService;
 use App\Services\UserSiteAccessService;
@@ -1316,6 +1317,7 @@ class TimesheetController extends Controller
             ->where('status', TimesheetAmendment::STATUS_APPROVED)
             ->where('payroll_adjustment_required', true)
             ->whereNull('applied_at')
+            ->whereHas('timesheet', fn (Builder $query) => $this->siteAccess()->applyTimesheetScope($query, $auth, []))
             ->with([
                 'timesheet:id,shift_id,user_id,client_id,work_date,starts_at,ends_at,status,staff_name_snapshot,client_name_snapshot,shift_site_name_snapshot,payroll_reference,exported_to_payroll_at',
                 'timesheet.shift:id,starts_at,ends_at',
@@ -1323,10 +1325,13 @@ class TimesheetController extends Controller
                 'reviewedBy:id,name',
             ])
             ->orderBy('reviewed_at')
+            ->orderBy('id')
             ->paginate(20)
             ->withQueryString();
 
         return inertia('operations/timesheets/payroll-adjustments', [
+            'canProcess' => $auth->isApproved() && ($auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny')),
+            'evidence' => ['timezone' => $this->workerTimezone()],
             'amendments' => $amendments->through(fn (TimesheetAmendment $a) => [
                 'id' => $a->id,
                 'timesheet_id' => $a->timesheet_id,
@@ -1346,34 +1351,25 @@ class TimesheetController extends Controller
         ]);
     }
 
-    /**
-     * Mark a payroll-linked amendment as processed (payroll adjustment handled externally).
-     */
+    /** Records external handling; never applies pay values or marks a Timesheet paid. */
     public function markPayrollAdjustmentProcessed(Request $request, TimesheetAmendment $amendment)
     {
+        $receipts = app(TimesheetPayrollAdjustmentReceipt::class);
+        $rootEntry = $receipts->begin($request);
         $auth = $request->user();
         abort_unless($auth && ($auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny')), 403);
-
-        if ($amendment->status !== TimesheetAmendment::STATUS_APPROVED) {
-            return back()->with('error', 'Only approved amendments can be marked as processed.');
+        $result = app(TimesheetPayrollAdjustmentService::class)->process($amendment, $auth);
+        if ($result->error !== null) {
+            return back()->with('error', $result->error);
+        }
+        $response = back()->with('success', $result->changed
+            ? 'Payroll adjustment marked as processed.'
+            : 'This adjustment has already been marked as processed.');
+        if ($receipt = $receipts->committed($rootEntry, $result)) {
+            $response->with('timesheet_payroll_adjustment_result', $receipt);
         }
 
-        if (! $amendment->payroll_adjustment_required) {
-            return back()->with('error', 'This amendment does not require payroll adjustment.');
-        }
-
-        if ($amendment->applied_at) {
-            return back()->with('success', 'This adjustment has already been marked as processed.');
-        }
-
-        $amendment->update(['applied_at' => now()]);
-
-        AuditLogger::log('timesheet.amendment.payroll_processed', $amendment->timesheet, [
-            'amendment_id' => $amendment->id,
-            'processed_by' => $auth->id,
-        ]);
-
-        return back()->with('success', 'Payroll adjustment marked as processed.');
+        return $response;
     }
 
     protected function canReviewTimesheets(?User $user): bool

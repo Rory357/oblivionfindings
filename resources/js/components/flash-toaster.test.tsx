@@ -67,3 +67,16 @@ it.each(['Selected timesheets approved.', 'Timesheet archived.'])(
         expect(success).toHaveBeenCalledWith(message);
     },
 );
+
+it.each([
+    'Payroll adjustment marked as processed.',
+    'This adjustment has already been marked as processed.',
+])(
+    'leaves external adjustment confirmation to its matching receipt: %s',
+    (message) => {
+        page.component = 'operations/timesheets/payroll-adjustments';
+        page.props.flash = { success: message };
+        render(<FlashToaster />);
+        expect(success).not.toHaveBeenCalled();
+    },
+);

@@ -56,9 +56,16 @@ export default function FlashToaster() {
             'Timesheet rejected.',
             'Timesheet returned for changes.',
         ].includes(rawSuccess ?? '');
+    const adjustmentDialogOwnsResult =
+        page.component === 'operations/timesheets/payroll-adjustments' &&
+        [
+            'Payroll adjustment marked as processed.',
+            'This adjustment has already been marked as processed.',
+        ].includes(rawSuccess ?? '');
     const success =
         page.component === 'operations/shift-notes/Index' ||
-        timesheetDialogOwnsResult
+        timesheetDialogOwnsResult ||
+        adjustmentDialogOwnsResult
             ? null
             : rawSuccess;
     const error = asToastText(flash?.error);

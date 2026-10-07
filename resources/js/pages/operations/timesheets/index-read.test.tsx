@@ -260,3 +260,14 @@ it('distinguishes recorded manual activities from linked shift task completion',
     ).toBeTruthy();
     expect(screen.queryByText(/Activity items:/)).toBeNull();
 });
+
+it('provides payroll adjustment navigation only with the current review grant', () => {
+    const { rerender } = render(<TimesheetsIndex {...props} />);
+    expect(
+        screen.getByRole('link', { name: 'Payroll adjustments' }),
+    ).toHaveAttribute('href', '/operations/timesheets/payroll-adjustments');
+    rerender(<TimesheetsIndex {...props} canApprove={false} />);
+    expect(
+        screen.queryByRole('link', { name: 'Payroll adjustments' }),
+    ).toBeNull();
+});

@@ -819,6 +819,7 @@ export default function TimesheetsIndex({
                     }))}
                     staff={staff}
                     canCreate={canCreate}
+                    canReviewAdjustments={canApprove}
                     ownOnly={isOwnOnlyView}
                     loading={reads.loading}
                     onCreateTimesheet={() => {
