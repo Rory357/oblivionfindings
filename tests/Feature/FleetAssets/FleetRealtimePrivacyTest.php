@@ -167,7 +167,7 @@ class FleetRealtimePrivacyTest extends TestCase
         // Keep consent, telemetry and authorization effects inside this observation.
         Queue::fake();
         $client->supportWorkers()->attach($user->id);
-        $consent = $this->createTrackingConsent($client, 'Fleet Tracking');
+        $consent = $this->createTrackingConsent($client, 'Fleet Tracking', $user);
         $device = Device::factory()->tracking()->create();
         $this->assignDeviceToClient($device, $client, $consent);
         $asset = Asset::factory()->create([
@@ -176,6 +176,8 @@ class FleetRealtimePrivacyTest extends TestCase
             'client_id' => $client->id,
             'category' => 'Personal Tracker',
             'status' => 'active',
+            'created_by_user_id' => $user->id,
+            'updated_by_user_id' => $user->id,
         ]);
         DeviceAssetLink::query()->create([
             'device_id' => $device->id,
@@ -252,7 +254,7 @@ class FleetRealtimePrivacyTest extends TestCase
         ]);
     }
 
-    private function createTrackingConsent(Client $client, string $typeName = 'Personal Tracker (Wandering Risk)'): ClientConsent
+    private function createTrackingConsent(Client $client, string $typeName = 'Personal Tracker (Wandering Risk)', ?User $recorder = null): ClientConsent
     {
         $type = ConsentType::query()->firstOrCreate(
             ['name' => $typeName],
@@ -275,7 +277,7 @@ class FleetRealtimePrivacyTest extends TestCase
             ],
         );
 
-        return AuthoritativeConsentFixture::manualSelf($client, $type, User::factory()->create(), [
+        return AuthoritativeConsentFixture::manualSelf($client, $type, $recorder ?? User::factory()->create(), [
             'status' => 'given',
             'given_at' => now(),
             'expires_at' => now()->addMonth(),
