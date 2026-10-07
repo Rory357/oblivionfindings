@@ -44,7 +44,7 @@ const steps = [
     },
     {
         key: 'identity',
-        label: 'Support identity',
+        label: 'Sender identity',
         blurb: 'Sender and reply mailbox',
         icon: Inbox,
     },
@@ -355,10 +355,10 @@ export function EmailConfigurationDialog({
                 open
                 onClose={close}
                 title="Edit email settings"
-                description="Choose the outgoing provider, approved support identity and public-reply content, then review the changes."
+                description="Choose the shared email provider and sender, then review the changes. Protected eMAR backups use this configuration; IT support has its own delivery switch."
                 railIcon={Mail}
                 railTitle="Email settings"
-                railSub="IT support delivery"
+                railSub="Shared outgoing email"
                 steps={steps}
                 stepIndex={step}
                 onStepClick={(index) => {
@@ -414,7 +414,7 @@ export function EmailConfigurationDialog({
                     saved ? (
                         <WizardSuccessPane
                             title="Email settings saved"
-                            blurb="The saved configuration is available for IT support delivery. Provider acceptance still needs its own test."
+                            blurb="The saved provider is available to protected eMAR backups and enabled IT support delivery. Provider acceptance still needs verification."
                             actions={<Button onClick={onClose}>Done</Button>}
                         />
                     ) : undefined
@@ -545,7 +545,7 @@ export function EmailConfigurationDialog({
                                 <StepHead
                                     icon={Mail}
                                     title="Choose the delivery provider"
-                                    blurb="These settings control IT messages when support delivery is enabled. Mail capture remains active in an isolated environment."
+                                    blurb="Protected eMAR backups use this saved provider. The IT support switch controls IT messages only. Local mail capture still prevents external sending."
                                 />
                                 <TilePicker
                                     value={draft.provider}
@@ -718,8 +718,8 @@ export function EmailConfigurationDialog({
                             <WizardStepPane key="identity">
                                 <StepHead
                                     icon={Inbox}
-                                    title="Choose the support identity"
-                                    blurb="The selected mailbox is the sender and receives replies. Manage account connections from Support mailbox settings."
+                                    title="Choose the sender identity"
+                                    blurb="For Microsoft 365 or Google Workspace, select the approved connected mailbox. SMTP backups use the sender address below. IT support also requires a connected reply mailbox."
                                 />
                                 <Field
                                     label="Support mailbox"
@@ -812,13 +812,26 @@ export function EmailConfigurationDialog({
                                     label="Sender and reply address"
                                     required
                                     error={errors.from_address}
-                                    hint="Must match the selected support mailbox."
+                                    hint="For Microsoft 365, Google Workspace or enabled IT support, this must match the selected mailbox."
                                 >
                                     <Input
-                                        readOnly
+                                        type="email"
+                                        readOnly={
+                                            draft.provider !== 'smtp' ||
+                                            draft.support_enabled
+                                        }
                                         value={
-                                            selected?.mailbox_email ??
-                                            draft.from_address
+                                            draft.provider === 'smtp' &&
+                                            !draft.support_enabled
+                                                ? draft.from_address
+                                                : (selected?.mailbox_email ??
+                                                  draft.from_address)
+                                        }
+                                        onChange={(event) =>
+                                            change(
+                                                'from_address',
+                                                event.target.value,
+                                            )
                                         }
                                     />
                                 </Field>

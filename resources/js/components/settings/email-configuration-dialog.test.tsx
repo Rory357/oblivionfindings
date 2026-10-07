@@ -151,6 +151,65 @@ function goToReview() {
 describe('email settings save confirmation and recovery', () => {
     beforeEach(() => vi.clearAllMocks());
 
+    it('saves an SMTP backup sender without requiring an IT support mailbox', async () => {
+        const current = {
+            ...initial,
+            connections: [],
+            settings: {
+                ...initial.settings,
+                provider: 'smtp' as const,
+                support_enabled: false,
+                support_connection_id: null,
+                support_connection_version: null,
+                from_address: '',
+            },
+        };
+        vi.mocked(axios.put).mockResolvedValue({
+            data: {
+                data: {
+                    ...current,
+                    settings: {
+                        ...current.settings,
+                        from_address: 'backups@example.test',
+                        configuration_version: 3,
+                    },
+                },
+            },
+        });
+        setup(current);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Go to Sender identity' }),
+        );
+        const sender = screen.getByLabelText(/Sender and reply address/);
+        expect(sender).not.toHaveAttribute('readonly');
+        fireEvent.change(sender, { target: { value: 'backups@example.test' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Go to Review' }));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Save email settings' }),
+        );
+        await screen.findByText('Email settings saved');
+        expect(axios.put).toHaveBeenCalledWith(
+            '/settings/email',
+            expect.objectContaining({
+                provider: 'smtp',
+                from_address: 'backups@example.test',
+                support_enabled: false,
+                support_connection_id: null,
+            }),
+            expect.anything(),
+        );
+    });
+
+    it('keeps a connected mailbox sender read-only', () => {
+        setup();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Go to Sender identity' }),
+        );
+        expect(
+            screen.getByLabelText(/Sender and reply address/),
+        ).toHaveAttribute('readonly');
+    });
+
     it('keeps rail navigation free, but routes a submit with missing required identity fields back to that step', () => {
         setup({
             ...initial,
@@ -164,7 +223,7 @@ describe('email settings save confirmation and recovery', () => {
             screen.getByText('Complete the required fields before saving.'),
         ).toBeInTheDocument();
         expect(
-            screen.getByText('Choose the support identity'),
+            screen.getByText('Choose the sender identity'),
         ).toBeInTheDocument();
         expect(screen.getByText('Enter a sender name.')).toBeInTheDocument();
         expect(axios.put).not.toHaveBeenCalled();
@@ -187,7 +246,7 @@ describe('email settings save confirmation and recovery', () => {
         ).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
         expect(
-            screen.getByText('Choose the support identity'),
+            screen.getByText('Choose the sender identity'),
         ).toBeInTheDocument();
         expect(
             screen.queryByText('Enter an SMTP host.'),

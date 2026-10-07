@@ -191,6 +191,7 @@ class BackupDeliveryService
         }, 1);
         $submissionStarted = false;
         try {
+            app(BackupEmailSender::class)->prepare();
             // ONE attempt. Nested release cannot retry a submitted transport side effect.
             DB::transaction(function () use ($actor, $id, $token, &$submissionStarted): void {
                 $row = MedicationBackupDelivery::query()->lockForUpdate()->findOrFail($id);

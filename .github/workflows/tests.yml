@@ -195,6 +195,7 @@ jobs:
           tests/Feature/Emar/ProviderMedicationTransferTest.php
           tests/Feature/Emar/MedicineCatalogueWorkflowTest.php
           tests/Feature/Emar/MedicationBackupDeliveryTest.php
+          tests/Feature/Emar/BackupEmailConfigurationTest.php
           tests/Feature/Auth/AuthenticationTest.php
           tests/Feature/Auth/EmailVerificationTest.php
           tests/Feature/Auth/TwoFactorChallengeTest.php

@@ -27,7 +27,7 @@ The clinical protocol controller file also passed all 10 tests / 87 assertions a
 
 Connected-service permissions must remain explicitly assigned. Dedicated seeding regressions cover fresh/repeated seeding, removal of blanket built-in-role grants, preservation of explicit user/custom-role assignments and deny overrides, and permission-registration replay/rollback. External sign-in also covers the canonical email verification notice and resend route while internal routes remain denied.
 
-The GitHub medication release job includes all six connected feature files, the existing login/email-verification/MFA regressions and focused units. It installs qpdf and checks its executable before running the real PDF test; a missing dependency must not silently count as encryption coverage.
+The GitHub medication release job includes all connected feature files, including BackupEmailConfigurationTest, the existing login/email-verification/MFA regressions and focused units. It installs qpdf and checks its executable before running the real PDF test; a missing dependency must not silently count as encryption coverage.
 
 ## Synthetic desktop checks
 
@@ -45,7 +45,7 @@ No production migrations, live clinical transmissions, invitations, supplier ord
 2. Assign the exact management/send permissions to approved staff, preserving house, person, employment and controlled-medication checks. Confirm a staff account and a dedicated external account remain isolated.
 3. Configure pharmacy partners from the documented contract. Test signed acceptance/rejection, timeout/unknown, duplicate acknowledgement and delayed acknowledgement in the supplier's approved test environment. Delivery acceptance never counts as physical stock receipt.
 4. Import only licensed catalogue data. Review exact code/name/product strength/form and packaging, publish with an expiry, and verify a medicine binding and revocation. A catalogue image is an aid to identification, never authority to administer.
-5. Configure an absolute official qpdf executable through EMAR_BACKUP_QPDF_PATH; configure the organisation's mail transport and approved recipient mailboxes. EMAR_BACKUP_SEND_ENABLED remains false until configured. Use approved private storage and a shared scheduler lock/cache on multiple application servers.
+5. Configure an absolute official qpdf executable through EMAR_BACKUP_QPDF_PATH; save the organisation's provider and sender in Main Settings → Email and approve recipient mailboxes. Backups use that saved SMTP or canonical Google/Microsoft mailbox even when IT support email is disabled. Incomplete saved settings and array/log capture prevent submission; they never fall back to server credentials. EMAR_BACKUP_SEND_ENABLED remains false until configured. Use approved private storage and a shared scheduler lock/cache on multiple application servers.
 6. Before enabling routine backup delivery, demonstrate delivery and opening of a fictional protected PDF outside the application. Each generated PDF has a separate password. The authorised duty process must obtain and securely retain the current password before an outage; the unavailable application cannot reveal it during an outage. Do not email passwords alongside charts.
 7. Monitor delivery history. A result marked unknown/uncertain needs a human check and is not automatically resent; some recipients may already have received it. Review retention and ensure scheduled maintenance runs.
 
