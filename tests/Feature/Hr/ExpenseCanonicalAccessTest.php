@@ -130,6 +130,7 @@ test('hidden claims and their lifecycle actions are concealed', function (): voi
         'submitted_at' => now()->subDay(),
     ]);
     $item = $hidden->items()->firstOrFail();
+    Queue::fake(); // Capture only the denied claim reads and commands below.
 
     $this->actingAs($this->manager)
         ->get("/hr/compensation/expenses/{$hidden->id}")

@@ -84,6 +84,9 @@ class EscalateUnresolvedEligibilityJobTest extends TestCase
         $shift = $this->makeFutureBlockedShift();
         $this->createEligibilitySignal($shift, now()->subHours(12)); // 12h ago, threshold is 24h
 
+        // Arrangement may emit a separate eligibility-review notice; measure this job only.
+        Notification::fake();
+
         (new EscalateUnresolvedEligibilityJob(thresholdHours: 24))
             ->handle(app(ShiftStaffEligibilityService::class), app(ShiftSignalService::class));
 
@@ -132,6 +135,9 @@ class EscalateUnresolvedEligibilityJobTest extends TestCase
 
         // Unassign the staff.
         $shift->update(['user_id' => null, 'status' => 'draft']);
+
+        // Arrangement may emit a separate eligibility-review notice; measure this job only.
+        Notification::fake();
 
         (new EscalateUnresolvedEligibilityJob(thresholdHours: 24))
             ->handle(app(ShiftStaffEligibilityService::class), app(ShiftSignalService::class));
@@ -259,12 +265,14 @@ class EscalateUnresolvedEligibilityJobTest extends TestCase
             [
                 'status' => 'expired',
                 'evidence_type' => 'manual',
+                'valid_from' => now()->subYear(),
+                'expires_at' => now()->subDay(),
                 'last_checked_at' => now(),
                 'next_check_at' => now()->addDay(),
             ],
         );
 
-        return Shift::factory()->create([
+        $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
             'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,
@@ -274,6 +282,14 @@ class EscalateUnresolvedEligibilityJobTest extends TestCase
             'status' => 'scheduled',
             'created_by' => $this->staff->id,
         ]);
+        $this->assertSame('expired', HrStaffComplianceStatus::query()
+            ->where('user_id', $this->staff->id)
+            ->where('requirement_id', $requirement->id)
+            ->sole()->status);
+        $this->assertTrue(app(ShiftStaffEligibilityService::class)
+            ->evaluate($shift, $this->staff->fresh())->hasBlocks());
+
+        return $shift;
     }
 
     /**

@@ -5,6 +5,7 @@ namespace Tests\Unit\Operations;
 use App\Models\Client;
 use App\Models\Shift;
 use App\Models\ShiftSignal;
+use App\Models\ShiftSignalOutbox;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\ControlRoom\ControlRoomNotificationService;
@@ -41,6 +42,10 @@ class ShiftSignalServiceTest extends TestCase
             'status' => 'scheduled',
         ]);
 
+        // Creating assigned work may already emit an eligibility signal. Keep that
+        // evidence intact and measure the no-show command independently.
+        $existingSignalIds = ShiftSignal::query()->orderBy('id')->pluck('id')->all();
+        $existingOutboxIds = ShiftSignalOutbox::query()->orderBy('id')->pluck('id')->all();
         $service = app(ShiftSignalService::class);
 
         $first = $service->emitForShift(
@@ -62,10 +67,16 @@ class ShiftSignalServiceTest extends TestCase
         );
 
         $this->assertSame($first->id, $second->id);
-        $this->assertSame(1, ShiftSignal::query()->count());
-        $this->assertDatabaseCount('shift_signal_outbox', 1);
+        $this->assertSame(count($existingSignalIds) + 1, ShiftSignal::query()->count());
+        $this->assertDatabaseCount('shift_signal_outbox', count($existingOutboxIds) + 1);
+        $this->assertSame($existingSignalIds, ShiftSignal::query()->whereIn('id', $existingSignalIds)->orderBy('id')->pluck('id')->all());
+        $this->assertSame($existingOutboxIds, ShiftSignalOutbox::query()->whereIn('id', $existingOutboxIds)->orderBy('id')->pluck('id')->all());
+        $this->assertSame(1, ShiftSignal::query()->whereKey($first->id)->where('shift_id', $shift->id)->where('signal_type', ShiftSignalService::TYPE_NO_SHOW)->count());
+        $this->assertSame(1, ShiftSignalOutbox::query()->where('shift_signal_id', $first->id)->count());
         $this->assertDatabaseHas('control_room_signals', [
             'signal_type_code' => 'shift_no_show',
+            'external_ref' => 'shift_signal_'.$first->id,
+            'site_id' => $site->id,
         ]);
     }
 }

@@ -48,13 +48,17 @@ async function openClientProfileFromMyDay(page: Page) {
     await expect(careAction).toHaveAttribute('href', /\/clients\/\d+$/);
     await careAction.click();
 
-    await expect(page).toHaveURL(/\/clients\/\d+(?:\?.*)?$/);
+    await expect(page).toHaveURL(/\/clients\/\d+(?:\?.*)?$/, {
+        timeout: 30_000,
+    });
     await expect(
         page.getByRole('heading', { name: 'Playwright Meds', level: 1 }),
     ).toBeVisible();
 }
 
 test.describe('canonical client profile care readiness', () => {
+    // Current fixture reset takes up to 20s with live eligibility observers.
+    test.setTimeout(60_000);
     test.beforeEach(async ({ context }) => {
         resetMedicationReadinessFixtures();
         await context.setOffline(false);
@@ -105,7 +109,19 @@ test.describe('canonical client profile care readiness', () => {
 
         await openClientProfileFromMyDay(page);
         const profileUrl = new URL(page.url());
-        await page.goto(`${profileUrl.pathname}?tab=mar`);
+        // The MAR grid owns a scoped day read; the profile summary does not
+        // establish that this separate medication source has loaded.
+        const dayPath = `/emar/clients/${profileUrl.pathname.split('/').at(-1)}/day`;
+        const [dayResponse] = await Promise.all([
+            page.waitForResponse(
+                (response) =>
+                    response.request().method() === 'GET' &&
+                    new URL(response.url()).pathname === dayPath,
+                { timeout: 30_000 },
+            ),
+            page.goto(`${profileUrl.pathname}?tab=mar`),
+        ]);
+        expect(dayResponse.ok()).toBe(true);
 
         await expect(
             page.getByRole('heading', { name: 'Medication', exact: true }),

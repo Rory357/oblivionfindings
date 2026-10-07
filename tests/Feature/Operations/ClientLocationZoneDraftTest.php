@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\RefreshWorkforceEligibility;
 use App\Models\Asset;
 use App\Models\AssetGeofence;
 use App\Models\AuditLog;
@@ -24,6 +25,8 @@ beforeEach(function () {
 
 it('persists and reloads an inactive private draft without operational effects and replays one version', function () {
     extract(ClientLocationWorkspaceFixture::make());
+    $queueBaseline = Queue::pushedJobs();
+    expect(array_keys($queueBaseline))->toBe([RefreshWorkforceEligibility::class]);
     $counts = collect(['asset_geofences', 'asset_geofence_assignments', 'fleet_geofence_states', 'device_assignments', 'control_room_alerts', 'fleet_signals', 'device_command_requests', 'jobs', 'notifications'])
         ->mapWithKeys(fn ($table) => [$table => DB::table($table)->count()]);
     $url = "/operations/clients/{$client->id}/location/zones";
@@ -34,7 +37,7 @@ it('persists and reloads an inactive private draft without operational effects a
     foreach ($counts as $table => $count) {
         expect(DB::table($table)->count())->toBe($count);
     }
-    Queue::assertNothingPushed();
+    expect(Queue::pushedJobs())->toBe($queueBaseline);
     Notification::assertNothingSent();
     Http::assertNothingSent();
 });

@@ -237,6 +237,7 @@ test('a changed delivery outcome invalidates the reviewed retry even when it fai
     $actor = technicalOperationsActor($site);
     $row = technicalOperationsDelivery($site, attributes: ['it_status' => 'failed', 'it_attempts' => 3]);
     $url = '/it/setup/technical-deliveries/device/'.$row->id;
+    Queue::fake(); // Measure the read/retry boundary after source fixture setup.
     $review = $this->actingAs($actor)->getJson($url.'?viewer_user_id='.$actor->id)->assertOk()->json('data');
     $row->update(['it_attempts' => 4]);
     $this->postJson($url.'/retry', ['viewer_user_id' => $actor->id, 'version' => $review['version']])->assertConflict();
@@ -249,9 +250,10 @@ test('forged actor and source identifiers and lost site access deny retry before
     $actor = technicalOperationsActor($site);
     $row = technicalOperationsDelivery($site, attributes: ['it_status' => 'failed']);
     $url = '/it/setup/technical-deliveries/device/'.$row->id;
+    $hidden = technicalOperationsDelivery(Site::factory()->create(), attributes: ['it_status' => 'failed']);
+    Queue::fake(); // Both source fixtures precede every denied read/command.
     $review = $this->actingAs($actor)->getJson($url.'?viewer_user_id='.$actor->id)->assertOk()->json('data');
     $this->postJson($url.'/retry', ['viewer_user_id' => $actor->id + 999, 'version' => $review['version']])->assertForbidden();
-    $hidden = technicalOperationsDelivery(Site::factory()->create(), attributes: ['it_status' => 'failed']);
     $this->getJson('/it/setup/technical-deliveries/device/'.$hidden->id.'?viewer_user_id='.$actor->id)->assertNotFound();
     HrEmployeeProfile::query()->where('user_id', $actor->id)->update(['is_active' => false]);
     $this->postJson($url.'/retry', ['viewer_user_id' => $actor->id, 'version' => $review['version']])->assertNotFound();
@@ -265,6 +267,7 @@ test('audit failure rolls back the allowance and hides exception details even in
     $actor = technicalOperationsActor($site);
     $row = technicalOperationsDelivery($site, attributes: ['it_status' => 'dead_letter', 'it_attempts' => 5]);
     $url = '/it/setup/technical-deliveries/device/'.$row->id;
+    Queue::fake(); // Measure the read/retry boundary after source fixture setup.
     $review = $this->actingAs($actor)->getJson($url.'?viewer_user_id='.$actor->id)->assertOk()->json('data');
     AuditLog::creating(function (AuditLog $audit): void {
         if ($audit->action === 'it.monitoring.delivery_retry_requested') {

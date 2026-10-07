@@ -11,6 +11,7 @@ use App\Domain\SecurityDevices\Management\Jobs\DispatchDeviceCommand;
 use App\Domain\SecurityDevices\Management\Services\DeviceCommandContractVerifier;
 use App\Domain\SecurityDevices\Management\Services\DeviceCommandQueueService;
 use App\Domain\SecurityDevices\Management\Services\DeviceCommandRequestService;
+use App\Jobs\RefreshWorkforceEligibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -67,6 +68,8 @@ class ClientLocateRequestTest extends TestCase
     public function test_removing_the_signed_context_cannot_downgrade_to_a_generic_request(): void
     {
         $fixture = ClientLocateFixture::make();
+        $queueBaseline = Queue::pushedJobs();
+        $this->assertSame([RefreshWorkforceEligibility::class], array_keys($queueBaseline));
         $command = app(DeviceCommandRequestService::class)->request($fixture['device'], $fixture['actor'],
             new CommandRequestInput('tracking.location_refresh', [], 'Request the location for an agreed check.', 'client-location:'.Str::uuid(),
                 stepUpConfirmedAt: CarbonImmutable::now(), originContext: $fixture['origin']));
@@ -86,12 +89,14 @@ class ClientLocateRequestTest extends TestCase
             $this->assertSame(CommandStatus::Blocked, $command->fresh()->status);
             $this->assertSame('signature_invalid', $command->fresh()->blocked_reason_code);
         }
-        Queue::assertNothingPushed();
+        $this->assertSame($queueBaseline, Queue::pushedJobs());
     }
 
     public function test_withdrawn_resident_consent_blocks_an_existing_ready_request(): void
     {
         $fixture = ClientLocateFixture::make();
+        $queueBaseline = Queue::pushedJobs();
+        $this->assertSame([RefreshWorkforceEligibility::class], array_keys($queueBaseline));
         $command = app(DeviceCommandRequestService::class)->request($fixture['device'], $fixture['actor'],
             new CommandRequestInput('tracking.location_refresh', [], 'Request the location for an agreed check.', 'client-location:'.Str::uuid(),
                 stepUpConfirmedAt: CarbonImmutable::now(), originContext: $fixture['origin']));
@@ -103,7 +108,7 @@ class ClientLocateRequestTest extends TestCase
             $this->assertSame('client_location_context_changed', $command->fresh()->blocked_reason_code);
             $this->assertSame(CommandStatus::Blocked, $command->fresh()->status);
         }
-        Queue::assertNothingPushed();
+        $this->assertSame($queueBaseline, Queue::pushedJobs());
         Http::assertNothingSent();
     }
 
@@ -154,6 +159,8 @@ class ClientLocateRequestTest extends TestCase
     public function test_http_rejects_forged_inputs_and_stale_or_future_session_confirmation(): void
     {
         $f = ClientLocateFixture::make();
+        $queueBaseline = Queue::pushedJobs();
+        $this->assertSame([RefreshWorkforceEligibility::class], array_keys($queueBaseline));
         $url = '/operations/clients/'.$f['client']->id.'/location/locate-requests';
         $data = ['reason' => 'Check the agreed pickup location.', 'idempotency_key' => (string) Str::uuid(), 'access_fingerprint' => $f['fingerprint']];
         $this->actingAs($f['actor'])->postJson($url, [...$data, 'step_up_confirmed_at' => now()->toISOString()])->assertUnprocessable();
@@ -163,13 +170,15 @@ class ClientLocateRequestTest extends TestCase
             $this->withSession(['auth.password_confirmed_at' => $timestamp])->postJson($url, [...$data, 'idempotency_key' => (string) Str::uuid()])
                 ->assertCreated()->assertJsonPath('request.status', 'awaiting_step_up');
         }
-        Queue::assertNothingPushed();
+        $this->assertSame($queueBaseline, Queue::pushedJobs());
     }
 
     public function test_http_conceals_foreign_request_and_rechecks_withdrawal_and_assignment_change(): void
     {
         $f = ClientLocateFixture::make();
         $other = ClientLocateFixture::make();
+        $queueBaseline = Queue::pushedJobs();
+        $this->assertSame([RefreshWorkforceEligibility::class], array_keys($queueBaseline));
         $url = '/operations/clients/'.$f['client']->id.'/location/locate-requests';
         $this->actingAs($f['actor']);
         $response = $this->postJson($url, ['reason' => 'Check the agreed pickup location.', 'idempotency_key' => (string) Str::uuid(), 'access_fingerprint' => $f['fingerprint']])->assertCreated();
@@ -181,17 +190,19 @@ class ClientLocateRequestTest extends TestCase
         $this->getJson($status)->assertForbidden();
         $f['consent']->update(['status' => 'withdrawn', 'withdrawn_at' => now()]);
         $this->getJson($status)->assertForbidden();
-        Queue::assertNothingPushed();
+        $this->assertSame($queueBaseline, Queue::pushedJobs());
     }
 
     public function test_unavailable_tracker_does_not_create_a_command_and_legacy_html_redirect_is_preserved(): void
     {
         $f = ClientLocateFixture::make();
         $f['device']->update(['config' => ['management' => ['capabilities' => []]]]);
+        $queueBaseline = Queue::pushedJobs();
+        $this->assertSame([RefreshWorkforceEligibility::class], array_keys($queueBaseline));
         $url = '/operations/clients/'.$f['client']->id.'/location/locate-requests';
         $this->actingAs($f['actor'])->getJson($url.'?access_fingerprint='.$f['fingerprint'])->assertOk()->assertJsonPath('available', false);
         $this->postJson($url, ['reason' => 'Check the agreed pickup location.', 'idempotency_key' => (string) Str::uuid(), 'access_fingerprint' => $f['fingerprint']])->assertUnprocessable();
         $this->post('/operations/clients/'.$f['client']->id.'/location/locate-now')->assertRedirect();
-        Queue::assertNothingPushed();
+        $this->assertSame($queueBaseline, Queue::pushedJobs());
     }
 }

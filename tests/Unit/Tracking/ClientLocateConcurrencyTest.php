@@ -74,6 +74,7 @@ class ClientLocateConcurrencyTest extends CommittedDatabaseTestCase
         $fixture = ClientLocateFixture::make();
         $command = $this->ready($fixture);
         $other = DB::connection('locate_interleaving');
+        $queuedBeforeAction = Queue::pushedJobs();
         try {
             DB::transaction(function () use ($fixture, $command, $other): void {
                 $consent = fn () => DB::table('client_consents')->where('id', $fixture['consent']->id);
@@ -88,7 +89,7 @@ class ClientLocateConcurrencyTest extends CommittedDatabaseTestCase
         }
         $this->assertSame(0, DB::transactionLevel());
         $this->assertSame(CommandStatus::Ready, $command->fresh()->status, 'The owning transaction rolled back all command writes.');
-        Queue::assertNothingPushed();
+        $this->assertSame($queuedBeforeAction, Queue::pushedJobs(), 'The measured command must not add jobs of any class.');
         Http::assertNothingSent();
     }
 
@@ -99,6 +100,7 @@ class ClientLocateConcurrencyTest extends CommittedDatabaseTestCase
         $expiry = $command->expires_at->toISOString();
         $auditCount = $command->auditEvents()->count();
         $other = DB::connection('locate_interleaving');
+        $queuedBeforeAction = Queue::pushedJobs();
         $other->beginTransaction();
         $other->table('clients')->where('id', $fixture['client']->id)->lockForUpdate()->first();
         try {
@@ -113,7 +115,7 @@ class ClientLocateConcurrencyTest extends CommittedDatabaseTestCase
         $this->assertNotNull($other->table('client_consents')->where('id', $fixture['consent']->id)->lock('for update nowait')->first());
         $this->assertSame(CommandStatus::Ready, $command->fresh()->status);
         $this->assertSame($auditCount, $command->auditEvents()->count());
-        Queue::assertNothingPushed();
+        $this->assertSame($queuedBeforeAction, Queue::pushedJobs(), 'The measured command must not add jobs of any class.');
         $other->commit();
         $queued = app(DeviceCommandQueueService::class)->queue($command->fresh(), $fixture['actor']);
         $this->assertSame($command->id, $queued->id);
@@ -187,6 +189,7 @@ class ClientLocateConcurrencyTest extends CommittedDatabaseTestCase
                 $command = $this->ready($f);
                 $table = $f[$target]->getTable();
                 $id = $f[$target]->id;
+                $queuedBeforeAction = Queue::pushedJobs();
                 try {
                     DB::transaction(function () use ($f, $command, $table, $id, $target): void {
                         $before = DB::table($table)->where('id', $id)->first();
@@ -208,8 +211,8 @@ class ClientLocateConcurrencyTest extends CommittedDatabaseTestCase
             } finally {
                 $f['type']->update(['requires_capacity_assessment' => false]);
             }
+            $this->assertSame($queuedBeforeAction, Queue::pushedJobs(), 'Current '.$target.' denial must not add jobs of any class.');
         }
-        Queue::assertNothingPushed();
     }
 
     private function providerFrame(array $f): array
@@ -239,6 +242,7 @@ class ClientLocateConcurrencyTest extends CommittedDatabaseTestCase
         $f = ClientLocateFixture::awaitingDelivery();
         $expiry = $f['command']->expires_at->toISOString();
         $other = DB::connection('locate_interleaving');
+        $queuedBeforeAction = Queue::pushedJobs();
         $other->beginTransaction();
         $other->table('clients')->where('id', $f['client']->id)->lockForUpdate()->first();
         try {
@@ -255,7 +259,7 @@ class ClientLocateConcurrencyTest extends CommittedDatabaseTestCase
         $this->assertSame($expiry, $f['command']->fresh()->expires_at->toISOString());
         $this->assertSame(CommandStatus::Running, $f['command']->fresh()->status);
         $this->assertSame(1, $f['command']->auditEvents()->where('action', 'provider_delivery_started')->count());
-        Queue::assertNothingPushed();
+        $this->assertSame($queuedBeforeAction, Queue::pushedJobs(), 'The measured command must not add jobs of any class.');
     }
 
     public function test_provider_claim_first_holds_care_evidence_until_commit_without_claiming_socket_recall(): void
@@ -294,6 +298,7 @@ class ClientLocateConcurrencyTest extends CommittedDatabaseTestCase
             }
             $f['actor']->unsetRelations();
             $command = $this->ready($f);
+            $queuedBeforeAction = Queue::pushedJobs();
             try {
                 DB::transaction(function () use ($f, $change, $newSite, $eligibleRole, $command): void {
                     $this->assertContains($f['site']->id, app(UserSiteAccessService::class)->accessibleSiteIds($f['actor']));
@@ -321,8 +326,8 @@ class ClientLocateConcurrencyTest extends CommittedDatabaseTestCase
             }
             $this->assertSame(0, DB::transactionLevel());
             $this->assertSame(CommandStatus::Ready, $command->fresh()->status);
+            $this->assertSame($queuedBeforeAction, Queue::pushedJobs(), 'Current '.$change.' denial must not add jobs of any class.');
         }
-        Queue::assertNothingPushed();
     }
 
     public function test_current_read_scope_cannot_be_reused_after_its_callback_or_with_no_transaction(): void

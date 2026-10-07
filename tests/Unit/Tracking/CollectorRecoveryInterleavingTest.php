@@ -120,6 +120,7 @@ class CollectorRecoveryInterleavingTest extends CommittedDatabaseTestCase
     public function test_recovery_locks_parent_before_attempt_and_a_late_result_preserves_its_outcome(): void
     {
         [$request, $attempt, $collector, $payload, $at] = $this->fixture();
+        $queueBefore = Queue::pushedJobs();
         $lockQueries = [];
         $capture = true;
         DB::listen(function (QueryExecuted $query) use (&$lockQueries, &$capture): void {
@@ -152,6 +153,6 @@ class CollectorRecoveryInterleavingTest extends CommittedDatabaseTestCase
         $this->assertSame(CommandAttemptStatus::Uncertain, $attempt->fresh()->status);
         $this->assertSame(1, $request->auditEvents()->where('action', 'collector_result_timeout_uncertain')->count());
         Http::assertNothingSent();
-        Queue::assertNothingPushed();
+        $this->assertSame($queueBefore, Queue::pushedJobs());
     }
 }

@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import {
     collectConsoleErrors,
     expectNoConsoleErrors,
+    expectPostRedirect,
     gotoMyDay,
     loginAsChecklistWorker,
     loginAsClockInCandidateWorker,
@@ -79,6 +80,8 @@ test.describe('attendance readiness workflows', () => {
     test('checklist task ticks and handover are submitted with clock out', async ({
         page,
     }, testInfo) => {
+        // Fixture setup, login and the atomic save share CI's single PHP worker.
+        test.setTimeout(60_000);
         const consoleErrors = collectConsoleErrors(page);
 
         await loginAsChecklistWorker(page, testInfo);
@@ -105,7 +108,14 @@ test.describe('attendance readiness workflows', () => {
             .fill('Checklist completed during atomic clock-out test.');
         const submit = dialog.getByTestId('end-shift-submit');
         await expect(submit).toBeEnabled();
+        const clockOutResponse = page.waitForResponse(
+            (response) =>
+                new URL(response.url()).pathname === '/attendance/clock-out' &&
+                response.request().method() === 'POST',
+            { timeout: 30_000 },
+        );
         await submit.click();
+        expect((await clockOutResponse).status()).toBe(302);
 
         await expect(
             page.getByRole('button', { name: 'Clock in', exact: true }),
@@ -141,6 +151,8 @@ test.describe('timesheet approval readiness workflows', () => {
     test('manager can bulk approve submitted timesheets with stable selectors', async ({
         page,
     }) => {
+        // Fixture setup and the redirected read share the case budget.
+        test.setTimeout(60_000);
         const consoleErrors = collectConsoleErrors(page);
 
         await loginAsStaff(page);
@@ -156,11 +168,15 @@ test.describe('timesheet approval readiness workflows', () => {
         await page
             .getByTestId('approvals-decision-notes')
             .fill('Playwright readiness approval.');
-        await page.getByTestId('approvals-bulk-approve').click();
+        await expectPostRedirect(
+            page,
+            /^\/operations\/timesheets\/bulk-approve$/,
+            () => page.getByTestId('approvals-bulk-approve').click(),
+        );
 
         await expect(
             page.getByText(/Selected timesheets approved/i).first(),
-        ).toBeVisible();
+        ).toBeVisible({ timeout: 30_000 });
         expectNoConsoleErrors(consoleErrors);
     });
 

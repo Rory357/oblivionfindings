@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Events\CoverageSupplyAdded;
 use App\Jobs\ShiftAutoAlertJob;
 use App\Models\Client;
@@ -25,6 +26,7 @@ use App\Services\ControlRoom\ControlRoomNotificationService;
 use App\Services\ControlRoom\SignalProcessingService;
 use App\Services\ShiftCoverageService;
 use App\Services\ShiftSignalService;
+use App\Services\UserSiteAccessService;
 use Database\Seeders\ShiftControlRoomSignalRegistrationSeeder;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -56,7 +58,7 @@ class ShiftControlRoomSignalPipelineTest extends TestCase
         // threshold; setting `now` 35 minutes after the planned start crosses it.
         $this->travelTo(Carbon::parse('2026-04-06 10:35:00'));
 
-        $shift = $this->makeShift([
+        $shift = $this->makeCurrentAssignedShift([
             'starts_at' => now()->subMinutes(35),
             'ends_at' => now()->addHours(4),
             'status' => 'scheduled',
@@ -107,7 +109,7 @@ class ShiftControlRoomSignalPipelineTest extends TestCase
 
     public function test_no_show_transitions_to_late_start_when_start_evidence_appears(): void
     {
-        $shift = $this->makeShift([
+        $shift = $this->makeCurrentAssignedShift([
             'starts_at' => Carbon::parse('2026-04-06 10:00:00'),
             'ends_at' => Carbon::parse('2026-04-06 14:00:00'),
             'status' => 'scheduled',
@@ -363,7 +365,7 @@ class ShiftControlRoomSignalPipelineTest extends TestCase
     {
         $this->travelTo(Carbon::parse('2026-04-06 10:40:00'));
 
-        $completedShift = $this->makeShift([
+        $completedShift = $this->makeCurrentAssignedShift([
             'starts_at' => now()->subHours(5),
             'ends_at' => now()->subHour(),
             'actual_starts_at' => now()->subHours(5),
@@ -371,7 +373,7 @@ class ShiftControlRoomSignalPipelineTest extends TestCase
             'status' => 'completed',
         ]);
 
-        $attendanceResolvedShift = $this->makeShift([
+        $attendanceResolvedShift = $this->makeCurrentAssignedShift([
             'starts_at' => now()->subMinutes(10),
             'ends_at' => now()->addHours(3),
             'status' => 'scheduled',
@@ -710,6 +712,28 @@ class ShiftControlRoomSignalPipelineTest extends TestCase
             ->contains(fn ($event) => $event->description === ShiftAutoAlertJob::class);
 
         $this->assertTrue($scheduled);
+    }
+
+    /** Valid source setup; both eligibility observation and attendance detectors remain live. */
+    private function makeCurrentAssignedShift(array $attributes): Shift
+    {
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
+        $staff = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $staff->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'position_role' => 'support_worker',
+            'start_date' => Carbon::parse($attributes['starts_at'])->subYear()->toDateString(),
+            'end_date' => null,
+            'is_active' => true,
+            'created_by' => $staff->id,
+            'updated_by' => $staff->id,
+        ]);
+        $shift = $this->makeShift([...$attributes, 'site' => $site, 'staff' => $staff]);
+        app(UserSiteAccessService::class)->assertCanAccessShift($staff->fresh(), $shift);
+
+        return $shift;
     }
 
     protected function makeShift(array $attributes = []): Shift

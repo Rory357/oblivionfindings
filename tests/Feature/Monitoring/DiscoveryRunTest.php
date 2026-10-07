@@ -482,6 +482,7 @@ it('accepts one scoped collector result idempotently and reconciles the canonica
 it('rejects invalid network bounds before creating or dispatching a run', function (array $attributes, string $reason) {
     Queue::fake();
     $record = taskEightScope($attributes);
+    Queue::fake(); // Measure invalid run startup after the observed Site save.
 
     expect(fn () => app(DiscoveryRunner::class)->start($record['scope'], 'manual:user:7'))
         ->toThrow(UnexpectedValueException::class, $reason)

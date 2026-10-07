@@ -14,6 +14,7 @@ use App\Domain\Monitoring\Services\MonitorScheduler;
 use App\Domain\Monitoring\Services\RuntimeEnvelopeCodec;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Jobs\RefreshWorkforceEligibility;
 use App\Models\Site;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Scheduling\Schedule;
@@ -238,9 +239,12 @@ it('omits collectors assigned outside the device canonical Site and raw collecto
     ]);
     $unsafe['monitor']->update(['collector_id' => $unsafeCollector->id]);
 
+    $queueBaseline = Queue::pushedJobs();
+    expect(array_keys($queueBaseline))->toBe([RefreshWorkforceEligibility::class]);
+
     $result = app(MonitorScheduler::class)->dispatchDue($now);
 
-    Queue::assertNothingPushed();
+    expect(Queue::pushedJobs())->toBe($queueBaseline);
     expect(MonitoringOutbox::query()->count())->toBe(0)
         ->and($result->omitted)->toBe(2);
 });
@@ -253,9 +257,12 @@ it('honours the shared scheduler lock before scanning monitors', function () {
     $heldLock = Cache::store('array')->lock("monitoring:schedule:{$scheduleKey}", 120);
     expect($heldLock->get())->toBeTrue();
 
+    $queueBaseline = Queue::pushedJobs();
+    expect(array_keys($queueBaseline))->toBe([RefreshWorkforceEligibility::class]);
+
     $result = app(MonitorScheduler::class)->dispatchDue($now);
 
-    Queue::assertNothingPushed();
+    expect(Queue::pushedJobs())->toBe($queueBaseline);
     expect($result->lockAcquired)->toBeFalse()
         ->and($result->scanned)->toBe(0);
     $heldLock->release();

@@ -1,4 +1,9 @@
-import { expect, test, type Page } from '@playwright/test';
+import {
+    test as base,
+    expect,
+    type BrowserContext,
+    type Page,
+} from '@playwright/test';
 
 import {
     expectJourneyBrowserHealthy,
@@ -11,6 +16,61 @@ import {
     seedIncidentHandoverFixtures,
     type IncidentHandoverManifest,
 } from './incident-handover-helpers';
+
+type ActorBrowser = {
+    context: BrowserContext;
+    page: Page;
+    guard: ReturnType<typeof installJourneyBrowserGuards>;
+};
+type ActorBrowsers = {
+    asActor: (
+        user: IncidentHandoverManifest['users']['operator'],
+    ) => Promise<Page>;
+    expectHealthy: () => Promise<void>;
+};
+
+// Keep each actor's cookies and live page together. Replacing cookies underneath
+// another actor's polling page can redirect it through Login/My Day while the
+// next actor works, aborting unrelated module downloads.
+const test = base.extend<{ actorBrowsers: ActorBrowsers }>({
+    actorBrowsers: async ({ browser, baseURL, viewport }, provideActors) => {
+        const actors = new Map<number, ActorBrowser>();
+        const contexts = new Set<BrowserContext>();
+        try {
+            await provideActors({
+                asActor: async (user) => {
+                    let actor = actors.get(user.id);
+                    if (!actor) {
+                        const context = await browser.newContext({
+                            baseURL,
+                            viewport,
+                        });
+                        contexts.add(context);
+                        const page = await context.newPage();
+                        actor = {
+                            context,
+                            page,
+                            guard: installJourneyBrowserGuards(page),
+                        };
+                        actors.set(user.id, actor);
+                        await loginAsFixture(page, user);
+                    }
+                    return actor.page;
+                },
+                expectHealthy: async () => {
+                    for (const actor of actors.values()) {
+                        await expectJourneyBrowserHealthy(
+                            actor.page,
+                            actor.guard,
+                        );
+                    }
+                },
+            });
+        } finally {
+            await Promise.all([...contexts].map((context) => context.close()));
+        }
+    },
+});
 
 async function createTaggedAlert(
     page: Page,
@@ -78,15 +138,14 @@ test.describe('Control Room / Incident / H&S alternate workflow branches', () =>
     test.describe.configure({ timeout: 300_000 });
 
     test('proves branches A–F without console, request, focus, or duplicate-work failures', async ({
-        page,
+        actorBrowsers,
     }, testInfo) => {
         test.skip(
             testInfo.project.name !== 'chromium-desktop',
             'The accepted multi-role remediation scope is desktop web.',
         );
         const manifest = seedIncidentHandoverFixtures();
-        const guard = installJourneyBrowserGuards(page);
-        await loginAsFixture(page, manifest.users.operator);
+        let page = await actorBrowsers.asActor(manifest.users.operator);
 
         // A — A routine alert ends without an incident or H&S record.
         const routineId = await createTaggedAlert(page, manifest, 'A-routine');
@@ -258,7 +317,7 @@ echo json_encode(['id' => $definition->id], JSON_THROW_ON_ERROR);
                 'Initial response resolved before new witness evidence.',
             resolution_code: 'initial_review_complete',
         });
-        await loginAsFixture(page, manifest.users.owner);
+        page = await actorBrowsers.asActor(manifest.users.owner);
         await postLaravel(
             page,
             `/health-safety/events/${reopenJourney.eventId}/accept-handover`,
@@ -323,7 +382,7 @@ echo json_encode([
             has_closed_at: true,
             closure_audits: 1,
         });
-        await loginAsFixture(page, manifest.users.reviewer);
+        page = await actorBrowsers.asActor(manifest.users.reviewer);
         await postLaravel(
             page,
             `/incidents/${reopenJourney.incidentId}/review`,
@@ -405,7 +464,7 @@ echo json_encode([
 
         // D — Snooze hides only temporarily; unsnooze and escalation restore
         // active queue truth with plain language and a durable audit trail.
-        await loginAsFixture(page, manifest.users.operator);
+        page = await actorBrowsers.asActor(manifest.users.operator);
         scalar<{ id: number }>(`
 $definition = \\App\\Models\\ControlRoom\\SlaDefinition::query()->updateOrCreate(
     ['code' => 'task19-snooze-escalate'],
@@ -580,7 +639,7 @@ echo json_encode([
             transferId,
             'E-task-transfer',
         );
-        await loginAsFixture(page, manifest.users.owner);
+        page = await actorBrowsers.asActor(manifest.users.owner);
         await postLaravel(
             page,
             `/health-safety/events/${transferJourney.eventId}/accept-handover`,
@@ -627,12 +686,12 @@ echo json_encode([
             page,
             `/health-safety/events/${transferJourney.eventId}/investigations/${transferInvestigationId}/submit`,
         );
-        await loginAsFixture(page, manifest.users.reviewer);
+        page = await actorBrowsers.asActor(manifest.users.reviewer);
         await postLaravel(
             page,
             `/health-safety/events/${transferJourney.eventId}/investigations/${transferInvestigationId}/complete`,
         );
-        await loginAsFixture(page, manifest.users.verifier);
+        page = await actorBrowsers.asActor(manifest.users.verifier);
         await postLaravel(
             page,
             `/health-safety/events/${transferJourney.eventId}/investigations/${transferInvestigationId}/complete`,
@@ -681,7 +740,7 @@ echo json_encode([
         // F — Every parent close remains blocked on its unmet prerequisite,
         // typed closing text remains in place, and the same path succeeds after
         // WorkSafe, H&S, and Incident are completed in order.
-        await loginAsFixture(page, manifest.users.operator);
+        page = await actorBrowsers.asActor(manifest.users.operator);
         const gateId = await createTaggedAlert(
             page,
             manifest,
@@ -693,7 +752,7 @@ echo json_encode([
             gateId,
             'F-closure-gates',
         );
-        await loginAsFixture(page, manifest.users.owner);
+        page = await actorBrowsers.asActor(manifest.users.owner);
         await postLaravel(
             page,
             `/health-safety/events/${gateJourney.eventId}/accept-handover`,
@@ -736,7 +795,7 @@ echo json_encode([
             `/health-safety/events/${gateJourney.eventId}?action=worksafe-decision`,
         );
 
-        await loginAsFixture(page, manifest.users.reviewer);
+        page = await actorBrowsers.asActor(manifest.users.reviewer);
         await postLaravel(page, `/incidents/${gateJourney.incidentId}/review`, {
             review_notes: 'Reviewed while H&S remains deliberately incomplete.',
         });
@@ -775,7 +834,7 @@ echo json_encode([
             `/health-safety/events/${gateJourney.eventId}`,
         );
 
-        await loginAsFixture(page, manifest.users.operator);
+        page = await actorBrowsers.asActor(manifest.users.operator);
         await postLaravel(page, `/control-room/alerts/${gateId}/resolve`, {
             resolution_notes:
                 'Operational response complete; governance remains open.',
@@ -819,7 +878,7 @@ echo json_encode([
             page.locator(`a[href="/incidents/${gateJourney.incidentId}"]`),
         ).toHaveAttribute('href', `/incidents/${gateJourney.incidentId}`);
 
-        await loginAsFixture(page, manifest.users.owner);
+        page = await actorBrowsers.asActor(manifest.users.owner);
         await postLaravel(
             page,
             `/health-safety/events/${gateJourney.eventId}/worksafe/decision`,
@@ -837,12 +896,12 @@ echo json_encode([
                     'Acceptance and WorkSafe decision are complete.',
             },
         );
-        await loginAsFixture(page, manifest.users.reviewer);
+        page = await actorBrowsers.asActor(manifest.users.reviewer);
         await postLaravel(page, `/incidents/${gateJourney.incidentId}/close`, {
             closed_outcome: 'All governance complete',
             closed_notes: 'H&S closed first.',
         });
-        await loginAsFixture(page, manifest.users.operator);
+        page = await actorBrowsers.asActor(manifest.users.operator);
         await postLaravel(page, `/control-room/alerts/${gateId}/close`, {
             closure_notes:
                 'The same closure path now succeeds after prerequisites.',
@@ -865,6 +924,6 @@ echo json_encode([
         });
 
         await page.goto('/control-room/alerts?lens=all_records');
-        await expectJourneyBrowserHealthy(page, guard);
+        await actorBrowsers.expectHealthy();
     });
 });

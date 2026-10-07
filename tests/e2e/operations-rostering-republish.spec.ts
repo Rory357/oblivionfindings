@@ -14,6 +14,8 @@ import {
 } from './rostering-flags';
 
 test.describe('operations rostering — republish flow', () => {
+    // The fixture's declared availability and entered wall times are Auckland-local.
+    test.use({ timezoneId: 'Pacific/Auckland' });
     test.skip(!rosteringFlagsEnabled, rosteringFlagSkipReason);
     test.skip(
         ({ viewport }) => !viewport || viewport.width < 1024,
@@ -49,10 +51,45 @@ test.describe('operations rostering — republish flow', () => {
                 response.url().endsWith('/operations/shifts/9101') &&
                 response.request().method() === 'PUT',
         );
+        const savedShiftResponse = page.waitForResponse(
+            async (response) => {
+                const request = response.request();
+                if (
+                    new URL(response.url()).pathname !==
+                        '/operations/shifts/9101' ||
+                    request.method() !== 'GET' ||
+                    response.status() !== 200 ||
+                    response.headers()['x-inertia'] !== 'true' ||
+                    !(response.headers()['content-type'] ?? '').includes(
+                        'application/json',
+                    ) ||
+                    request.redirectedFrom()?.method() !== 'PUT'
+                ) {
+                    return false;
+                }
+
+                return (
+                    request.redirectedFrom() ===
+                    (await updateResponse).request()
+                );
+            },
+            { timeout: 30_000 },
+        );
         await editDialog
             .getByRole('button', { name: /^Save changes$/ })
             .click();
         expect((await updateResponse).status()).toBe(303);
+        const savedShift = await (await savedShiftResponse).json();
+        expect(savedShift.component).toBe('operations/shifts/show');
+        expect(savedShift.props.shift.id).toBe(9101);
+        expect(savedShift.props.flash.success).toBe('Shift updated.');
+        expect(new Date(savedShift.props.shift.starts_at).toISOString()).toBe(
+            '2026-05-03T21:30:00.000Z',
+        );
+        expect(new Date(savedShift.props.shift.ends_at).toISOString()).toBe(
+            '2026-05-04T00:30:00.000Z',
+        );
+        expect(savedShift.props.shift.publish_dirty_at).not.toBeNull();
         await expect(editDialog).not.toBeVisible();
 
         await expect(page).toHaveURL(/\/operations\/shifts\/9101(?:\?|$)/);

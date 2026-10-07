@@ -4,6 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 import {
     collectConsoleErrors,
     expectNoConsoleErrors,
+    expectPostRedirect,
     loginAsStaff,
     resetRosteringReadinessFixtures,
 } from './helpers';
@@ -35,8 +36,14 @@ async function expectNoBlockingAxeViolations(page: Page) {
 async function openPublishReview(page: Page) {
     await page.goto('/operations/rostering?week=2026-05-04&site_id=9001');
     await expect(page.getByTestId('rostering-publish-panel')).toBeVisible();
-    await page.getByTestId('rostering-review-publish').click();
-    await expect(page.getByTestId('publish-review-page')).toBeVisible();
+    await expectPostRedirect(
+        page,
+        /^\/operations\/rostering\/periods\/\d+\/review$/,
+        () => page.getByTestId('rostering-review-publish').click(),
+    );
+    await expect(page.getByTestId('publish-review-page')).toBeVisible({
+        timeout: 30_000,
+    });
 }
 
 async function openPublishDiff(page: Page) {
@@ -96,9 +103,7 @@ test.describe('operations rostering a11y smoke', () => {
         const consoleErrors = collectConsoleErrors(page);
 
         await loginAsStaff(page);
-        await page.goto('/operations/rostering?week=2026-05-04&site_id=9001');
-        await page.getByTestId('rostering-review-publish').click();
-        await expect(page.getByTestId('publish-review-page')).toBeVisible();
+        await openPublishReview(page);
 
         await expectNoBlockingAxeViolations(page);
         expectNoConsoleErrors(consoleErrors);

@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\RefreshWorkforceEligibility;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -25,11 +26,13 @@ test('old calendar sync bookmarks require the settings permission', function () 
 test('retired calendar sync write endpoints cannot create delete or queue a connection', function () {
     Queue::fake();
     $this->actingAs(User::factory()->create(['approved_at' => now()]));
+    $queueBaseline = Queue::pushedJobs();
+    expect(array_keys($queueBaseline))->toBe([RefreshWorkforceEligibility::class]);
     $this->post('/operations/calendar-sync', ['provider' => 'google'])->assertStatus(405);
     $this->delete('/operations/calendar-sync/1')->assertNotFound();
     $this->post('/operations/calendar-sync/1/trigger')->assertNotFound();
     foreach (['store', 'destroy', 'trigger'] as $action) {
         expect(Route::has('operations.calendar_sync.'.$action))->toBeFalse();
     }
-    Queue::assertNothingPushed();
+    expect(Queue::pushedJobs())->toBe($queueBaseline);
 });
