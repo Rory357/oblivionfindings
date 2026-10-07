@@ -1,7 +1,5 @@
-import { ListCaption } from '@/components/lists';
 import {
     PageHeader,
-    PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
     PageHeaderMeterBig,
@@ -11,15 +9,22 @@ import {
     PageHeaderRail,
     type PageHeaderRailItem,
     PageHeaderSearch,
-    PageHeaderStatusChip,
     PageHeaderViewToggle,
-    PageLayout,
 } from '@/components/page';
-import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
+import PageShell from '@/components/page-shell';
 import {
-    AlertTriangle,
-    Building2,
+    EntityFilter,
+    WeekPicker,
+    addDaysWP,
+    weekNumberISO,
+} from '@/components/rostering';
+import { ErrorState } from '@/components/ui/error-state';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { LoadingState } from '@/components/ui/loading-state';
+import AppLayout from '@/layouts/app-layout';
+import { formatDateOnly, formatDateTimeInZone } from '@/lib/datetime';
+import { Head } from '@inertiajs/react';
+import {
     CalendarDays,
     CheckCircle2,
     ChevronLeft,
@@ -32,591 +37,591 @@ import {
     List,
     NotebookPen,
     Plus,
-    Users,
+    Search,
+    X,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { toast } from 'sonner';
-
-import { Button as GuardrailButton } from '@/components/ui/button';
+import { useMemo, useRef, useState } from 'react';
 import {
     CardsView,
     EmptyState,
     type NoteHandlers,
 } from './components/cards-view';
 import { ListView } from './components/list-view';
+import { NoteActionDialog } from './components/note-action-dialog';
 import { NoteDetailDialog } from './components/note-detail-dialog';
+import {
+    type NoteEvidence,
+    type NoteFilters,
+    type NotePagination,
+    type NoteSummary,
+    noteExportUrl,
+} from './components/note-query';
 import { NoteRail, computeCoverageGaps } from './components/note-rail';
 import { NoteWizard, type WizardInitial } from './components/note-wizard';
 import {
     type Catalogue,
     type CatalogueShift,
-    type Filters,
     NOTE_TYPES,
-    type NoteType,
     type ShiftNote,
     type StatusTab,
     TYPE_META,
     type ViewMode,
     clientName,
-    matchesTab,
-    noteDate,
     ymd,
 } from './components/shared';
+import { useNoteFilters } from './components/use-note-filters';
 
 type Props = {
     notes: ShiftNote[];
     weekStart: string;
     weekEnd: string;
-    filters: { week: string };
+    filters: NoteFilters;
+    summary: NoteSummary;
+    pagination: NotePagination;
+    evidence: NoteEvidence;
     catalogue: Catalogue;
-    can: { create: boolean; manage: boolean };
+    can: { create: boolean; manage: boolean; flag: boolean; review: boolean };
     currentUser: { id: number; name: string; is_manager: boolean };
 };
-
-const EMPTY_FILTERS: Filters = { client: null, staff: null, type: null };
-
 export default function ShiftNotesIndex({
     notes = [],
     weekStart,
+    weekEnd,
+    filters: loadedFilters,
+    summary,
+    pagination,
+    evidence,
     catalogue,
-    can = { create: false, manage: false },
-    currentUser = { id: 0, name: '', is_manager: false },
+    can,
+    currentUser,
 }: Props) {
+    const query = useNoteFilters(loadedFilters);
+    const filters = query.draft;
     const weekStartDate = useMemo(
-        () => new Date(`${weekStart}T00:00:00`),
+        () => new Date(`${weekStart}T12:00:00`),
         [weekStart],
     );
-
-    const [search, setSearch] = useState('');
-    const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
-    const [tab, setTab] = useState<StatusTab>('all');
     const [view, setView] = useState<ViewMode>('cards');
-    const [selectedDay, setSelectedDay] = useState<string | null>(null);
+    const [pickerOpen, setPickerOpen] = useState(false);
+    const weekButton = useRef<HTMLButtonElement>(null);
     const [wizardOpen, setWizardOpen] = useState(false);
     const [wizardInitial, setWizardInitial] = useState<WizardInitial | null>(
         null,
     );
+    const [editNote, setEditNote] = useState<ShiftNote | null>(null);
+    const [noteAction, setNoteAction] = useState<{
+        note: ShiftNote;
+        action: 'flag' | 'review';
+    } | null>(null);
     const [detailId, setDetailId] = useState<number | null>(null);
-
-    const gaps = useMemo(
-        () => computeCoverageGaps(catalogue.shifts, notes, weekStartDate),
-        [catalogue.shifts, notes, weekStartDate],
+    const detailNote = notes.find((note) => note.id === detailId) ?? null;
+    const selectedDay =
+        filters.date_from === filters.date_to ? filters.date_from : null;
+    const changed = JSON.stringify(filters) !== JSON.stringify(loadedFilters);
+    const hasFilters = !!(
+        filters.q ||
+        filters.type ||
+        filters.client_id ||
+        filters.author_id ||
+        filters.site_id ||
+        filters.date_from ||
+        filters.date_to ||
+        filters.flagged ||
+        filters.status !== 'all'
     );
-
-    const heroCounts = useMemo(() => {
-        const reviewed = notes.filter((n) => n.reviewed_at).length;
-        const awaiting = notes.length - reviewed;
-        return {
-            total: notes.length,
-            reviewed,
-            flagged: notes.filter((n) => n.is_flagged).length,
-            gaps: gaps.length,
-            awaiting,
-            incidents: notes.filter((n) => n.type === 'incident').length,
-            people: new Set(notes.map((n) => n.client?.id).filter(Boolean))
-                .size,
-            houses:
-                new Set(notes.map((n) => n.site?.id).filter(Boolean)).size ||
-                catalogue.sites.length,
-            staffOnRoster: catalogue.staff.length,
-        };
-    }, [notes, gaps, catalogue.sites.length, catalogue.staff.length]);
-
-    const tabCounts = useMemo(
-        () => ({
-            all: notes.length,
-            flagged: notes.filter((n) => n.is_flagged).length,
-            awaiting: notes.filter((n) => !n.reviewed_at).length,
-            reviewed: notes.filter((n) => n.reviewed_at).length,
-        }),
-        [notes],
-    );
-
-    const baseFiltered = useMemo(() => {
-        const q = search.trim().toLowerCase();
-        return notes.filter((n) => {
-            if (filters.client != null && n.client?.id !== filters.client)
-                return false;
-            if (filters.staff != null && n.user?.id !== filters.staff)
-                return false;
-            if (filters.type != null && n.type !== filters.type) return false;
-            if (selectedDay && ymd(noteDate(n)) !== selectedDay) return false;
-            if (q) {
-                const hay = [
-                    n.body,
-                    clientName(n.client),
-                    n.user?.name,
-                    n.site?.name,
-                ]
-                    .filter(Boolean)
-                    .join(' ')
-                    .toLowerCase();
-                if (!hay.includes(q)) return false;
-            }
-            return true;
-        });
-    }, [notes, filters, search, selectedDay]);
-
-    const filtered = useMemo(
-        () => baseFiltered.filter((n) => matchesTab(n, tab)),
-        [baseFiltered, tab],
-    );
-
-    const detailNote =
-        detailId != null
-            ? (notes.find((n) => n.id === detailId) ?? null)
-            : null;
-
-    const hasFilters =
-        search.trim() !== '' ||
-        filters.client != null ||
-        filters.staff != null ||
-        filters.type != null ||
-        selectedDay != null ||
-        tab !== 'all';
-
-    const clearFilters = () => {
-        setSearch('');
-        setFilters(EMPTY_FILTERS);
-        setSelectedDay(null);
-        setTab('all');
-    };
-
-    // ---- navigation + actions --------------------------------------------
-    const goWeek = (week: Date) => {
-        const target = ymd(week);
-        setSelectedDay(null);
-        if (target === weekStart) return;
-        router.get(
-            '/operations/shift-notes',
-            { week: target },
-            { preserveState: true, preserveScroll: true },
-        );
-    };
-
-    const shiftWeek = (days: number) => {
-        const next = new Date(weekStartDate);
-        next.setDate(next.getDate() + days);
-        goWeek(next);
-    };
-
+    const readNotice = query.error
+        ? 'These counts belong to the last loaded selection. Your new choices are retained.'
+        : changed
+          ? 'Search choices changed. Use Search to update the records and counts.'
+          : null;
+    const rangeLabel =
+        pagination.total === 0
+            ? 'No matching notes'
+            : `Showing ${pagination.from}–${pagination.to} of ${pagination.total} matching notes · Page ${pagination.current_page} of ${pagination.last_page}`;
+    const goWeek = (date: Date) =>
+        query.change({ week: ymd(date), date_from: null, date_to: null });
+    const selectDay = (date: string | null) =>
+        query.change({ date_from: date, date_to: date });
     const openNew = () => {
+        setEditNote(null);
         setWizardInitial(null);
         setWizardOpen(true);
     };
-
     const openForShift = (shift: CatalogueShift) => {
+        setEditNote(null);
         setWizardInitial({ client_id: shift.client_id, shift_id: shift.id });
         setWizardOpen(true);
     };
-
-    const onExport = () => {
-        window.location.href = `/operations/shift-notes/export?week=${weekStart}`;
+    const gaps = useMemo(
+        () =>
+            computeCoverageGaps(
+                catalogue.shifts,
+                notes,
+                weekStartDate,
+                catalogue.note_shift_ids,
+                evidence.timezone,
+            ),
+        [
+            catalogue.shifts,
+            catalogue.note_shift_ids,
+            notes,
+            weekStartDate,
+            evidence.timezone,
+        ],
+    );
+    const flagNote = (note: ShiftNote) => {
+        if (!can.flag || !note.can_flag) return;
+        setDetailId(null);
+        setNoteAction({ note, action: 'flag' });
     };
-
-    const flagNote = (note: ShiftNote) =>
-        router.patch(
-            `/operations/shift-notes/${note.id}/flag`,
-            {},
-            {
-                preserveScroll: true,
-                preserveState: true,
-                onSuccess: () =>
-                    toast.success(
-                        note.is_flagged ? 'Flag removed' : 'Note flagged',
-                    ),
-            },
-        );
-
-    const reviewNote = (note: ShiftNote) =>
-        router.patch(
-            `/operations/shift-notes/${note.id}/review`,
-            {},
-            {
-                preserveScroll: true,
-                preserveState: true,
-                onSuccess: () => toast.success('Note marked as reviewed'),
-            },
-        );
-
+    const reviewNote = (note: ShiftNote) => {
+        if (!can.review || !note.can_review || note.reviewed_at) return;
+        setDetailId(null);
+        setNoteAction({ note, action: 'review' });
+    };
     const handlers: NoteHandlers = {
-        onOpen: (n) => setDetailId(n.id),
+        onOpen: (note) => setDetailId(note.id),
         onFlag: flagNote,
         onReview: reviewNote,
+        timeZone: evidence.timezone,
+        canFlag: can.flag,
+        canReview: can.review,
     };
-
-    /* ---------------- Event Horizon header ---------------- */
-
-    const weekLabel = weekStartDate.toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-    });
-    const weekEndLabel = new Date(
-        weekStartDate.getTime() + 6 * 86400000,
-    ).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
-
-    const railItems: PageHeaderRailItem<StatusTab>[] = [
-        { key: 'all', label: 'All notes', icon: Layers, count: tabCounts.all },
+    const rails: PageHeaderRailItem<StatusTab>[] = [
+        { key: 'all', label: 'All notes', icon: Layers, count: summary.total },
         {
             key: 'flagged',
             label: 'Flagged',
             icon: Flag,
-            count: tabCounts.flagged,
-            alert: true,
+            count: summary.flagged,
         },
         {
             key: 'awaiting',
             label: 'Awaiting review',
             icon: Clock,
-            count: tabCounts.awaiting,
+            count: summary.awaiting,
         },
         {
             key: 'reviewed',
             label: 'Reviewed',
             icon: CheckCircle2,
-            count: tabCounts.reviewed,
+            count: summary.reviewed,
         },
     ];
-
-    const currentViewLabel =
-        railItems.find((v) => v.key === tab)?.label ?? 'All notes';
-
-    const titleChip =
-        heroCounts.flagged > 0 ? (
-            <PageHeaderStatusChip variant="critical">
-                {heroCounts.flagged} flagged
-            </PageHeaderStatusChip>
-        ) : heroCounts.awaiting > 0 ? (
-            <PageHeaderStatusChip variant="warning">
-                {heroCounts.awaiting} awaiting review
-            </PageHeaderStatusChip>
-        ) : (
-            <PageHeaderStatusChip variant="success">
-                All reviewed
-            </PageHeaderStatusChip>
-        );
-
-    const clientOptions = [
-        { value: 'all', label: 'All clients' },
-        ...catalogue.clients.map((c) => ({
-            value: String(c.id),
-            label: `${c.first_name} ${c.last_name}`,
-        })),
+    const meters: [StatusTab, string, number, string][] = [
+        [
+            'all',
+            'Recorded notes',
+            summary.total,
+            'Matching filters, across every page',
+        ],
+        ['awaiting', 'Awaiting review', summary.awaiting, 'No review recorded'],
+        ['flagged', 'Flagged', summary.flagged, 'Recorded flags for attention'],
+        ['reviewed', 'Reviewed', summary.reviewed, 'Recorded reviews'],
     ];
-    const staffOptions = [
-        { value: 'all', label: 'All staff' },
-        ...catalogue.staff.map((s) => ({
-            value: String(s.id),
-            label: s.name,
-        })),
-    ];
-    const typeOptions = [
-        { value: 'all', label: 'All types' },
-        ...NOTE_TYPES.map((t) => ({ value: t, label: TYPE_META[t].label })),
-    ];
-
-    const header = (
-        <PageHeader
-            icon={NotebookPen}
-            title="Shift notes"
-            titleChip={titleChip}
-            subline={`${weekLabel} → ${weekEndLabel} · ${heroCounts.people} ${
-                heroCounts.people === 1 ? 'client' : 'clients'
-            } · ${heroCounts.houses} ${heroCounts.houses === 1 ? 'house' : 'houses'} · ${heroCounts.staffOnRoster} staff on roster`}
-            actions={
-                <>
-                    <PageHeaderSearch
-                        value={search}
-                        onChange={setSearch}
-                        placeholder="Search notes, clients, staff…"
-                    />
-                    <PageHeaderGlassButton icon={Download} onClick={onExport}>
-                        Export
-                    </PageHeaderGlassButton>
-                    {can.create ? (
-                        <PageHeaderPrimaryButton icon={Plus} onClick={openNew}>
-                            Add note
-                        </PageHeaderPrimaryButton>
-                    ) : null}
-                </>
-            }
-            meters={
-                <>
-                    <PageHeaderMeterBlock
-                        label="Notes this week"
-                        ariaLabel="View all notes"
-                        onClick={() => setTab('all')}
-                    >
-                        <PageHeaderMeterBig>
-                            {heroCounts.total}
-                        </PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            across {heroCounts.houses}{' '}
-                            {heroCounts.houses === 1 ? 'house' : 'houses'}
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
-                    <PageHeaderMeterBlock
-                        label="Awaiting review"
-                        tone={heroCounts.awaiting > 0 ? 'warning' : 'success'}
-                        ariaLabel="View notes awaiting review"
-                        onClick={() => setTab('awaiting')}
-                    >
-                        <PageHeaderMeterBig>
-                            {heroCounts.awaiting}
-                        </PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            not yet signed off
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
-                    <PageHeaderMeterBlock
-                        label="Flagged"
-                        tone={heroCounts.flagged > 0 ? 'critical' : 'success'}
-                        ariaLabel="View flagged notes"
-                        onClick={() => setTab('flagged')}
-                    >
-                        <PageHeaderMeterBig>
-                            {heroCounts.flagged}
-                        </PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            need manager attention
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
-                    <PageHeaderMeterBlock
-                        label="Coverage gaps"
-                        tone={heroCounts.gaps > 0 ? 'warning' : 'success'}
-                        ariaLabel="View the week rail with coverage gaps"
-                        onClick={() =>
-                            document
-                                .getElementById('shift-notes-rail')
-                                ?.scrollIntoView({
-                                    behavior: 'smooth',
-                                    block: 'start',
-                                })
-                        }
-                    >
-                        <PageHeaderMeterBig>
-                            {heroCounts.gaps}
-                        </PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            shifts without a note yet
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
-                    <PageHeaderMeterBlock
-                        label="Incidents"
-                        tone={heroCounts.incidents > 0 ? 'warning' : 'success'}
-                        ariaLabel="Filter to incident notes"
-                        onClick={() =>
-                            setFilters((prev) => ({
-                                ...prev,
-                                type: 'incident' as NoteType,
-                            }))
-                        }
-                    >
-                        <PageHeaderMeterBig>
-                            {heroCounts.incidents}
-                        </PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            incident notes this week
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
-                </>
-            }
-            filters={
-                <>
-                    <PageHeaderFilterButton
-                        icon={ChevronLeft}
-                        aria-label="Previous week"
-                        onClick={() => shiftWeek(-7)}
-                    />
-                    <PageHeaderFilterButton
-                        icon={CalendarDays}
-                        onClick={() => goWeek(new Date())}
-                    >
-                        {weekLabel} → {weekEndLabel}
-                    </PageHeaderFilterButton>
-                    <PageHeaderFilterButton
-                        icon={ChevronRight}
-                        aria-label="Next week"
-                        onClick={() => shiftWeek(7)}
-                    />
-                    <PageHeaderFilterSelect
-                        icon={Users}
-                        label="All clients"
-                        value={
-                            filters.client != null
-                                ? String(filters.client)
-                                : 'all'
-                        }
-                        options={clientOptions}
-                        onChange={(v) =>
-                            setFilters((prev) => ({
-                                ...prev,
-                                client: v === 'all' ? null : Number(v),
-                            }))
-                        }
-                    />
-                    <PageHeaderFilterSelect
-                        icon={Building2}
-                        label="All staff"
-                        value={
-                            filters.staff != null
-                                ? String(filters.staff)
-                                : 'all'
-                        }
-                        options={staffOptions}
-                        onChange={(v) =>
-                            setFilters((prev) => ({
-                                ...prev,
-                                staff: v === 'all' ? null : Number(v),
-                            }))
-                        }
-                    />
-                    <PageHeaderFilterSelect
-                        icon={AlertTriangle}
-                        label="All types"
-                        value={filters.type ?? 'all'}
-                        options={typeOptions}
-                        onChange={(v) =>
-                            setFilters((prev) => ({
-                                ...prev,
-                                type: v === 'all' ? null : (v as NoteType),
-                            }))
-                        }
-                    />
-                    <PageHeaderViewToggle
-                        value={view}
-                        onChange={setView}
-                        ariaLabel="Layout"
-                        options={[
-                            {
-                                value: 'cards',
-                                label: 'Cards',
-                                icon: LayoutGrid,
-                            },
-                            { value: 'list', label: 'List', icon: List },
-                        ]}
-                    />
-                </>
-            }
-            rail={
-                <PageHeaderRail
-                    items={railItems}
-                    value={tab}
-                    onSelect={setTab}
-                    ariaLabel="Note views"
-                />
-            }
-        />
-    );
-
+    const options = (
+        items: { id: number; name: string }[],
+        id: number | null,
+        label: string,
+    ) =>
+        id !== null && !items.some((item) => item.id === id)
+            ? [...items, { id, name: `Selected ${label} unavailable` }]
+            : items;
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Operations', href: '/operations' },
                 { title: 'Shift notes', href: '/operations/shift-notes' },
             ]}
         >
             <Head title="Shift notes" />
-
-            <PageLayout hero={header}>
-                <div className="space-y-4">
-                    <ListCaption
-                        title={currentViewLabel}
-                        caption={`${filtered.length} of ${notes.length} shown`}
-                        right={
-                            hasFilters ? (
-                                <GuardrailButton
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={clearFilters}
-                                    className="text-xs text-muted-foreground"
+            <PageShell>
+                <PageHeader
+                    variant="index"
+                    frontline
+                    icon={NotebookPen}
+                    title="Shift notes"
+                    subline={`${formatDateOnly(weekStart)} → ${formatDateOnly(weekEnd)} · ${evidence.timezone} · Read and document support for each shift`}
+                    actions={
+                        <>
+                            <form
+                                onSubmit={(event) => {
+                                    event.preventDefault();
+                                    query.change();
+                                }}
+                                className="w-full min-w-0 basis-full sm:w-auto sm:flex-1 sm:basis-auto"
+                            >
+                                <fieldset
+                                    disabled={query.loading}
+                                    className="flex min-w-0 flex-wrap gap-2"
+                                >
+                                    <PageHeaderSearch
+                                        value={filters.q}
+                                        onChange={query.editSearch}
+                                        placeholder="Search notes, people or staff"
+                                        className="min-w-0"
+                                    />
+                                    <PageHeaderGlassButton
+                                        type="submit"
+                                        icon={Search}
+                                    >
+                                        Search
+                                    </PageHeaderGlassButton>
+                                </fieldset>
+                            </form>
+                            <PageHeaderGlassButton
+                                icon={Download}
+                                disabled={
+                                    query.loading || !!query.error || changed
+                                }
+                                onClick={() => {
+                                    window.location.href =
+                                        noteExportUrl(loadedFilters);
+                                }}
+                            >
+                                Export matching notes
+                            </PageHeaderGlassButton>
+                            {can.create && (
+                                <PageHeaderPrimaryButton
+                                    icon={Plus}
+                                    onClick={openNew}
+                                    disabled={query.loading}
+                                >
+                                    Add note
+                                </PageHeaderPrimaryButton>
+                            )}
+                        </>
+                    }
+                    meters={
+                        <div className="grid w-full min-w-0 grid-cols-2 gap-2 xl:grid-cols-4">
+                            {meters.map(([key, label, value, caption]) => (
+                                <PageHeaderMeterBlock
+                                    key={key}
+                                    label={label}
+                                    ariaLabel={`View ${label.toLowerCase()}`}
+                                    onClick={() => {
+                                        if (!query.loading)
+                                            query.change({ status: key });
+                                    }}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {value}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {caption}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            ))}
+                        </div>
+                    }
+                    filters={
+                        <fieldset
+                            disabled={query.loading}
+                            className="flex w-full min-w-0 flex-wrap items-center gap-3"
+                        >
+                            <PageHeaderGlassButton
+                                icon={ChevronLeft}
+                                aria-label="Previous week"
+                                onClick={() =>
+                                    goWeek(addDaysWP(weekStartDate, -7))
+                                }
+                            >
+                                Previous
+                            </PageHeaderGlassButton>
+                            <PageHeaderGlassButton
+                                ref={weekButton}
+                                icon={CalendarDays}
+                                aria-haspopup="dialog"
+                                aria-expanded={pickerOpen}
+                                onClick={() => setPickerOpen(!pickerOpen)}
+                            >
+                                Week {weekNumberISO(weekStartDate)} · Choose
+                                week
+                            </PageHeaderGlassButton>
+                            <PageHeaderGlassButton
+                                icon={ChevronRight}
+                                aria-label="Next week"
+                                onClick={() =>
+                                    goWeek(addDaysWP(weekStartDate, 7))
+                                }
+                            >
+                                Next
+                            </PageHeaderGlassButton>
+                            <EntityFilter
+                                onDark
+                                label="Client"
+                                allLabel="All clients"
+                                items={options(
+                                    catalogue.clients.map((c) => ({
+                                        id: c.id,
+                                        name: clientName(c),
+                                    })),
+                                    filters.client_id,
+                                    'client',
+                                )}
+                                value={filters.client_id}
+                                onChange={(client_id) =>
+                                    query.change({ client_id })
+                                }
+                            />
+                            <EntityFilter
+                                onDark
+                                label="Author"
+                                allLabel="All authors"
+                                items={options(
+                                    catalogue.staff,
+                                    filters.author_id,
+                                    'author',
+                                )}
+                                value={filters.author_id}
+                                onChange={(author_id) =>
+                                    query.change({ author_id })
+                                }
+                            />
+                            <EntityFilter
+                                onDark
+                                label="Site"
+                                allLabel="All sites"
+                                items={options(
+                                    catalogue.sites,
+                                    filters.site_id,
+                                    'site',
+                                )}
+                                value={filters.site_id}
+                                onChange={(site_id) =>
+                                    query.change({ site_id })
+                                }
+                            />
+                            <PageHeaderFilterSelect
+                                label="Note type"
+                                value={filters.type ?? 'all'}
+                                options={[
+                                    { value: 'all', label: 'All types' },
+                                    ...NOTE_TYPES.map((type) => ({
+                                        value: type,
+                                        label: TYPE_META[type].label,
+                                    })),
+                                ]}
+                                onChange={(type) =>
+                                    query.change({
+                                        type: type === 'all' ? null : type,
+                                    })
+                                }
+                            />
+                            <PageHeaderViewToggle
+                                value={view}
+                                onChange={setView}
+                                ariaLabel="Note display"
+                                options={[
+                                    {
+                                        value: 'cards',
+                                        label: 'Cards',
+                                        icon: LayoutGrid,
+                                    },
+                                    {
+                                        value: 'list',
+                                        label: 'List',
+                                        icon: List,
+                                    },
+                                ]}
+                            />
+                            {hasFilters && (
+                                <PageHeaderGlassButton
+                                    icon={X}
+                                    onClick={query.clear}
                                 >
                                     Clear filters
-                                </GuardrailButton>
-                            ) : undefined
-                        }
-                    />
-
-                    {selectedDay ? (
-                        <div className="flex items-center gap-3 text-[13px]">
-                            <span className="font-semibold">
-                                Showing{' '}
-                                {new Date(
-                                    `${selectedDay}T12:00:00`,
-                                ).toLocaleDateString('en-NZ', {
-                                    weekday: 'long',
-                                    day: 'numeric',
-                                    month: 'long',
-                                })}
-                            </span>
-                            <GuardrailButton
-                                unstyled
-                                type="button"
-                                onClick={() => setSelectedDay(null)}
-                                className="font-medium text-primary hover:underline"
-                            >
-                                ← Back to whole week
-                            </GuardrailButton>
-                        </div>
-                    ) : null}
-
-                    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-                        <main className="min-w-0">
-                            {filtered.length === 0 ? (
-                                <EmptyState
-                                    filtersActive={hasFilters}
-                                    canCreate={can.create}
-                                    onClearFilters={clearFilters}
-                                    onAddNote={openNew}
-                                />
-                            ) : view === 'cards' ? (
-                                <CardsView notes={filtered} {...handlers} />
-                            ) : (
-                                <ListView notes={filtered} {...handlers} />
+                                </PageHeaderGlassButton>
                             )}
-                        </main>
-                        <div id="shift-notes-rail" className="min-w-0">
-                            <NoteRail
-                                weekNotes={notes}
-                                gaps={gaps}
-                                weekStart={weekStartDate}
-                                selectedDay={selectedDay}
-                                onSelectDay={setSelectedDay}
-                                onOpen={(n) => setDetailId(n.id)}
-                                onAddNoteForShift={openForShift}
+                            {(filters.date_from || filters.date_to) && (
+                                <PageHeaderGlassButton
+                                    icon={CalendarDays}
+                                    onClick={() => selectDay(null)}
+                                >
+                                    {formatDateOnly(filters.date_from)} →{' '}
+                                    {formatDateOnly(filters.date_to)} · Whole
+                                    week
+                                </PageHeaderGlassButton>
+                            )}
+                            <p
+                                role="status"
+                                className="text-caption w-full text-band-foreground!"
+                            >
+                                {query.loading
+                                    ? 'Updating notes…'
+                                    : (readNotice ?? rangeLabel)}{' '}
+                                · Counts cover all matching records before the
+                                status filter · Updated{' '}
+                                {formatDateTimeInZone(
+                                    evidence.checked_at,
+                                    evidence.timezone,
+                                )}
+                            </p>
+                        </fieldset>
+                    }
+                    rail={
+                        <fieldset
+                            disabled={query.loading}
+                            className="w-full min-w-0"
+                        >
+                            <PageHeaderRail
+                                items={rails}
+                                value={filters.status}
+                                onSelect={(status) => query.change({ status })}
+                                ariaLabel="Note views"
+                            />
+                        </fieldset>
+                    }
+                />
+                {pickerOpen && (
+                    <WeekPicker
+                        selectedWeekStart={weekStartDate}
+                        anchorRef={weekButton}
+                        onSelect={(date) => {
+                            goWeek(date);
+                            setPickerOpen(false);
+                        }}
+                        onClose={() => setPickerOpen(false)}
+                        showContextMenu={false}
+                    />
+                )}
+                <div className="space-y-4" aria-busy={query.loading}>
+                    {query.loading ? (
+                        <LoadingState message="Loading matching notes…" />
+                    ) : query.error ? (
+                        <div role="alert">
+                            <ErrorState
+                                title="Notes could not be updated"
+                                message={query.error}
+                                onRetry={query.retry}
                             />
                         </div>
-                    </div>
+                    ) : (
+                        <>
+                            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+                                <section
+                                    aria-label="Records"
+                                    className="min-w-0"
+                                >
+                                    {notes.length === 0 ? (
+                                        <EmptyState
+                                            filtersActive={hasFilters}
+                                            canCreate={can.create}
+                                            onClearFilters={query.clear}
+                                            onAddNote={openNew}
+                                        />
+                                    ) : view === 'cards' ? (
+                                        <CardsView
+                                            notes={notes}
+                                            {...handlers}
+                                        />
+                                    ) : (
+                                        <ListView notes={notes} {...handlers} />
+                                    )}
+                                </section>
+                                <NoteRail
+                                    weekNotes={notes}
+                                    gaps={gaps}
+                                    weekStart={weekStartDate}
+                                    selectedDay={selectedDay}
+                                    onSelectDay={selectDay}
+                                    onOpen={handlers.onOpen}
+                                    onAddNoteForShift={
+                                        can.create ? openForShift : undefined
+                                    }
+                                    timeZone={evidence.timezone}
+                                    awaitingTotal={summary.awaiting}
+                                    onAwaiting={() =>
+                                        query.change({ status: 'awaiting' })
+                                    }
+                                    shiftResults={catalogue.shift_results}
+                                />
+                            </div>
+                            <LaravelPagination
+                                links={pagination.links}
+                                lastPage={pagination.last_page}
+                            />
+                        </>
+                    )}
                 </div>
-            </PageLayout>
-
+            </PageShell>
             <NoteDetailDialog
                 note={detailNote}
-                open={detailId != null}
-                onOpenChange={(open) => !open && setDetailId(null)}
-                currentUser={currentUser}
+                open={detailId !== null}
+                onOpenChange={(open) => {
+                    if (!open) setDetailId(null);
+                }}
+                timeZone={evidence.timezone}
+                canFlag={can.flag}
+                canReview={can.review}
+                onEdit={(note) => {
+                    if (!note.can_edit) return;
+                    setDetailId(null);
+                    setEditNote(note);
+                    setWizardInitial(null);
+                    setWizardOpen(true);
+                }}
                 onFlag={flagNote}
                 onReview={reviewNote}
             />
-
-            {wizardOpen ? (
+            {wizardOpen && (
                 <NoteWizard
                     open={wizardOpen}
                     onOpenChange={(open) => {
                         if (!open) {
                             setWizardOpen(false);
                             setWizardInitial(null);
+                            setEditNote(null);
                         }
                     }}
+                    key={editNote?.id ?? 'new'}
                     initial={wizardInitial}
+                    editNote={editNote}
+                    actorId={currentUser.id}
+                    canSave={
+                        editNote
+                            ? notes.some(
+                                  (note) =>
+                                      note.id === editNote.id && note.can_edit,
+                              )
+                            : can.create
+                    }
+                    timeZone={evidence.timezone}
+                    weekStart={weekStart}
                     catalogue={catalogue}
                     onCreated={(week) => {
-                        setTab('all');
-                        goWeek(week);
+                        query.change({
+                            week: ymd(week),
+                            status: 'all',
+                            q: '',
+                            type: null,
+                            client_id: null,
+                            author_id: null,
+                            site_id: null,
+                            date_from: null,
+                            date_to: null,
+                            flagged: false,
+                        });
                     }}
                 />
-            ) : null}
+            )}
+            {noteAction && (
+                <NoteActionDialog
+                    key={`${noteAction.action}:${noteAction.note.id}`}
+                    {...noteAction}
+                    allowed={notes.some(
+                        (note) =>
+                            note.id === noteAction.note.id &&
+                            (noteAction.action === 'flag'
+                                ? can.flag && note.can_flag
+                                : can.review && note.can_review),
+                    )}
+                    actorId={currentUser.id}
+                    timeZone={evidence.timezone}
+                    weekStart={weekStart}
+                    onClose={() => setNoteAction(null)}
+                />
+            )}
         </AppLayout>
     );
 }

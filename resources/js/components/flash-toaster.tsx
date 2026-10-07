@@ -32,10 +32,19 @@ function asToastText(value: unknown): string | null {
 }
 
 export default function FlashToaster() {
-    const props = usePage().props as any;
+    const page = usePage();
+    const props = page.props as {
+        flash?: Flash;
+        errors?: Record<string, unknown>;
+    };
     const flash = props.flash as Flash | undefined;
-    const errors = props.errors as Record<string, any> | undefined;
-    const success = asToastText(flash?.success);
+    const errors = props.errors;
+    // Shift Notes owns confirmation in its command dialog after matching the
+    // committed receipt. A generic redirect message must not bypass that check.
+    const success =
+        page.component === 'operations/shift-notes/Index'
+            ? null
+            : asToastText(flash?.success);
     const error = asToastText(flash?.error);
     const warning = asToastText(flash?.warning);
     const info = asToastText(flash?.info);

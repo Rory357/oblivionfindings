@@ -5,7 +5,8 @@ import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
 import { Button as GuardrailButton } from '@/components/ui/button';
-import { type NoteHandlers } from './cards-view';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { CardsView, type NoteHandlers } from './cards-view';
 import { type ShiftNote, TypeBadge, clientName, fmtShiftChip } from './shared';
 
 export function ListView({
@@ -13,7 +14,11 @@ export function ListView({
     onOpen,
     onFlag,
     onReview,
+    timeZone,
+    canFlag = false,
+    canReview = false,
 }: { notes: ShiftNote[] } & NoteHandlers) {
+    const mobile = useIsMobile();
     const sorted = useMemo(
         () =>
             [...notes].sort(
@@ -24,6 +29,18 @@ export function ListView({
         [notes],
     );
 
+    if (mobile)
+        return (
+            <CardsView
+                notes={notes}
+                onOpen={onOpen}
+                onFlag={onFlag}
+                onReview={onReview}
+                timeZone={timeZone}
+                canFlag={canFlag}
+                canReview={canReview}
+            />
+        );
     return (
         <div className="overflow-hidden rounded-2xl border border-border bg-card">
             <div className="grid grid-cols-[1.4fr_auto] items-center gap-3 border-b border-border bg-muted/40 px-4 py-2.5 text-[11px] font-bold tracking-wide text-muted-foreground uppercase md:grid-cols-[1.4fr_1fr_1.1fr_auto_auto]">
@@ -39,15 +56,9 @@ export function ListView({
                     return (
                         <div
                             key={n.id}
-                            role="button"
-                            tabIndex={0}
+                            role="group"
+                            aria-label={`Note #${n.id} for ${clientName(n.client)}`}
                             onClick={() => onOpen(n)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    onOpen(n);
-                                }
-                            }}
                             className="grid cursor-pointer grid-cols-[1.4fr_auto] items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset md:grid-cols-[1.4fr_1fr_1.1fr_auto_auto]"
                         >
                             <div className="min-w-0">
@@ -78,7 +89,9 @@ export function ListView({
                                     <TypeBadge type={n.type} />
                                 </div>
                                 <div className="mt-1 truncate text-[11.5px] text-muted-foreground">
-                                    {n.shift ? fmtShiftChip(n.shift) : '—'}
+                                    {n.shift
+                                        ? fmtShiftChip(n.shift, timeZone)
+                                        : '—'}
                                 </div>
                             </div>
 
@@ -90,7 +103,7 @@ export function ListView({
                                 className="flex items-center justify-end gap-1.5"
                                 onClick={(e) => e.stopPropagation()}
                             >
-                                {!n.reviewed_at ? (
+                                {!n.reviewed_at && canReview && n.can_review ? (
                                     <GuardrailButton
                                         unstyled
                                         type="button"
@@ -101,20 +114,22 @@ export function ListView({
                                         Review
                                     </GuardrailButton>
                                 ) : null}
-                                <GuardrailButton
-                                    unstyled
-                                    type="button"
-                                    onClick={() => onFlag(n)}
-                                    className={cn(
-                                        'inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors',
-                                        n.is_flagged
-                                            ? 'border-border bg-background hover:bg-accent'
-                                            : 'border-status-critical/30 text-status-critical hover:bg-status-critical-bg',
-                                    )}
-                                >
-                                    <Flag className="h-3.5 w-3.5" />
-                                    {n.is_flagged ? 'Unflag' : 'Flag'}
-                                </GuardrailButton>
+                                {canFlag && n.can_flag && (
+                                    <GuardrailButton
+                                        unstyled
+                                        type="button"
+                                        onClick={() => onFlag(n)}
+                                        className={cn(
+                                            'inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors',
+                                            n.is_flagged
+                                                ? 'border-border bg-background hover:bg-accent'
+                                                : 'border-status-critical/30 text-status-critical hover:bg-status-critical-bg',
+                                        )}
+                                    >
+                                        <Flag className="h-3.5 w-3.5" />
+                                        {n.is_flagged ? 'Unflag' : 'Flag'}
+                                    </GuardrailButton>
+                                )}
                                 <GuardrailButton
                                     unstyled
                                     type="button"
