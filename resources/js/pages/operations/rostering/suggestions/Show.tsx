@@ -12,8 +12,19 @@ import {
 } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
+import {
+    formatDateOnly,
+    formatDateTimeInZone,
+    WORKER_TIMEZONE,
+} from '@/lib/datetime';
 import { useI18n } from '@/lib/i18n';
 import { Head, router } from '@inertiajs/react';
 import { Check, Send, Wand2, X } from 'lucide-react';
@@ -67,23 +78,14 @@ type Suggestion = {
 type Props = {
     run: SuggestionRun;
     suggestions: Suggestion[];
+    worker_timezone?: string;
 };
 
-type TFunction = (key: string, fallback?: string) => string;
-
-function formatDateTime(value: string | null | undefined, t: TFunction) {
-    if (!value) return t('rostering.common.unscheduled', 'Unscheduled');
-
-    return new Intl.DateTimeFormat(undefined, {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short',
-        hour: 'numeric',
-        minute: '2-digit',
-    }).format(new Date(value));
-}
-
-export default function Show({ run, suggestions }: Props) {
+export default function Show({
+    run,
+    suggestions,
+    worker_timezone = WORKER_TIMEZONE,
+}: Props) {
     const { t } = useI18n();
     const isGenerating = run.status === 'pending' || run.status === 'running';
     const canApply = !run.is_expired && run.status === 'completed';
@@ -97,7 +99,7 @@ export default function Show({ run, suggestions }: Props) {
         if (!isGenerating) return;
 
         const interval = window.setInterval(() => {
-            router.reload({ only: ['run', 'suggestions'] });
+            router.reload({ only: ['run', 'suggestions', 'worker_timezone'] });
         }, 5000);
 
         return () => window.clearInterval(interval);
@@ -207,7 +209,7 @@ export default function Show({ run, suggestions }: Props) {
             subline={`${t(
                 'rostering.suggestions.head_title',
                 'Roster suggestions',
-            )} · ${run.week_start} → ${run.week_end}${
+            )} · ${formatDateOnly(run.week_start)} → ${formatDateOnly(run.week_end)} · ${worker_timezone}${
                 run.requested_by ? ` · ${run.requested_by}` : ''
             }`}
             actions={
@@ -370,17 +372,31 @@ export default function Show({ run, suggestions }: Props) {
                                     <Card key={shiftId}>
                                         <CardHeader className="pb-2">
                                             <CardTitle className="text-base">
-                                                {formatDateTime(
-                                                    shift?.starts_at,
-                                                    t,
-                                                )}{' '}
-                                                ·{' '}
                                                 {shift?.client ??
                                                     t(
                                                         'rostering.suggestions.open_shift',
                                                         'Open shift',
                                                     )}
                                             </CardTitle>
+                                            <CardDescription>
+                                                {formatDateTimeInZone(
+                                                    shift?.starts_at,
+                                                    worker_timezone,
+                                                    t(
+                                                        'rostering.suggestions.start_unavailable',
+                                                        'Start time unavailable',
+                                                    ),
+                                                )}{' '}
+                                                →{' '}
+                                                {formatDateTimeInZone(
+                                                    shift?.ends_at,
+                                                    worker_timezone,
+                                                    t(
+                                                        'rostering.suggestions.end_unavailable',
+                                                        'End time unavailable',
+                                                    ),
+                                                )}
+                                            </CardDescription>
                                         </CardHeader>
                                         <CardContent className="space-y-2">
                                             {shiftSuggestions.map(

@@ -7,6 +7,7 @@ use App\Models\Shift;
 use App\Models\StaffTimeOff;
 use App\Models\User;
 use App\Services\Eligibility\EligibilityResult;
+use App\Services\Eligibility\PreparedShiftWorkload;
 use App\Services\Eligibility\Rules\AvailabilityRule;
 use App\Services\Eligibility\Rules\DriverLicenceExpiryRule;
 use App\Services\Eligibility\Rules\FatigueRule;
@@ -47,8 +48,10 @@ class ShiftStaffEligibilityService
      *                                                            querying per pair. When null (the default, single-call path) the
      *                                                            original per-pair queries run unchanged.
      */
-    public function evaluate(Shift $shift, User $user, ?Collection $preloadedUserShifts = null): EligibilityResult
+    public function evaluate(Shift $shift, User $user, ?Collection $preloadedUserShifts = null, ?PreparedShiftWorkload $workload = null): EligibilityResult
     {
+        $workload?->assertFor($shift, $user);
+        $preloadedUserShifts = $workload?->conflictShifts($shift) ?? $preloadedUserShifts;
         $checks = [];
 
         // ── Existing checks (converted to rule-result format) ──────────
@@ -66,7 +69,7 @@ class ShiftStaffEligibilityService
         // ── New rule classes ───────────────────────────────────────────
 
         $checks = array_merge($checks, $this->availabilityRule->evaluateAll($shift, $user));
-        $checks = array_merge($checks, $this->fatigueRule->evaluateAll($shift, $user));
+        $checks = array_merge($checks, $this->fatigueRule->evaluateAll($shift, $user, $workload));
         $checks[] = $this->siteAssignmentRule->evaluate($shift, $user);
         $checks[] = $this->driverLicenceRule->evaluate($shift, $user);
         $checks[] = $this->requiredDriverLicenceRule->evaluate($shift, $user);

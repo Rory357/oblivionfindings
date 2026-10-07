@@ -45,6 +45,7 @@ class RosterSuggestionController extends Controller
         ]);
 
         return inertia('operations/rostering/suggestions/Show', [
+            'worker_timezone' => (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC'),
             'run' => [
                 'id' => $run->id,
                 'status' => $run->status,

@@ -11,7 +11,9 @@ use App\Models\ShiftTask;
 use App\Models\User;
 use App\Services\CoverageReservationService;
 use App\Services\CurrentAuthorizationReads;
+use App\Services\Eligibility\AssignmentEligibilityDecision;
 use App\Services\Eligibility\AssignmentEligibilityGateway;
+use App\Services\Eligibility\ProposedShiftWorkloadService;
 use App\Services\NotificationService;
 use App\Services\Operations\WorkforceMutationGuard;
 use App\Services\ShiftReplacementService;
@@ -60,7 +62,22 @@ class ShiftPlanningCommand
                 $needsDecision = $userId && (! $locked || (int) $userId !== (int) $locked->user_id || $timesChanged
                     || array_key_exists('required_licence_class', $data) || array_key_exists('required_licence_endorsements', $data));
                 if ($needsDecision) {
-                    $decision = app(AssignmentEligibilityGateway::class)->decide($candidate, $evidence['users']->get((int) $userId));
+                    $recipient = $evidence['users']->get((int) $userId);
+                    try {
+                        $workload = app(ProposedShiftWorkloadService::class)->prepareCurrent(collect([$candidate]), $locked ? [$locked->id] : [], $actor)->get((int) $userId);
+                        if (! $workload) {
+                            throw new \LogicException('The assignment workload was not prepared.');
+                        }
+                        $decision = app(AssignmentEligibilityGateway::class)->decide($candidate, $recipient, $workload);
+                    } catch (Throwable $exception) {
+                        try {
+                            Log::error('Shift planning workload unavailable', ['shift_id' => $locked?->id,
+                                'user_id' => $userId, 'exception_class' => $exception::class]);
+                        } catch (Throwable) {
+                            // Diagnostics cannot replace the existing safe outcome.
+                        }
+                        $decision = AssignmentEligibilityDecision::unavailable($candidate, $recipient);
+                    }
                     try {
                         $decision->assertMayAssign('user_id', 'This staff member cannot be assigned to this shift.');
                     } catch (ValidationException $exception) {
