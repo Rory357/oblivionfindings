@@ -37,6 +37,8 @@ class CoverageReservationService
         array $meta = [],
         int $ttlMinutes = 10,
     ): CoverageReservation {
+        $windowStartsAt = $this->utcInstant($windowStartsAt);
+        $windowEndsAt = $this->utcInstant($windowEndsAt);
         $this->assertActorCanReserveAtSite($actor, $siteId, $coverageRequirementId);
 
         return DB::transaction(function () use ($actor, $siteId, $windowStartsAt, $windowEndsAt, $coverageRequirementId, $roleKey, $meta, $ttlMinutes) {
@@ -140,13 +142,13 @@ class CoverageReservationService
                 ]);
             }
 
-            if ($key === 'window_starts_at' && ! $reservation->window_starts_at?->equalTo(Carbon::parse((string) $expected))) {
+            if ($key === 'window_starts_at' && ! $reservation->window_starts_at?->equalTo($this->utcInstant($expected))) {
                 throw ValidationException::withMessages([
                     'coverage_reservation_token' => 'This coverage hold was created for a different start time.',
                 ]);
             }
 
-            if ($key === 'window_ends_at' && ! $reservation->window_ends_at?->equalTo(Carbon::parse((string) $expected))) {
+            if ($key === 'window_ends_at' && ! $reservation->window_ends_at?->equalTo($this->utcInstant($expected))) {
                 throw ValidationException::withMessages([
                     'coverage_reservation_token' => 'This coverage hold was created for a different end time.',
                 ]);
@@ -214,12 +216,13 @@ class CoverageReservationService
                     ->orWhere(function ($windowQuery) use ($shift) {
                         if (! $shift->site_id || ! $shift->starts_at || ! $shift->ends_at) {
                             $windowQuery->whereRaw('1 = 0');
+
                             return;
                         }
 
                         $windowQuery->where('site_id', $shift->site_id)
-                            ->where('window_starts_at', $shift->starts_at)
-                            ->where('window_ends_at', $shift->ends_at);
+                            ->where('window_starts_at', $this->utcInstant($shift->starts_at))
+                            ->where('window_ends_at', $this->utcInstant($shift->ends_at));
                     });
             })
             ->update([
@@ -266,8 +269,8 @@ class CoverageReservationService
                 'reservation_token' => (string) Str::uuid(),
                 'status' => self::STATUS_ACTIVE,
                 'reason' => $reason,
-                'window_starts_at' => Carbon::parse($coverage['starts_at']),
-                'window_ends_at' => Carbon::parse($coverage['ends_at']),
+                'window_starts_at' => $this->utcInstant($coverage['starts_at']),
+                'window_ends_at' => $this->utcInstant($coverage['ends_at']),
                 'expires_at' => now()->addMinutes(5),
                 'meta' => [
                     'shift_id' => $shift->id,
@@ -287,15 +290,15 @@ class CoverageReservationService
             return null;
         }
 
-        $windowStartsAt = Carbon::parse((string) $startsAt);
-        $windowEndsAt = Carbon::parse((string) $endsAt);
+        $windowStartsAt = $this->utcInstant($startsAt);
+        $windowEndsAt = $this->utcInstant($endsAt);
         $coverageRequirementId = ! empty($payload['coverage_rule_id']) ? (int) $payload['coverage_rule_id'] : null;
         $this->assertActorCanReserveAtSite($actor, $siteId, $coverageRequirementId);
         $roleKey = ! empty($payload['role_key'])
             ? trim((string) $payload['role_key'])
             : collect($payload['coverage_roles'] ?? [])
-            ->map(fn ($role) => is_string($role) ? trim($role) : null)
-            ->first(fn (?string $role) => $role !== null && $role !== '');
+                ->map(fn ($role) => is_string($role) ? trim($role) : null)
+                ->first(fn (?string $role) => $role !== null && $role !== '');
 
         return DB::transaction(function () use ($actor, $siteId, $windowStartsAt, $windowEndsAt, $coverageRequirementId, $roleKey, $reason) {
             $this->expireStaleReservations();
@@ -397,8 +400,8 @@ class CoverageReservationService
                 fn ($query, $ruleId) => $query->where('coverage_requirement_id', $ruleId),
                 fn ($query) => $query->whereNull('coverage_requirement_id'),
             )
-            ->where('window_starts_at', Carbon::parse($window['starts_at']))
-            ->where('window_ends_at', Carbon::parse($window['ends_at']))
+            ->where('window_starts_at', $this->utcInstant($window['starts_at']))
+            ->where('window_ends_at', $this->utcInstant($window['ends_at']))
             ->when($roleKey, fn ($query) => $query->where('role_key', $roleKey))
             ->count();
 
@@ -465,5 +468,12 @@ class CoverageReservationService
         });
 
         return $matchingSlot['slot_key'] ?? null;
+    }
+
+    private function utcInstant(mixed $value): CarbonInterface
+    {
+        return $value instanceof CarbonInterface
+            ? $value->copy()->utc()
+            : Carbon::parse((string) $value)->utc();
     }
 }

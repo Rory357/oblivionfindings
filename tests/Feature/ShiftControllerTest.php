@@ -280,8 +280,8 @@ class ShiftControllerTest extends TestCase
 
     public function test_coverage_reservation_post_is_idempotent_and_shift_create_get_only_validates_token(): void
     {
-        $startsAt = now()->addDay()->setTime(9, 0);
-        $endsAt = now()->addDay()->setTime(10, 0);
+        $startsAt = now((string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC')))->addDay()->setTime(9, 0);
+        $endsAt = $startsAt->copy()->setTime(10, 0);
         $rule = SiteCoverageRequirement::create([
             'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,

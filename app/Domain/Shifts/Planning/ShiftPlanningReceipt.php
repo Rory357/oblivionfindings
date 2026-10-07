@@ -52,13 +52,27 @@ class ShiftPlanningReceipt
                     'reason' => $result->rejectionReason, 'values_hash' => ShiftPlanningIntent::hash($result->intent)];
             }
 
-            return ['action' => $action, 'actor_id' => $result->actorId, 'shift_id' => (int) $shift->id,
+            $warnings = [];
+            if ($action === 'create') {
+                $warnings = array_key_exists('warning_reasons', $result->eligibility)
+                    ? $result->eligibility['warning_reasons'] : ($result->eligibility === [] ? [] : null);
+                if (! is_array($warnings) || ! array_is_list($warnings) || array_filter($warnings, static fn ($warning) => ! is_string($warning)) !== []) {
+                    return null;
+                }
+            }
+
+            $receipt = ['action' => $action, 'actor_id' => $result->actorId, 'shift_id' => (int) $shift->id,
                 'scope' => 'single', 'source' => $result->source, 'client_id' => (int) $shift->client_id,
                 'site_id' => (int) $shift->site_id, 'user_id' => $shift->user_id === null ? null : (int) $shift->user_id,
                 'service_context_id' => $shift->service_context_id === null ? null : (int) $shift->service_context_id,
                 'status' => $shift->status, 'changed' => $result->changed, 'outcome' => $result->changed ? 'saved' : 'unchanged',
                 'starts_at' => ShiftPlanningIntent::instant($shift->starts_at), 'ends_at' => ShiftPlanningIntent::instant($shift->ends_at),
                 'values_hash' => ShiftPlanningIntent::hash($result->intent)];
+            if ($action === 'create') {
+                $receipt['assignment_warnings'] = $warnings;
+            }
+
+            return $receipt;
         } catch (Throwable $exception) {
             try {
                 Log::warning('Committed Shift planning result could not be presented', ['action' => $action, 'exception_class' => $exception::class]);

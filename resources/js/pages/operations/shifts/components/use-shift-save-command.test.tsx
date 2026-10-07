@@ -46,6 +46,7 @@ let hash: string;
 async function receipt(input = expected): Promise<ShiftSaveReceipt> {
     return {
         action: input.source ? 'update' : 'create',
+        ...(!input.source ? { assignment_warnings: [] } : {}),
         actor_id: input.actorId,
         shift_id: input.source?.shift_id ?? 56,
         scope: 'single',
@@ -312,4 +313,138 @@ it('cannot confirm late callbacks after an unmounted dialog or an already-finish
         options.onFinish();
     });
     expect(transport.put).toHaveBeenCalledTimes(1);
+});
+
+it('keeps only current committed create warnings and does not reuse a stale session advisory', async () => {
+    const input = { ...expected, source: null };
+    const warnings = ['Confirm safe cover before the shift starts'];
+    const valid = { ...(await receipt(input)), assignment_warnings: warnings };
+    const outcome = shiftSaveReceipt(
+        {
+            shift_result: valid,
+            warning: 'Old staff warning',
+            eligibility_result: { warning_reasons: ['Old preview warning'] },
+        },
+        input,
+        valid.values_hash,
+    );
+    expect(outcome).toMatchObject({
+        status: 'confirmed',
+        warnings: ['Confirm safe cover before the shift starts'],
+    });
+    warnings.push('Changed after confirmation');
+    if (outcome.status === 'confirmed')
+        expect(outcome.warnings).toEqual([
+            'Confirm safe cover before the shift starts',
+        ]);
+});
+
+it('confirms a clean create without presenting warnings left over from another request', async () => {
+    const input = { ...expected, source: null };
+    const valid = await receipt(input);
+    expect(
+        shiftSaveReceipt(
+            {
+                shift_result: valid,
+                warning: 'Old warning',
+                eligibility_result: { warning_reasons: ['Old eligibility'] },
+            },
+            input,
+            valid.values_hash,
+        ),
+    ).toMatchObject({ status: 'confirmed', warnings: [] });
+});
+
+it('withholds confirmation when create warning evidence is absent or malformed', async () => {
+    const input = { ...expected, source: null };
+    const valid = await receipt(input);
+    for (const invalid of [
+        undefined,
+        null,
+        'Review cover',
+        {},
+        [null],
+        [1],
+        [{}],
+        [['Nested']],
+    ]) {
+        expect(
+            shiftSaveReceipt(
+                {
+                    shift_result: { ...valid, assignment_warnings: invalid },
+                    success: 'Shift created.',
+                },
+                input,
+                valid.values_hash,
+            ).status,
+        ).toBe('unknown');
+    }
+});
+
+it('cannot present another actor, request or time window as a saved create with warnings', async () => {
+    const input = { ...expected, source: null };
+    const valid = {
+        ...(await receipt(input)),
+        assignment_warnings: ['Private current advisory'],
+    };
+    for (const mismatch of [
+        { actor_id: 2 },
+        { values_hash: 'b'.repeat(64) },
+        { ends_at: '2026-10-05T04:48:00.000Z' },
+    ]) {
+        expect(
+            shiftSaveReceipt(
+                { shift_result: { ...valid, ...mismatch } },
+                input,
+                valid.values_hash,
+            ),
+        ).toEqual({
+            status: 'unknown',
+            message: expect.any(String),
+        });
+    }
+});
+
+it('retains saved create warnings after the response and prevents sending the same create twice', async () => {
+    const input = { ...expected, source: null };
+    const valid = {
+        ...(await receipt(input)),
+        assignment_warnings: ['Arrange a rest break'],
+    };
+    const hook = renderHook(() => useShiftSaveCommand('1:new'));
+    await act(async () => hook.result.current.submit(input, {}));
+    act(() => {
+        const options = transport.post.mock.calls[0][2];
+        options.onSuccess({ props: { flash: { shift_result: valid } } });
+        options.onFinish();
+    });
+    expect(hook.result.current.outcome).toMatchObject({
+        status: 'confirmed',
+        warnings: ['Arrange a rest break'],
+    });
+    await act(async () => hook.result.current.submit(input, {}));
+    expect(transport.post).toHaveBeenCalledTimes(1);
+    hook.unmount();
+});
+
+it('does not replay a create whose success response omitted current warning evidence', async () => {
+    const input = { ...expected, source: null };
+    const valid = await receipt(input);
+    const hook = renderHook(() => useShiftSaveCommand('1:new'));
+    await act(async () => hook.result.current.submit(input, {}));
+    act(() => {
+        const options = transport.post.mock.calls[0][2];
+        options.onSuccess({
+            props: {
+                flash: {
+                    shift_result: { ...valid, assignment_warnings: undefined },
+                },
+            },
+        });
+        options.onFinish();
+    });
+    expect(hook.result.current.outcome?.status).toBe('unknown');
+    await act(async () => hook.result.current.submit(input, {}));
+    expect(transport.post).toHaveBeenCalledTimes(1);
+    hook.unmount();
 });

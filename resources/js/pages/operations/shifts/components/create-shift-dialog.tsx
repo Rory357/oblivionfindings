@@ -1429,12 +1429,25 @@ function ShiftDialogForm({
                             }
                             blurb={saved}
                             actions={
-                                <GuardrailButton
-                                    className="frontline-hit"
-                                    onClick={onClose}
-                                >
-                                    Done
-                                </GuardrailButton>
+                                <div className="flex max-w-lg min-w-0 flex-col items-center gap-4">
+                                    {command.outcome?.status === 'confirmed' &&
+                                        command.outcome.warnings.length > 0 && (
+                                            <EligibilityAlertBanner
+                                                type="warnings"
+                                                title="Staff eligibility warnings"
+                                                reasons={
+                                                    command.outcome.warnings
+                                                }
+                                                className="text-left [overflow-wrap:anywhere]"
+                                            />
+                                        )}
+                                    <GuardrailButton
+                                        className="frontline-hit"
+                                        onClick={onClose}
+                                    >
+                                        Done
+                                    </GuardrailButton>
+                                </div>
                             }
                         />
                     ) : undefined

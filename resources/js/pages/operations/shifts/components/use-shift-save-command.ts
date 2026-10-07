@@ -50,6 +50,7 @@ export type ShiftSaveReceipt = {
     starts_at: string;
     ends_at: string;
     values_hash: string;
+    assignment_warnings?: string[];
 };
 export type ShiftSaveExpectation = {
     actorId: number;
@@ -69,7 +70,7 @@ export type ShiftEligibilityFeedback = {
     }>;
 };
 export type ShiftSaveOutcome =
-    | { status: 'confirmed'; receipt: ShiftSaveReceipt }
+    | { status: 'confirmed'; receipt: ShiftSaveReceipt; warnings: string[] }
     | {
           status: 'rejected';
           message: string;
@@ -202,9 +203,16 @@ export function shiftSaveReceipt(
                     ? 'The shift was not saved. Add a reason before confirming the eligibility override.'
                     : 'The shift was not saved. Review the current staff eligibility warnings. Your entries are kept here.',
         };
-    // A committed create may retain an informational eligibility warning.
+    // The current create receipt owns its warnings; old session flash and
+    // eligibility previews cannot describe this committed assignment.
+    const warnings = receipt.assignment_warnings;
+    const validWarnings =
+        action !== 'create' ||
+        (Array.isArray(warnings) &&
+            warnings.every((warning) => typeof warning === 'string'));
     if (
         !flash.error &&
+        validWarnings &&
         bound &&
         positive(expected.siteId) &&
         positive(receipt.shift_id) &&
@@ -227,7 +235,11 @@ export function shiftSaveReceipt(
         /^[a-f0-9]{64}$/.test(hash) &&
         receipt.values_hash === hash
     )
-        return { status: 'confirmed', receipt: receipt as ShiftSaveReceipt };
+        return {
+            status: 'confirmed',
+            receipt: receipt as ShiftSaveReceipt,
+            warnings: action === 'create' ? [...(warnings as string[])] : [],
+        };
     return { status: 'unknown', message: UNKNOWN_SHIFT_SAVE };
 }
 

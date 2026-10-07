@@ -285,12 +285,7 @@ class WorkforceShiftSaveCommandIntegrityTest extends TestCase
         $body = $this->body(['override_acknowledged' => $ack, 'override_reason' => '  ', 'location' => 'Unapplied location',
             'starts_at' => '2026-10-11T19:00:00Z', 'ends_at' => '2026-10-11T23:00:00Z',
             'tasks' => [['id' => $task->id, 'label' => 'Unapplied task', 'scheduled_time' => '08:40']]]);
-        // The unchanged allocator expands rules in the normalized payload's UTC timezone.
-        // Arrange a real matching gap; worker-local rule interpretation is separate.
-        if ($hold === 'automatic') {
-            $body['starts_at'] = '2026-10-12T08:00:00Z';
-            $body['ends_at'] = '2026-10-12T12:00:00Z';
-        }
+        // Both supplied and automatic holds target the existing Monday 08:00 worker-local rule.
         $rule = $this->coverageRule();
         $body['coverage_rule_id'] = $rule->id;
         $reservation = $hold === 'supplied' ? $this->hold($body, $rule) : null;
@@ -438,6 +433,194 @@ class WorkforceShiftSaveCommandIntegrityTest extends TestCase
             $this->assertFalse(DB::connection()->getPdo()->inTransaction());
             $this->assertSame($queue, $this->queueState());
         });
+    }
+
+    public function test_committed_create_warnings_are_bound_to_the_actual_receipt_and_withheld_from_foreign_readers(): void
+    {
+        $other = $this->person(['shifts.viewAny']);
+        $body = $this->body();
+        $this->decision('warning');
+        $this->commitFixtures();
+        $this->withSession(['assignment_warnings' => ['Prior unrelated warning']]);
+        $this->requestSave('create', $body)->assertRedirect()->assertSessionHasNoErrors();
+        $receipt = session('shift_result');
+        $this->assertSame('create', $receipt['action']);
+        $this->assertSame($this->actor->id, $receipt['actor_id']);
+        $this->assertSame('saved', $receipt['outcome']);
+        $this->assertTrue($receipt['changed']);
+        $this->assertSame($this->expectedHash($body), $receipt['values_hash']);
+        $this->assertSame(['Current fixture warning'], $receipt['assignment_warnings']);
+        $saved = Shift::findOrFail($receipt['shift_id']);
+        $this->assertSame($this->worker->id, $saved->user_id);
+        $this->assertSame($this->actor->id, $saved->created_by);
+        $this->assertSame(0, ShiftEligibilityOverride::where('shift_id', $saved->id)->count());
+        $before = $this->state();
+        $queue = $this->queueState();
+        $this->get(route('operations.shifts.index'))->assertOk()->assertInertia(fn ($page) => $page
+            ->where('flash.shift_result.actor_id', $this->actor->id)
+            ->where('flash.shift_result.shift_id', $saved->id)
+            ->where('flash.shift_result.assignment_warnings', ['Current fixture warning']));
+        $this->assertSame($before, $this->state());
+        $this->withSession(['shift_result' => $receipt, 'assignment_warnings' => ['Prior unrelated warning']]);
+        $this->actingAs($other)->get(route('operations.shifts.index'))->assertRedirect(route('my-day'));
+        $this->withSession(['shift_result' => $receipt, 'assignment_warnings' => ['Prior unrelated warning']]);
+        $this->get(route('my-day'))->assertOk()->assertInertia(fn ($page) => $page
+            ->component('my-day/index')->where('flash.shift_result', null)
+            ->missing('flash.assignment_warnings'));
+        $this->assertSame($before, $this->state());
+        $this->assertSame($queue, $this->queueState());
+    }
+
+    public static function warningFreeCreateRecipients(): array
+    {
+        return ['assigned pass' => [true], 'open draft' => [false]];
+    }
+
+    #[DataProvider('warningFreeCreateRecipients')]
+    public function test_next_warning_free_create_projects_an_empty_list_even_with_old_session_warnings(bool $assigned): void
+    {
+        $this->decision('warning');
+        $this->commitFixtures();
+        $this->requestSave('create', $this->body())->assertRedirect()->assertSessionHasNoErrors();
+        $prior = session('shift_result');
+        $this->assertSame(['Current fixture warning'], $prior['assignment_warnings']);
+        if ($assigned) {
+            $this->decision('pass');
+        }
+        $body = $this->body(['user_id' => $assigned ? $this->worker->id : null, 'starts_at' => '2026-10-12T19:00:07Z', 'ends_at' => '2026-10-12T23:00:12Z']);
+        $this->withSession(['shift_result' => $prior, 'assignment_warnings' => ['Prior unrelated warning']]);
+        $this->assertSame(['Prior unrelated warning'], session('assignment_warnings'));
+        $this->assertContains('assignment_warnings', session('_flash.old', []));
+        $this->requestSave('create', $body)->assertRedirect()->assertSessionHasNoErrors();
+        $receipt = session('shift_result');
+        $this->assertNotSame($prior['shift_id'], $receipt['shift_id']);
+        $this->assertSame($this->actor->id, $receipt['actor_id']);
+        $this->assertSame('create', $receipt['action']);
+        $this->assertSame('saved', $receipt['outcome']);
+        $this->assertSame($assigned ? 'scheduled' : 'draft', $receipt['status']);
+        $this->assertSame($assigned ? $this->worker->id : null, $receipt['user_id']);
+        $this->assertSame($this->expectedHash($body), $receipt['values_hash']);
+        $this->assertSame([], $receipt['assignment_warnings']);
+        // withSession replaces the value but does not reflash an old key; this request expires it.
+        $this->assertNull(session('assignment_warnings'));
+        $before = $this->state();
+        $queue = $this->queueState();
+        $this->get(route('operations.shifts.index'))->assertOk()->assertInertia(fn ($page) => $page
+            ->where('flash.shift_result.shift_id', $receipt['shift_id'])
+            ->where('flash.shift_result.assignment_warnings', [])
+            ->missing('flash.assignment_warnings'));
+        $this->assertSame($before, $this->state());
+        $this->assertSame($queue, $this->queueState());
+    }
+
+    public static function createWarningNoReceiptBoundaries(): array
+    {
+        return ['nested commit' => ['nested_commit'], 'nested rollback' => ['nested_rollback'],
+            'projection fault' => ['projection_fault'], 'validation denial' => ['validation_denial']];
+    }
+
+    #[DataProvider('createWarningNoReceiptBoundaries')]
+    public function test_create_without_a_confirmed_root_receipt_cannot_project_stale_warning_metadata(string $boundary): void
+    {
+        $body = $this->body();
+        if ($boundary !== 'validation_denial') {
+            $this->decision('warning');
+        }
+        $this->commitFixtures();
+        if ($boundary === 'projection_fault') {
+            $this->app->instance(ShiftPlanningReceipt::class, new class extends ShiftPlanningReceipt
+            {
+                private int $calls = 0;
+
+                protected function isPhysicalRoot(): bool
+                {
+                    if (++$this->calls === 2) {
+                        throw new \RuntimeException('sanitized warning projection failure');
+                    }
+
+                    return parent::isPhysicalRoot();
+                }
+            });
+        }
+        $before = $this->state();
+        $queue = $this->queueState();
+        $this->withProductionManager(function () use ($body, $boundary, $before, $queue): void {
+            $nested = in_array($boundary, ['nested_commit', 'nested_rollback'], true);
+            if ($nested) {
+                DB::beginTransaction();
+            }
+            $this->withSession(['shift_result' => ['actor_id' => $this->actor->id, 'action' => 'create', 'assignment_warnings' => ['Old receipt warning']],
+                'assignment_warnings' => ['Prior unrelated warning']]);
+            if ($boundary === 'validation_denial') {
+                $this->requestSave('create', [...$body, 'ends_at' => '2026-10-11T18:00:00Z'], null, true)
+                    ->assertUnprocessable()->assertJsonValidationErrors('ends_at');
+            } else {
+                $this->requestSave('create', $body)->assertRedirect()->assertSessionHasNoErrors();
+                $this->assertSame(count($before['shifts']) + 1, Shift::count());
+            }
+            $this->assertNull(session('shift_result'));
+            if ($nested) {
+                $this->assertSame(1, DB::transactionLevel());
+                $this->assertTrue(DB::connection()->getPdo()->inTransaction());
+                $boundary === 'nested_commit' ? DB::commit() : DB::rollBack();
+            }
+            $this->assertSame(0, DB::transactionLevel());
+            $this->assertFalse(DB::connection()->getPdo()->inTransaction());
+            $this->assertNull(session('shift_result'));
+            if (in_array($boundary, ['validation_denial', 'nested_rollback'], true)) {
+                $this->assertSame($before, $this->state());
+                $this->assertSame($queue, $this->queueState());
+            } else {
+                $saved = Shift::where('created_by', $this->actor->id)->sole();
+                $this->assertSame('scheduled', $saved->status);
+                $this->assertSame($this->worker->id, $saved->user_id);
+                $this->assertSame(0, ShiftEligibilityOverride::where('shift_id', $saved->id)->count());
+            }
+            $after = $this->state();
+            $afterQueue = $this->queueState();
+            $this->get(route('operations.shifts.index'))->assertOk()->assertInertia(fn ($page) => $page
+                ->where('flash.shift_result', null)->missing('flash.assignment_warnings'));
+            $this->assertSame($after, $this->state());
+            $this->assertSame($afterQueue, $this->queueState());
+        });
+    }
+
+    public static function malformedCreateWarningLists(): array
+    {
+        return ['object-shaped list' => [['private_key' => 'Malformed message']],
+            'non-string entry' => [[42]], 'nested entry' => [[['message' => 'Malformed nested message']]]];
+    }
+
+    #[DataProvider('malformedCreateWarningLists')]
+    public function test_malformed_current_create_warning_projection_withholds_confirmation_without_failing_the_saved_command(array $warnings): void
+    {
+        $this->mock(ShiftStaffEligibilityService::class, function ($mock) use ($warnings): void {
+            $mock->shouldReceive('evaluate')->once()->andReturnUsing(function (Shift $candidate, User $recipient) use ($warnings): EligibilityResult {
+                $this->assertSame($this->site->id, $candidate->site_id);
+                $this->assertSame($candidate->user_id, $recipient->id);
+                $this->assertTrue($recipient->isApproved());
+
+                return new EligibilityResult(true, [], $warnings, [], []);
+            });
+        });
+        $this->assertSame(AssignmentEligibilityGateway::class, get_class(app(AssignmentEligibilityGateway::class)));
+        $this->commitFixtures();
+        $this->withSession(['assignment_warnings' => ['Prior unrelated warning']]);
+        $this->requestSave('create', $this->body())->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertNull(session('shift_result'));
+        $saved = Shift::where('created_by', $this->actor->id)->sole();
+        $this->assertSame('scheduled', $saved->status);
+        $this->assertSame($this->worker->id, $saved->user_id);
+        $this->assertSame(0, ShiftEligibilityOverride::where('shift_id', $saved->id)->count());
+        $this->assertSame($warnings, session('assignment_warnings'));
+        $this->assertSame(0, DB::transactionLevel());
+        $this->assertFalse(DB::connection()->getPdo()->inTransaction());
+        $before = $this->state();
+        $queue = $this->queueState();
+        $this->get(route('operations.shifts.index'))->assertOk()->assertInertia(fn ($page) => $page
+            ->where('flash.shift_result', null)->missing('flash.assignment_warnings'));
+        $this->assertSame($before, $this->state());
+        $this->assertSame($queue, $this->queueState());
     }
 
     public function test_create_warning_remains_an_allowed_save_without_override_requirement(): void

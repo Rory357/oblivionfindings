@@ -22,7 +22,7 @@ class ShiftCoverageService
      * queries plus the per-slice summarisation. The service is resolved
      * per-request (not bound as a singleton), so this instance cache is
      * cleared naturally at the end of each request and cannot leak stale data
-     * across requests. Keyed by (siteId, rangeStart ISO, rangeEnd ISO,
+     * across requests. Keyed by (siteId, worker timezone, rangeStart ISO, rangeEnd ISO,
      * sliceMinutes) — the full set of inputs that determine the result.
      *
      * NOTE: only the pre-lifecycle windows are cached. The acknowledgement
@@ -50,8 +50,14 @@ class ShiftCoverageService
         ?int $siteId = null,
         int $sliceMinutes = self::DEFAULT_SLICE_MINUTES,
     ): array {
+        // Weekly rule clocks are worker-local; supplied boundaries retain their exact instants.
+        $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC'));
+        $rangeStart = $rangeStart->copy()->timezone($timezone);
+        $rangeEnd = $rangeEnd->copy()->timezone($timezone);
+
         $memoKey = implode('|', [
             $siteId ?? 'all',
+            $timezone,
             $rangeStart->toIso8601String(),
             $rangeEnd->toIso8601String(),
             $sliceMinutes,
@@ -82,6 +88,10 @@ class ShiftCoverageService
         ?int $siteId = null,
         int $sliceMinutes = self::DEFAULT_SLICE_MINUTES,
     ): array {
+        // DATETIME boundaries use UTC; recurring DATE predicates below remain local dates.
+        $queryStart = $rangeStart->copy()->utc();
+        $queryEnd = $rangeEnd->copy()->utc();
+
         $rules = SiteCoverageRequirement::query()
             ->with([
                 'site:id,name,type',
@@ -104,8 +114,8 @@ class ShiftCoverageService
         $reservations = CoverageReservation::query()
             ->where('status', CoverageReservationService::STATUS_ACTIVE)
             ->whereIn('site_id', $siteIds)
-            ->where('window_starts_at', '<', $rangeEnd)
-            ->where('window_ends_at', '>', $rangeStart)
+            ->where('window_starts_at', '<', $queryEnd)
+            ->where('window_ends_at', '>', $queryStart)
             ->where(function ($query) {
                 $query->whereNull('expires_at')
                     ->orWhere('expires_at', '>', now());
@@ -121,16 +131,16 @@ class ShiftCoverageService
             ->withCount([
                 'shifts as active_occurrences_count' => fn ($query) => $query
                     ->whereNotIn('status', ['completed', 'cancelled'])
-                    ->where('ends_at', '>=', $rangeStart),
+                    ->where('ends_at', '>=', $queryStart),
                 'shifts as open_occurrences_count' => fn ($query) => $query
                     ->whereNotIn('status', ['completed', 'cancelled'])
                     ->whereNull('user_id')
-                    ->where('ends_at', '>=', $rangeStart),
+                    ->where('ends_at', '>=', $queryStart),
             ])
             ->withMin([
                 'shifts as next_starts_at' => fn ($query) => $query
                     ->whereNotIn('status', ['completed', 'cancelled'])
-                    ->where('ends_at', '>=', $rangeStart),
+                    ->where('ends_at', '>=', $queryStart),
             ], 'starts_at')
             ->where('start_date', '<=', $rangeEnd->toDateString())
             ->where(function ($query) use ($rangeStart) {
@@ -152,8 +162,8 @@ class ShiftCoverageService
                 'site:id,name,type',
             ])
             ->whereNotIn('status', ['cancelled'])
-            ->where('starts_at', '<', $rangeEnd)
-            ->where('ends_at', '>', $rangeStart)
+            ->where('starts_at', '<', $queryEnd)
+            ->where('ends_at', '>', $queryStart)
             ->where(function ($query) use ($siteIds) {
                 $query->whereIn('site_id', $siteIds)
                     ->orWhere(function ($fallback) use ($siteIds) {
@@ -631,12 +641,14 @@ class ShiftCoverageService
         CarbonInterface $rangeEnd,
     ): array {
         $occurrences = [];
-        $cursor = $rangeStart->copy()->startOfDay();
+        // Existing overnight demand can carry into the first local day of the range.
+        $cursor = $rangeStart->copy()->startOfDay()->subDay();
         $endDay = $rangeEnd->copy()->endOfDay();
 
         while ($cursor->lte($endDay)) {
             if ($this->weekdayCode($cursor) !== $rule->day_of_week) {
                 $cursor = $cursor->addDay();
+
                 continue;
             }
 

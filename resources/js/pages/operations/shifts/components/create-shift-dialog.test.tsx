@@ -189,7 +189,12 @@ async function send(editMode = true) {
     );
     return (editMode ? t.put : t.post).mock.calls[0];
 }
-async function confirm(call: unknown[], changed = true) {
+async function confirm(
+    call: unknown[],
+    changed = true,
+    receiptOverrides: Record<string, unknown> = {},
+    flash: Record<string, unknown> = {},
+) {
     const payload = call[1] as ShiftSaveProjection;
     const options = call[2] as {
         onSuccess: (page: unknown) => void;
@@ -205,6 +210,7 @@ async function confirm(call: unknown[], changed = true) {
         options.onSuccess({
             props: {
                 flash: {
+                    ...flash,
                     shift_result: {
                         action: String(call[0]).endsWith('/55')
                             ? 'update'
@@ -225,6 +231,10 @@ async function confirm(call: unknown[], changed = true) {
                         starts_at: values.starts_at,
                         ends_at: values.ends_at,
                         values_hash: await shiftSaveHash(values),
+                        ...(!String(call[0]).endsWith('/55')
+                            ? { assignment_warnings: [] }
+                            : {}),
+                        ...receiptOverrides,
                     },
                 },
             },
@@ -751,4 +761,82 @@ it('retains a rejected draft and refreshes current eligibility before another at
     expect(
         screen.queryByText('Your shift changes were saved.'),
     ).not.toBeInTheDocument();
+});
+
+it('keeps current staff warnings visible with a confirmed newly created shift until Done', async () => {
+    render(<CreateShiftDialog {...base} defaultUserId={7} />);
+    const call = await send(false);
+    await confirm(
+        call,
+        true,
+        { assignment_warnings: ['Arrange a rest break before the next duty'] },
+        {
+            warning: 'Stale warning for another shift',
+            eligibility_result: { warning_reasons: ['Stale preview'] },
+        },
+    );
+    expect(await screen.findByText('The shift was created.')).toBeVisible();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+        'Staff eligibility warnings',
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(
+        'Arrange a rest break before the next duty',
+    );
+    expect(
+        screen.queryByText('Stale warning for another shift'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Stale preview')).not.toBeInTheDocument();
+    expect(base.onClose).not.toHaveBeenCalled();
+    expect(t.post).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(base.onClose).toHaveBeenCalledTimes(1);
+});
+
+it('does not carry a previous staff warning into a clean create confirmation', async () => {
+    render(<CreateShiftDialog {...base} defaultUserId={7} />);
+    const call = await send(false);
+    await confirm(
+        call,
+        true,
+        {},
+        {
+            warning: 'Old staff warning',
+            eligibility_result: {
+                warning_reasons: ['Old eligibility warning'],
+            },
+        },
+    );
+    expect(await screen.findByText('The shift was created.')).toBeVisible();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText('Old staff warning')).not.toBeInTheDocument();
+    expect(
+        screen.queryByText('Old eligibility warning'),
+    ).not.toBeInTheDocument();
+});
+
+it('retains a create draft and prevents a duplicate when the saved warning list is malformed', async () => {
+    render(<CreateShiftDialog {...base} defaultUserId={7} />);
+    step(/Tasks & notes/);
+    fireEvent.change(screen.getByLabelText(/Handover notes/), {
+        target: { value: 'Keep this create draft' },
+    });
+    const call = await send(false);
+    await confirm(call, true, { assignment_warnings: [null] });
+    expect(
+        await screen.findByRole('link', { name: 'Open roster to check' }),
+    ).toBeVisible();
+    expect(
+        screen.queryByText('The shift was created.'),
+    ).not.toBeInTheDocument();
+    expect(
+        screen.queryByRole('button', { name: 'Done' }),
+    ).not.toBeInTheDocument();
+    const button = screen.getByRole('button', { name: 'Create shift' });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(t.post).toHaveBeenCalledTimes(1);
+    step(/Tasks & notes/);
+    expect(screen.getByLabelText(/Handover notes/)).toHaveValue(
+        'Keep this create draft',
+    );
 });
