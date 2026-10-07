@@ -332,6 +332,11 @@ class HandleInertiaRequests extends Middleware
                     return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id
                         ? $request->session()->get('eligibility_result') : null;
                 },
+                'roster_suggestion_result' => function () use ($request) {
+                    $outcome = $request->session()->get('roster_suggestion_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
                 'shift_result' => function () use ($request) {
                     $outcome = $request->session()->get('shift_result');
 

@@ -1,0 +1,33 @@
+# Suggestions commands and confirmed outcomes — 8 October 2026
+
+Status: implemented and accepted at the recorded automated scope in the Workforce integration checkout. Independent review is clear. Main delivery and authenticated browser verification remain outstanding. Base checkpoint: `bde726a6cbf04a0fdfcbddb76ef2bdfa33dff674`.
+
+## Behaviour
+
+Accept records a planning choice; Apply assigns the worker after the existing current staffing checks. Dismiss remains available for expired suggestions. Unexpired acceptance retains its permissive existing status behaviour, without making current candidate eligibility a new acceptance requirement. Apply accepted acts on all currently accepted choices in the run, including those outside the displayed filter.
+
+The shared planning writer rechecks current approved account, exact permission and approved-Site access, canonical duty ownership and the saved source while holding the existing mutation boundary. Accept and Dismiss verify persisted controls before returning. Modern requests carry the displayed source revision, so a changed duty, worker, time or assignment cannot silently become the target of an old screen. Public service callers use the same planning writer; assignment policy, cumulative workload, current capacity and reservation algorithms remain intact.
+
+Each modern action correlates one request with its actor, run, source, action and submitted-intent hash. A result is presented as saved only after the physical root transaction ends successfully. Nested transactions and uncertain presentation do not produce a false committed receipt. The response includes actual saved suggestion controls or assignment rows and whole-run counts. Expired acceptance can accurately report that it was marked stale; an empty or failed preflight cannot claim an assignment.
+
+The UI checks that confirmation, then requires a same-user current list before enabling another action. An interrupted, mismatched or incomplete result stays held for an explicit reload. Reload never repeats the write. A synchronous guard serializes preparation, reads and writes; stale callbacks and user/run changes cannot unlock a different command. The existing header, status filter, search, counts, dates, supplied action links and capabilities remain in use. The normal Inertia error modal is suppressed only for an invalid response bearing this exact modern command's UUID and header, allowing the inline recovery message to remain usable. Other requests keep their existing handlers.
+
+UUIDs correlate attempts; this is not durable idempotency and no automatic replay is introduced. The source hash is not a permission or eligibility certificate. Control Room, independent eMAR and unrelated Fleet changes remain outside this increment.
+
+## Verification
+
+- Focused UI: 30 cases pass in `test-results/suggestion-command-ui-third.json` and its log, covering current confirmation, source/actor/attempt mismatch, expiry, actual assignment evidence, bulk preflight/empty outcomes, interrupted writes, explicit read recovery, context changes and request-specific error handling.
+- The initial 29 UI cases passed. The second 30-case run had 14 test setup failures because the new listener mock had not been added; the corrected third run is the accepted UI result. The failed run is retained and not included in passing counts.
+- Full TypeScript and scoped ESLint pass on the final listener-inclusive source: `suggestion-command-types-final.log` and `suggestion-command-eslint-final.log`.
+- Review identified fractional-clock values being compared with whole-second database timestamps. Intended accepted/dismissed/applied timestamps are normalized to the persistence precision. All three explicit fractional-clock cases pass in the native run.
+- The normal production build passes in 5m35s with `assets/app-DBkwc2Qa.js`. The existing chunk-size advisory remains. Log: `test-results/suggestion-command-build-final.log`.
+- One fresh native run passes exactly **113 cases / 3,447 assertions**, with zero failures, errors or skipped cases. Both Pest and the launcher exit 0. This consists of 75 new command cases, 4 preserved direct-service audit cases, 24 current-read cases, 5 accepted-workload controls, the HTTP suggest/accept/apply journey, 3 direct Applier controls and the distinct-worker capacity rollback case. No native retries or broader runs were needed.
+- Receipt: `test-results/workforce-main-suggestioncommands113-final-receipt.json`, SHA256 `aed77df5106e1ef8b5561c695c2a6e6d8a7d160e07087bd485851157bc86f279`. XML/stdout/run/process/cleanup/schema-cleanup records share the same stem. Known missing isolated `.env` diagnostics are retained; stderr is empty and warnings were not suppressed. This selected run does not certify the whole repository or replace historical evidence for unselected cases.
+- Independent closure at `2026-10-07T22:20:18.1223214Z`: no owned/native test processes remain; the exact private schema and its connections are gone; 5,761 frozen entries show no drift; all five protected previews retain their process birth and command. No process was killed. The unrelated Monitoring test process was preserved under the existing ordinary-peer admission policy.
+- Backend syntax and scoped formatting pass. Existing Controller formatting is preserved outside the exact owned method projection; middleware is additive only. Independent reconstruction verifies the four edited PHP baselines and all 24 untouched method bodies. Source and wire-contract review is clear. AuditTrail keeps every original assertion and status/provenance expectation, with only lawful current actor/canonical source fixture setup added.
+
+## Outstanding acceptance
+
+The owned browser session has expired at the development login page. Permission to use the seeded development account, or a manual sign-in, remains pending. Automatic approval review rejected credential discovery without that specific permission; no lookup retry, authentication bypass, account change or browser record mutation occurred. Authenticated user journeys and main/GitHub integration remain outstanding. Four earlier verified local checkpoints are also awaiting that browser acceptance; this report does not claim they have been pushed.
+
+The full supported-living Workforce programme and its connected-module matrix remain active. The original qualification/modified-duty and clinical provenance decisions remain held. Continue independent authorised work without inventing those policies.

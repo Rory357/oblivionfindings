@@ -274,28 +274,18 @@ class RosterSuggestionService
 
     public function accept(RosterSuggestion $suggestion, User $actor): RosterSuggestion
     {
-        $this->assertFresh($suggestion);
+        $result = app(RosterSuggestionCommand::class)->decide('accept', $suggestion, $actor);
+        if ($result->outcome === 'expired_marked_stale') {
+            // The legacy stale marker is already persisted before the rejection.
+            abort(422, 'This roster suggestion has expired. Generate a fresh run before applying it.');
+        }
 
-        $suggestion->forceFill([
-            'status' => RosterSuggestion::STATUS_ACCEPTED,
-            'accepted_by' => $actor->id,
-            'accepted_at' => now(),
-            'dismissed_by' => null,
-            'dismissed_at' => null,
-        ])->save();
-
-        return $suggestion->fresh() ?? $suggestion;
+        return $result->model;
     }
 
     public function dismiss(RosterSuggestion $suggestion, User $actor): RosterSuggestion
     {
-        $suggestion->forceFill([
-            'status' => RosterSuggestion::STATUS_DISMISSED,
-            'dismissed_by' => $actor->id,
-            'dismissed_at' => now(),
-        ])->save();
-
-        return $suggestion->fresh() ?? $suggestion;
+        return app(RosterSuggestionCommand::class)->decide('dismiss', $suggestion, $actor)->model;
     }
 
     public function expireStaleRuns(): int

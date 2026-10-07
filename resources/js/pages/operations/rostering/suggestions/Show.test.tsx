@@ -1,6 +1,14 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+} from '@testing-library/react';
+import { webcrypto } from 'node:crypto';
 import type { ComponentProps, ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { suggestionHash } from './use-suggestion-command';
 
 import { Button } from '@/components/ui/button';
 import Show from './Show';
@@ -12,7 +20,8 @@ const { post, reload } = vi.hoisted(() => ({
 
 vi.mock('@inertiajs/react', () => ({
     Head: () => null,
-    router: { post, reload },
+    usePage: () => ({ props: { auth: { user: { id: 1 } } } }),
+    router: { post, reload, on: () => () => {} },
 }));
 vi.mock('@/layouts/app-layout', () => ({
     default: ({ children }: { children: ReactNode }) => children,
@@ -131,6 +140,8 @@ const fixture: ComponentProps<typeof Show> = {
         {
             id: 23,
             shift_id: 42,
+            candidate_user_id: 3,
+            source_revision: 'a'.repeat(64),
             rank: 1,
             score: 80,
             status: 'suggested',
@@ -168,46 +179,134 @@ function acceptedProps(): ComponentProps<typeof Show> {
     };
 }
 
+beforeEach(() => {
+    post.mockClear();
+    reload.mockClear();
+    vi.stubGlobal('crypto', webcrypto);
+});
+afterEach(() => vi.unstubAllGlobals());
+function currentPage(props = fixture, result?: unknown) {
+    return {
+        props: {
+            ...props,
+            auth: { user: { id: 1 } },
+            worker_timezone: props.worker_timezone ?? 'Pacific/Auckland',
+            suggestion_visibility: props.suggestion_visibility ?? {
+                basis: 'current_canonical_run_site',
+                recorded_count: props.suggestions.length,
+                visible_count: props.suggestions.length,
+                withheld_count: 0,
+            },
+            flash: { roster_suggestion_result: result },
+            errors: {},
+        },
+    };
+}
+async function sent(count = 1) {
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(count));
+}
+async function confirmChoice(
+    action: 'accept' | 'dismiss',
+    props = acceptedProps(),
+    index = 0,
+) {
+    const payload = post.mock.calls[index][1];
+    const status = action === 'accept' ? 'accepted' : 'dismissed';
+    const result = {
+        action,
+        actor_id: 1,
+        request_id: payload.request_id,
+        scope: 'single',
+        run_id: 17,
+        site_id: 2,
+        suggestion_id: 23,
+        expected_source: payload.expected_source,
+        values_hash: await suggestionHash({
+            action,
+            source: payload.expected_source,
+        }),
+        outcome: status,
+        changed: true,
+        disposition: 'single',
+        counts: { selected: 1, applied: 0, stale: 0, failed: 0 },
+        assignments: [],
+        suggestion: {
+            id: 23,
+            status,
+            accepted_by: null,
+            accepted_at: null,
+            dismissed_by: null,
+            dismissed_at: null,
+            applied_by: null,
+            applied_at: null,
+            [`${status}_by`]: 1,
+            [`${status}_at`]: '2026-10-08T01:00:00.000Z',
+        },
+    };
+    act(() => {
+        post.mock.calls[index][2].onSuccess(currentPage(props, result));
+        post.mock.calls[index][2].onFinish();
+    });
+}
 describe('roster suggestion save sequencing', () => {
     beforeEach(() => post.mockClear());
 
-    it('waits for a saved acceptance before enabling the bulk apply action', () => {
+    it('waits for a saved acceptance before enabling the bulk apply action', async () => {
         const view = render(<Show {...fixture} />);
         const apply = screen.getByRole('button', {
             name: 'Apply accepted',
         });
         expect(apply).toBeDisabled();
         fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
+        await sent();
         expect(post).toHaveBeenCalledWith(
             '/operations/rostering/suggestions/23/accept',
-            {},
+            expect.objectContaining({
+                request_id: expect.any(String),
+                expected_source: expect.objectContaining({
+                    source_revision: 'a'.repeat(64),
+                }),
+            }),
             expect.objectContaining({ onFinish: expect.any(Function) }),
         );
         expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
         view.rerender(<Show {...acceptedProps()} />);
         expect(apply).toBeDisabled();
-        act(() => post.mock.calls[0][2].onFinish());
+        await confirmChoice('accept');
+        expect(screen.getByRole('status')).toHaveTextContent('Choice accepted');
         expect(apply).toBeEnabled();
         fireEvent.click(apply);
         fireEvent.click(apply);
-        expect(post).toHaveBeenCalledTimes(2);
+        await sent(2);
         expect(post.mock.calls[1][0]).toBe(
             '/operations/rostering/suggestions/17/apply-accepted',
         );
         expect(apply).toBeDisabled();
     });
 
-    it('unlocks retry after a failed save without treating an unsaved selection as accepted', () => {
+    it('holds an unconfirmed save until an explicit current read without replaying it', async () => {
         render(<Show {...fixture} />);
         fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
+        await sent();
         act(() => post.mock.calls[0][2].onFinish());
+        expect(screen.getByRole('button', { name: 'Accept' })).toBeDisabled();
+        expect(screen.getByRole('alert')).toHaveTextContent(
+            'may already have saved',
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Reload suggestions' }),
+        );
+        act(() => {
+            reload.mock.calls[0][0].onSuccess(currentPage());
+            reload.mock.calls[0][0].onFinish();
+        });
         expect(screen.getByRole('button', { name: 'Accept' })).toBeEnabled();
         expect(
             screen.getByRole('button', { name: 'Apply accepted' }),
         ).toBeDisabled();
+        expect(post).toHaveBeenCalledTimes(1);
     });
-
-    it('keeps expired assignments blocked while retaining authorised dismissal', () => {
+    it('keeps expired assignments blocked while retaining authorised dismissal', async () => {
         render(
             <Show
                 {...acceptedProps()}
@@ -230,6 +329,7 @@ describe('roster suggestion save sequencing', () => {
         const dismiss = screen.getByRole('button', { name: 'Dismiss' });
         expect(dismiss).toBeEnabled();
         fireEvent.click(dismiss);
+        await sent();
         expect(post.mock.calls[0][0]).toBe(
             '/operations/rostering/suggestions/23/dismiss',
         );
@@ -292,14 +392,17 @@ describe('suggestion duty times', () => {
         );
         try {
             act(() => vi.advanceTimersByTime(5000));
-            expect(reload).toHaveBeenCalledWith({
-                only: [
-                    'run',
-                    'suggestions',
-                    'worker_timezone',
-                    'suggestion_visibility',
-                ],
-            });
+            expect(reload).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    only: [
+                        'run',
+                        'suggestions',
+                        'worker_timezone',
+                        'suggestion_visibility',
+                        'auth',
+                    ],
+                }),
+            );
             view.rerender(<Show {...timedProps('UTC')} />);
             expect(screen.getByText(/Roster suggestions ·/)).toHaveTextContent(
                 '28 Dec 2026 → 3 Jan 2027 · UTC',
@@ -480,7 +583,7 @@ describe('suggestion source visibility and current actions', () => {
         ).toBeEnabled();
     });
 
-    it('uses the current action URL and disables only the denied row action', () => {
+    it('uses the current action URL and disables only the denied row action', async () => {
         render(
             <Show
                 {...fixture}
@@ -497,6 +600,7 @@ describe('suggestion source visibility and current actions', () => {
         );
         expect(screen.getByRole('button', { name: 'Accept' })).toBeDisabled();
         fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+        await sent();
         expect(post.mock.calls[0][0]).toBe(
             '/operations/rostering/suggestions/23/apply?from=run',
         );
@@ -514,6 +618,7 @@ describe('suggestion source visibility and current actions', () => {
                     'suggestions',
                     'worker_timezone',
                     'suggestion_visibility',
+                    'auth',
                 ],
             }),
         );
@@ -533,50 +638,43 @@ describe('suggestion source visibility and current actions', () => {
         fireEvent.click(
             screen.getByRole('button', { name: 'Reload suggestions' }),
         );
-        act(() => reload.mock.calls[1][0].onFinish());
+        act(() => {
+            reload.mock.calls[1][0].onSuccess(currentPage(acceptedProps()));
+            reload.mock.calls[1][0].onFinish();
+        });
         expect(screen.queryByRole('alert')).toBeNull();
         expect(reload).toHaveBeenCalledTimes(2);
         expect(post).not.toHaveBeenCalled();
     });
 
-    it('stops polling during a command and resets transient state for another run', () => {
-        vi.useFakeTimers();
-        const view = render(
-            <Show {...fixture} run={{ ...fixture.run, status: 'running' }} />,
+    it('ignores an old command finishing after navigation to another run', async () => {
+        const view = render(<Show {...fixture} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+        await sent();
+        view.rerender(
+            <Show
+                {...acceptedProps()}
+                run={{
+                    ...fixture.run,
+                    id: 18,
+                    urls: {
+                        apply_accepted:
+                            '/operations/rostering/suggestions/18/apply-accepted',
+                    },
+                }}
+            />,
         );
-        try {
-            fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
-            act(() => vi.advanceTimersByTime(5000));
-            expect(reload).not.toHaveBeenCalled();
-            view.rerender(
-                <Show
-                    {...acceptedProps()}
-                    run={{
-                        ...fixture.run,
-                        id: 18,
-                        urls: {
-                            apply_accepted:
-                                '/operations/rostering/suggestions/18/apply-accepted',
-                        },
-                    }}
-                />,
-            );
-            const apply = screen.getByRole('button', {
-                name: 'Apply accepted',
-            });
-            expect(apply).toBeEnabled();
-            fireEvent.click(apply);
-            expect(post.mock.calls[1][0]).toBe(
-                '/operations/rostering/suggestions/18/apply-accepted',
-            );
-            act(() => post.mock.calls[0][2].onFinish());
-            expect(apply).toBeDisabled();
-        } finally {
-            view.unmount();
-            vi.useRealTimers();
-        }
+        const apply = screen.getByRole('button', { name: 'Apply accepted' });
+        expect(apply).toBeEnabled();
+        fireEvent.click(apply);
+        await sent(2);
+        expect(post.mock.calls[1][0]).toBe(
+            '/operations/rostering/suggestions/18/apply-accepted',
+        );
+        act(() => post.mock.calls[0][2].onFinish());
+        expect(apply).toBeDisabled();
+        expect(screen.queryByRole('alert')).toBeNull();
     });
-
     it('uses a safe failure explanation without rendering stored technical detail', () => {
         render(
             <Show

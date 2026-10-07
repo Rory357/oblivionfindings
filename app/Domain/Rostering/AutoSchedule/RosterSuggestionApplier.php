@@ -24,11 +24,14 @@ class RosterSuggestionApplier
         private readonly ShiftLifecycleService $lifecycle,
     ) {}
 
-    public function applyOne(RosterSuggestion $suggestion, User $actor): RosterSuggestion
+    public function applyOne(RosterSuggestion $suggestion, User $actor, ?callable $beforeApply = null, ?callable $capture = null): RosterSuggestion
     {
-        return DB::transaction(function () use ($suggestion, $actor) {
+        return DB::transaction(function () use ($suggestion, $actor, $beforeApply, $capture) {
             app(AttendanceTimeEntryProjector::class)->lockApplicationPayrollMutex();
             $locked = RosterSuggestion::query()->lockForUpdate()->findOrFail($suggestion->id);
+            foreach (['roster_suggestion_run_id', 'shift_id', 'candidate_user_id'] as $key) {
+                abort_unless(RosterSuggestionSource::id($locked->getRawOriginal($key)) === RosterSuggestionSource::id($suggestion->getRawOriginal($key)), 409, 'This suggestion changed source. Reload before applying it.');
+            }
             $run = RosterSuggestionRun::query()->lockForUpdate()->findOrFail($locked->roster_suggestion_run_id);
             $locked->setRelation('run', $run);
             $shiftHint = Shift::query()->find($locked->shift_id);
@@ -41,18 +44,26 @@ class RosterSuggestionApplier
             abort_unless($actor->isApproved() && $actor->canDo('rostering.autoSchedule'), 403);
             $locked->setRelation('shift', $inputs['shifts']->get($locked->shift_id))
                 ->setRelation('candidate', $inputs['users']->get($locked->candidate_user_id));
+            if ($beforeApply) {
+                $beforeApply($locked, $run, $actor);
+            }
             $this->assertApplyable($locked);
-            $this->applyLocked($locked, $actor);
+            $stored = $this->applyLocked($locked, $actor);
+            if ($capture) {
+                $capture($stored);
+
+                return $stored;
+            }
 
             return $locked->fresh(['shift.staff', 'candidate']) ?? $locked;
         });
     }
 
-    public function applyAccepted(RosterSuggestionRun $run, User $actor): array
+    public function applyAccepted(RosterSuggestionRun $run, User $actor, ?callable $beforeApply = null, ?callable $capture = null): array
     {
         $results = ['applied' => 0, 'stale' => 0, 'failed' => 0];
 
-        DB::transaction(function () use ($run, $actor, &$results): void {
+        DB::transaction(function () use ($run, $actor, &$results, $beforeApply, $capture): void {
             app(AttendanceTimeEntryProjector::class)->lockApplicationPayrollMutex();
             $currentRun = RosterSuggestionRun::query()->lockForUpdate()->findOrFail($run->id);
             abort_unless((int) $currentRun->site_id === (int) $run->getRawOriginal('site_id'), 409,
@@ -61,13 +72,31 @@ class RosterSuggestionApplier
                 ->where('roster_suggestion_run_id', $currentRun->id)
                 ->where('status', RosterSuggestion::STATUS_ACCEPTED)
                 ->orderBy('shift_id')->orderBy('rank')->orderBy('id')->lockForUpdate()->get();
+            $stored = collect();
+            $authorized = false;
+            $authorize = function () use ($currentRun, &$actor, $beforeApply, &$authorized): void {
+                if (! $authorized && $beforeApply) {
+                    $beforeApply($currentRun, $actor);
+                }
+                $authorized = true;
+            };
+            $finish = function () use ($authorize, $capture, $currentRun, $suggestions, $stored, &$results): void {
+                $authorize();
+                if ($capture) {
+                    $capture($currentRun, $suggestions, $stored, $results);
+                }
+            };
             if ($suggestions->isEmpty()) {
+                $finish();
+
                 return;
             }
             $suggestions->each(fn (RosterSuggestion $row) => $row->setRelation('run', $currentRun));
             $duplicates = $suggestions->count() - $suggestions->unique('shift_id')->count();
             if ($duplicates > 0) {
                 $results['stale'] = $duplicates;
+
+                $finish();
 
                 return;
             }
@@ -76,6 +105,8 @@ class RosterSuggestionApplier
             $shiftHints = $this->snapshotShiftsFor($suggestions);
             if ($shiftHints->count() !== $suggestions->count()) {
                 $results['stale'] = $suggestions->count();
+
+                $finish();
 
                 return;
             }
@@ -89,6 +120,7 @@ class RosterSuggestionApplier
             foreach ($suggestions as $suggestion) {
                 $suggestion->setRelation('candidate', $inputs['users']->get($suggestion->candidate_user_id));
             }
+            $authorize();
             $proposed = $suggestions->map(function (RosterSuggestion $row): Shift {
                 $candidate = clone $row->shift;
                 $candidate->user_id = $row->candidate_user_id;
@@ -109,17 +141,22 @@ class RosterSuggestionApplier
                 }
                 $results = ['applied' => 0, 'stale' => 0, 'failed' => $suggestions->count()];
 
+                $finish();
+
                 return;
             }
             $results = $this->preflightAcceptedSuggestions($suggestions, $workloads);
             if ($results['stale'] > 0 || $results['failed'] > 0) {
+                $finish();
+
                 return;
             }
             foreach ($suggestions as $suggestion) {
                 $this->assertApplyable($suggestion);
-                $this->applyLocked($suggestion, $actor, $workloads->get($suggestion->candidate_user_id));
+                $stored->push($this->applyLocked($suggestion, $actor, $workloads->get($suggestion->candidate_user_id)));
                 $results['applied']++;
             }
+            $finish();
         });
 
         return $results;
@@ -138,8 +175,12 @@ class RosterSuggestionApplier
         ]);
     }
 
-    private function applyLocked(RosterSuggestion $suggestion, User $actor, ?PreparedShiftWorkload $workload = null): void
+    private function applyLocked(RosterSuggestion $suggestion, User $actor, ?PreparedShiftWorkload $workload = null): RosterSuggestion
     {
+        $sourceShift = $suggestion->getRelation('shift');
+        $shiftBefore = $sourceShift->getRawOriginal();
+        $sourceShiftId = (int) $sourceShift->id;
+        $assignedStatus = $sourceShift->status === 'draft' ? 'scheduled' : $sourceShift->status;
         $this->lifecycle->assign(
             $suggestion->shift,
             $actor,
@@ -151,15 +192,28 @@ class RosterSuggestionApplier
             source: ShiftLifecycleSource::Bulk,
             workload: $workload,
         );
+        $assigned = Shift::query()->whereKey($sourceShiftId)->lockForUpdate()->firstOrFail();
+        if ((int) $assigned->user_id !== (int) $suggestion->candidate_user_id || $assigned->status !== $assignedStatus) {
+            throw ValidationException::withMessages(['suggestion' => 'The saved assignment did not match this suggestion. No assignments were applied.']);
+        }
+        foreach (array_diff($sourceShift->getFillable(), ['user_id', 'status']) as $field) {
+            if ($assigned->getRawOriginal($field) !== ($shiftBefore[$field] ?? null)) {
+                throw ValidationException::withMessages(['suggestion' => 'The assignment source changed while saving. No assignments were applied.']);
+            }
+        }
         $before = $suggestion->getRawOriginal();
+        $suggestionId = (int) $suggestion->id;
         if ($suggestion->forceFill([
             'status' => RosterSuggestion::STATUS_APPLIED,
             'applied_by' => $actor->id,
-            'applied_at' => now(),
+            'applied_at' => now()->startOfSecond(),
         ])->save() !== true) {
             throw ValidationException::withMessages(['suggestion' => 'This suggestion could not be saved. No assignments were applied.']);
         }
-        $stored = RosterSuggestion::query()->whereKey($suggestion->id)->lockForUpdate()->firstOrFail();
+        $stored = RosterSuggestion::query()->whereKey($suggestionId)->lockForUpdate()->firstOrFail();
+        if ((int) $suggestion->id !== $suggestionId) {
+            throw ValidationException::withMessages(['suggestion' => 'The saved suggestion changed identity. No assignments were applied.']);
+        }
         if ($stored->status !== RosterSuggestion::STATUS_APPLIED || (int) $stored->applied_by !== (int) $actor->id
             || ! $stored->applied_at || ! $stored->applied_at->equalTo($suggestion->applied_at)) {
             throw ValidationException::withMessages(['suggestion' => 'The saved suggestion did not match this command. No assignments were applied.']);
@@ -169,6 +223,9 @@ class RosterSuggestionApplier
                 throw ValidationException::withMessages(['suggestion' => 'The suggestion source changed while saving. No assignments were applied.']);
             }
         }
+
+        return $stored->setRelation('run', $suggestion->getRelation('run'))
+            ->setRelation('shift', $assigned)->setRelation('candidate', $suggestion->getRelation('candidate'));
     }
 
     /**

@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Operations;
 
 use App\Domain\Rostering\AutoSchedule\RosterSuggestionApplier;
+use App\Domain\Rostering\AutoSchedule\RosterSuggestionCommand;
 use App\Domain\Rostering\AutoSchedule\RosterSuggestionService;
+use App\Domain\Rostering\AutoSchedule\RosterSuggestionSource;
 use App\Domain\Rostering\RosteringFeatureFlags;
 use App\Http\Controllers\Controller;
 use App\Models\RosterSuggestion;
@@ -87,11 +89,14 @@ class RosterSuggestionController extends Controller
                     && $shift->client_id !== null && (int) $shift->site_id === (int) $run->site_id;
                 $canAccept = ! $run->isExpired();
                 $context = $shift->serviceContext;
+                $source = RosterSuggestionSource::single($run, $suggestion, $shift);
 
                 return [
                     'id' => $suggestion->id,
                     'shift_id' => $suggestion->shift_id,
                     'candidate_user_id' => $suggestion->candidate_user_id,
+                    'source_revision' => $source['source_revision'],
+                    'expected_source' => $source,
                     'rank' => $suggestion->rank,
                     'score' => (float) $suggestion->score,
                     'status' => $suggestion->status,
@@ -132,53 +137,93 @@ class RosterSuggestionController extends Controller
 
     public function accept(Request $request, RosterSuggestion $suggestion)
     {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('rostering.autoSchedule'), 403);
+        $request->session()->forget('roster_suggestion_result');
         abort_unless($this->featureFlags->autoScheduleEnabled(), 404);
-        $this->authorizeSuggestion($suggestion, $auth);
+        $execution = app(RosterSuggestionCommand::class)->execute($request, 'accept', $suggestion);
+        $result = $execution['result'];
+        if ($result->outcome === 'expired_marked_stale') {
+            if (! $execution['modern'] || $execution['receipt'] === null) {
+                abort(422, 'This roster suggestion has expired. Generate a fresh run before applying it.');
+            }
 
-        $updated = $this->suggestions->accept($suggestion, $auth);
+            return back()->setStatusCode(303)->with('warning', 'This roster suggestion has expired. Generate a fresh run before applying it.')
+                ->with('roster_suggestion_result', $execution['receipt']);
+        }
 
-        return back()->with('success', __('rostering.suggestions.accepted', ['id' => $updated->id]));
+        $response = $execution['modern'] && $execution['receipt'] === null
+            ? back()->with('warning', 'The command result could not be confirmed. Reload before acting again.')
+            : back()->with('success', __('rostering.suggestions.accepted', ['id' => $result->suggestionId]));
+        if ($execution['modern']) {
+            $response->setStatusCode(303);
+        }
+        if ($execution['receipt'] !== null) {
+            $response->with('roster_suggestion_result', $execution['receipt']);
+        }
+
+        return $response;
     }
 
     public function dismiss(Request $request, RosterSuggestion $suggestion)
     {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('rostering.autoSchedule'), 403);
+        $request->session()->forget('roster_suggestion_result');
         abort_unless($this->featureFlags->autoScheduleEnabled(), 404);
-        $this->authorizeSuggestion($suggestion, $auth);
+        $execution = app(RosterSuggestionCommand::class)->execute($request, 'dismiss', $suggestion);
+        $result = $execution['result'];
+        $response = $execution['modern'] && $execution['receipt'] === null
+            ? back()->with('warning', 'The command result could not be confirmed. Reload before acting again.')
+            : back()->with('warning', __('rostering.suggestions.dismissed', ['id' => $result->suggestionId]));
+        if ($execution['modern']) {
+            $response->setStatusCode(303);
+        }
+        if ($execution['receipt'] !== null) {
+            $response->with('roster_suggestion_result', $execution['receipt']);
+        }
 
-        $updated = $this->suggestions->dismiss($suggestion, $auth);
-
-        return back()->with('warning', __('rostering.suggestions.dismissed', ['id' => $updated->id]));
+        return $response;
     }
 
     public function apply(Request $request, RosterSuggestion $suggestion)
     {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('rostering.autoSchedule'), 403);
+        $request->session()->forget('roster_suggestion_result');
         abort_unless($this->featureFlags->autoScheduleEnabled(), 404);
-        $this->authorizeSuggestion($suggestion, $auth);
+        $execution = app(RosterSuggestionCommand::class)->execute($request, 'apply', $suggestion);
+        $result = $execution['result'];
+        $response = $execution['modern'] && $execution['receipt'] === null
+            ? back()->with('warning', 'The command result could not be confirmed. Reload before acting again.')
+            : back()->with('success', __('rostering.suggestions.applied'));
+        if ($execution['modern']) {
+            $response->setStatusCode(303);
+        }
+        if ($execution['receipt'] !== null) {
+            $response->with('roster_suggestion_result', $execution['receipt']);
+        }
 
-        $this->applier->applyOne($suggestion, $auth);
-
-        return back()->with('success', __('rostering.suggestions.applied'));
+        return $response;
     }
 
     public function applyAccepted(Request $request, RosterSuggestionRun $run)
     {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('rostering.autoSchedule'), 403);
+        $request->session()->forget('roster_suggestion_result');
         abort_unless($this->featureFlags->autoScheduleEnabled(), 404);
-        $this->assertCanAccessRun($run, $auth);
+        $execution = app(RosterSuggestionCommand::class)->execute($request, 'apply_accepted', $run);
+        $result = $execution['result'];
+        $counts = $result->counts;
+        if ($execution['modern']) {
+            $response = match (true) {
+                $execution['receipt'] === null => back()->with('warning', 'The command result could not be confirmed. Reload before acting again.'),
+                $result->disposition === 'empty' => back()->with('info', 'There are no accepted suggestions to apply. Reload for current choices.'),
+                $result->disposition === 'preflight_no_change' => back()->with('warning', 'No assignments were applied. Reload and review the current suggestions.'),
+                default => back()->with('success', __('rostering.suggestions.bulk_applied', $counts)),
+            };
+            $response->setStatusCode(303);
+        } else {
+            $response = back()->with($counts['failed'] > 0 ? 'warning' : 'success', __('rostering.suggestions.bulk_applied', $counts));
+        }
+        if ($execution['receipt'] !== null) {
+            $response->with('roster_suggestion_result', $execution['receipt']);
+        }
 
-        $results = $this->applier->applyAccepted($run, $auth);
-
-        return back()->with(
-            $results['failed'] > 0 ? 'warning' : 'success',
-            __('rostering.suggestions.bulk_applied', $results),
-        );
+        return $response;
     }
 
     private function hasCurrentSourceForRun(Shift $shift, RosterSuggestionRun $run): bool

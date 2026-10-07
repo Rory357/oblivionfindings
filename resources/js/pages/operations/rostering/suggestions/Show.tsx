@@ -27,9 +27,16 @@ import {
     WORKER_TIMEZONE,
 } from '@/lib/datetime';
 import { useI18n } from '@/lib/i18n';
-import { Head, router } from '@inertiajs/react';
+import type { SharedData } from '@/types';
+import { Head, usePage } from '@inertiajs/react';
 import { Check, RefreshCw, Send, Wand2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+
+import {
+    useSuggestionCommand,
+    validSuggestionSource,
+    type SuggestionSource,
+} from './use-suggestion-command';
 
 type SuggestionRun = {
     id: number;
@@ -58,6 +65,8 @@ type SuggestionRun = {
 type Suggestion = {
     id: number;
     shift_id: number;
+    candidate_user_id?: number | null;
+    source_revision?: string;
     rank: number;
     score: number;
     status: string;
@@ -114,58 +123,46 @@ function SuggestionRunPage({
     const isGenerating = run.status === 'pending' || run.status === 'running';
     const canApply = !run.is_expired && run.status === 'completed';
     const hasAccepted = suggestions.some((item) => item.status === 'accepted');
-    const [processing, setProcessing] = useState(false);
-    const [refreshing, setRefreshing] = useState(false);
-    const [refreshError, setRefreshError] = useState(false);
-    const busy = processing || refreshing;
-    const blocked = busy || refreshError;
+    const { auth } = usePage<SharedData>().props;
+    const command = useSuggestionCommand(auth.user?.id ?? 0, {
+        run_id: run.id,
+        site_id: run.site?.id ?? 0,
+    });
+    const { busy, blocked, refresh, notice, activity, needsRead } = command;
+    const sourceFor = (suggestion: Suggestion) => ({
+        run_id: run.id,
+        site_id: run.site?.id ?? 0,
+        suggestion_id: suggestion.id,
+        shift_id: suggestion.shift_id,
+        candidate_user_id: suggestion.candidate_user_id,
+        status: suggestion.status,
+        source_revision: suggestion.source_revision,
+    });
     const missingCapabilities =
         !run.can ||
         !run.urls ||
-        suggestions.some((item) => !item.can || !item.urls);
+        suggestions.some(
+            (item) =>
+                !item.can ||
+                !item.urls ||
+                !validSuggestionSource(sourceFor(item)),
+        );
     const canApplyAccepted = Boolean(
         canApply &&
         hasAccepted &&
         run.can?.apply_accepted &&
-        run.urls?.apply_accepted,
+        run.urls?.apply_accepted &&
+        run.site,
     );
-    const refresh = () => {
-        if (busy) return;
-        setRefreshing(true);
-        setRefreshError(false);
-        router.reload({
-            only: [
-                'run',
-                'suggestions',
-                'worker_timezone',
-                'suggestion_visibility',
-            ],
-            onError: () => setRefreshError(true),
-            onCancel: () => setRefreshError(true),
-            onFinish: () => setRefreshing(false),
-        });
-    };
-
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
 
     useEffect(() => {
         if (!isGenerating || blocked) return;
 
-        const interval = window.setInterval(() => {
-            router.reload({
-                only: [
-                    'run',
-                    'suggestions',
-                    'worker_timezone',
-                    'suggestion_visibility',
-                ],
-            });
-        }, 5000);
-
+        const interval = window.setInterval(() => refresh(true), 5000);
         return () => window.clearInterval(interval);
-    }, [isGenerating, blocked]);
-
+    }, [isGenerating, blocked, refresh]);
     const rosterHref = `/operations/rostering?week=${run.week_start}${
         run.site ? `&site_id=${run.site.id}` : ''
     }`;
@@ -219,13 +216,17 @@ function SuggestionRunPage({
     );
 
     const applyAccepted = () => {
-        if (!canApplyAccepted || blocked || !run.urls?.apply_accepted) return;
-        setProcessing(true);
-        router.post(
-            run.urls.apply_accepted,
-            {},
-            { preserveScroll: true, onFinish: () => setProcessing(false) },
-        );
+        if (
+            !canApplyAccepted ||
+            blocked ||
+            !run.urls?.apply_accepted ||
+            !run.site
+        )
+            return;
+        void command.submit(run.urls.apply_accepted, {
+            action: 'apply_accepted',
+            source: { run_id: run.id, site_id: run.site.id },
+        });
     };
 
     const postSuggestion = (
@@ -233,15 +234,19 @@ function SuggestionRunPage({
         action: 'accept' | 'dismiss' | 'apply',
     ) => {
         const url = suggestion.urls?.[action];
-        if (blocked || !suggestion.can?.[action] || !url) return;
-        setProcessing(true);
-        router.post(
-            url,
-            {},
-            { preserveScroll: true, onFinish: () => setProcessing(false) },
-        );
+        const source = sourceFor(suggestion);
+        if (
+            blocked ||
+            !suggestion.can?.[action] ||
+            !url ||
+            !validSuggestionSource(source)
+        )
+            return;
+        void command.submit(url, {
+            action,
+            source: source as SuggestionSource,
+        });
     };
-
     const titleChip = isGenerating ? (
         <PageHeaderStatusChip variant="info">
             {t('rostering.suggestions.status.running', 'Generating…')}
@@ -406,10 +411,12 @@ function SuggestionRunPage({
                             variant="outline"
                             className="min-h-[44px] shrink-0"
                             disabled={busy}
-                            onClick={refresh}
+                            onClick={() => refresh()}
                         >
                             <RefreshCw className="mr-2 size-4" />
-                            {refreshing ? 'Refreshing…' : 'Reload suggestions'}
+                            {activity === 'read'
+                                ? 'Refreshing…'
+                                : 'Reload suggestions'}
                         </Button>
                     </div>
                     {missingCapabilities ? (
@@ -418,12 +425,25 @@ function SuggestionRunPage({
                             currently available.
                         </p>
                     ) : null}
-                    {refreshError ? (
-                        <p role="alert" className="text-sm text-destructive">
-                            Suggestions could not be refreshed. The list may be
-                            out of date. Try reloading again.
+                    {activity === 'command' ? (
+                        <p
+                            role="status"
+                            className="text-sm text-muted-foreground"
+                        >
+                            Checking and saving your action…
                         </p>
-                    ) : null}
+                    ) : notice ? (
+                        <p
+                            role={
+                                needsRead || notice.kind === 'warning'
+                                    ? 'alert'
+                                    : 'status'
+                            }
+                            className="text-sm"
+                        >
+                            {notice.message}
+                        </p>
+                    ) : null}{' '}
                     {isGenerating ? (
                         <Card>
                             <CardHeader className="pb-2">
@@ -447,7 +467,6 @@ function SuggestionRunPage({
                             </CardContent>
                         </Card>
                     ) : null}
-
                     {run.status === 'failed' ? (
                         <Card className="border-destructive">
                             <CardHeader className="pb-2">
@@ -466,7 +485,6 @@ function SuggestionRunPage({
                             </CardContent>
                         </Card>
                     ) : null}
-
                     {!isGenerating &&
                     run.status !== 'failed' &&
                     Object.keys(grouped).length === 0 ? (
@@ -483,7 +501,6 @@ function SuggestionRunPage({
                             </CardContent>
                         </Card>
                     ) : null}
-
                     <div className="space-y-3">
                         {Object.entries(grouped).map(
                             ([shiftId, shiftSuggestions]) => {
@@ -647,6 +664,11 @@ function SuggestionRunPage({
                                                                 variant="outline"
                                                                 disabled={
                                                                     blocked ||
+                                                                    !validSuggestionSource(
+                                                                        sourceFor(
+                                                                            suggestion,
+                                                                        ),
+                                                                    ) ||
                                                                     !suggestion
                                                                         .can
                                                                         ?.accept ||
@@ -674,6 +696,11 @@ function SuggestionRunPage({
                                                                 variant="outline"
                                                                 disabled={
                                                                     blocked ||
+                                                                    !validSuggestionSource(
+                                                                        sourceFor(
+                                                                            suggestion,
+                                                                        ),
+                                                                    ) ||
                                                                     !suggestion
                                                                         .can
                                                                         ?.dismiss ||
@@ -699,6 +726,11 @@ function SuggestionRunPage({
                                                                 className="min-h-[44px]"
                                                                 disabled={
                                                                     blocked ||
+                                                                    !validSuggestionSource(
+                                                                        sourceFor(
+                                                                            suggestion,
+                                                                        ),
+                                                                    ) ||
                                                                     !suggestion
                                                                         .can
                                                                         ?.apply ||
