@@ -205,16 +205,31 @@ class ShiftLifecycleServiceTest extends TestCase
             'user_id' => null,
         ]);
         $this->makeCurrentAtSite($assignee, Site::query()->findOrFail($shift->site_id));
-        $this->mock(ShiftStaffEligibilityService::class, function ($mock): void {
-            $mock->shouldReceive('evaluate')
-                ->once()
-                ->andReturn(EligibilityResult::fromChecks([]));
+        $evaluations = [];
+        $this->mock(ShiftStaffEligibilityService::class, function ($mock) use (&$evaluations): void {
+            $mock->shouldReceive('evaluate')->twice()->andReturnUsing(
+                function (Shift $evaluatedShift, User $evaluatedUser) use (&$evaluations): EligibilityResult {
+                    $evaluations[] = [
+                        'shift_id' => (int) $evaluatedShift->id,
+                        'assigned_user_id' => $evaluatedShift->user_id === null ? null : (int) $evaluatedShift->user_id,
+                        'status' => $evaluatedShift->status,
+                        'assignee_id' => (int) $evaluatedUser->id,
+                    ];
+
+                    return EligibilityResult::fromChecks([]);
+                },
+            );
         });
 
         $assigned = app(ShiftLifecycleService::class)->assign($shift, $actor, $assignee);
 
         $this->assertSame('scheduled', $assigned->status);
         $this->assertSame($assignee->id, $assigned->user_id);
+
+        $this->assertSame([
+            ['shift_id' => (int) $shift->id, 'assigned_user_id' => null, 'status' => 'draft', 'assignee_id' => (int) $assignee->id],
+            ['shift_id' => (int) $shift->id, 'assigned_user_id' => (int) $assignee->id, 'status' => 'scheduled', 'assignee_id' => (int) $assignee->id],
+        ], $evaluations, 'The current assignment decision precedes the refresh of the saved assignment.');
 
         $event = TimelineEvent::query()
             ->where('type', ShiftTimelineService::ASSIGNED_EVENT_TYPE)
@@ -247,8 +262,20 @@ class ShiftLifecycleServiceTest extends TestCase
             'overrideable' => true,
             'message' => 'Current turnaround evidence needs acknowledgement.',
         ]]);
-        $this->mock(ShiftStaffEligibilityService::class, function ($mock) use ($currentWarning): void {
-            $mock->shouldReceive('evaluate')->once()->andReturn($currentWarning);
+        $evaluations = [];
+        $this->mock(ShiftStaffEligibilityService::class, function ($mock) use ($currentWarning, &$evaluations): void {
+            $mock->shouldReceive('evaluate')->twice()->andReturnUsing(
+                function (Shift $evaluatedShift, User $evaluatedUser) use ($currentWarning, &$evaluations): EligibilityResult {
+                    $evaluations[] = [
+                        'shift_id' => (int) $evaluatedShift->id,
+                        'assigned_user_id' => $evaluatedShift->user_id === null ? null : (int) $evaluatedShift->user_id,
+                        'status' => $evaluatedShift->status,
+                        'assignee_id' => (int) $evaluatedUser->id,
+                    ];
+
+                    return $currentWarning;
+                },
+            );
         });
 
         app(ShiftLifecycleService::class)->assign($shift, $actor, $assignee, [
@@ -258,6 +285,11 @@ class ShiftLifecycleServiceTest extends TestCase
             'overridden_by' => $assignee->id,
             'rules_overridden' => ['stale_caller_rule'],
         ]);
+
+        $this->assertSame([
+            ['shift_id' => (int) $shift->id, 'assigned_user_id' => null, 'status' => 'draft', 'assignee_id' => (int) $assignee->id],
+            ['shift_id' => (int) $shift->id, 'assigned_user_id' => (int) $assignee->id, 'status' => 'scheduled', 'assignee_id' => (int) $assignee->id],
+        ], $evaluations, 'The current assignment decision precedes the refresh of the saved assignment.');
 
         $override = ShiftEligibilityOverride::query()->where('shift_id', $shift->id)->sole();
         $this->assertSame($assignee->id, (int) $override->user_id);
