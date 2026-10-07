@@ -72,6 +72,10 @@ import {
     startOfWeek,
     weekLabel,
 } from '@/components/rostering';
+import {
+    type EligibilityObservation,
+    EligibilityRefreshPanel,
+} from '@/components/rostering/eligibility-refresh-panel';
 import ViewTimesheetDialog, {
     type ViewTimesheetRow,
 } from '@/components/timesheets/view-timesheet-dialog';
@@ -79,6 +83,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
+import { WORKER_TIMEZONE } from '@/lib/datetime';
 import { index as rosteringIndex } from '@/routes/operations/rostering';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
@@ -279,6 +284,12 @@ type ComplianceBadge = {
 };
 
 type Props = {
+    eligibilityFreshness?: Record<string, EligibilityObservation>;
+    workforcePreferences?: {
+        default_tab: 'shifts' | 'calendar';
+        roster_view: 'grid' | 'list';
+        revision: string;
+    };
     canManageAny: boolean;
     workerTimezone?: string;
     availabilityCapabilities?: {
@@ -449,13 +460,15 @@ function isRosterTab(value: unknown): value is RosterTab {
     );
 }
 
-function initialRosterTab(): RosterTab {
+function initialRosterTab(
+    defaultTab: 'shifts' | 'calendar' = 'shifts',
+): RosterTab {
     if (typeof window === 'undefined') {
-        return 'shifts';
+        return defaultTab;
     }
 
     const requested = new URLSearchParams(window.location.search).get('tab');
-    return isRosterTab(requested) ? requested : 'shifts';
+    return isRosterTab(requested) ? requested : defaultTab;
 }
 
 const SHIFT_TYPE_COLORS = [
@@ -547,7 +560,8 @@ function rangesOverlap(aS: string, aE: string, bS: string, bE: string) {
 }
 
 export default function RosteringIndex(props: Props) {
-    const { auth } = usePage().props as {
+    const rosterPage = usePage();
+    const { auth } = rosterPage.props as {
         auth?: { user?: { name?: string }; can?: any };
     };
     const canViewOperationsReports = Boolean(
@@ -570,7 +584,20 @@ export default function RosteringIndex(props: Props) {
         [weekStartDate],
     );
 
-    const [tab, setTab] = useState<RosterTab>(() => initialRosterTab());
+    const [tab, setTab] = useState<RosterTab>(() =>
+        initialRosterTab(props.workforcePreferences?.default_tab),
+    );
+    useEffect(() => {
+        const requested = new URL(
+            rosterPage.url,
+            'http://local',
+        ).searchParams.get('tab');
+        setTab(
+            isRosterTab(requested)
+                ? requested
+                : (props.workforcePreferences?.default_tab ?? 'shifts'),
+        );
+    }, [rosterPage.url, props.workforcePreferences?.default_tab]);
     const [pickerOpen, setPickerOpen] = useState(false);
     // Header scoped search — narrows the week grid's staff/site rows.
     const [gridSearch, setGridSearch] = useState('');
@@ -2435,10 +2462,31 @@ export default function RosteringIndex(props: Props) {
             <Head title="Rostering" />
 
             <PageLayout hero={header}>
+                {tab === 'shifts' &&
+                    props.eligibilityFreshness &&
+                    Object.keys(props.eligibilityFreshness).length > 0 && (
+                        <div className="mb-4">
+                            <EligibilityRefreshPanel
+                                duties={Object.values(
+                                    props.eligibilityFreshness,
+                                ).map((result) => ({
+                                    id: result.shift_id,
+                                    label: `Shift #${result.shift_id}${result.starts_at ? ` · ${new Intl.DateTimeFormat('en-NZ', { timeZone: props.workerTimezone || WORKER_TIMEZONE, day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(result.starts_at))}` : ''}`,
+                                }))}
+                                workerTimezone={props.workerTimezone}
+                            />
+                        </div>
+                    )}
                 <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
                     <div className="min-w-0">
                         {tab === 'shifts' ? (
                             <WeekGridPane
+                                initialView={
+                                    props.workforcePreferences?.roster_view ===
+                                    'list'
+                                        ? 'list'
+                                        : 'week'
+                                }
                                 days={days}
                                 rows={filteredStaffRows}
                                 siteRows={filteredSiteRows}

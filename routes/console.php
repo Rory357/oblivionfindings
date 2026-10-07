@@ -75,6 +75,7 @@ use App\Jobs\ShiftTaskDueJob;
 use App\Jobs\SyncResourceCalendarsJob;
 use App\Jobs\SyncWorkCalendarsJob;
 use App\Models\MedicationIdempotencyResult;
+use App\Services\Eligibility\WorkforceEligibilityRefresh;
 use App\Services\Fleet\FinanceReviewNotices;
 use App\Services\Medication\PharmacyConnect\PharmacyDispatchService;
 use App\Services\MedicationAlertService;
@@ -996,3 +997,9 @@ app(Schedule::class)->command('emar:expire-second-person-confirmations')->everyM
 app(Schedule::class)->call(fn () => app(PharmacyDispatchService::class)->recover())
     ->name('emar-pharmacy-dispatch-recovery')->everyMinute()->withoutOverlapping()->onOneServer();
 app(Schedule::class)->command('medications:chart-backups')->everyMinute()->withoutOverlapping()->onOneServer();
+
+// Durable workforce eligibility recovery uses the existing minute scheduler.
+Artisan::command('workforce:recover-eligibility-refresh', function () {
+    $this->info((string) app(WorkforceEligibilityRefresh::class)->recover());
+})->purpose('Recover pending or interrupted workforce eligibility checks');
+app(Schedule::class)->command('workforce:recover-eligibility-refresh')->everyMinute()->withoutOverlapping();

@@ -3,6 +3,7 @@
 namespace App\Services\Operations;
 
 use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Services\HrFatiguePolicySettings;
 use App\Models\ControlRoomAlert;
 use App\Models\Shift;
 use App\Models\ShiftSignal;
@@ -250,8 +251,9 @@ class ShiftReportingService
     protected function buildStaffUtilisation(array $filters): array
     {
         $periodWeeks = $this->periodWeeks($filters['start'], $filters['end']);
-        $warningThreshold = (float) config('hr.fatigue.warning_threshold_weekly', 40);
-        $maxThreshold = (float) config('hr.fatigue.max_hours_per_week', 50);
+        $policy = app(HrFatiguePolicySettings::class)->values();
+        $warningThreshold = $policy['warning_threshold_weekly'];
+        $maxThreshold = $policy['max_hours_per_week'];
 
         $shifts = Shift::query()
             ->with([

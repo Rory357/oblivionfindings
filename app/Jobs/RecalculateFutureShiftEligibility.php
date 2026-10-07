@@ -6,8 +6,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Shift;
 use App\Models\User;
 use App\Notifications\ShiftEligibilityWarningNotification;
-use App\Services\ShiftSignalService;
-use App\Services\ShiftStaffEligibilityService;
+use App\Services\Eligibility\WorkforceEligibilityRefresh;
 use App\Services\UserSiteAccessService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -18,8 +17,8 @@ use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 /**
- * Nightly job that scans future scheduled shifts with assigned staff
- * and re-evaluates eligibility. When a shift is now blocked (e.g. cert
+ * Nightly job that stages a bounded durable scan of assigned employee duties
+ * and current evidence. When a shift is now blocked (e.g. cert
  * expired, leave approved after assignment), it emits a control-room
  * signal and notifies the relevant manager.
  *
@@ -35,64 +34,18 @@ class RecalculateFutureShiftEligibility implements ShouldQueue
 
     public int $timeout = 300;
 
-    public function handle(
-        ShiftStaffEligibilityService $eligibility,
-        ShiftSignalService $signals,
-    ): void {
-        $flagged = 0;
-        $scanned = 0;
+    public function handle(WorkforceEligibilityRefresh $refresh): void
+    {
+        $scan = $refresh->requestNightlyScan()->fresh();
+        Log::info('Nightly workforce eligibility refresh staged', [
+            'recheck_id' => $scan->id, 'staged_count' => $scan->scanned_count,
+            'complete' => $scan->status === 'completed',
+        ]);
+    }
 
-        Shift::query()
-            ->whereIn('status', ['scheduled'])
-            ->whereNotNull('user_id')
-            ->where('starts_at', '>', now())
-            ->where('starts_at', '<', now()->addDays(14))
-            ->with(['staff:id,name,email', 'site:id,name'])
-            ->chunkById(50, function ($shifts) use ($eligibility, $signals, &$flagged, &$scanned) {
-                foreach ($shifts as $shift) {
-                    $scanned++;
-
-                    if (! $shift->staff) {
-                        continue;
-                    }
-
-                    try {
-                        $result = $eligibility->evaluate($shift, $shift->staff);
-                    } catch (\Throwable $e) {
-                        Log::warning('Future eligibility check failed', [
-                            'shift_id' => $shift->id,
-                            'error' => $e->getMessage(),
-                        ]);
-
-                        continue;
-                    }
-
-                    if (! $result->hasBlocks()) {
-                        continue;
-                    }
-
-                    $flagged++;
-
-                    // Emit control-room signal (idempotent — won't duplicate for same shift+type+date).
-                    $signals->emitForShift(
-                        shift: $shift,
-                        signalType: self::SIGNAL_TYPE,
-                        severity: 'high',
-                        occurredAt: now(),
-                        payload: [
-                            'staff_name' => $shift->staff->name,
-                            'blocking_reasons' => $result->blocking_reasons,
-                            'checked_at' => now()->toIso8601String(),
-                        ],
-                        windowKey: now()->toDateString(),
-                    );
-
-                    // Notify the staff member's manager, or fall back to provider managers.
-                    $this->notifyManager($shift, $result->blocking_reasons);
-                }
-            });
-
-        Log::info("Future shift eligibility scan complete: {$scanned} scanned, {$flagged} flagged.");
+    public function notifyEligibilityReview(Shift $shift, array $reasons): void
+    {
+        $this->notifyManager($shift, $reasons);
     }
 
     protected function notifyManager(Shift $shift, array $blockingReasons): void
@@ -140,7 +93,7 @@ class RecalculateFutureShiftEligibility implements ShouldQueue
             Log::warning('Failed to send eligibility warning notification', [
                 'shift_id' => $shift->id,
                 'manager_id' => $manager->id,
-                'error' => $e->getMessage(),
+                'exception_class' => $e::class,
             ]);
         }
     }

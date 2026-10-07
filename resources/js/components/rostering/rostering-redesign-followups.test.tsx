@@ -1190,3 +1190,33 @@ describe('availability scanability and scope', () => {
         expect(screen.queryByText(/more$/)).not.toBeInTheDocument();
     });
 });
+
+it('opens the saved roster layout and keeps an explicit in-session layout choice', () => {
+    const view = render(
+        <WeekGridPane
+            days={weekDays}
+            rows={[]}
+            todayKey={null}
+            canManage={false}
+            initialView="list"
+        />,
+    );
+    expect(screen.getByRole('tab', { name: 'List' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+    );
+    fireEvent.click(screen.getByRole('tab', { name: 'Day' }));
+    view.rerender(
+        <WeekGridPane
+            days={weekDays}
+            rows={[]}
+            todayKey={null}
+            canManage={false}
+            initialView="list"
+        />,
+    );
+    expect(screen.getByRole('tab', { name: 'Day' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+    );
+});

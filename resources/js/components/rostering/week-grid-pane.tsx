@@ -82,6 +82,7 @@ export type GridStaffRow = {
 };
 
 export type WeekGridPaneProps = {
+    initialView?: GridView;
     days: Date[];
     rows: GridStaffRow[];
     /** Same shifts grouped by site. When provided, a Staff/Site toggle appears. */
@@ -537,6 +538,7 @@ function buildEmptyCellActions(
 }
 
 export function WeekGridPane({
+    initialView = 'week',
     days,
     rows,
     siteRows,
@@ -564,7 +566,7 @@ export function WeekGridPane({
     actionEndSlot,
 }: WeekGridPaneProps) {
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
-    const [view, setView] = useState<GridView>('week');
+    const [view, setView] = useState<GridView>(initialView);
     const [groupBy, setGroupBy] = useState<GroupBy>('staff');
     const [dayCursor, setDayCursor] = useState<string | null>(null);
 

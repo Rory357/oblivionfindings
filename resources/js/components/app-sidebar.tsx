@@ -1329,6 +1329,12 @@ function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/operations/rostering/conflicts',
             icon: AlertTriangle,
         });
+    if (can?.rostering?.viewAny)
+        workforce.push({
+            title: 'Workforce settings',
+            href: '/operations/workforce-settings',
+            icon: Settings,
+        });
 
     return workforce.length > 0
         ? [{ label: 'Workforce', items: workforce }]

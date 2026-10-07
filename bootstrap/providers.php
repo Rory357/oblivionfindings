@@ -5,6 +5,7 @@ return [
     App\Providers\AuthServiceProvider::class,
     App\Providers\EventServiceProvider::class,
     App\Providers\MedicationSupportServiceProvider::class,
+    App\Providers\WorkforceEligibilityServiceProvider::class,
     App\Providers\FortifyServiceProvider::class,
     App\Providers\LlmServiceProvider::class,
 ];
