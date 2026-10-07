@@ -14,6 +14,8 @@ import {
 } from './rostering-flags';
 
 test.describe('operations rostering — republish flow', () => {
+    // These fixture dates and staff availability are in the house's NZ time.
+    test.use({ timezoneId: 'Pacific/Auckland' });
     test.skip(!rosteringFlagsEnabled, rosteringFlagSkipReason);
     test.skip(
         ({ viewport }) => !viewport || viewport.width < 1024,
@@ -41,9 +43,26 @@ test.describe('operations rostering — republish flow', () => {
 
         const editDialog = page.getByRole('dialog', { name: /Edit shift/i });
         await editDialog.getByRole('button', { name: /^Schedule\b/i }).click();
+        const eligibilityResponse = page.waitForResponse((response) => {
+            const url = new URL(response.url());
+            return (
+                url.pathname === '/operations/shifts/eligibility-preview' &&
+                Date.parse(url.searchParams.get('starts_at') ?? '') ===
+                    Date.parse('2026-05-03T21:30:00Z') &&
+                Date.parse(url.searchParams.get('ends_at') ?? '') ===
+                    Date.parse('2026-05-04T00:30:00Z')
+            );
+        });
         await editDialog.getByLabel(/^Start/).fill('2026-05-04T09:30');
         await editDialog.getByLabel(/^End/).fill('2026-05-04T12:30');
         await editDialog.getByRole('button', { name: /^Review\b/i }).click();
+        const eligibility = await eligibilityResponse;
+        expect(eligibility.ok()).toBe(true);
+        expect(await eligibility.json()).toMatchObject({
+            is_allowed: true,
+            blocked_reasons: [],
+            warning_reasons: [],
+        });
         const updateResponse = page.waitForResponse(
             (response) =>
                 response.url().endsWith('/operations/shifts/9101') &&
@@ -56,6 +75,17 @@ test.describe('operations rostering — republish flow', () => {
         await expect(editDialog).not.toBeVisible();
 
         await expect(page).toHaveURL(/\/operations\/shifts\/9101(?:\?|$)/);
+        // Reload and re-open from server props: a 303 alone is not a save.
+        await page.reload();
+        await page.getByRole('button', { name: /^Edit shift$/ }).click();
+        await editDialog.getByRole('button', { name: /^Schedule\b/i }).click();
+        await expect(editDialog.getByLabel(/^Start/)).toHaveValue(
+            '2026-05-04T09:30',
+        );
+        await expect(editDialog.getByLabel(/^End/)).toHaveValue(
+            '2026-05-04T12:30',
+        );
+        await editDialog.getByRole('button', { name: /^Cancel$/ }).click();
         await page.goto(
             `/operations/rostering?week=${ROSTERING_DEMO_PUBLISH_TARGET.week}&site_id=${ROSTERING_DEMO_PUBLISH_TARGET.siteId}`,
         );
@@ -99,6 +129,82 @@ test.describe('operations rostering — republish flow', () => {
         await expect(publishPanel).toContainText(/published/i);
         await expect(publishPanel).not.toContainText(/changed after publish/i);
 
+        expectNoConsoleErrors(consoleErrors);
+    });
+
+    test('a server eligibility warning keeps the unsaved edit open', async ({
+        page,
+    }) => {
+        test.setTimeout(90_000);
+        const consoleErrors = collectConsoleErrors(page);
+        resetRosteringReadinessFixtures();
+        await loginAsStaff(page);
+        await page.goto('/operations/shifts/9101');
+        await page.getByRole('button', { name: /^Edit shift$/ }).click();
+        const editDialog = page.getByRole('dialog', { name: /Edit shift/i });
+        await editDialog.getByRole('button', { name: /^Schedule\b/i }).click();
+
+        // Simulate availability changing after a successful preview. The real
+        // update endpoint must still reject this unacknowledged overnight warning.
+        let stalePreviewSent = false;
+        await page.route(
+            '**/operations/shifts/eligibility-preview?**',
+            async (route) => {
+                const url = new URL(route.request().url());
+                if (
+                    !stalePreviewSent &&
+                    Date.parse(url.searchParams.get('ends_at') ?? '') ===
+                        Date.parse('2026-05-04T12:30:00Z')
+                ) {
+                    stalePreviewSent = true;
+                    await route.fulfill({
+                        json: {
+                            is_allowed: true,
+                            blocked_reasons: [],
+                            warning_reasons: [],
+                        },
+                    });
+                } else {
+                    await route.continue();
+                }
+            },
+        );
+        await editDialog.getByLabel(/^Start/).fill('2026-05-04T21:30');
+        await editDialog.getByLabel(/^End/).fill('2026-05-05T00:30');
+        await editDialog.getByRole('button', { name: /^Review\b/i }).click();
+        await expect(
+            editDialog.getByRole('button', { name: /^Save changes$/ }),
+        ).toBeEnabled();
+        expect(stalePreviewSent).toBe(true);
+        await editDialog
+            .getByRole('button', { name: /^Save changes$/ })
+            .click();
+        await expect(editDialog.getByText('Fix before saving:')).toBeVisible();
+        await expect(
+            editDialog.getByText(/Staff not available/).first(),
+        ).toBeVisible();
+        await expect(
+            editDialog.getByText('Staff eligibility warnings'),
+        ).toBeVisible();
+        await editDialog.getByRole('button', { name: /^Schedule\b/i }).click();
+        await expect(editDialog.getByLabel(/^Start/)).toHaveValue(
+            '2026-05-04T21:30',
+        );
+        await expect(editDialog.getByLabel(/^End/)).toHaveValue(
+            '2026-05-05T00:30',
+        );
+        await editDialog.getByRole('button', { name: /^Cancel$/ }).click();
+
+        await page.reload();
+        await page.getByRole('button', { name: /^Edit shift$/ }).click();
+        await editDialog.getByRole('button', { name: /^Schedule\b/i }).click();
+        await expect(editDialog.getByLabel(/^Start/)).toHaveValue(
+            '2026-05-04T09:00',
+        );
+        await expect(editDialog.getByLabel(/^End/)).toHaveValue(
+            '2026-05-04T12:00',
+        );
+        await editDialog.getByRole('button', { name: /^Cancel$/ }).click();
         expectNoConsoleErrors(consoleErrors);
     });
 });

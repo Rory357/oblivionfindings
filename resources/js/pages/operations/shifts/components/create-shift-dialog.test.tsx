@@ -1,5 +1,11 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+} from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CreateShiftDialog } from './create-shift-dialog';
 
@@ -7,6 +13,7 @@ const inertiaSpies = vi.hoisted(() => ({
     put: vi.fn(),
     post: vi.fn(),
     routerPost: vi.fn(),
+    serverError: null as string | null,
 }));
 
 vi.mock('@inertiajs/react', async () => {
@@ -18,6 +25,7 @@ vi.mock('@inertiajs/react', async () => {
         },
         useForm: (initialData: Record<string, unknown>) => {
             const [data, setDataState] = ReactActual.useState(initialData);
+            const [errors, setErrors] = ReactActual.useState({});
             const transformRef = ReactActual.useRef<
                 | ((data: Record<string, unknown>) => Record<string, unknown>)
                 | null
@@ -25,7 +33,7 @@ vi.mock('@inertiajs/react', async () => {
 
             const form = {
                 data,
-                errors: {},
+                errors,
                 processing: false,
                 setData: (
                     key: string | Record<string, unknown>,
@@ -48,14 +56,22 @@ vi.mock('@inertiajs/react', async () => {
                     transformRef.current = callback;
                     return form;
                 },
-                put: (url: string, options?: { onSuccess?: () => void }) => {
+                put: (
+                    url: string,
+                    options?: { onSuccess?: () => void; onError?: () => void },
+                ) => {
                     inertiaSpies.put(
                         url,
                         transformRef.current
                             ? transformRef.current(data)
                             : data,
                     );
-                    options?.onSuccess?.();
+                    if (inertiaSpies.serverError) {
+                        setErrors({ user_id: inertiaSpies.serverError });
+                        options?.onError?.();
+                    } else {
+                        options?.onSuccess?.();
+                    }
                 },
                 post: (url: string, options?: { onSuccess?: () => void }) => {
                     inertiaSpies.post(
@@ -73,6 +89,21 @@ vi.mock('@inertiajs/react', async () => {
     };
 });
 
+const eligible = { is_allowed: true, blocked_reasons: [], warning_reasons: [] };
+const previewResponse = (
+    body: {
+        is_allowed: boolean;
+        blocked_reasons: string[];
+        warning_reasons: string[];
+    } = eligible,
+) => ({ ok: true, json: async () => body });
+
+beforeEach(() => {
+    inertiaSpies.serverError = null;
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(previewResponse()));
+});
+afterEach(() => vi.unstubAllGlobals());
+
 describe('CreateShiftDialog edit mode', () => {
     beforeEach(() => {
         inertiaSpies.put.mockClear();
@@ -80,7 +111,7 @@ describe('CreateShiftDialog edit mode', () => {
         inertiaSpies.routerPost.mockClear();
     });
 
-    it('prefills from initialShift and submits a PUT to the update route', () => {
+    it('prefills from initialShift and submits a PUT to the update route', async () => {
         const onClose = vi.fn();
 
         render(
@@ -160,6 +191,11 @@ describe('CreateShiftDialog edit mode', () => {
         });
 
         fireEvent.click(screen.getByRole('button', { name: /Review/ }));
+        await waitFor(() =>
+            expect(
+                screen.getByRole('button', { name: /Save changes/i }),
+            ).toBeEnabled(),
+        );
         fireEvent.click(screen.getByRole('button', { name: /Save changes/i }));
 
         expect(inertiaSpies.put).toHaveBeenCalledWith(
@@ -203,7 +239,7 @@ describe('CreateShiftDialog edit mode', () => {
         ).toBeNull();
     });
 
-    it('can clear an existing shift licence requirement', () => {
+    it('can clear an existing shift licence requirement', async () => {
         render(
             <CreateShiftDialog
                 open
@@ -231,6 +267,11 @@ describe('CreateShiftDialog edit mode', () => {
             screen.getByRole('button', { name: /Passenger endorsement/i }),
         );
         fireEvent.click(screen.getByRole('button', { name: /Review/ }));
+        await waitFor(() =>
+            expect(
+                screen.getByRole('button', { name: /Save changes/i }),
+            ).toBeEnabled(),
+        );
         fireEvent.click(screen.getByRole('button', { name: /Save changes/i }));
 
         expect(inertiaSpies.put).toHaveBeenCalledWith(
@@ -240,6 +281,103 @@ describe('CreateShiftDialog edit mode', () => {
                 required_licence_endorsements: [],
             }),
         );
+    });
+
+    function renderAssignedEdit(onClose = vi.fn()) {
+        render(
+            <CreateShiftDialog
+                open
+                onClose={onClose}
+                clients={[{ id: 10, first_name: 'Ari', last_name: 'Kauri' }]}
+                staff={[{ id: 7, name: 'Aroha King' }]}
+                initialShift={{
+                    id: 44,
+                    starts_at: '2026-05-04T09:00:00+12:00',
+                    ends_at: '2026-05-04T13:00:00+12:00',
+                    status: 'scheduled',
+                    client: { id: 10 },
+                    staff: { id: 7 },
+                }}
+            />,
+        );
+    }
+
+    it('waits through debounce and ignores an old eligibility response after an edit', async () => {
+        const responses: Array<
+            (value: ReturnType<typeof previewResponse>) => void
+        > = [];
+        vi.mocked(fetch).mockImplementation(
+            () =>
+                new Promise((resolve) => {
+                    responses.push(
+                        resolve as (
+                            value: ReturnType<typeof previewResponse>,
+                        ) => void,
+                    );
+                }),
+        );
+        renderAssignedEdit();
+        fireEvent.click(screen.getByRole('button', { name: /Review/ }));
+        const save = screen.getByRole('button', { name: /Save changes/i });
+        expect(save).toBeDisabled();
+        fireEvent.submit(save.closest('form')!);
+        expect(inertiaSpies.put).not.toHaveBeenCalled();
+        await waitFor(() => expect(responses).toHaveLength(1));
+
+        fireEvent.click(
+            screen.getByRole('button', { name: /Schedule.*Times, break/ }),
+        );
+        fireEvent.change(screen.getByLabelText(/^Start/), {
+            target: { value: '2026-05-04T09:30' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: /Review/ }));
+        await act(async () => responses[0](previewResponse()));
+        expect(
+            screen.getByRole('button', { name: /Save changes/i }),
+        ).toBeDisabled();
+        await waitFor(() => expect(responses).toHaveLength(2));
+        await act(async () => responses[1](previewResponse()));
+        expect(
+            screen.getByRole('button', { name: /Save changes/i }),
+        ).toBeEnabled();
+        expect(inertiaSpies.put).not.toHaveBeenCalled();
+    });
+
+    it('keeps the draft and refreshes warnings when the server rejects a stale preview', async () => {
+        const onClose = vi.fn();
+        renderAssignedEdit(onClose);
+        fireEvent.click(screen.getByRole('button', { name: /Review/ }));
+        await waitFor(() =>
+            expect(
+                screen.getByRole('button', { name: /Save changes/i }),
+            ).toBeEnabled(),
+        );
+        inertiaSpies.serverError = 'Staff not available. Review before saving.';
+        vi.mocked(fetch).mockResolvedValue(
+            previewResponse({
+                ...eligible,
+                warning_reasons: ['Staff not available.'],
+            }) as Response,
+        );
+        fireEvent.click(screen.getByRole('button', { name: /Save changes/i }));
+        expect(onClose).not.toHaveBeenCalled();
+        expect(screen.getByText(inertiaSpies.serverError)).toBeVisible();
+        expect(
+            screen.getByRole('button', { name: /Save changes/i }),
+        ).toBeDisabled();
+        await waitFor(() =>
+            expect(
+                screen.getByText('Staff eligibility warnings'),
+            ).toBeVisible(),
+        );
+        fireEvent.click(screen.getByRole('button', { name: /Save changes/i }));
+        expect(
+            screen.getByRole('dialog', {
+                name: 'Override Eligibility Warnings',
+            }),
+        ).toBeVisible();
+        expect(inertiaSpies.put).toHaveBeenCalledTimes(1);
+        expect(onClose).not.toHaveBeenCalled();
     });
 });
 
