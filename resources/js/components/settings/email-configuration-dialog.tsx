@@ -123,11 +123,45 @@ export function EmailConfigurationDialog({
           )
         : undefined;
     const locked = pending !== null || failure !== null;
+    const backupFields =
+        draft.provider === 'smtp'
+            ? [
+                  { label: 'SMTP host', complete: !!draft.smtp_host.trim() },
+                  {
+                      label: 'sender address',
+                      complete: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+                          draft.from_address.trim(),
+                      ),
+                  },
+                  {
+                      label: 'SMTP password',
+                      complete:
+                          !draft.smtp_username.trim() ||
+                          !!draft.smtp_password ||
+                          (base.smtp_password_saved &&
+                              !draft.clear_smtp_password),
+                  },
+              ]
+            : [
+                  {
+                      label: 'approved connected sending mailbox',
+                      complete:
+                          !!selected?.connected &&
+                          selected.provider === draft.provider &&
+                          selected.configuration_version ===
+                              draft.support_connection_version &&
+                          selected.sending_issue === null,
+                  },
+              ];
+    const missingBackupFields = backupFields
+        .filter((field) => !field.complete)
+        .map((field) => field.label);
     const completion = (() => {
         const fields = [
             draft.provider,
             draft.from_name.trim(),
             draft.public_reply_mode,
+            ...backupFields.map((field) => (field.complete ? 'complete' : '')),
         ];
         if (draft.support_enabled) {
             fields.push(
@@ -414,7 +448,13 @@ export function EmailConfigurationDialog({
                     saved ? (
                         <WizardSuccessPane
                             title="Email settings saved"
-                            blurb="The saved provider is available to protected eMAR backups and enabled IT support delivery. Provider acceptance still needs verification."
+                            blurb={
+                                missingBackupFields.length > 0
+                                    ? 'Saved with incomplete backup email setup. Complete ' +
+                                      missingBackupFields.join(', ') +
+                                      ' before sending protected backups.'
+                                    : 'The configuration is saved. Check delivery readiness in eMAR before sending protected backups. Saving does not confirm delivery.'
+                            }
                             actions={<Button onClick={onClose}>Done</Button>}
                         />
                     ) : undefined
@@ -892,6 +932,23 @@ export function EmailConfigurationDialog({
                                     title="Review email settings"
                                     blurb="Saving changes configuration. It does not send a test message or prove delivery."
                                 />
+                                {missingBackupFields.length > 0 && (
+                                    <Alert>
+                                        <ShieldCheck />
+                                        <AlertTitle>
+                                            Backup email setup incomplete
+                                        </AlertTitle>
+                                        <AlertDescription>
+                                            Complete{' '}
+                                            {missingBackupFields.join(', ')}{' '}
+                                            before sending protected backups.
+                                            You can save these entries now;
+                                            incomplete saved settings block
+                                            backup email and do not use server
+                                            mail settings instead.
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
                                 <ReviewCard
                                     icon={Mail}
                                     title="Provider"
@@ -926,12 +983,24 @@ export function EmailConfigurationDialog({
                                 </ReviewCard>
                                 <ReviewCard
                                     icon={Inbox}
-                                    title="Support identity"
+                                    title="Sender identity"
                                     onEdit={() => setStep(1)}
                                 >
                                     <ReviewRow
                                         label="Sender name"
                                         value={draft.from_name}
+                                    />
+                                    <ReviewRow
+                                        label="Sender address"
+                                        value={
+                                            draft.provider === 'smtp' &&
+                                            !draft.support_enabled
+                                                ? draft.from_address ||
+                                                  'Not set'
+                                                : (selected?.mailbox_email ??
+                                                      draft.from_address) ||
+                                                  'Not set'
+                                        }
                                     />
                                     <ReviewRow
                                         label="Mailbox"

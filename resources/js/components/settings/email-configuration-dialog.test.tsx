@@ -62,13 +62,16 @@ vi.mock('@/components/wizard/shell', () => ({
     ),
     WizardSuccessPane: ({
         title,
+        blurb,
         actions,
     }: {
         title: string;
+        blurb: string;
         actions: ReactNode;
     }) => (
         <section>
             <h2>{title}</h2>
+            <p>{blurb}</p>
             {actions}
         </section>
     ),
@@ -229,7 +232,7 @@ describe('email settings save confirmation and recovery', () => {
         expect(axios.put).not.toHaveBeenCalled();
     });
 
-    it('does not require hidden connection or host settings while delivery is disabled', () => {
+    it('allows an incomplete draft with IT off without claiming full backup setup', () => {
         setup({
             ...initial,
             settings: {
@@ -242,7 +245,7 @@ describe('email settings save confirmation and recovery', () => {
             },
         });
         expect(
-            screen.getByText('Settings completeness: 100%'),
+            screen.getByText('Settings completeness: 67%'),
         ).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
         expect(
@@ -255,6 +258,56 @@ describe('email settings save confirmation and recovery', () => {
             screen.queryByText('Choose the approved support mailbox.'),
         ).not.toBeInTheDocument();
     });
+
+    it.each(['smtp', 'google'] as const)(
+        'reports incomplete %s backup setup before and after saving with IT off',
+        async (provider) => {
+            const current = {
+                ...initial,
+                connections: [],
+                settings: {
+                    ...initial.settings,
+                    provider,
+                    smtp_host: '',
+                    from_address: '',
+                    support_enabled: false,
+                    support_connection_id: null,
+                    support_connection_version: null,
+                },
+            };
+            vi.mocked(axios.put).mockResolvedValue({
+                data: {
+                    data: {
+                        ...current,
+                        settings: {
+                            ...current.settings,
+                            configuration_version: 3,
+                        },
+                    },
+                },
+            });
+            setup(current);
+            fireEvent.click(
+                screen.getByRole('button', { name: 'Go to Review' }),
+            );
+            expect(
+                screen.getByText('Backup email setup incomplete'),
+            ).toBeInTheDocument();
+            expect(
+                screen.getByText(
+                    /incomplete saved settings block backup email/,
+                ),
+            ).toBeInTheDocument();
+            fireEvent.click(
+                screen.getByRole('button', { name: 'Save email settings' }),
+            );
+            await screen.findByText(/Saved with incomplete backup email setup/);
+            expect(
+                screen.queryByText(/provider is available/),
+            ).not.toBeInTheDocument();
+            expect(axios.put).toHaveBeenCalledTimes(1);
+        },
+    );
 
     it('announces saved only after the expected next version for the current actor', async () => {
         vi.mocked(axios.put).mockResolvedValue({ data: { data: saved(3) } });
