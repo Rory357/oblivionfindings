@@ -70,6 +70,7 @@ use App\Http\Controllers\RosteringController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShiftSeriesController;
 use App\Http\Controllers\ShiftTaskController;
+use App\Http\Controllers\StaffAvailabilityController;
 use App\Http\Controllers\StaffTimeOffController;
 use App\Http\Controllers\SummaryController;
 use App\Http\Controllers\TimelineController;
@@ -1035,8 +1036,8 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // -------------------------------------------------------------------------
 
     // Availability now lives inside Rostering so there is one scheduler surface.
-    Route::get('/availability', fn () => redirect()->route('operations.rostering.index', ['tab' => 'availability']))
-        ->middleware(['role_scope:my-day', 'permission:rostering.viewAny'])
+    Route::get('/availability', [StaffAvailabilityController::class, 'workspace'])
+        ->middleware('permission:rostering.viewAny|staff.viewAny|staff.availability.updateAny|staff.availability.updateSelf')
         ->name('operations.availability.index');
 
     // -------------------------------------------------------------------------

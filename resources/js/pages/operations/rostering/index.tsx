@@ -280,6 +280,12 @@ type ComplianceBadge = {
 
 type Props = {
     canManageAny: boolean;
+    workerTimezone?: string;
+    availabilityCapabilities?: {
+        view_any: boolean;
+        update_any: boolean;
+        update_self: boolean;
+    };
     canApproveLeave: boolean;
     canPublishRoster: boolean;
     canAutoScheduleRoster: boolean;
@@ -2740,7 +2746,11 @@ export default function RosteringIndex(props: Props) {
                                     upcomingLeave={
                                         availabilitySummary.upcomingLeave
                                     }
-                                    canManage={props.canManageAny}
+                                    canManage={
+                                        props.availabilityCapabilities
+                                            ?.update_any ?? false
+                                    }
+                                    workerTimezone={props.workerTimezone}
                                 />
                             ) : (
                                 <Card>

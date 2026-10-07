@@ -53,6 +53,11 @@ class RosteringController extends Controller
         abort_unless($auth && $auth->canDo('rostering.viewAny'), 403);
 
         $canManageAny = $auth->canDo('shifts.manageAny');
+        $availabilityCapabilities = [
+            'view_any' => $canManageAny || $auth->canDo('staff.viewAny') || $auth->canDo('staff.availability.updateAny'),
+            'update_any' => $auth->canDo('staff.availability.updateAny'),
+            'update_self' => $auth->canDo('staff.availability.updateSelf'),
+        ];
         $canApproveLeave = $auth->canDo('hr.leave.approve') || $auth->canDo('hr.leave.manage');
         // Need-to-know: schedulers see WHO is off + the leave type, but the free-text
         // reason of sick / family-violence leave is HR/employee-only (mirrors the hub).
@@ -80,6 +85,8 @@ class RosteringController extends Controller
         $isAvailabilityTab = $request->query('tab') === 'availability';
 
         $data = $request->validated();
+        $availabilityWeekStart = $this->rosterPeriods->weekStart($data['week'] ?? null);
+        $availabilityWeekEnd = $availabilityWeekStart->copy()->addDays(7);
 
         $week = ! empty($data['week'])
             ? Carbon::parse($data['week'])
@@ -119,6 +126,15 @@ class RosteringController extends Controller
                 ->get(['id', 'name', 'type', 'is_active', 'site_id']);
         }
 
+        // Availability coordinators use approved staff/Sites independently of
+        // the existing shift/template command pickers on the other tabs.
+        if ($isAvailabilityTab && $availabilityCapabilities['view_any']) {
+            $availabilitySiteIds = $this->siteAccess->accessibleSiteIds($auth, ['reports.viewAny']);
+            $staff = $this->siteAccess->applyStaffScope(User::query(), $auth, ['reports.viewAny'])
+                ->orderBy('name')->get(['id', 'name', 'email']);
+            $sites = Site::query()->whereIn('id', $availabilitySiteIds)
+                ->orderBy('name')->get(['id', 'name', 'type']);
+        }
         $query = Shift::query()
             ->with([
                 'client:id,first_name,last_name',
@@ -551,6 +567,8 @@ class RosteringController extends Controller
 
         return inertia('operations/rostering/index', [
             'canManageAny' => $canManageAny,
+            'availabilityCapabilities' => $availabilityCapabilities,
+            'workerTimezone' => (string) config('app.worker_timezone', 'Pacific/Auckland'),
             'canApproveLeave' => $canApproveLeave,
             'canPublishRoster' => $auth->canDo('rostering.publish'),
             'canAutoScheduleRoster' => $auth->canDo('rostering.autoSchedule'),
@@ -558,10 +576,10 @@ class RosteringController extends Controller
                 'publish' => $publishEnabled,
                 'auto_schedule' => $autoScheduleEnabled,
             ],
-            'weekStart' => $weekStart->toDateString(),
-            'weekEnd' => $weekEnd->toDateString(),
+            'weekStart' => ($isAvailabilityTab ? $availabilityWeekStart : $weekStart)->toDateString(),
+            'weekEnd' => ($isAvailabilityTab ? $availabilityWeekEnd : $weekEnd)->toDateString(),
             'filters' => [
-                'week' => $weekStart->toDateString(),
+                'week' => ($isAvailabilityTab ? $availabilityWeekStart : $weekStart)->toDateString(),
                 // Cast to int: the 'integer' rule validates but does not cast,
                 // so query-string values arrive as strings — and the hero
                 // EntityFilter pills match items with a strict ===, so a
@@ -670,11 +688,13 @@ class RosteringController extends Controller
                 'label' => $b->label,
                 'notes' => $b->notes,
             ])->values(),
-            'staffAvailabilitySummary' => $canManageAny
-                ? ($request->query('tab') === 'availability'
-                    ? $this->buildAvailabilitySummary($auth)
-                    : Inertia::optional(fn () => $this->buildAvailabilitySummary($auth)))
-                : ['staff' => [], 'upcomingLeave' => []],
+            'staffAvailabilitySummary' => $isAvailabilityTab
+                ? $this->buildAvailabilitySummary($auth, $availabilityWeekStart, $availabilityWeekEnd,
+                    ! empty($data['staff_id']) ? (int) $data['staff_id'] : null,
+                    $siteFilter === null ? null : (array) $siteFilter, $availabilityCapabilities['view_any'])
+                : Inertia::optional(fn () => $this->buildAvailabilitySummary($auth, $availabilityWeekStart, $availabilityWeekEnd,
+                    ! empty($data['staff_id']) ? (int) $data['staff_id'] : null,
+                    $siteFilter === null ? null : (array) $siteFilter, $availabilityCapabilities['view_any'])),
             'capacity' => $capacity,
 
             // HR leave overlay: formal leave requests in the visible 14-day time-off window.
@@ -817,17 +837,29 @@ class RosteringController extends Controller
         return app(ShiftSeriesPresenter::class)->detail($series);
     }
 
-    protected function buildAvailabilitySummary(User $auth): array
+    protected function buildAvailabilitySummary(User $auth, Carbon $weekStart, Carbon $weekEnd, ?int $staffId = null, ?array $siteIds = null, bool $viewAny = false): array
     {
-        $staff = User::query()
-            ->when($auth->organization_id, fn ($query) => $query->where('organization_id', $auth->organization_id))
+        $queryStart = $weekStart->copy()->utc();
+        $queryEnd = $weekEnd->copy()->utc();
+        $staff = $this->siteAccess->applyStaffScope(User::query(), $auth, ['reports.viewAny'])
+            ->when(! $viewAny, fn ($query) => $query->whereKey($auth->id))
+            ->when($staffId, fn ($query) => $query->whereKey($staffId))
+            ->when($siteIds !== null, fn ($query) => $query->whereHas('hrEmployeeProfile', function ($profiles) use ($siteIds): void {
+                $profiles->where(function ($sites) use ($siteIds): void {
+                    $sites->whereIn('primary_site_id', $siteIds);
+                    foreach ($siteIds as $siteId) {
+                        $sites->orWhereJsonContains('secondary_site_ids', (int) $siteId);
+                    }
+                });
+            }))
             ->staff()
             ->with([
                 'staffAvailability' => fn ($query) => $query
                     ->orderBy('day_of_week')
                     ->orderBy('starts_at'),
                 'staffTimeOff' => fn ($query) => $query
-                    ->where('ends_at', '>=', now())
+                    ->where('starts_at', '<', $queryEnd)
+                    ->where('ends_at', '>', $queryStart)
                     ->orderBy('starts_at'),
             ])
             ->orderBy('name')
@@ -839,13 +871,15 @@ class RosteringController extends Controller
             $upcomingLeave = HrLeaveRequest::query()
                 ->whereIn('user_id', $staff->pluck('id'))
                 ->where('status', 'approved')
-                ->where('ends_at', '>=', now())
+                ->where('starts_at', '<', $queryEnd)
+                ->where('ends_at', '>', $queryStart)
                 ->orderBy('starts_at')
                 ->get()
                 ->groupBy('user_id')
                 ->map(fn ($items) => $items->map(fn ($leave) => [
                     'id' => $leave->id,
-                    'leave_type' => $leave->leave_type,
+                    'leave_type' => LeaveService::isSensitiveLeaveType($leave->leave_type) && ! $auth->canDo('hr.leave.manage') && (int) $leave->user_id !== (int) $auth->id
+                        ? 'leave' : $leave->leave_type,
                     'starts_at' => $leave->starts_at?->toIso8601String(),
                     'ends_at' => $leave->ends_at?->toIso8601String(),
                     'status' => $leave->status,
@@ -858,6 +892,8 @@ class RosteringController extends Controller
                 'name' => $member->name,
                 'email' => $member->email,
                 'role' => $member->role,
+                'can_manage' => $auth->canDo('staff.availability.updateAny')
+                    || ((int) $auth->id === (int) $member->id && $auth->canDo('staff.availability.updateSelf')),
                 // Each row in staff_availabilities means "this worker is free
                 // on day_of_week between starts_at and ends_at". Absence of a
                 // row for a given day = not declared. The pane treats slot
@@ -867,10 +903,12 @@ class RosteringController extends Controller
                     'day_of_week' => $slot->day_of_week,
                     'start_time' => substr((string) $slot->starts_at, 0, 5),
                     'end_time' => substr((string) $slot->ends_at, 0, 5),
+                    'ends_next_day' => (bool) $slot->ends_next_day,
                 ])->values(),
                 'staff_time_off' => $member->staffTimeOff->map(fn ($off) => [
                     'id' => $off->id,
-                    'reason' => $off->label ?? $off->type,
+                    'reason' => LeaveService::isSensitiveLeaveType($off->type) && ! $auth->canDo('hr.leave.manage') && (int) $member->id !== (int) $auth->id
+                        ? 'Leave' : ($off->label ?? $off->type),
                     'starts_at' => $off->starts_at?->toIso8601String(),
                     'ends_at' => $off->ends_at?->toIso8601String(),
                 ])->values(),

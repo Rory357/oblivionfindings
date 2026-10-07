@@ -201,7 +201,9 @@ describe('rostering redesign follow-up wiring', () => {
         expect(screen.getByText('1 of 1 staff shown')).toBeVisible();
         expect(screen.queryByText('Total staff')).not.toBeInTheDocument();
         expect(screen.queryByText('Declared today')).not.toBeInTheDocument();
-        expect(screen.queryByText('Currently on leave')).not.toBeInTheDocument();
+        expect(
+            screen.queryByText('Currently on leave'),
+        ).not.toBeInTheDocument();
         expect(screen.queryByText('No data')).not.toBeInTheDocument();
         expect(screen.getByText('Aroha King')).toBeVisible();
         // Edit no longer navigates — it opens an in-page dialog.
@@ -1115,5 +1117,76 @@ describe('rostering redesign follow-up wiring', () => {
             expect.objectContaining({ id: 44 }),
             { reason: 'Called in sick', notes: null },
         );
+    });
+});
+
+describe('availability scanability and scope', () => {
+    it('shows every overnight interval without a hover and respects row edit denial', () => {
+        render(
+            <AvailabilityPane
+                canManage
+                staff={[
+                    {
+                        id: 71,
+                        name: 'Night worker',
+                        email: 'night@example.test',
+                        can_manage: false,
+                        staff_availability: [
+                            {
+                                id: 1,
+                                day_of_week: 0,
+                                start_time: '22:00',
+                                end_time: '07:00',
+                                ends_next_day: true,
+                            },
+                            {
+                                id: 2,
+                                day_of_week: 1,
+                                start_time: '10:00',
+                                end_time: '13:00',
+                                ends_next_day: false,
+                            },
+                        ],
+                    },
+                ]}
+                upcomingLeave={{}}
+            />,
+        );
+        expect(screen.getByText('22:00–24:00')).toBeVisible();
+        expect(screen.getByText('00:00–07:00 (continues)')).toBeVisible();
+        expect(screen.getByText('10:00–13:00')).toBeVisible();
+        expect(
+            screen.queryByRole('button', { name: 'Edit availability' }),
+        ).not.toBeInTheDocument();
+    });
+    it('shows all approved leave entries in the configured worker timezone', () => {
+        render(
+            <AvailabilityPane
+                canManage={false}
+                workerTimezone="Pacific/Honolulu"
+                staff={[
+                    {
+                        id: 71,
+                        name: 'Worker',
+                        email: 'worker@example.test',
+                        staff_availability: [],
+                    },
+                ]}
+                upcomingLeave={{
+                    71: Array.from({ length: 5 }, (_, i) => ({
+                        id: i + 1,
+                        leave_type: 'annual_leave',
+                        starts_at: `2026-10-${String(i + 6).padStart(2, '0')}T01:00:00Z`,
+                        ends_at: `2026-10-${String(i + 6).padStart(2, '0')}T02:00:00Z`,
+                        status: 'approved',
+                    })),
+                }}
+            />,
+        );
+        expect(
+            screen.getByText('5 Oct 2026–5 Oct 2026 · annual leave'),
+        ).toBeVisible();
+        expect(screen.getAllByText(/· annual leave/)).toHaveLength(5);
+        expect(screen.queryByText(/more$/)).not.toBeInTheDocument();
     });
 });

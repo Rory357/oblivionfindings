@@ -653,6 +653,9 @@ function buildIconNavItems({
     }
 
     const hasWorkforce =
+        !!can?.staff?.viewAny ||
+        !!can?.staff?.availabilityUpdateAny ||
+        !!can?.staff?.availabilityUpdateSelf ||
         canAccessShiftHandovers(can) ||
         !!can?.job_board?.viewAny ||
         !!can?.job_board?.claim ||
@@ -1276,10 +1279,16 @@ function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/operations/rostering',
             icon: CalendarDays,
         });
-    if (can?.rostering?.viewAny)
+    // Roster readers already reach this workspace through its Availability tab.
+    if (
+        !can?.rostering?.viewAny &&
+        (can?.staff?.viewAny ||
+            can?.staff?.availabilityUpdateAny ||
+            can?.staff?.availabilityUpdateSelf)
+    )
         workforce.push({
             title: 'Availability',
-            href: '/operations/rostering?tab=availability',
+            href: '/operations/availability',
             icon: Clock,
         });
     if (canAccessShiftHandovers(can))
@@ -3036,6 +3045,16 @@ export function buildNavSearchCatalog(ctx: {
     };
 
     for (const icon of iconNavItems) {
+        if (icon.id === 'workforce' && can?.rostering?.viewAny) {
+            push({
+                id: 'workforce:rostering:availability',
+                label: 'Availability',
+                href: '/operations/rostering?tab=availability',
+                section: icon.label,
+                group: 'Rostering',
+                icon: Clock,
+            });
+        }
         // Keep relocated Fleet pages discoverable in command search as well as
         // their workspace menus; consolidation only shortens the left rail.
         if (icon.id === 'fleet-assets') {

@@ -8,6 +8,46 @@ import {
 } from './app-sidebar';
 
 describe('app sidebar workforce navigation', () => {
+    it.each(['viewAny', 'availabilityUpdateSelf', 'availabilityUpdateAny'])(
+        'keeps %s discoverable without granting roster navigation',
+        (permission) => {
+            const catalog = buildNavSearchCatalog({
+                can: { staff: { [permission]: true } },
+            }).filter((item) => item.section === 'Workforce');
+            expect(catalog.map((item) => item.href)).toEqual([
+                '/operations/availability',
+            ]);
+        },
+    );
+
+    it.each([
+        {},
+        { viewAny: true },
+        { availabilityUpdateSelf: true },
+        { availabilityUpdateAny: true },
+    ])(
+        'uses the roster availability tab when roster access is present with staff grants %j',
+        (staff) => {
+            const catalog = buildNavSearchCatalog({
+                can: { rostering: { viewAny: true }, staff },
+            }).filter((item) => item.section === 'Workforce');
+            expect(
+                catalog.some((item) => item.href === '/operations/rostering'),
+            ).toBe(true);
+            expect(
+                catalog.some(
+                    (item) => item.href === '/operations/availability',
+                ),
+            ).toBe(false);
+            expect(
+                catalog.find((item) => item.label === 'Availability'),
+            ).toMatchObject({
+                href: '/operations/rostering?tab=availability',
+                group: 'Rostering',
+            });
+        },
+    );
+
     it('keeps IT destinations in the app sidebar without duplicating tabs or device navigation', () => {
         const catalog = buildNavSearchCatalog({
             can: { it: { view: true, request: true, manage: true } },
@@ -191,7 +231,7 @@ describe('app sidebar workforce navigation', () => {
                 expect.objectContaining({
                     label,
                     section: 'Workforce',
-                    group: 'Workforce',
+                    group: label === 'Availability' ? 'Rostering' : 'Workforce',
                 }),
             ),
         );
@@ -520,7 +560,13 @@ describe('finance sidebar highlighting', () => {
     });
 
     it('lights no finance hub outside the module', () => {
-        expect(HUBS.filter((href) => isSubItemActive('/governance/meetings', href))).toEqual([]);
-        expect(HUBS.filter((href) => isSubItemActive('/dashboard', href))).toEqual([]);
+        expect(
+            HUBS.filter((href) =>
+                isSubItemActive('/governance/meetings', href),
+            ),
+        ).toEqual([]);
+        expect(
+            HUBS.filter((href) => isSubItemActive('/dashboard', href)),
+        ).toEqual([]);
     });
 });

@@ -1,33 +1,47 @@
-import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+} from '@/components/page/page-header';
+import {
+    EditAvailabilityDialog,
+    continuingAvailability,
+} from '@/components/rostering/edit-availability-dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import {
+    Command,
+    CommandEmpty,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from '@/components/ui/command';
 import { Label } from '@/components/ui/label';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
-import { Calendar } from 'lucide-react';
+import { WORKER_TIMEZONE } from '@/lib/datetime';
+import { Head, router } from '@inertiajs/react';
+import { CalendarCheck, Plus } from 'lucide-react';
+import { useState } from 'react';
 
-import { PageHero } from '@/components/page';
+type Staff = { id: number; name: string; email: string };
 type Availability = {
     id: number;
     day_of_week: number;
     starts_at: string;
     ends_at: string;
+    ends_next_day?: boolean;
 };
-
 type Props = {
-    user: { id: number; name: string; email: string };
+    user: Staff;
     availability: Availability[];
     canManage: boolean;
+    workerTimezone?: string;
+    staffOptions?: Staff[];
 };
-
-const dayLabels = [
+const DAYS = [
     'Sunday',
     'Monday',
     'Tuesday',
@@ -36,180 +50,167 @@ const dayLabels = [
     'Friday',
     'Saturday',
 ];
-
 export default function StaffAvailability({
     user,
     availability,
     canManage,
+    workerTimezone = WORKER_TIMEZONE,
+    staffOptions = [],
 }: Props) {
-    const form = useForm({
-        day_of_week: '1',
-        starts_at: '09:00',
-        ends_at: '17:00',
-    });
-
-    const grouped = dayLabels.map((label, day) => ({
-        label,
-        day,
-        blocks: availability.filter((a) => a.day_of_week === day),
+    const [editing, setEditing] = useState(false);
+    const blocks = availability.map((block) => ({
+        ...block,
+        start_time: block.starts_at,
+        end_time: block.ends_at,
     }));
-
+    const [pickerOpen, setPickerOpen] = useState(false);
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Staff', href: '/staff' },
-                { title: user.name, href: `/staff/${user.id}` },
-                {
-                    title: 'Availability',
-                    href: `/staff/${user.id}/availability`,
-                },
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Availability', href: '/operations/availability' },
             ]}
         >
             <Head title={`Availability: ${user.name}`} />
-
-            <PageShell>
-                <PageHero
-                    icon={Calendar}
+            <div className="space-y-4">
+                <PageHeader
+                    icon={CalendarCheck}
                     title="Availability"
-                    description={`${user.name} • ${user.email}`}
-                    stats={[
-                        { label: 'Blocks', value: availability.length },
-                        {
-                            label: 'Days covered',
-                            value: new Set(
-                                availability.map((a) => a.day_of_week),
-                            ).size,
-                        },
-                    ]}
+                    subline={`${user.name} · Weekly working times · ${workerTimezone}`}
+                    actions={
+                        canManage ? (
+                            <PageHeaderGlassButton
+                                icon={Plus}
+                                onClick={() => setEditing(true)}
+                            >
+                                Edit weekly availability
+                            </PageHeaderGlassButton>
+                        ) : undefined
+                    }
                 />
-
-                <div className="flex items-center justify-end gap-2">
-                    <Link href={`/staff/${user.id}`}>
-                        <Button variant="outline">Back</Button>
-                    </Link>
-                </div>
-
-                {canManage ? (
-                    <form
-                        className="space-y-3 rounded-md border p-4"
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            form.post(`/staff/${user.id}/availability`, {
-                                preserveScroll: true,
-                            });
-                        }}
-                    >
-                        <div className="font-medium">
-                            Add availability block
-                        </div>
-                        <div className="grid gap-3 md:grid-cols-3">
-                            <div className="space-y-1">
-                                <Label>Day</Label>
-                                <Select
-                                    value={form.data.day_of_week}
-                                    onValueChange={(v) =>
-                                        form.setData('day_of_week', v)
-                                    }
+                {staffOptions.length > 1 && (
+                    <div className="max-w-md space-y-2">
+                        <Label>Staff member</Label>
+                        <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    className="w-full justify-start"
+                                    role="combobox"
+                                    aria-expanded={pickerOpen}
+                                    aria-label="Staff member"
                                 >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select day" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {dayLabels.map((d, idx) => (
-                                            <SelectItem
-                                                key={d}
-                                                value={String(idx)}
+                                    {user.name}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="p-0">
+                                <Command>
+                                    <CommandInput placeholder="Find a staff member" />
+                                    <CommandList>
+                                        <CommandEmpty>
+                                            No matching staff
+                                        </CommandEmpty>
+                                        {staffOptions.map((staff) => (
+                                            <CommandItem
+                                                key={staff.id}
+                                                value={`${staff.name} ${staff.id}`}
+                                                onSelect={() => {
+                                                    setPickerOpen(false);
+                                                    router.get(
+                                                        '/operations/availability',
+                                                        { staff_id: staff.id },
+                                                        {
+                                                            preserveScroll: true,
+                                                        },
+                                                    );
+                                                }}
                                             >
-                                                {d}
-                                            </SelectItem>
+                                                {staff.name}
+                                            </CommandItem>
                                         ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-1">
-                                <Label>Start</Label>
-                                <Input
-                                    type="time"
-                                    value={form.data.starts_at}
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'starts_at',
-                                            e.target.value,
-                                        )
-                                    }
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <Label>End</Label>
-                                <Input
-                                    type="time"
-                                    value={form.data.ends_at}
-                                    onChange={(e) =>
-                                        form.setData('ends_at', e.target.value)
-                                    }
-                                />
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button type="submit" disabled={form.processing}>
-                                Add
-                            </Button>
-                            {form.recentlySuccessful ? (
-                                <span className="text-xs text-muted-foreground">
-                                    Saved.
-                                </span>
-                            ) : null}
-                        </div>
-                    </form>
-                ) : null}
-
+                                    </CommandList>
+                                </Command>
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+                )}
+                <p className="text-subtle">
+                    Availability is a weekly preference. Approved leave, other
+                    duties and eligibility are checked separately. Overnight
+                    blocks show the day they end.
+                </p>
                 <div className="grid gap-4 md:grid-cols-2">
-                    {grouped.map((g) => (
-                        <div key={g.day} className="rounded-md border">
-                            <div className="p-4 font-medium">{g.label}</div>
-                            <div className="divide-y">
-                                {g.blocks.length ? (
-                                    g.blocks.map((b) => (
-                                        <div
-                                            key={b.id}
-                                            className="flex items-center justify-between gap-3 p-4"
+                    {[1, 2, 3, 4, 5, 6, 0].map((day) => (
+                        <section
+                            key={day}
+                            className="rounded-lg border bg-card"
+                        >
+                            <h2 className="text-section-title border-b p-4">
+                                {DAYS[day]}
+                            </h2>
+                            <div className="space-y-2 p-4">
+                                {continuingAvailability(blocks, day).map(
+                                    (block) => (
+                                        <p
+                                            key={`continued-${block.id}`}
+                                            className="text-subtle"
                                         >
-                                            <div className="text-sm">
-                                                {b.starts_at} – {b.ends_at}
-                                            </div>
-                                            {canManage ? (
-                                                <Button
-                                                    variant="destructive"
-                                                    onClick={() => {
-                                                        if (
-                                                            !confirm(
-                                                                'Remove this availability block?',
-                                                            )
-                                                        )
-                                                            return;
-                                                        form.delete(
-                                                            `/staff/${user.id}/availability/${b.id}`,
-                                                            {
-                                                                preserveScroll: true,
-                                                            },
-                                                        );
-                                                    }}
-                                                >
-                                                    Remove
-                                                </Button>
-                                            ) : null}
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="p-4 text-sm text-muted-foreground">
-                                        No availability blocks.
-                                    </div>
+                                            Continues from{' '}
+                                            {DAYS[block.day_of_week]} until{' '}
+                                            {block.end_time}
+                                        </p>
+                                    ),
+                                )}
+                                {availability.filter(
+                                    (block) => block.day_of_week === day,
+                                ).length ? (
+                                    availability
+                                        .filter(
+                                            (block) =>
+                                                block.day_of_week === day,
+                                        )
+                                        .map((block) => (
+                                            <p
+                                                key={block.id}
+                                                className="text-sm"
+                                            >
+                                                {block.starts_at}–
+                                                {block.ends_at}
+                                                {block.ends_next_day
+                                                    ? ` · ends ${DAYS[(day + 1) % 7]}`
+                                                    : ''}
+                                            </p>
+                                        ))
+                                ) : continuingAvailability(blocks, day)
+                                      .length ? null : (
+                                    <p className="text-subtle">
+                                        No times supplied
+                                    </p>
                                 )}
                             </div>
-                        </div>
+                        </section>
                     ))}
                 </div>
-            </PageShell>
+                {canManage && (
+                    <Button onClick={() => setEditing(true)}>
+                        Review or change availability
+                    </Button>
+                )}
+                <EditAvailabilityDialog
+                    key={user.id}
+                    open={editing}
+                    onOpenChange={setEditing}
+                    staff={user}
+                    canManage={canManage}
+                    blocks={availability.map((block) => ({
+                        ...block,
+                        start_time: block.starts_at,
+                        end_time: block.ends_at,
+                    }))}
+                    workerTimezone={workerTimezone}
+                    reloadKeys={['availability']}
+                />
+            </div>
         </AppLayout>
     );
 }

@@ -1,16 +1,13 @@
-import {
-    CalendarCheck,
-    Clock,
-    Plane,
-    Search,
-    User,
-} from 'lucide-react';
+import { WORKER_TIMEZONE } from '@/lib/datetime';
+import { rosterWallTime } from '@/lib/roster-time';
+import { CalendarCheck, Search, User } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { cn } from '@/lib/utils';
 
 import {
@@ -38,9 +35,11 @@ type Availability = {
     day_of_week: number;
     start_time: string;
     end_time: string;
+    ends_next_day?: boolean;
 };
 
 export type AvailabilityStaffMember = {
+    can_manage?: boolean;
     id: number;
     name: string;
     email: string;
@@ -53,16 +52,24 @@ export type AvailabilityPaneProps = {
     staff: AvailabilityStaffMember[];
     upcomingLeave: Record<number, AvailabilityLeaveRequest[]>;
     canManage: boolean;
+    workerTimezone?: string;
 };
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-function hashHue(name: string): number {
-    let h = 0;
-    for (let i = 0; i < name.length; i++) {
-        h = (h * 31 + name.charCodeAt(i)) % 360;
-    }
-    return h;
+function daySlots(availability: Availability[], day: number): string[] {
+    return availability.flatMap((slot) => {
+        if (slot.day_of_week === day)
+            return [
+                `${slot.start_time}–${slot.ends_next_day ? '24:00' : slot.end_time}`,
+            ];
+        if (
+            slot.ends_next_day &&
+            slot.end_time.slice(0, 5) > '00:00' &&
+            (slot.day_of_week + 1) % 7 === day
+        )
+            return [`00:00–${slot.end_time} (continues)`];
+        return [];
+    });
 }
 
 function initials(name: string): string {
@@ -79,11 +86,11 @@ export function AvailabilityPane({
     staff,
     upcomingLeave,
     canManage,
+    workerTimezone = WORKER_TIMEZONE,
 }: AvailabilityPaneProps) {
     const [search, setSearch] = useState('');
-    const [editing, setEditing] = useState<AvailabilityStaffMember | null>(
-        null,
-    );
+    const [editingId, setEditingId] = useState<number | null>(null);
+    const editing = staff.find((member) => member.id === editingId) ?? null;
     const searchTerm = search.trim().toLowerCase();
 
     const filtered = useMemo(
@@ -97,8 +104,10 @@ export function AvailabilityPane({
         [staff, searchTerm],
     );
 
-    // Highlight the current day in each staff member’s schedule.
-    const todayIdx = new Date().getDay();
+    // Highlight the current worker-zone day in each staff member’s schedule.
+    const todayIdx = new Date(
+        `${rosterWallTime(new Date(), workerTimezone).slice(0, 10)}T12:00:00Z`,
+    ).getUTCDay();
     const editingBlocks: EditAvailabilityBlock[] = useMemo(() => {
         if (!editing) return [];
         return (editing.staff_availability ?? []).map((slot) => ({
@@ -106,6 +115,7 @@ export function AvailabilityPane({
             day_of_week: slot.day_of_week,
             start_time: slot.start_time,
             end_time: slot.end_time,
+            ends_next_day: slot.ends_next_day,
         }));
     }, [editing]);
 
@@ -115,7 +125,7 @@ export function AvailabilityPane({
                 <div>
                     <h2
                         id="availability-heading"
-                        className="text-base font-bold tracking-tight"
+                        className="text-section-title"
                     >
                         Staff availability
                     </h2>
@@ -123,7 +133,10 @@ export function AvailabilityPane({
                         Weekly availability, planned time off, and approved
                         leave for roster decisions.
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground" role="status">
+                    <p
+                        className="mt-1 text-xs text-muted-foreground"
+                        role="status"
+                    >
                         {filtered.length} of {staff.length} staff shown
                     </p>
                 </div>
@@ -135,7 +148,7 @@ export function AvailabilityPane({
                         placeholder="Search staff..."
                         value={search}
                         onChange={(event) => setSearch(event.target.value)}
-                        className="h-9 pl-9 text-sm"
+                        className="frontline-tap pl-9 text-sm"
                     />
                 </div>
             </div>
@@ -150,15 +163,16 @@ export function AvailabilityPane({
                     </CardContent>
                 </Card>
             ) : (
-                <div className="grid [grid-template-columns:repeat(auto-fill,minmax(320px,1fr))] gap-3">
+                <div className="grid [grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr))] gap-3">
                     {filtered.map((member) => (
                         <AvailabilityCard
                             key={member.id}
                             member={member}
                             upcomingLeave={upcomingLeave[member.id] ?? []}
-                            canManage={canManage}
+                            canManage={member.can_manage ?? canManage}
                             todayIdx={todayIdx}
-                            onEdit={() => setEditing(member)}
+                            workerTimezone={workerTimezone}
+                            onEdit={() => setEditingId(member.id)}
                         />
                     ))}
                 </div>
@@ -167,7 +181,7 @@ export function AvailabilityPane({
             <EditAvailabilityDialog
                 open={Boolean(editing)}
                 onOpenChange={(open) => {
-                    if (!open) setEditing(null);
+                    if (!open) setEditingId(null);
                 }}
                 staff={
                     editing
@@ -179,7 +193,9 @@ export function AvailabilityPane({
                           }
                         : null
                 }
+                canManage={editing?.can_manage ?? canManage}
                 blocks={editingBlocks}
+                workerTimezone={workerTimezone}
             />
         </section>
     );
@@ -191,261 +207,177 @@ function AvailabilityCard({
     canManage,
     todayIdx,
     onEdit,
+    workerTimezone,
 }: {
     member: AvailabilityStaffMember;
     upcomingLeave: AvailabilityLeaveRequest[];
     canManage: boolean;
     todayIdx: number;
     onEdit: () => void;
+    workerTimezone: string;
 }) {
     const availability = member.staff_availability ?? [];
     const timeOff = member.staff_time_off ?? [];
-    const hue = hashHue(member.name);
-    const inits = initials(member.name);
-
-    const daysCovered = new Set(availability.map((a) => a.day_of_week)).size;
-    const totalBlocks = availability.length;
-    const hasAnyData =
-        availability.length > 0 ||
-        timeOff.length > 0 ||
-        upcomingLeave.length > 0;
-
-    const declaredToday = availability.some(
-        (slot) => slot.day_of_week === todayIdx,
-    );
-    const now = new Date().toISOString();
+    const daysCovered = DAY_NAMES.filter(
+        (_, index) => daySlots(availability, index).length > 0,
+    ).length;
+    const declaredToday = daySlots(availability, todayIdx).length > 0;
+    const now = Date.now();
     const currentlyOnLeave = upcomingLeave.some(
-        (leave) => leave.starts_at <= now && leave.ends_at >= now,
+        (leave) =>
+            Date.parse(leave.starts_at) <= now &&
+            Date.parse(leave.ends_at) > now,
     );
-
-    const statusBadge: { label: string; classes: string } = currentlyOnLeave
-        ? {
-              label: 'On leave',
-              classes: 'bg-status-warning-bg text-status-warning',
-          }
+    const status: { label: string; variant: StatusVariant } = currentlyOnLeave
+        ? { label: 'On leave', variant: 'warning' }
         : declaredToday
-          ? {
-                label: 'Available today',
-                classes: 'bg-status-success-bg text-status-success',
-            }
+          ? { label: 'Times supplied today', variant: 'info' }
           : daysCovered > 0
-            ? {
-                  label: `${daysCovered}/7 days set`,
-                  classes: 'bg-accent text-[var(--brand-deep,var(--primary))]',
-              }
-            : {
-                  label: 'No data',
-                  classes:
-                      'bg-muted text-muted-foreground border border-dashed border-border',
-              };
-
+            ? { label: `${daysCovered}/7 days set`, variant: 'neutral' }
+            : { label: 'No times supplied', variant: 'neutral' };
     return (
-        <article className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:-translate-y-px hover:shadow-md">
+        <article className="flex min-w-0 flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm">
             <header className="flex items-start gap-3">
                 <div
-                    className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-[12px] font-bold text-white"
-                    style={{
-                        background: `linear-gradient(135deg, hsl(${hue} 70% 55%), hsl(${(hue + 40) % 360} 70% 45%))`,
-                    }}
+                    className="grid size-10 shrink-0 place-items-center rounded-full bg-category-hr-bg text-sm font-semibold text-category-hr"
                     aria-hidden="true"
                 >
-                    {inits}
+                    {initials(member.name)}
                 </div>
                 <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                        <h3 className="m-0 truncate text-sm leading-tight font-bold">
-                            {member.name}
-                        </h3>
-                        <span
-                            className={cn(
-                                'inline-flex shrink-0 items-center rounded-full px-2 py-[2px] text-[10.5px] font-bold tracking-wide uppercase',
-                                statusBadge.classes,
-                            )}
-                        >
-                            {statusBadge.label}
-                        </span>
-                    </div>
-                    <p className="truncate text-xs text-muted-foreground">
-                        {member.email}
-                    </p>
-                    {member.role ? (
-                        <Badge
-                            variant="outline"
-                            className="mt-1 text-[10px] capitalize"
-                        >
+                    <h3 className="text-sm font-semibold break-words">
+                        {member.name}
+                    </h3>
+                    <p className="text-caption break-words">{member.email}</p>
+                    {member.role && (
+                        <Badge variant="outline" className="mt-1 capitalize">
                             {member.role.replace(/_/g, ' ')}
                         </Badge>
-                    ) : null}
+                    )}
                 </div>
             </header>
-
             <div>
-                <p className="mb-1.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
-                    Weekly availability
+                <StatusBadge variant={status.variant}>
+                    {status.label}
+                </StatusBadge>
+            </div>
+            <div>
+                <p className="text-caption mb-2">
+                    Weekly availability · {availability.length}{' '}
+                    {availability.length === 1 ? 'block' : 'blocks'}
                 </p>
-                <div className="grid grid-cols-7 gap-1">
-                    {DAY_NAMES.map((day, idx) => {
-                        const slot = availability.find(
-                            (item) => item.day_of_week === idx,
-                        );
-                        const isAvailable = Boolean(slot);
-                        const isToday = idx === todayIdx;
-
+                <dl className="divide-y rounded-lg border">
+                    {[1, 2, 3, 4, 5, 6, 0].map((index) => {
+                        const slots = daySlots(availability, index);
                         return (
                             <div
-                                key={day}
-                                title={
-                                    slot
-                                        ? `${day}: ${slot.start_time}–${slot.end_time}`
-                                        : `${day}: not declared`
-                                }
+                                key={index}
                                 className={cn(
-                                    'flex flex-col items-center justify-center rounded-md border py-1.5 text-[10px] font-semibold',
-                                    isAvailable
-                                        ? 'border-status-success/30 bg-status-success-bg text-status-success'
-                                        : 'border-dashed border-border bg-muted/40 text-muted-foreground/60',
-                                    isToday &&
-                                        'ring-2 ring-primary/40 ring-offset-1 ring-offset-card',
+                                    'grid grid-cols-[3rem_1fr] gap-2 px-3 py-2 text-sm',
+                                    index === todayIdx && 'bg-accent',
                                 )}
                             >
-                                <span className="leading-none">{day}</span>
-                                {isAvailable && slot ? (
-                                    <span className="mt-0.5 text-[9px] font-bold tabular-nums">
-                                        {slot.start_time}
-                                    </span>
-                                ) : (
-                                    <span className="mt-0.5 text-[9px] leading-none">
-                                        —
-                                    </span>
-                                )}
+                                <dt className="font-medium">
+                                    {DAY_NAMES[index]}
+                                    {index === todayIdx && (
+                                        <span className="sr-only">
+                                            {' '}
+                                            (today)
+                                        </span>
+                                    )}
+                                </dt>
+                                <dd className="min-w-0 space-y-1">
+                                    {slots.length ? (
+                                        slots.map((slot, slotIndex) => (
+                                            <p
+                                                key={slotIndex}
+                                                className="tabular-nums"
+                                            >
+                                                {slot}
+                                            </p>
+                                        ))
+                                    ) : (
+                                        <span className="text-muted-foreground">
+                                            No times supplied
+                                        </span>
+                                    )}
+                                </dd>
                             </div>
                         );
                     })}
-                </div>
+                </dl>
             </div>
-
-            <dl className="m-0 grid grid-cols-3 gap-2 border-y border-dashed border-border py-2.5">
-                <Stat
-                    icon={<CalendarCheck className="h-3 w-3" />}
-                    label="Blocks"
-                    value={totalBlocks}
-                />
-                <Stat
-                    icon={<Clock className="h-3 w-3" />}
-                    label="Time off"
-                    value={timeOff.length}
-                    tone={timeOff.length > 0 ? 'warn' : 'default'}
-                />
-                <Stat
-                    icon={<Plane className="h-3 w-3" />}
-                    label="Leave"
-                    value={upcomingLeave.length}
-                    tone={upcomingLeave.length > 0 ? 'info' : 'default'}
-                />
-            </dl>
-
-            {(timeOff.length > 0 || upcomingLeave.length > 0) && (
-                <div className="flex flex-wrap gap-1.5">
-                    {timeOff.slice(0, 2).map((off) => (
-                        <span
-                            key={`off-${off.id}`}
-                            className="inline-flex items-center gap-1 rounded-md bg-status-warning-bg px-2 py-0.5 text-[10.5px] font-semibold text-status-warning"
-                            title={off.reason}
-                        >
-                            <Clock className="h-2.5 w-2.5" />
-                            {formatRange(off.starts_at, off.ends_at)}
-                        </span>
+            {timeOff.length > 0 && (
+                <section
+                    className="space-y-2"
+                    aria-label={`Planned time off for ${member.name}`}
+                >
+                    <h4 className="text-sm font-medium">Planned time off</h4>
+                    {timeOff.map((off) => (
+                        <p key={off.id} className="text-caption">
+                            {formatRange(
+                                off.starts_at,
+                                off.ends_at,
+                                workerTimezone,
+                            )}
+                            {off.reason ? ` · ${off.reason}` : ''}
+                        </p>
                     ))}
-                    {upcomingLeave.slice(0, 2).map((leave) => (
-                        <span
-                            key={`leave-${leave.id}`}
-                            className="inline-flex items-center gap-1 rounded-md bg-status-info-bg px-2 py-0.5 text-[10.5px] font-semibold text-status-info"
-                            title={formatLeaveType(leave.leave_type)}
-                        >
-                            <Plane className="h-2.5 w-2.5" />
-                            {formatRange(leave.starts_at, leave.ends_at)}
-                        </span>
-                    ))}
-                    {timeOff.length + upcomingLeave.length > 4 && (
-                        <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[10.5px] font-semibold text-muted-foreground">
-                            +{timeOff.length + upcomingLeave.length - 4} more
-                        </span>
-                    )}
-                </div>
+                </section>
             )}
-
-            {!hasAnyData ? (
-                <p className="text-xs text-muted-foreground/70 italic">
-                    No availability data configured.
-                </p>
-            ) : null}
-
-            {canManage ? (
-                <footer className="mt-auto flex items-center justify-end">
+            {upcomingLeave.length > 0 && (
+                <section
+                    className="space-y-2"
+                    aria-label={`Approved leave for ${member.name}`}
+                >
+                    <h4 className="text-sm font-medium">Approved leave</h4>
+                    {upcomingLeave.map((leave) => (
+                        <p key={leave.id} className="text-caption">
+                            {formatRange(
+                                leave.starts_at,
+                                leave.ends_at,
+                                workerTimezone,
+                            )}{' '}
+                            · {leave.leave_type?.replace(/_/g, ' ') || 'Leave'}
+                        </p>
+                    ))}
+                </section>
+            )}
+            {canManage && (
+                <footer className="mt-auto flex justify-end">
                     <Button
                         type="button"
                         size="sm"
                         variant="outline"
-                        className="h-8 text-xs"
+                        className="frontline-hit"
                         onClick={onEdit}
                     >
-                        <CalendarCheck className="h-3.5 w-3.5" />
+                        <CalendarCheck className="size-4" />
                         Edit availability
                     </Button>
                 </footer>
-            ) : null}
+            )}
         </article>
     );
 }
 
-function Stat({
-    icon,
-    label,
-    value,
-    tone = 'default',
-}: {
-    icon: React.ReactNode;
-    label: string;
-    value: number;
-    tone?: 'default' | 'warn' | 'info';
-}) {
-    const valueTone =
-        tone === 'warn'
-            ? 'text-status-warning'
-            : tone === 'info'
-              ? 'text-status-info'
-              : 'text-foreground';
-    return (
-        <div className="min-w-0">
-            <dt className="inline-flex items-center gap-1 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
-                {icon}
-                {label}
-            </dt>
-            <dd
-                className={cn(
-                    'm-0 mt-0.5 text-sm font-bold tabular-nums',
-                    valueTone,
-                )}
-            >
-                {value}
-            </dd>
-        </div>
-    );
-}
-
-function formatRange(startsAt: string, endsAt: string): string {
-    return `${formatDate(startsAt)}–${formatDate(endsAt)}`;
-}
-
-function formatDate(value: string): string {
-    return new Date(value).toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-    });
-}
-
-function formatLeaveType(value: string): string {
-    return value?.replace(/_/g, ' ') ?? 'Leave';
+function formatRange(
+    startsAt: string,
+    endsAt: string,
+    timeZone: string,
+): string {
+    const format = (value: string) => {
+        const instant = new Date(value);
+        return Number.isFinite(instant.getTime())
+            ? new Intl.DateTimeFormat('en-NZ', {
+                  timeZone,
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+              }).format(instant)
+            : 'Date unavailable';
+    };
+    return `${format(startsAt)}–${format(endsAt)}`;
 }
 
 export default AvailabilityPane;
