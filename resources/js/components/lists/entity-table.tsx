@@ -70,6 +70,8 @@ export interface EntityTableProps<T> {
     identity: (row: T) => EntityTableIdentity;
     identityLabel?: string;
     identityWidth?: string;
+    /** Keep complete clinical/product identities visible without hover. */
+    wrapIdentity?: boolean;
     columns: EntityTableColumn<T>[];
     /** The one MenuItem[] feeding kebab AND context menu. */
     actionsFor: (row: T) => MenuItem[];
@@ -114,6 +116,7 @@ export function EntityTable<T>({
     identity,
     identityLabel = 'Name',
     identityWidth = '1.9fr',
+    wrapIdentity = false,
     columns,
     actionsFor,
     onOpen,
@@ -274,19 +277,38 @@ export function EntityTable<T>({
                                                     onClick={(event) =>
                                                         event.stopPropagation()
                                                     }
-                                                    className="truncate text-[13px] font-semibold text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                                                    className={cn(
+                                                        'text-[13px] font-semibold text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring',
+                                                        wrapIdentity
+                                                            ? 'break-words whitespace-normal'
+                                                            : 'truncate',
+                                                    )}
                                                 >
                                                     {id.name}
                                                 </Link>
                                             ) : (
-                                                <span className="truncate text-[13px] font-semibold text-foreground">
+                                                <span
+                                                    className={cn(
+                                                        'text-[13px] font-semibold text-foreground',
+                                                        wrapIdentity
+                                                            ? 'break-words whitespace-normal'
+                                                            : 'truncate',
+                                                    )}
+                                                >
                                                     {id.name}
                                                 </span>
                                             )}
                                             {id.extra}
                                         </span>
                                         {id.subline ? (
-                                            <span className="block truncate text-[11.5px] text-muted-foreground">
+                                            <span
+                                                className={cn(
+                                                    'block text-[11.5px] text-muted-foreground',
+                                                    wrapIdentity
+                                                        ? 'break-words whitespace-normal'
+                                                        : 'truncate',
+                                                )}
+                                            >
                                                 {id.subline}
                                             </span>
                                         ) : null}

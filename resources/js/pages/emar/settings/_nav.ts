@@ -26,6 +26,7 @@ export const SET_VIEWS: Record<
     ViewKey,
     { label: string; secs: [string, string][] }
 > = {
+    connections: {label:'Connected services',secs:[['overview','Overview']]},
     rules: {
         label: 'Medication rules',
         secs: [

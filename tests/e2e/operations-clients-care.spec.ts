@@ -113,9 +113,15 @@ test.describe('canonical client profile care readiness', () => {
         await expect(
             page.getByText('PW Meds Morning Tablets', { exact: true }).first(),
         ).toBeVisible();
-        await expect(
-            page.getByRole('link', { name: 'Open medication record' }).first(),
-        ).toBeVisible();
+        const chartLink = page.getByRole('link', {
+            name: 'Open MAR chart',
+            exact: true,
+        });
+        await expect(chartLink).toBeVisible();
+        await expect(chartLink).toHaveAttribute(
+            'href',
+            `/emar/mar?client_id=${profileUrl.pathname.split('/').at(-1)}`,
+        );
 
         expectNoUnexpectedConsoleErrors(consoleErrors);
     });

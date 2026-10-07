@@ -76,6 +76,11 @@ if (\\App\\Models\\Client::withTrashed()->whereIn('id', $ids)->exists()) {
 }
 
 test.describe('operations client profile phase 1', () => {
+    // These journeys include fixture bootstraps, full profile navigations and
+    // persisted writes. Allow the complete flow to finish before afterEach
+    // deletes its records; individual assertion limits remain unchanged.
+    test.describe.configure({ timeout: 90_000 });
+
     test.afterEach(() => {
         cleanupClientProfilePhaseOneFixtures();
     });
@@ -275,9 +280,6 @@ echo json_encode([
     test('resumes, saves and discards an author-owned daily note draft in profile', async ({
         page,
     }) => {
-        // The complete lifecycle includes two persisted writes and redirects;
-        // keep per-assertion limits while allowing both operations to finish.
-        test.setTimeout(60_000);
         const { clientId } = seedClientProfilePhaseOneFixture();
         runLaravelPhp(`
 $client = \\App\\Models\\Client::query()->findOrFail(${clientId});

@@ -25,7 +25,7 @@ it('keeps PHP and browser CI in bounded crash safe shards', function () {
     $phpJob = $tests['jobs']['ci'] ?? [];
     $phpSteps = collect($phpJob['steps'] ?? []);
     $shards = $phpSteps->firstWhere('name', 'Crash-safe tests (${{ matrix.suite }} ${{ matrix.shard_index }}/${{ matrix.shard_count }})');
-    $release = $phpSteps->firstWhere('name', 'Pack stock and historical recovery release gates');
+    $release = $phpSteps->firstWhere('name', 'Medication and connected-care release gates');
     $expectedMatrix = [
         ['suite' => 'foundation', 'shard_index' => 0, 'shard_count' => 1, 'batch_size' => 30],
         ['suite' => 'emar-release', 'shard_index' => 0, 'shard_count' => 1, 'batch_size' => 1],
@@ -43,6 +43,8 @@ it('keeps PHP and browser CI in bounded crash safe shards', function () {
         ->and($release['run'] ?? '')->toStartWith('php vendor/bin/pest ')
         ->toContain('tests/Feature/Emar/PackLedgerIntegrationTest.php')
         ->toContain('tests/Feature/Emar/MedicationHistoricalRecoveryTest.php')
+        ->toContain('tests/Feature/Emar/ConnectedMedicationPermissionSeedingTest.php')
+        ->toContain('tests/Feature/Auth/EmailVerificationTest.php')
         ->toContain('--log-junit storage/logs/emar-release-gates.xml')
         ->and((string) $phpunit->xpath('/phpunit/php/ini[@name="memory_limit"]')[0]['value'])->toBe('1024M');
 

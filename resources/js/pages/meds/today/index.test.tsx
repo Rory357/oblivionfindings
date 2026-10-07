@@ -1024,3 +1024,35 @@ describe('Meds today (P01 C3)', () => {
         ).toHaveTextContent(`reoffer|follow-up|scheduled|13|${NZ('08:00')}|`);
     });
 });
+
+describe('visible MAR entry point', () => {
+    beforeEach(() =>
+        window.history.replaceState(null, '', '/meds/today?site_id=5'),
+    );
+    it('opens the selected person’s chart with the same NZ date and house', () => {
+        render(<MedsToday {...props()} selected_client_id={1} />);
+        const link = screen.getByRole('link', { name: 'Open MAR chart' });
+        const url = new URL(link.getAttribute('href')!, window.location.origin);
+        expect(url.pathname).toBe('/emar/mar');
+        expect(Object.fromEntries(url.searchParams)).toEqual({
+            date: '2026-04-30',
+            client_id: '1',
+            site_id: '5',
+        });
+    });
+    it('hides the shortcut when the worker has no MAR access', () => {
+        const data = props();
+        render(
+            <MedsToday
+                {...data}
+                board_can={{ ...data.board_can, view_emar: false }}
+            />,
+        );
+        expect(
+            screen.queryByRole('link', { name: 'MAR charts' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('link', { name: 'Open MAR chart' }),
+        ).not.toBeInTheDocument();
+    });
+});

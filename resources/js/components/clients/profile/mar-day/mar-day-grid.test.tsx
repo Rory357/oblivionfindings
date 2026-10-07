@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { cellKind, cellLabel, recordBlock } from './dose-cell';
-import { MarDayGrid, MarDayLegend, nowColumn } from './mar-day-grid';
+import { MarDayGrid, MarDayLegend } from './mar-day-grid';
 import type { DayDose, DayMedicine, MedicationDay } from './types';
 
 vi.mock('@inertiajs/react', () => ({ router: { visit: vi.fn() } }));
@@ -172,11 +172,6 @@ describe('dose cells', () => {
             recordBlock(due, kind, day({ date: '2026-06-14' }), 'Aroha'),
         ).toBe('Only today’s doses are recorded here.');
     });
-
-    it('places "now" after the last dose time already passed', () => {
-        expect(nowColumn(['08:00', '13:00', '20:00'], '14:30')).toBe(1);
-        expect(nowColumn(['08:00', '13:00'], '07:00')).toBe(-1);
-    });
 });
 
 describe('MarDayGrid', () => {
@@ -211,7 +206,7 @@ describe('MarDayGrid', () => {
         );
         expect(onRecord).toHaveBeenCalledTimes(1);
 
-        expect(screen.getByText('Now 2:30 pm')).toBeTruthy();
+        expect(screen.queryByText('Now 2:30 pm')).not.toBeInTheDocument();
     });
 
     it('moves focus through the grid with the arrow keys', () => {
@@ -243,5 +238,51 @@ describe('MarDayGrid', () => {
         expect(screen.getByText('Overdue')).toBeTruthy();
         expect(screen.getByText('Given')).toBeTruthy();
         expect(screen.getByText('Waiting for the order check')).toBeTruthy();
+    });
+});
+
+// Clinical times must keep their NZ meaning, even when transport uses UTC.
+describe('chart clarity', () => {
+    it('shows the dose-window end in NZ time and exposes medicine details directly', () => {
+        const details = vi.fn();
+        render(
+            <MarDayGrid
+                day={day({
+                    medicines: [
+                        medicine('Iron', {
+                            '13:00': [
+                                dose('13:00', { status: 'due', state: 'due' }),
+                            ],
+                        }),
+                    ],
+                })}
+                personName="Aroha"
+                onRecord={vi.fn()}
+                onOpenDose={vi.fn()}
+                onMedicineDetails={details}
+            />,
+        );
+        expect(screen.getByText('until 2:00 pm')).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Medicine details for Iron' }),
+        );
+        expect(details).toHaveBeenCalledWith(
+            expect.objectContaining({ name: 'Iron' }),
+        );
+    });
+    it('does not label a future dose as now when all doses are later', () => {
+        render(
+            <MarDayGrid
+                day={day({ now: '2026-06-15T07:00:00+12:00' })}
+                personName="Aroha"
+                onRecord={vi.fn()}
+                onOpenDose={vi.fn()}
+                onMedicineDetails={vi.fn()}
+            />,
+        );
+        expect(
+            screen.getByRole('columnheader', { name: '8:00 am' }),
+        ).toHaveTextContent('8:00 am');
+        expect(screen.queryByText(/Now 7:00/)).not.toBeInTheDocument();
     });
 });

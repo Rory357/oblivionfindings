@@ -8,7 +8,7 @@
  * `loosens()` reads the same ranking the server uses (P11 v5 AUDIT §5: one
  * rule for the destructive confirm, the history label and put-back). */
 
-export type ViewKey = 'rules' | 'rounds' | 'staff' | 'alerts' | 'history';
+export type ViewKey = 'rules' | 'rounds' | 'staff' | 'alerts' | 'history' | 'connections';
 
 export type SettingDefinition = {
     group: string;
@@ -463,6 +463,7 @@ export const channelWords = (channels: string[]) => {
 };
 
 export const VIEW_LABEL: Record<ViewKey, string> = {
+    connections: 'Connected services',
     rules: 'Medication rules',
     rounds: 'Rounds & timing',
     staff: 'Staff & PINs',

@@ -407,10 +407,19 @@ function LoadingOrMissing({
     onClose: () => void;
     onRetry: () => void;
 }) {
+    const closing = useRef(false);
+    const close = () => {
+        closing.current = true;
+        onClose();
+    };
     return (
-        <Dialog open onOpenChange={(o) => !o && onClose()}>
+        <Dialog open onOpenChange={(o) => !o && close()}>
             <DialogContent
-                className="frontline-dialog flex max-h-[88vh] flex-col overflow-hidden p-0"
+                onCloseAutoFocus={(event) => {
+                    // Loading hands focus to the real recording dialog.
+                    if (!closing.current) event.preventDefault();
+                }}
+                className="flex max-h-[88vh] flex-col overflow-hidden p-0"
                 style={{
                     width: 'min(92vw, 480px)',
                     maxWidth: 'min(92vw, 480px)',
@@ -443,11 +452,7 @@ function LoadingOrMissing({
                     ) : null}
                 </div>
                 <DialogFooter className="shrink-0 border-t bg-muted/30 p-4">
-                    <Button
-                        className="frontline-tap"
-                        variant="outline"
-                        onClick={onClose}
-                    >
+                    <Button variant="outline" onClick={close}>
                         Close
                     </Button>
                 </DialogFooter>
@@ -1381,7 +1386,7 @@ function RecordDoseForm({
         if (!block) return null;
         if (block.copy.action === 'clock-in') {
             return (
-                <Button asChild variant="outline" className="frontline-tap">
+                <Button asChild variant="outline">
                     <a href="/attendance">
                         <LogIn className="size-4" /> Clock in
                     </a>
@@ -1390,19 +1395,14 @@ function RecordDoseForm({
         }
         if (block.copy.action === 'eligibility' && onEligibility) {
             return (
-                <Button
-                    type="button"
-                    variant="outline"
-                    className="frontline-tap"
-                    onClick={onEligibility}
-                >
+                <Button type="button" variant="outline" onClick={onEligibility}>
                     <UserCheck className="size-4" /> View my eligibility
                 </Button>
             );
         }
         if (block.copy.action === 'message-lead' && req.house_lead) {
             return (
-                <Button asChild variant="outline" className="frontline-tap">
+                <Button asChild variant="outline">
                     <a href="/operations/messages">
                         <MessageSquare className="size-4" /> Message{' '}
                         {req.house_lead.name}
@@ -1569,7 +1569,6 @@ function RecordDoseForm({
                     <span className="text-status-critical">*</span>
                 </Label>
                 <TilePicker
-                    frontline
                     labelledBy="rd-oc-l"
                     describedBy={errors.outcome ? 'rd-oc-e' : undefined}
                     invalid={!!errors.outcome}
@@ -1701,7 +1700,6 @@ function RecordDoseForm({
                                 <span className="text-status-critical">*</span>
                             </Label>
                             <TilePicker
-                                frontline
                                 labelledBy="rd-prn-l"
                                 invalid={!!errors.prnReason}
                                 value={f.prnReason}
@@ -2010,11 +2008,7 @@ function RecordDoseForm({
                     live="alert"
                     title="Not confirmed — check before trying again"
                     actions={
-                        <Button
-                            asChild
-                            variant="outline"
-                            className="frontline-tap"
-                        >
+                        <Button asChild variant="outline">
                             <a href={`/emar/mar?client_id=${req.person.id}`}>
                                 <Search className="size-4" /> Check the chart
                             </a>
@@ -2237,7 +2231,6 @@ function RecordDoseForm({
           !lockedForward &&
           phase !== 'sending' ? (
             <Button
-                className="frontline-tap"
                 type="button"
                 variant="ghost"
                 onClick={() => setF((x) => ({ ...x, step: x.step - 1 }))}
@@ -2246,7 +2239,6 @@ function RecordDoseForm({
             </Button>
         ) : (
             <Button
-                className="frontline-tap"
                 type="button"
                 variant="outline"
                 onClick={requestClose}
@@ -2266,18 +2258,12 @@ function RecordDoseForm({
             phase !== 'sending' &&
             phase !== 'duplicate' &&
             !lockedForward ? (
-                <Button
-                    className="frontline-tap"
-                    type="button"
-                    variant="outline"
-                    onClick={requestClose}
-                >
+                <Button type="button" variant="outline" onClick={requestClose}>
                     Cancel
                 </Button>
             ) : null}
             {f.step < 2 ? (
                 <Button
-                    className="frontline-tap"
                     type="button"
                     onClick={next}
                     disabled={!!blockedContinue}
@@ -2286,16 +2272,11 @@ function RecordDoseForm({
                     Continue <ChevronRight className="size-4" />
                 </Button>
             ) : phase === 'duplicate' ? (
-                <Button
-                    className="frontline-tap"
-                    type="button"
-                    onClick={onClose}
-                >
+                <Button type="button" onClick={onClose}>
                     Close
                 </Button>
             ) : (
                 <Button
-                    className="frontline-tap"
                     type="button"
                     onClick={() => void save()}
                     disabled={phase === 'sending'}
@@ -2347,7 +2328,6 @@ function RecordDoseForm({
                     <>
                         {onNext && nextLabel ? (
                             <Button
-                                className="frontline-tap"
                                 type="button"
                                 variant="outline"
                                 onClick={onNext}
@@ -2355,12 +2335,7 @@ function RecordDoseForm({
                                 {nextLabel} <ChevronRight className="size-4" />
                             </Button>
                         ) : null}
-                        <Button
-                            className="frontline-tap"
-                            type="button"
-                            onClick={onClose}
-                            autoFocus
-                        >
+                        <Button type="button" onClick={onClose} autoFocus>
                             Done
                         </Button>
                     </>
@@ -2384,7 +2359,6 @@ function RecordDoseForm({
     return (
         <>
             <WizardShell
-                frontline
                 open
                 onClose={requestClose}
                 onCloseAutoFocus={(e) => {
@@ -2449,7 +2423,6 @@ function RecordDoseForm({
                 </WizardStepPane>
             </WizardShell>
             <ConfirmDialog
-                frontline
                 open={discard}
                 onClose={() => setDiscard(false)}
                 onConfirm={() => {

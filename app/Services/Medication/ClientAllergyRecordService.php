@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\ClientMedicalProfile;
 use App\Models\MedicationAllergy;
 use App\Models\User;
+use App\Services\CurrentAuthorizationReads;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -36,14 +37,12 @@ class ClientAllergyRecordService
      *
      * @return list<array{allergen: string, severity: ?string, reaction: ?string, source: string, allergy: MedicationAllergy}>
      */
-    public function forClient(Client $client): array
+    public function forClient(Client $client, ?CurrentAuthorizationReads $reads = null): array
     {
-        $register = MedicationAllergy::query()
-            ->where('client_id', $client->id)
-            ->get();
-        $profile = ClientMedicalProfile::query()
-            ->where('client_id', $client->id)
-            ->first();
+        $registerQuery = MedicationAllergy::query()->where('client_id', $client->id)->orderBy('id');
+        $profileQuery = ClientMedicalProfile::query()->where('client_id', $client->id);
+        $register = ($reads ? $reads->query($registerQuery) : $registerQuery)->get();
+        $profile = ($reads ? $reads->query($profileQuery) : $profileQuery)->first();
 
         return $this->combine($client->id, $register, $profile);
     }

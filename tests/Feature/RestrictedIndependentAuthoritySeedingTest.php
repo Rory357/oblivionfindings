@@ -20,9 +20,14 @@ test('revoke migration removes restricted independent authority from an already-
     $this->seed(RbacSeeder::class);
     $restricted = RbacSeeder::RESTRICTED_INDEPENDENT_AUTHORITY;
     // The historical migration revokes only the keys that existed on 24 Sep.
-    // Telemetry history and controlled management were introduced later with
-    // no implicit admin grant; do not manufacture them as historical grants.
-    $laterKeys = ['assets.telemetry.history', 'medications.controlled.manage'];
+    // These capabilities were introduced later without an implicit admin grant;
+    // do not manufacture them as grants covered by the 24 Sep migration.
+    $laterKeys = [
+        'assets.telemetry.history', 'medications.controlled.manage',
+        'medications.pharmacy.connect.manage', 'medications.pharmacy.send',
+        'medications.external.manage', 'medications.transfers.manage',
+        'medications.catalogue.manage', 'medications.backups.manage',
+    ];
     $leftBehind = array_values(array_diff($restricted, $laterKeys));
     expect(Permission::query()->whereIn('key', $laterKeys)->count())->toBe(count($laterKeys))
         ->and(array_values(array_intersect($restricted, restrictedAuthorityRoleKeys('admin'))))->toBe([])

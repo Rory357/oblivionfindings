@@ -1,3 +1,7 @@
+import {
+    ConnectedEntryPoints,
+    useConnectedAccess,
+} from './connected/_entry-points';
 import { ErrorTriageSettings } from './settings/_error-triage';
 /* Medication › Settings (eMAR P11 v5). The Fleet Settings workspace pattern:
  * one PageHeader page with a rail of views, Sections (TierTwoTabs) inside each
@@ -166,6 +170,7 @@ type Props = {
 };
 
 const VIEW_ICON: Record<ViewKey, LucideIcon> = {
+    connections: Layers,
     rules: Pill,
     rounds: Repeat,
     staff: UserCheck,
@@ -289,6 +294,14 @@ export default function EmarSettings(props: Props) {
             props.onCall?.houses,
         ],
     );
+    const connectedAccess = useConnectedAccess();
+    const hasConnections = Boolean(
+        connectedAccess.pharmacyConnectManage ||
+        connectedAccess.externalManage ||
+        connectedAccess.transfersManage ||
+        connectedAccess.catalogueManage ||
+        connectedAccess.backupsManage,
+    );
     // P11 F1 + Q2: people who manage or read a house's round templates
     // reach them here without other Settings access.
     const templatesOnly = !settingsAccess && props.templateAccess.read;
@@ -330,10 +343,12 @@ export default function EmarSettings(props: Props) {
                       'log',
                   ]
                 : [],
+            connections: hasConnections ? ['overview'] : [],
             history: settingsAccess ? ['decide', 'changes'] : [],
         }),
         [
             settingsAccess,
+            hasConnections,
             templatesOnly,
             witnessPin.can_reset,
             props.controlledSettingsAccess.view,
@@ -876,7 +891,9 @@ export default function EmarSettings(props: Props) {
     }));
     const clearQ = () => setQuery('');
     const body =
-        view === 'rules' && sec === 'overview' ? (
+        view === 'connections' ? (
+            <ConnectedEntryPoints />
+        ) : view === 'rules' && sec === 'overview' ? (
             <RulesOverview data={ruleData} q={query} />
         ) : view === 'rules' && sec === 'medicines' ? (
             <MedicineRules

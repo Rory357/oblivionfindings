@@ -11,6 +11,7 @@ import {
     Activity,
     CheckCircle2,
     ClipboardCheck,
+    ClipboardList,
     Clock3,
     Flag,
     LogIn,
@@ -848,6 +849,15 @@ export default function MedsToday(props: MedsTodayProps) {
                         }}
                         placeholder="Search people or medicines…"
                     />
+                    {board_can.view_emar && (
+                        <PageHeaderGlassButton asChild icon={ClipboardList}>
+                            <Link
+                                href={`/emar/mar?${new URLSearchParams({ date: props.date, ...(person ? { client_id: String(person) } : {}), ...(query().get('site_id') || query().get('site') ? { site_id: (query().get('site_id') || query().get('site'))! } : {}) })}`}
+                            >
+                                {person ? 'Open MAR chart' : 'MAR charts'}
+                            </Link>
+                        </PageHeaderGlassButton>
+                    )}
                     {extraCan.view_handovers ? (
                         <PageHeaderGlassButton
                             asChild

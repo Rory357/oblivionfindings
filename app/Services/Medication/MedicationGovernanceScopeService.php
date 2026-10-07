@@ -63,7 +63,11 @@ final class MedicationGovernanceScopeService
         'medications.controlled.manage',
         'medications.controlled.override',
         'medications.stock.update',
+        'medications.pharmacy.send',
+        'medications.pharmacy.connect.manage',
         'medications.orders.manage',
+        // Provider transfers re-check authority while creating or signing reconciliation.
+        'medications.transfers.manage',
         // Reconciliation sign-off and prescriber responses re-check this on the locked actor.
         'medications.orders.verify',
         'medications.breakglass',

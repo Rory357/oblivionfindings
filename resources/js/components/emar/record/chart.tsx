@@ -17,6 +17,7 @@ import { useDoseRecorder } from '@/components/emar/recording/use-dose-recorder';
 import { EntityTable } from '@/components/lists/entity-table';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { formatDateOnly } from '@/lib/datetime';
 import { MarTab } from '@/pages/operations/clients/tabs/mar';
 import {
@@ -30,6 +31,37 @@ import { useMemo, useState } from 'react';
 import { ReadingState } from './reading';
 import { SectionCard } from './ui';
 import { useRecordJson } from './use-record-json';
+
+export function ChartViewSwitch({
+    week,
+    onChange,
+}: {
+    week: boolean;
+    onChange: (week: boolean) => void;
+}) {
+    return (
+        <ToggleGroup
+            type="single"
+            size="sm"
+            variant="outline"
+            value={week ? 'week' : 'day'}
+            onValueChange={(value) => {
+                if (value) onChange(value === 'week');
+            }}
+            aria-label="Chart period"
+            className="shrink-0 bg-card"
+        >
+            <ToggleGroupItem value="day" aria-label="Day">
+                <CalendarDays className="size-4" />
+                Day
+            </ToggleGroupItem>
+            <ToggleGroupItem value="week" aria-label="Week">
+                <CalendarRange className="size-4" />
+                Week
+            </ToggleGroupItem>
+        </ToggleGroup>
+    );
+}
 
 export function ChartSection({
     clientId,
@@ -49,23 +81,7 @@ export function ChartSection({
     onChange: (date: string | null, week: boolean) => void;
 }) {
     return (
-        <div className="min-w-0 max-w-full space-y-5">
-            {view !== 'asneeded' && (
-                <div className="flex gap-2">
-                    <Button
-                        variant={!week ? 'default' : 'outline'}
-                        onClick={() => onChange(date, false)}
-                    >
-                        <CalendarDays className="size-4" /> Day
-                    </Button>
-                    <Button
-                        variant={week ? 'default' : 'outline'}
-                        onClick={() => onChange(date, true)}
-                    >
-                        <CalendarRange className="size-4" /> Week
-                    </Button>
-                </div>
-            )}
+        <div className="max-w-full min-w-0 space-y-5">
             {week && view !== 'asneeded' ? (
                 <WeekChart
                     clientId={clientId}
@@ -152,7 +168,7 @@ function WeekChart({
     return (
         <SectionCard
             title="Seven-day chart"
-            className="min-w-0 max-w-full"
+            className="max-w-full min-w-0"
             right={
                 <>
                     <Button
@@ -187,8 +203,8 @@ function WeekChart({
             }
         >
             <p className="text-caption text-muted-foreground">
-                {formatDateOnly(data.days[0].date)} – {formatDateOnly(last.date)} ·
-                Pacific/Auckland
+                {formatDateOnly(data.days[0].date)} –{' '}
+                {formatDateOnly(last.date)} · Pacific/Auckland
                 {hidden
                     ? ` · ${hidden} controlled doses — details need controlled-medicine access`
                     : ''}
@@ -204,7 +220,7 @@ function WeekChart({
                     role="region"
                     aria-label={`Seven-day medication chart for ${personName}. Scroll horizontally to see all days.`}
                     tabIndex={0}
-                    className="min-w-0 max-w-full rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                    className="max-w-full min-w-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                     onKeyDown={(event) => {
                         if (event.target !== event.currentTarget) return;
                         const scroller =
@@ -237,7 +253,7 @@ function WeekChart({
                     }}
                 >
                     <EntityTable
-                        className="min-w-0 max-w-full"
+                        className="max-w-full min-w-0"
                         rows={orders}
                         rowKey={clinicalKey}
                         identityLabel="Medicine"
@@ -248,6 +264,7 @@ function WeekChart({
                         })}
                         minWidth={1200}
                         rowHeight="content"
+                        wrapIdentity
                         actionsFor={() => []}
                         columns={data.days.map((day) => ({
                             key: day.date,
@@ -256,7 +273,8 @@ function WeekChart({
                             cell: (medicine: DayMedicine) => {
                                 const current = day.medicines.find(
                                     (row) =>
-                                        clinicalKey(row) === clinicalKey(medicine),
+                                        clinicalKey(row) ===
+                                        clinicalKey(medicine),
                                 );
                                 const doses = current
                                     ? Object.values(current.cells).flat()
@@ -290,7 +308,8 @@ function WeekChart({
                                                             setDetail({
                                                                 day,
                                                                 dose,
-                                                                medicine: current,
+                                                                medicine:
+                                                                    current,
                                                             });
                                                     }}
                                                 >

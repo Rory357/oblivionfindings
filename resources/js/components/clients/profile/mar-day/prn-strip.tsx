@@ -73,7 +73,7 @@ export function PrnStrip({
                             <Button
                                 size="sm"
                                 variant="outline"
-                                className="frontline-tap w-full shrink-0 sm:w-auto"
+                                className="shrink-0"
                                 aria-disabled={blocked ? true : undefined}
                                 onClick={() => {
                                     if (!blocked) onRecord(med.id);

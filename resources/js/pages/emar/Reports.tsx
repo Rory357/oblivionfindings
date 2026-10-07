@@ -57,6 +57,7 @@ import {
     XAxis,
     YAxis,
 } from 'recharts';
+import { ConnectedServicesMenu } from './connected/_entry-points';
 
 type ClientOption = { id: number; name: string };
 /**
@@ -506,6 +507,7 @@ export default function Reports(props: Props) {
                     stats={heroStats}
                     actions={
                         <>
+                            <ConnectedServicesMenu />
                             <PageHeaderPrimaryButton asChild icon={Download}>
                                 <a
                                     href={exportUrl(

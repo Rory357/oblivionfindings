@@ -43,17 +43,20 @@ class ClinicalProtocolManagementControllerTest extends TestCase
             'instructions' => 'Record before breakfast.',
         ]);
 
+        $scheduleNow = now('UTC')->startOfSecond();
         ClinicalProtocolSchedule::factory()->create([
             'clinical_protocol_id' => $protocol->id,
-            'due_at' => now()->addHours(3),
+            'due_at' => $scheduleNow->copy()->addHours(3),
             'status' => 'pending',
         ]);
         ClinicalProtocolSchedule::factory()->overdue()->create([
             'clinical_protocol_id' => $protocol->id,
+            'due_at' => $scheduleNow->copy()->subHours(2),
         ]);
         ClinicalProtocolSchedule::factory()->completed()->create([
             'clinical_protocol_id' => $protocol->id,
-            'completed_at' => now()->subDay(),
+            'due_at' => $scheduleNow->copy()->subHours(25),
+            'completed_at' => $scheduleNow->copy()->subDay(),
         ]);
 
         $this->actingAs($user)

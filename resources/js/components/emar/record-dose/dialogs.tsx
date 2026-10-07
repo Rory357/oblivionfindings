@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/command';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { LogIn, MessageSquare, Pill, UserCheck } from 'lucide-react';
-import type { ComponentProps } from 'react';
+import { useRef, type ComponentProps } from 'react';
 import { blockAllCopy } from './copy';
 import {
     BlockedPanel,
@@ -71,8 +71,7 @@ export function BlockedWhy({
 
     return (
         <SettingsModal
-            frontline
-            width={720}
+            width={480}
             title="Why can’t I record this?"
             description={
                 label
@@ -84,7 +83,6 @@ export function BlockedWhy({
             footer={
                 <>
                     <Button
-                        className="frontline-tap"
                         variant={
                             copy.action === 'clock-in' ? 'outline' : 'default'
                         }
@@ -93,7 +91,7 @@ export function BlockedWhy({
                         Close
                     </Button>
                     {copy.action === 'clock-in' ? (
-                        <Button asChild className="frontline-tap">
+                        <Button asChild>
                             <a href="/attendance">
                                 <LogIn className="size-4" /> Clock in
                             </a>
@@ -138,8 +136,7 @@ export function WhyDialog({
     if (state.status !== 'ready') {
         return (
             <SettingsModal
-                frontline
-                width={720}
+                width={480}
                 title="Why can’t I record this?"
                 description={
                     state.status === 'loading'
@@ -148,11 +145,7 @@ export function WhyDialog({
                 }
                 onClose={onClose}
                 footer={
-                    <Button
-                        className="frontline-tap"
-                        variant="outline"
-                        onClick={onClose}
-                    >
+                    <Button variant="outline" onClick={onClose}>
                         Close
                     </Button>
                 }
@@ -177,23 +170,17 @@ export function WhyDialog({
 
     return (
         <SettingsModal
-            frontline
-            width={720}
+            width={480}
             title="Why can’t I record this?"
             description={`${req.person.preferred_name} · ${req.order.name}${req.due ? ` · ${timeLabel(req.due.due_at)}` : ''}`}
             onClose={onClose}
             footer={
                 <>
-                    <Button
-                        className="frontline-tap"
-                        variant="outline"
-                        onClick={onClose}
-                    >
+                    <Button variant="outline" onClick={onClose}>
                         Close
                     </Button>
                     {allowNotGiven ? (
                         <Button
-                            className="frontline-tap"
                             variant={action ? 'outline' : 'default'}
                             onClick={onRecordNotGiven}
                         >
@@ -201,20 +188,17 @@ export function WhyDialog({
                         </Button>
                     ) : null}
                     {action === 'clock-in' ? (
-                        <Button asChild className="frontline-tap">
+                        <Button asChild>
                             <a href="/attendance">
                                 <LogIn className="size-4" /> Clock in
                             </a>
                         </Button>
                     ) : action === 'eligibility' && onEligibility ? (
-                        <Button
-                            className="frontline-tap"
-                            onClick={onEligibility}
-                        >
+                        <Button onClick={onEligibility}>
                             <UserCheck className="size-4" /> View my eligibility
                         </Button>
                     ) : action === 'message-lead' && req.house_lead ? (
-                        <Button asChild className="frontline-tap">
+                        <Button asChild>
                             <a href="/operations/messages">
                                 <MessageSquare className="size-4" /> Message{' '}
                                 {req.house_lead.name}
@@ -255,34 +239,48 @@ export function AsNeededPicker({
     choices,
     onClose,
     onPick,
+    onCloseAutoFocus,
 }: {
     choices: AsNeededChoice[];
     onClose: () => void;
+    onCloseAutoFocus?: ComponentProps<typeof SettingsModal>['onCloseAutoFocus'];
     onPick: (orderId: number) => void;
 }) {
+    const advancing = useRef(false);
     const people = [
         ...new Map(choices.map((c) => [c.client_id, c.client_name])).entries(),
     ];
     return (
         <SettingsModal
-            frontline
-            width={720}
+            width={people.length > 1 ? 720 : 480}
+            onCloseAutoFocus={(event) => {
+                if (advancing.current) event.preventDefault();
+                else onCloseAutoFocus?.(event);
+            }}
             title="Record an as-needed dose"
-            description="Choose the person and medicine. Only people on your shift and their current as-needed orders are listed."
+            description={
+                people.length === 1
+                    ? `Choose a current as-needed medicine for ${people[0][1]}. Safety checks open next.`
+                    : 'Choose a person and their current as-needed medicine. Recording authority and safety checks are checked next.'
+            }
             onClose={onClose}
             footer={
-                <Button
-                    className="frontline-tap"
-                    variant="outline"
-                    onClick={onClose}
-                >
+                <Button variant="outline" onClick={onClose}>
                     Close
                 </Button>
             }
         >
-            <Command className="rounded-lg border">
+            <Command
+                label="Search as-needed medicines"
+                className="rounded-lg border"
+            >
                 <CommandInput
-                    placeholder="Search people or medicines…"
+                    aria-label="Search as-needed medicines"
+                    placeholder={
+                        people.length === 1
+                            ? 'Search medicines…'
+                            : 'Search people or medicines…'
+                    }
                     autoFocus
                 />
                 <CommandList className="max-h-[320px]">
@@ -301,7 +299,10 @@ export function AsNeededPicker({
                                         <CommandItem
                                             key={c.id}
                                             value={`${name} ${c.name}`}
-                                            onSelect={() => onPick(c.id)}
+                                            onSelect={() => {
+                                                advancing.current = true;
+                                                onPick(c.id);
+                                            }}
                                             className="items-start"
                                         >
                                             <Pill
@@ -316,10 +317,14 @@ export function AsNeededPicker({
                                                         : ''}
                                                 </span>
                                                 <span className="block text-xs text-muted-foreground">
-                                                    {c.given_last_24h} of{' '}
-                                                    {c.max_per_day ??
-                                                        'no limit'}{' '}
+                                                    {c.given_last_24h}
+                                                    {c.max_per_day !== null
+                                                        ? ` of ${c.max_per_day}`
+                                                        : ''}{' '}
                                                     in the last 24 hours
+                                                    {c.max_per_day === null
+                                                        ? ' · maximum not recorded'
+                                                        : ''}
                                                     {c.last_given_label
                                                         ? ` · last ${c.last_given_label}`
                                                         : ''}
@@ -337,7 +342,7 @@ export function AsNeededPicker({
                                                     ? 'Limit reached'
                                                     : c.interval_blocked
                                                       ? 'Too soon'
-                                                      : 'Available'}
+                                                      : 'Check dose'}
                                             </StatusBadge>
                                         </CommandItem>
                                     );
@@ -371,29 +376,20 @@ export function ErrorCreatedDialog({
 }) {
     return (
         <SettingsModal
-            frontline
-            width={720}
+            width={480}
             title="Recorded and reported"
             description={`${medicine} for ${person}: ${amount} given — more than ordered. The chart shows what was really given.`}
             onClose={onClose}
             footer={
                 <>
                     {incidentId ? (
-                        <Button
-                            asChild
-                            variant="outline"
-                            className="frontline-tap"
-                        >
+                        <Button asChild variant="outline">
                             <a href={`/incidents/${incidentId}`}>
                                 Open the incident
                             </a>
                         </Button>
                     ) : null}
-                    <Button
-                        className="frontline-tap"
-                        onClick={onClose}
-                        autoFocus
-                    >
+                    <Button onClick={onClose} autoFocus>
                         Done
                     </Button>
                 </>

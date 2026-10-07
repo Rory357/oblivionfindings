@@ -11,6 +11,8 @@ import {
     BellRing,
     ChevronLeft,
     ChevronRight,
+    ClipboardCheck,
+    Clock,
     FileText,
     Pill,
     Plus,
@@ -57,7 +59,7 @@ import {
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { SkeletonTable } from '@/components/ui/skeleton-table';
-import { formatDateTime } from '@/lib/datetime';
+import { formatDateTime, formatTime } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 
 export type MarTabProps = {
@@ -284,11 +286,21 @@ export function MarTab({
         .size;
 
     return (
-        <div className="max-w-full min-w-0 space-y-5">
+        <div className="max-w-full min-w-0 space-y-3">
             {/* Profile launch point and allergy warnings */}
             {!embedded || day ? (
-                <Card className="max-w-full min-w-0 gap-0 py-0">
-                    <CardContent className="max-w-full min-w-0 space-y-3 p-5">
+                <Card
+                    className={cn(
+                        'max-w-full min-w-0 gap-0 py-0',
+                        embedded && 'border-0 bg-transparent shadow-none',
+                    )}
+                >
+                    <CardContent
+                        className={cn(
+                            'max-w-full min-w-0 space-y-2',
+                            embedded ? 'p-0' : 'p-5',
+                        )}
+                    >
                         {!embedded ? (
                             <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div className="flex items-center gap-3">
@@ -320,7 +332,7 @@ export function MarTab({
                                             <Link
                                                 href={`/emar/mar?client_id=${clientId}`}
                                             >
-                                                Open medication record
+                                                Open MAR chart
                                             </Link>
                                         </Button>
                                     )}
@@ -425,8 +437,40 @@ export function MarTab({
             (day.followup_counts?.open ??
                 (day.followups?.length ?? 0) +
                     (day.legacy_effect_checks?.total ?? 0)) > 0 ? (
-                <Card className="max-w-full min-w-0 gap-0 py-0">
-                    <CardContent className="p-5">
+                <details className="group rounded-lg border bg-card">
+                    <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                        <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                            <ClipboardCheck className="size-4 text-primary" />
+                            {day.followup_counts?.open ??
+                                (day.followups?.length ?? 0) +
+                                    (day.legacy_effect_checks?.total ?? 0)}{' '}
+                            to follow up
+                            {!!day.followup_counts?.overdue && (
+                                <span className="text-status-critical">
+                                    · {day.followup_counts.overdue} overdue
+                                </span>
+                            )}
+                            {!!day.followup_counts?.unscheduled && (
+                                <span className="text-status-warning">
+                                    · {day.followup_counts.unscheduled} with no
+                                    check time
+                                </span>
+                            )}
+                            {load.status === 'error' && (
+                                <span className="text-status-warning">
+                                    · Couldn’t refresh
+                                </span>
+                            )}
+                            <span className="text-caption text-muted-foreground">
+                                Including earlier doses
+                            </span>
+                        </span>
+                        <span className="text-caption flex items-center gap-1 text-primary">
+                            Review follow-ups{' '}
+                            <ChevronRight className="size-4 transition-transform group-open:rotate-90" />
+                        </span>
+                    </summary>
+                    <div className="border-t p-4">
                         {load.status === 'error' && (
                             <p
                                 role="status"
@@ -440,19 +484,19 @@ export function MarTab({
                             work={day}
                             clientId={clientId}
                         />
-                    </CardContent>
-                </Card>
+                    </div>
+                </details>
             ) : null}
 
             {/* The day */}
             <Card className="max-w-full min-w-0 gap-0 py-0">
-                <CardContent className="max-w-full min-w-0 space-y-3 p-5">
+                <CardContent className="max-w-full min-w-0 space-y-3 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="flex max-w-full min-w-0 flex-wrap items-center gap-1.5">
                             <Button
                                 variant="outline"
                                 size="icon"
-                                className="frontline-tap"
+                                className="shrink-0"
                                 aria-label="Earlier day"
                                 disabled={!day || !canGoBack}
                                 onClick={() =>
@@ -470,7 +514,7 @@ export function MarTab({
                             <Button
                                 variant="outline"
                                 size="icon"
-                                className="frontline-tap"
+                                className="shrink-0"
                                 aria-label="Later day"
                                 disabled={!day || !canGoForward}
                                 onClick={() =>
@@ -506,6 +550,18 @@ export function MarTab({
                         </div>
                     </div>
 
+                    {day && view !== 'asneeded' && (
+                        <div className="text-caption flex flex-wrap items-center justify-between gap-2 text-muted-foreground">
+                            <span>
+                                Select a medicine for details, or a due dose to
+                                record it.
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                                <Clock className="size-3.5" />
+                                As at {formatTime(day.now)} · NZ time
+                            </span>
+                        </div>
+                    )}
                     {view === 'asneeded' && day ? null : load.status ===
                           'error' && !day ? (
                         <ErrorState
@@ -596,9 +652,16 @@ export function MarTab({
                             onRecord={(id) => recorder.recordAsNeeded(id)}
                         />
                         {day.prn.rows.length === 0 && day.prn.hidden === 0 ? (
-                            <p className="text-caption text-muted-foreground">
-                                No as-needed medicines for {personName}.
-                            </p>
+                            <EmptyState
+                                icon={Pill}
+                                variant="compact"
+                                title={`No as-needed medicines for ${personName}`}
+                                description={
+                                    isToday
+                                        ? 'An as-needed dose needs a current medication order. Ask the medication lead to check the order if a medicine is missing.'
+                                        : 'No as-needed medicines are listed for this day. Return to today to see current orders.'
+                                }
+                            />
                         ) : null}
                     </CardContent>
                 </Card>

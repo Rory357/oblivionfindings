@@ -309,6 +309,26 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
         return 'Settings';
     }, [currentPath]);
 
+    if (auth?.user?.role === 'external_clinician') {
+        return (
+            <div className="space-y-5">
+                <nav
+                    aria-label="Clinical account security"
+                    className="flex gap-3"
+                >
+                    <Button variant="outline" asChild>
+                        <Link href="/settings/password">Password</Link>
+                    </Button>
+                    <Button variant="outline" asChild>
+                        <Link href="/settings/two-factor">
+                            Two-factor authentication
+                        </Link>
+                    </Button>
+                </nav>
+                {children}
+            </div>
+        );
+    }
     if (typeof window === 'undefined') {
         return null;
     }

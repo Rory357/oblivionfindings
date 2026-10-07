@@ -658,3 +658,9 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
 
 require __DIR__.'/emar-stock.php';
 require __DIR__.'/emar-downtime.php';
+
+require __DIR__.'/emar-pharmacy-connect.php';
+
+require __DIR__.'/emar-external-clinical.php';
+
+require __DIR__.'/emar-catalogue-backups.php';

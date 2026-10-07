@@ -54,22 +54,25 @@ export function useDoseRecorder(
     context: DoseRecorderContext | null,
     /** Called when the recorder closes, so the caller can refresh its view. */
     onClosed?: () => void,
+    /** Keep focus on a persistent launcher when a temporary picker opens this flow. */
+    returnFocus?: () => HTMLElement | null,
 ): DoseRecorder {
     const [target, setTarget] = useState<Target | null>(null);
     // Focus goes back to whatever opened the recorder.
     const opener = useRef<HTMLElement | null>(null);
 
-    const remember = () => {
+    const remember = useCallback(() => {
         opener.current =
-            document.activeElement instanceof HTMLElement
+            returnFocus?.() ??
+            (document.activeElement instanceof HTMLElement
                 ? document.activeElement
-                : null;
-    };
+                : null);
+    }, [returnFocus]);
     const close = useCallback(() => {
         setTarget(null);
         onClosed?.();
         const back = opener.current;
-        opener.current = null;
+        // Keep the opener until the dialog close-autofocus runs. The next launch replaces it.
         // After the dialog has unmounted and released focus.
         window.setTimeout(() => back?.isConnected && back.focus(), 0);
     }, [onClosed]);
@@ -79,12 +82,18 @@ export function useDoseRecorder(
             remember();
             setTarget({ kind: 'scheduled', row, outcome });
         },
-        [],
+        [remember],
     );
-    const recordAsNeeded = useCallback((medicationId?: number | null) => {
-        remember();
-        setTarget({ kind: 'as_needed', medicationId: medicationId ?? null });
-    }, []);
+    const recordAsNeeded = useCallback(
+        (medicationId?: number | null) => {
+            remember();
+            setTarget({
+                kind: 'as_needed',
+                medicationId: medicationId ?? null,
+            });
+        },
+        [remember],
+    );
 
     let element: ReactNode = null;
     if (target && context) {
@@ -115,6 +124,12 @@ export function useDoseRecorder(
                 <AsNeededPicker
                     choices={context.prnMedications}
                     onClose={close}
+                    onCloseAutoFocus={(event) => {
+                        if (opener.current?.isConnected) {
+                            event.preventDefault();
+                            opener.current.focus();
+                        }
+                    }}
                     onPick={(medicationId) =>
                         setTarget({ kind: 'as_needed', medicationId })
                     }

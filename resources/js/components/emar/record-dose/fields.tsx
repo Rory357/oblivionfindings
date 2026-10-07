@@ -141,7 +141,7 @@ export function ReasonSelect({
                 <SelectTrigger
                     id={`rd-${id}`}
                     aria-invalid={!!error}
-                    className="frontline-tap w-full"
+                    className="w-full"
                 >
                     <SelectValue placeholder="Choose a reason" />
                 </SelectTrigger>
@@ -209,7 +209,6 @@ function Stepper({
                 type="button"
                 variant="outline"
                 size="icon"
-                className="frontline-tap"
                 aria-label={`Less — ${label.toLowerCase()}`}
                 onClick={() => onChange(Math.max(0, (value ?? 0) - step))}
             >
@@ -231,7 +230,6 @@ function Stepper({
                 type="button"
                 variant="outline"
                 size="icon"
-                className="frontline-tap"
                 aria-label={`More — ${label.toLowerCase()}`}
                 onClick={() => onChange((value ?? 0) + step)}
             >
@@ -307,7 +305,6 @@ export function AmountField({
         <Button
             type="button"
             variant="outline"
-            className="frontline-tap"
             onClick={() => onChange({ mode: 'asOrdered', amount: ordered })}
         >
             {label}
@@ -357,7 +354,6 @@ export function AmountField({
                         <span className="text-status-critical">*</span>
                     </Label>
                     <TilePicker
-                        frontline
                         labelledBy="rd-sev-l"
                         invalid={!!errors.severity}
                         value={value.severity}
@@ -480,7 +476,6 @@ export function AmountField({
                     <Button
                         type="button"
                         variant="outline"
-                        className="frontline-tap"
                         onClick={() => onChange({ mode: 'more', amount: null })}
                     >
                         More than ordered was given
@@ -514,7 +509,6 @@ export function AmountField({
                     <Button
                         type="button"
                         variant="outline"
-                        className="frontline-tap"
                         onClick={() => onChange({ mode: 'more', amount: null })}
                     >
                         More than ordered was given
@@ -531,7 +525,6 @@ export function AmountField({
                     <Button
                         type="button"
                         variant="outline"
-                        className="frontline-tap"
                         onClick={() =>
                             onChange({ mode: 'less', amount: null, reason: '' })
                         }
@@ -666,7 +659,7 @@ export function SecondPerson({
                                 role="combobox"
                                 aria-expanded={open}
                                 aria-invalid={!!errors.second}
-                                className="frontline-tap w-full justify-between font-normal"
+                                className="w-full justify-between font-normal"
                             >
                                 <span className="flex items-center gap-2 truncate">
                                     <Search

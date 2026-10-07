@@ -561,6 +561,12 @@ final class MedicationOrderWorkflow
         return $source;
     }
 
+    /** Validate a review proposal without creating or publishing a prescription. */
+    public function proposedPrescription(array $input, ?ClientMedication $medication = null): array
+    {
+        return $this->validatePrescription($input, $medication);
+    }
+
     private function validatePrescription(array $input, ?ClientMedication $medication): array
     {
         $validated = Validator::make($input, [

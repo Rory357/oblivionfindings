@@ -16,6 +16,7 @@ use App\Services\Medication\Controlled\ControlledRegisterService;
 use App\Services\Medication\Followups\MedicationFollowupService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
+use App\Services\Medication\PharmacyConnect\PharmacyDispatchGuard;
 use App\Services\Medication\Stock\MedicationStockService;
 use App\Services\Medication\Stock\StockReadPayload;
 use App\Support\Medication\MedicationStockQuantity as Qty;
@@ -80,10 +81,10 @@ final class MedicationStockController extends Controller
                 if ($stored) {
                     return response()->json([...$stored, 'duplicate' => true]);
                 }
-                $result = $this->execute($med, $actor, $action, $data, $lockedUsers);
+                $auditEvents = [];
+                $result = $this->execute($med, $actor, $action, $data, $lockedUsers, $auditEvents);
                 $payload = ['success' => true, ...$result];
                 $this->scope->rememberIdempotencyResult('emar-p06-command', $replay, $payload, $fingerprint, durable: true);
-                $auditEvents = [];
                 if ($action === 'count') {
                     $count = MedicationStockCountRecord::findOrFail($result['count_id']);
                     if ($count->state === 'needs_review') {
@@ -118,7 +119,7 @@ final class MedicationStockController extends Controller
             }, authorizationUserIds: array_values(array_filter([(int) ($data['witnessed_by'] ?? 0)]))), 5);
     }
 
-    private function execute(ClientMedication $med, User $actor, string $action, array $data, Collection $lockedUsers): array
+    private function execute(ClientMedication $med, User $actor, string $action, array $data, Collection $lockedUsers, array &$auditEvents): array
     {
         if ($action === 'order') {
             abort_unless($med->active && $med->state === 'active', 422, 'This medicine is no longer active.');
@@ -132,7 +133,7 @@ final class MedicationStockController extends Controller
             return ['order_id' => $order->id];
         }
         if ($action === 'order_update') {
-            return $this->updateOrder($med, $actor, $data);
+            return $this->updateOrder($med, $actor, $data, $auditEvents);
         }
         $stock = ClientMedicationStock::where('client_medication_id', $med->id)->lockForUpdate()->first();
         if (! $stock) {
@@ -192,7 +193,7 @@ final class MedicationStockController extends Controller
         return ['movement_id' => $this->stock->move($stock, $actor, $action === 'going_out' ? [...$data, 'kind' => 'going_out'] : $data)->id];
     }
 
-    private function updateOrder(ClientMedication $med, User $actor, array $data): array
+    private function updateOrder(ClientMedication $med, User $actor, array $data, array &$auditEvents): array
     {
         $order = MedicationPharmacyOrder::where('client_id', $med->client_id)->where('client_medication_id', $med->id)->lockForUpdate()->findOrFail($data['order_id']);
         try {
@@ -200,8 +201,10 @@ final class MedicationStockController extends Controller
             $next = $data['next'];
             if (in_array($next, ['cancelled', 'closed_short'], true)) {
                 PharmacySupplyRules::assertClosure($order->status, $next, $data['reason'] ?? '');
+                app(PharmacyDispatchGuard::class)->localClosure($order, $med->client, $med, $actor, $auditEvents);
                 $order->forceFill(['status' => $next, 'closed_by' => $actor->id, 'closed_at' => now(), 'closure_reason' => $data['reason']])->save();
             } elseif ($next === 'contacted') {
+                app(PharmacyDispatchGuard::class)->assertManualContact($order);
                 if ($order->status !== 'draft' || empty($data['communication_method']) || trim((string) ($data['communication_reference'] ?? '')) === '') {
                     throw new InvalidArgumentException('Record how the pharmacy was contacted and the source or reference. Saving here does not send this order.');
                 }

@@ -204,6 +204,107 @@ describe('RecordDoseDialog (P01)', () => {
         submitMock.mockReset();
     });
 
+    it('requires a PRN reason and check time, retains them through review, and saves through the PRN contract', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2026-10-07T00:00:00Z'));
+        try {
+            submitMock.mockResolvedValue({
+                status: 'processed',
+                data: { administration: { id: 90 } },
+            });
+            const base = requirements();
+            open(
+                requirements({
+                    kind: 'prn',
+                    due: null,
+                    order: { ...base.order, is_prn: true },
+                    prn: {
+                        count_24h: 0,
+                        max_24h: 4,
+                        min_hours_between: 4,
+                        last_at: null,
+                        last_by: null,
+                        reasons: ['Pain'],
+                    },
+                }),
+                { kind: 'prn', orderId: 41 },
+            );
+            await screen.findByText('Losartan 50mg');
+            fireEvent.click(screen.getByRole('button', { name: /^Continue/ }));
+            fireEvent.click(screen.getByRole('button', { name: /^Given/ }));
+            fireEvent.click(screen.getByRole('button', { name: /^Continue/ }));
+            expect(
+                screen.getByText('Choose what it was for.'),
+            ).toBeInTheDocument();
+            expect(
+                screen.getByText('Choose when to check whether it helped.'),
+            ).toBeInTheDocument();
+            expect(submitMock).not.toHaveBeenCalled();
+
+            fireEvent.click(
+                screen.getByRole('button', {
+                    name: /^Pain\s*From the prescription$/,
+                }),
+            );
+            fireEvent.click(
+                screen.getByRole('button', {
+                    name: 'Check by date: Choose date',
+                }),
+            );
+            fireEvent.click(
+                screen.getByRole('button', { name: 'Wed 7 October 2026' }),
+            );
+            fireEvent.click(screen.getByRole('button', { name: 'Use date' }));
+            fireEvent.click(
+                screen.getByRole('button', {
+                    name: 'Check by time: Choose time',
+                }),
+            );
+            fireEvent.change(
+                screen.getByRole('textbox', { name: 'Check by time hour' }),
+                { target: { value: '01' } },
+            );
+            fireEvent.change(
+                screen.getByRole('textbox', { name: 'Check by time minute' }),
+                { target: { value: '30' } },
+            );
+            fireEvent.click(screen.getByRole('button', { name: 'PM' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Use time' }));
+            fireEvent.click(screen.getByRole('button', { name: /^Continue/ }));
+            expect(screen.getByText('Pain')).toBeInTheDocument();
+            expect(screen.getByText(/Owner Priya Shah · by/)).toHaveTextContent(
+                '1:30 pm',
+            );
+            fireEvent.click(screen.getByRole('button', { name: /Back/ }));
+            expect(
+                screen.getByRole('button', {
+                    name: /^Pain\s*From the prescription$/,
+                }),
+            ).toHaveAttribute('aria-pressed', 'true');
+            expect(
+                screen.getByRole('button', { name: 'Check by time: 01:30 PM' }),
+            ).toBeInTheDocument();
+            fireEvent.click(screen.getByRole('button', { name: /^Continue/ }));
+            fireEvent.click(
+                screen.getByRole('button', { name: /^Record outcome$/ }),
+            );
+            await waitFor(() => expect(submitMock).toHaveBeenCalledOnce());
+            expect(submitMock.mock.calls[0][0]).toBe('/meds/today/prn');
+            expect(submitMock.mock.calls[0][1]).toMatchObject({
+                client_medication_id: 41,
+                reason: 'Pain',
+                amount_mode: 'as_ordered',
+                effect_check_due_at: '2026-10-07T13:30',
+            });
+            expect(submitMock.mock.calls[0][1]).not.toHaveProperty(
+                'scheduled_for',
+            );
+            expect(await screen.findByText('Recorded')).toBeInTheDocument();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it('walks safety checks, outcome and review, then records once', async () => {
         submitMock.mockResolvedValue({
             status: 'processed',

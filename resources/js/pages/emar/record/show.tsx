@@ -1,8 +1,9 @@
+import { ConnectedServicesMenu } from '@/pages/emar/connected/_entry-points';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { AlertTriangle, Clock, Home, Pill } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
-import { ChartSection } from '@/components/emar/record/chart';
+import { ChartSection, ChartViewSwitch } from '@/components/emar/record/chart';
 import { ClinicalSection } from '@/components/emar/record/clinical';
 import { HistorySection } from '@/components/emar/record/history';
 import {
@@ -196,9 +197,14 @@ function AvailableRecord({
                                 placeholder="Find in this record…"
                                 onOpen={() => setFind(true)}
                             />
+                            <ConnectedServicesMenu clientId={person.id} />
                             <RecordDoseLaunch
                                 clientId={person.id}
                                 personName={person.preferred}
+                                asNeeded={
+                                    location.tab === 'chart' &&
+                                    activeView === 'asneeded'
+                                }
                             />
                         </>
                     }
@@ -223,7 +229,8 @@ function AvailableRecord({
                             </PageHeaderMeterBlock>
                             <PageHeaderMeterBlock
                                 label="Allergies"
-                                href={`/clients/${person.id}?tab=medical`}
+                                onClick={() => jump('allergies', 'allergies')}
+                                ariaLabel="View allergies"
                                 tone={
                                     meters.allergies.status === 'recorded'
                                         ? 'critical'
@@ -310,25 +317,37 @@ function AvailableRecord({
                         />
                     }
                 />
-                <TierTwoTabs
-                    tabs={section.views}
-                    activeTab={activeView}
-                    onTab={(view) => go({ tab: location.tab, view })}
-                    testIdPrefix="medication-record"
-                    panelId="medication-record-panel"
-                    renderLink={(tab, className, inner, accessibility) => (
-                        <Button
-                            unstyled
-                            className={className}
-                            onClick={() =>
-                                go({ tab: location.tab, view: tab.key })
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <TierTwoTabs
+                        tabs={section.views}
+                        activeTab={activeView}
+                        onTab={(view) => go({ tab: location.tab, view })}
+                        testIdPrefix="medication-record"
+                        panelId="medication-record-panel"
+                        renderLink={(tab, className, inner, accessibility) => (
+                            <Button
+                                unstyled
+                                className={className}
+                                onClick={() =>
+                                    go({ tab: location.tab, view: tab.key })
+                                }
+                                {...accessibility}
+                            >
+                                {inner}
+                            </Button>
+                        )}
+                    />
+                    {location.tab === 'chart' && activeView !== 'asneeded' && (
+                        <ChartViewSwitch
+                            week={week}
+                            onChange={(nextWeek) =>
+                                navigateQuery({
+                                    mode: nextWeek ? 'week' : null,
+                                })
                             }
-                            {...accessibility}
-                        >
-                            {inner}
-                        </Button>
+                        />
                     )}
-                />
+                </div>
                 <div
                     id="medication-record-panel"
                     role="tabpanel"

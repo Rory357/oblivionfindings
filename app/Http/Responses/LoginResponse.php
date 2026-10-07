@@ -4,7 +4,6 @@ namespace App\Http\Responses;
 
 use App\Models\Role;
 use App\Models\User;
-use Illuminate\Http\Request;
 use Illuminate\Routing\Exceptions\UrlGenerationException;
 use Illuminate\Support\Facades\Log;
 use Laravel\Fortify\Contracts\LoginResponse as LoginResponseContract;
@@ -28,6 +27,13 @@ class LoginResponse implements LoginResponseContract
     public function toResponse($request)
     {
         $user = $request->user();
+        if ($user instanceof User && $user->isExternalClinicianAccount()) {
+            $request->session()->forget('url.intended');
+
+            return $request->wantsJson()
+                ? response()->json(['two_factor' => false])
+                : redirect('/clinical-portal');
+        }
         $url = config('fortify.home', '/dashboard');
 
         if ($user instanceof User) {
@@ -110,6 +116,7 @@ class LoginResponse implements LoginResponseContract
                 'route' => $routeName,
                 'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }

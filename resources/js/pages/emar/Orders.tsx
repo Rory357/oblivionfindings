@@ -42,6 +42,7 @@ import {
     XCircle,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { ConnectedServicesMenu } from './connected/_entry-points';
 import {
     CovertStatus,
     CovertWizard,
@@ -418,6 +419,15 @@ export default function Orders(props: Props) {
                     subline={`Prescriber’s instructions, checks and transitions · loaded ${formatDateTime(props.loaded_at)}`}
                     actions={
                         <>
+                            <ConnectedServicesMenu
+                                clientId={
+                                    Number(
+                                        new URLSearchParams(
+                                            window.location.search,
+                                        ).get('client_id'),
+                                    ) || undefined
+                                }
+                            />
                             <PageHeaderSearch
                                 value={search}
                                 onChange={setSearch}

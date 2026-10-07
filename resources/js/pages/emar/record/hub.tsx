@@ -25,7 +25,8 @@ import {
     secondPersonDisplay,
     type SecondPersonEvidence,
 } from '@/lib/medication-second-person';
-import { Head, router, usePage } from '@inertiajs/react';
+import { ConnectedServicesMenu } from '@/pages/emar/connected/_entry-points';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     CalendarDays,
     ClipboardList,
@@ -129,23 +130,26 @@ export default function MedicationRecordHub(props: Props) {
                     wrapTitle
                     subline="Open a person’s medication record from their chart, medicine or as-needed dose."
                     actions={
-                        <form
-                            onSubmit={(event) => {
-                                event.preventDefault();
-                                visit({ q: search });
-                            }}
-                        >
-                            <PageHeaderSearch
-                                value={search}
-                                onChange={setSearch}
-                                placeholder={
-                                    props.view === 'charts'
-                                        ? 'Find a person…'
-                                        : 'Find a person or medicine…'
-                                }
-                                ariaLabel="Search MAR and medicines"
-                            />
-                        </form>
+                        <>
+                            <form
+                                onSubmit={(event) => {
+                                    event.preventDefault();
+                                    visit({ q: search });
+                                }}
+                            >
+                                <PageHeaderSearch
+                                    value={search}
+                                    onChange={setSearch}
+                                    placeholder={
+                                        props.view === 'charts'
+                                            ? 'Find a person…'
+                                            : 'Find a person or medicine…'
+                                    }
+                                    ariaLabel="Search MAR and medicines"
+                                />
+                            </form>
+                            <ConnectedServicesMenu />
+                        </>
                     }
                     meters={
                         <>
@@ -241,7 +245,7 @@ export default function MedicationRecordHub(props: Props) {
                                     <PageHeaderFilterButton
                                         id="medication-hub-day"
                                         icon={CalendarDays}
-                                        className="h-11 shrink-0 gap-2 px-3 whitespace-nowrap"
+                                        className="shrink-0"
                                         aria-label={`NZ calendar day: ${formatDateOnly(props.filters.date)}`}
                                     >
                                         Day ·{' '}
@@ -335,6 +339,7 @@ export default function MedicationRecordHub(props: Props) {
                             }
                             minWidth={props.view === 'charts' ? 850 : 1000}
                             rowHeight="content"
+                            wrapIdentity
                             identity={(row) => ({
                                 icon: props.view === 'charts' ? Users : Pill,
                                 name:
@@ -352,6 +357,7 @@ export default function MedicationRecordHub(props: Props) {
                                         </StatusBadge>
                                     ) : undefined,
                             })}
+                            hrefFor={(row) => row.href}
                             onOpen={(row) => router.visit(row.href)}
                             columns={
                                 props.view === 'charts'
@@ -414,23 +420,35 @@ export default function MedicationRecordHub(props: Props) {
                                           },
                                           {
                                               key: 'record',
-                                              label: 'Record',
+                                              label: 'Chart / record',
                                               width: '180px',
-                                              cell: (row) =>
-                                                  row.can_record ? (
-                                                      <RecordDoseLaunch
-                                                          clientId={
-                                                              row.client_id
-                                                          }
-                                                          personName={
-                                                              row.person
-                                                          }
-                                                      />
-                                                  ) : (
-                                                      <span className="text-caption text-muted-foreground">
-                                                          Open record
-                                                      </span>
-                                                  ),
+                                              cell: (row) => (
+                                                  <div className="flex flex-col items-start gap-2">
+                                                      <Button
+                                                          asChild
+                                                          variant="outline"
+                                                          size="sm"
+                                                      >
+                                                          <Link
+                                                              href={row.href}
+                                                              aria-label={`Open MAR chart for ${row.person}`}
+                                                          >
+                                                              <ClipboardList className="size-4" />
+                                                              Open chart
+                                                          </Link>
+                                                      </Button>
+                                                      {row.can_record && (
+                                                          <RecordDoseLaunch
+                                                              clientId={
+                                                                  row.client_id
+                                                              }
+                                                              personName={
+                                                                  row.person
+                                                              }
+                                                          />
+                                                      )}
+                                                  </div>
+                                              ),
                                           },
                                       ]
                                     : props.view === 'medicines'

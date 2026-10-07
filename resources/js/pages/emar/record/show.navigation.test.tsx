@@ -31,9 +31,12 @@ vi.mock('@/layouts/app-layout', () => ({
     default: ({ children }: { children: ReactNode }) => <main>{children}</main>,
 }));
 vi.mock('@/components/emar/record/record-dose-launch', () => ({
-    RecordDoseLaunch: () => null,
+    RecordDoseLaunch: ({ asNeeded }: { asNeeded?: boolean }) => (
+        <Button>{asNeeded ? 'Record as-needed dose' : 'Record a dose'}</Button>
+    ),
 }));
 vi.mock('@/components/emar/record/chart', () => ({
+    ChartViewSwitch: () => null,
     ChartSection: ({
         date,
         week,
@@ -62,7 +65,7 @@ vi.mock('@/components/emar/record/reading', () => ({
     RecordMedicineDialog: () => null,
 }));
 vi.mock('@/components/emar/record/safety', () => ({
-    SafetySection: () => null,
+    SafetySection: () => <section>Allergy contents</section>,
 }));
 vi.mock('@/components/emar/record/support', () => ({
     CanonicalSupportSection: () => null,
@@ -98,6 +101,17 @@ beforeEach(() => {
 });
 
 describe('person medication record context', () => {
+    it('matches the header recording entry to the selected chart view', () => {
+        render(<PersonMedicationRecord {...props} />);
+        fireEvent.click(screen.getByRole('tab', { name: 'As needed' }));
+        expect(
+            screen.getByRole('button', { name: 'Record as-needed dose' }),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('tab', { name: 'Scheduled doses' }));
+        expect(
+            screen.getByRole('button', { name: 'Record a dose' }),
+        ).toBeInTheDocument();
+    });
     it('retains the person, house, historical date and chart mode through Clinical and back', () => {
         render(<PersonMedicationRecord {...props} />);
         fireEvent.click(screen.getByRole('tab', { name: 'Clinical' }));
@@ -123,6 +137,25 @@ describe('person medication record context', () => {
         expect(back.searchParams.get('date')).toBe('2026-10-04');
         expect(back.searchParams.get('site_id')).toBe('3');
         expect(back.searchParams.has('client_id')).toBe(false);
+    });
+
+    it('opens allergies inside the medication record without wider profile access', () => {
+        render(<PersonMedicationRecord {...props} />);
+        fireEvent.click(screen.getByRole('button', { name: 'View allergies' }));
+        expect(screen.getByText('Allergy contents')).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Allergies' })).toHaveAttribute(
+            'aria-selected',
+            'true',
+        );
+        const destination = new URL(state.url, 'https://example.test');
+        expect(destination.pathname).toBe('/emar/mar');
+        expect(Object.fromEntries(destination.searchParams)).toEqual({
+            client_id: '10',
+            date: '2026-10-04',
+            site_id: '3',
+            mode: 'week',
+            tab: 'allergies',
+        });
     });
 
     it('changes the day without losing the house or keeping week mode', () => {
