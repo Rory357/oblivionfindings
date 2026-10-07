@@ -76,6 +76,8 @@ beforeEach(function () {
         'created_by' => $this->actor->id,
         'updated_by' => $this->actor->id,
     ]);
+    // The following assertions measure intake, not actor/Site setup refreshes.
+    Queue::fake();
 });
 
 function intakeInsideOuterTransaction(object $test, string $email)

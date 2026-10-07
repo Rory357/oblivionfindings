@@ -461,6 +461,8 @@ it('does not treat privacy-blocked telemetry as command evidence and expires wit
     Queue::fake();
     $fixture = governedQueclinkTrackingFixture('864696060004174');
     bindGovernedQueclinkCommandCredential($fixture);
+    // Observe command work after the lawful account/Site fixture refreshes.
+    Queue::fake();
     $request = requestGovernedLocationRefresh($fixture);
     $attempt = app(CommandDispatchPort::class)->dispatch($request, $fixture['actor']);
     $pending = app(GovernedCommandLifecycleService::class)->markSent(QueclinkPendingCommand::query()->sole());

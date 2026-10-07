@@ -76,6 +76,7 @@ class FacilitySignalDeliveryRecoveryTest extends TestCase
     {
         $schedule = $this->schedule();
         $dueDate = $schedule->next_due_date->toDateString();
+        Queue::fake(); // Observe acceptance after manager/Site fixture refreshes.
         $eventName = 'eloquent.creating: '.FacilitySignalOutbox::class;
 
         Event::listen($eventName, function (): never {
@@ -146,6 +147,7 @@ class FacilitySignalDeliveryRecoveryTest extends TestCase
             ]),
         ];
 
+        Queue::fake(); // Include no setup refreshes from either fixture Site.
         foreach ($records as $record) {
             try {
                 app(FacilitySignalService::class)->emitInspectionFailed($schedule, $record);
@@ -164,6 +166,7 @@ class FacilitySignalDeliveryRecoveryTest extends TestCase
     {
         $schedule = $this->schedule();
         $dueDate = $schedule->next_due_date->toDateString();
+        Queue::fake(); // Observe acceptance after manager/Site fixture refreshes.
         $eventName = 'eloquent.updating: '.SiteInspectionSchedule::class;
 
         Event::listen($eventName, function (): never {

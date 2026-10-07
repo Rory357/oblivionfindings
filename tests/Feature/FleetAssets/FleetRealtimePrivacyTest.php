@@ -164,6 +164,8 @@ class FleetRealtimePrivacyTest extends TestCase
         $site = Site::factory()->create();
         $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
         $user = $this->makeSiteUser($site, ['fleet.viewAny', 'assets.telemetry.view', 'clients.viewAssigned']);
+        // Keep consent, telemetry and authorization effects inside this observation.
+        Queue::fake();
         $client->supportWorkers()->attach($user->id);
         $consent = $this->createTrackingConsent($client, 'Fleet Tracking');
         $device = Device::factory()->tracking()->create();

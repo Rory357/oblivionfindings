@@ -259,12 +259,14 @@ class EscalateUnresolvedEligibilityJobTest extends TestCase
             [
                 'status' => 'expired',
                 'evidence_type' => 'manual',
+                'valid_from' => now()->subYear(),
+                'expires_at' => now()->subDay(),
                 'last_checked_at' => now(),
                 'next_check_at' => now()->addDay(),
             ],
         );
 
-        return Shift::factory()->create([
+        $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
             'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,
@@ -274,6 +276,14 @@ class EscalateUnresolvedEligibilityJobTest extends TestCase
             'status' => 'scheduled',
             'created_by' => $this->staff->id,
         ]);
+        $this->assertSame('expired', HrStaffComplianceStatus::query()
+            ->where('user_id', $this->staff->id)
+            ->where('requirement_id', $requirement->id)
+            ->sole()->status);
+        $this->assertTrue(app(ShiftStaffEligibilityService::class)
+            ->evaluate($shift, $this->staff->fresh())->hasBlocks());
+
+        return $shift;
     }
 
     /**

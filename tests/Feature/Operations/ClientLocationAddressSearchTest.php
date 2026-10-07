@@ -32,6 +32,7 @@ it('does not contact the provider when address lookup is disabled', function () 
 it('reuses the address provider without transmitting client or tracker context', function () {
     config(['fleet.maps.client_zone_address_search_enabled' => true]);
     extract(ClientLocationWorkspaceFixture::make());
+    Queue::fake(); // Measure lookup after current account/Client/Site setup.
     Http::fake(['nominatim.openstreetmap.org/*' => Http::response([
         ['display_name' => 'Synthetic QA place', 'lat' => '-36.85', 'lon' => '174.76', 'address' => []],
     ])]);
