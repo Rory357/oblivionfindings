@@ -1,4 +1,4 @@
-/* Board (kanban) view — Draft / Awaiting sign-off / Acknowledged columns. */
+/* Board (kanban) view — Draft / Awaiting acknowledgement / Acknowledged columns. */
 import {
     ArrowRight,
     Check,
@@ -32,7 +32,7 @@ const COLUMNS: {
     { status: 'draft', label: 'Draft', dot: 'bg-muted-foreground' },
     {
         status: 'submitted',
-        label: 'Awaiting sign-off',
+        label: 'Awaiting acknowledgement',
         dot: 'bg-status-warning',
     },
     {
@@ -44,10 +44,11 @@ const COLUMNS: {
 
 function BoardCard({
     h,
+    timeZone,
     onOpen,
     onSubmit,
     onAcknowledge,
-}: { h: Handover } & CardHandlers) {
+}: { h: Handover; timeZone?: string } & CardHandlers) {
     const c = cardCounts(h);
     return (
         <GuardrailCard
@@ -105,7 +106,7 @@ function BoardCard({
                     <span>
                         {' '}
                         · {h.outgoing_shift.label}{' '}
-                        {fmtTime(h.outgoing_shift.starts_at)}
+                        {fmtTime(h.outgoing_shift.starts_at, timeZone)}
                     </span>
                 ) : null}
             </div>
@@ -174,8 +175,9 @@ function BoardCard({
 
 export function BoardView({
     handovers,
+    timeZone,
     ...handlers
-}: { handovers: Handover[] } & CardHandlers) {
+}: { handovers: Handover[]; timeZone?: string } & CardHandlers) {
     const byStatus = useMemo(() => {
         const map: Record<string, Handover[]> = {
             draft: [],
@@ -221,7 +223,12 @@ export function BoardView({
                                 </div>
                             ) : (
                                 items.map((h) => (
-                                    <BoardCard key={h.id} h={h} {...handlers} />
+                                    <BoardCard
+                                        key={h.id}
+                                        h={h}
+                                        timeZone={timeZone}
+                                        {...handlers}
+                                    />
                                 ))
                             )}
                         </div>

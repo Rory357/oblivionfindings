@@ -18,17 +18,18 @@ import {
     cardCounts,
     clientName,
     fmtShiftRange,
-    handoverDate,
+    handoverCalendarDate,
     moodEmoji,
     type Handover,
 } from './shared';
 
 export function ListView({
     handovers,
+    timeZone,
     onOpen,
     onSubmit,
     onAcknowledge,
-}: { handovers: Handover[] } & CardHandlers) {
+}: { handovers: Handover[]; timeZone?: string } & CardHandlers) {
     const sorted = useMemo(
         () =>
             [...handovers].sort(
@@ -159,8 +160,9 @@ export function ListView({
                                 </div>
                                 <div className="truncate text-[11.5px] text-muted-foreground">
                                     {h.outgoing_shift
-                                        ? `${fmtShiftRange(h.outgoing_shift)} · ${handoverDate(
+                                        ? `${fmtShiftRange(h.outgoing_shift, timeZone)} · ${handoverCalendarDate(
                                               h,
+                                              timeZone,
                                           ).toLocaleDateString('en-NZ', {
                                               day: 'numeric',
                                               month: 'short',

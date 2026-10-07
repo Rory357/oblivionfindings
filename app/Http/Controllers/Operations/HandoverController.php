@@ -25,39 +25,47 @@ class HandoverController extends Controller
         $auth = $request->user();
         abort_unless($this->handoverService->canAccessWorkflow($auth), 403);
 
-        $filters = $request->validate([
+        $input = $request->validate([
             'week' => ['nullable', 'date'],
+            'q' => ['nullable', 'string', 'max:100'],
+            'staff' => ['nullable', 'integer', 'min:1'],
+            'client' => ['nullable', 'integer', 'min:1'],
+            'site' => ['nullable', 'integer', 'min:1'],
+            'status' => ['nullable', 'in:all,draft,submitted,acknowledged'],
+            'page' => ['nullable', 'integer', 'min:1'],
         ]);
 
-        // Week is the unit of navigation (Mon–Sun). Compute the window in the
-        // worker timezone, then query the UTC-stored created_at column with the
-        // UTC-converted bounds (see reference_eloquent_timezone_storage).
         $tz = config('app.worker_timezone') ?: config('app.timezone', 'UTC');
-        $weekStart = ! empty($filters['week'])
-            ? Carbon::parse($filters['week'], $tz)->startOfWeek(Carbon::MONDAY)
+        $weekStart = ! empty($input['week'])
+            ? Carbon::parse($input['week'], $tz)->startOfWeek(Carbon::MONDAY)
             : Carbon::now($tz)->startOfWeek(Carbon::MONDAY);
         $weekEnd = $weekStart->copy()->endOfWeek(Carbon::SUNDAY);
         $startUtc = $weekStart->copy()->utc();
-        $endUtc = $weekEnd->copy()->utc();
-
+        $endUtc = $weekStart->copy()->addWeek()->utc();
+        $filters = [
+            'week' => $weekStart->toDateString(),
+            'q' => trim($input['q'] ?? ''),
+            'staff' => isset($input['staff']) ? (int) $input['staff'] : null,
+            'client' => isset($input['client']) ? (int) $input['client'] : null,
+            'site' => isset($input['site']) ? (int) $input['site'] : null,
+            'status' => $input['status'] ?? 'all',
+            'page' => (int) ($input['page'] ?? 1),
+        ];
         $canViewAny = $this->handoverService->canViewAny($auth);
+        $includeControlledMedication = $auth->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY);
 
-        $handovers = ShiftHandover::query()
+        $handoverQuery = ShiftHandover::query()
             ->tap(fn ($query) => $this->siteAccess()->applyHandoverScope($query, $auth, $this->handoverBypassPermissions()))
-            ->with($this->presenter->mapEagerLoads())
-            // Filter the week by the handover's effective date — its outgoing
-            // shift's start (what the UI groups + navigates by), falling back to
-            // created_at only when there's no dated shift. Keeps the week filter
-            // consistent with the day grouping, the rail strip, and the
-            // post-create week jump.
+            // Keep the outgoing Shift's effective date, with created_at only
+            // for a record which has no dated outgoing Shift.
             ->where(function ($dateScope) use ($startUtc, $endUtc) {
                 $dateScope
-                    ->whereHas('outgoingShift', fn ($s) => $s
+                    ->whereHas('outgoingShift', fn ($shift) => $shift
                         ->whereNotNull('starts_at')
-                        ->whereBetween('starts_at', [$startUtc, $endUtc]))
+                        ->where('starts_at', '>=', $startUtc)->where('starts_at', '<', $endUtc))
                     ->orWhere(fn ($noShift) => $noShift
-                        ->whereDoesntHave('outgoingShift', fn ($s) => $s->whereNotNull('starts_at'))
-                        ->whereBetween('created_at', [$startUtc, $endUtc]));
+                        ->whereDoesntHave('outgoingShift', fn ($shift) => $shift->whereNotNull('starts_at'))
+                        ->where('created_at', '>=', $startUtc)->where('created_at', '<', $endUtc));
             })
             ->when(! $canViewAny, function ($query) use ($auth) {
                 $query->where(function ($nested) use ($auth) {
@@ -70,27 +78,98 @@ class HandoverController extends Controller
                         ->orWhereHas('incomingShift', fn ($shiftQuery) => $shiftQuery->where('user_id', $auth->id));
                 });
             })
-            ->orderByDesc('created_at')
-            ->limit(300)
-            ->get()
+            ->when($filters['client'] !== null, fn ($query) => $query
+                ->whereHas('client', fn ($client) => $client->whereKey($filters['client'])))
+            ->when($filters['site'] !== null, fn ($query) => $query
+                ->whereHas('client.site', fn ($site) => $site->whereKey($filters['site'])))
+            ->when($filters['staff'] !== null, function ($query) use ($filters): void {
+                $query->where(function ($staff) use ($filters): void {
+                    $staff->whereHas('outgoingStaff', fn ($user) => $user->whereKey($filters['staff']))
+                        ->orWhereHas('acknowledger', fn ($user) => $user->whereKey($filters['staff']))
+                        ->orWhereHas('incomingShift.staff', fn ($user) => $user->whereKey($filters['staff']))
+                        ->orWhere(fn ($unbound) => $unbound->whereNull('incoming_shift_id')
+                            ->whereHas('incomingStaff', fn ($user) => $user->whereKey($filters['staff'])));
+                });
+            });
+
+        if ($filters['q'] !== '') {
+            $needle = mb_strtolower($filters['q'], 'UTF-8');
+            $matchingIds = [];
+            // Search exactly the displayed fields, never raw JSON or private
+            // worker notes. Chunk the whole permitted week without a search cap.
+            (clone $handoverQuery)->select([
+                'shift_handovers.id', 'client_id', 'outgoing_staff_id', 'incoming_shift_id', 'incoming_staff_id',
+                'handover_notes', 'client_mood', 'medications_due', 'incidents_to_note', 'follow_up_items', 'tasks_pending',
+            ])->with([
+                'client:id,first_name,last_name,site_id', 'client.site:id,name',
+                'outgoingStaff:id,name', 'incomingShift:id,user_id', 'incomingShift.staff:id,name', 'incomingStaff:id,name',
+            ])->chunkById(200, function ($handovers) use ($needle, $includeControlledMedication, &$matchingIds): void {
+                foreach ($handovers as $handover) {
+                    if (str_contains(mb_strtolower($this->presenter->indexSearchText($handover, $includeControlledMedication), 'UTF-8'), $needle)) {
+                        $matchingIds[] = (int) $handover->id;
+                    }
+                }
+            }, 'shift_handovers.id', 'id');
+            // Integer literals avoid a parameter ceiling without weakening
+            // the original scope or silently capping complete search results.
+            $handoverQuery->whereIntegerInRaw('shift_handovers.id', $matchingIds);
+        }
+
+        $statusCounts = (clone $handoverQuery)->reorder()
+            ->selectRaw('status, COUNT(*) AS aggregate')->groupBy('status')
+            ->pluck('aggregate', 'status')->map(fn ($count): int => (int) $count)->all();
+        $total = array_sum($statusCounts);
+        $openIncoming = (clone $handoverQuery)->where(function ($incoming): void {
+            $incoming->whereHas('incomingShift', fn ($shift) => $shift->whereNull('user_id'))
+                ->orWhere(fn ($unbound) => $unbound->whereNull('incoming_shift_id')->whereNull('incoming_staff_id'));
+        })->count();
+        $activeTotal = $filters['status'] === 'all' ? $total : ($statusCounts[$filters['status']] ?? 0);
+        $filters['page'] = min($filters['page'], max(1, (int) ceil($activeTotal / 300)));
+        $handoverPage = (clone $handoverQuery)
+            ->when($filters['status'] !== 'all', fn ($query) => $query->where('status', $filters['status']))
+            ->with($this->presenter->mapEagerLoads())
+            ->orderByDesc('created_at')->orderByDesc('id')
+            ->paginate(300, ['*'], 'page', $filters['page'])->appends($filters);
+        $handovers = $handoverPage->getCollection()
             ->map(fn (ShiftHandover $handover) => $this->presenter->mapHandover(
                 $handover,
                 $auth,
-                $auth->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
-            ))
-            ->values();
+                $includeControlledMedication,
+            ))->values();
 
         return inertia('operations/handovers/Index', [
             'handovers' => $handovers,
+            'handoverPagination' => [
+                'current_page' => $handoverPage->currentPage(), 'last_page' => $handoverPage->lastPage(),
+                'per_page' => $handoverPage->perPage(), 'total' => $handoverPage->total(),
+                'from' => $handoverPage->firstItem(), 'to' => $handoverPage->lastItem(),
+                'links' => $handoverPage->linkCollection()->all(),
+            ],
+            'summary' => [
+                'total' => $total, 'draft' => $statusCounts['draft'] ?? 0,
+                'submitted' => $statusCounts['submitted'] ?? 0,
+                'acknowledged' => $statusCounts['acknowledged'] ?? 0,
+                'openIncoming' => $openIncoming,
+            ],
+            'evidence' => [
+                'state' => $total === 0 ? 'no_records' : 'recorded',
+                'basis' => 'handover_records_by_outgoing_shift_start_or_created_at',
+                'scope' => $canViewAny ? 'permitted_sites' : 'own_related_records_in_permitted_sites',
+                'filter_basis' => 'week_search_staff_client_site_before_status',
+                'list_basis' => 'same_cohort_with_selected_status',
+                'period_start' => $startUtc->toIso8601String(),
+                'period_end_exclusive' => $endUtc->toIso8601String(),
+                'timezone' => $tz, 'checked_at' => now()->toIso8601String(), 'complete' => true,
+            ],
+            'lists' => ['handovers' => ['total' => $handoverPage->total(), 'shown' => $handovers->count(),
+                'limit' => 300, 'truncated' => $handoverPage->total() > $handovers->count()]],
             'weekStart' => $weekStart->toDateString(),
             'weekEnd' => $weekEnd->toDateString(),
-            'filters' => ['week' => $weekStart->toDateString()],
+            'filters' => $filters,
             'catalogue' => $this->presenter->catalogue($auth),
             'can' => [
                 'create' => $this->canCreateHandovers($auth),
                 'manage' => (bool) $auth->canDo('shifts.manageAny'),
-                // Gates the read-only "Medications this shift" lens in the detail
-                // dialog — the snapshot endpoint sits behind medications.view.
                 'view_medications' => (bool) $auth->canDo('medications.view'),
             ],
             'currentUser' => ['id' => $auth->id, 'name' => $auth->name],

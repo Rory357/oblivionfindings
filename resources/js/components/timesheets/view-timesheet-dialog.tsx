@@ -194,11 +194,13 @@ export default function ViewTimesheetDialog({
     timesheet,
     onOpenChange,
     canApprove = false,
+    canSubmit,
 }: {
     open: boolean;
     timesheet: ViewTimesheetRow | null;
     onOpenChange: (open: boolean) => void;
     canApprove?: boolean;
+    canSubmit?: boolean;
 }) {
     const [busy, setBusy] = useState(false);
     const [reasonAction, setReasonAction] = useState<
@@ -207,6 +209,9 @@ export default function ViewTimesheetDialog({
 
     if (!timesheet) return null;
     const t = timesheet;
+    const maySubmit =
+        (canSubmit ?? Boolean(t.can_mutate)) && t.status === 'draft';
+    const mayReview = canApprove && t.status === 'submitted';
     const hours = (t.total_hours ?? t.hours ?? 0) as number;
     const tagPills: string[] = [];
     if (t.sleepover) tagPills.push('Sleepover');
@@ -220,6 +225,8 @@ export default function ViewTimesheetDialog({
     );
 
     function call(method: 'post', url: string, data: Record<string, any> = {}) {
+        const permitted = url.endsWith('/submit') ? maySubmit : mayReview;
+        if (!permitted || busy) return;
         setBusy(true);
         router[method](url, data, {
             preserveScroll: true,
@@ -682,7 +689,7 @@ export default function ViewTimesheetDialog({
                             </Button>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                            {canApprove && t.status === 'submitted' ? (
+                            {mayReview ? (
                                 <>
                                     <Button
                                         variant="outline"
@@ -724,7 +731,7 @@ export default function ViewTimesheetDialog({
                                     </Button>
                                 </>
                             ) : null}
-                            {t.status === 'draft' ? (
+                            {maySubmit ? (
                                 <Button
                                     size="sm"
                                     className="gap-1.5"
@@ -761,9 +768,11 @@ export default function ViewTimesheetDialog({
                         : 'Return for changes?'
                 }
                 description={
-                    reasonAction === 'reject'
-                        ? 'The staff member will see this timesheet as rejected, with your reason.'
-                        : 'The timesheet goes back to the staff member to fix and resubmit.'
+                    !mayReview
+                        ? 'This action is no longer available. Your reason is retained; close and refresh the record to check access.'
+                        : reasonAction === 'reject'
+                          ? 'The staff member will see this timesheet as rejected, with your reason.'
+                          : 'The timesheet goes back to the staff member to fix and resubmit.'
                 }
                 label={
                     reasonAction === 'reject'
@@ -776,7 +785,11 @@ export default function ViewTimesheetDialog({
                         : 'Return to staff'
                 }
                 destructive={reasonAction === 'reject'}
-                onConfirm={(reason) => {
+                onConfirm={(reason, done) => {
+                    if (!mayReview || busy) {
+                        done();
+                        return;
+                    }
                     if (reasonAction === 'reject') {
                         call('post', `/operations/timesheets/${t.id}/reject`, {
                             decision_notes: reason,

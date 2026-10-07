@@ -316,6 +316,11 @@ class HandleInertiaRequests extends Middleware
 
                     return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
                 },
+                'shift_note_result' => function () use ($request) {
+                    $outcome = $request->session()->get('shift_note_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
                 // Many controllers use 'status' (starter-kit convention). Treat it as success.
                 'success' => session('success') ?? session('status'),
                 'error' => session('error'),

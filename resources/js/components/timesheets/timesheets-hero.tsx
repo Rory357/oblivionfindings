@@ -1,370 +1,304 @@
-import { PageHero, type PageHeroBadge } from '@/components/page';
-import { PageHeaderPrimaryButton } from '@/components/page/page-header';
-import { WeekPicker } from '@/components/rostering/week-picker';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 import {
-    AlertCircle,
-    CalendarDays,
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+} from '@/components/page';
+import { EntityFilter, WeekPicker } from '@/components/rostering';
+import { formatDateOnly, formatDateTimeInZone } from '@/lib/datetime';
+import {
     CalendarRange,
-    ChevronDown,
     ChevronLeft,
     ChevronRight,
-    DollarSign,
-    FilePlus2,
     FileText,
-    MapPin,
-    MoreHorizontal,
-    Send,
-    Users,
+    Plus,
+    Search,
     X,
 } from 'lucide-react';
-import { useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
+import type { TimesheetFilters } from './use-timesheet-filters';
 
 export type TimesheetsHeroSummary = {
-    firstName: string;
     week_start: string;
     week_end: string;
     week_number: number;
-    timesheets_total: number;
-    timesheets_submitted: number;
-    timesheets_approved: number;
-    timesheets_returned: number;
-    unapproved: number;
     hours_this_week: number;
-    hours_target: number;
-    next_payroll_date: string;
-    sites_count: number;
-    regions_count: number;
-    rostered_today: number;
-    staff_on_shift: number;
+    hours_target: number | null;
+    next_payroll_date: string | null;
+    regions_count: number | null;
+    evidence: { timezone: string; checked_at: string; scope: string };
 };
-
-function fmtMonthDay(iso: string) {
-    if (!iso) return '';
-    return new Date(iso).toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-    });
+type Choice = { id: number; name: string };
+function availableChoice(
+    items: Choice[],
+    selected: number | null,
+    label: string,
+) {
+    return selected !== null && !items.some((item) => item.id === selected)
+        ? [...items, { id: selected, name: `Selected ${label} unavailable` }]
+        : items;
 }
-
-function fmtWeekdayMonthDay(iso: string) {
-    if (!iso) return '';
-    return new Date(iso).toLocaleDateString('en-NZ', {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short',
-    });
-}
-
-// Week-nav chip — matches rostering's exact styling: rounded-md squared,
-// xs-bold text on the dark hero.
-function WeekChip({
-    children,
-    onClick,
-    solid,
-    title,
-    buttonRef,
-    ariaHasPopup,
-    ariaExpanded,
-}: {
-    children: ReactNode;
-    onClick?: () => void;
-    solid?: boolean;
-    title?: string;
-    buttonRef?: RefObject<HTMLButtonElement | null>;
-    ariaHasPopup?: 'dialog';
-    ariaExpanded?: boolean;
-}) {
-    return (
-        // eslint-disable-next-line no-restricted-syntax -- segmented week-stepper on dark hero; not a shadcn Button.
-        <button
-            type="button"
-            ref={buttonRef}
-            onClick={onClick}
-            title={title}
-            aria-haspopup={ariaHasPopup}
-            aria-expanded={ariaExpanded}
-            className={cn(
-                'inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors',
-                solid
-                    ? 'border-primary-foreground/35 bg-primary-foreground/20 hover:bg-primary-foreground/30'
-                    : 'border-primary-foreground/20 bg-primary-foreground/10 hover:bg-primary-foreground/20',
-            )}
-        >
-            {children}
-        </button>
-    );
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// TimesheetsHero — Rostering-pattern PageHero banner for the timesheet
-// approval workspace. Week-nav chips render only when the parent wires
-// the handlers; unwired controls are hidden rather than shipped as
-// decorative no-ops.
-// ─────────────────────────────────────────────────────────────────────
 export default function TimesheetsHero({
     summary,
+    counts,
+    filters,
+    clients,
+    staff,
+    canCreate,
+    ownOnly,
+    loading,
     onCreateTimesheet,
+    onSearch,
+    onSearchSubmit,
+    onChange,
+    onClear,
     onPrevWeek,
     onNextWeek,
     onPickWeek,
     onClearWeek,
-    weekFilterActive = false,
-    onMore,
-    canCreate,
-    sitesCount,
-    staffCount,
+    rangeLabel,
+    notice,
+    rail,
 }: {
     summary: TimesheetsHeroSummary;
-    onCreateTimesheet: () => void;
-    onPrevWeek?: () => void;
-    onNextWeek?: () => void;
-    onPickWeek?: (weekStart: Date) => void;
-    /** Shown as an "All weeks" chip when the list is scoped to one week. */
-    onClearWeek?: () => void;
-    weekFilterActive?: boolean;
-    onMore?: () => void;
+    counts: Record<string, number>;
+    filters: TimesheetFilters;
+    clients: Choice[];
+    staff: Choice[];
     canCreate: boolean;
-    sitesCount?: number;
-    staffCount?: number;
+    ownOnly: boolean;
+    loading: boolean;
+    onCreateTimesheet: () => void;
+    onSearch: (value: string) => void;
+    onSearchSubmit: () => void;
+    onChange: (value: Partial<TimesheetFilters>) => void;
+    onClear: () => void;
+    onPrevWeek: () => void;
+    onNextWeek: () => void;
+    onPickWeek: (date: Date) => void;
+    onClearWeek: () => void;
+    rangeLabel: string;
+    notice: string | null;
+    rail: ReactNode;
 }) {
-    const weekBtnRef = useRef<HTMLButtonElement | null>(null);
     const [pickerOpen, setPickerOpen] = useState(false);
-    const coveragePct =
-        summary.hours_target > 0
-            ? Math.min(
-                  100,
-                  Math.round(
-                      (summary.hours_this_week / summary.hours_target) * 100,
-                  ),
-              )
-            : 0;
-
-    const badges: PageHeroBadge[] = [
-        {
-            icon: AlertCircle,
-            label: `${summary.unapproved} awaiting approval`,
-            tone: 'warning',
-        },
-        {
-            icon: Send,
-            label: `${summary.timesheets_returned} returned to staff`,
-            tone: 'critical',
-        },
-        {
-            icon: DollarSign,
-            label: `Payroll closes ${summary.next_payroll_date}`,
-            tone: 'info',
-        },
+    const weekRef = useRef<HTMLButtonElement>(null);
+    const dated = Boolean(filters.from || filters.to);
+    const hasFilters =
+        dated ||
+        Boolean(
+            filters.search ||
+            filters.client_id ||
+            filters.staff_id ||
+            filters.tab !== 'all',
+        );
+    const period = dated
+        ? `${filters.from ? formatDateOnly(filters.from) : 'Any start date'} → ${filters.to ? formatDateOnly(filters.to) : 'Any end date'}`
+        : 'All weeks';
+    const meters = [
+        ['all', 'Active records', 'Matching filters in the All tab'],
+        [
+            'submitted',
+            'Awaiting approval',
+            'Matching records you may view for review',
+        ],
+        ['returned', 'Returned', 'Matching records returned for changes'],
+        [
+            'approved',
+            'Approved',
+            'Matching approved records; payment is separate',
+        ],
     ];
-
-    const hasWeekNav = Boolean(onPrevWeek || onNextWeek || onPickWeek);
-
     return (
         <>
-            <PageHero
-                category="ops"
+            <PageHeader
+                variant="index"
+                frontline
+                title={ownOnly ? 'My timesheets' : 'Timesheets'}
                 icon={FileText}
-                title={
-                    <span>
-                        <span className="mb-2 flex items-center gap-2 text-[10.5px] font-semibold tracking-wider text-primary-foreground/80 uppercase">
-                            <span
-                                aria-hidden="true"
-                                className="relative inline-flex h-2 w-2"
-                            >
-                                <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-status-success/70" />
-                                <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success ring-2 ring-status-success/30" />
-                            </span>
-                            Live timesheets · refreshed just now
-                        </span>
-                        <span className="block">
-                            <span className="font-normal text-primary-foreground/80">
-                                Kia ora {summary.firstName}, your week of
-                                timesheets —{' '}
-                            </span>
-                            <span className="border-b-2 border-primary-foreground/40 pb-0.5">
-                                {fmtWeekdayMonthDay(summary.week_start)} →{' '}
-                                {fmtWeekdayMonthDay(summary.week_end)}
-                            </span>
-                        </span>
-                    </span>
-                }
-                description={
-                    <span>
-                        <span className="font-semibold text-primary-foreground tabular-nums">
-                            {summary.unapproved}
-                        </span>{' '}
-                        timesheet
-                        {summary.unapproved === 1 ? '' : 's'} need a decision,{' '}
-                        <span className="font-semibold text-primary-foreground tabular-nums">
-                            {summary.timesheets_returned}
-                        </span>{' '}
-                        have been returned for changes, and{' '}
-                        <span className="font-semibold text-primary-foreground tabular-nums">
-                            {summary.hours_this_week}
-                        </span>{' '}
-                        of{' '}
-                        <span className="tabular-nums">
-                            {summary.hours_target}
-                        </span>{' '}
-                        rostered hours have been logged so far. Payroll closes{' '}
-                        <span className="font-semibold text-primary-foreground">
-                            {summary.next_payroll_date}
-                        </span>
-                        .
-                    </span>
-                }
-                meta={[
-                    {
-                        icon: CalendarDays,
-                        label: `Week ${summary.week_number} · Mon–Sun`,
-                    },
-                    {
-                        icon: MapPin,
-                        label: `${sitesCount ?? summary.sites_count} site${(sitesCount ?? summary.sites_count) === 1 ? '' : 's'} · ${summary.regions_count} region${summary.regions_count === 1 ? '' : 's'}`,
-                    },
-                    {
-                        icon: Users,
-                        label: `${summary.rostered_today} rostered · ${summary.staff_on_shift} on shift${typeof staffCount === 'number' && staffCount > 0 ? ` · ${staffCount} staff` : ''}`,
-                    },
-                ]}
-                badges={badges}
-                stats={[
-                    { label: 'Total', value: summary.timesheets_total },
-                    {
-                        label: 'Pending',
-                        value: summary.timesheets_submitted,
-                        tone:
-                            summary.timesheets_submitted > 0
-                                ? 'warning'
-                                : undefined,
-                    },
-                    {
-                        label: 'Approved',
-                        value: summary.timesheets_approved,
-                        tone: 'success',
-                    },
-                    {
-                        label: 'Returned',
-                        value: summary.timesheets_returned,
-                        tone:
-                            summary.timesheets_returned > 0
-                                ? 'critical'
-                                : undefined,
-                    },
-                ]}
+                subline={`${period} · ${summary.evidence.timezone} · Review recorded work, hours and approval decisions`}
                 actions={
                     <>
-                        {canCreate ? (
+                        <form
+                            className="w-full min-w-0 basis-full sm:w-auto sm:flex-1 sm:basis-auto"
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                onSearchSubmit();
+                            }}
+                        >
+                            <fieldset
+                                disabled={loading}
+                                className="flex min-w-0 flex-wrap gap-2"
+                            >
+                                <PageHeaderSearch
+                                    value={filters.search}
+                                    onChange={onSearch}
+                                    placeholder="Search names or location"
+                                    className="min-w-0"
+                                />
+                                <PageHeaderGlassButton
+                                    type="submit"
+                                    icon={Search}
+                                >
+                                    Search
+                                </PageHeaderGlassButton>
+                            </fieldset>
+                        </form>
+                        {canCreate && (
                             <PageHeaderPrimaryButton
-                                icon={FilePlus2}
+                                icon={Plus}
+                                disabled={loading}
                                 onClick={onCreateTimesheet}
-                                data-testid="open-create-timesheet"
                             >
                                 Create timesheet
                             </PageHeaderPrimaryButton>
-                        ) : null}
-                        {onMore ? (
-                            <Button
-                                type="button"
-                                size="icon"
-                                variant="outline"
-                                onClick={onMore}
-                                aria-label="More actions"
-                                className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
-                            >
-                                <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                        ) : null}
+                        )}
                     </>
                 }
-                children={
-                    <div className="max-w-xl rounded-xl border border-primary-foreground/15 bg-primary-foreground/5 p-3">
-                        <div className="mb-1.5 flex items-center justify-between text-[11.5px] text-primary-foreground/80">
-                            <span className="font-medium text-primary-foreground">
-                                Hours logged vs. rostered
-                            </span>
-                            <span className="tabular-nums">
-                                {summary.hours_this_week} /{' '}
-                                {summary.hours_target}h · {coveragePct}%
-                            </span>
-                        </div>
-                        <div className="h-1.5 overflow-hidden rounded-full bg-primary-foreground/15">
-                            <div
-                                className="h-full rounded-full bg-primary-foreground/85 transition-all"
-                                style={{ width: coveragePct + '%' }}
-                            />
-                        </div>
+                meters={
+                    <div className="grid w-full min-w-0 grid-cols-2 gap-2 xl:grid-cols-4">
+                        {meters.map(([tab, label, caption]) => (
+                            <PageHeaderMeterBlock
+                                key={tab}
+                                label={label}
+                                ariaLabel={`View ${label.toLowerCase()}`}
+                                onClick={() => {
+                                    if (!loading) onChange({ tab });
+                                }}
+                            >
+                                <PageHeaderMeterBig>
+                                    {counts[tab] ?? 0}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    {caption}
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                        ))}
                     </div>
                 }
-                footer={
-                    hasWeekNav ? (
-                        <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                                {onPrevWeek ? (
-                                    <WeekChip
-                                        onClick={onPrevWeek}
-                                        title="Previous week"
-                                    >
-                                        <ChevronLeft className="h-3.5 w-3.5" />
-                                        Wk {summary.week_number - 1}
-                                    </WeekChip>
-                                ) : null}
-                                {onPickWeek ? (
-                                    <WeekChip
-                                        solid
-                                        buttonRef={weekBtnRef}
-                                        ariaHasPopup="dialog"
-                                        ariaExpanded={pickerOpen}
-                                        onClick={() => setPickerOpen((v) => !v)}
-                                    >
-                                        <CalendarRange className="h-3.5 w-3.5" />
-                                        Wk {summary.week_number} ·{' '}
-                                        {fmtMonthDay(summary.week_start)} →{' '}
-                                        {fmtMonthDay(summary.week_end)} · pick
-                                        week
-                                        <ChevronDown className="h-3 w-3" />
-                                    </WeekChip>
-                                ) : null}
-                                {onNextWeek ? (
-                                    <WeekChip
-                                        onClick={onNextWeek}
-                                        title="Next week"
-                                    >
-                                        Wk {summary.week_number + 1}
-                                        <ChevronRight className="h-3.5 w-3.5" />
-                                    </WeekChip>
-                                ) : null}
-                                {weekFilterActive && onClearWeek ? (
-                                    <WeekChip
-                                        onClick={onClearWeek}
-                                        title="Show every week"
-                                    >
-                                        <X className="h-3.5 w-3.5" />
-                                        All weeks
-                                    </WeekChip>
-                                ) : null}
-                            </div>
-                        </div>
-                    ) : undefined
+                filters={
+                    <div className="w-full min-w-0 space-y-3">
+                        <fieldset
+                            disabled={loading}
+                            className="flex flex-wrap items-center gap-2"
+                        >
+                            <PageHeaderGlassButton
+                                icon={ChevronLeft}
+                                onClick={onPrevWeek}
+                                aria-label="Previous week"
+                            >
+                                Previous
+                            </PageHeaderGlassButton>
+                            <PageHeaderGlassButton
+                                ref={weekRef}
+                                icon={CalendarRange}
+                                onClick={() => setPickerOpen(!pickerOpen)}
+                                aria-haspopup="dialog"
+                                aria-expanded={pickerOpen}
+                            >
+                                Week {summary.week_number} · Choose week
+                            </PageHeaderGlassButton>
+                            <PageHeaderGlassButton
+                                icon={ChevronRight}
+                                onClick={onNextWeek}
+                                aria-label="Next week"
+                            >
+                                Next
+                            </PageHeaderGlassButton>
+                            {dated && (
+                                <PageHeaderGlassButton onClick={onClearWeek}>
+                                    All weeks
+                                </PageHeaderGlassButton>
+                            )}
+                            <EntityFilter
+                                onDark
+                                label="Client"
+                                allLabel="All clients"
+                                items={availableChoice(
+                                    clients,
+                                    filters.client_id,
+                                    'client',
+                                )}
+                                value={filters.client_id}
+                                onChange={(client_id) =>
+                                    onChange({ client_id })
+                                }
+                            />
+                            {(!ownOnly || filters.staff_id !== null) && (
+                                <EntityFilter
+                                    onDark
+                                    label="Staff"
+                                    allLabel="All staff"
+                                    items={availableChoice(
+                                        staff,
+                                        filters.staff_id,
+                                        'staff member',
+                                    )}
+                                    value={filters.staff_id}
+                                    onChange={(staff_id) =>
+                                        onChange({ staff_id })
+                                    }
+                                />
+                            )}
+                            {hasFilters && (
+                                <PageHeaderGlassButton
+                                    icon={X}
+                                    onClick={onClear}
+                                >
+                                    Clear filters
+                                </PageHeaderGlassButton>
+                            )}
+                        </fieldset>
+                        <p className="text-caption text-band-foreground!">
+                            Week of {formatDateOnly(summary.week_start)} →{' '}
+                            {formatDateOnly(summary.week_end)}:{' '}
+                            {summary.hours_this_week}h recorded with the current
+                            filters, before status.{' '}
+                            {summary.hours_target === null
+                                ? 'Rostered hours are unavailable for a text search.'
+                                : `${summary.hours_target}h planned in assigned shifts starting that week.`}{' '}
+                            {dated ? '' : 'The list includes all weeks.'}
+                        </p>
+                        <p
+                            role="status"
+                            className="text-caption text-band-foreground!"
+                        >
+                            {loading ? 'Loading timesheets…' : rangeLabel} ·
+                            Updated{' '}
+                            {formatDateTimeInZone(
+                                summary.evidence.checked_at,
+                                summary.evidence.timezone,
+                            )}
+                        </p>
+                        {notice && (
+                            <p
+                                role="alert"
+                                className="text-caption text-band-foreground!"
+                            >
+                                {notice}
+                            </p>
+                        )}
+                    </div>
                 }
+                rail={rail}
             />
-
-            {pickerOpen && onPickWeek ? (
+            {pickerOpen && (
                 <WeekPicker
+                    anchorRef={weekRef}
                     selectedWeekStart={
-                        new Date(summary.week_start + 'T00:00:00')
+                        new Date(`${summary.week_start}T12:00:00`)
                     }
-                    anchorRef={weekBtnRef}
                     showContextMenu={false}
-                    onSelect={(next) => {
+                    onSelect={(date) => {
                         setPickerOpen(false);
-                        onPickWeek(next);
+                        onPickWeek(date);
                     }}
                     onClose={() => setPickerOpen(false)}
                 />
-            ) : null}
+            )}
         </>
     );
 }

@@ -28,6 +28,36 @@ class HandoverPresenter
     ) {}
 
     /**
+     * The existing index search haystack, using only presenter-visible values.
+     * Relations are supplied by the caller's narrowly scoped search eager loads.
+     * No action, lock, worker-note or medication-domain projection runs here.
+     */
+    public function indexSearchText(ShiftHandover $handover, bool $includeControlledMedication): string
+    {
+        $client = $handover->client;
+        $currentIncomingStaff = $handover->incomingShift?->staff;
+        $incomingUserId = $currentIncomingStaff?->id
+            ?? ($handover->incoming_shift_id ? null : $handover->incoming_staff_id);
+        $incomingName = ($currentIncomingStaff || $incomingUserId)
+            ? ($currentIncomingStaff?->name ?? $handover->incomingStaff?->name ?? 'Pending assignment')
+            : null;
+        $values = [
+            $handover->handover_notes,
+            $client ? trim($client->first_name.' '.$client->last_name) : 'Unknown client',
+            $handover->outgoingStaff?->name,
+            $incomingName,
+            $client?->site?->name,
+            $handover->client_mood,
+            ...($includeControlledMedication ? $this->listToDisplayStrings($handover->medications_due) : []),
+            ...$this->listToDisplayStrings($handover->incidents_to_note),
+            ...$this->listToDisplayStrings($handover->follow_up_items),
+            ...$this->listToDisplayStrings($handover->tasks_pending),
+        ];
+
+        return implode(' ', array_filter($values, fn ($value): bool => $value !== null && $value !== ''));
+    }
+
+    /**
      * Shape a single handover for index-style surfaces — full record plus the
      * per-user action/edit-lock flags the UI gates affordances on.
      *
