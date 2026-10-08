@@ -1,6 +1,6 @@
 # Workforce header consistency — 8 October 2026
 
-Status: implemented and verified in the main-integration checkout; scoped main delivery is in progress.
+Status: the header/navigation unit is implemented and verified on main. The wider Workforce programme remains active.
 
 ## User-reported issues
 - Workforce settings also opens Operations and highlights its Dashboard.
@@ -31,3 +31,7 @@ Job Board's Post position button already had no callback. The backend accepts a 
 
 ## Boundaries
 Control Room remains independent. No eMAR-specific files, permission grants, database accounts or policies changed for this UI work. The unrelated FleetRealtimePrivacyTest change is excluded. The roster template native corrective run is owned by the roster agent and explicitly excludes concurrent frontend/document changes from its backend freeze.
+
+## Main verification
+
+The22-file header/navigation change is integrated as18fa2dea29181c4f32047ac110b0058007951ced, independently of the five earlier roster checkpoints and pending template library. Main passes103 focused UI cases, the full TypeScript check, and its production build (9m40s, app-cb_PkdU0.js; existing chunk-size advisory). Initial commands could not start because this checkout had empty dependency directories; matching locked development dependencies were connected and main application autoload resolution verified before delivery. The original failed startup logs are retained. Browser acceptance above used the isolated integration preview; this is not a claim that the hosted site has deployed the commit.
