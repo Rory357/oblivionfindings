@@ -34,6 +34,9 @@ final class TimesheetPayrollAdjustmentProcess
             throw new RuntimeException('Only the exact local process-owned test schema and receipt prefix are permitted.');
         }
         WorkforceEligibilityRuntimeProcess::assertEnvironmentFiles(base_path(), $database, getmypid(), getenv('CI'), getenv('GITHUB_ACTIONS'));
+        if (! is_dir(dirname($prefix)) && ! mkdir(dirname($prefix), 0777)) {
+            throw new RuntimeException('The owned payroll runtime artifact directory could not be created.');
+        }
         $process = new Process([PHP_BINARY, __FILE__, json_encode($operation, JSON_THROW_ON_ERROR)], base_path(), [
             'APP_ENV' => 'testing', 'APP_KEY' => config('app.key'), 'APP_BASE_PATH' => base_path(),
             'LARAVEL_STORAGE_PATH' => storage_path(), 'DB_CONNECTION' => 'mysql', 'DB_URL' => '', 'DB_SOCKET' => '',

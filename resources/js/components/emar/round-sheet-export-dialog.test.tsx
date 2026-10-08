@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button';
 import { ExportDialog } from '@/pages/emar/reports/_export-dialog';
 import type { ExportContext } from '@/pages/emar/reports/_types';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -101,7 +102,9 @@ describe('audited round-sheet export', () => {
             const [open, setOpen] = useState(false);
             return (
                 <main>
-                    <button onClick={() => setOpen(true)}>Print round</button>
+                    <Button type="button" onClick={() => setOpen(true)}>
+                        Print round
+                    </Button>
                     {open && (
                         <RoundSheetExportDialog
                             roundId={27}
