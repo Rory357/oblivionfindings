@@ -20,6 +20,7 @@ use App\Services\Medication\ExternalClinical\ProviderMedicationTransfers;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationOrderWorkflow;
 use App\Services\Medication\MedicationRecordAccess;
+use App\Services\Medication\MedicationScopeDecisionService;
 use App\Support\MedicationJourney;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -231,16 +232,29 @@ final class MedicationExternalClinicalController extends Controller
         if ($proposal->status !== 'accepted' || $proposal->revision_id === null || ! $actor->canDo('medications.view')) {
             return $empty;
         }
-        $revision = MedicationOrderRevision::query()->canonicalVersion()->where('client_id', $proposal->client_id)->find($proposal->revision_id);
+        $revision = MedicationOrderRevision::query()->canonicalVersion()->with('version')->where('client_id', $proposal->client_id)->find($proposal->revision_id);
         $order = $revision ? ClientMedication::query()->current()->where('client_id', $proposal->client_id)->find($revision->client_medication_id) : null;
         if ($order === null || ($order->controlled_drug && ! $actor->canDo('medications.controlled.view'))
             || ! in_array((int) $proposal->client_id, $this->records->readableClientIds($actor, [$proposal->client_id]), true)) {
             return $empty;
         }
 
+        // Checking defaults to the independent workflow. An author or read-back
+        // witness keeps the exact order in view; any deliberate alone-check is
+        // still chosen explicitly within the existing order workflow.
+        $canCheck = $actor->canDo('medications.orders.verify')
+            && $revision->status === 'pending'
+            && (int) $revision->base_version === (int) $order->version
+            && ((int) $revision->version->version_number > (int) $order->version || $order->approval_status !== 'verified')
+            && $order->state !== 'ceased' && $order->ceased_at === null
+            && ! in_array((int) $actor->id, [(int) $revision->entered_by, (int) $revision->read_back_witness_id], true)
+            && (! $order->controlled_drug || $actor->canDo('medications.controlled.record'))
+            && in_array((int) $order->client_id, app(MedicationScopeDecisionService::class)
+                ->clientIdsWithCurrentAuthority($actor, [(int) $order->client_id], now()), true);
+
         return ['order_id' => $order->id, 'order_url' => '/emar/prescriptions?'.http_build_query([
             'client_id' => $proposal->client_id, 'order_id' => $order->id,
-            'action' => $actor->canDo('medications.orders.verify') ? 'check' : 'view',
+            'action' => $canCheck ? 'check' : 'view',
         ])];
     }
 

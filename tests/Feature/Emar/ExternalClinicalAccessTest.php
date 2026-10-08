@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Http\Responses\LoginResponse;
 use App\Models\AuditLog;
 use App\Models\Client;
+use App\Models\ClientMedication;
 use App\Models\MedicationExternalClinician;
 use App\Models\MedicationExternalGrant;
 use App\Models\MedicationExternalProposal;
@@ -438,9 +439,14 @@ final class ExternalClinicalAccessTest extends TestCase
             'source' => $this->sourceInput(), 'source_file' => UploadedFile::fake()->create('prescription.pdf', 8, 'application/pdf')];
         $accepted = $this->actingAs($this->manager)->postJson('/emar/connected-care/proposals/'.$proposal->id.'/decision', $decision)->assertSuccessful()
             ->assertJsonPath('order_id', $order->id);
+        $this->assertTrue($this->manager->canDo('medications.orders.manage'));
+        $this->assertTrue($this->manager->canDo('medications.orders.verify'));
         $this->assertStringContainsString('order_id='.$order->id, $accepted->json('order_url'));
+        parse_str(parse_url($accepted->json('order_url'), PHP_URL_QUERY), $authorTarget);
+        $this->assertSame('view', $authorTarget['action']);
         $this->actingAs($this->manager)->get($accepted->json('order_url'))->assertOk()
-            ->assertInertia(fn ($page) => $page->where('open_order_id', $order->id)->where('prefill_client_id', $this->person->id));
+            ->assertInertia(fn ($page) => $page->where('open_order_id', $order->id)
+                ->where('prefill_client_id', $this->person->id)->where('open_order_action', 'view'));
         $persisted = $this->actingAs($this->manager)->get('/emar/connected-care?client_id='.$this->person->id)->assertOk();
         $this->assertSame($order->id, $persisted->inertiaProps('proposals.0.order_id'));
         $this->assertSame($accepted->json('order_url'), $persisted->inertiaProps('proposals.0.order_url'));
@@ -448,10 +454,150 @@ final class ExternalClinicalAccessTest extends TestCase
         $this->assertSame('verified', $order->approval_status);
         $revision = MedicationOrderRevision::findOrFail($proposal->refresh()->revision_id);
         $this->assertSame('pending', $revision->status);
+        $this->assertSame($this->manager->id, (int) $revision->entered_by);
+        $pendingEvidence = $revision->getRawOriginal();
+        $this->actingAs($this->manager)->post('/emar/order-revisions/'.$revision->id.'/check', ['source_matches' => true,
+            'dose_route_times_checked' => true, 'allergies_interactions_checked' => true])
+            ->assertRedirect()->assertSessionHasErrors('checker');
+        $this->assertSame($pendingEvidence, $revision->refresh()->getRawOriginal());
+        $this->assertSame('10 mg', $order->refresh()->dosage);
         $checker = $this->connectedStaff();
-        $this->actingAs($checker)->post('/emar/order-revisions/'.$revision->id.'/check', ['source_matches' => true,
+        $forChecker = $this->actingAs($checker)->get('/emar/connected-care?client_id='.$this->person->id)->assertOk();
+        $checkerUrl = $forChecker->inertiaProps('proposals.0.order_url');
+        parse_str(parse_url($checkerUrl, PHP_URL_QUERY), $checkerTarget);
+        $this->assertSame('check', $checkerTarget['action']);
+        $this->assertSame((string) $order->id, $checkerTarget['order_id']);
+        $this->get($checkerUrl)->assertOk()->assertInertia(fn ($page) => $page
+            ->where('open_order_id', $order->id)->where('open_order_action', 'check')->where('open_check_mode', 'independent'));
+        $this->post('/emar/order-revisions/'.$revision->id.'/check', ['source_matches' => true,
             'dose_route_times_checked' => true, 'allergies_interactions_checked' => true])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame('20 mg', $order->refresh()->dosage);
+        $this->assertSame($checker->id, (int) $revision->refresh()->checked_by);
+        $completed = $this->get('/emar/connected-care?client_id='.$this->person->id)->assertOk();
+        parse_str(parse_url($completed->inertiaProps('proposals.0.order_url'), PHP_URL_QUERY), $completedTarget);
+        $this->assertSame('view', $completedTarget['action']);
+    }
+
+    public function test_accepted_start_proposal_opens_author_view_and_independent_checker_can_publish_initial_version(): void
+    {
+        $submitted = $this->actingAs($this->clinician)->postJson('/clinical-portal/people/'.$this->person->id.'/proposals', [
+            'kind' => 'start', 'prescription' => $this->prescription(), 'reason' => 'Start prescribed medicine',
+            'request_key' => 'start-continuation',
+        ])->assertSuccessful();
+        $proposal = MedicationExternalProposal::findOrFail($submitted->json('id'));
+        $accepted = $this->actingAs($this->manager)->postJson('/emar/connected-care/proposals/'.$proposal->id.'/decision', [
+            'decision' => 'accept', 'decision_note' => 'Source confirmed', 'source_confirmed' => true,
+            'source' => $this->sourceInput(), 'source_file' => UploadedFile::fake()->create('prescription.pdf', 8, 'application/pdf'),
+        ])->assertSuccessful();
+        $revision = MedicationOrderRevision::with('version')->findOrFail($proposal->refresh()->revision_id);
+        $order = ClientMedication::findOrFail($revision->client_medication_id);
+        $this->assertSame(1, (int) $order->version);
+        $this->assertSame(1, (int) $revision->base_version);
+        $this->assertSame(1, (int) $revision->version->version_number);
+        $this->assertSame('pending_verification', $order->approval_status);
+        $this->assertSame($this->manager->id, (int) $revision->entered_by);
+        $accepted->assertJsonPath('order_id', $order->id);
+        parse_str(parse_url($accepted->json('order_url'), PHP_URL_QUERY), $authorTarget);
+        $this->assertSame('view', $authorTarget['action']);
+        $this->get($accepted->json('order_url'))->assertOk()->assertInertia(fn ($page) => $page
+            ->where('open_order_id', $order->id)->where('open_order_action', 'view'));
+
+        $checker = $this->connectedStaff();
+        $response = $this->actingAs($checker)->get('/emar/connected-care?client_id='.$this->person->id)->assertOk();
+        $checkerUrl = $response->inertiaProps('proposals.0.order_url');
+        parse_str(parse_url($checkerUrl, PHP_URL_QUERY), $checkerTarget);
+        $this->assertSame('check', $checkerTarget['action']);
+        $this->assertSame((string) $order->id, $checkerTarget['order_id']);
+        $this->get($checkerUrl)->assertOk()->assertInertia(fn ($page) => $page
+            ->where('open_order_id', $order->id)->where('open_order_action', 'check')->where('open_check_mode', 'independent'));
+        $this->post('/emar/order-revisions/'.$revision->id.'/check', ['source_matches' => true,
+            'dose_route_times_checked' => true, 'allergies_interactions_checked' => true])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('verified', $order->refresh()->approval_status);
+        $this->assertSame(1, (int) $order->version);
+        $this->assertSame('checked', $revision->refresh()->status);
+        $this->assertSame($checker->id, (int) $revision->checked_by);
+    }
+
+    public static function nonIndependentProposalReaders(): array
+    {
+        return [
+            'read-back witness' => ['witness'],
+            'without current work' => ['no_work'],
+            'verification withdrawn' => ['no_verify'],
+            'stale in-effect version' => ['stale_base'],
+            'stopped order' => ['stopped'],
+            'sent-back revision' => ['sent_back'],
+            'controlled reader without record permission' => ['controlled_read_only'],
+        ];
+    }
+
+    #[DataProvider('nonIndependentProposalReaders')]
+    public function test_accepted_proposal_continuation_keeps_non_independent_readers_in_exact_order_view(string $condition): void
+    {
+        $order = $this->chart();
+        $proposal = app(ExternalClinicalProposals::class)->submit($this->clinician, $this->person->id, [
+            'kind' => 'change', 'medication_id' => $order->id, 'expected_version' => 1,
+            'prescription' => $this->prescription(['dosage' => '20 mg']), 'reason' => 'Prescriber source reviewed',
+            'request_key' => 'continuation-'.$condition,
+        ], null);
+        $this->actingAs($this->manager)->postJson('/emar/connected-care/proposals/'.$proposal->id.'/decision', [
+            'decision' => 'accept', 'decision_note' => 'Source confirmed', 'source_confirmed' => true,
+            'source' => $this->sourceInput(), 'source_file' => UploadedFile::fake()->create('prescription.pdf', 8, 'application/pdf'),
+        ])->assertSuccessful();
+        $revision = MedicationOrderRevision::findOrFail($proposal->refresh()->revision_id);
+        $checker = $this->connectedStaff();
+        $this->actingAs($checker);
+        $baseline = $this->get('/emar/connected-care?client_id='.$this->person->id)->assertOk();
+        parse_str(parse_url($baseline->inertiaProps('proposals.0.order_url'), PHP_URL_QUERY), $baselineTarget);
+        $this->assertSame('check', $baselineTarget['action']);
+
+        switch ($condition) {
+            case 'witness':
+                // The recorded read-back involvement remains distinct from the author.
+                $revision->forceFill(['read_back_witness_id' => $checker->id])->save();
+                break;
+            case 'no_work':
+                Shift::where('user_id', $checker->id)->where('client_id', $this->person->id)
+                    ->update(['status' => 'completed', 'actual_ends_at' => now()->subMinute()]);
+                break;
+            case 'no_verify':
+                $checker->permissionOverrides()->syncWithoutDetaching(Permission::where('key', 'medications.orders.verify')
+                    ->pluck('id')->mapWithKeys(fn ($id) => [$id => ['allowed' => false]])->all());
+                break;
+            case 'stale_base':
+                $order->forceFill(['version' => $revision->base_version + 1])->save();
+                break;
+            case 'stopped':
+                $order->forceFill(['state' => 'ceased', 'active' => false, 'ceased_at' => now(),
+                    'ceased_by' => $this->manager->id, 'ceased_reason' => 'Prescriber stopped before review'])->save();
+                break;
+            case 'sent_back':
+                $this->post('/emar/order-revisions/'.$revision->id.'/send-back', ['reason' => 'Source needs correction'])
+                    ->assertRedirect()->assertSessionHasNoErrors();
+                break;
+            case 'controlled_read_only':
+                $order->forceFill(['controlled_drug' => true])->save();
+                foreach (['medications.controlled.view' => true, 'medications.controlled.record' => false] as $key => $allowed) {
+                    $permission = Permission::firstOrCreate(['key' => $key], ['description' => $key, 'group' => 'medications']);
+                    $checker->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => $allowed]]);
+                }
+                break;
+        }
+        $checker = $checker->fresh();
+        $this->assertTrue($checker->can('viewMedications', $this->person->fresh()));
+        $retainedOrder = $order->fresh()->getRawOriginal();
+        $retainedRevision = $revision->fresh()->getRawOriginal();
+        $response = $this->actingAs($checker)->get('/emar/connected-care?client_id='.$this->person->id)->assertOk();
+        $orderUrl = $response->inertiaProps('proposals.0.order_url');
+        parse_str(parse_url($orderUrl, PHP_URL_QUERY), $viewTarget);
+        $this->assertSame('view', $viewTarget['action']);
+        $this->assertSame((string) $order->id, $viewTarget['order_id']);
+        $this->assertSame((string) $this->person->id, $viewTarget['client_id']);
+        $this->get($orderUrl)->assertOk()->assertInertia(fn ($page) => $page
+            ->where('open_order_id', $order->id)->where('prefill_client_id', $this->person->id)->where('open_order_action', 'view'));
+        $this->assertSame($retainedOrder, $order->fresh()->getRawOriginal());
+        $this->assertSame($retainedRevision, $revision->fresh()->getRawOriginal());
     }
 
     public function test_read_only_grant_and_restricted_controlled_orders_deny_proposals(): void
