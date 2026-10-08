@@ -7,28 +7,45 @@ import {
     PageHeaderMeterCaption,
     PageHeaderMeterDonut,
     PageHeaderRail,
-    type PageHeaderRailItem,
     PageHeaderSearch,
     PageHeaderStatusChip,
     PageLayout,
+    type PageHeaderRailItem,
 } from '@/components/page';
+import {
+    qualificationMappingLabel,
+    type QualificationOption,
+} from '@/components/rostering/qualification-requirement-fields';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
-import { Award, Layers, ShieldAlert, ShieldCheck, Users } from 'lucide-react';
+import {
+    Award,
+    Layers,
+    Pencil,
+    Plus,
+    ShieldAlert,
+    ShieldCheck,
+    Trash2,
+    Users,
+} from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-
-type QualificationRequirement = {
-    id: number;
-    qualification_name: string;
-    is_mandatory: boolean;
-    client: { id: number; first_name: string; last_name: string } | null;
-};
+import {
+    QualificationRemoveDialog,
+    QualificationRequirementEditor,
+    type QualificationClient,
+    type QualificationContext,
+    type QualificationRequirement,
+} from './requirement-editor';
 
 type Props = {
+    can?: { create: boolean; edit: boolean; delete: boolean };
+    complianceRequirements?: QualificationOption[];
+    editableClients?: QualificationClient[];
+    serviceContexts?: QualificationContext[];
     requirements: {
         data: QualificationRequirement[];
         links: { url: string | null; label: string; active: boolean }[];
@@ -62,8 +79,24 @@ export default function QualificationsIndex({
     filters = {},
     stats,
     clients = [],
+    can = { create: false, edit: false, delete: false },
+    complianceRequirements = [],
+    editableClients = [],
+    serviceContexts = [],
 }: Props) {
-    const { labels } = usePage().props as any;
+    const page = usePage().props as unknown as {
+        labels?: Record<string, string>;
+        auth?: { user?: { id: number } };
+    };
+    const { labels } = page;
+    const actorId = page.auth?.user?.id ?? 0;
+    const [editor, setEditor] = useState<
+        QualificationRequirement | null | undefined
+    >(undefined);
+    const [removing, setRemoving] = useState<QualificationRequirement | null>(
+        null,
+    );
+    const [notice, setNotice] = useState('');
     const clientSingular: string = labels?.['client.singular'] ?? 'Client';
     const clientPlural: string = labels?.['client.plural'] ?? 'Clients';
 
@@ -156,15 +189,24 @@ export default function QualificationsIndex({
                     {s.mandatory} mandatory
                 </PageHeaderStatusChip>
             }
-            subline={`Worker qualification requirements by ${clientSingular.toLowerCase()} · ${
-                s.total
-            } ${s.total === 1 ? 'requirement' : 'requirements'} · configured from ${clientSingular.toLowerCase()} and shift workflows`}
+            subline={`Worker qualification requirements by ${clientSingular.toLowerCase()} · ${s.total} ${s.total === 1 ? 'requirement' : 'requirements'}`}
             actions={
-                <PageHeaderSearch
-                    value={q}
-                    onChange={setQ}
-                    placeholder={`Search qualifications and ${clientPlural.toLowerCase()}…`}
-                />
+                <>
+                    <PageHeaderSearch
+                        value={q}
+                        onChange={setQ}
+                        placeholder={`Search qualifications and ${clientPlural.toLowerCase()}…`}
+                    />
+                    {can.create ? (
+                        <Button
+                            onClick={() => setEditor(null)}
+                            className="min-h-11"
+                        >
+                            <Plus className="mr-2 size-4" />
+                            Add requirement
+                        </Button>
+                    ) : null}
+                </>
             }
             meters={
                 <>
@@ -246,6 +288,14 @@ export default function QualificationsIndex({
 
             <PageLayout hero={header}>
                 <div className="flex flex-col gap-5">
+                    {notice ? (
+                        <p
+                            role="status"
+                            className="rounded-lg border p-3 text-sm"
+                        >
+                            {notice}
+                        </p>
+                    ) : null}
                     <ListCaption
                         title={currentViewLabel}
                         caption={`${requirements.data.length} of ${viewTotal} shown`}
@@ -268,7 +318,7 @@ export default function QualificationsIndex({
                                     key={req.id}
                                     className="transition-all hover:border-border hover:shadow-sm"
                                 >
-                                    <CardContent className="flex items-center gap-4 p-4">
+                                    <CardContent className="flex flex-wrap items-start gap-4 p-4">
                                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                                             <ShieldCheck className="h-5 w-5" />
                                         </div>
@@ -286,6 +336,18 @@ export default function QualificationsIndex({
                                                         : 'Optional'}
                                                 </Badge>
                                             </div>
+                                            <p className="mt-1 text-sm text-muted-foreground">
+                                                {qualificationMappingLabel(
+                                                    req.mapping,
+                                                )}
+                                            </p>
+                                            <p className="mt-1 text-sm text-muted-foreground">
+                                                {req.service_context_id
+                                                    ? (req.service_context
+                                                          ?.name ??
+                                                      'Recorded service context unavailable')
+                                                    : 'All service contexts for this Client'}
+                                            </p>
                                             <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
                                                 {req.client && (
                                                     <span>
@@ -295,10 +357,39 @@ export default function QualificationsIndex({
                                                 )}
                                             </div>
                                         </div>
-                                        <div className="shrink-0 text-xs text-muted-foreground">
-                                            Configure from{' '}
-                                            {clientSingular.toLowerCase()} or
-                                            shift workflows
+                                        <div className="flex flex-wrap gap-2">
+                                            {can.edit ? (
+                                                <Button
+                                                    variant="outline"
+                                                    className="min-h-11"
+                                                    onClick={() =>
+                                                        setEditor(req)
+                                                    }
+                                                >
+                                                    <Pencil className="mr-2 size-4" />
+                                                    Edit
+                                                    <span className="sr-only">
+                                                        {' '}
+                                                        {req.qualification_name}
+                                                    </span>
+                                                </Button>
+                                            ) : null}
+                                            {can.delete ? (
+                                                <Button
+                                                    variant="ghost"
+                                                    className="min-h-11 text-status-critical"
+                                                    onClick={() =>
+                                                        setRemoving(req)
+                                                    }
+                                                >
+                                                    <Trash2 className="mr-2 size-4" />
+                                                    Remove
+                                                    <span className="sr-only">
+                                                        {' '}
+                                                        {req.qualification_name}
+                                                    </span>
+                                                </Button>
+                                            ) : null}
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -334,6 +425,43 @@ export default function QualificationsIndex({
                     )}
                 </div>
             </PageLayout>
+            {editor !== undefined ? (
+                <QualificationRequirementEditor
+                    key={editor?.id ?? 'new'}
+                    requirement={editor}
+                    actorId={actorId}
+                    canEdit={editor ? can.edit : can.create}
+                    clients={editableClients}
+                    contexts={serviceContexts}
+                    options={complianceRequirements}
+                    onClose={() => setEditor(undefined)}
+                    onSaved={() => {
+                        setEditor(undefined);
+                        setNotice('Qualification requirement saved.');
+                        router.reload({
+                            only: ['requirements', 'stats'],
+                            preserveScroll: true,
+                        });
+                    }}
+                />
+            ) : null}
+            {removing ? (
+                <QualificationRemoveDialog
+                    key={removing.id}
+                    requirement={removing}
+                    actorId={actorId}
+                    allowed={can.delete}
+                    onClose={() => setRemoving(null)}
+                    onRemoved={() => {
+                        setRemoving(null);
+                        setNotice('Qualification requirement removed.');
+                        router.reload({
+                            only: ['requirements', 'stats'],
+                            preserveScroll: true,
+                        });
+                    }}
+                />
+            ) : null}
         </AppLayout>
     );
 }

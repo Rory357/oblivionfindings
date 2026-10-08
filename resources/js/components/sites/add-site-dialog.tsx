@@ -10,6 +10,16 @@ import {
 import GeofenceDrawMap, {
     type GeofenceShape,
 } from '@/components/geofence-draw-map';
+import {
+    HouseQualificationFields,
+    copyHouseQualification,
+    houseQualificationErrors,
+    houseQualificationSummary,
+    newHouseQualification,
+    type HouseQualificationOptions,
+    type HouseQualificationValues,
+    type QualificationMapping,
+} from '@/components/rostering/qualification-requirement-fields';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -102,11 +112,12 @@ export type AddSiteCopyableSite = {
     name: string;
     type: string;
     coverage: AddSiteCopyableCoverage[];
-    credentials: {
+    credentials: (Partial<HouseQualificationValues> & {
+        mapping?: QualificationMapping;
         name: string;
         category: string;
         expiry_period_months: number | null;
-    }[];
+    })[];
 };
 export type AddSiteCredential = {
     key: string;
@@ -122,6 +133,7 @@ export type AddSiteReferenceData = {
     copyableSites: AddSiteCopyableSite[];
     credentialCatalogue: AddSiteCredential[];
     coverageRoleKeys: AddSiteRoleKey[];
+    qualificationRequirementOptions?: HouseQualificationOptions;
 };
 
 /* ------------------------------------------------------------------ */
@@ -140,7 +152,8 @@ export type CoverageRule = {
     service_context_id: string;
     roles: { caregiver: number; driver: number; med_competent: number };
 };
-export type CredentialRow = {
+export type CredentialRow = HouseQualificationValues & {
+    mapping?: QualificationMapping;
     key: string;
     name: string;
     category: 'mandatory' | 'recommended';
@@ -400,6 +413,13 @@ function validateStep(key: StepKey, d: SiteWizardForm): Record<string, string> {
                 !c.starts_time ||
                 !c.ends_time,
         );
+        d.credentials.forEach((credential, index) => {
+            for (const [key, message] of Object.entries(
+                houseQualificationErrors(credential),
+            )) {
+                e[`credentials.${index}.${key}`] = message;
+            }
+        });
         if (bad)
             e.coverage_days =
                 'Each coverage rule needs a name, at least one day, and start & end times.';
@@ -1851,6 +1871,8 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
             return;
         }
         const credentials: CredentialRow[] = source.credentials.map((c) => ({
+            ...copyHouseQualification(c),
+            mapping: c.mapping,
             key: credentialKeyForName(c.name, ref.credentialCatalogue),
             name: c.name,
             category:
@@ -1886,6 +1908,9 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
             set('credentials', [
                 ...data.credentials,
                 {
+                    ...newHouseQualification(
+                        ref.qualificationRequirementOptions,
+                    ),
                     key: cat.key,
                     name: cat.name,
                     category: 'mandatory',
@@ -2039,14 +2064,14 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
                     </div>
                     {data.credentials.length > 0 ? (
                         <div className="mt-3 grid gap-2">
-                            {data.credentials.map((c) => (
+                            {data.credentials.map((c, index) => (
                                 <div
                                     key={c.key}
-                                    className="grid items-center gap-2 rounded-lg border border-border bg-card/70 p-2.5 sm:grid-cols-[1.4fr_1.2fr_1fr]"
+                                    className="min-w-0 space-y-4 rounded-lg border border-border bg-card/70 p-4"
                                 >
-                                    <span className="text-[13px] font-semibold">
+                                    <h4 className="text-sm font-semibold">
                                         {c.name}
-                                    </span>
+                                    </h4>
                                     <Segmented
                                         value={c.category}
                                         onChange={(v) =>
@@ -2080,12 +2105,48 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
                                                 })
                                             }
                                             placeholder="—"
-                                            className="h-8"
+                                            aria-label={
+                                                c.name +
+                                                ' expiry period in months'
+                                            }
+                                            className="min-h-11"
                                         />
                                         <span className="shrink-0 text-[11px] text-muted-foreground">
                                             mo. expiry
                                         </span>
                                     </div>
+                                    <HouseQualificationFields
+                                        id={`site-credential-${index}`}
+                                        value={c}
+                                        mapping={c.mapping}
+                                        options={
+                                            ref.qualificationRequirementOptions
+                                                ?.mapping_options ?? []
+                                        }
+                                        onChange={(patch) =>
+                                            updateCredential(c.key, patch)
+                                        }
+                                        errors={{
+                                            hr_compliance_requirement_id: err(
+                                                `credentials.${index}.hr_compliance_requirement_id`,
+                                            ),
+                                            applicability_mode: err(
+                                                `credentials.${index}.applicability_mode`,
+                                            ),
+                                            minimum_qualified_staff: err(
+                                                `credentials.${index}.minimum_qualified_staff`,
+                                            ),
+                                        }}
+                                    />
+                                    {err(
+                                        `credentials.${index}.expiry_period_months`,
+                                    ) ? (
+                                        <FieldErr>
+                                            {err(
+                                                `credentials.${index}.expiry_period_months`,
+                                            )}
+                                        </FieldErr>
+                                    ) : null}
                                 </div>
                             ))}
                         </div>
@@ -2551,10 +2612,17 @@ function StepReview({ ctx }: { ctx: SiteStepCtx }) {
                             label="Credentials"
                             value={
                                 data.credentials.length > 0
-                                    ? `${data.credentials.length} required`
+                                    ? `${data.credentials.length} recorded`
                                     : null
                             }
                         />
+                        {data.credentials.map((credential, index) => (
+                            <ReviewRow
+                                key={index}
+                                label={credential.name}
+                                value={`${credential.category} · ${houseQualificationSummary(credential)} · ${ref.qualificationRequirementOptions?.mapping_options.find((option) => option.id === credential.hr_compliance_requirement_id)?.name ?? (credential.hr_compliance_requirement_id === null ? 'Not linked to a recognised qualification' : 'Existing qualification link unavailable')}`}
+                            />
+                        ))}
                     </ReviewCard>
                     <ReviewCard
                         icon={Users}

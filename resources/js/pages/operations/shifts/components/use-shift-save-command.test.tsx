@@ -448,3 +448,55 @@ it('does not replay a create whose success response omitted current warning evid
     expect(transport.post).toHaveBeenCalledTimes(1);
     hook.unmount();
 });
+
+it('binds a new shift warning to an unsaved create and never accepts an invented persisted ID', () => {
+    const input = { ...expected, source: null };
+    const rejection = {
+        action: 'create',
+        scope: 'single',
+        actor_id: 1,
+        shift_id: null,
+        source: null,
+        values_hash: hash,
+        changed: false,
+        outcome: 'not_saved',
+        reason: 'eligibility_warning',
+    };
+    const feedback = {
+        warning_reasons: ['Mandatory qualification not linked'],
+        overrideable_warnings: [
+            {
+                rule: 'client_qualification',
+                message: 'Mandatory qualification not linked',
+                overrideable: true,
+            },
+        ],
+    };
+    expect(
+        shiftSaveReceipt(
+            { shift_result: rejection, eligibility_result: feedback },
+            input,
+            hash,
+        ),
+    ).toMatchObject({ status: 'rejected', eligibility: feedback });
+    for (const mismatch of [
+        { actor_id: 2 },
+        { shift_id: 56 },
+        { source: expected.source },
+        { action: 'update' },
+        { values_hash: 'a'.repeat(64) },
+        { changed: true },
+        { outcome: 'saved' },
+    ]) {
+        expect(
+            shiftSaveReceipt(
+                {
+                    shift_result: { ...rejection, ...mismatch },
+                    eligibility_result: feedback,
+                },
+                input,
+                hash,
+            ).status,
+        ).toBe('unknown');
+    }
+});

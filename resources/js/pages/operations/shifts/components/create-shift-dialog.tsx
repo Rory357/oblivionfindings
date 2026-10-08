@@ -1315,16 +1315,25 @@ function ShiftDialogForm({
             return;
         }
         if (eligLoading) return;
-        if (isEdit && eligibilityStatus?.status === 'blocked') {
+        const governedCreateWarning =
+            !isEdit &&
+            command.outcome?.status === 'rejected' &&
+            (command.outcome.reason === 'eligibility_warning' ||
+                command.outcome.reason === 'override_reason_required');
+        if (
+            (isEdit || governedCreateWarning) &&
+            eligibilityStatus?.status === 'blocked'
+        ) {
             return;
         }
         if (
-            isEdit &&
+            (isEdit || governedCreateWarning) &&
             eligibilityStatus?.status === 'warnings' &&
             eligibilityWarnings.length > 0
         ) {
             if (
-                eligPreview?.overrideable_warnings?.length &&
+                (governedCreateWarning ||
+                    eligPreview?.overrideable_warnings?.length) &&
                 !canOverrideEligibility
             ) {
                 setSaveError(

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Hr\Services\HrEligibilityRuleSettings;
 use App\Http\Requests\StoreSiteRequest;
 use App\Http\Requests\UpdateSiteRequest;
 use App\Models\Asset;
@@ -21,6 +22,7 @@ use App\Models\SiteHouseRoom;
 use App\Models\SiteStaffRequirement;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Eligibility\WorkforceRequirementMapping;
 use App\Services\Fleet\BoundaryService;
 use App\Services\NotificationService;
 use App\Services\Sites\SiteContactService;
@@ -515,6 +517,7 @@ class SiteController extends Controller
 
     public function create(Request $request)
     {
+        $houseApproach = app(HrEligibilityRuleSettings::class)->values()['house_qualification_approach'];
         $this->authorize('create', Site::class);
 
         $users = $this->staffPicker($request->user());
@@ -522,6 +525,13 @@ class SiteController extends Controller
         return inertia('sites/create', [
             'users' => $users,
             'regionOptions' => NzRegions::REGIONS,
+            'qualificationRequirementOptions' => [
+                'mapping_options' => app(WorkforceRequirementMapping::class)->catalog(),
+                'house_qualification_approach' => $houseApproach,
+                'new_requirement_defaults' => SiteStaffRequirement::newRequirementDefaults(
+                    $houseApproach,
+                ),
+            ],
             'checklistTemplates' => $this->checklistTemplatesPayload(),
             'availableAssets' => $this->availableAssetsPayload(null),
         ]);
@@ -684,19 +694,29 @@ class SiteController extends Controller
      */
     private function persistStaffRequirements(Site $site, array $credentials, ?User $user): void
     {
-        foreach ($credentials as $cred) {
+        foreach ($credentials as $index => $cred) {
             $expiry = $cred['expiry_period_months'] ?? null;
             $expiry = ($expiry !== null && (int) $expiry > 0) ? (int) $expiry : null;
 
-            SiteStaffRequirement::updateOrCreate(
+            $requirement = SiteStaffRequirement::firstOrNew(
                 ['site_id' => $site->id, 'requirement_name' => $cred['name']],
-                [
-                    'category' => $cred['category'],
-                    'certification_required' => ($cred['category'] ?? null) === 'mandatory',
-                    'expiry_period_months' => $expiry,
-                    'is_active' => true,
-                ],
             );
+            $choice = SiteStaffRequirement::applicabilityValues(
+                $cred, app(HrEligibilityRuleSettings::class)->values()['house_qualification_approach'],
+                $requirement->exists ? $requirement : null, 'credentials.'.$index.'.',
+            );
+            $mapping = array_key_exists('hr_compliance_requirement_id', $cred)
+                ? ['hr_compliance_requirement_id' => $cred['hr_compliance_requirement_id']] : [];
+            $requirement->fill([
+                'category' => $cred['category'],
+                'certification_required' => ($cred['category'] ?? null) === 'mandatory',
+                'expiry_period_months' => $expiry,
+                'is_active' => true,
+                ...$mapping, ...$choice,
+            ]);
+            if (! $requirement->save()) {
+                throw ValidationException::withMessages(['credentials.'.$index => 'The staff requirement could not be saved.']);
+            }
         }
     }
 
@@ -808,6 +828,7 @@ class SiteController extends Controller
 
     public function edit(Request $request, Site $site)
     {
+        $houseApproach = app(HrEligibilityRuleSettings::class)->values()['house_qualification_approach'];
         $this->authorize('update', $site);
 
         $users = $this->staffPicker($request->user());
@@ -883,6 +904,13 @@ class SiteController extends Controller
             ],
             'users' => $users,
             'regionOptions' => NzRegions::REGIONS,
+            'qualificationRequirementOptions' => [
+                'mapping_options' => app(WorkforceRequirementMapping::class)->catalog(),
+                'house_qualification_approach' => $houseApproach,
+                'new_requirement_defaults' => SiteStaffRequirement::newRequirementDefaults(
+                    $houseApproach,
+                ),
+            ],
             'checklistTemplates' => $this->checklistTemplatesPayload(),
             'availableAssets' => $this->availableAssetsPayload($site->id),
         ]);
@@ -1018,6 +1046,7 @@ class SiteController extends Controller
         array $accessibleSiteIds,
         bool $canViewAllSites,
     ): array {
+        $houseApproach = app(HrEligibilityRuleSettings::class)->values()['house_qualification_approach'];
         $referenceSiteIds = $canViewAllSites
             ? Site::query()
                 ->whereIn('type', $allowedTypes)
@@ -1037,7 +1066,7 @@ class SiteController extends Controller
                 'coverageRequirements' => fn ($q) => $q->where('is_active', true)
                     ->orderByRaw("FIELD(day_of_week, 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun')")
                     ->orderBy('starts_time'),
-                'staffRequirements' => fn ($q) => $q->where('is_active', true),
+                'staffRequirements' => fn ($q) => $q->where('is_active', true)->with('hrComplianceRequirement'),
             ])
             ->orderBy('name')
             ->get(['id', 'name', 'type'])
@@ -1061,6 +1090,11 @@ class SiteController extends Controller
                     'name' => $r->requirement_name,
                     'category' => $r->category,
                     'expiry_period_months' => $r->expiry_period_months,
+                    'hr_compliance_requirement_id' => $r->hr_compliance_requirement_id,
+                    'applicability_mode' => $r->applicability_mode,
+                    'minimum_qualified_staff' => $r->minimum_qualified_staff,
+                    'mapping' => app(WorkforceRequirementMapping::class)->present($r),
+                    'applicability_status' => $r->hasConfiguredApplicability() ? 'configured' : 'unresolved',
                 ])->values(),
             ])
             ->values();
@@ -1085,6 +1119,13 @@ class SiteController extends Controller
             'copyableSites' => $copyableSites,
             'credentialCatalogue' => config('site_credentials.catalogue', []),
             'coverageRoleKeys' => config('site_credentials.coverage_role_keys', []),
+            'qualificationRequirementOptions' => [
+                'mapping_options' => app(WorkforceRequirementMapping::class)->catalog(),
+                'house_qualification_approach' => $houseApproach,
+                'new_requirement_defaults' => SiteStaffRequirement::newRequirementDefaults(
+                    $houseApproach,
+                ),
+            ],
         ];
     }
 

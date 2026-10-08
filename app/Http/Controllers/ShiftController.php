@@ -941,6 +941,8 @@ class ShiftController extends Controller
             'tasks' => ['sometimes', 'array', 'max:50'],
             'tasks.*.label' => ['required_with:tasks', 'string', 'max:255'],
             'tasks.*.scheduled_time' => ['nullable', 'date_format:H:i'],
+            'override_acknowledged' => ['nullable', 'boolean'],
+            'override_reason' => ['nullable', 'string', 'max:2000'],
         ]);
 
         // Preserve the existing maximum elapsed planning duration.
@@ -950,6 +952,23 @@ class ShiftController extends Controller
 
         $result = app(ShiftPlanningCommand::class)->save($auth, $data);
         $receipt = app(ShiftPlanningReceipt::class)->committed($rootEntry, 'create', $result);
+        if ($result->rejectionReason !== null) {
+            $response = back()->with('eligibility_result', $result->eligibility)->withInput();
+            $typedRejection = $request->header('X-Shift-Result') === 'committed-v1'
+                && ($receipt['outcome'] ?? null) === 'not_saved';
+            if (! $typedRejection) {
+                if ($result->rejectionReason === 'override_reason_required') {
+                    $response->withErrors(['override_reason' => 'A reason is required when overriding eligibility warnings.']);
+                } else {
+                    $response->withErrors(['user_id' => trim('Review and acknowledge the eligibility warnings before saving this shift. '.implode(' ', $result->eligibility['warning_reasons'] ?? []))]);
+                }
+            }
+            if ($receipt !== null) {
+                $response->with('shift_result', $receipt);
+            }
+
+            return $response;
+        }
         if (! empty($result->eligibility['warning_reasons'])) {
             session()->flash('assignment_warnings', $result->eligibility['warning_reasons']);
         }

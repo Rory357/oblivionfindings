@@ -149,7 +149,6 @@ export function shiftSaveReceipt(
         : receipt.source === null;
     const bound =
         positive(expected.actorId) &&
-        positive(receipt.shift_id) &&
         receipt.actor_id === expected.actorId &&
         receipt.action === action &&
         receipt.scope === 'single' &&
@@ -184,7 +183,9 @@ export function shiftSaveReceipt(
 
     if (
         bound &&
-        action === 'update' &&
+        (action === 'create'
+            ? receipt.shift_id === null
+            : positive(receipt.shift_id)) &&
         receipt.outcome === 'not_saved' &&
         receipt.changed === false &&
         (receipt.reason === 'eligibility_warning' ||

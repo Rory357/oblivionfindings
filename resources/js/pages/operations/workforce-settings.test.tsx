@@ -153,3 +153,51 @@ it('reviews and submits both personal choices together', () => {
         expect.any(Object),
     );
 });
+
+it('retains a House qualification choice across sections and guards leaving the settings page', () => {
+    window.history.replaceState(
+        {},
+        '',
+        '/operations/workforce-settings#safety/checks',
+    );
+    render(
+        <WorkforceSettings
+            {...props}
+            eligibilityRules={{
+                values: {
+                    unmapped_mandatory_qualification: 'warn',
+                    house_qualification_approach: 'per_requirement',
+                },
+                defaults: {
+                    unmapped_mandatory_qualification: 'warn',
+                    house_qualification_approach: 'per_requirement',
+                },
+                revision: 'd'.repeat(64),
+                source: 'deployment_defaults',
+                scope: 'organisation',
+                can_edit: true,
+                can_view_history: false,
+                urls: {
+                    update: '/operations/workforce-settings/eligibility-rules',
+                    history: null,
+                },
+            }}
+        />,
+    );
+    fireEvent.click(screen.getByLabelText('House qualification approach'));
+    fireEvent.click(screen.getByRole('option', { name: 'Every worker' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Roster' }));
+    expect(
+        screen.getByText('You have an unsaved qualification rule.'),
+    ).toBeVisible();
+    const leaving = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(leaving);
+    expect(leaving.defaultPrevented).toBe(true);
+    fireEvent.click(
+        screen.getByRole('button', { name: 'Review qualification rule' }),
+    );
+    expect(
+        screen.getByLabelText('House qualification approach'),
+    ).toHaveTextContent('Every worker');
+    expect(patch).not.toHaveBeenCalled();
+});

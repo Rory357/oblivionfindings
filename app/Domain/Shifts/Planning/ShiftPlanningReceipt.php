@@ -38,6 +38,16 @@ class ShiftPlanningReceipt
                 return null;
             }
             $shift = $result->shift;
+            if ($action === 'create' && $result->rejectionReason !== null) {
+                if ($shift->exists || $shift->id !== null || $result->source !== null || $result->changed
+                    || ! in_array($result->rejectionReason, ['eligibility_warning', 'override_reason_required'], true)) {
+                    return null;
+                }
+
+                return ['action' => 'create', 'actor_id' => $result->actorId, 'shift_id' => null,
+                    'scope' => 'single', 'source' => null, 'outcome' => 'not_saved', 'changed' => false,
+                    'reason' => $result->rejectionReason, 'values_hash' => ShiftPlanningIntent::hash($result->intent)];
+            }
             if (! $shift->exists || ! $shift->id || ! in_array($shift->status, ['draft', 'scheduled'], true)) {
                 return null;
             }

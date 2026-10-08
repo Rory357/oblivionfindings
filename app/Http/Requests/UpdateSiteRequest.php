@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\Site;
 use App\Models\SiteContact;
+use App\Services\Eligibility\WorkforceRequirementMapping;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
@@ -114,6 +115,9 @@ class UpdateSiteRequest extends FormRequest
             'credentials.*.name' => ['required_with:credentials', 'string', 'max:255'],
             'credentials.*.category' => ['required_with:credentials', 'in:mandatory,recommended'],
             'credentials.*.expiry_period_months' => ['nullable', 'integer', 'min:0', 'max:120'],
+            'credentials.*.hr_compliance_requirement_id' => app(WorkforceRequirementMapping::class)->validationRules(),
+            'credentials.*.applicability_mode' => ['nullable', 'in:all_workers,minimum_staff'],
+            'credentials.*.minimum_qualified_staff' => ['nullable', 'integer', 'min:1', 'max:4294967295'],
 
             // Geofence — circle seeded into the shared AssetGeofence
             'geofence' => ['nullable', 'array'],

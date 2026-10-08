@@ -558,65 +558,85 @@ it('omits only the new task ID in edit transport while retaining existing manual
     expect(tasks[1]).not.toHaveProperty('id');
 });
 
-it('shows current typed eligibility warnings and submits an explicit authorised reason', async () => {
-    await edit();
-    const call = await send();
-    const hash = await shiftSaveHash(call[1]);
-    act(() => {
-        call[2].onSuccess({
-            props: {
-                flash: {
-                    shift_result: {
-                        action: 'update',
-                        actor_id: 1,
-                        shift_id: 55,
-                        scope: 'single',
-                        source: current.source,
-                        changed: false,
-                        outcome: 'not_saved',
-                        reason: 'eligibility_warning',
-                        values_hash: hash,
-                    },
-                    eligibility_result: {
-                        is_eligible: false,
-                        is_allowed: true,
-                        blocked_reasons: [],
-                        warning_reasons: ['Review fatigue warning'],
-                        overrideable_warnings: [
-                            {
-                                rule: 'fatigue',
-                                message: 'Review fatigue warning',
-                                overrideable: true,
-                            },
-                        ],
+it.each([true, false])(
+    'shows typed eligibility warnings and submits an explicit authorised reason (edit=%s)',
+    async (editMode) => {
+        if (editMode) await edit();
+        else render(<CreateShiftDialog {...base} defaultUserId={7} />);
+        const transport = editMode ? t.put : t.post;
+        const call = await send(editMode);
+        const hash = await shiftSaveHash({
+            ...call[1],
+            required_licence_class: call[1].required_licence_class ?? null,
+            required_licence_endorsements:
+                call[1].required_licence_endorsements ?? [],
+        });
+        act(() => {
+            call[2].onSuccess({
+                props: {
+                    flash: {
+                        shift_result: {
+                            action: editMode ? 'update' : 'create',
+                            actor_id: 1,
+                            shift_id: editMode ? 55 : null,
+                            scope: 'single',
+                            source: editMode ? current.source : null,
+                            changed: false,
+                            outcome: 'not_saved',
+                            reason: 'eligibility_warning',
+                            values_hash: hash,
+                        },
+                        eligibility_result: {
+                            is_eligible: false,
+                            is_allowed: true,
+                            blocked_reasons: [],
+                            warning_reasons: ['Review fatigue warning'],
+                            overrideable_warnings: [
+                                {
+                                    rule: 'fatigue',
+                                    message: 'Review fatigue warning',
+                                    overrideable: true,
+                                },
+                            ],
+                        },
                     },
                 },
-            },
+            });
+            call[2].onFinish();
         });
-        call[2].onFinish();
-    });
-    expect(await screen.findByText('Review fatigue warning')).toBeVisible();
-    expect(
-        screen.queryByText('Your shift changes were saved.'),
-    ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-    expect(
-        screen.getByRole('button', { name: 'Confirm and save' }),
-    ).toBeDisabled();
-    fireEvent.change(screen.getByLabelText(/Reason for override/), {
-        target: { value: 'Confirmed safe cover arrangement' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm and save' }));
-    await waitFor(() => expect(t.put).toHaveBeenCalledTimes(2));
-    expect(t.put.mock.calls[1][1]).toMatchObject({
-        override_acknowledged: true,
-        override_reason: 'Confirmed safe cover arrangement',
-    });
-    await confirm(t.put.mock.calls[1]);
-    expect(
-        await screen.findByText('Your shift changes were saved.'),
-    ).toBeVisible();
-});
+        expect(await screen.findByText('Review fatigue warning')).toBeVisible();
+        expect(
+            screen.queryByText('Your shift changes were saved.'),
+        ).not.toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: editMode ? 'Save changes' : 'Create shift',
+            }),
+        );
+        expect(
+            screen.getByRole('button', { name: 'Confirm and save' }),
+        ).toBeDisabled();
+        fireEvent.change(screen.getByLabelText(/Reason for override/), {
+            target: { value: 'Confirmed safe cover arrangement' },
+        });
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Confirm and save' }),
+        );
+        await waitFor(() => expect(transport).toHaveBeenCalledTimes(2));
+        expect(transport.mock.calls[1][1]).toMatchObject({
+            override_acknowledged: true,
+            override_reason: 'Confirmed safe cover arrangement',
+        });
+        await confirm(transport.mock.calls[1]);
+        expect(
+            await screen.findByText(
+                editMode
+                    ? 'Your shift changes were saved.'
+                    : 'The shift was created.',
+            ),
+        ).toBeVisible();
+    },
+);
 
 it('uses the fetched roster timezone for creation from another module and preserves the original instants', async () => {
     fetcher.mockImplementation(async () => ({
@@ -839,4 +859,60 @@ it('retains a create draft and prevents a duplicate when the saved warning list 
     expect(screen.getByLabelText(/Handover notes/)).toHaveValue(
         'Keep this create draft',
     );
+});
+
+it('does not allow an unauthorised worker to override a governed create warning', async () => {
+    t.override = false;
+    render(<CreateShiftDialog {...base} defaultUserId={7} />);
+    const call = await send(false);
+    const values = {
+        ...call[1],
+        required_licence_class: call[1].required_licence_class ?? null,
+        required_licence_endorsements:
+            call[1].required_licence_endorsements ?? [],
+    };
+    const hash = await shiftSaveHash(values);
+    act(() => {
+        call[2].onSuccess({
+            props: {
+                flash: {
+                    shift_result: {
+                        action: 'create',
+                        actor_id: 1,
+                        shift_id: null,
+                        source: null,
+                        scope: 'single',
+                        outcome: 'not_saved',
+                        changed: false,
+                        reason: 'eligibility_warning',
+                        values_hash: hash,
+                    },
+                    eligibility_result: {
+                        is_eligible: false,
+                        is_allowed: true,
+                        warning_reasons: ['Mandatory qualification not linked'],
+                        overrideable_warnings: [
+                            {
+                                rule: 'client_qualification',
+                                message: 'Mandatory qualification not linked',
+                                overrideable: true,
+                            },
+                        ],
+                    },
+                },
+            },
+        });
+        call[2].onFinish();
+    });
+    expect(
+        await screen.findByText('Mandatory qualification not linked'),
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Create shift' }));
+    expect(
+        screen.getByText(/authorised coordinator must review/),
+    ).toBeVisible();
+    expect(
+        screen.queryByRole('button', { name: 'Confirm and save' }),
+    ).not.toBeInTheDocument();
+    expect(t.post).toHaveBeenCalledOnce();
 });

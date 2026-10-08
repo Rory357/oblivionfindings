@@ -1,6 +1,12 @@
 <?php
 
 return [
+    // Operational qualification policy; independent of global HR hard stops.
+    'eligibility_rules' => [
+        'unmapped_mandatory_qualification' => 'warn',
+        'house_qualification_approach' => 'per_requirement',
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Fatigue Rules

@@ -94,20 +94,36 @@ it('keeps joined Client options and statistics within the requirement Site and s
     expect(StaffQualificationRequirement::query()->orderBy('id')->get()->map->getRawOriginal()->all())->toBe($before);
 });
 
-function qualificationSiteManager(Site $site): User
+it('keeps a roster-only qualification reader out of each mutation route', function () {
+    $site = Site::factory()->create();
+    $reader = qualificationSiteManager($site, false);
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $row = qualificationRequirementFor($client, 'Existing requirement');
+    $before = StaffQualificationRequirement::query()->orderBy('id')->get()->map->getRawOriginal()->all();
+
+    $this->actingAs($reader)->post(route('operations.qualifications.store'), [
+        'client_id' => $client->id, 'qualification_name' => 'Reader write',
+    ])->assertForbidden();
+    $this->put(route('operations.qualifications.update', $row), ['qualification_name' => 'Reader write'])->assertForbidden();
+    $this->delete(route('operations.qualifications.destroy', $row))->assertForbidden();
+    expect(StaffQualificationRequirement::query()->orderBy('id')->get()->map->getRawOriginal()->all())->toBe($before);
+});
+
+function qualificationSiteManager(Site $site, bool $canMutate = true): User
 {
     $manager = User::factory()->create(['approved_at' => now()]);
-    $permission = Permission::firstOrCreate(
-        ['key' => 'rostering.viewAny'],
-        ['description' => 'View rostering', 'group' => 'Rostering', 'module' => 'operations'],
-    );
+    $keys = $canMutate ? ['rostering.viewAny', 'qualifications.create', 'qualifications.edit', 'qualifications.delete'] : ['rostering.viewAny'];
+    $permissions = collect($keys)->map(fn ($key) => Permission::firstOrCreate(
+        ['key' => $key],
+        ['description' => $key, 'group' => 'Rostering', 'module' => 'operations'],
+    )->id)->all();
     $role = Role::create([
         'name' => 'qualification-site-test-'.uniqid(),
         'label' => 'Qualification Site test',
         'level' => 10,
         'type' => 'custom',
     ]);
-    $role->permissions()->sync([$permission->id]);
+    $role->permissions()->sync($permissions);
     $manager->roles()->attach($role);
     HrEmployeeProfile::factory()->create([
         'user_id' => $manager->id,

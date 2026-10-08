@@ -9,8 +9,10 @@ use App\Models\User;
 use App\Services\Eligibility\EligibilityResult;
 use App\Services\Eligibility\PreparedShiftWorkload;
 use App\Services\Eligibility\Rules\AvailabilityRule;
+use App\Services\Eligibility\Rules\ClientQualificationRule;
 use App\Services\Eligibility\Rules\DriverLicenceExpiryRule;
 use App\Services\Eligibility\Rules\FatigueRule;
+use App\Services\Eligibility\Rules\HouseQualificationRule;
 use App\Services\Eligibility\Rules\HsTrainingRule;
 use App\Services\Eligibility\Rules\MedicationCompetencyRule;
 use App\Services\Eligibility\Rules\RequiredDriverLicenceRule;
@@ -33,6 +35,8 @@ class ShiftStaffEligibilityService
         protected RequiredDriverLicenceRule $requiredDriverLicenceRule,
         protected HsTrainingRule $hsTrainingRule,
         protected MedicationCompetencyRule $medicationCompetencyRule,
+        protected ?ClientQualificationRule $clientQualificationRule = null,
+        protected ?HouseQualificationRule $houseQualificationRule = null,
     ) {}
 
     /**
@@ -48,7 +52,7 @@ class ShiftStaffEligibilityService
      *                                                            querying per pair. When null (the default, single-call path) the
      *                                                            original per-pair queries run unchanged.
      */
-    public function evaluate(Shift $shift, User $user, ?Collection $preloadedUserShifts = null, ?PreparedShiftWorkload $workload = null): EligibilityResult
+    public function evaluate(Shift $shift, User $user, ?Collection $preloadedUserShifts = null, ?PreparedShiftWorkload $workload = null, bool $currentQualifications = false): EligibilityResult
     {
         $workload?->assertFor($shift, $user);
         $preloadedUserShifts = $workload?->conflictShifts($shift) ?? $preloadedUserShifts;
@@ -76,6 +80,10 @@ class ShiftStaffEligibilityService
         $checks = array_merge($checks, $this->hsTrainingRule->evaluateAll($shift, $user));
         $checks[] = $this->medicationCompetencyRule->evaluate($shift, $user);
         $checks[] = $this->checkOnboarding($shift, $user);
+        $checks = array_merge($checks, ($this->clientQualificationRule ??= app(ClientQualificationRule::class))
+            ->evaluateAll($shift, $user, $currentQualifications || $workload?->currentEvidence !== null));
+        $checks = array_merge($checks, ($this->houseQualificationRule ??= app(HouseQualificationRule::class))
+            ->evaluateAll($shift, $user, $currentQualifications || $workload?->currentEvidence !== null));
 
         return EligibilityResult::fromChecks($checks);
     }

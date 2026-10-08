@@ -59,7 +59,9 @@ class ShiftPlanningCommand
                 $override = null;
                 $userId = $candidate->user_id;
                 $timesChanged = $locked && (! $candidate->starts_at->equalTo($locked->starts_at) || ! $candidate->ends_at->equalTo($locked->ends_at));
-                $needsDecision = $userId && (! $locked || (int) $userId !== (int) $locked->user_id || $timesChanged
+                $qualificationSourceChanged = $locked && ((int) $candidate->client_id !== (int) $locked->client_id
+                    || $candidate->service_context_id !== $locked->service_context_id);
+                $needsDecision = $userId && (! $locked || (int) $userId !== (int) $locked->user_id || $timesChanged || $qualificationSourceChanged
                     || array_key_exists('required_licence_class', $data) || array_key_exists('required_licence_endorsements', $data));
                 if ($needsDecision) {
                     $recipient = $evidence['users']->get((int) $userId);
@@ -88,7 +90,9 @@ class ShiftPlanningCommand
 
                         return new ShiftPlanningResult($locked, (int) $actor->id, false, $intent, $evidence['source'], null, $decision->result?->toArray() ?? [], $exception->errors(), $exception->status);
                     }
-                    if ($locked && $decision->isWarning()) {
+                    $governedCreateWarning = ! $locked && collect($decision->result?->checked_rules ?? [])
+                        ->contains(fn (array $check) => ! $check['passed'] && ($check['requires_assignment_acknowledgement'] ?? false));
+                    if (($locked || $governedCreateWarning) && $decision->isWarning()) {
                         // No Shift/task/override write precedes a rejection.
                         // The canonical reservation acquisition/release is retained.
                         $reason = null;
@@ -108,7 +112,7 @@ class ShiftPlanningCommand
                         if ($reason !== null) {
                             $this->releaseRejectedHold($reservation);
 
-                            return new ShiftPlanningResult($locked, (int) $actor->id, false, $intent, $evidence['source'], $reason, $decision->result?->toArray() ?? []);
+                            return new ShiftPlanningResult($locked ?? $candidate, (int) $actor->id, false, $intent, $evidence['source'], $reason, $decision->result?->toArray() ?? []);
                         }
                     }
                 }
