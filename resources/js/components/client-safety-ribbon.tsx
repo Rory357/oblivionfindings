@@ -1,3 +1,4 @@
+import type { AllergySummary } from '@/components/emar/record/allergy-record';
 import {
     Tooltip,
     TooltipContent,
@@ -24,6 +25,8 @@ export type SafetyAllergy = {
     key: string | null;
     label: string;
     group: string | null;
+    severity?: string | null;
+    reaction?: string | null;
 };
 
 export type SafetyRisk = {
@@ -42,6 +45,7 @@ export type SafetyCareFlag = {
 export type ClientSafety = {
     has_any: boolean;
     allergies: SafetyAllergy[];
+    allergy_record?: AllergySummary | null;
     critical_risks: SafetyRisk[];
     other_risks_count: number;
     active_risks_count: number;
@@ -53,6 +57,7 @@ export type ClientSafety = {
 export type ClientSafetySummary = {
     has_any: boolean;
     allergies_count: number;
+    allergy_record?: AllergySummary | null;
     critical_risks_count: number;
     active_risks_count: number;
     safeguarding: boolean;
@@ -60,6 +65,15 @@ export type ClientSafetySummary = {
     top_allergy: string | null;
     top_risk: string | null;
 };
+
+/** A hidden record is not an empty list, and an empty list is not reviewed absence. */
+export function allergyReviewCaption(record?: AllergySummary | null) {
+    if (!record) return null;
+    if (!record.reviewed) return 'Allergies not reviewed';
+    if (record.status === 'no_known') return 'No known allergies';
+    if (record.status === 'none') return 'No allergies recorded';
+    return null;
+}
 
 const iconMap: Record<string, LucideIcon> = {
     shield: Shield,
@@ -145,7 +159,8 @@ export default function ClientSafetyRibbon({
     sticky?: boolean;
     className?: string;
 }) {
-    if (!safety || !safety.has_any) return null;
+    const allergyCaption = allergyReviewCaption(safety?.allergy_record);
+    if (!safety || (!safety.has_any && !allergyCaption)) return null;
 
     const { allergies, critical_risks, care_flags, other_risks_count } = safety;
 
@@ -194,15 +209,35 @@ export default function ClientSafetyRibbon({
                                 key={`allergy-${a.key ?? i}`}
                                 tone="danger"
                                 icon={AlertTriangle}
-                                title={
-                                    a.group
-                                        ? `Allergy (${a.group}): ${a.label}`
-                                        : `Allergy: ${a.label}`
-                                }
+                                title={[
+                                    `Allergy: ${a.label}`,
+                                    a.severity?.replaceAll('_', ' '),
+                                    a.reaction,
+                                ]
+                                    .filter(Boolean)
+                                    .join(' · ')}
                             >
                                 Allergy: {a.label}
+                                {a.severity
+                                    ? ` · ${a.severity.replaceAll('_', ' ')}`
+                                    : ''}
                             </Pill>
                         ))}
+
+                        {allergyCaption && (
+                            <Pill
+                                tone={
+                                    safety.allergy_record?.status ===
+                                        'no_known' &&
+                                    safety.allergy_record.reviewed
+                                        ? 'info'
+                                        : 'warning'
+                                }
+                                icon={Info}
+                            >
+                                {allergyCaption}
+                            </Pill>
+                        )}
 
                         {critical_risks.map((r) => (
                             <Pill
@@ -253,10 +288,24 @@ export function ClientSafetyBadges({
     summary: ClientSafetySummary | null | undefined;
     className?: string;
 }) {
-    if (!summary || !summary.has_any) return null;
+    const allergyCaption = allergyReviewCaption(summary?.allergy_record);
+    if (!summary || (!summary.has_any && !allergyCaption)) return null;
 
     return (
         <div className={cn('flex flex-wrap items-center gap-1', className)}>
+            {allergyCaption && (
+                <Pill
+                    tone={
+                        summary.allergy_record?.status === 'no_known' &&
+                        summary.allergy_record.reviewed
+                            ? 'info'
+                            : 'warning'
+                    }
+                    icon={Info}
+                >
+                    {allergyCaption}
+                </Pill>
+            )}
             {summary.allergies_count > 0 && (
                 <Pill
                     tone="danger"

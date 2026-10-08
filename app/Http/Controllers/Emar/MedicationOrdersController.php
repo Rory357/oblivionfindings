@@ -22,6 +22,7 @@ use App\Services\Medication\MedicationReconciliationWorkflow;
 use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Medication\OrderAllergyMatcher;
+use App\Support\MedicationJourney;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -42,8 +43,12 @@ final class MedicationOrdersController extends Controller
 
     public function index(Request $request)
     {
+        $request->validate(['site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'],
+            'order_id' => ['nullable', 'integer', 'min:1'], 'reconciliation_id' => ['nullable', 'integer', 'min:1'], 'review_item' => ['nullable', 'integer', 'min:1']]);
         $actor = $request->user();
-        $sites = $this->scope->readerSiteIds($actor, 'medications.view', $request->integer('site_id') ?: null);
+        $siteId = $request->integer('site_id') ?: null;
+        $sites = $this->scope->readerSiteIds($actor, 'medications.view', $siteId, $request->integer('client_id') ?: null);
+        $readerSites = $siteId !== null ? [$siteId] : $sites;
         $view = match ($request->query('view')) {
             'to_check', 'check' => 'to_check',
             'covert' => 'covert',
@@ -54,11 +59,14 @@ final class MedicationOrdersController extends Controller
         if ($view === 'reviews') {
             return to_route('emar.reviews', $request->only('site_id', 'client_id', 'search'));
         }
-        $clients = Client::query()->whereIn('site_id', $sites)->with('site:id,name')->orderBy('last_name')->get();
+        $clients = Client::query()->whereIn('site_id', $readerSites)->with('site:id,name')->orderBy('last_name')->get();
         $readableIds = $this->access->readableClientIds($actor, $clients->modelKeys());
         $clients = $clients->whereIn('id', $readableIds)->values();
+        $clientId = $request->integer('client_id') ?: null;
+        abort_if($clientId !== null && ! in_array($clientId, $readableIds, true), 404);
+        $scopedIds = $clientId !== null ? [$clientId] : $readableIds;
         $writableIds = $this->work->clientIdsWithCurrentAuthority($actor, $readableIds, now());
-        $query = ClientMedication::query()->current()->whereIn('client_id', $readableIds)
+        $query = ClientMedication::query()->current()->whereIn('client_id', $scopedIds)
             ->when(! $actor->canDo('medications.controlled.view'), fn ($q) => $q->where('controlled_drug', false));
         $counts = [
             'current' => (clone $query)->where('state', '!=', 'ceased')->count(),
@@ -66,8 +74,8 @@ final class MedicationOrdersController extends Controller
             'written' => MedicationOrderRevision::query()->canonicalVersion()->whereIn('client_medication_id', (clone $query)->where('state', '!=', 'ceased')->select('id'))
                 ->whereNotNull('written_due_at')->whereNull('written_confirmation')->whereIn('status', ['pending', 'checked', 'checked_alone'])->count(),
             'ending' => (clone $query)->where('state', '!=', 'ceased')->whereBetween('end_date', [now()->timezone('Pacific/Auckland')->toDateString(), now()->timezone('Pacific/Auckland')->addDays(14)->toDateString()])->count(),
-            'covert' => $this->scope->scopeCanonicalClientMedicationRows(MedicationCovertAuthorisation::query(), $sites, false)->whereIn('client_medication_id', (clone $query)->select('id'))->whereIn('client_id', $readableIds)->active()->count(),
-            'reconciliations' => MedicationReconciliation::query()->whereIn('client_id', $readableIds)->whereNull('signed_off_at')->count(),
+            'covert' => $this->scope->scopeCanonicalClientMedicationRows(MedicationCovertAuthorisation::query(), $sites, false)->whereIn('client_medication_id', (clone $query)->select('id'))->whereIn('client_id', $scopedIds)->active()->count(),
+            'reconciliations' => MedicationReconciliation::query()->whereIn('client_id', $scopedIds)->whereNull('signed_off_at')->count(),
         ];
         $filter = $request->string('show')->toString();
         if ($filter === 'stopped') {
@@ -94,10 +102,10 @@ final class MedicationOrdersController extends Controller
         $revisions = $this->scope->scopeCanonicalClientMedicationRows(MedicationOrderRevision::query()->canonicalVersion(), $sites, false)->whereIn('client_medication_id', $page->pluck('id'))
             ->with(['version', 'enterer:id,name', 'checker:id,name', 'witness:id,name'])->orderBy('id')->get()->groupBy('client_medication_id');
         $page->through(fn ($medication) => $this->summary($medication, $revisions->get($medication->id, collect()), $actor, $writableIds));
-        $reconciliations = MedicationReconciliation::query()->whereIn('client_id', $readableIds)->with(['client:id,first_name,last_name', 'items'])->orderByDesc('id')->limit(100)->get()
+        $reconciliations = MedicationReconciliation::query()->whereIn('client_id', $scopedIds)->with(['client:id,first_name,last_name', 'items'])->orderByDesc('id')->limit(100)->get()
             ->map(fn ($record) => $this->reconciliationPayload($record, $actor, $writableIds));
-        $covert = $this->scope->scopeCanonicalClientMedicationRows(MedicationCovertAuthorisation::query(), $sites, false)->whereIn('client_id', $readableIds)
-            ->whereIn('client_medication_id', ClientMedication::query()->whereIn('client_id', $readableIds)
+        $covert = $this->scope->scopeCanonicalClientMedicationRows(MedicationCovertAuthorisation::query(), $sites, false)->whereIn('client_id', $scopedIds)
+            ->whereIn('client_medication_id', ClientMedication::query()->whereIn('client_id', $scopedIds)
                 ->when(! $actor->canDo('medications.controlled.view'), fn ($q) => $q->where('controlled_drug', false))->select('id'))
             ->with(['medication:id,name,client_id,controlled_drug', 'client:id,first_name,last_name', 'files'])->orderByDesc('id')->limit(100)->get()
             ->map(fn ($record) => array_merge($record->toArray(), [
@@ -115,9 +123,13 @@ final class MedicationOrdersController extends Controller
             $handoff = $item->only('id', 'client_id', 'client_medication_id', 'outcome', 'name_snapshot', 'recommendation') + ['entered' => $item->linked_order_version_id !== null];
         }
 
+        $selectedReconciliation = $request->integer('reconciliation_id')
+            ? MedicationReconciliation::query()->whereIn('client_id', $scopedIds)->with(['client:id,first_name,last_name', 'items'])->findOrFail($request->integer('reconciliation_id')) : null;
+        $opened = $request->integer('order_id') ? $this->readableOrder($actor, $request->integer('order_id')) : null;
+        abort_if($opened !== null && ! in_array((int) $opened->client_id, $scopedIds, true), 404);
+
         $openAction = in_array($request->input('action'), ['entry', 'check', 'covert'], true) ? $request->input('action') : 'view';
         if ($request->integer('order_id') && $openAction === 'check') {
-            $opened = $this->readableOrder($actor, $request->integer('order_id'));
             $waiting = MedicationOrderRevision::query()->canonicalVersion()->where('client_id', $opened->client_id)->where('client_medication_id', $opened->id)
                 ->where(fn ($q) => $q->where('status', 'pending')->orWhere(fn ($second) => $second->where('status', 'checked_alone')->whereNull('second_checked_at')))->exists();
             if (! $waiting) {
@@ -129,6 +141,7 @@ final class MedicationOrdersController extends Controller
             'orders' => $page, 'counts' => $counts, 'houses' => $this->scope->sitePicker($sites),
             'clients' => $clients->map(fn ($client) => ['id' => $client->id, 'name' => trim($client->first_name.' '.$client->last_name), 'site_id' => $client->site_id, 'can_enter' => in_array($client->id, $writableIds, true)]),
             'covert' => $covert, 'reconciliations' => $reconciliations,
+            'selected_reconciliation' => $selectedReconciliation ? $this->reconciliationPayload($selectedReconciliation, $actor, $writableIds) : null,
             'respite_stays' => RespiteStay::query()->whereIn('client_id', $readableIds)->orderByDesc('id')->limit(200)->get(['id', 'client_id', 'status', 'actual_start', 'actual_end']),
             'can' => ['manage' => $actor->canDo('medications.orders.manage'), 'verify' => $actor->canDo('medications.orders.verify'),
                 'controlled_view' => $actor->canDo('medications.controlled.view'), 'controlled_record' => $actor->canDo('medications.controlled.record')],
@@ -139,8 +152,8 @@ final class MedicationOrdersController extends Controller
             'open_check_mode' => in_array($request->input('mode'), ['send_back', 'second'], true) ? $request->input('mode') : 'independent',
             'open_new_order' => $request->input('action') === 'entry' && ! $request->integer('order_id'),
             'review_handoff' => $handoff,
-            'prefill_client_id' => in_array($request->integer('client_id'), $readableIds, true) ? $request->integer('client_id') : null,
-            'filters' => array_merge($request->only('show', 'search', 'site_id'), ['view' => $view]),
+            'prefill_client_id' => $clientId ?? $selectedReconciliation?->client_id ?? $opened?->client_id,
+            'filters' => array_merge($request->only('show', 'search', 'site_id', 'client_id'), ['view' => $view, 'return_to' => MedicationJourney::returnTo($request->query('return_to'))]),
         ]);
     }
 

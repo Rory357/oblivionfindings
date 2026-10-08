@@ -77,6 +77,7 @@ final class DoseOmissions
                 'description' => "{$name} dose due {$due->format('H:i')} not recorded for {$person}",
                 'performed_by' => null,
                 'client_id' => $row['client_id'],
+                'client_medication_id' => $row['client_medication_id'],
                 'client_name' => $person,
                 'details' => [
                     'medication' => $name,

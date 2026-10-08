@@ -678,7 +678,12 @@ export default function ShiftShow({
         ],
     );
 
-    const [activeTab, setActiveTab] = useState('tasks');
+    const [activeTab, setActiveTab] = useState(
+        () =>
+            new URLSearchParams(
+                typeof window === 'undefined' ? '' : window.location.search,
+            ).get('tab') ?? 'tasks',
+    );
     const resolvedActiveTab = shiftTabs.some((t) => t.key === activeTab)
         ? activeTab
         : (shiftTabs[0]?.key ?? 'tasks');

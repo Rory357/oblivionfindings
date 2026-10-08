@@ -13,7 +13,8 @@ import {
     formatDateTime,
     toDatetimeLocal,
 } from '@/lib/datetime';
-import { useForm } from '@inertiajs/react';
+import type { SharedData } from '@/types';
+import { useForm, usePage } from '@inertiajs/react';
 import {
     CheckCheck,
     ClipboardCheck,
@@ -87,6 +88,8 @@ export function OrderDetail({
     review?: ReviewHandoff;
     initialCheckMode?: 'independent' | 'second' | 'send_back';
 }) {
+    const { auth } = usePage<SharedData>().props;
+    const canOpenStock = Boolean(auth.can?.medications?.stockUpdate);
     const [section, setSection] = useState(0);
     const [action, setAction] = useState<Action>(initialAction);
     const pending = detail.revisions.find(
@@ -564,9 +567,15 @@ export function OrderDetail({
                                     No supply recorded for this medicine.
                                 </Note>
                             )}
-                            <Button asChild variant="outline">
-                                <a href="/emar/stock">Open Stock & pharmacy</a>
-                            </Button>
+                            {canOpenStock && (
+                                <Button asChild variant="outline">
+                                    <a
+                                        href={`/emar/stock/packs?client_id=${order.client_id}&medication_id=${order.id}`}
+                                    >
+                                        Open Stock & pharmacy
+                                    </a>
+                                </Button>
+                            )}
                         </>
                     )}
                     {action === 'check' && selected && (

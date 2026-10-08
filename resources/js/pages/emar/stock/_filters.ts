@@ -1,3 +1,4 @@
+import { medicationReturnParams } from '@/lib/medication-navigation';
 import { router } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import type { StockFilters } from './_hub-types';
@@ -80,30 +81,35 @@ export function useStockFilters(server: StockFilters) {
         const serial = flight.current.serial;
         const owns = () => flight.current.serial === serial;
         flight.current.timer = setTimeout(() => {
-            router.get('/emar/stock', next, {
-                preserveState: true,
-                preserveScroll: true,
-                replace: delay > 0,
-                onCancelToken: (token) => {
-                    if (owns()) flight.current.cancel = () => token.cancel();
-                    else token.cancel();
+            router.get(
+                '/emar/stock',
+                { ...next, ...medicationReturnParams() },
+                {
+                    preserveState: true,
+                    preserveScroll: true,
+                    replace: delay > 0,
+                    onCancelToken: (token) => {
+                        if (owns())
+                            flight.current.cancel = () => token.cancel();
+                        else token.cancel();
+                    },
+                    onSuccess: (page) => {
+                        if (!owns()) return;
+                        const accepted = page.props.filters as StockFilters;
+                        current.current = accepted;
+                        setFilters(accepted);
+                    },
+                    onError: () => {
+                        if (owns()) setFailed(true);
+                    },
+                    onFinish: () => {
+                        if (owns()) {
+                            flight.current.pending = false;
+                            setBusy(false);
+                        }
+                    },
                 },
-                onSuccess: (page) => {
-                    if (!owns()) return;
-                    const accepted = page.props.filters as StockFilters;
-                    current.current = accepted;
-                    setFilters(accepted);
-                },
-                onError: () => {
-                    if (owns()) setFailed(true);
-                },
-                onFinish: () => {
-                    if (owns()) {
-                        flight.current.pending = false;
-                        setBusy(false);
-                    }
-                },
-            });
+            );
         }, delay);
     };
     return {

@@ -2582,6 +2582,7 @@ class EmarController extends Controller
     // ─── Prescriptions / Prescriber Orders ─────────────────
     public function prescriptions(Request $request)
     {
+        $request->validate(['site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'], 'prescriber_order_id' => ['nullable', 'integer', 'min:1']]);
         $actor = $request->user();
         abort_unless($actor, 403);
         $siteFilter = $request->integer('site_id') ?: null;
@@ -2605,6 +2606,11 @@ class EmarController extends Controller
             ->with('site:id,name')
             ->orderBy('last_name')
             ->get(['id', 'first_name', 'last_name', 'site_id']);
+        $readableIds = $this->personScopedClientIds($actor, $clients->pluck('id'));
+        $clients = $clients->whereIn('id', $readableIds)->values();
+        $clientFilter = $request->integer('client_id') ?: null;
+        abort_if($clientFilter !== null && ! in_array($clientFilter, $readableIds, true), 404);
+        $scopedIds = $clientFilter !== null ? [$clientFilter] : $readableIds;
         $workScopedClientIds = $this->medicationScope->clientIdsWithCurrentAuthority(
             $actor,
             $clients->pluck('id')->map(fn ($clientId): int => (int) $clientId)->all(),
@@ -2617,7 +2623,7 @@ class EmarController extends Controller
             && $canViewControlled
             && $canRecordControlled;
 
-        $medications = ClientMedication::active()
+        $medications = ClientMedication::active()->whereIn('client_id', $scopedIds)
             ->where('approval_status', 'verified')
             ->whereHas('client', fn ($q) => $q->whereIn('site_id', $accessibleSiteIds))
             ->when(! $canViewControlled, fn ($query) => $query->where('controlled_drug', false))
@@ -2648,6 +2654,10 @@ class EmarController extends Controller
             $readerSiteIds,
             true,
         );
+        $orderQuery->whereIn('client_id', $scopedIds);
+        if ($request->integer('prescriber_order_id')) {
+            abort_unless((clone $orderQuery)->when(! $canViewControlled, fn ($q) => $q->visibleToOrdinaryReader())->whereKey($request->integer('prescriber_order_id'))->exists(), 404);
+        }
         if (! $canViewControlled) {
             $orderQuery->visibleToOrdinaryReader();
         }
@@ -2764,6 +2774,7 @@ class EmarController extends Controller
             $readerSiteIds,
             false,
         );
+        $covertQuery->whereIn('client_id', $scopedIds);
         if (! $canViewControlled) {
             $this->governanceScope->scopeWithoutControlledMedicationRows($covertQuery);
         }
@@ -2805,6 +2816,8 @@ class EmarController extends Controller
 
         return Inertia::render('emar/Prescriptions', [
             'orders' => $orders,
+            'selected_prescriber_order_id' => $request->integer('prescriber_order_id') ?: null,
+            'selected_prescriber_order' => collect($orders)->firstWhere('id', $request->integer('prescriber_order_id')),
             'covert' => $covert,
             'clients' => $clients
                 ->map(fn (Client $c) => [
@@ -3175,6 +3188,7 @@ class EmarController extends Controller
             'rounds' => $rounds,
             'date' => $date,
             'now_label' => now()->setTimezone(config('app.worker_timezone', config('app.timezone')))->format('g:i a'),
+            'selected_site_id' => $siteFilter,
             'lastGenerated' => $lastGenerated?->toIso8601String(),
             'guidedRound' => $guidedRound,
             'activity' => $activity,
@@ -3452,7 +3466,7 @@ class EmarController extends Controller
         abort_unless($actor && $actor->canDo('medications.view'), 403);
         $filters = $request->validate([
             'site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'],
-            'client_medication_id' => ['nullable', 'integer', 'min:1'], 'date' => ['nullable', 'date_format:Y-m-d'],
+            'client_medication_id' => ['nullable', 'integer', 'min:1'], 'date' => ['nullable', 'date_format:Y-m-d'], 'destruction_id' => ['nullable', 'integer', 'min:1'],
         ]);
         $siteFilter = isset($filters['site_id']) ? (int) $filters['site_id'] : null;
         $clientFilter = isset($filters['client_id']) ? (int) $filters['client_id'] : null;
@@ -3481,7 +3495,7 @@ class EmarController extends Controller
 
         // Flat, client-side-filterable disposal register. Voided records remain
         // in the list (struck through) — the register is immutable (MoD Regs 1977).
-        $destructions = $this->governanceScope->scopeCanonicalClientMedicationRows(
+        $destructionQuery = $this->governanceScope->scopeCanonicalClientMedicationRows(
             MedicationDestruction::query(),
             $readerSiteIds,
         )
@@ -3499,9 +3513,12 @@ class EmarController extends Controller
                 'witness2:id,name',
                 'voidedByUser:id,name',
             ])
-            ->latest('destroyed_at')
-            ->limit(300)
-            ->get();
+            ->where(fn ($q) => $q->whereNull('medication_destructions.site_id')->orWhereHas('client', fn ($c) => $c->whereColumn('clients.site_id', 'medication_destructions.site_id')));
+        $selectedDestruction = $request->integer('destruction_id') ? (clone $destructionQuery)->findOrFail($request->integer('destruction_id')) : null;
+        $destructions = (clone $destructionQuery)->latest('destroyed_at')->limit(300)->get();
+        if ($selectedDestruction !== null) {
+            $destructions = $destructions->push($selectedDestruction)->unique('id')->sortByDesc('destroyed_at')->values();
+        }
 
         // Every active medication is destroyable — same CdMedication shape the
         // shared RecordDestructionDialog consumes on the Controlled Drugs page.
@@ -3521,6 +3538,7 @@ class EmarController extends Controller
 
         return Inertia::render('emar/Destructions', [
             'filters' => ['site_id' => $siteFilter, 'client_id' => $clientFilter, 'client_medication_id' => $medicineFilter, 'date' => $filters['date'] ?? null],
+            'selected_destruction_id' => $selectedDestruction?->id,
             'can_record' => $request->user()?->canDo('medications.controlled.record') ?? false,
             'destructions' => $destructions->map(fn (MedicationDestruction $d) => [
                 'id' => $d->id,

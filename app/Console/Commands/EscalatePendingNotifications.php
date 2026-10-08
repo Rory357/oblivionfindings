@@ -140,7 +140,10 @@ class EscalatePendingNotifications extends Command
 
             $reminderNumber = ((int) $payload['reminder_number']);
 
-            $recipients = $this->resolveEscalationRecipients($n, $rule, $reminderNumber);
+            $recipients = app(NotificationService::class)->filterRecipientScope(
+                $this->resolveEscalationRecipients($n, $rule, $reminderNumber),
+                $payload,
+            );
 
             if (! $rule->force_delivery) {
                 $svc = app(NotificationService::class);

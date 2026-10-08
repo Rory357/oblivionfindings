@@ -5,7 +5,8 @@ import {
 import { SettingsNotice } from '@/components/settings/settings-notice';
 import { Input } from '@/components/ui/input';
 import { Field } from '@/components/wizard/primitives';
-import { Link, router } from '@inertiajs/react';
+import type { SharedData } from '@/types';
+import { Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { Toggle } from '../connected/_forms';
 import {
@@ -39,6 +40,7 @@ type Props = {
     unavailable_reason: string | null;
 };
 export default function PharmacyConnections(props: Props) {
+    const { auth } = usePage<SharedData>().props;
     const [q, setQ] = useState('');
     const [edit, setEdit] = useState<Connection | 'new' | null>(null);
     return (
@@ -52,11 +54,13 @@ export default function PharmacyConnections(props: Props) {
             onQuery={setQ}
             actions={
                 <>
-                    <PageHeaderGlassButton asChild>
-                        <Link href="/emar/stock?view=orders">
-                            Pharmacy orders
-                        </Link>
-                    </PageHeaderGlassButton>
+                    {auth.can?.medications?.stockUpdate && (
+                        <PageHeaderGlassButton asChild>
+                            <Link href="/emar/stock?view=orders">
+                                Pharmacy orders
+                            </Link>
+                        </PageHeaderGlassButton>
+                    )}
                     {props.can_manage && (
                         <PageHeaderPrimaryButton
                             disabled={!props.partners.length}

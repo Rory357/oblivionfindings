@@ -81,7 +81,17 @@ class NotificationService
 
         $extra = $this->applyRoutingDefaults($extra);
 
-        $recipients = $this->resolveRecipients($actor, $entity, $client, $extra);
+        $recipientScope = [
+            'recipient_scope' => $extra['data']['recipient_scope'] ?? (in_array($entityLabel, [
+                'medical profile', 'condition', 'emergency contact',
+            ], true) ? 'client_medical' : null),
+            'entity' => $entityLabel,
+            'client_id' => $client?->id ?? ($entity?->client_id ?? null),
+        ];
+        $recipients = $this->filterRecipientScope(
+            $this->resolveRecipients($actor, $entity, $client, $extra),
+            $recipientScope,
+        );
 
         // If force_delivery is enabled for this event, bypass user/role preferences.
         if (!$rule || !$rule->enabled || !$rule->force_delivery) {
@@ -112,9 +122,47 @@ class NotificationService
             ] : null,
         ], $extra['data'] ?? []);
 
+        if ($recipientScope['recipient_scope'] !== null) {
+            // Retain the same authority boundary for delayed reminders.
+            $payload['recipient_scope'] = $recipientScope['recipient_scope'];
+            $payload['client_id'] = $recipientScope['client_id'];
+        }
+
         $notification = new AppEventNotification($payload);
 
         $recipients->each(fn(User $u) => $u->notify($notification));
+    }
+
+    /** Medical facts require the same current reads as the Medical section. */
+    public function filterRecipientScope(Collection $recipients, array $payload): Collection
+    {
+        $scope = $payload['recipient_scope'] ?? null;
+        if ($scope === null && in_array($payload['entity'] ?? null, [
+            'medical profile', 'condition', 'emergency contact',
+        ], true)) {
+            // Older pending notifications do not carry the explicit marker.
+            $scope = 'client_medical';
+        }
+        if ($scope === null) {
+            return $recipients;
+        }
+        if ($scope !== 'client_medical' || ! is_numeric($payload['client_id'] ?? null)) {
+            return collect();
+        }
+        $client = $this->recipientScopeClient((int) $payload['client_id']);
+        if ($client === null) {
+            return collect();
+        }
+
+        return $recipients->filter(fn (User $recipient): bool =>
+            $recipient->can('view', $client) && $recipient->can('viewMedications', $client)
+        )->values();
+    }
+
+    /** Re-read ownership/site instead of retaining the writer's relationship snapshot. */
+    protected function recipientScopeClient(int $clientId): ?Client
+    {
+        return Client::query()->find($clientId);
     }
 
     protected function escalationRuleFor(string $eventKey): ?NotificationEscalationRule

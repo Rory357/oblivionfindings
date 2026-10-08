@@ -1,3 +1,8 @@
+import {
+    doseRecoveryKey,
+    keepDoseRecovery,
+} from '@/components/emar/record-dose/recovery';
+import { setOfflineQueueActor } from '@/lib/offline-queue';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RecordDoseLaunch } from './record-dose-launch';
@@ -73,6 +78,8 @@ vi.mock('@/components/emar/recording/use-dose-recorder', () => ({
 }));
 
 beforeEach(() => {
+    setOfflineQueueActor(null);
+    setOfflineQueueActor(71);
     vi.clearAllMocks();
     Object.assign(state, {
         load: 'ready',
@@ -91,6 +98,26 @@ function open() {
 }
 
 describe('MAR as-needed recording entry', () => {
+    it('keeps unrelated as-needed choices available beside an unconfirmed attempt', () => {
+        keepDoseRecovery(doseRecoveryKey(16, 41, '2026-10-08T08:00:00+13:00'), {
+            target: {
+                kind: 'scheduled',
+                orderId: 41,
+                scheduledFor: '2026-10-08T08:00:00+13:00',
+            },
+        });
+        open();
+        expect(
+            screen.getByRole('button', { name: 'Check original attempt' }),
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Choose an as-needed medicine',
+            }),
+        );
+        expect(state.recordAsNeeded).toHaveBeenCalledOnce();
+        expect(state.recordScheduled).not.toHaveBeenCalled();
+    });
     it('opens the current person’s searchable medicine picker directly and uses the canonical recorder', () => {
         open();
         expect(screen.getByRole('dialog')).toHaveAccessibleName(

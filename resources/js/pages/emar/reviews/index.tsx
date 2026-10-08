@@ -1,3 +1,4 @@
+import { MedicationJourneyReturn } from '@/components/emar/medication-journey-return';
 import { displayTime } from '@/components/fleet-assets/maintenance/time-picker';
 import { PersonCell, PersonDisc } from '@/components/lists/entity-cells';
 import {
@@ -48,6 +49,7 @@ import {
 } from 'lucide-react';
 import {
     useEffect,
+    useMemo,
     useRef,
     useState,
     type MouseEvent,
@@ -120,6 +122,18 @@ export default function ReviewsPage(props: ReviewPageProps) {
         today,
         as_at: asAt,
     } = props;
+    const selectedItem = selected?.items.find(
+        (item) => item.id === props.selected_item_id,
+    );
+    const selectedAction = useMemo<ReviewAction | null>(
+        () =>
+            selected
+                ? selectedItem
+                    ? { type: 'change', review: selected, item: selectedItem }
+                    : { type: 'detail', review: selected }
+                : null,
+        [selected, selectedItem],
+    );
     const [search, setSearch] = useState(filters.search ?? '');
     const [action, setAction] = useState<ReviewAction | null>(() =>
         can.manage &&
@@ -127,13 +141,12 @@ export default function ReviewsPage(props: ReviewPageProps) {
             typeof window === 'undefined' ? '' : window.location.search,
         ).get('book') === '1'
             ? { type: 'book', clientId: person?.id, clientName: person?.name }
-            : selected
-              ? { type: 'detail', review: selected }
-              : null,
+            : selectedAction,
     );
     const ctx = useEntityContextMenu<Review | ChangeRow>();
     const view = filters.view ?? 'due';
     const filterParams = {
+        return_to: filters.return_to || undefined,
         view,
         search: filters.search || undefined,
         site_id: filters.site_id || undefined,
@@ -173,11 +186,12 @@ export default function ReviewsPage(props: ReviewPageProps) {
         // Filters only change after a server response; keep an interrupted query until it is sent.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [search, action]);
-    const previousSelection = useRef(selected?.id);
+    const selectionKey = `${selected?.id ?? ''}:${props.selected_item_id ?? ''}`;
+    const previousSelection = useRef(selectionKey);
     const pendingAction = useRef<ReviewAction | null>(null);
     useEffect(() => {
-        if (previousSelection.current !== selected?.id) {
-            previousSelection.current = selected?.id;
+        if (previousSelection.current !== selectionKey) {
+            previousSelection.current = selectionKey;
             const pending = pendingAction.current;
             pendingAction.current = null;
             setAction(
@@ -186,16 +200,16 @@ export default function ReviewsPage(props: ReviewPageProps) {
                       'review' in pending &&
                       pending.review.id === selected.id
                         ? withReview(pending, selected)
-                        : { type: 'detail', review: selected }
+                        : selectedAction
                     : null,
             );
         }
-    }, [selected]);
+    }, [selected, selectionKey, selectedAction]);
     const close = () => {
         pendingAction.current = null;
         setAction(null);
         if (selected || action?.type === 'book')
-            navigate({ review: undefined, book: undefined });
+            navigate({ review: undefined, item: undefined, book: undefined });
     };
     const open = (next: ReviewAction) => {
         if (searchTimer.current !== null)
@@ -555,6 +569,7 @@ export default function ReviewsPage(props: ReviewPageProps) {
                     subline={`Medication reviews${person ? ` for ${person.name}` : ''} · Pacific/Auckland`}
                     actions={
                         <>
+                            <MedicationJourneyReturn />
                             <PageHeaderSearch
                                 value={search}
                                 onChange={setSearch}

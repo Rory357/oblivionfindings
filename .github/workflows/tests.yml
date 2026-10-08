@@ -116,6 +116,7 @@ jobs:
         run: |
           npx tsc --noEmit
           npx vitest run resources/js/pages/emar resources/js/lib/emar-navigation.test.ts resources/js/pages/settings/profile.test.tsx
+          npx vitest run resources/js/components/emar resources/js/lib/medication-navigation.test.ts resources/js/lib/medication-record-events.test.ts resources/js/components/client-safety-ribbon.test.tsx resources/js/pages/operations/clients/index.test.tsx
 
       - name: Copy Environment File
         run: cp .env.example .env
@@ -170,6 +171,9 @@ jobs:
           tests/Feature/Emar/StockPacksWorkflowTest.php
           tests/Feature/Emar/StockManagementTest.php
           tests/Feature/Emar/StockManagementPaginationTest.php
+          tests/Feature/Emar/ProfileAllergySafetyTest.php
+          tests/Feature/Emar/CanonicalAllergyProjectionTest.php
+          tests/Feature/ClientMedicalControllerTest.php
           tests/Feature/Emar/ControlledProductTest.php
           tests/Feature/FleetAssets/ResidentTransportMedicationTransitTest.php
           tests/Feature/FleetAssets/ResidentTransportJourneySecurityTest.php

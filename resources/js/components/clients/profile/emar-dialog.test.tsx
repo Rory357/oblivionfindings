@@ -96,7 +96,7 @@ describe('EmarRecordDialog — as-needed only (interim, until P02-6)', () => {
                     name: /Record scheduled doses on Meds today/,
                 })
                 .getAttribute('href'),
-        ).toBe('/meds/today');
+        ).toBe('/meds/today?client_id=7');
         expect(scheduledDoseRecordLink(7, lead).href).toBe(
             '/emar/mar?client_id=7',
         );

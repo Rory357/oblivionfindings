@@ -66,10 +66,11 @@ class RoundsPagePayloadTest extends TestCase
                 );
         }
 
-        $this->actingAs($reader)->get(route('emar.rounds', ['date' => $utcDate]))
+        $this->actingAs($reader)->get(route('emar.rounds', ['date' => $utcDate, 'site_id' => $site->id]))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('date', $utcDate)
+                ->where('selected_site_id', $site->id)
                 ->has('rounds', 1)
                 ->where('rounds.0.id', $priorRound->id)
                 ->where('rounds.0.round_date', $utcDate)

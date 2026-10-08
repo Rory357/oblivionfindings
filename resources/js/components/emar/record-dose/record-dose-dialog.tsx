@@ -18,6 +18,7 @@ import {
     validateStockPackLines,
     type StockPackLine,
 } from '@/components/medications/stock-pack-fields';
+import { SettingsModal } from '@/components/settings/settings-modal';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -46,6 +47,7 @@ import {
     prepareMedicationMutationReplayState,
     submitEmarMutation,
 } from '@/lib/emar-offline';
+import { medicationRecorded } from '@/lib/medication-record-events';
 import {
     emptyMedicationScanCapture,
     hasVerifiedMedicationScan,
@@ -57,7 +59,10 @@ import {
     secondPersonDisplay,
     type SecondPersonEvidence,
 } from '@/lib/medication-second-person';
-import { readServerSyncOutcome } from '@/lib/offline-queue';
+import {
+    getOfflineQueueActorId,
+    readServerSyncOutcome,
+} from '@/lib/offline-queue';
 import { cn } from '@/lib/utils';
 import axios from 'axios';
 import {
@@ -110,6 +115,13 @@ import {
     SupportChip,
     activeBlock,
 } from './parts';
+import {
+    clearDoseRecovery,
+    doseRecoveryKey,
+    findDoseRecovery,
+    keepDoseRecovery,
+    readDoseRecovery,
+} from './recovery';
 import {
     ENTRY_LABEL,
     isBlockedAnswer,
@@ -172,6 +184,13 @@ interface FormState {
     cdBalance: string;
     packChecked: boolean;
 }
+export type PendingDose = {
+    form: FormState;
+    uuid: string;
+    body: Record<string, unknown>;
+    display: DoseRequirements;
+    target: DoseTarget;
+};
 
 /** Recording context an entry point locks (shown on step 1 and the review). */
 export interface TransportContext {
@@ -349,6 +368,30 @@ export function RecordDoseDialog({
     returnFocus?: () => HTMLElement | null;
 }) {
     const requirements = useDoseRequirements(target);
+    const [pending] = useState(() =>
+        findDoseRecovery<PendingDose>(
+            target.orderId,
+            target.kind === 'scheduled' ? target.scheduledFor : 'prn',
+        ),
+    );
+    const [resumeOriginal, setResumeOriginal] = useState(false);
+    // A committed PRN may now be blocked by its interval limit. Confirm the
+    // original request independently of the permission to record another dose.
+    if (pending && !resumeOriginal) {
+        const canResume =
+            requirements.status === 'ready' &&
+            !isBlockedAnswer(requirements.data) &&
+            JSON.stringify(requirements.data.order) ===
+                JSON.stringify(pending.draft.display.order);
+        return (
+            <PendingDoseConfirmation
+                pending={pending}
+                onClose={onClose}
+                onRecorded={onRecorded}
+                onResume={canResume ? () => setResumeOriginal(true) : undefined}
+            />
+        );
+    }
 
     if (requirements.status !== 'ready') {
         return (
@@ -395,6 +438,148 @@ export function RecordDoseDialog({
             nextLabel={nextLabel}
             returnFocus={returnFocus}
         />
+    );
+}
+
+function PendingDoseConfirmation({
+    pending,
+    onClose,
+    onRecorded,
+    onResume,
+}: {
+    pending: { key: string; draft: PendingDose; person: number; order: number };
+    onClose: () => void;
+    onRecorded?: (result: RecordedResult) => void;
+    onResume?: () => void;
+}) {
+    const [state, setState] = useState<
+        'loading' | 'recorded' | 'unconfirmed' | 'unavailable'
+    >('loading');
+    const [chart, setChart] = useState<string | null>(null);
+    const [attempt, setAttempt] = useState(0);
+    const callbacks = useRef({ onClose, onRecorded });
+    useEffect(() => {
+        callbacks.current = { onClose, onRecorded };
+    }, [onClose, onRecorded]);
+    useEffect(() => {
+        let active = true;
+        const actor = getOfflineQueueActorId();
+        const closeForActor = () => {
+            active = false;
+            callbacks.current.onClose();
+        };
+        window.addEventListener('emar:actor-changed', closeForActor);
+        setState('loading');
+        axios
+            .get('/meds/today/recording-status', {
+                params: {
+                    client_medication_id: pending.order,
+                    client_request_uuid: pending.draft.uuid,
+                },
+                headers: { Accept: 'application/json' },
+            })
+            .then(({ data }) => {
+                if (!active || getOfflineQueueActorId() !== actor) return;
+                if (
+                    data.status === 'recorded' &&
+                    Number.isInteger(data.administration_id) &&
+                    typeof data.chart_url === 'string' &&
+                    data.chart_url.startsWith('/emar/mar?')
+                ) {
+                    clearDoseRecovery(pending.key);
+                    medicationRecorded(pending.person);
+                    setChart(data.chart_url);
+                    setState('recorded');
+                    callbacks.current.onRecorded?.({
+                        status: 'recorded',
+                        administrationId: data.administration_id,
+                    });
+                } else setState('unconfirmed');
+            })
+            .catch(() => {
+                if (active) setState('unavailable');
+            });
+        return () => {
+            active = false;
+            window.removeEventListener('emar:actor-changed', closeForActor);
+        };
+    }, [
+        pending.key,
+        pending.order,
+        pending.person,
+        pending.draft.uuid,
+        attempt,
+    ]);
+    return (
+        <SettingsModal
+            title="Check an unconfirmed dose"
+            description="Check the original request before recording anything else for this dose."
+            width={480}
+            onClose={onClose}
+        >
+            <div className="space-y-4">
+                {state === 'loading' ? (
+                    <LoadingState message="Checking whether the original request was recorded…" />
+                ) : state === 'recorded' ? (
+                    <>
+                        <p role="status">
+                            The original dose is recorded. No new dose was
+                            created.
+                        </p>
+                        {chart && (
+                            <Button asChild>
+                                <a href={chart}>Open the recorded dose</a>
+                            </Button>
+                        )}
+                    </>
+                ) : (
+                    <>
+                        <p role="alert">
+                            {state === 'unavailable'
+                                ? 'The result could not be checked with your current access or connection.'
+                                : 'The server has not confirmed the original request. This does not mean it failed.'}
+                        </p>
+                        {state === 'unconfirmed' && (
+                            <ReviewCard title="Original attempt" icon={Pill}>
+                                <ReviewRow
+                                    label="Medicine"
+                                    value={`${pending.draft.display.order.name} · ${pending.draft.display.order.dosage ?? 'See order'}`}
+                                />
+                                <ReviewRow
+                                    label="Outcome"
+                                    value={
+                                        pending.draft.form.outcome ??
+                                        'Not confirmed'
+                                    }
+                                />
+                                <ReviewRow
+                                    label="When"
+                                    value={localLabel(pending.draft.form.when)}
+                                />
+                            </ReviewCard>
+                        )}
+                        <p className="text-sm text-muted-foreground">
+                            {onResume
+                                ? 'You can review and retry the same request. Its original dose details and request identity are retained.'
+                                : 'Current recording checks or the order have changed. Keep this browser tab open and ask the medication lead to check the chart.'}{' '}
+                            Do not create a replacement dose while its result is
+                            unknown.
+                        </p>
+                        <Button
+                            variant="outline"
+                            onClick={() => setAttempt((value) => value + 1)}
+                        >
+                            Check again
+                        </Button>
+                        {state === 'unconfirmed' && onResume && (
+                            <Button onClick={onResume}>
+                                Review original attempt
+                            </Button>
+                        )}
+                    </>
+                )}
+            </div>
+        </SettingsModal>
     );
 }
 
@@ -506,32 +691,43 @@ function RecordDoseForm({
             ? formatAmount(req.order.dose_amount, req.order.dose_unit)
             : '—');
 
-    const [f, setF] = useState<FormState>(() => ({
-        step: mode === 'notgiven' || mode === 'reoffer' ? 1 : 0,
-        outcome: null,
-        reason: '',
-        lateReason: '',
-        note: '',
-        when: nzLocal(),
-        followBy: '',
-        prnReason: '',
-        checkBy: '',
-        amount: {
-            mode: 'asOrdered',
-            amount: req.order.dose_amount,
-            reason: '',
-            severity: '',
-            immediate: '',
-        },
-        obs: {},
-        second: { id: null, pin: '' },
-        stockQuantity: '',
-        packLines: [],
-        cdBalance: '',
-        packChecked: false,
-    }));
+    const recoveryKey = doseRecoveryKey(
+        req.person.id,
+        req.order.id,
+        target.kind === 'scheduled' ? target.scheduledFor : 'prn',
+    );
+    const [recovered] = useState(() =>
+        readDoseRecovery<PendingDose>(recoveryKey),
+    );
+    const [f, setF] = useState<FormState>(
+        () =>
+            recovered?.form ?? {
+                step: mode === 'notgiven' || mode === 'reoffer' ? 1 : 0,
+                outcome: null,
+                reason: '',
+                lateReason: '',
+                note: '',
+                when: nzLocal(),
+                followBy: '',
+                prnReason: '',
+                checkBy: '',
+                amount: {
+                    mode: 'asOrdered',
+                    amount: req.order.dose_amount,
+                    reason: '',
+                    severity: '',
+                    immediate: '',
+                },
+                obs: {},
+                second: { id: null, pin: '' },
+                stockQuantity: '',
+                packLines: [],
+                cdBalance: '',
+                packChecked: false,
+            },
+    );
     const [errors, setErrors] = useState<Errors>({});
-    const [phase, setPhase] = useState<Phase>('edit');
+    const [phase, setPhase] = useState<Phase>(recovered ? 'uncertain' : 'edit');
     const [serverMessage, setServerMessage] = useState<string | null>(null);
     const [duplicateOf, setDuplicateOf] = useState<{
         by: string | null;
@@ -547,11 +743,46 @@ function RecordDoseForm({
         reference: string | null;
         incidentId: number | null;
     } | null>(null);
-    const dirty = useRef(false);
+    const dirty = useRef(Boolean(recovered));
     const bodyRef = useRef<HTMLDivElement>(null);
     const replay = useRef(createMedicationMutationReplayState());
+    const submitted = useRef<PendingDose | null>(recovered);
+    const saveInFlight = useRef(false);
+    const actorAtOpen = useRef(getOfflineQueueActorId());
+    const actorChanged = useRef(false);
+    useEffect(() => {
+        const closeForActorChange = () => {
+            actorChanged.current = true;
+            clearDoseRecovery(recoveryKey);
+            onClose();
+        };
+        window.addEventListener('emar:actor-changed', closeForActorChange);
+        return () =>
+            window.removeEventListener(
+                'emar:actor-changed',
+                closeForActorChange,
+            );
+    }, [onClose, recoveryKey]);
+    if (recovered && replay.current.fingerprint === null)
+        replay.current.uuid = recovered.uuid;
+
+    useEffect(() => {
+        const preventLoss = (event: BeforeUnloadEvent) => {
+            if (dirty.current && phase !== 'done' && phase !== 'duplicate') {
+                event.preventDefault();
+                event.returnValue = '';
+            }
+        };
+        window.addEventListener('beforeunload', preventLoss);
+        return () => window.removeEventListener('beforeunload', preventLoss);
+    }, [phase]);
 
     const set = (patch: Partial<FormState>) => {
+        if (
+            phase === 'uncertain' &&
+            !Object.keys(patch).every((key) => key === 'second')
+        )
+            return;
         dirty.current = true;
         setF((x) => ({ ...x, ...patch }));
         // Fixing a field clears its own message; other messages stay.
@@ -976,20 +1207,58 @@ function RecordDoseForm({
     }
 
     async function save() {
-        const body = Object.fromEntries(
-            Object.entries(payload()).filter(
-                ([, v]) => v !== null && v !== undefined,
-            ),
-        );
+        if (
+            actorChanged.current ||
+            getOfflineQueueActorId() !== actorAtOpen.current
+        ) {
+            onClose();
+            return;
+        }
+        if (saveInFlight.current) return;
+        const retry = phase === 'uncertain' ? submitted.current : null;
+        const body: Record<string, unknown> = retry
+            ? {
+                  ...retry.body,
+                  ...(f.second.pin ? { witness_credential: f.second.pin } : {}),
+              }
+            : Object.fromEntries(
+                  Object.entries(payload()).filter(
+                      ([, v]) => v !== null && v !== undefined,
+                  ),
+              );
         // The PIN is never part of the replay identity: re-typing it must not
         // create a new request (or a duplicate record).
         const material = { ...body };
         delete material.witness_credential;
-        replay.current = prepareMedicationMutationReplayState(
-            replay.current,
-            material,
-        );
+        replay.current = retry
+            ? { uuid: retry.uuid, fingerprint: replay.current.fingerprint }
+            : prepareMedicationMutationReplayState(replay.current, material);
         const needsPin = typeof body.witnessed_by === 'number';
+        if (
+            needsPin &&
+            !body.second_person_pin_forgotten &&
+            !body.witness_credential
+        ) {
+            setServerMessage(
+                'Your colleague needs to re-enter their PIN before this same request can be checked again.',
+            );
+            return;
+        }
+        const safeBody = { ...body };
+        delete safeBody.witness_credential;
+        submitted.current = {
+            form: { ...f, step: 2, second: { ...f.second, pin: '' } },
+            uuid: replay.current.uuid,
+            body: safeBody,
+            display: retry?.display ?? req,
+            target,
+        };
+        keepDoseRecovery(recoveryKey, submitted.current);
+        setF((current) => ({
+            ...current,
+            second: { ...current.second, pin: '' },
+        }));
+        saveInFlight.current = true;
         setPhase('sending');
         setServerMessage(null);
         try {
@@ -1011,9 +1280,19 @@ function RecordDoseForm({
                     queuedMessage: `Saved on this device — ${med} for ${p} isn’t on the chart yet. It will send when you reconnect. Don’t record it again.`,
                 },
             );
-            handleOutcome(outcome.status, outcome.data);
+            if (
+                !actorChanged.current &&
+                getOfflineQueueActorId() === actorAtOpen.current
+            )
+                handleOutcome(outcome.status, outcome.data);
         } catch (error) {
-            handleError(error);
+            if (
+                !actorChanged.current &&
+                getOfflineQueueActorId() === actorAtOpen.current
+            )
+                handleError(error);
+        } finally {
+            saveInFlight.current = false;
         }
     }
 
@@ -1022,6 +1301,7 @@ function RecordDoseForm({
         data: Record<string, unknown> | undefined,
     ) {
         if (status === 'queued') {
+            clearDoseRecovery(recoveryKey);
             onRecorded?.({ status: 'queued', administrationId: null });
             onClose();
             return;
@@ -1040,6 +1320,8 @@ function RecordDoseForm({
         ) {
             setDuplicateOf((data?.duplicate_of as typeof duplicateOf) ?? null);
             setPhase('duplicate');
+            clearDoseRecovery(recoveryKey);
+            medicationRecorded(req.person.id);
             onRecorded?.({ status: 'duplicate', administrationId: null });
             return;
         }
@@ -1051,6 +1333,8 @@ function RecordDoseForm({
             const administration = data?.administration as
                 | ({ id?: number } & SecondPersonEvidence)
                 | undefined;
+            clearDoseRecovery(recoveryKey);
+            medicationRecorded(req.person.id);
             onRecorded?.({
                 status: 'recorded',
                 administrationId: administration?.id ?? null,
@@ -1111,7 +1395,12 @@ function RecordDoseForm({
             setPhase('done');
             return;
         }
-        setPhase('rejected');
+        const confirmedRejection =
+            status === 'rejected' &&
+            readServerSyncOutcome(data).kind === 'rejected' &&
+            phase !== 'uncertain';
+        setPhase(confirmedRejection ? 'rejected' : 'uncertain');
+        if (confirmedRejection) clearDoseRecovery(recoveryKey);
         setServerMessage('The server didn’t confirm this was saved.');
     }
 
@@ -1149,10 +1438,15 @@ function RecordDoseForm({
             setPhase('uncertain');
             return;
         }
-        if (error.response.status >= 500) {
+        if (phase === 'uncertain' || error.response.status >= 500) {
             setPhase('uncertain');
+            setServerMessage(
+                error.response.data?.message ??
+                    'The result is still unconfirmed. Keep this attempt and check the chart.',
+            );
             return;
         }
+        clearDoseRecovery(recoveryKey);
         const body = error.response.data as
             | {
                   error?: string;
@@ -2009,15 +2303,45 @@ function RecordDoseForm({
                     title="Not confirmed — check before trying again"
                     actions={
                         <Button asChild variant="outline">
-                            <a href={`/emar/mar?client_id=${req.person.id}`}>
+                            <a
+                                href={`/emar/mar?client_id=${req.person.id}&date=${encodeURIComponent((target.kind === 'scheduled' ? nzLocal(new Date(target.scheduledFor)) : f.when).slice(0, 10))}&tab=chart${isPrn ? '&view=asneeded' : ''}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
                                 <Search className="size-4" /> Check the chart
                             </a>
                         </Button>
                     }
                 >
-                    We didn’t get confirmation that this was saved, so it isn’t
-                    shown as recorded. Check {p}’s chart first. Trying again
-                    won’t create a duplicate.
+                    This dose may already have been saved. Check {p}’s chart in
+                    the new tab, then return here. Your entries and this
+                    request’s identity are kept; trying again checks the same
+                    request. Do not start another record for this dose.
+                    {serverMessage ? <p>{serverMessage}</p> : null}
+                    {typeof submitted.current?.body.witnessed_by === 'number' &&
+                    !submitted.current.body.second_person_pin_forgotten ? (
+                        <Field
+                            id="retry-pin"
+                            label="Colleague’s PIN"
+                            required
+                            error={errors.pin}
+                        >
+                            <Input
+                                id="rd-retry-pin"
+                                type="password"
+                                autoComplete="off"
+                                value={f.second.pin}
+                                onChange={(event) =>
+                                    set({
+                                        second: {
+                                            ...f.second,
+                                            pin: event.target.value,
+                                        },
+                                    })
+                                }
+                            />
+                        </Field>
+                    ) : null}
                 </Notice>
             ) : null}
             {phase === 'duplicate' ? (
@@ -2229,7 +2553,8 @@ function RecordDoseForm({
     const footerStart =
         phase === 'duplicate' ? null : f.step > 0 &&
           !lockedForward &&
-          phase !== 'sending' ? (
+          phase !== 'sending' &&
+          phase !== 'uncertain' ? (
             <Button
                 type="button"
                 variant="ghost"
@@ -2378,11 +2703,17 @@ function RecordDoseForm({
                     disabled:
                         i > f.step ||
                         (mode !== 'record' && i === 0) ||
-                        phase === 'sending',
+                        phase === 'sending' ||
+                        phase === 'uncertain',
                 }))}
                 stepIndex={f.step}
                 onStepClick={(i) => {
-                    if (i <= f.step) setF((x) => ({ ...x, step: i }));
+                    if (
+                        phase !== 'uncertain' &&
+                        phase !== 'sending' &&
+                        i <= f.step
+                    )
+                        setF((x) => ({ ...x, step: i }));
                 }}
                 pct={pct}
                 pctLabel="Completeness"
@@ -2427,11 +2758,22 @@ function RecordDoseForm({
                 onClose={() => setDiscard(false)}
                 onConfirm={() => {
                     setDiscard(false);
+                    if (phase !== 'uncertain') clearDoseRecovery(recoveryKey);
                     onClose();
                 }}
-                title="Discard this record?"
-                description="Nothing has been saved. What you entered for this dose will be lost, and the dose stays as not yet recorded."
-                confirmText="Discard"
+                title={
+                    phase === 'uncertain'
+                        ? 'Keep this unconfirmed attempt?'
+                        : 'Discard this record?'
+                }
+                description={
+                    phase === 'uncertain'
+                        ? 'The dose may already be recorded. This recovery draft stays in this browser session so you can reopen this same dose and retry the same request. Keep this browser tab open; check the chart before recording anything else for this dose.'
+                        : 'Nothing has been saved. What you entered for this dose will be lost, and the dose stays as not yet recorded.'
+                }
+                confirmText={
+                    phase === 'uncertain' ? 'Keep draft and close' : 'Discard'
+                }
                 cancelText="Keep recording"
             />
         </>

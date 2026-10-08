@@ -162,10 +162,12 @@ export type ReviewPageProps = {
         site_id?: number | null;
         client_id?: number | null;
         kind?: ReviewKind | null;
+        return_to?: string | null;
     };
     sites: { id: number; name: string }[];
     can: ReviewPermissions;
     selected: Review | null;
+    selected_item_id?: number | null;
     person: {
         id: number;
         name: string;

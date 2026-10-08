@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationRound;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\ClientAllergyRecordService;
@@ -16,7 +17,7 @@ use Carbon\CarbonPeriod;
 /** Buffered PDF evidence, shared with its fresh release check. No live record writes. */
 final class MedicationPdfDataset
 {
-    public function read(User $actor, string $type, MedicationReportPeriod $period, array $sites, ?int $clientId, ?int $medicineId, bool $includePrn = true): array
+    public function read(User $actor, string $type, MedicationReportPeriod $period, array $sites, ?int $clientId, ?int $medicineId, bool $includePrn = true, ?int $roundId = null): array
     {
         $access = app(MedicationReportAccess::class);
         abort_unless($access->canExport($actor, $type), 403);
@@ -74,10 +75,17 @@ final class MedicationPdfDataset
             $result['notes'] = ['Opening balance: '.($opening?->on_hand_after ?? $entries->first()?->on_hand_before ?? 'Not recorded'), 'Closing balance: '.($entries->last()?->on_hand_after ?? $opening?->on_hand_after ?? 'Not recorded')];
         } else {
             abort_unless(count($sites) === 1 && $period->from === $period->to, 422, 'A round sheet needs one house and one NZ day.');
-            $rows = app(MedicationReportDataset::class)->doseRows($actor, $period, $sites);
+            $round = $roundId !== null ? MedicationRound::query()->whereIn('site_id', $sites)->findOrFail($roundId) : null;
+            if ($round !== null) {
+                abort_unless($round->round_date->toDateString() === $period->from, 404);
+                $result['scope'] .= ' · '.$round->name;
+                $result['round'] = ['id' => $round->id, 'site_id' => $round->site_id, 'service_context_id' => $round->service_context_id,
+                    'scheduled_time' => $round->scheduled_time, 'window_minutes' => $round->windowMinutes()];
+            }
+            $rows = app(MedicationReportDataset::class)->doseRows($actor, $period, $sites, $clientId, $roundId);
             $result['columns'] = ['Person', 'Due (NZDT/NZST)', 'Medicine', 'Dose / route', 'Recorded result', 'Recorded (NZDT/NZST)'];
             $result['rows'] = array_map(fn ($r) => [$r['person'], CarbonImmutable::parse($r['due_at'])->timezone('Pacific/Auckland')->format('H:i T'), $r['medicine'], $r['dose'].' / '.$r['route'], $r['status'], $r['recorded_at'] ? CarbonImmutable::parse($r['recorded_at'])->timezone('Pacific/Auckland')->format('H:i T') : '—'], $rows);
-            $result['notes'] = ['One house and one selected NZ day. Rows come from the same scheduled-dose projection as the medication record.', 'This printout is a record snapshot. Record care in eMAR; do not use a paper signature to alter the electronic record.'];
+            $result['notes'] = [($round !== null ? 'Selected round and its scheduled window on one NZ day.' : 'One house and one selected NZ day.').' Rows come from the same scheduled-dose projection as the medication record.', 'This printout is a record snapshot. Record care in eMAR; do not use a paper signature to alter the electronic record.'];
         }
         abort_if(count($result['rows']) > 2000 || count($result['chart']) > 1000, 422, 'This PDF exceeds the supported page size. Choose a shorter period or make a CSV.');
 

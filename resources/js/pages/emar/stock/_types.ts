@@ -6,6 +6,8 @@ export type Pager<T> = {
 };
 export type StockItem = {
     id: number;
+    client_id: number;
+    site_id: number | null;
     name: string;
     client_name: string;
     site_name: string | null;

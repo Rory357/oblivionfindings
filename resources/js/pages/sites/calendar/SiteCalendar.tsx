@@ -74,8 +74,9 @@ import {
     type ColorBy,
     type RecurPreset,
 } from '@/lib/calendar/recur';
-import type { SharedData } from '@/types';
 import { formatDateTime } from '@/lib/datetime';
+import { withMedicationReturn } from '@/lib/medication-navigation';
+import type { SharedData } from '@/types';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -147,10 +148,8 @@ import {
     fmtTimeRange,
     JumpToDate,
     MO,
-    periodLabel,
-    viewRange,
-    type CalView,
     MonthView,
+    periodLabel,
     sameDay,
     SourceDot,
     startOfMonth,
@@ -159,8 +158,10 @@ import {
     TimelineView,
     TodayRail,
     useNow,
+    viewRange,
     WD,
     WeekView,
+    type CalView,
     type Decorated,
     type Density,
     type SourceDef,
@@ -512,20 +513,51 @@ export default function SiteCalendar({
     dataAdapter,
 }: SiteCalendarProps) {
     const effectiveSources = dataAdapter?.sourceFilters ?? sources;
-    const [view, setView] = useState<CalView>(
-        () => dataAdapter?.initialView ?? 'month',
+    const [returnState] = useState(
+        () =>
+            new URLSearchParams(
+                typeof window === 'undefined' ? '' : window.location.search,
+            ),
     );
-    const [navDate, setNavDate] = useState(() => new Date());
+    const [view, setView] = useState<CalView>(() => {
+        const value = returnState.get('calendar_view');
+        return VIEWS.some((item) => item.key === value)
+            ? (value as CalView)
+            : (dataAdapter?.initialView ?? 'month');
+    });
+    const [navDate, setNavDate] = useState(() => {
+        const value = returnState.get('calendar_date');
+        const date =
+            value && /^\d{4}-\d{2}-\d{2}$/.test(value)
+                ? new Date(value + 'T12:00:00')
+                : new Date();
+        return Number.isNaN(date.getTime()) ? new Date() : date;
+    });
     const [colorBy, setColorBy] = useState<ColorBy>('source');
     const [density, setDensity] = useState<Density>('comfortable');
     const [events, setEvents] = useState<Decorated[]>([]);
     const [railEvents, setRailEvents] = useState<Decorated[]>([]);
     const [loading, setLoading] = useState(true);
-    const [sourceAvailability, setSourceAvailability] = useState<Record<string, string>>({});
-    const [railAvailability, setRailAvailability] = useState<Record<string, string>>({});
+    const [sourceAvailability, setSourceAvailability] = useState<
+        Record<string, string>
+    >({});
+    const [railAvailability, setRailAvailability] = useState<
+        Record<string, string>
+    >({});
     const [railUnavailable, setRailUnavailable] = useState(false);
-    const [lastScheduleLoad, setLastScheduleLoad] = useState<number | null>(null);
-    const unavailableSources = [...new Set([...Object.keys(sourceAvailability).filter(key => sourceAvailability[key] === 'unavailable'), ...Object.keys(railAvailability).filter(key => railAvailability[key] === 'unavailable')])];
+    const [lastScheduleLoad, setLastScheduleLoad] = useState<number | null>(
+        null,
+    );
+    const unavailableSources = [
+        ...new Set([
+            ...Object.keys(sourceAvailability).filter(
+                (key) => sourceAvailability[key] === 'unavailable',
+            ),
+            ...Object.keys(railAvailability).filter(
+                (key) => railAvailability[key] === 'unavailable',
+            ),
+        ]),
+    ];
     // Distinguish a real fetch failure (403 vs network) from a genuinely empty
     // period, so "no events" doesn't silently mask a broken feed (G-5).
     const [fetchError, setFetchError] = useState<
@@ -534,14 +566,27 @@ export default function SiteCalendar({
     const [enabledSources, setEnabledSources] = useState<Set<string>>(
         () =>
             new Set(
-                dataAdapter?.initialSources ??
+                (returnState.has('calendar_sources')
+                    ? (returnState.get('calendar_sources') ?? '')
+                          .split(',')
+                          .filter((key) =>
+                              effectiveSources.some(
+                                  (source) => source.key === key,
+                              ),
+                          )
+                    : dataAdapter?.initialSources) ??
                     effectiveSources.map((s) => s.key),
             ),
     );
-    const [houseFilter, setHouseFilter] = useState<number | 'all'>('all');
-    const [committeeFilter, setCommitteeFilter] = useState<string>('all');
+    const [houseFilter, setHouseFilter] = useState<number | 'all'>(() => {
+        const value = Number(returnState.get('calendar_house'));
+        return value > 0 ? value : 'all';
+    });
+    const [committeeFilter, setCommitteeFilter] = useState<string>(
+        returnState.get('calendar_committee') ?? 'all',
+    );
     // Header scoped search — narrows the loaded feed by entry/site name.
-    const [q, setQ] = useState('');
+    const [q, setQ] = useState(returnState.get('calendar_q') ?? '');
     const [selected, setSelected] = useState<Decorated | null>(null);
     const [createOpen, setCreateOpen] = useState(false);
     const [editEvent, setEditEvent] = useState<Decorated | null>(null);
@@ -580,10 +625,9 @@ export default function SiteCalendar({
 
     const srcByKey = useMemo(
         () =>
-            Object.fromEntries(effectiveSources.map((s) => [s.key, s])) as Record<
-                string,
-                SourceDef
-            >,
+            Object.fromEntries(
+                effectiveSources.map((s) => [s.key, s]),
+            ) as Record<string, SourceDef>,
         [effectiveSources],
     );
     const eventTypeByKey = useMemo(
@@ -618,13 +662,21 @@ export default function SiteCalendar({
                 if (generation === fetchGenerationRef.current) {
                     setEvents((res.events ?? []).map(decorate));
                     setSourceAvailability(res.availability ?? {});
-                    if (!Object.values(res.availability ?? {}).includes('unavailable')) setLastScheduleLoad(Date.now());
+                    if (
+                        !Object.values(res.availability ?? {}).includes(
+                            'unavailable',
+                        )
+                    )
+                        setLastScheduleLoad(Date.now());
                     setFetchError(null);
                 }
             } catch (err: unknown) {
                 if ((err as Error)?.name === 'AbortError') return;
                 if (generation === fetchGenerationRef.current) {
-                    const status = (err as any)?.response?.status ?? (err as any)?.status ?? (err as any)?.statusCode;
+                    const status =
+                        (err as any)?.response?.status ??
+                        (err as any)?.status ??
+                        (err as any)?.statusCode;
                     if (status === 403 || status === 401) {
                         setEvents([]);
                         setFetchError('forbidden');
@@ -672,7 +724,10 @@ export default function SiteCalendar({
         } catch (err: unknown) {
             if ((err as Error)?.name === 'AbortError') return;
             if (generation === fetchGenerationRef.current) {
-                const status = (err as any)?.response?.status ?? (err as any)?.status ?? (err as any)?.statusCode;
+                const status =
+                    (err as any)?.response?.status ??
+                    (err as any)?.status ??
+                    (err as any)?.statusCode;
                 if (status === 403 || status === 401) {
                     setEvents([]);
                     setFetchError('forbidden');
@@ -984,7 +1039,12 @@ export default function SiteCalendar({
                     preserveScroll: true,
                     preserveState: true,
                     onSuccess: refresh,
-                    onError: () => { toast.error('Could not reschedule this entry. Please try again.'); refresh(); },
+                    onError: () => {
+                        toast.error(
+                            'Could not reschedule this entry. Please try again.',
+                        );
+                        refresh();
+                    },
                 },
             );
         },
@@ -1245,11 +1305,39 @@ export default function SiteCalendar({
 
     const content = (
         <div className="space-y-3">
-            {(unavailableSources.length > 0 || railUnavailable) && <GuardrailCard unstyled role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-status-warning/30 bg-status-warning-bg px-4 py-3 text-sm text-status-warning">
-                <AlertTriangle className="size-4" />
-                <span className="min-w-0 flex-1">{[...unavailableSources.map(key => effectiveSources.find(source => source.key === key)?.label ?? key), ...(railUnavailable ? ['Upcoming and overdue summary'] : [])].join(', ')} unavailable. Showing only the information loaded; the schedule may be incomplete.{lastScheduleLoad && ` Last complete calendar load: ${formatDateTime(lastScheduleLoad)}.`}</span>
-                <Button variant="outline" className="frontline-tap" onClick={refresh}>Retry loading</Button>
-            </GuardrailCard>}
+            {(unavailableSources.length > 0 || railUnavailable) && (
+                <GuardrailCard
+                    unstyled
+                    role="alert"
+                    className="flex flex-wrap items-center gap-3 rounded-xl border border-status-warning/30 bg-status-warning-bg px-4 py-3 text-sm text-status-warning"
+                >
+                    <AlertTriangle className="size-4" />
+                    <span className="min-w-0 flex-1">
+                        {[
+                            ...unavailableSources.map(
+                                (key) =>
+                                    effectiveSources.find(
+                                        (source) => source.key === key,
+                                    )?.label ?? key,
+                            ),
+                            ...(railUnavailable
+                                ? ['Upcoming and overdue summary']
+                                : []),
+                        ].join(', ')}{' '}
+                        unavailable. Showing only the information loaded; the
+                        schedule may be incomplete.
+                        {lastScheduleLoad &&
+                            ` Last complete calendar load: ${formatDateTime(lastScheduleLoad)}.`}
+                    </span>
+                    <Button
+                        variant="outline"
+                        className="frontline-tap"
+                        onClick={refresh}
+                    >
+                        Retry loading
+                    </Button>
+                </GuardrailCard>
+            )}
             {fetchError && (
                 <div
                     role="alert"
@@ -1313,7 +1401,8 @@ export default function SiteCalendar({
                             onSelect={(ev) => {
                                 hidePreview();
                                 if (dataAdapter?.onOpenItem) {
-                                    if (dataAdapter.onOpenItem(ev) !== false) return;
+                                    if (dataAdapter.onOpenItem(ev) !== false)
+                                        return;
                                 }
                                 setSelected(ev);
                             }}
@@ -1345,7 +1434,8 @@ export default function SiteCalendar({
                 value={q}
                 onChange={setQ}
                 placeholder={
-                    dataAdapter?.searchPlaceholder ?? (scope === 'site'
+                    dataAdapter?.searchPlaceholder ??
+                    (scope === 'site'
                         ? 'Search this calendar…'
                         : 'Search entries, sites…')
                 }
@@ -1419,12 +1509,17 @@ export default function SiteCalendar({
                         <DropdownMenuItem
                             onSelect={() => setSubscribeOpen(true)}
                         >
-                            <Rss className="mr-2 h-4 w-4" /> Add to your calendar
+                            <Rss className="mr-2 h-4 w-4" /> Add to your
+                            calendar
                         </DropdownMenuItem>
                     )}
                     <DropdownMenuItem
                         onSelect={() =>
-                            downloadICS(visibleEvents, dataAdapter?.exportFilename ?? 'site-calendar.ics')
+                            downloadICS(
+                                visibleEvents,
+                                dataAdapter?.exportFilename ??
+                                    'site-calendar.ics',
+                            )
                         }
                     >
                         <Download className="mr-2 h-4 w-4" /> Export this period
@@ -1460,7 +1555,11 @@ export default function SiteCalendar({
                 </DropdownMenuContent>
             </DropdownMenu>
             {dataAdapter?.primaryAction && (
-                <PageHeaderPrimaryButton onClick={() => router.visit(dataAdapter.primaryAction!.href)}>
+                <PageHeaderPrimaryButton
+                    onClick={() =>
+                        router.visit(dataAdapter.primaryAction!.href)
+                    }
+                >
                     {dataAdapter.primaryAction.label}
                 </PageHeaderPrimaryButton>
             )}
@@ -1543,7 +1642,9 @@ export default function SiteCalendar({
                                         allSourcesOn
                                             ? new Set()
                                             : new Set(
-                                                  effectiveSources.map((s) => s.key),
+                                                  effectiveSources.map(
+                                                      (s) => s.key,
+                                                  ),
                                               ),
                                     )
                                 }
@@ -1664,7 +1765,11 @@ export default function SiteCalendar({
             <PageHeaderMeterBlock
                 label="Viewing"
                 className="min-w-[220px]!"
-                value={fetchError || railUnavailable || unavailableSources.length ? 'Incomplete schedule' : `${periodCount} ${periodCount === 1 ? 'entry' : 'entries'}`}
+                value={
+                    fetchError || railUnavailable || unavailableSources.length
+                        ? 'Incomplete schedule'
+                        : `${periodCount} ${periodCount === 1 ? 'entry' : 'entries'}`
+                }
                 ariaLabel="View this period in the agenda"
                 onClick={() => setView('agenda')}
             >
@@ -1697,7 +1802,11 @@ export default function SiteCalendar({
             </PageHeaderMeterBlock>
             <PageHeaderMeterBlock
                 label="Next 7 days"
-                value={fetchError || railUnavailable || unavailableSources.length ? '—' : next7Total}
+                value={
+                    fetchError || railUnavailable || unavailableSources.length
+                        ? '—'
+                        : next7Total
+                }
                 ariaLabel="View the coming week"
                 onClick={() => {
                     setNavDate(new Date());
@@ -1733,32 +1842,44 @@ export default function SiteCalendar({
                 ariaLabel="View overdue entries in the agenda"
                 onClick={() => setView('agenda')}
             >
-                <PageHeaderMeterBig>{fetchError || railUnavailable || unavailableSources.length ? '—' : overdueCount}</PageHeaderMeterBig>
+                <PageHeaderMeterBig>
+                    {fetchError || railUnavailable || unavailableSources.length
+                        ? '—'
+                        : overdueCount}
+                </PageHeaderMeterBig>
                 <PageHeaderMeterCaption>
                     past their due date
                 </PageHeaderMeterCaption>
             </PageHeaderMeterBlock>
-            {dataAdapter?.showApprovalMeter !== false && <PageHeaderMeterBlock
-                label="To approve"
-                tone={toApproveCount > 0 ? 'warning' : 'success'}
-                ariaLabel={
-                    canApprove
-                        ? 'Review pending approvals'
-                        : 'View pending entries in the agenda'
-                }
-                onClick={() =>
-                    canApprove ? setApprovalsOpen(true) : setView('agenda')
-                }
-            >
-                <PageHeaderMeterBig>{toApproveCount}</PageHeaderMeterBig>
-                <PageHeaderMeterCaption>
-                    awaiting sign-off
-                </PageHeaderMeterCaption>
-            </PageHeaderMeterBlock>}
+            {dataAdapter?.showApprovalMeter !== false && (
+                <PageHeaderMeterBlock
+                    label="To approve"
+                    tone={toApproveCount > 0 ? 'warning' : 'success'}
+                    ariaLabel={
+                        canApprove
+                            ? 'Review pending approvals'
+                            : 'View pending entries in the agenda'
+                    }
+                    onClick={() =>
+                        canApprove ? setApprovalsOpen(true) : setView('agenda')
+                    }
+                >
+                    <PageHeaderMeterBig>{toApproveCount}</PageHeaderMeterBig>
+                    <PageHeaderMeterCaption>
+                        awaiting sign-off
+                    </PageHeaderMeterCaption>
+                </PageHeaderMeterBlock>
+            )}
             <PageHeaderMeterBlock
                 label="Mine"
-                href={dataAdapter?.mineLink?.href ?? (dataAdapter ? '/governance/my-work' : '/my-calendar')}
-                ariaLabel={dataAdapter?.mineLink?.label ?? (dataAdapter ? 'Open My Work' : 'Open My Calendar')}
+                href={
+                    dataAdapter?.mineLink?.href ??
+                    (dataAdapter ? '/governance/my-work' : '/my-calendar')
+                }
+                ariaLabel={
+                    dataAdapter?.mineLink?.label ??
+                    (dataAdapter ? 'Open My Work' : 'Open My Calendar')
+                }
             >
                 <PageHeaderMeterBig>{mineCount}</PageHeaderMeterBig>
                 <PageHeaderMeterCaption>
@@ -1778,6 +1899,33 @@ export default function SiteCalendar({
     const dialogs = (
         <>
             <EventDetailDialog
+                sourceUrl={(() => {
+                    const url = new URL(page.url, window.location.origin);
+                    url.searchParams.set('calendar_view', view);
+                    url.searchParams.set(
+                        'calendar_date',
+                        `${navDate.getFullYear()}-${String(navDate.getMonth() + 1).padStart(2, '0')}-${String(navDate.getDate()).padStart(2, '0')}`,
+                    );
+                    if (q) url.searchParams.set('calendar_q', q);
+                    else url.searchParams.delete('calendar_q');
+                    if (houseFilter !== 'all')
+                        url.searchParams.set(
+                            'calendar_house',
+                            String(houseFilter),
+                        );
+                    else url.searchParams.delete('calendar_house');
+                    url.searchParams.set(
+                        'calendar_sources',
+                        [...enabledSources].join(','),
+                    );
+                    if (committeeFilter !== 'all')
+                        url.searchParams.set(
+                            'calendar_committee',
+                            committeeFilter,
+                        );
+                    else url.searchParams.delete('calendar_committee');
+                    return url.pathname + url.search + url.hash;
+                })()}
                 event={selected}
                 onClose={() => setSelected(null)}
                 eventTypeByKey={eventTypeByKey}
@@ -1911,7 +2059,17 @@ export default function SiteCalendar({
                                 : 'Site Calendar')
                         }
                         titleChip={
-                            fetchError || railUnavailable || unavailableSources.length ? <PageHeaderStatusChip variant="warning">Schedule incomplete</PageHeaderStatusChip> : loading ? <PageHeaderStatusChip variant="neutral">Loading schedule</PageHeaderStatusChip> : overdueCount > 0 ? (
+                            fetchError ||
+                            railUnavailable ||
+                            unavailableSources.length ? (
+                                <PageHeaderStatusChip variant="warning">
+                                    Schedule incomplete
+                                </PageHeaderStatusChip>
+                            ) : loading ? (
+                                <PageHeaderStatusChip variant="neutral">
+                                    Loading schedule
+                                </PageHeaderStatusChip>
+                            ) : overdueCount > 0 ? (
                                 <PageHeaderStatusChip variant="critical">
                                     {overdueCount} overdue
                                 </PageHeaderStatusChip>
@@ -2089,6 +2247,7 @@ const PRIORITY_TONE: Record<string, string> = {
 };
 
 function EventDetailDialog({
+    sourceUrl,
     event,
     onClose,
     eventTypeByKey,
@@ -2099,6 +2258,7 @@ function EventDetailDialog({
     onEdit,
     onChanged,
 }: {
+    sourceUrl: string;
     event: Decorated | null;
     onClose: () => void;
     eventTypeByKey: Record<string, EventTypeOption>;
@@ -2389,7 +2549,16 @@ function EventDetailDialog({
                     <DialogFooter className="flex-row flex-wrap items-center justify-between gap-2 sm:justify-between">
                         {!event.editable && event.link ? (
                             <Button variant="secondary" size="sm" asChild>
-                                <Link href={event.link}>
+                                <Link
+                                    href={
+                                        event.source === 'medication'
+                                            ? withMedicationReturn(
+                                                  event.link,
+                                                  sourceUrl,
+                                              )
+                                            : event.link
+                                    }
+                                >
                                     <ExternalLink className="mr-1 h-3.5 w-3.5" />{' '}
                                     Open record
                                 </Link>
@@ -3465,7 +3634,13 @@ function QuickAddMenu({
     onClose: () => void;
 }) {
     const hourDate = ctx.hour != null ? new Date(ctx.date) : null;
-    if (hourDate && ctx.hour != null) hourDate.setHours(Math.floor(ctx.hour), Math.round((ctx.hour % 1) * 60), 0, 0);
+    if (hourDate && ctx.hour != null)
+        hourDate.setHours(
+            Math.floor(ctx.hour),
+            Math.round((ctx.hour % 1) * 60),
+            0,
+            0,
+        );
     const where = `${siteName ? `to ${siteName} · ` : ''}${WD[ctx.date.getDay()]} ${ctx.date.getDate()} ${MO[ctx.date.getMonth()].slice(0, 3)} ${ctx.date.getFullYear()}${hourDate ? ` · ${fmtTime(hourDate)}` : ''}`;
 
     // The shared calendar right-click menu (CalendarContextMenu in _parts).

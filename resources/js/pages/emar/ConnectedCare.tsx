@@ -9,7 +9,9 @@ import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { ReviewCard, ReviewRow } from '@/components/wizard/shell';
 import { formatDateOnly, formatDateTime } from '@/lib/datetime';
-import { Link, router } from '@inertiajs/react';
+import { emarScopedHref } from '@/lib/emar-navigation';
+import { withMedicationReturn } from '@/lib/medication-navigation';
+import { Link, router, usePage } from '@inertiajs/react';
 import { ArrowLeftRight } from 'lucide-react';
 import { useState } from 'react';
 import {
@@ -48,6 +50,7 @@ export default function ConnectedCare(props: ConnectedProps) {
         id: number;
         name: string;
     } | null>(null);
+    const { url: pageUrl } = usePage();
     const matches = (s: string) => s.toLowerCase().includes(q.toLowerCase());
     const saved = () => router.reload();
     const person = props.selected_client;
@@ -72,7 +75,12 @@ export default function ConnectedCare(props: ConnectedProps) {
             actions={
                 <>
                     <PageHeaderGlassButton asChild>
-                        <Link href="/emar/prescriptions">
+                        <Link
+                            href={withMedicationReturn(
+                                emarScopedHref('/emar/prescriptions', pageUrl),
+                                pageUrl,
+                            )}
+                        >
                             Medication orders
                         </Link>
                     </PageHeaderGlassButton>
@@ -528,10 +536,16 @@ export default function ConnectedCare(props: ConnectedProps) {
                     {transfer.reconciliation_id && (
                         <Button asChild variant="outline">
                             <Link
-                                href={
-                                    '/emar/prescriptions?view=reconciliation&client_id=' +
-                                    transfer.client_id
-                                }
+                                href={withMedicationReturn(
+                                    emarScopedHref(
+                                        '/emar/prescriptions?view=reconciliation&client_id=' +
+                                            transfer.client_id +
+                                            '&reconciliation_id=' +
+                                            transfer.reconciliation_id,
+                                        pageUrl,
+                                    ),
+                                    pageUrl,
+                                )}
                             >
                                 Open medication reconciliation
                             </Link>

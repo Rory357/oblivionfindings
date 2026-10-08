@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\SanitizesCsvOutput;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientMedication;
+use App\Models\MedicationRound;
 use App\Models\User;
 use App\Services\AuthorizationEvidenceLockService;
 use App\Services\CurrentAuthorizationReads;
@@ -160,7 +161,7 @@ class MedicationReportsController extends Controller
 
     public function export(Request $request)
     {
-        $data = $request->validate(['type' => ['required', Rule::in(['mar', 'cd_register', 'round_sheet', 'doses', 'errors', 'stock', 'audit', 'syringe_drivers'])], 'site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'], 'medication_id' => ['nullable', 'integer', 'min:1'], 'kind' => ['nullable', 'string', 'max:100'], 'q' => ['nullable', 'string', 'max:80'], 'include_in_error' => ['nullable', 'boolean'], 'include_prn' => ['nullable', 'boolean']]);
+        $data = $request->validate(['type' => ['required', Rule::in(['mar', 'cd_register', 'round_sheet', 'doses', 'errors', 'stock', 'audit', 'syringe_drivers'])], 'site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'], 'medication_id' => ['nullable', 'integer', 'min:1'], 'round_id' => ['nullable', 'integer', 'min:1'], 'kind' => ['nullable', 'string', 'max:100'], 'q' => ['nullable', 'string', 'max:80'], 'include_in_error' => ['nullable', 'boolean'], 'include_prn' => ['nullable', 'boolean']]);
         $actor = $request->user();
         $type = $data['type'];
         abort_unless($this->access->canExport($actor, $type), 403);
@@ -170,11 +171,11 @@ class MedicationReportsController extends Controller
         $clientId = $request->integer('client_id') ?: null;
         $sites = $this->access->siteIds($actor, $request->integer('site_id') ?: null, $clientId, $type === 'stock' ? 'stock' : ($type === 'cd_register' ? 'controlled' : 'doses'));
         if (in_array($type, ['mar', 'cd_register', 'round_sheet'], true)) {
-            $read = fn (User $current) => app(MedicationPdfDataset::class)->read($current, $type, $period, $sites, $clientId, $request->integer('medication_id') ?: null, ! $request->has('include_prn') || $request->boolean('include_prn'));
+            $read = fn (User $current) => app(MedicationPdfDataset::class)->read($current, $type, $period, $sites, $clientId, $request->integer('medication_id') ?: null, ! $request->has('include_prn') || $request->boolean('include_prn'), $type === 'round_sheet' ? ($request->integer('round_id') ?: null) : null);
             $evidence = $read($actor);
             $digest = hash('sha256', json_encode($evidence, JSON_THROW_ON_ERROR));
             $bytes = Pdf::setOption(['defaultFont' => 'DejaVu Sans', 'isRemoteEnabled' => false])->loadView('pdf.medication-report', ['evidence' => $evidence, 'actor' => $actor, 'generated' => CarbonImmutable::now('UTC'), 'purpose' => $purpose])->setPaper('a4', 'landscape')->output();
-            app(MedicationExportAudit::class)->record($actor, $type, $sites, $period, $purpose, $clientId, ['rows' => count($evidence['rows']), 'include_prn' => ! $request->has('include_prn') || $request->boolean('include_prn'), 'medication_id' => $request->integer('medication_id') ?: null], function (User $current) use ($read, $digest) {
+            app(MedicationExportAudit::class)->record($actor, $type, $sites, $period, $purpose, $clientId, ['rows' => count($evidence['rows']), 'include_prn' => ! $request->has('include_prn') || $request->boolean('include_prn'), 'medication_id' => $request->integer('medication_id') ?: null, 'round_id' => $type === 'round_sheet' ? ($request->integer('round_id') ?: null) : null], function (User $current) use ($read, $digest) {
                 abort_unless(hash_equals($digest, hash('sha256', json_encode($read($current), JSON_THROW_ON_ERROR))), 409, 'The records or your access changed while the file was being prepared. Refresh and try again.');
             });
 
@@ -211,7 +212,15 @@ class MedicationReportsController extends Controller
 
     public function legacyRoundSheet(Request $request)
     {
+        $request->validate(['date' => ['nullable', 'date_format:Y-m-d'], 'site_id' => ['nullable', 'integer', 'min:1'], 'round_id' => ['nullable', 'integer', 'min:1']]);
         $day = $request->input('date', CarbonImmutable::now('Pacific/Auckland')->toDateString());
+        if ($request->integer('round_id')) {
+            $sites = $this->access->siteIds($request->user(), $request->integer('site_id') ?: null);
+            $round = MedicationRound::query()->whereIn('site_id', $sites)->findOrFail($request->integer('round_id'));
+            abort_if($request->filled('date') && $day !== $round->round_date->toDateString(), 404);
+            $day = $round->round_date->toDateString();
+            $request->merge(['site_id' => $round->site_id]);
+        }
         $request->merge(['type' => 'round_sheet', 'period' => 'custom', 'date_from' => $day, 'date_to' => $day]);
 
         return $this->export($request);

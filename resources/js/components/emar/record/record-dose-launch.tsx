@@ -5,6 +5,15 @@ import {
 } from '@/components/clients/profile/mar-day/dose-cell';
 import type { MedicationDay } from '@/components/clients/profile/mar-day/types';
 import { AsNeededPicker } from '@/components/emar/record-dose/dialogs';
+import {
+    RecordDoseDialog,
+    type PendingDose,
+} from '@/components/emar/record-dose/record-dose-dialog';
+import { pendingDoseRecoveries } from '@/components/emar/record-dose/recovery';
+import type {
+    DoseTarget,
+    EntryPoint,
+} from '@/components/emar/record-dose/types';
 import { useDoseRecorder } from '@/components/emar/recording/use-dose-recorder';
 import { PageHeaderPrimaryButton } from '@/components/page';
 import { SettingsModal } from '@/components/settings/settings-modal';
@@ -61,24 +70,27 @@ export function RecordDoseLaunch({
     );
 }
 
-function DosePicker({
+export function DosePicker({
     clientId,
     personName,
     asNeeded,
     onClose,
     returnFocus,
+    entry = 'mar',
 }: {
     clientId: number;
     personName: string;
     asNeeded: boolean;
     onClose: () => void;
     returnFocus: () => HTMLElement | null;
+    entry?: EntryPoint;
 }) {
     // A recording action always checks today's orders, even on a historical chart.
     const { data, load, reload } = useRecordJson<MedicationDay>(
         `/emar/clients/${clientId}/day`,
     );
     const [choosing, setChoosing] = useState(true);
+    const [recovering, setRecovering] = useState<DoseTarget | null>(null);
     const context = useMemo(
         () =>
             data?.recorder?.client
@@ -89,9 +101,10 @@ function DosePicker({
                       notGivenReasons: data.recorder.not_given_reasons,
                       signedAs: data.recorder.signed_as,
                       prnMedications: data.prn.rows,
+                      entry,
                   }
                 : null,
-        [data],
+        [data, entry],
     );
     const recorder = useDoseRecorder(context, onClose, returnFocus);
     const doses =
@@ -105,6 +118,7 @@ function DosePicker({
                 ['due_now', 'due', 'overdue'].includes(kind),
             ) ?? [];
     const ready = load === 'ready' && data !== null;
+    const pending = ready ? pendingDoseRecoveries<PendingDose>(clientId) : [];
     const canChoose = ready && data.can.record && context !== null;
     const hidden =
         ready &&
@@ -121,7 +135,10 @@ function DosePicker({
     return (
         <>
             {choosing &&
-                (asNeeded && canChoose && data.prn.rows.length > 0 ? (
+                (asNeeded &&
+                canChoose &&
+                data.prn.rows.length > 0 &&
+                pending.length === 0 ? (
                     <AsNeededPicker
                         choices={data.prn.rows}
                         onClose={onClose}
@@ -174,6 +191,29 @@ function DosePicker({
                             )
                         ) : (
                             <div className="space-y-3">
+                                {pending.map((attempt) => (
+                                    <div
+                                        key={attempt.key}
+                                        className="flex items-center justify-between gap-4 rounded-lg border p-3"
+                                    >
+                                        <p className="text-sm">
+                                            A previous dose attempt needs
+                                            confirmation.
+                                        </p>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => {
+                                                setRecovering(
+                                                    attempt.draft.target,
+                                                );
+                                                setChoosing(false);
+                                            }}
+                                        >
+                                            Check original attempt
+                                        </Button>
+                                    </div>
+                                ))}
                                 {accessMessage && (
                                     <div
                                         role="status"
@@ -209,6 +249,17 @@ function DosePicker({
                                                     : 'An as-needed dose needs a current medication order. Ask the medication lead to check the order if a medicine is missing.'
                                             }
                                         />
+                                    ) : canChoose ? (
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => {
+                                                recorder.recordAsNeeded();
+                                                setChoosing(false);
+                                            }}
+                                        >
+                                            <Pill className="size-4" /> Choose
+                                            an as-needed medicine
+                                        </Button>
                                     ) : null
                                 ) : canChoose ? (
                                     <>
@@ -307,6 +358,17 @@ function DosePicker({
                     </SettingsModal>
                 ))}
             {recorder.element}
+            {recovering && (
+                <RecordDoseDialog
+                    target={recovering}
+                    entry={entry}
+                    signedAs={
+                        context?.signedAs ?? { name: '', role_label: null }
+                    }
+                    onClose={onClose}
+                    returnFocus={returnFocus}
+                />
+            )}
         </>
     );
 }

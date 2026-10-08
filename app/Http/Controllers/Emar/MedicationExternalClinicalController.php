@@ -8,6 +8,7 @@ use App\Models\ClientMedication;
 use App\Models\MedicationExternalClinician;
 use App\Models\MedicationExternalGrant;
 use App\Models\MedicationExternalProposal;
+use App\Models\MedicationOrderRevision;
 use App\Models\MedicationProviderTransfer;
 use App\Models\User;
 use App\Services\CurrentAuthorizationReads;
@@ -19,6 +20,7 @@ use App\Services\Medication\ExternalClinical\ProviderMedicationTransfers;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationOrderWorkflow;
 use App\Services\Medication\MedicationRecordAccess;
+use App\Support\MedicationJourney;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -35,12 +37,18 @@ final class MedicationExternalClinicalController extends Controller
 
     public function index(Request $request)
     {
+        $data = $request->validate(['client_id' => ['nullable', 'integer', 'min:1'], 'site_id' => ['nullable', 'integer', 'min:1']]);
         $actor = $request->user();
-        $sites = $this->scope->readerSiteIds($actor, 'medications.view');
+        $clientId = isset($data['client_id']) ? (int) $data['client_id'] : null;
+        $siteId = isset($data['site_id']) ? (int) $data['site_id'] : null;
+        $sites = $this->scope->readerSiteIds($actor, 'medications.view', $siteId, $clientId);
+        if ($siteId !== null) {
+            $sites = [$siteId];
+        }
         $clients = Client::query()->whereIn('site_id', $sites)->orderBy('last_name')->get();
         $ids = $this->records->readableClientIds($actor, $clients->modelKeys());
         $clients = $clients->whereIn('id', $ids)->values();
-        $selected = $request->integer('client_id') ? $this->records->client($actor, $request->integer('client_id')) : null;
+        $selected = $clientId !== null ? $this->records->client($actor, $clientId) : null;
         $selectedIds = $selected ? [$selected->id] : $ids;
         $canAccess = $actor->canDo('medications.external.manage');
         $canRevokeIdentity = $this->external->canRevokeIdentity($actor);
@@ -63,6 +71,7 @@ final class MedicationExternalClinicalController extends Controller
         return Inertia::render('emar/ConnectedCare', [
             'clients' => $clients->map(fn ($c) => ['id' => $c->id, 'name' => $c->full_name])->all(),
             'selected_client' => $selected ? $this->person($selected) : null,
+            'filters' => ['site_id' => $siteId, 'client_id' => $clientId, 'return_to' => MedicationJourney::returnTo($request->query('return_to'))],
             'clinicians' => $profiles->map(fn ($p) => ['id' => $p->id, 'user_id' => $p->user_id, 'name' => $p->user->name, 'email' => $p->user->email,
                 'provider_name' => $p->provider_name, 'registration_authority' => $p->registration_authority, 'registration_number' => $p->registration_number,
                 'identity_verified_at' => $p->identity_verified_at?->toIso8601String(), 'expires_at' => $p->expires_at?->toIso8601String(), 'revoked_at' => $p->revoked_at?->toIso8601String()])->all(),
@@ -70,7 +79,7 @@ final class MedicationExternalClinicalController extends Controller
                 'client_id' => $g->client_id, 'site_id' => $g->site_id, 'purpose' => $g->purpose, 'can_propose' => $g->can_propose,
                 'include_controlled' => $g->include_controlled, 'expires_at' => $g->expires_at?->toIso8601String(), 'revoked_at' => $g->revoked_at?->toIso8601String(),
                 'active' => $this->grantAvailability($g) === 'ready', 'availability' => $this->grantAvailability($g)])->all(),
-            'proposals' => $proposals->map(fn ($p) => $this->proposal($p))->all(),
+            'proposals' => $proposals->map(fn ($p) => $this->proposal($p, $actor))->all(),
             'transfers' => $transfers->map(fn ($t) => $this->transfer($t))->all(),
             'can' => ['manage_access' => $canAccess, 'revoke_identity' => $canRevokeIdentity, 'manage_orders' => $canOrders, 'transfer' => $canTransfer, 'export' => $actor->canDo('medications.reports.export')],
             'witnesses' => $canOrders ? $this->scope->prescriptionWitnessStaffPicker($sites, $actor->id)->all() : [],
@@ -207,10 +216,32 @@ final class MedicationExternalClinicalController extends Controller
     private function mutation(Request $request, $record, string $message)
     {
         $data = is_array($record) ? $record : ['id' => $record->id, 'revision_id' => $record->revision_id, 'reconciliation_id' => $record->reconciliation_id];
+        if ($record instanceof MedicationExternalProposal) {
+            $data = array_merge($data, $this->orderContinuation($record, $request->user()));
+        }
 
         return $request->expectsJson()
             ? response()->json(['success' => true, 'message' => $message, ...$data])
             : back()->with('success', $message);
+    }
+
+    private function orderContinuation(MedicationExternalProposal $proposal, User $actor): array
+    {
+        $empty = ['order_id' => null, 'order_url' => null];
+        if ($proposal->status !== 'accepted' || $proposal->revision_id === null || ! $actor->canDo('medications.view')) {
+            return $empty;
+        }
+        $revision = MedicationOrderRevision::query()->canonicalVersion()->where('client_id', $proposal->client_id)->find($proposal->revision_id);
+        $order = $revision ? ClientMedication::query()->current()->where('client_id', $proposal->client_id)->find($revision->client_medication_id) : null;
+        if ($order === null || ($order->controlled_drug && ! $actor->canDo('medications.controlled.view'))
+            || ! in_array((int) $proposal->client_id, $this->records->readableClientIds($actor, [$proposal->client_id]), true)) {
+            return $empty;
+        }
+
+        return ['order_id' => $order->id, 'order_url' => '/emar/prescriptions?'.http_build_query([
+            'client_id' => $proposal->client_id, 'order_id' => $order->id,
+            'action' => $actor->canDo('medications.orders.verify') ? 'check' : 'view',
+        ])];
     }
 
     private function grantAvailability(MedicationExternalGrant $grant): string
@@ -249,12 +280,13 @@ final class MedicationExternalClinicalController extends Controller
         return ['id' => $client->id, 'name' => $client->full_name, 'date_of_birth' => $client->date_of_birth?->toDateString()];
     }
 
-    private function proposal(MedicationExternalProposal $p): array
+    private function proposal(MedicationExternalProposal $p, ?User $actor = null): array
     {
         return ['id' => $p->id, 'client_id' => $p->client_id, 'client_name' => $p->client->full_name, 'clinician_name' => $p->clinician->user->name,
             'kind' => $p->kind, 'medication_id' => $p->medication_id, 'expected_version' => $p->expected_version,
             'prescription' => $p->prescription, 'reason' => $p->reason, 'status' => $p->status, 'submitted_at' => $p->submitted_at?->toIso8601String(),
-            'revision_id' => $p->revision_id, 'decision_note' => $p->decision_note, 'has_source_file' => $p->source_file_path !== null];
+            'revision_id' => $p->revision_id, 'decision_note' => $p->decision_note, 'has_source_file' => $p->source_file_path !== null]
+            + ($actor !== null ? $this->orderContinuation($p, $actor) : ['order_id' => null, 'order_url' => null]);
     }
 
     private function transfer(MedicationProviderTransfer $t): array

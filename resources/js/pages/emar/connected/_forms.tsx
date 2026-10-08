@@ -393,6 +393,9 @@ export function ProposalDecision({
 }) {
     const command = useCommand();
     const [saved, setSaved] = useState(false);
+    const [orderUrl, setOrderUrl] = useState<string | null>(
+        p.order_url ?? null,
+    );
     const [decision, setDecision] = useState('');
     const [note, setNote] = useState('');
     const [confirmed, setConfirmed] = useState(false);
@@ -441,30 +444,49 @@ export function ProposalDecision({
             }
             saveLabel="Record decision"
             onSave={async () => {
-                if (
-                    await command.run(
-                        '/emar/connected-care/proposals/' + p.id + '/decision',
-                        multipart({
-                            decision,
-                            decision_note: note,
-                            source_confirmed: confirmed,
-                            source,
-                            source_file: file,
-                            ...stop,
-                        }),
-                    )
-                ) {
+                const result = await command.run<{ order_url?: string | null }>(
+                    '/emar/connected-care/proposals/' + p.id + '/decision',
+                    multipart({
+                        decision,
+                        decision_note: note,
+                        source_confirmed: confirmed,
+                        source,
+                        source_file: file,
+                        ...stop,
+                    }),
+                );
+                if (result) {
+                    setOrderUrl(result.order_url ?? null);
                     setSaved(true);
                     onSaved();
                 }
             }}
             success="Decision recorded"
-            successDetail="Accepted requests enter the existing medication-order checking workflow. They do not become ready to give until the required checks pass."
+            successDetail={
+                <>
+                    <span>
+                        Accepted requests enter medication-order checking. They
+                        are ready to give only after the required checks pass.
+                    </span>
+                    {orderUrl && (
+                        <Button asChild variant="outline">
+                            <a href={orderUrl}>Open the medication order</a>
+                        </Button>
+                    )}
+                </>
+            }
             steps={[
                 {
                     label: 'Request',
                     content: (
                         <div className="space-y-4">
+                            {orderUrl && (
+                                <Button asChild variant="outline">
+                                    <a href={orderUrl}>
+                                        Open the medication order
+                                    </a>
+                                </Button>
+                            )}
                             <ReviewCard
                                 icon={ClipboardCheck}
                                 title={p.kind + ' request'}

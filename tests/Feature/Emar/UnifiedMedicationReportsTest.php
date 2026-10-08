@@ -21,6 +21,7 @@ use App\Models\MedicationRound;
 use App\Models\MedicationStockLot;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\ServiceContext;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\CompetencyAcknowledgement;
@@ -575,4 +576,44 @@ it('opens canonical staff eligibility only when the report reader has medication
     $actor->permissionOverrides()->syncWithoutDetaching([Permission::where('key', 'medications.view')->firstOrFail()->id => ['allowed' => false]]);
     $this->actingAs($actor->fresh())->get($url)->assertOk()->assertInertia(fn ($page) => $page->where('page.data.0.href', null));
     $this->get($href)->assertForbidden();
+});
+
+it('prints the exact round window and rejects mismatched house or historical day', function () {
+    $actor = p09Reader('admin', $this->site);
+    $context = ServiceContext::factory()->create(['type' => 'residential', 'site_id' => $this->site->id, 'is_active' => true]);
+    $this->person->update(['service_context_id' => $context->id]);
+    foreach (['07:00', '09:00'] as $time) {
+        $medicine = p09Medicine($this->person, ['name' => 'Synthetic '.$time.' medicine', 'dose_times' => [$time]]);
+        MedicationDoseSlot::firstOrCreate(['client_medication_id' => $medicine->id, 'nz_date' => '2026-09-29', 'ordered_time' => $time],
+            ['client_id' => $this->person->id, 'due_at' => Carbon::parse('2026-09-29 '.$time, 'Pacific/Auckland')->utc(), 'controlled' => false, 'generated_at' => now()]);
+    }
+    $excluded = Client::factory()->create(['site_id' => $this->site->id, 'service_context_id' => null]);
+    $excludedMedicine = p09Medicine($excluded, ['name' => 'Different service context sentinel']);
+    MedicationDoseSlot::firstOrCreate(['client_medication_id' => $excludedMedicine->id, 'nz_date' => '2026-09-29', 'ordered_time' => '07:00'],
+        ['client_id' => $excluded->id, 'due_at' => Carbon::parse('2026-09-29 07:00', 'Pacific/Auckland')->utc(), 'controlled' => false, 'generated_at' => now()]);
+    $round = MedicationRound::create(['site_id' => $this->site->id, 'service_context_id' => $context->id, 'name' => 'Synthetic selected morning', 'round_date' => '2026-09-29',
+        'scheduled_time' => '07:00', 'window_minutes' => 10, 'status' => 'pending']);
+    $evidence = app(MedicationPdfDataset::class)->read($actor, 'round_sheet', new MedicationReportPeriod('2026-09-29', '2026-09-29'), [$this->site->id], null, null, true, $round->id);
+    expect($evidence['rows'])->toHaveCount(1)->and($evidence['rows'][0][2])->toBe('Synthetic 07:00 medicine')->and($evidence['round']['id'])->toBe($round->id);
+    $renderer = Mockery::mock(Barryvdh\DomPDF\PDF::class);
+    Pdf::shouldReceive('setOption')->once()->andReturn($renderer);
+    $renderer->shouldReceive('loadView')->once()->with('pdf.medication-report', Mockery::on(fn ($payload) => $payload['evidence']['round']['id'] === $round->id && count($payload['evidence']['rows']) === 1))->andReturnSelf();
+    $renderer->shouldReceive('setPaper')->once()->andReturnSelf();
+    $renderer->shouldReceive('output')->once()->andReturn('%PDF-exact-synthetic-round');
+    $this->actingAs($actor)->getJson('/emar/pdf/round-sheet?'.http_build_query(['round_id' => $round->id, 'purpose' => 'audit']))->assertOk();
+    expect(MedicationEvent::where('kind', 'export.created')->sole()->facts['round_id'])->toBe($round->id);
+    $this->getJson('/emar/pdf/round-sheet?'.http_build_query(['round_id' => $round->id, 'site_id' => Site::factory()->create(['is_active' => true])->id, 'purpose' => 'audit']))->assertNotFound();
+    $this->getJson('/emar/pdf/round-sheet?'.http_build_query(['round_id' => $round->id, 'date' => '2026-09-28', 'purpose' => 'audit']))->assertNotFound();
+});
+
+it('links controlled report rows to their exact register medicine and NZ day', function () {
+    $actor = p09Reader('admin', $this->site);
+    $medicine = p09Medicine($this->person, ['controlled_drug' => true]);
+    $entry = ClientControlledDrugEntry::create(['client_id' => $this->person->id, 'client_medication_id' => $medicine->id,
+        'entry_type' => 'receipt', 'quantity' => 2, 'unit' => 'tablets', 'on_hand_before' => 0, 'on_hand_after' => 2,
+        'recorded_at' => Carbon::parse('2026-09-29 00:05', 'Pacific/Auckland')->utc(), 'recorded_by' => $actor->id]);
+    $rows = app(MedicationReportDataset::class)->read($actor, 'controlled', new MedicationReportPeriod('2026-09-01', '2026-09-29'), [$this->site->id])['rows'];
+    $row = collect($rows)->firstWhere('reference', 'register:'.$entry->id);
+    expect($row['href'])->toContain('/emar/controlled?')->toContain('date=2026-09-29')->toContain('client_medication_id='.$medicine->id)->toContain('entry_id='.$entry->id);
+    $this->actingAs($actor)->get($row['href'])->assertOk()->assertInertia(fn ($page) => $page->where('product.selected_entry_id', $entry->id));
 });

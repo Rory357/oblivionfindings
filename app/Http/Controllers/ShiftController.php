@@ -32,6 +32,7 @@ use App\Services\CoverageReservationService;
 use App\Services\Eligibility\AssignmentEligibilityGateway;
 use App\Services\EnhancedMarService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationTimelineVisibilityService;
 use App\Services\Medication\WitnessPinService;
 use App\Services\NotificationService;
@@ -46,6 +47,7 @@ use App\Services\ShiftTimelineService;
 use App\Services\Sites\SiteChecklistScheduler;
 use App\Services\UserSiteAccessService;
 use App\Support\ClientSafetyPayload;
+use App\Support\MedicationJourney;
 use App\Support\ShiftTaskSupport;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -420,6 +422,15 @@ class ShiftController extends Controller
             );
 
             $medicationSummary = [
+                'date' => $shiftDate->toDateString(),
+                'mar_url' => app(MarLinkService::class)->urlFor($auth, $shift->client_id, $shiftDate->toDateString(), [
+                    'site_id' => $shift->client?->site_id,
+                    'return_to' => MedicationJourney::returnTo($request->query('return_to'))
+                        ?? '/operations/shifts/'.$shift->id.'?tab=medications',
+                ]),
+                'medical_url' => $auth->can('view', $shift->client) && $auth->can('viewMedications', $shift->client)
+                    ? route('operations.clients.show', ['client' => $shift->client_id, 'tab' => 'medical', 'return_to' => '/operations/shifts/'.$shift->id.'?tab=medications'])
+                    : null,
                 'stats' => $mar['stats'],
                 'allergies' => $mar['allergies'],
                 'due' => collect($mar['scheduled'] ?? [])
@@ -577,7 +588,7 @@ class ShiftController extends Controller
             'medications' => $medicationSummary,
             // PIN-1: people without a usable witness PIN are listed but can't be chosen.
             'medicationWitnesses' => app(WitnessPinService::class)->pickerRows($medicationWitnesses),
-            'client_safety' => $shift->client ? ClientSafetyPayload::forClient($shift->client) : null,
+            'client_safety' => $shift->client ? ClientSafetyPayload::forViewer($shift->client, $request->user()) : null,
             'links' => [
                 'client_care' => $shift->client ? route('operations.clients.show', $shift->client) : null,
             ],

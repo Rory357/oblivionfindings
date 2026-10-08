@@ -24,6 +24,8 @@ vi.mock('@inertiajs/react', () => ({
 
 const items: StockItem[] = Array.from({ length: 25 }, (_, index) => ({
     id: index + 1,
+    client_id: index + 1,
+    site_id: 1,
     name: `Synthetic medicine ${index + 1}`,
     client_name: `Synthetic person ${index + 1}`,
     site_name: 'Synthetic house',

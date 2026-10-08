@@ -1,5 +1,10 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { MedicationJourneyReturn } from '@/components/emar/medication-journey-return';
 import { DateTimeField } from '@/components/fleet-assets/maintenance/date-time-field';
+import {
+    EntityContextMenu,
+    useEntityContextMenu,
+} from '@/components/lists/entity-menu';
 import {
     EntityTable,
     type EntityTableColumn,
@@ -146,6 +151,7 @@ export function ConnectedHeader({
                     subline={subline}
                     actions={
                         <>
+                            <MedicationJourneyReturn />
                             <PageHeaderSearch
                                 value={query}
                                 onChange={onQuery}
@@ -196,6 +202,9 @@ export function BoundedTable<T extends { id: number | string }>({
     empty?: string;
 }) {
     const [page, setPage] = useState(1);
+    const context = useEntityContextMenu<T>();
+    const actionsFor = (row: T) =>
+        open ? [{ label: 'Open', onClick: () => open(row) }] : [];
     const last = Math.max(1, Math.ceil(rows.length / 25));
     const current = Math.min(page, last);
     return (
@@ -244,12 +253,19 @@ export function BoundedTable<T extends { id: number | string }>({
                     rowHeight="content"
                     columns={columns}
                     onOpen={open}
-                    actionsFor={(r) =>
-                        open ? [{ label: 'Open', onClick: () => open(r) }] : []
-                    }
+                    actionsFor={actionsFor}
+                    onRowContextMenu={context.open}
                 />
             ) : (
                 <SettingsNotice>{empty}</SettingsNotice>
+            )}
+            {context.ctx && (
+                <EntityContextMenu
+                    {...context.ctx}
+                    onClose={context.close}
+                    title={identity(context.ctx.record).name}
+                    items={actionsFor(context.ctx.record)}
+                />
             )}
         </div>
     );
@@ -284,7 +300,7 @@ export function ReviewWizard({
     saved: boolean;
     saveLabel?: string;
     success?: string;
-    successDetail?: string;
+    successDetail?: ReactNode;
 }) {
     const [returnTarget] = useState(() => {
         if (typeof document === 'undefined') return null;

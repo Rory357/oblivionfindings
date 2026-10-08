@@ -6,21 +6,31 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedicalProfile;
 use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationAllergy;
 use App\Models\MedicationCompetencyAssessment;
+use App\Models\MedicationEvent;
+use App\Models\MedicationOrderRevision;
+use App\Models\MedicationOrderVersion;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\MedicationSafetyPolicySettings;
+use App\Services\Medication\OrderAllergyMatcher;
+use App\Services\Medication\Recording\DoseRecordingRequirements;
 use App\Services\MedicationSafetyService;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -214,6 +224,176 @@ class ProfileAllergySafetyTest extends TestCase
                         && $none['allergies'] === []
                         && $none['allergy_status'] === 'none_recorded';
                 }));
+    }
+
+    public static function severeCanonicalAllergies(): array
+    {
+        $cases = [];
+        foreach (['severe', 'life_threatening'] as $severity) {
+            foreach (['new', 'copied'] as $origin) {
+                foreach (['warn', 'block'] as $policy) {
+                    $cases[$severity.' '.$origin.' '.$policy] = [$severity, $origin, $policy];
+                }
+            }
+        }
+
+        return $cases;
+    }
+
+    #[DataProvider('severeCanonicalAllergies')]
+    public function test_canonical_severity_blocks_given_through_safety_requirements_and_save(string $severity, string $origin, string $policy): void
+    {
+        app(MedicationSafetyPolicySettings::class)->save([MedicationSafetyPolicySettings::PROFILE_ALLERGY_MATCH => $policy]);
+        if ($origin === 'copied') {
+            $source = MedicationAllergy::create(['client_id' => $this->client->id, 'allergen' => 'Penicillin', 'severity' => $severity, 'reaction' => 'Anaphylaxis', 'recorded_by' => $this->worker->id]);
+            $evidence = $source->fresh()->getAttributes();
+            DB::transaction(fn () => app(ClientAllergyRecordService::class)->copyLegacy(Client::whereKey($this->client->id)->lockForUpdate()->firstOrFail()));
+            $this->assertSame($evidence, $source->fresh()->getAttributes());
+        } else {
+            ClientMedicalProfile::create(['client_id' => $this->client->id, 'allergies_canonical_at' => now(), 'allergy_records' => [
+                ['key' => (string) Str::uuid(), 'allergen' => 'Penicillin', 'severity' => $severity, 'reaction' => 'Anaphylaxis'],
+            ]]);
+        }
+        $order = $this->order('Amoxicillin 500mg capsule', ['09:30']);
+        $check = app(MedicationSafetyService::class)->performSafetyCheck($this->client, $order);
+        $warning = collect($check['warnings'])->firstWhere('type', 'allergy');
+        $this->assertTrue($check['blocked']);
+        $this->assertSame($severity, $warning['details']['severity']);
+        $this->assertSame('Anaphylaxis', $warning['details']['reaction']);
+        $this->assertSame('health_profile', $warning['details']['source']);
+        $this->assertSame('danger', $warning['severity']);
+        $this->assertCount(1, app(ClientAllergyRecordService::class)->forClient($this->client));
+
+        $requirements = app(DoseRecordingRequirements::class)->forScheduledDose($this->worker, $order, now());
+        $this->assertNull($requirements['block_all']);
+        $this->assertSame(DoseRecordingRequirements::BLOCK_ALLERGY, $requirements['block_given']['key']);
+        $this->assertSame($severity, $requirements['allergy']['match']['severity']);
+        $this->actingAs($this->worker)->from('/meds/today')->post('/meds/today/record', [
+            'client_medication_id' => $order->id, 'scheduled_for' => now()->toIso8601String(),
+            'status' => 'given', 'administered_at' => now()->toIso8601String(),
+        ])->assertRedirect('/meds/today')->assertSessionHasErrors();
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+    }
+
+    public function test_an_unrated_canonical_entry_keeps_its_reaction_and_uses_the_profile_policy(): void
+    {
+        ClientMedicalProfile::create(['client_id' => $this->client->id, 'allergies_canonical_at' => now(), 'allergy_records' => [
+            ['key' => (string) Str::uuid(), 'allergen' => 'Penicillin', 'reaction' => 'Recorded reaction; severity not yet assessed'],
+        ]]);
+        $order = $this->order('Amoxicillin 500mg capsule', ['09:30']);
+        $check = app(MedicationSafetyService::class)->performSafetyCheck($this->client, $order);
+        $warning = collect($check['warnings'])->firstWhere('type', 'allergy');
+        $this->assertFalse($check['blocked']);
+        $this->assertNull($warning['details']['severity']);
+        $this->assertSame('Recorded reaction; severity not yet assessed', $warning['details']['reaction']);
+        app(MedicationSafetyPolicySettings::class)->save([MedicationSafetyPolicySettings::PROFILE_ALLERGY_MATCH => 'block']);
+        $this->assertTrue(app(MedicationSafetyService::class)->performSafetyCheck($this->client, $order)['blocked']);
+    }
+
+    public function test_a_checked_prescriber_confirmation_applies_only_to_its_version_and_unchanged_canonical_evidence(): void
+    {
+        $entry = ['key' => (string) Str::uuid(), 'allergen' => 'Amoxicillin', 'severity' => 'life_threatening', 'reaction' => 'Anaphylaxis'];
+        $profile = ClientMedicalProfile::create(['client_id' => $this->client->id, 'allergies_canonical_at' => now(), 'allergy_records' => [$entry]]);
+        $order = $this->order('Amoxicillin 500mg capsule', ['09:30']);
+        $order->forceFill(['approval_status' => 'verified', 'version' => 1])->save();
+        $inspection = app(OrderAllergyMatcher::class)->inspect($this->client, $order->name);
+        $confirmation = ['match_sha256' => $inspection['match_sha256'], 'matches' => $inspection['matches'], 'instruction' => 'Recorded prescriber instruction for this checked order'];
+        $version = MedicationOrderVersion::create([
+            'client_id' => $this->client->id, 'client_medication_id' => $order->id, 'version_number' => 1,
+            'name' => $order->name, 'dosage' => $order->dosage, 'frequency' => 'Daily', 'dose_times' => ['09:30'],
+            'active' => true, 'state' => 'active', 'changed_by' => $this->worker->id, 'changed_at' => now()->subHour(),
+        ]);
+        MedicationOrderRevision::create([
+            'client_id' => $this->client->id, 'client_medication_id' => $order->id, 'medication_order_version_id' => $version->id,
+            'base_version' => 1, 'status' => 'checked', 'entered_by' => $this->worker->id, 'checked_by' => $this->worker->id,
+            'checked_at' => now()->subHour(), 'allergy_confirmation' => $confirmation,
+        ]);
+        $check = app(MedicationSafetyService::class)->performSafetyCheck($this->client, $order);
+        $this->assertFalse($check['blocked']);
+        $this->assertEquals($confirmation, collect($check['warnings'])->firstWhere('type', 'allergy')['details']['prescriber_confirmation']);
+        $this->assertNull(app(DoseRecordingRequirements::class)->forScheduledDose($this->worker, $order, now())['block_given']);
+
+        $profile->forceFill(['allergy_records' => [[...$entry, 'reaction' => 'Changed reaction evidence']]])->save();
+        $this->assertTrue(app(MedicationSafetyService::class)->performSafetyCheck($this->client, $order)['blocked']);
+        $profile->forceFill(['allergy_records' => [$entry]])->save();
+        $order->forceFill(['version' => 2])->save();
+        $this->assertTrue(app(MedicationSafetyService::class)->performSafetyCheck($this->client, $order)['blocked']);
+    }
+
+    public function test_recording_status_confirms_a_saved_prn_even_when_its_interval_now_blocks_recording(): void
+    {
+        [$order, $uuid, $record] = $this->prnForRecovery();
+        $this->getJson('/meds/today/prn/'.$order->id.'/requirements')->assertOk()
+            ->assertJsonPath('block_all.key', DoseRecordingRequirements::BLOCK_PRN_LIMIT);
+        $events = MedicationEvent::count();
+        $receipts = DB::table('medication_idempotency_results')->count();
+        $response = $this->getJson('/meds/today/recording-status?'.http_build_query([
+            'client_medication_id' => $order->id, 'client_request_uuid' => $uuid,
+        ]))->assertOk()->assertJsonPath('status', 'recorded')->assertJsonPath('administration_id', $record->id);
+        parse_str(parse_url($response->json('chart_url'), PHP_URL_QUERY), $chart);
+        $this->assertSame('/emar/mar', parse_url($response->json('chart_url'), PHP_URL_PATH));
+        $this->assertSame((string) $this->client->id, $chart['client_id']);
+        $this->assertSame((string) $this->site->id, $chart['site_id']);
+        $this->assertSame('2026-04-30', $chart['date']);
+        $this->assertSame('history', $chart['tab']);
+        $this->assertSame((string) $record->id, $chart['dose_id']);
+        $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+        $this->assertSame($events, MedicationEvent::count());
+        $this->assertSame($receipts, DB::table('medication_idempotency_results')->count());
+    }
+
+    public function test_recording_status_does_not_reveal_foreign_unknown_or_other_medicine_requests(): void
+    {
+        [$order, $uuid, $record] = $this->prnForRecovery();
+        $status = fn (int $medicine, string $request) => $this->getJson('/meds/today/recording-status?'.http_build_query([
+            'client_medication_id' => $medicine, 'client_request_uuid' => $request,
+        ]))->assertOk()->assertExactJson(['status' => 'unconfirmed']);
+        $status($order->id, (string) Str::uuid());
+        $other = $this->order('Another medicine', ['09:30']);
+        $status($other->id, $uuid);
+        $someoneElse = User::factory()->create(['approved_at' => now()]);
+        DB::table('client_medication_administrations')->where('id', $record->id)->update(['administered_by' => $someoneElse->id]);
+        $status($order->id, $uuid);
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+    }
+
+    public function test_recording_status_rechecks_current_person_site_module_and_controlled_access(): void
+    {
+        [$order, $uuid] = $this->prnForRecovery();
+        $url = '/meds/today/recording-status?'.http_build_query([
+            'client_medication_id' => $order->id, 'client_request_uuid' => $uuid,
+        ]);
+        $order->forceFill(['controlled_drug' => true])->save();
+        $this->getJson($url)->assertNotFound();
+        $order->forceFill(['controlled_drug' => false])->save();
+        $this->client->forceFill(['site_id' => Site::factory()->create(['is_active' => true])->id])->save();
+        $this->getJson($url)->assertNotFound();
+        $this->client->forceFill(['site_id' => $this->site->id])->save();
+        $this->worker->permissionOverrides()->syncWithoutDetaching(Permission::where('key', 'medications.view')->pluck('id')
+            ->mapWithKeys(fn ($id) => [$id => ['allowed' => false]])->all());
+        $this->actingAs($this->worker->fresh())->getJson($url)->assertNotFound();
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+    }
+
+    /** A committed worker request whose HTTP result the caller may have lost. */
+    private function prnForRecovery(): array
+    {
+        $order = $this->order('Paracetamol 500mg', []);
+        $order->forceFill(['is_prn' => true, 'min_hours_between_doses' => 6])->save();
+        // Prescription changes correctly reset verification; approve only after those changes are saved.
+        $order->forceFill(['approval_status' => 'verified', 'verified_at' => now()]);
+        $this->assertFalse($order->isDirty(ClientMedication::verificationSensitiveFields()));
+        $order->save();
+        $this->assertSame('verified', $order->fresh()->approval_status);
+        $uuid = (string) Str::uuid();
+        $this->actingAs($this->worker)->postJson('/meds/today/prn', [
+            'client_medication_id' => $order->id, 'client_request_uuid' => $uuid,
+            'administered_at' => now()->toIso8601String(), 'reason' => 'Pain',
+        ])->assertOk()->assertJsonPath('success', true);
+        $record = ClientMedicationAdministration::where('client_request_uuid', $uuid)->sole();
+
+        return [$order, $uuid, $record];
     }
 
     private function clientOnShift(string $first, string $last): Client

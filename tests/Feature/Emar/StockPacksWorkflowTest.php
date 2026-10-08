@@ -126,6 +126,13 @@ class StockPacksWorkflowTest extends TestCase
         $this->get('/emar/stock/packs?'.http_build_query(['client_id' => $people[0]['client']->id, 'count_id' => $people[1]['count_id']]))->assertNotFound();
         $this->get('/emar/stock/packs?'.http_build_query(['client_id' => $people[0]['client']->id, 'count_id' => $people[0]['count_id']]))
             ->assertInertia(fn ($page) => $page->where('focused_count.id', $people[0]['count_id']));
+        $this->get('/emar/stock/packs?'.http_build_query(['client_id' => $people[0]['client']->id, 'medication_id' => $people[0]['med']->id]))
+            ->assertInertia(fn ($page) => $page
+                ->where('items.data.0.id', $people[0]['med']->id)
+                ->where('items.data.0.client_id', $people[0]['client']->id)
+                ->where('items.data.0.site_id', $site->id));
+        $this->getJson('/emar/stock/packs/medicine/'.$people[0]['med']->id)->assertOk()
+            ->assertJsonPath('client_id', $people[0]['client']->id)->assertJsonPath('site_id', $site->id);
         $this->assertSame($before, $this->stockReadSnapshot());
     }
 

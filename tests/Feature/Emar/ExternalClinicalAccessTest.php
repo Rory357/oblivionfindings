@@ -414,6 +414,16 @@ final class ExternalClinicalAccessTest extends TestCase
         $this->assertFalse($request->session()->has('url.intended'));
     }
 
+    public function test_connected_care_preserves_requested_site_and_rejects_conflicting_person_context(): void
+    {
+        $this->actingAs($this->manager)->get('/emar/connected-care?'.http_build_query(['client_id' => $this->person->id, 'site_id' => $this->site->id, 'return_to' => '/emar/rounds?site_id='.$this->site->id]))
+            ->assertOk()->assertInertia(fn ($page) => $page->where('filters.site_id', $this->site->id)->where('filters.return_to', '/emar/rounds?site_id='.$this->site->id)->where('selected_client.id', $this->person->id));
+        $other = Site::factory()->create(['is_active' => true]);
+        $this->getJson('/emar/connected-care?'.http_build_query(['client_id' => $this->person->id, 'site_id' => $other->id]))->assertNotFound();
+        $this->getJson('/emar/connected-care?client_id=invalid')->assertUnprocessable();
+        $this->getJson('/emar/connected-care?site_id=-1')->assertUnprocessable();
+    }
+
     public function test_proposal_is_immutable_review_evidence_and_acceptance_waits_for_independent_check(): void
     {
         $order = $this->chart();
@@ -426,7 +436,14 @@ final class ExternalClinicalAccessTest extends TestCase
         $this->assertNotSame($proposal->prescription['dosage'], DB::table('medication_external_proposals')->value('prescription'));
         $decision = ['decision' => 'accept', 'decision_note' => 'Source reviewed and confirmed', 'source_confirmed' => true,
             'source' => $this->sourceInput(), 'source_file' => UploadedFile::fake()->create('prescription.pdf', 8, 'application/pdf')];
-        $this->actingAs($this->manager)->postJson('/emar/connected-care/proposals/'.$proposal->id.'/decision', $decision)->assertSuccessful();
+        $accepted = $this->actingAs($this->manager)->postJson('/emar/connected-care/proposals/'.$proposal->id.'/decision', $decision)->assertSuccessful()
+            ->assertJsonPath('order_id', $order->id);
+        $this->assertStringContainsString('order_id='.$order->id, $accepted->json('order_url'));
+        $this->actingAs($this->manager)->get($accepted->json('order_url'))->assertOk()
+            ->assertInertia(fn ($page) => $page->where('open_order_id', $order->id)->where('prefill_client_id', $this->person->id));
+        $persisted = $this->actingAs($this->manager)->get('/emar/connected-care?client_id='.$this->person->id)->assertOk();
+        $this->assertSame($order->id, $persisted->inertiaProps('proposals.0.order_id'));
+        $this->assertSame($accepted->json('order_url'), $persisted->inertiaProps('proposals.0.order_url'));
         $this->assertSame('10 mg', $order->refresh()->dosage);
         $this->assertSame('verified', $order->approval_status);
         $revision = MedicationOrderRevision::findOrFail($proposal->refresh()->revision_id);

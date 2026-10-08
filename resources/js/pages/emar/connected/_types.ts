@@ -38,6 +38,7 @@ export type Proposal = {
     status: string;
     submitted_at: string;
     revision_id: number | null;
+    order_url?: string | null;
     decision_note: string | null;
     has_source_file: boolean;
 };

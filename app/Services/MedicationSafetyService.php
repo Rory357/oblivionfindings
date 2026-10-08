@@ -63,29 +63,30 @@ class MedicationSafetyService
         }
 
         // 2. Check for allergies — the medication allergy register and the
-        // health profile (EM-07). A profile entry has no severity; whether its
-        // match warns or blocks is the organisation's setting.
+        // canonical health profile. Only an unrated profile entry uses the
+        // organisation's warn/block setting; recorded severity is always retained.
         $allergyCheck = $this->checkAllergies($client, $medication);
         if ($allergyCheck['has_match']) {
             $blockUnratedProfileMatches = ($allergyCheck['profile_match_policy'] ?? 'warn') === 'block';
             $prescriberConfirmation = app(CheckedOrderAllergyConfirmation::class)->forOrder($medication);
 
             foreach ($allergyCheck['matches'] as $index => $allergy) {
+                $source = $allergyCheck['sources'][$index] ?? ClientAllergyRecordService::SOURCE_REGISTER;
                 $confirmedMatch = $prescriberConfirmation !== null && collect($prescriberConfirmation['matches'] ?? [])
                     ->contains(fn ($match) => mb_strtolower(trim($match['allergen'])) === mb_strtolower(trim($allergy->allergen)));
                 if ($confirmedMatch) {
                     $warnings[] = [
                         'type' => 'allergy', 'severity' => 'warning',
                         'message' => 'Recorded allergy to '.$allergy->allergen.'. The prescriber confirmed this checked version is safe: '.$prescriberConfirmation['instruction'],
-                        'details' => ['allergen' => $allergy->allergen, 'prescriber_confirmation' => $prescriberConfirmation],
+                        'details' => ['allergen' => $allergy->allergen, 'severity' => $allergy->severity, 'reaction' => $allergy->reaction, 'source' => $source, 'prescriber_confirmation' => $prescriberConfirmation],
                     ];
 
                     continue;
                 }
-                $fromProfile = ($allergyCheck['sources'][$index] ?? ClientAllergyRecordService::SOURCE_REGISTER)
+                $fromProfile = $source
                     === ClientAllergyRecordService::SOURCE_PROFILE;
 
-                if ($fromProfile) {
+                if ($fromProfile && ! filled($allergy->severity)) {
                     // Plain-language copy approved in P00 v2 (no emoji, no capitals).
                     $matchLine = "Possible allergy match — {$medication->name} matches recorded {$allergy->allergen} allergy (health profile)";
                     $warning = [
@@ -94,7 +95,7 @@ class MedicationSafetyService
                         'message' => $matchLine,
                         'details' => [
                             'allergen' => $allergy->allergen,
-                            'reaction' => null,
+                            'reaction' => $allergy->reaction,
                             'severity' => null,
                             'source' => ClientAllergyRecordService::SOURCE_PROFILE,
                         ],
@@ -110,7 +111,7 @@ class MedicationSafetyService
                     continue;
                 }
 
-                $severity = $allergy->severity === 'life_threatening' ? 'danger' : 'warning';
+                $severity = $allergy->isSevere() ? 'danger' : 'warning';
                 $blocked = $blocked || $allergy->isSevere();
 
                 $warning = [
@@ -121,7 +122,7 @@ class MedicationSafetyService
                         'allergen' => $allergy->allergen,
                         'reaction' => $allergy->reaction,
                         'severity' => $allergy->severity,
-                        'source' => ClientAllergyRecordService::SOURCE_REGISTER,
+                        'source' => $source,
                     ],
                 ];
 
@@ -299,8 +300,8 @@ class MedicationSafetyService
      */
     /**
      * Match the medicine against every recorded allergy: the medication
-     * allergy register and the health profile. Profile matches are unsaved
-     * MedicationAllergy instances (severity null) so both sources share the
+     * allergy register and the canonical health profile. Profile matches are
+     * unsaved MedicationAllergy instances retaining their clinical fields, using the
      * same matching rules; `sources[i]` names where `matches[i]` came from.
      *
      * @return array{has_match: bool, matches: list<MedicationAllergy>, sources: list<string>, allergy_count: int, profile_match_policy: string}

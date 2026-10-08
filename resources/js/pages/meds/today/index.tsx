@@ -6,6 +6,7 @@
  * Source of truth: Emar/WorkerMedsController. What each dose needs and
  * allows comes from the same requirements the dialog reads; saving checks
  * everything again on the server. */
+import { withMedicationReturn } from '@/lib/medication-navigation';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Activity,
@@ -391,8 +392,11 @@ export default function MedsToday(props: MedsTodayProps) {
         const row = schedule.find((r) => r.client_id === clientId && r.mar_url);
         return () =>
             router.visit(
-                row?.mar_url ??
-                    `/emar/mar?client_id=${clientId}&date=${props.date}`,
+                withMedicationReturn(
+                    row?.mar_url ??
+                        `/emar/mar?client_id=${clientId}&date=${props.date}`,
+                    `/meds/today?${query()}`,
+                ),
             );
     };
 
@@ -852,7 +856,10 @@ export default function MedsToday(props: MedsTodayProps) {
                     {board_can.view_emar && (
                         <PageHeaderGlassButton asChild icon={ClipboardList}>
                             <Link
-                                href={`/emar/mar?${new URLSearchParams({ date: props.date, ...(person ? { client_id: String(person) } : {}), ...(query().get('site_id') || query().get('site') ? { site_id: (query().get('site_id') || query().get('site'))! } : {}) })}`}
+                                href={withMedicationReturn(
+                                    `/emar/mar?${new URLSearchParams({ date: props.date, ...(person ? { client_id: String(person) } : {}), ...(query().get('site_id') || query().get('site') ? { site_id: (query().get('site_id') || query().get('site'))! } : {}) })}`,
+                                    `/meds/today?${query()}`,
+                                )}
                             >
                                 {person ? 'Open MAR chart' : 'MAR charts'}
                             </Link>
@@ -999,7 +1006,7 @@ export default function MedsToday(props: MedsTodayProps) {
                                     canExport={board_can.export_round === true}
                                     onPrint={() =>
                                         window.open(
-                                            `/emar/pdf/round-sheet?date=${encodeURIComponent(props.date)}`,
+                                            `/emar/pdf/round-sheet?date=${encodeURIComponent(props.date)}&round_id=${props.guidedRound!.round.id}`,
                                             '_blank',
                                             'noopener',
                                         )

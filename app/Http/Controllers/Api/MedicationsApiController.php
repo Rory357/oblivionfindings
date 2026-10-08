@@ -11,7 +11,6 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
 use App\Models\ControlledDrugLossReport;
-use App\Models\MedicationAllergy;
 use App\Models\MedicationDashboardAlert;
 use App\Models\MedicationError;
 use App\Models\MedicationInteraction;
@@ -23,6 +22,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\EnhancedMarService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\ClientAllergyRecordCommands;
 use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationScopeDecision;
@@ -47,6 +47,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Enum;
 use Illuminate\Validation\ValidationException;
 
@@ -1789,71 +1790,55 @@ class MedicationsApiController extends Controller
     public function getAllergies(Request $request, Client $client)
     {
         $this->authorize('viewMedications', $client);
-
-        $allergies = MedicationAllergy::where('client_id', $client->id)
-            ->whereNull('deleted_at')
-            ->with('recordedBy:id,name')
-            ->orderByDesc('created_at')
-            ->get();
+        $service = app(ClientAllergyRecordService::class);
+        $records = $service->forClient($client);
+        $summary = $service->summary($client, $records);
+        $recorderIds = collect($records)->mapWithKeys(fn ($entry) => [$entry['key'] => $entry['added_by'] ?? $entry['source_recorded_by'] ?? $entry['allergy']->recorded_by]);
+        $recorderNames = User::query()->whereIn('id', $recorderIds->filter()->unique()->values())->pluck('name', 'id');
 
         return response()->json([
-            'allergies' => $allergies->map(fn ($a) => [
-                'id' => $a->id,
-                'allergen' => $a->allergen,
-                'reaction' => $a->reaction,
-                'severity' => $a->severity,
-                'is_severe' => $a->isSevere(),
-                'notes' => $a->notes,
-                'identified_date' => $a->identified_date?->toDateString(),
-                'recorded_by' => $a->recordedBy?->name,
-            ]),
-            // Medication register + health profile (EM-07): the same combined
-            // source dose-time safety checks read, so ordering and dosing agree.
-            'recorded_allergies' => array_map(
-                fn (array $entry): array => [
-                    'allergen' => $entry['allergen'],
-                    'severity' => $entry['severity'],
-                    'reaction' => $entry['reaction'],
-                    'source' => $entry['source'],
-                ],
-                app(ClientAllergyRecordService::class)->forClient($client),
-            ),
-        ]);
+            // Both compatibility lists describe the same current record. Copied
+            // register rows remain evidence, never a second current allergy list.
+            'allergies' => array_map(fn (array $entry): array => [
+                ...$entry,
+                'id' => preg_match('/^register-(\d+)$/D', $entry['key'], $match) ? (int) $match[1] : $entry['key'],
+                'is_severe' => in_array($entry['severity'] ?? null, ['severe', 'life_threatening'], true),
+                'recorded_by' => $recorderNames[$recorderIds[$entry['key']] ?? null] ?? null,
+            ], $summary['entries']),
+            'recorded_allergies' => array_map(fn (array $entry): array => [
+                'allergen' => $entry['allergen'], 'severity' => $entry['severity'] ?? null,
+                'reaction' => $entry['reaction'] ?? null, 'source' => $entry['source'],
+            ], $summary['entries']),
+            'allergy_record' => $summary,
+            'allergy_management_url' => $service->managementUrl($client, $request->user()),
+        ])->header('Cache-Control', 'private, no-store');
     }
 
-    /**
-     * Create allergy
-     */
+    /** Add an allergy through the same audited canonical commands as the profile editor. */
     public function createAllergy(Request $request, Client $client)
     {
         $this->authorize('update', $client);
-
         $data = $request->validate([
             'allergen' => ['required', 'string', 'max:255'],
-            'reaction' => ['nullable', 'string', 'max:500'],
+            'reaction' => ['nullable', 'string', 'max:2000'],
             'severity' => ['nullable', 'in:mild,moderate,severe,life_threatening'],
-            'notes' => ['nullable', 'string'],
-            'identified_date' => ['nullable', 'date'],
+            'notes' => ['nullable', 'string', 'max:5000'],
+            'identified_date' => ['nullable', 'date_format:Y-m-d'],
+            'identified_by' => ['nullable', 'string', 'max:255'],
+            // Older callers can append without these. Current callers get a
+            // digest conflict check and exactly-once retry with their UUID.
+            'request_uuid' => ['sometimes', 'uuid'], 'digest' => ['sometimes', 'string', 'size:64'],
         ]);
-
-        $allergy = MedicationAllergy::create([
-            'client_id' => $client->id,
-            'allergen' => $data['allergen'],
-            'reaction' => $data['reaction'] ?? null,
-            'severity' => $data['severity'] ?? null,
-            'notes' => $data['notes'] ?? null,
-            'identified_date' => $data['identified_date'] ?? null,
-            'recorded_by' => $request->user()->id,
-        ]);
+        $data['request_uuid'] ??= (string) Str::uuid();
+        $result = app(ClientAllergyRecordCommands::class)->append($request->user(), (int) $client->id, $data);
+        $entry = collect($result['entries'])->firstWhere('key', $data['request_uuid'])
+            ?? collect($result['entries'])->first(fn ($record) => app(ClientAllergyRecordService::class)->entryKey($record) === app(ClientAllergyRecordService::class)->entryKey($data));
 
         return response()->json([
             'success' => true,
-            'allergy' => [
-                'id' => $allergy->id,
-                'allergen' => $allergy->allergen,
-                'severity' => $allergy->severity,
-            ],
-        ]);
+            'allergy' => [...$entry, 'id' => preg_match('/^register-(\d+)$/D', $entry['key'], $match) ? (int) $match[1] : $entry['key']],
+            'allergy_record' => $result,
+        ])->header('Cache-Control', 'private, no-store');
     }
 
     /**

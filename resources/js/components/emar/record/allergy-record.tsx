@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Field, SelectInput } from '@/components/wizard/primitives';
@@ -8,6 +9,7 @@ import {
     WizardStepPane,
 } from '@/components/wizard/shell';
 import { formatDateTime } from '@/lib/datetime';
+import { withMedicationReturn } from '@/lib/medication-navigation';
 import { Link } from '@inertiajs/react';
 import axios from 'axios';
 import {
@@ -39,6 +41,7 @@ export type AllergySummary = {
     digest: string;
     can_edit?: boolean;
     can_review?: boolean;
+    management_url?: string | null;
 };
 
 export function AllergyRecord({
@@ -56,89 +59,50 @@ export function AllergyRecord({
         return <ReadingState load={load} reload={reload} />;
     return (
         <>
-            <SectionCard
-                icon={ShieldAlert}
-                title="Allergy record"
-                right={
-                    editable ? (
-                        <>
-                            {data.can_edit && (
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setAction('edit')}
-                                >
-                                    <Pencil className="size-4" /> Edit allergies
-                                </Button>
-                            )}
-                            {data.can_review && (
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setAction('review')}
-                                >
-                                    <ClipboardCheck className="size-4" />{' '}
-                                    Confirm reviewed
-                                </Button>
-                            )}
-                        </>
-                    ) : (
-                        <Button variant="outline" asChild>
-                            <Link
-                                href={`/operations/clients/${clientId}/medical`}
-                            >
-                                Open health profile
-                            </Link>
-                        </Button>
-                    )
-                }
-            >
-                {data.entries.length ? (
-                    <div className="divide-y rounded-lg border">
-                        {data.entries.map((entry) => (
-                            <div key={entry.key} className="p-3">
-                                <p className="font-semibold">
-                                    {entry.allergen || 'Allergen not recorded'}
-                                    {entry.severity && (
-                                        <span className="text-caption ml-2 text-muted-foreground">
-                                            {entry.severity.replaceAll(
-                                                '_',
-                                                ' ',
-                                            )}
-                                        </span>
-                                    )}
-                                </p>
-                                <p className="text-sm">
-                                    {entry.reaction || 'Reaction not recorded'}
-                                </p>
-                                {entry.notes && (
-                                    <p className="text-caption mt-1 whitespace-pre-wrap text-muted-foreground">
-                                        {entry.notes}
-                                    </p>
+            <div id="allergy-record" className="scroll-mt-5">
+                <SectionCard
+                    icon={ShieldAlert}
+                    title="Allergy record"
+                    right={
+                        editable ? (
+                            <>
+                                {data.can_edit && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setAction('edit')}
+                                    >
+                                        <Pencil className="size-4" /> Edit
+                                        allergies
+                                    </Button>
                                 )}
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <p className="text-sm">
-                        {data.status === 'no_known'
-                            ? 'No known allergies — confirmed after review.'
-                            : 'No allergies recorded. This does not establish no known allergies.'}
-                    </p>
-                )}
-                {data.reviewed ? (
-                    <div className="text-caption text-muted-foreground">
-                        Reviewed by {data.reviewed.by || 'Recorded reviewer'} ·{' '}
-                        {formatDateTime(data.reviewed.at)}
-                        <p className="whitespace-pre-wrap">
-                            Checked with: {data.reviewed.how}
-                        </p>
-                    </div>
-                ) : (
-                    <p className="text-caption text-status-warning">
-                        Not reviewed — a house lead or clinical lead confirms
-                        the list.
-                    </p>
-                )}
-            </SectionCard>
+                                {data.can_review && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setAction('review')}
+                                    >
+                                        <ClipboardCheck className="size-4" />{' '}
+                                        Confirm reviewed
+                                    </Button>
+                                )}
+                            </>
+                        ) : data.management_url ? (
+                            <Button variant="outline" asChild>
+                                <Link
+                                    href={withMedicationReturn(
+                                        data.management_url,
+                                        window.location.pathname +
+                                            window.location.search,
+                                    )}
+                                >
+                                    Open health profile
+                                </Link>
+                            </Button>
+                        ) : null
+                    }
+                >
+                    <AllergySummaryContent data={data} />
+                </SectionCard>
+            </div>
             {action && (
                 <AllergyEditor
                     key={action}
@@ -151,6 +115,57 @@ export function AllergyRecord({
                         reload();
                     }}
                 />
+            )}
+        </>
+    );
+}
+
+export function AllergySummaryContent({ data }: { data: AllergySummary }) {
+    return (
+        <>
+            {data.entries.length ? (
+                <div className="divide-y rounded-lg border">
+                    {data.entries.map((entry) => (
+                        <div key={entry.key} className="p-3">
+                            <p className="font-semibold">
+                                {entry.allergen || 'Allergen not recorded'}
+                                {entry.severity && (
+                                    <span className="text-caption ml-2 text-muted-foreground">
+                                        {entry.severity.replaceAll('_', ' ')}
+                                    </span>
+                                )}
+                            </p>
+                            <p className="text-sm">
+                                {entry.reaction || 'Reaction not recorded'}
+                            </p>
+                            {entry.notes && (
+                                <p className="text-caption mt-1 whitespace-pre-wrap text-muted-foreground">
+                                    {entry.notes}
+                                </p>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <p className="text-sm">
+                    {data.status === 'no_known'
+                        ? 'No known allergies — confirmed after review.'
+                        : 'No allergies recorded. This does not establish no known allergies.'}
+                </p>
+            )}
+            {data.reviewed ? (
+                <div className="text-caption text-muted-foreground">
+                    Reviewed by {data.reviewed.by || 'Recorded reviewer'} ·{' '}
+                    {formatDateTime(data.reviewed.at)}
+                    <p className="whitespace-pre-wrap">
+                        Checked with: {data.reviewed.how}
+                    </p>
+                </div>
+            ) : (
+                <p className="text-caption text-status-warning">
+                    Not reviewed — a house lead or clinical lead confirms the
+                    list.
+                </p>
             )}
         </>
     );
@@ -350,6 +365,14 @@ function AllergyEditor({
                         </div>
                     ) : (
                         <div className="space-y-4">
+                            {records.length === 0 && (
+                                <EmptyState
+                                    icon={ShieldAlert}
+                                    variant="compact"
+                                    title="No allergies recorded"
+                                    description="Add known allergy details from the person’s health record. An empty list does not confirm that there are no known allergies."
+                                />
+                            )}
                             {records.map((entry) => (
                                 <div
                                     key={entry.key}

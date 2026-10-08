@@ -7,6 +7,10 @@
  * wizard is launched from a client profile the picker is replaced by this), and
  * the live clinical card shown in the wizard rail once a client is chosen.
  */
+import {
+    AllergySummaryContent,
+    type AllergySummary,
+} from '@/components/emar/record/allergy-record';
 import { Input } from '@/components/ui/input';
 import { NEWS2_BAND_LABEL, type News2Band } from '@/lib/news2';
 import { cn } from '@/lib/utils';
@@ -64,7 +68,10 @@ export function ClientPicker({
                     headers: { Accept: 'application/json' },
                 },
             )
-                .then((r) => r.json())
+                .then((r) => {
+                    if (!r.ok) throw new Error('Clinical card unavailable');
+                    return r.json();
+                })
                 .then((data: { clients?: ClientResult[] }) => {
                     if (active) {
                         setResults(data.clients ?? []);
@@ -187,6 +194,7 @@ export function ClientChip({
 /* ------------------------------------------------------------------ */
 
 type ClinicalCard = {
+    allergy_record: AllergySummary;
     allergies: string[];
     disabilities: string[];
     blood_type: string | null;
@@ -218,6 +226,7 @@ export function ClinicalCardRail({ clientId }: { clientId: number | null }) {
         }
         let active = true;
         setLoading(true);
+        setCard(null);
         fetch(`/health-clinical/clients/${clientId}/clinical-card`, {
             headers: { Accept: 'application/json' },
         })
@@ -256,20 +265,13 @@ export function ClinicalCardRail({ clientId }: { clientId: number | null }) {
                     <ShieldAlert className="h-3 w-3 text-status-critical" />{' '}
                     Allergies
                 </div>
-                {card?.allergies?.length ? (
-                    <div className="flex flex-wrap gap-1">
-                        {card.allergies.map((a) => (
-                            <span
-                                key={a}
-                                className="rounded-full bg-status-critical-bg px-2 py-0.5 text-[10.5px] font-medium text-status-critical"
-                            >
-                                {a}
-                            </span>
-                        ))}
-                    </div>
+                {card?.allergy_record ? (
+                    <AllergySummaryContent data={card.allergy_record} />
                 ) : (
-                    <span className="text-[11px] text-muted-foreground">
-                        None recorded
+                    <span className="text-caption">
+                        {loading
+                            ? 'Loading allergy record…'
+                            : 'Allergy record unavailable — check the person’s health profile.'}
                     </span>
                 )}
             </div>

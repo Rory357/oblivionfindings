@@ -1,3 +1,4 @@
+import { onMedicationRecorded } from '@/lib/medication-record-events';
 import { useCallback, useEffect, useState } from 'react';
 
 export type RecordLoad = 'loading' | 'ready' | 'error' | 'forbidden';
@@ -55,6 +56,10 @@ export function useRecordJson<T>(url: string | null, refreshKey = '') {
     }, [url, refreshKey, nonce]);
 
     const reload = useCallback(() => setNonce((value) => value + 1), []);
+    useEffect(() => {
+        const clientId = Number(url?.match(/^\/emar\/clients\/(\d+)\//)?.[1]);
+        if (clientId) return onMedicationRecorded(clientId, reload);
+    }, [url, reload]);
 
     // Never paint another person's data between a URL change and its effect.
     return {

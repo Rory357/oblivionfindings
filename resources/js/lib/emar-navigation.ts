@@ -226,7 +226,7 @@ export const EMAR_HUBS: EmarHub[] = [
         key: 'today',
         label: 'Meds today',
         icon: Pill,
-        visible: any(administer, hasLeadCapability),
+        visible: any(view, administer, hasLeadCapability),
         ownRail: true,
         views: [
             {

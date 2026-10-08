@@ -34,7 +34,7 @@ import {
     Pill,
     Users,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type View = 'charts' | 'medicines' | 'asneeded';
 type Row = SecondPersonEvidence & {
@@ -73,6 +73,7 @@ type Props = {
         date: string;
         status: string;
         range: number;
+        work?: 'all' | 'due' | 'overdue';
     };
     today: string;
     as_at: string;
@@ -107,6 +108,7 @@ export default function MedicationRecordHub(props: Props) {
     const breadcrumbs = useEmarBreadcrumbs();
     const { url: pageUrl } = usePage();
     const [search, setSearch] = useState(props.filters.q);
+    useEffect(() => setSearch(props.filters.q), [props.filters.q]);
     const [effectDose, setEffectDose] = useState<number | null>(null);
     const visit = (
         extra: Record<string, string | number | null>,
@@ -114,7 +116,13 @@ export default function MedicationRecordHub(props: Props) {
     ) =>
         router.get(
             PATHS[view],
-            { ...props.filters, ...extra },
+            {
+                ...props.filters,
+                ...(view !== props.view
+                    ? { q: '', work: 'all', page: null }
+                    : {}),
+                ...extra,
+            },
             { preserveScroll: true },
         );
     const title = RAIL.find((item) => item.key === props.view)!.label;
@@ -155,7 +163,7 @@ export default function MedicationRecordHub(props: Props) {
                         <>
                             <PageHeaderMeterBlock
                                 label="People with medicines"
-                                onClick={() => visit({}, 'charts')}
+                                onClick={() => visit({ work: 'all' }, 'charts')}
                                 ariaLabel="View medication charts"
                             >
                                 <PageHeaderMeterBig>
@@ -182,7 +190,15 @@ export default function MedicationRecordHub(props: Props) {
                             <PageHeaderMeterBlock
                                 label="Due now"
                                 onClick={() =>
-                                    visit({ date: props.today }, 'charts')
+                                    visit(
+                                        {
+                                            date: props.today,
+                                            work: 'due',
+                                            q: '',
+                                            page: null,
+                                        },
+                                        'charts',
+                                    )
                                 }
                                 ariaLabel="View doses due now"
                             >
@@ -199,7 +215,15 @@ export default function MedicationRecordHub(props: Props) {
                                     props.meters.overdue ? 'critical' : 'brand'
                                 }
                                 onClick={() =>
-                                    visit({ date: props.today }, 'charts')
+                                    visit(
+                                        {
+                                            date: props.today,
+                                            work: 'overdue',
+                                            q: '',
+                                            page: null,
+                                        },
+                                        'charts',
+                                    )
                                 }
                                 ariaLabel="View overdue doses"
                             >
@@ -233,6 +257,21 @@ export default function MedicationRecordHub(props: Props) {
                                     })),
                                 ]}
                             />
+                            {props.view === 'charts' && (
+                                <PageHeaderFilterSelect
+                                    label="Work"
+                                    value={props.filters.work ?? 'all'}
+                                    allValue="all"
+                                    options={[
+                                        { value: 'all', label: 'All charts' },
+                                        { value: 'due', label: 'Due now' },
+                                        { value: 'overdue', label: 'Overdue' },
+                                    ]}
+                                    onChange={(work) =>
+                                        visit({ work, page: null })
+                                    }
+                                />
+                            )}
                             <DatePicker
                                 compact
                                 id="medication-hub-day"

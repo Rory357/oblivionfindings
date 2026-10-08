@@ -5,6 +5,7 @@ namespace App\Services\Medication;
 use App\Models\Client;
 use App\Models\User;
 use App\Support\EmarUrl;
+use App\Support\MedicationJourney;
 use Illuminate\Support\Facades\Gate;
 
 /**
@@ -18,14 +19,28 @@ final class MarLinkService
     /** @var array<string, bool> */
     private array $openable = [];
 
-    public function urlFor(?User $viewer, mixed $clientId, ?string $date = null): ?string
+    /** @var array<int, int|null> */
+    private array $clientSiteIds = [];
+
+    public function urlFor(?User $viewer, mixed $clientId, ?string $date = null, array $context = []): ?string
     {
         $clientId = is_numeric($clientId) ? (int) $clientId : 0;
         if ($viewer === null || $clientId <= 0) {
             return null;
         }
 
-        return $this->canOpen($viewer, $clientId) ? EmarUrl::mar($clientId, $date) : null;
+        if (! $this->canOpen($viewer, $clientId)) {
+            return null;
+        }
+        $siteId = filter_var($context['site_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($siteId !== false && $siteId !== ($this->clientSiteIds[$clientId] ?? null)) {
+            return null;
+        }
+
+        return EmarUrl::mar($clientId, $date, [
+            'site_id' => $siteId !== false ? $siteId : null,
+            'return_to' => MedicationJourney::returnTo($context['return_to'] ?? null),
+        ]);
     }
 
     public function canOpen(User $viewer, int $clientId): bool
@@ -33,6 +48,7 @@ final class MarLinkService
         $key = $viewer->getKey().':'.$clientId;
         if (! array_key_exists($key, $this->openable)) {
             $client = Client::query()->find($clientId);
+            $this->clientSiteIds[$clientId] = $client?->site_id !== null ? (int) $client->site_id : null;
             $this->openable[$key] = $client !== null
                 && Gate::forUser($viewer)->allows('viewMedications', $client);
         }
@@ -67,6 +83,7 @@ final class MarLinkService
                 ->keyBy(fn (Client $client): int => (int) $client->id);
             foreach ($unknown as $id) {
                 $client = $clients->get($id);
+                $this->clientSiteIds[$id] = $client?->site_id !== null ? (int) $client->site_id : null;
                 $this->openable[$key($id)] = $client !== null
                     && Gate::forUser($viewer)->allows('viewMedications', $client);
             }

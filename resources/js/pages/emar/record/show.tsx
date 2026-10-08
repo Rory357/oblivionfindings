@@ -41,7 +41,12 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { useEmarRecordBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTime, formatTime } from '@/lib/datetime';
-import { emarScopedHref } from '@/lib/emar-navigation';
+import {
+    emarScopedHref,
+    isFrontlineMedication,
+    type EmarNavigationPermissions,
+} from '@/lib/emar-navigation';
+import { medicationReturnTo } from '@/lib/medication-navigation';
 
 export default function PersonMedicationRecord(props: RecordPageProps) {
     if (props.unavailable)
@@ -86,14 +91,21 @@ function AvailableRecord({
     as_at,
     can,
 }: Extract<RecordPageProps, { person: unknown }>) {
-    const page = usePage();
+    const page = usePage<{ auth?: { can?: EmarNavigationPermissions } }>();
     const query = new URLSearchParams(page.url.split('?')[1]);
     const date = query.get('date');
     const hubUrl = new URL(
-        emarScopedHref('/emar/mar', page.url),
+        emarScopedHref(
+            isFrontlineMedication(page.props.auth?.can)
+                ? '/meds/today'
+                : '/emar/medications',
+            page.url,
+        ),
         'https://emar.invalid',
     );
-    hubUrl.searchParams.delete('client_id');
+    const backHref =
+        medicationReturnTo(query.get('return_to')) ??
+        hubUrl.pathname + hubUrl.search;
     const week = query.get('mode') === 'week';
     const historyPage = Math.max(1, Number(query.get('page')) || 1);
     const sections = RECORD_SECTIONS.map((item) => ({
@@ -166,7 +178,7 @@ function AvailableRecord({
                     variant="profile"
                     wrapTitle
                     mobileSummary={`${meters.medicines.count} medicines · ${person.house ?? 'Medication record'}`}
-                    backHref={hubUrl.pathname + hubUrl.search}
+                    backHref={backHref}
                     mark={
                         <span className="eh-mark-ring text-sm font-semibold">
                             {person.initials}

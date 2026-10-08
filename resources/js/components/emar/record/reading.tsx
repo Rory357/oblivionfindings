@@ -1,3 +1,4 @@
+import { withMedicationReturn } from '@/lib/medication-navigation';
 import { Link } from '@inertiajs/react';
 import {
     ArrowUpRight,
@@ -503,7 +504,11 @@ export function RecordMedicineDialog({
                             ) : null}
                             <Button variant="link" asChild>
                                 <Link
-                                    href={`/emar/orders?client_id=${clientId}`}
+                                    href={withMedicationReturn(
+                                        `/emar/prescriptions?client_id=${clientId}&order_id=${order.id}`,
+                                        window.location.pathname +
+                                            window.location.search,
+                                    )}
                                 >
                                     Open Orders & reviews{' '}
                                     <ArrowUpRight className="size-4" />

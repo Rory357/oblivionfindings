@@ -4,6 +4,9 @@ namespace App\Support;
 
 use App\Models\Client;
 use App\Models\ClientMedicalProfile;
+use App\Models\User;
+use App\Services\Clients\ClientProfileSectionAccess;
+use App\Services\Medication\ClientAllergyRecordService;
 
 /**
  * Canonical shape for the Client Safety Ribbon.
@@ -36,7 +39,8 @@ class ClientSafetyPayload
     /**
      * @return array{
      *   has_any: bool,
-     *   allergies: array<int,array{key:?string,label:string,group:?string}>,
+     *   allergies: array<int,array{key:?string,label:string,group:?string,severity:?string,reaction:?string}>,
+     *   allergy_record: array|null,
      *   critical_risks: array<int,array{id:int,label:string,severity:string}>,
      *   other_risks_count: int,
      *   active_risks_count: int,
@@ -45,10 +49,22 @@ class ClientSafetyPayload
      *   safeguarding_flag: bool
      * }
      */
+    public static function forViewer(Client $client, User $viewer): array
+    {
+        $sections = app(ClientProfileSectionAccess::class)->for($viewer, $client);
+
+        return self::forClient(
+            $client,
+            includeMedical: $viewer->can('viewMedications', $client),
+            includeRisks: (bool) $sections['risks'],
+        );
+    }
+
     public static function forClient(
         Client $client,
         bool $includeMedical = true,
         bool $includeRisks = true,
+        ?array $allergyRecord = null,
     ): array {
         $profile = $includeMedical
             ? ($client->relationLoaded('medicalProfile')
@@ -62,7 +78,15 @@ class ClientSafetyPayload
                 : $client->risks()->get())
             : collect();
 
-        $allergies = self::normaliseAllergies($profile);
+        if ($includeMedical) {
+            $records = new ClientAllergyRecordService;
+            $allergyRecord ??= $client->exists
+                ? $records->summary($client)
+                : $records->summaryFromEvidence((int) $client->id, collect(), $profile);
+        } else {
+            $allergyRecord = null;
+        }
+        $allergies = self::normaliseAllergies($allergyRecord);
         $disabilities = self::normaliseDisabilities($profile);
 
         $activeRisks = collect($risks)->filter(fn ($r) => (bool) ($r->active ?? false))->values();
@@ -90,6 +114,7 @@ class ClientSafetyPayload
         return [
             'has_any' => $hasAny,
             'allergies' => $allergies,
+            'allergy_record' => $allergyRecord,
             'critical_risks' => $criticalRisks,
             'other_risks_count' => max(0, $activeRisks->count() - count($criticalRisks)),
             'active_risks_count' => $activeRisks->count(),
@@ -110,6 +135,7 @@ class ClientSafetyPayload
      * @return array{
      *   has_any: bool,
      *   allergies_count: int,
+     *   allergy_record: array|null,
      *   critical_risks_count: int,
      *   active_risks_count: int,
      *   safeguarding: bool,
@@ -122,11 +148,13 @@ class ClientSafetyPayload
         Client $client,
         bool $includeMedical = true,
         bool $includeRisks = true,
+        ?array $allergyRecord = null,
     ): array {
         $full = self::forClient(
             $client,
             includeMedical: $includeMedical,
             includeRisks: $includeRisks,
+            allergyRecord: $allergyRecord,
         );
 
         return [
@@ -134,6 +162,7 @@ class ClientSafetyPayload
                 || $full['safeguarding_flag']
                 || in_array($full['risk_level'], ['high', 'critical'], true),
             'allergies_count' => count($full['allergies']),
+            'allergy_record' => $full['allergy_record'],
             'critical_risks_count' => count($full['critical_risks']),
             'active_risks_count' => $full['active_risks_count'],
             'safeguarding' => $full['safeguarding_flag'],
@@ -144,51 +173,23 @@ class ClientSafetyPayload
     }
 
     /**
-     * @return array<int,array{key:?string,label:string,group:?string}>
+     * @return array<int,array{key:?string,label:string,group:?string,severity:?string,reaction:?string}>
      */
-    private static function normaliseAllergies(?ClientMedicalProfile $profile): array
+    private static function normaliseAllergies(?array $record): array
     {
-        if (! $profile) {
-            return [];
-        }
+        $options = collect(ClientMedicalProfile::ALLERGEN_OPTIONS)->keyBy('label');
 
-        $raw = $profile->allergies;
+        return array_map(static function (array $entry) use ($options): array {
+            $label = (string) $entry['allergen'];
 
-        // The model casts to array, but historic records may hold a free-text
-        // string. Handle both so the ribbon never silently drops data.
-        if (is_string($raw)) {
-            $raw = trim($raw);
-            if ($raw === '') {
-                return [];
-            }
-
-            return [[
-                'key' => null,
-                'label' => $raw,
-                'group' => null,
-            ]];
-        }
-
-        if (! is_array($raw) || empty($raw)) {
-            return [];
-        }
-
-        $optionsByKey = collect(ClientMedicalProfile::ALLERGEN_OPTIONS)
-            ->keyBy('value');
-
-        return collect($raw)
-            ->filter(fn ($v) => is_string($v) && $v !== '')
-            ->map(function (string $v) use ($optionsByKey) {
-                $opt = $optionsByKey->get($v);
-
-                return [
-                    'key' => $v,
-                    'label' => $opt['label'] ?? self::humanise($v),
-                    'group' => $opt['group'] ?? null,
-                ];
-            })
-            ->values()
-            ->all();
+            return [
+                'key' => $entry['key'] ?? null,
+                'label' => $label,
+                'group' => $options->get($label)['group'] ?? null,
+                'severity' => $entry['severity'] ?? null,
+                'reaction' => $entry['reaction'] ?? null,
+            ];
+        }, $record['entries'] ?? []);
     }
 
     /**

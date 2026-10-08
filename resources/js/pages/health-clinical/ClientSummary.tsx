@@ -1,8 +1,13 @@
+import {
+    AllergySummaryContent,
+    type AllergySummary,
+} from '@/components/emar/record/allergy-record';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
+import { withMedicationReturn } from '@/lib/medication-navigation';
 import { Head, Link } from '@inertiajs/react';
 import { Activity, ClipboardList, HeartPulse, ShieldAlert } from 'lucide-react';
 
@@ -47,6 +52,8 @@ type ClinicalEvent = {
 };
 
 type Summary = {
+    allergy_record: AllergySummary;
+    allergy_management_url: string | null;
     medical_profile: MedicalProfile;
     recent_observations: Observation[];
     active_protocols: Protocol[];
@@ -116,25 +123,32 @@ export default function ClientSummary({
                     />
                 }
             >
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <ShieldAlert className="size-4" /> Allergy record
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <AllergySummaryContent data={summary.allergy_record} />
+                        {summary.allergy_management_url && (
+                            <Button asChild variant="outline">
+                                <Link
+                                    href={withMedicationReturn(
+                                        summary.allergy_management_url,
+                                        window.location.pathname +
+                                            window.location.search,
+                                    )}
+                                >
+                                    Manage allergies in health profile
+                                </Link>
+                            </Button>
+                        )}
+                    </CardContent>
+                </Card>
                 {/* Medical Profile */}
                 {summary.medical_profile && (
                     <>
-                        {summary.medical_profile.allergies &&
-                            summary.medical_profile.allergies.length > 0 && (
-                                <div className="flex items-center gap-3 rounded-xl border-2 border-status-critical/30 bg-status-critical-bg p-4">
-                                    <ShieldAlert className="h-6 w-6 shrink-0 text-status-critical" />
-                                    <div>
-                                        <p className="text-sm font-bold text-status-critical">
-                                            Allergies
-                                        </p>
-                                        <p className="text-sm text-status-critical">
-                                            {summary.medical_profile.allergies.join(
-                                                ', ',
-                                            )}
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
                         {summary.medical_profile.gp_name && (
                             <Card className="border-status-success/30 bg-status-success-bg">
                                 <CardContent className="p-4">

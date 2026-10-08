@@ -1,3 +1,4 @@
+import { medicationReturnTo } from '@/lib/medication-navigation';
 import {
     Activity,
     BellRing,
@@ -135,6 +136,8 @@ export function locationSearch(
                   : value === 'week');
         if (valid) params.set(key, value);
     }
+    const returnTo = medicationReturnTo(current.get('return_to'));
+    if (returnTo) params.set('return_to', returnTo);
     if (location.tab !== RECORD_SECTIONS[0].key)
         params.set('tab', location.tab);
     if (location.view !== section.views[0].key)

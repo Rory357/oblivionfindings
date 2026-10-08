@@ -19,6 +19,7 @@ import {
     type RoundSummary,
 } from '@/components/emar/rounds/types';
 import { EmarMeters } from '@/components/emar/workspace-navigation';
+import { EntityContextMenu } from '@/components/lists/entity-menu';
 import {
     addDays,
     DayPickerChip,
@@ -34,7 +35,6 @@ import {
 } from '@/components/page/page-header';
 import { EntityFilter, type RosterTabItem } from '@/components/rostering';
 import {
-    ShiftContextMenu,
     type ShiftCtxItem,
     type ShiftCtxState,
 } from '@/components/rostering/shift-context-menu';
@@ -69,11 +69,12 @@ import {
     Zap,
 } from 'lucide-react';
 import type { ComponentType, MouseEvent } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type Props = {
     rounds: RoundSummary[];
     date: string;
+    selected_site_id?: number | null;
     now_label: string;
     lastGenerated: string | null;
     guidedRound: GuidedRound | null;
@@ -122,7 +123,13 @@ export default function Rounds(props: Props) {
     const [activeTab, setActiveTab] = useState('board');
     const [search, setSearch] = useState('');
     const [boardView, setBoardView] = useState<'cards' | 'list'>('cards');
-    const [siteFilter, setSiteFilter] = useState<number | null>(null);
+    const [siteFilter, setSiteFilter] = useState<number | null>(
+        props.selected_site_id ?? null,
+    );
+    useEffect(
+        () => setSiteFilter(props.selected_site_id ?? null),
+        [props.selected_site_id],
+    );
     const [residentFilter, setResidentFilter] = useState<number | null>(null);
     const [statusChip, setStatusChip] = useState<StatusChip>('all');
     const [expanded, setExpanded] = useState<Record<number, boolean>>({});
@@ -135,25 +142,29 @@ export default function Rounds(props: Props) {
 
     // ── Navigation (date + guided modal are server-driven; site/resident filters are client-side) ──
     const goDate = (next: string) =>
-        router.get('/emar/rounds', { date: next }, { preserveScroll: true });
+        router.get(
+            '/emar/rounds',
+            { date: next, site_id: siteFilter },
+            { preserveScroll: true },
+        );
     const openGuided = (roundId: number) =>
         router.get(
             '/emar/rounds',
-            { date, guided: roundId },
+            { date, site_id: siteFilter, guided: roundId },
             { preserveState: true, preserveScroll: true },
         );
     const closeGuided = () =>
         router.get(
             '/emar/rounds',
-            { date },
+            { date, site_id: siteFilter },
             { preserveState: true, preserveScroll: true },
         );
 
     const toggleExpand = (id: number) =>
         setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
-    const printRoundSheet = () =>
+    const printRoundSheet = (roundId?: number) =>
         window.open(
-            `/emar/pdf/round-sheet?date=${encodeURIComponent(date)}`,
+            `/emar/pdf/round-sheet?date=${encodeURIComponent(date)}${roundId ? '&round_id=' + roundId : ''}${siteFilter ? '&site_id=' + siteFilter : ''}`,
             '_blank',
             'noopener',
         );
@@ -320,7 +331,7 @@ export default function Rounds(props: Props) {
             items.push({
                 icon: <Printer className="h-3.5 w-3.5" />,
                 label: 'Print round sheet',
-                onClick: printRoundSheet,
+                onClick: () => printRoundSheet(original.id),
             });
         if (canManage)
             items.push({
@@ -441,7 +452,13 @@ export default function Rounds(props: Props) {
                     allLabel="All sites"
                     items={sites}
                     value={siteFilter}
-                    onChange={setSiteFilter}
+                    onChange={(site_id) =>
+                        router.get(
+                            '/emar/rounds',
+                            { date, site_id },
+                            { preserveState: true, preserveScroll: true },
+                        )
+                    }
                     onDark
                     className="rounded-lg"
                 />
@@ -692,7 +709,7 @@ export default function Rounds(props: Props) {
                         cd_witness: signer.cd_witness,
                     }}
                     canExport={canExport}
-                    onPrint={printRoundSheet}
+                    onPrint={() => printRoundSheet(guidedRound.round.id)}
                     onClose={closeGuided}
                 />
             )}
@@ -710,7 +727,7 @@ export default function Rounds(props: Props) {
                               }
                             : undefined
                     }
-                    onPrint={printRoundSheet}
+                    onPrint={() => printRoundSheet(auditRound.id)}
                 />
             )}
 
@@ -730,8 +747,20 @@ export default function Rounds(props: Props) {
             )}
 
             {contextMenu && (
-                <ShiftContextMenu
-                    ctx={contextMenu}
+                <EntityContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    title={contextMenu.meta}
+                    items={contextMenu.items.map((item) =>
+                        item.sep
+                            ? { separator: true }
+                            : {
+                                  label: item.label,
+                                  icon: () => <>{item.icon}</>,
+                                  danger: item.tone === 'critical',
+                                  onClick: item.onClick,
+                              },
+                    )}
                     onClose={() => setContextMenu(null)}
                 />
             )}

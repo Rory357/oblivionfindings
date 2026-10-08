@@ -17,6 +17,7 @@ import { AlertTriangle, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 type EditPayload = {
+    can_edit_medical?: boolean;
     initialValues: Partial<ClientWizardForm>;
     sites: AddClientDialogProps['sites'];
     serviceContexts: AddClientDialogProps['serviceContexts'];
@@ -95,6 +96,7 @@ export function ClientEditDialog({
                 isOpen
                 onClose={() => onOpenChange(false)}
                 clientId={clientId}
+                canEditMedical={payload.can_edit_medical === true}
                 initialValues={payload.initialValues}
                 sites={payload.sites}
                 serviceContexts={payload.serviceContexts}
