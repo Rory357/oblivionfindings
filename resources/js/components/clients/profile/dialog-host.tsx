@@ -102,9 +102,15 @@ export function ProfileDialogs({
 
         return (
             <DosePicker
+                key={`${flowContext.clientId}:${dialog.ctx?.medicationId ?? 'all'}`}
                 onClose={onClose}
                 clientId={flowContext.clientId}
                 personName={flowContext.preferredName}
+                medicationId={
+                    typeof dialog.ctx?.medicationId === 'number'
+                        ? dialog.ctx.medicationId
+                        : undefined
+                }
                 asNeeded={false}
                 entry="client-profile"
                 returnFocus={() => null}

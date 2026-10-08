@@ -80,6 +80,7 @@ export function DosePicker({
     onClose,
     returnFocus,
     entry = 'mar',
+    medicationId,
 }: {
     clientId: number;
     personName: string;
@@ -87,11 +88,30 @@ export function DosePicker({
     onClose: () => void;
     returnFocus: () => HTMLElement | null;
     entry?: EntryPoint;
+    /** An existing profile deep link requests this exact order, never a substitute. */
+    medicationId?: number;
 }) {
     // A recording action always checks today's orders, even on a historical chart.
-    const { data, load, reload } = useRecordJson<MedicationDay>(
-        `/emar/clients/${clientId}/day`,
-    );
+    const {
+        data: currentDay,
+        load,
+        reload,
+    } = useRecordJson<MedicationDay>(`/emar/clients/${clientId}/day`);
+    const data = useMemo(() => {
+        if (!currentDay || medicationId === undefined) return currentDay;
+        return {
+            ...currentDay,
+            medicines: currentDay.medicines.filter(
+                (medicine) => medicine.id === medicationId,
+            ),
+            prn: {
+                ...currentDay.prn,
+                rows: currentDay.prn.rows.filter(
+                    (medicine) => medicine.id === medicationId,
+                ),
+            },
+        };
+    }, [currentDay, medicationId]);
     const [choosing, setChoosing] = useState(true);
     const [recovering, setRecovering] = useState<DoseTarget | null>(null);
     const context = useMemo(
@@ -121,7 +141,16 @@ export function DosePicker({
                 ['due_now', 'due', 'overdue'].includes(kind),
             ) ?? [];
     const ready = load === 'ready' && data !== null;
-    const pending = ready ? pendingDoseRecoveries<PendingDose>(clientId) : [];
+    const pending = ready
+        ? pendingDoseRecoveries<PendingDose>(clientId).filter(
+              (attempt) =>
+                  medicationId === undefined || attempt.order === medicationId,
+          )
+        : [];
+    const requestedMedicine =
+        medicationId === undefined
+            ? null
+            : (data?.medicines[0] ?? data?.prn.rows[0]);
     const canChoose = ready && data.can.record && context !== null;
     const hidden =
         ready &&
@@ -162,9 +191,11 @@ export function DosePicker({
                                 : `Record a dose for ${personName}`
                         }
                         description={
-                            asNeeded
-                                ? 'Current as-needed medicines. Choose a medicine to open its safety checks and recording form.'
-                                : 'Choose a scheduled dose due today or an as-needed medicine. Safety checks open before recording.'
+                            medicationId !== undefined
+                                ? 'Only the requested medicine is shown. Choose its due dose or open its as-needed safety checks.'
+                                : asNeeded
+                                  ? 'Current as-needed medicines. Choose a medicine to open its safety checks and recording form.'
+                                  : 'Choose a scheduled dose due today or an as-needed medicine. Safety checks open before recording.'
                         }
                         width={
                             !asNeeded && canChoose && doses.length > 0
@@ -255,6 +286,14 @@ export function DosePicker({
                                         message="Reload the choices before recording a dose."
                                         onRetry={reload}
                                     />
+                                ) : medicationId !== undefined &&
+                                  !requestedMedicine ? (
+                                    <EmptyState
+                                        icon={Pill}
+                                        variant="compact"
+                                        title="The requested medicine is unavailable"
+                                        description="It may have changed or may no longer be available with your access. Close this window and check the chart, or ask the medication lead to review the original order."
+                                    />
                                 ) : asNeeded ? (
                                     data.prn.rows.length === 0 ? (
                                         <EmptyState
@@ -340,15 +379,23 @@ export function DosePicker({
                                                     </Card>
                                                 );
                                             })
-                                        ) : (
+                                        ) : medicationId !== undefined &&
+                                          data.prn.rows.length > 0 ? null : (
                                             <EmptyState
                                                 icon={Pill}
                                                 variant="compact"
-                                                title="No scheduled doses are due now"
+                                                title={
+                                                    requestedMedicine
+                                                        ? `No dose is available to record for ${requestedMedicine.name}`
+                                                        : 'No scheduled doses are due now'
+                                                }
                                                 description={
-                                                    data.prn.rows.length > 0
-                                                        ? 'You can choose an as-needed medicine below.'
-                                                        : 'Check the chart for later doses. As-needed recording requires a current as-needed order.'
+                                                    requestedMedicine
+                                                        ? 'Check this medicine’s times, order check and existing outcomes on the chart.'
+                                                        : data.prn.rows.length >
+                                                            0
+                                                          ? 'You can choose an as-needed medicine below.'
+                                                          : 'Check the chart for later doses. As-needed recording requires a current as-needed order.'
                                                 }
                                             />
                                         )}
@@ -356,17 +403,22 @@ export function DosePicker({
                                             <Button
                                                 variant="outline"
                                                 onClick={() => {
-                                                    recorder.recordAsNeeded();
+                                                    recorder.recordAsNeeded(
+                                                        medicationId,
+                                                    );
                                                     setChoosing(false);
                                                 }}
                                             >
                                                 <Pill className="size-4" />{' '}
-                                                Record an as-needed dose
+                                                {requestedMedicine
+                                                    ? `Record as-needed dose · ${requestedMedicine.name}`
+                                                    : 'Record an as-needed dose'}
                                             </Button>
                                         )}
                                     </>
                                 ) : null}
                                 {hidden &&
+                                    medicationId === undefined &&
                                     !(
                                         asNeeded && data.prn.rows.length === 0
                                     ) && (
