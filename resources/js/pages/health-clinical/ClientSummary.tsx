@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { withMedicationReturn } from '@/lib/medication-navigation';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { Activity, ClipboardList, HeartPulse, ShieldAlert } from 'lucide-react';
 
 type ClientRef = { id: number; first_name: string; last_name: string };
@@ -80,6 +80,7 @@ export default function ClientSummary({
     observation_types,
     event_types,
 }: Props) {
+    const pageUrl = usePage().url;
     const name = `${client.first_name} ${client.last_name}`;
 
     return (
@@ -136,8 +137,7 @@ export default function ClientSummary({
                                 <Link
                                     href={withMedicationReturn(
                                         summary.allergy_management_url,
-                                        window.location.pathname +
-                                            window.location.search,
+                                        pageUrl,
                                     )}
                                 >
                                     Manage allergies in health profile

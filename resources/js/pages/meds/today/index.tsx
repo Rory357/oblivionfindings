@@ -7,7 +7,7 @@
  * allows comes from the same requirements the dialog reads; saving checks
  * everything again on the server. */
 import { withMedicationReturn } from '@/lib/medication-navigation';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     CheckCircle2,
@@ -142,11 +142,6 @@ type Overlay =
     | { kind: 'error'; clientId: number | null }
     | null;
 
-const query = () =>
-    typeof window === 'undefined'
-        ? new URLSearchParams()
-        : medsTodayQuery(window.location.search);
-
 /** "Mon 28 Sep 2026" from the board's "2026-09-28". */
 function shortDate(ymd: string): string {
     const [y, m, d] = ymd.split('-').map(Number);
@@ -161,6 +156,16 @@ const nzDay = (iso: string): string =>
     new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date(iso));
 
 export default function MedsToday(props: MedsTodayProps) {
+    const pageUrl = usePage().url;
+    const query = useCallback(
+        () =>
+            medsTodayQuery(
+                typeof window === 'undefined'
+                    ? new URL(pageUrl, 'https://medication.invalid').search
+                    : window.location.search,
+            ),
+        [pageUrl],
+    );
     const {
         schedule,
         clients,

@@ -517,7 +517,8 @@ export default function ShiftShow({
     links,
     can,
 }: Props) {
-    const { auth } = usePage().props as any;
+    const page = usePage();
+    const { auth } = page.props as any;
     const canMarkTasks = canMarkShiftTasks(can, auth);
     const canActShift =
         auth?.can?.shifts?.update || auth?.can?.shifts?.manageAny;
@@ -544,7 +545,7 @@ export default function ShiftShow({
     const [overrideProcessing, setOverrideProcessing] = useState(false);
 
     // Session-flashed eligibility data (persisted after failed assignment attempt)
-    const pageProps = usePage().props as any;
+    const pageProps = page.props as any;
     const flashedEligibility = pageProps.flash?.eligibility_result ?? null;
     const flashedWarnings: string[] =
         pageProps.flash?.assignment_warnings ?? [];
@@ -680,9 +681,9 @@ export default function ShiftShow({
 
     const [activeTab, setActiveTab] = useState(
         () =>
-            new URLSearchParams(
-                typeof window === 'undefined' ? '' : window.location.search,
-            ).get('tab') ?? 'tasks',
+            new URL(page.url, 'https://medication.invalid').searchParams.get(
+                'tab',
+            ) ?? 'tasks',
     );
     const resolvedActiveTab = shiftTabs.some((t) => t.key === activeTab)
         ? activeTab
