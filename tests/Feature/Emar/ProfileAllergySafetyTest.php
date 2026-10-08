@@ -343,6 +343,103 @@ class ProfileAllergySafetyTest extends TestCase
         $this->assertSame($receipts, DB::table('medication_idempotency_results')->count());
     }
 
+    public static function retainedRecoveryOrderStates(): array
+    {
+        return [
+            'replaced order' => ['superseded'],
+            'retained legacy archived order' => ['soft_deleted'],
+            'stopped order' => ['stopped'],
+            'expired order' => ['expired'],
+        ];
+    }
+
+    #[DataProvider('retainedRecoveryOrderStates')]
+    public function test_recording_status_recovers_the_original_receipt_after_the_order_is_retired(string $state): void
+    {
+        [$order, $uuid, $record] = $this->prnForRecovery();
+        $this->retireRecoveryOrder($order, $state);
+        $originalOrder = ClientMedication::withTrashed()->findOrFail($order->id)->getRawOriginal();
+        $originalRecord = $record->fresh()->getRawOriginal();
+        $events = MedicationEvent::count();
+        $receipts = DB::table('medication_idempotency_results')->count();
+
+        $response = $this->getJson('/meds/today/recording-status?'.http_build_query([
+            'client_medication_id' => $order->id, 'client_request_uuid' => $uuid,
+        ]))->assertOk()->assertJsonPath('status', 'recorded')->assertJsonPath('administration_id', $record->id);
+        parse_str(parse_url($response->json('chart_url'), PHP_URL_QUERY), $chart);
+        $this->assertSame((string) $this->client->id, $chart['client_id']);
+        $this->assertSame((string) $this->site->id, $chart['site_id']);
+        $this->assertSame('2026-04-30', $chart['date']);
+        $this->assertSame('history', $chart['tab']);
+        $this->assertSame((string) $record->id, $chart['dose_id']);
+        $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
+        $this->assertSame($originalOrder, ClientMedication::withTrashed()->findOrFail($order->id)->getRawOriginal());
+        $this->assertSame($originalRecord, $record->fresh()->getRawOriginal());
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+        $this->assertSame($events, MedicationEvent::count());
+        $this->assertSame($receipts, DB::table('medication_idempotency_results')->count());
+        config(['medications.person_record' => 'p02']);
+        $this->get($response->json('chart_url'))->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('emar/record/show')->where('person.id', $this->client->id));
+        $this->getJson(route('emar.record.dose', ['client' => $this->client->id, 'administration' => $record->id], false))
+            ->assertOk()->assertJsonPath('dose.id', $record->id);
+    }
+
+    #[DataProvider('retainedRecoveryOrderStates')]
+    public function test_historical_recording_status_preserves_current_read_scope_and_request_privacy(string $state): void
+    {
+        [$order, $uuid, $record] = $this->prnForRecovery();
+        $order->forceFill(['controlled_drug' => true])->save();
+        $this->retireRecoveryOrder($order, $state);
+        $url = '/meds/today/recording-status?'.http_build_query([
+            'client_medication_id' => $order->id, 'client_request_uuid' => $uuid,
+        ]);
+        $this->getJson($url)->assertOk()->assertJsonPath('status', 'recorded');
+        $this->getJson('/meds/today/recording-status?'.http_build_query([
+            'client_medication_id' => $order->id, 'client_request_uuid' => (string) Str::uuid(),
+        ]))->assertOk()->assertExactJson(['status' => 'unconfirmed']);
+        $other = $this->order('Another recovery medicine', []);
+        $this->getJson('/meds/today/recording-status?'.http_build_query([
+            'client_medication_id' => $other->id, 'client_request_uuid' => $uuid,
+        ]))->assertOk()->assertExactJson(['status' => 'unconfirmed']);
+        $otherActor = User::factory()->create(['approved_at' => now()]);
+        DB::table('client_medication_administrations')->where('id', $record->id)->update(['administered_by' => $otherActor->id]);
+        $this->getJson($url)->assertOk()->assertExactJson(['status' => 'unconfirmed']);
+        DB::table('client_medication_administrations')->where('id', $record->id)->update(['administered_by' => $this->worker->id]);
+        $foreignClient = Client::factory()->create(['site_id' => $this->site->id, 'status' => 'active']);
+        DB::table('client_medication_administrations')->where('id', $record->id)->update(['client_id' => $foreignClient->id]);
+        $this->getJson($url)->assertOk()->assertExactJson(['status' => 'unconfirmed']);
+        DB::table('client_medication_administrations')->where('id', $record->id)->update(['client_id' => $this->client->id]);
+
+        $this->worker->permissionOverrides()->syncWithoutDetaching(Permission::where('key', 'medications.controlled.view')->pluck('id')
+            ->mapWithKeys(fn ($id) => [$id => ['allowed' => false]])->all());
+        $this->worker = $this->worker->fresh();
+        $this->assertFalse($this->worker->canDo('medications.controlled.view'));
+        $this->assertTrue($this->worker->canDo('medications.controlled.record'));
+        $this->actingAs($this->worker)->getJson($url)->assertNotFound();
+        $this->worker->permissionOverrides()->syncWithoutDetaching(Permission::where('key', 'medications.controlled.view')->pluck('id')
+            ->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])->all());
+        $this->worker = $this->worker->fresh();
+        $this->actingAs($this->worker)->getJson($url)->assertOk()->assertJsonPath('status', 'recorded');
+
+        $this->client->forceFill(['site_id' => Site::factory()->create(['is_active' => true])->id])->save();
+        $this->getJson($url)->assertNotFound();
+        $this->client->forceFill(['site_id' => $this->site->id])->save();
+        $this->getJson($url)->assertOk()->assertJsonPath('status', 'recorded');
+        $shift = Shift::where('client_id', $this->client->id)->where('user_id', $this->worker->id)->sole();
+        $shift->forceFill(['status' => 'completed', 'actual_ends_at' => now()->subMinute()])->save();
+        $this->assertFalse($this->worker->can('viewMedications', $this->client->fresh()));
+        $this->getJson($url)->assertNotFound();
+        $shift->forceFill(['status' => 'in_progress', 'actual_ends_at' => null])->save();
+        $this->getJson($url)->assertOk()->assertJsonPath('status', 'recorded');
+        $this->worker->permissionOverrides()->syncWithoutDetaching(Permission::where('key', 'medications.view')->pluck('id')
+            ->mapWithKeys(fn ($id) => [$id => ['allowed' => false]])->all());
+        $this->worker = $this->worker->fresh();
+        $this->assertFalse($this->worker->canDo('medications.view'));
+        $this->actingAs($this->worker)->getJson($url)->assertNotFound();
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+    }
+
     public function test_recording_status_does_not_reveal_foreign_unknown_or_other_medicine_requests(): void
     {
         [$order, $uuid, $record] = $this->prnForRecovery();
@@ -406,6 +503,20 @@ class ProfileAllergySafetyTest extends TestCase
         $record = ClientMedicationAdministration::where('client_request_uuid', $uuid)->sole();
 
         return [$order, $uuid, $record];
+    }
+
+    private function retireRecoveryOrder(ClientMedication $order, string $state): void
+    {
+        match ($state) {
+            'superseded' => $order->forceFill(['superseded_by' => $this->order('Replacement recovery medicine', [])->id])->save(),
+            // Synthetic retained legacy evidence: production deletion remains prohibited.
+            'soft_deleted' => DB::table('client_medications')->where('id', $order->id)->update(['deleted_at' => now()]),
+            'stopped' => $order->forceFill([
+                'state' => 'ceased', 'active' => false, 'ceased_at' => now(),
+                'ceased_reason' => 'Stopped after the committed dose', 'ceased_by' => $this->worker->id,
+            ])->save(),
+            'expired' => $order->forceFill(['end_date' => now()->subDay()->toDateString()])->save(),
+        };
     }
 
     private function clientOnShift(string $first, string $last): Client

@@ -120,6 +120,7 @@ import {
     doseRecoveryKey,
     findDoseRecovery,
     keepDoseRecovery,
+    formatPendingDoseWhen as localLabel,
     readDoseRecovery,
 } from './recovery';
 import {
@@ -235,22 +236,6 @@ const timeLabel = (iso: string | null | undefined) =>
               timeZone: TZ,
           })
         : '—';
-const localLabel = (local: string) => {
-    if (!local) return '—';
-    const [d, t] = local.split('T');
-    const [h, m] = (t ?? '00:00').split(':').map(Number);
-    const ampm = h >= 12 ? 'pm' : 'am';
-    const h12 = h % 12 === 0 ? 12 : h % 12;
-    const date = new Date(`${d}T12:00:00Z`).toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        timeZone: 'UTC',
-    });
-
-    return `${date} · ${h12}:${String(m).padStart(2, '0')} ${ampm}`;
-};
-
 /** "NZDT" or "NZST" — the zone the times are in, as the approved review shows it. */
 const nzZone = (date: Date = new Date()) =>
     new Intl.DateTimeFormat('en-NZ', { timeZone: TZ, timeZoneName: 'short' })
@@ -368,7 +353,7 @@ export function RecordDoseDialog({
     returnFocus?: () => HTMLElement | null;
 }) {
     const requirements = useDoseRequirements(target);
-    const [pending] = useState(() =>
+    const [pending, setPending] = useState(() =>
         findDoseRecovery<PendingDose>(
             target.orderId,
             target.kind === 'scheduled' ? target.scheduledFor : 'prn',
@@ -389,6 +374,7 @@ export function RecordDoseDialog({
                 onClose={onClose}
                 onRecorded={onRecorded}
                 onResume={canResume ? () => setResumeOriginal(true) : undefined}
+                returnFocus={returnFocus}
             />
         );
     }
@@ -433,6 +419,16 @@ export function RecordDoseDialog({
             shiftContext={shiftContext}
             onClose={onClose}
             onRecorded={onRecorded}
+            onCheckSaved={() => {
+                const original = findDoseRecovery<PendingDose>(
+                    target.orderId,
+                    target.kind === 'scheduled' ? target.scheduledFor : 'prn',
+                );
+                if (!original) return false;
+                setPending(original);
+                setResumeOriginal(false);
+                return true;
+            }}
             onEligibility={onEligibility}
             onNext={onNext}
             nextLabel={nextLabel}
@@ -446,12 +442,15 @@ function PendingDoseConfirmation({
     onClose,
     onRecorded,
     onResume,
+    returnFocus,
 }: {
     pending: { key: string; draft: PendingDose; person: number; order: number };
     onClose: () => void;
     onRecorded?: (result: RecordedResult) => void;
     onResume?: () => void;
+    returnFocus?: () => HTMLElement | null;
 }) {
+    const resuming = useRef(false);
     const [state, setState] = useState<
         'loading' | 'recorded' | 'unconfirmed' | 'unavailable'
     >('loading');
@@ -516,6 +515,17 @@ function PendingDoseConfirmation({
             description="Check the original request before recording anything else for this dose."
             width={480}
             onClose={onClose}
+            onCloseAutoFocus={(event) => {
+                if (resuming.current) {
+                    event.preventDefault();
+                    return;
+                }
+                const element = returnFocus?.();
+                if (element) {
+                    event.preventDefault();
+                    element.focus();
+                }
+            }}
         >
             <div className="space-y-4">
                 {state === 'loading' ? (
@@ -572,7 +582,12 @@ function PendingDoseConfirmation({
                             Check again
                         </Button>
                         {state === 'unconfirmed' && onResume && (
-                            <Button onClick={onResume}>
+                            <Button
+                                onClick={() => {
+                                    resuming.current = true;
+                                    onResume();
+                                }}
+                            >
                                 Review original attempt
                             </Button>
                         )}
@@ -657,6 +672,7 @@ function RecordDoseForm({
     shiftContext,
     onClose,
     onRecorded,
+    onCheckSaved,
     onEligibility,
     onNext,
     nextLabel,
@@ -672,11 +688,13 @@ function RecordDoseForm({
     shiftContext?: ShiftRecordingContext;
     onClose: () => void;
     onRecorded?: (result: RecordedResult) => void;
+    onCheckSaved: () => boolean;
     onEligibility?: () => void;
     onNext?: () => void;
     nextLabel?: string | null;
     returnFocus?: () => HTMLElement | null;
 }) {
+    const confirmingOriginal = useRef(false);
     const isPrn = req.kind === 'prn';
     const p = req.person.preferred_name;
     const med = req.order.name;
@@ -2302,21 +2320,31 @@ function RecordDoseForm({
                     live="alert"
                     title="Not confirmed — check before trying again"
                     actions={
-                        <Button asChild variant="outline">
-                            <a
-                                href={`/emar/mar?client_id=${req.person.id}&date=${encodeURIComponent((target.kind === 'scheduled' ? nzLocal(new Date(target.scheduledFor)) : f.when).slice(0, 10))}&tab=chart${isPrn ? '&view=asneeded' : ''}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                        <>
+                            <Button
+                                onClick={() => {
+                                    confirmingOriginal.current = onCheckSaved();
+                                }}
                             >
-                                <Search className="size-4" /> Check the chart
-                            </a>
-                        </Button>
+                                <Search className="size-4" /> Check saved result
+                            </Button>
+                            <Button asChild variant="outline">
+                                <a
+                                    href={`/emar/mar?client_id=${req.person.id}&date=${encodeURIComponent((target.kind === 'scheduled' ? nzLocal(new Date(target.scheduledFor)) : f.when).slice(0, 10))}&tab=history`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    Open medication history
+                                </a>
+                            </Button>
+                        </>
                     }
                 >
-                    This dose may already have been saved. Check {p}’s chart in
-                    the new tab, then return here. Your entries and this
-                    request’s identity are kept; trying again checks the same
-                    request. Do not start another record for this dose.
+                    This dose may already have been saved. Check the original
+                    result without recording another dose, or open {p}’s history
+                    in a new tab. Your entries and this request’s identity are
+                    kept; trying again checks the same request. Do not start
+                    another record for this dose.
                     {serverMessage ? <p>{serverMessage}</p> : null}
                     {typeof submitted.current?.body.witnessed_by === 'number' &&
                     !submitted.current.body.second_person_pin_forgotten ? (
@@ -2687,6 +2715,10 @@ function RecordDoseForm({
                 open
                 onClose={requestClose}
                 onCloseAutoFocus={(e) => {
+                    if (confirmingOriginal.current) {
+                        e.preventDefault();
+                        return;
+                    }
                     const el = returnFocus?.();
                     if (el) {
                         e.preventDefault();

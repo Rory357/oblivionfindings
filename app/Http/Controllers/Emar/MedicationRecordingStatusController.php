@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Emar;
 
 use App\Http\Controllers\Controller;
+use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Services\MarScheduleService;
 use App\Services\Medication\MedicationRecordAccess;
@@ -20,7 +21,10 @@ final class MedicationRecordingStatusController extends Controller
             'client_medication_id' => ['required', 'integer', 'min:1'],
             'client_request_uuid' => ['required', 'uuid'],
         ]);
-        $medicine = $access->medication($actor, (int) $data['client_medication_id']);
+        // A replaced or archived order still owns its committed receipt. Recheck
+        // the current person and Site authority instead of requiring an active order.
+        $medicine = ClientMedication::withTrashed()->findOrFail((int) $data['client_medication_id']);
+        $client = $access->client($actor, (int) $medicine->client_id);
         abort_if($medicine->controlled_drug && ! $actor->canDo('medications.controlled.view'), 404);
 
         // Filtering the actor before reading the receipt gives a foreign UUID
@@ -38,7 +42,7 @@ final class MedicationRecordingStatusController extends Controller
         if ($record !== null && $at !== null) {
             $payload = ['status' => 'recorded', 'administration_id' => (int) $record->id,
                 'chart_url' => route('emar.mar', [
-                    'client_id' => (int) $medicine->client_id, 'site_id' => $medicine->client->site_id,
+                    'client_id' => (int) $medicine->client_id, 'site_id' => $client->site_id,
                     'date' => $at->copy()->timezone($schedule->workerTimezone())->toDateString(),
                     'tab' => 'history', 'dose_id' => (int) $record->id,
                 ], false)];

@@ -1,5 +1,21 @@
 import { getOfflineQueueActorId } from '@/lib/offline-queue';
 
+/** Display the retained NZ wall time without converting it to the browser's zone. */
+export function formatPendingDoseWhen(local: string): string {
+    if (!local) return '—';
+    const [d, t] = local.split('T');
+    const [h, m] = (t ?? '00:00').split(':').map(Number);
+    const ampm = h >= 12 ? 'pm' : 'am';
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    const date = new Date(`${d}T12:00:00Z`).toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'UTC',
+    });
+    return `${date} · ${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
 // Unconfirmed requests survive an Inertia handoff or closing/reopening the
 // dialog, but clinical drafts and witness secrets are never written to storage.
 const pending = new Map<string, unknown>();

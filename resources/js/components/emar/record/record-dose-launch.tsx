@@ -9,7 +9,10 @@ import {
     RecordDoseDialog,
     type PendingDose,
 } from '@/components/emar/record-dose/record-dose-dialog';
-import { pendingDoseRecoveries } from '@/components/emar/record-dose/recovery';
+import {
+    formatPendingDoseWhen,
+    pendingDoseRecoveries,
+} from '@/components/emar/record-dose/recovery';
 import type {
     DoseTarget,
     EntryPoint,
@@ -196,10 +199,29 @@ export function DosePicker({
                                         key={attempt.key}
                                         className="flex items-center justify-between gap-4 rounded-lg border p-3"
                                     >
-                                        <p className="text-sm">
-                                            A previous dose attempt needs
-                                            confirmation.
-                                        </p>
+                                        <div className="min-w-0 space-y-1 text-sm">
+                                            <p className="font-semibold">
+                                                Unconfirmed attempt ·{' '}
+                                                {
+                                                    attempt.draft.display.order
+                                                        .name
+                                                }
+                                            </p>
+                                            <p className="text-muted-foreground">
+                                                {formatPendingDoseWhen(
+                                                    attempt.draft.form.when,
+                                                )}{' '}
+                                                · NZ time ·{' '}
+                                                {attempt.draft.form.outcome ??
+                                                    'Outcome not confirmed'}
+                                            </p>
+                                            <p>
+                                                Check the original attempt
+                                                before recording the same dose
+                                                again, even if the medicine
+                                                order has changed.
+                                            </p>
+                                        </div>
                                         <Button
                                             size="sm"
                                             variant="outline"

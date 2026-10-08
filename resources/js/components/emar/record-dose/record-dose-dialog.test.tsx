@@ -162,6 +162,10 @@ function requirements(
 function open(
     req: DoseRequirements | BlockedRequirements,
     target?: DoseTarget,
+    dialogProps: {
+        onClose?: () => void;
+        returnFocus?: () => HTMLElement | null;
+    } = {},
 ) {
     getMock.mockResolvedValue({ data: req });
     return render(
@@ -176,6 +180,7 @@ function open(
             entry="meds-today"
             signedAs={{ name: 'Priya Shah', role_label: 'Support worker' }}
             onClose={() => {}}
+            {...dialogProps}
         />,
     );
 }
@@ -214,12 +219,15 @@ describe('RecordDoseDialog (P01)', () => {
         submitMock.mockReset();
     });
 
-    async function submitUnknown(req = requirements()) {
+    async function submitUnknown(
+        req = requirements(),
+        dialogProps: Parameters<typeof open>[2] = {},
+    ) {
         submitMock.mockResolvedValueOnce({
             status: 'rejected',
             data: { unexpected: 'response' },
         });
-        const view = open(req);
+        const view = open(req, undefined, dialogProps);
         await screen.findByText('Losartan 50mg');
         fireEvent.click(screen.getByRole('button', { name: /continue/i }));
         fireEvent.click(await screen.findByRole('button', { name: /^Given/ }));
@@ -275,6 +283,116 @@ describe('RecordDoseDialog (P01)', () => {
         await screen.findByText('Recorded');
         expect(submitMock.mock.calls[1][1]).toEqual(original);
         expect(findDoseRecovery(41, req.due!.due_at)).toBeNull();
+    });
+
+    it('checks a saved result directly from the open uncertain form without submitting another dose', async () => {
+        const req = requirements();
+        render(<button>Record medication</button>);
+        const opener = screen.getByRole('button', {
+            name: 'Record medication',
+        });
+        opener.focus();
+        const view = await submitUnknown(req, {
+            onClose: () => view.unmount(),
+            returnFocus: () => opener,
+        });
+        const original = findDoseRecovery<PendingDose>(41, req.due!.due_at)!;
+        const historyLink = screen.getByRole('link', {
+            name: 'Open medication history',
+        });
+        const history = new URL(
+            historyLink.getAttribute('href')!,
+            'https://medication.invalid',
+        );
+        expect(history.searchParams.get('tab')).toBe('history');
+        expect(history.searchParams.get('client_id')).toBe('201');
+        getMock.mockResolvedValueOnce({
+            data: {
+                status: 'recorded',
+                administration_id: 90,
+                chart_url: '/emar/mar?client_id=201&tab=history&dose_id=90',
+            },
+        });
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Check saved result' }),
+        );
+        expect(
+            await screen.findByRole('link', { name: 'Open the recorded dose' }),
+        ).toHaveAttribute(
+            'href',
+            '/emar/mar?client_id=201&tab=history&dose_id=90',
+        );
+        expect(getMock).toHaveBeenLastCalledWith(
+            '/meds/today/recording-status',
+            expect.objectContaining({
+                params: {
+                    client_medication_id: 41,
+                    client_request_uuid: original.draft.uuid,
+                },
+            }),
+        );
+        expect(submitMock).toHaveBeenCalledOnce();
+        expect(findDoseRecovery(41, req.due!.due_at)).toBeNull();
+        await waitFor(() =>
+            expect(
+                screen.getByRole('dialog', {
+                    name: 'Check an unconfirmed dose',
+                }),
+            ).toContainElement(document.activeElement as HTMLElement),
+        );
+        fireEvent.click(
+            screen.getAllByRole('button', { name: 'Close' }).at(-1)!,
+        );
+        await waitFor(() => expect(opener).toHaveFocus());
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('keeps focus in the original form when reviewing an unconfirmed saved-result check', async () => {
+        const req = requirements();
+        await submitUnknown(req);
+        const original = findDoseRecovery<PendingDose>(41, req.due!.due_at)!;
+        getMock.mockResolvedValueOnce({ data: { status: 'unconfirmed' } });
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Check saved result' }),
+        );
+        fireEvent.click(
+            await screen.findByRole('button', {
+                name: 'Review original attempt',
+            }),
+        );
+        await screen.findByText('Original observed outcome.');
+        await waitFor(() =>
+            expect(screen.getByRole('dialog')).toContainElement(
+                document.activeElement as HTMLElement,
+            ),
+        );
+        expect(
+            findDoseRecovery<PendingDose>(41, req.due!.due_at)?.draft.uuid,
+        ).toBe(original.draft.uuid);
+        expect(submitMock).toHaveBeenCalledOnce();
+    });
+
+    it('retains the original UUID when the open-form result check is unavailable', async () => {
+        const req = requirements();
+        await submitUnknown(req);
+        const original = findDoseRecovery<PendingDose>(41, req.due!.due_at)!;
+        getMock.mockRejectedValueOnce({ response: { status: 404 } });
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Check saved result' }),
+        );
+        await screen.findByText(
+            'The result could not be checked with your current access or connection.',
+        );
+        expect(
+            findDoseRecovery<PendingDose>(41, req.due!.due_at)?.draft.uuid,
+        ).toBe(original.draft.uuid);
+        expect(submitMock).toHaveBeenCalledOnce();
+        expect(
+            screen.queryByRole('button', { name: 'Review original attempt' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Check again' }),
+        ).toBeInTheDocument();
     });
 
     it('keeps an uncertain request frozen after a later access denial', async () => {

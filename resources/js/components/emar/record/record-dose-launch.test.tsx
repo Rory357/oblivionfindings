@@ -100,6 +100,8 @@ function open() {
 describe('MAR as-needed recording entry', () => {
     it('keeps unrelated as-needed choices available beside an unconfirmed attempt', () => {
         keepDoseRecovery(doseRecoveryKey(16, 41, '2026-10-08T08:00:00+13:00'), {
+            display: { order: { name: 'Original antihistamine' } },
+            form: { when: '2026-10-08T08:05', outcome: 'given' },
             target: {
                 kind: 'scheduled',
                 orderId: 41,
@@ -107,6 +109,15 @@ describe('MAR as-needed recording entry', () => {
             },
         });
         open();
+        expect(
+            screen.getByText('Unconfirmed attempt · Original antihistamine'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('8 Oct 2026 · 8:05 am · NZ time · given'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(/even if the medicine order has changed/),
+        ).toBeInTheDocument();
         expect(
             screen.getByRole('button', { name: 'Check original attempt' }),
         ).toBeInTheDocument();
