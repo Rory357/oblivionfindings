@@ -42,6 +42,7 @@ import type {
     DoseTarget,
     RecordMode,
 } from '@/components/emar/record-dose/types';
+import { RoundSheetExportDialog } from '@/components/emar/round-sheet-export-dialog';
 import {
     EntityContextMenu,
     type MenuItem,
@@ -207,6 +208,7 @@ export default function MedsToday(props: MedsTodayProps) {
     const range = query().get('range') === 'today' ? 'today' : '24h';
     const outcome = query().get('outcome') ?? 'all';
     const [overlay, setOverlay] = useState<Overlay>(null);
+    const [exportRoundId, setExportRoundId] = useState<number | null>(null);
     const [ctx, setCtx] = useState<{
         x: number;
         y: number;
@@ -1005,10 +1007,8 @@ export default function MedsToday(props: MedsTodayProps) {
                                     signer={board_user}
                                     canExport={board_can.export_round === true}
                                     onPrint={() =>
-                                        window.open(
-                                            `/emar/pdf/round-sheet?date=${encodeURIComponent(props.date)}&round_id=${props.guidedRound!.round.id}`,
-                                            '_blank',
-                                            'noopener',
+                                        setExportRoundId(
+                                            props.guidedRound!.round.id,
                                         )
                                     }
                                     onClose={() => {
@@ -1252,6 +1252,13 @@ export default function MedsToday(props: MedsTodayProps) {
                     onClose={() => setCtx(null)}
                 />
             ) : null}
+            {exportRoundId && (
+                <RoundSheetExportDialog
+                    key={exportRoundId}
+                    roundId={exportRoundId}
+                    onClose={() => setExportRoundId(null)}
+                />
+            )}
         </AppLayout>
     );
 }

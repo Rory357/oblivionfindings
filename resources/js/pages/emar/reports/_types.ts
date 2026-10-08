@@ -9,7 +9,9 @@ export type Props = {
     exports: ExportOption[]; purposes: Record<string, string>; as_at: string;
     downtime_pack: { allowed: boolean; today: string; tomorrow: string; purpose: string } | null;
 };
-export type ExportContext = Pick<Props, 'filters' | 'sites' | 'people' | 'finance' | 'purposes' | 'exports'>;
+export type ExportContext = Pick<Props, 'filters' | 'sites' | 'people' | 'finance' | 'purposes' | 'exports'> & {
+    selected_round?: { id: number; name: string; site_id: number; date: string } | null;
+};
 
 export async function requestJson(url: string, payload?: Record<string, unknown>) {
     const response = await reportRequest(url, payload);

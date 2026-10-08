@@ -190,6 +190,8 @@ jobs:
           tests/Feature/Medication/ControlledDrugStockTruthTest.php
           tests/Unit/MedicationPaperRecoveryMigrationTest.php
           tests/Feature/Emar/DoseTimingSettingsTest.php
+          tests/Feature/Emar/UnifiedMedicationReportsTest.php
+          tests/Feature/Emar/PrescriptionsPageTest.php
           tests/Feature/It/ItTicketTriageTest.php
           tests/Feature/Incidents/IncidentJourneyPresenterTest.php
           tests/Feature/FrontlineLifecycleDemoSeederReplayTest.php

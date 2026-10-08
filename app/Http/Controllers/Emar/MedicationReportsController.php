@@ -129,16 +129,39 @@ class MedicationReportsController extends Controller
     /** Small context endpoint for the shared record-page export prompt (P02). */
     public function exportOptions(Request $request)
     {
-        $data = $request->validate(['type' => ['required', Rule::in(['mar', 'cd_register', 'round_sheet', 'doses', 'errors', 'stock', 'audit', 'syringe_drivers'])], 'site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1']]);
+        $data = $request->validate([
+            'type' => ['required', Rule::in(['mar', 'cd_register', 'round_sheet', 'doses', 'errors', 'stock', 'audit', 'syringe_drivers'])],
+            'site_id' => ['nullable', 'integer', 'min:1'],
+            'client_id' => ['nullable', 'integer', 'min:1'],
+            'round_id' => ['nullable', 'integer', 'min:1', Rule::prohibitedIf($request->input('type') !== 'round_sheet')],
+        ]);
         $actor = $request->user();
         $type = $data['type'];
         abort_unless($this->access->canExport($actor, $type), 403);
-        $period = MedicationReportPeriod::fromRequest($request);
         $sites = $this->access->siteIds($actor, $request->integer('site_id') ?: null, $request->integer('client_id') ?: null, $type === 'stock' ? 'stock' : ($type === 'cd_register' ? 'controlled' : 'doses'));
+        $selectedRound = null;
+        if ($request->integer('round_id')) {
+            $round = MedicationRound::query()->whereIn('site_id', $sites)->findOrFail($request->integer('round_id'));
+            $day = $round->round_date->toDateString();
+            $request->validate([
+                'date_from' => ['nullable', 'date_format:Y-m-d'],
+                'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+            ]);
+            abort_if(($request->filled('date_from') && $request->input('date_from') !== $day)
+                || ($request->filled('date_to') && $request->input('date_to') !== $day), 404);
+            if ($request->filled('period') && $request->input('period') !== 'custom') {
+                $requestedPeriod = MedicationReportPeriod::fromRequest($request);
+                abort_unless($requestedPeriod->from === $day && $requestedPeriod->to === $day, 404);
+            }
+            $request->merge(['site_id' => $round->site_id, 'period' => 'custom', 'date_from' => $day, 'date_to' => $day]);
+            $sites = [(int) $round->site_id];
+            $selectedRound = ['id' => (int) $round->id, 'name' => $round->name, 'site_id' => (int) $round->site_id, 'date' => $day];
+        }
+        $period = MedicationReportPeriod::fromRequest($request);
         $people = Client::query()->whereIn('id', $this->access->clientIds($actor, $sites))->when($request->integer('client_id'), fn ($q) => $q->whereKey($request->integer('client_id')))->orderBy('first_name')->limit(100)->get()->map(fn ($p) => ['id' => $p->id, 'name' => trim($p->first_name.' '.$p->last_name)]);
         $spec = ['mar' => ['MAR chart', 'PDF', 'One person, up to 31 NZ days. Ceased and superseded medicines stay in the period.'], 'cd_register' => ['Controlled drug register', 'PDF', 'One person and one medicine, up to 31 NZ days.'], 'round_sheet' => ['Round sheet', 'PDF', 'One house and one NZ day.'], 'doses' => ['Doses', 'CSV', 'Scheduled dose slots, including Away.'], 'errors' => ['Medication errors', 'CSV', 'Factual accounts, with in-error records excluded unless requested.'], 'stock' => ['Stock', 'CSV', 'Stock as at now.'], 'syringe_drivers' => ['Syringe drivers', 'CSV', 'Recorded driver use and canonical medicine contents; free-text notes are excluded.'], 'audit' => ['Audit trail', 'CSV', 'Filtered events over the selected period.']][$type];
 
-        return response()->json(['filters' => ['view' => 'exports', 'report' => 'doses', 'sub' => 'events', 'period' => 'custom', 'date_from' => $period->from, 'date_to' => $period->to, 'site_id' => count($sites) === 1 ? $sites[0] : null, 'client_id' => $request->integer('client_id') ?: null, 'kind' => '', 'q' => ''], 'sites' => app(MedicationGovernanceScopeService::class)->sitePicker($sites)->map->only(['id', 'name'])->values(), 'people' => $people, 'finance' => $this->access->financeOnly($actor), 'exports' => [['type' => $type, 'label' => $spec[0], 'format' => $spec[1], 'description' => $spec[2], 'allowed' => true]], 'purposes' => MedicationExportAudit::PURPOSES], 200, ['Cache-Control' => 'no-store']);
+        return response()->json(['filters' => ['view' => 'exports', 'report' => 'doses', 'sub' => 'events', 'period' => 'custom', 'date_from' => $period->from, 'date_to' => $period->to, 'site_id' => count($sites) === 1 ? $sites[0] : null, 'client_id' => $request->integer('client_id') ?: null, 'round_id' => $selectedRound['id'] ?? null, 'kind' => '', 'q' => ''], 'selected_round' => $selectedRound, 'sites' => app(MedicationGovernanceScopeService::class)->sitePicker($sites)->map->only(['id', 'name'])->values(), 'people' => $people, 'finance' => $this->access->financeOnly($actor), 'exports' => [['type' => $type, 'label' => $spec[0], 'format' => $spec[1], 'description' => $spec[2], 'allowed' => true]], 'purposes' => MedicationExportAudit::PURPOSES], 200, ['Cache-Control' => 'no-store']);
     }
 
     public function verify(Request $request)

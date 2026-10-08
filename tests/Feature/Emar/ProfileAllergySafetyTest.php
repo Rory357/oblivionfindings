@@ -365,14 +365,26 @@ class ProfileAllergySafetyTest extends TestCase
             'client_medication_id' => $order->id, 'client_request_uuid' => $uuid,
         ]);
         $order->forceFill(['controlled_drug' => true])->save();
-        $this->getJson($url)->assertNotFound();
+        // The frontline role can read controlled medicines; deny that grant explicitly.
+        $this->assertTrue($this->worker->canDo('medications.controlled.view'));
+        $this->getJson($url)->assertOk()->assertJsonPath('status', 'recorded');
+        $this->worker->permissionOverrides()->syncWithoutDetaching(Permission::where('key', 'medications.controlled.view')->pluck('id')
+            ->mapWithKeys(fn ($id) => [$id => ['allowed' => false]])->all());
+        $this->worker = $this->worker->fresh();
+        $this->assertFalse($this->worker->canDo('medications.controlled.view'));
+        $this->assertTrue($this->worker->canDo('medications.controlled.record'));
+        $this->actingAs($this->worker)->getJson($url)->assertNotFound();
         $order->forceFill(['controlled_drug' => false])->save();
+        $this->getJson($url)->assertOk()->assertJsonPath('status', 'recorded');
         $this->client->forceFill(['site_id' => Site::factory()->create(['is_active' => true])->id])->save();
         $this->getJson($url)->assertNotFound();
         $this->client->forceFill(['site_id' => $this->site->id])->save();
+        $this->getJson($url)->assertOk()->assertJsonPath('status', 'recorded');
         $this->worker->permissionOverrides()->syncWithoutDetaching(Permission::where('key', 'medications.view')->pluck('id')
             ->mapWithKeys(fn ($id) => [$id => ['allowed' => false]])->all());
-        $this->actingAs($this->worker->fresh())->getJson($url)->assertNotFound();
+        $this->worker = $this->worker->fresh();
+        $this->assertFalse($this->worker->canDo('medications.view'));
+        $this->actingAs($this->worker)->getJson($url)->assertNotFound();
         $this->assertDatabaseCount('client_medication_administrations', 1);
     }
 

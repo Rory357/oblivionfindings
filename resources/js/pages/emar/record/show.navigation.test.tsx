@@ -136,7 +136,8 @@ describe('person medication record context', () => {
         );
         expect(back.searchParams.get('date')).toBe('2026-10-04');
         expect(back.searchParams.get('site_id')).toBe('3');
-        expect(back.searchParams.has('client_id')).toBe(false);
+        expect(back.pathname).toBe('/meds/today');
+        expect(back.searchParams.get('client_id')).toBe('10');
     });
 
     it('opens allergies inside the medication record without wider profile access', () => {

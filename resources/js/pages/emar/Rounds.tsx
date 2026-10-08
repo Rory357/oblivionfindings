@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-syntax -- the templates/activity surfaces and the
    filter/segmented chips are custom-layout bordered panels (not Card components);
    all colours are semantic tokens. */
+import { RoundSheetExportDialog } from '@/components/emar/round-sheet-export-dialog';
 import RoundActivity from '@/components/emar/rounds/round-activity';
 import RoundActivityDialog from '@/components/emar/rounds/round-activity-dialog';
 import RoundAuditDialog from '@/components/emar/rounds/round-audit-dialog';
@@ -135,6 +136,7 @@ export default function Rounds(props: Props) {
     const [expanded, setExpanded] = useState<Record<number, boolean>>({});
     const [generateOpen, setGenerateOpen] = useState(false);
     const [auditRoundId, setAuditRoundId] = useState<number | null>(null);
+    const [exportRoundId, setExportRoundId] = useState<number | null>(null);
     const [activityView, setActivityView] = useState<ActivityItem | null>(null);
     const [contextMenu, setContextMenu] = useState<ShiftCtxState | null>(null);
 
@@ -162,12 +164,7 @@ export default function Rounds(props: Props) {
 
     const toggleExpand = (id: number) =>
         setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
-    const printRoundSheet = (roundId?: number) =>
-        window.open(
-            `/emar/pdf/round-sheet?date=${encodeURIComponent(date)}${roundId ? '&round_id=' + roundId : ''}${siteFilter ? '&site_id=' + siteFilter : ''}`,
-            '_blank',
-            'noopener',
-        );
+    const printRoundSheet = (roundId: number) => setExportRoundId(roundId);
     const markComplete = (id: number) => {
         router.post(
             `/emar/rounds/${id}/complete`,
@@ -762,6 +759,13 @@ export default function Rounds(props: Props) {
                               },
                     )}
                     onClose={() => setContextMenu(null)}
+                />
+            )}
+            {exportRoundId && (
+                <RoundSheetExportDialog
+                    key={exportRoundId}
+                    roundId={exportRoundId}
+                    onClose={() => setExportRoundId(null)}
                 />
             )}
         </AppLayout>
