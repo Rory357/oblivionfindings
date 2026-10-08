@@ -57,9 +57,6 @@ import {
     type Signal,
     SignalRail,
     SiteFilter,
-    TemplateDetailDialog,
-    TemplateWizardDialog,
-    TemplatesPane,
     TimeOffPane,
     type TimeOffRequest,
     UnassignMakeOpenDialog,
@@ -75,6 +72,8 @@ import {
     type EligibilityObservation,
     EligibilityRefreshPanel,
 } from '@/components/rostering/eligibility-refresh-panel';
+import { TemplateLibrary } from '@/components/rostering/template-library';
+import { TEMPLATE_READ_KEYS } from '@/components/rostering/use-template-command';
 import ViewTimesheetDialog, {
     type ViewTimesheetRow,
 } from '@/components/timesheets/view-timesheet-dialog';
@@ -640,18 +639,6 @@ export default function RosteringIndex(props: Props) {
     }>({});
     const [loadingAvailability, setLoadingAvailability] = useState(false);
     const [loadingTemplates, setLoadingTemplates] = useState(false);
-    // Template pop-ups: the wizard (create/edit) and the detail/apply dialog.
-    const [templateWizard, setTemplateWizard] = useState<{
-        mode: 'create' | 'edit';
-        template: RosterTemplateRow | null;
-    } | null>(null);
-    const [detailTemplate, setDetailTemplate] =
-        useState<RosterTemplateRow | null>(null);
-    // rosterTemplates is a lazy Inertia prop — week/filter navigations drop it.
-    // Cache the last loaded list so the tab doesn't blank on those visits.
-    const [cachedTemplates, setCachedTemplates] = useState<
-        RosterTemplateRow[] | null
-    >(props.rosterTemplates ?? null);
     // Recurring series tab — same lazy-prop caching as templates.
     const [loadingSeries, setLoadingSeries] = useState(false);
     const [detailSeriesId, setDetailSeriesId] = useState<number | null>(() => {
@@ -667,9 +654,6 @@ export default function RosteringIndex(props: Props) {
         useState<SeriesDetail | null>(props.seriesDetail ?? null);
     const todayBtnRef = useRef<HTMLButtonElement>(null);
 
-    useEffect(() => {
-        if (props.rosterTemplates) setCachedTemplates(props.rosterTemplates);
-    }, [props.rosterTemplates]);
     useEffect(() => {
         if (props.rosterSeries) setCachedSeries(props.rosterSeries);
     }, [props.rosterSeries]);
@@ -783,7 +767,7 @@ export default function RosteringIndex(props: Props) {
                 rosteringIndex.url(),
                 { ...filterPayload(), tab: 'templates' },
                 {
-                    only: ['rosterTemplates'],
+                    only: TEMPLATE_READ_KEYS,
                     preserveState: true,
                     preserveScroll: true,
                     replace: true,
@@ -2168,7 +2152,7 @@ export default function RosteringIndex(props: Props) {
             label: 'Templates',
             icon: LayoutTemplate,
             tone: 'violet' as const,
-            badge: cachedTemplates?.length,
+            badge: props.rosterTemplates?.length,
         },
         {
             id: 'recurring',
@@ -2831,38 +2815,7 @@ export default function RosteringIndex(props: Props) {
                             />
                         ) : null}
                         {tab === 'templates' ? (
-                            <TemplatesPane
-                                templates={cachedTemplates}
-                                loading={loadingTemplates && !cachedTemplates}
-                                canManage={Boolean(props.canManageTemplates)}
-                                canDelete={Boolean(props.canDeleteTemplates)}
-                                onCreate={() =>
-                                    setTemplateWizard({
-                                        mode: 'create',
-                                        template: null,
-                                    })
-                                }
-                                onView={(t) => setDetailTemplate(t)}
-                                onEdit={(t) =>
-                                    setTemplateWizard({
-                                        mode: 'edit',
-                                        template: t,
-                                    })
-                                }
-                                onDelete={(t) =>
-                                    router.delete(
-                                        `/operations/rostering/templates/${t.id}`,
-                                        { preserveScroll: true },
-                                    )
-                                }
-                                onDuplicate={(t) =>
-                                    router.post(
-                                        `/operations/rostering/templates/${t.id}/duplicate`,
-                                        {},
-                                        { preserveScroll: true },
-                                    )
-                                }
-                            />
+                            <TemplateLibrary loading={loadingTemplates} />
                         ) : null}
                         {tab === 'recurring' ? (
                             <SeriesPane
@@ -3183,33 +3136,6 @@ export default function RosteringIndex(props: Props) {
                         </Link>
                     </div>
                 ) : null}
-
-                <TemplateWizardDialog
-                    open={templateWizard !== null}
-                    onOpenChange={(open) => !open && setTemplateWizard(null)}
-                    template={templateWizard?.template}
-                    clients={props.clients ?? []}
-                    staff={props.staff ?? []}
-                    serviceContexts={props.serviceContexts ?? []}
-                />
-
-                <TemplateDetailDialog
-                    template={detailTemplate}
-                    open={detailTemplate !== null}
-                    onOpenChange={(open) => !open && setDetailTemplate(null)}
-                    canManage={Boolean(props.canManageTemplates)}
-                    canDelete={Boolean(props.canDeleteTemplates)}
-                    onEdit={(t) => {
-                        setDetailTemplate(null);
-                        setTemplateWizard({ mode: 'edit', template: t });
-                    }}
-                    onDelete={(t) =>
-                        router.delete(
-                            `/operations/rostering/templates/${t.id}`,
-                            { preserveScroll: true },
-                        )
-                    }
-                />
 
                 <SeriesDetailDialog
                     seriesId={detailSeriesId}

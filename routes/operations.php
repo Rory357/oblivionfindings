@@ -982,7 +982,7 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // create, edit, view and apply all happen in pop-ups on /operations/rostering;
     // only the mutation endpoints live here. The old index URL 302s to the tab so
     // existing bookmarks keep working.
-    Route::get('/rostering/templates', fn () => redirect()->route('operations.rostering.index', ['tab' => 'templates']))
+    Route::get('/rostering/templates', [RosterTemplateController::class, 'index'])
         ->middleware('permission:roster_templates.viewAny|rostering.viewAny')
         ->name('operations.rostering.templates.index');
 
