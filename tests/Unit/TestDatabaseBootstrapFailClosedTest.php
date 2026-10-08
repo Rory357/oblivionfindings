@@ -51,6 +51,9 @@ final class PendingMigrationKernelFake implements Kernel
 
 final class PendingMigrationBootstrapHarness extends TestCase
 {
+    // Fake kernel calls must never prepare or reset the real database bootstrap.
+    protected static bool $pendingMigrationsApplied = false;
+
     public function applyPendingMigrations(Application $app): void
     {
         $this->runPendingMigrationsAfterSchemaLoad($app);
@@ -117,3 +120,30 @@ it('marks successful pending migrations once and reuses that prepared state', fu
     expect($harness->pendingMigrationsWereApplied())->toBeTrue()
         ->and($kernel->calls)->toBe(1);
 });
+
+it('keeps fake pending migration state separate from the real bootstrap', function (bool $realMigrationsApplied): void {
+    $realState = new ReflectionProperty(TestCase::class, 'pendingMigrationsApplied');
+    $originalState = $realState->getValue();
+
+    try {
+        $realState->setValue(null, $realMigrationsApplied);
+        $harness = pendingMigrationBootstrapHarness();
+        expect($realState->getValue())->toBe($realMigrationsApplied);
+        $kernel = new PendingMigrationKernelFake(0);
+        $app = applicationWithPendingMigrationKernel($kernel);
+        $harness->applyPendingMigrations($app);
+        $harness->applyPendingMigrations($app);
+
+        expect($harness->pendingMigrationsWereApplied())->toBeTrue()
+            ->and($kernel->calls)->toBe(1)
+            ->and($realState->getValue())->toBe($realMigrationsApplied);
+        $harness->resetPendingMigrationState();
+        expect($harness->pendingMigrationsWereApplied())->toBeFalse()
+            ->and($realState->getValue())->toBe($realMigrationsApplied);
+    } finally {
+        $realState->setValue(null, $originalState);
+    }
+})->with([
+    'real schema still needs pending migrations' => [false],
+    'real schema already applied pending migrations' => [true],
+]);
