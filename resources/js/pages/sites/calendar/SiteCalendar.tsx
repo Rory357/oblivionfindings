@@ -512,12 +512,10 @@ export default function SiteCalendar({
     overdueCount: overdueCountProp,
     dataAdapter,
 }: SiteCalendarProps) {
+    const page = usePage<SharedData>();
     const effectiveSources = dataAdapter?.sourceFilters ?? sources;
     const [returnState] = useState(
-        () =>
-            new URLSearchParams(
-                typeof window === 'undefined' ? '' : window.location.search,
-            ),
+        () => new URL(page.url, 'https://calendar.invalid').searchParams,
     );
     const [view, setView] = useState<CalView>(() => {
         const value = returnState.get('calendar_view');
@@ -605,7 +603,6 @@ export default function SiteCalendar({
     } | null>(null);
     const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const page = usePage<SharedData>();
     const currentUserId = page.props.auth?.user?.id ?? null;
     // Admins who manage integrations get a deep-link to the resource-calendar sync
     // settings (Settings → Calendar sync). Staff never see connection management here.
@@ -1900,7 +1897,7 @@ export default function SiteCalendar({
         <>
             <EventDetailDialog
                 sourceUrl={(() => {
-                    const url = new URL(page.url, window.location.origin);
+                    const url = new URL(page.url, 'https://calendar.invalid');
                     url.searchParams.set('calendar_view', view);
                     url.searchParams.set(
                         'calendar_date',
