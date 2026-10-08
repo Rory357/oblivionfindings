@@ -61,11 +61,58 @@ class ClientMedicalControllerTest extends TestCase
         $this->createEmployeeProfile($this->viewer);
     }
 
-    public function test_client_medical_page_redirects_to_canonical_emar_medications_page(): void
+    public function test_client_medical_page_redirects_to_the_profile_medical_editor(): void
     {
         $this->actingAs($this->viewer)
             ->get(route('clients.medical.show', $this->client))
-            ->assertRedirect(EmarUrl::medications($this->client));
+            ->assertRedirect(route('operations.clients.show', ['client' => $this->client->id, 'tab' => 'medical', 'medical_section' => 'profile']));
+    }
+
+    public function test_legacy_medical_actions_keep_the_intended_section_and_safe_return_location(): void
+    {
+        $source = '/operations/shifts/12?tab=medications';
+        foreach (['profile', 'conditions', 'emergency_contacts'] as $section) {
+            $this->actingAs($this->viewer)->get(route('clients.medical.show', [
+                'client' => $this->client->id, 'section' => $section, 'return_to' => $source,
+            ]))->assertRedirect(route('operations.clients.show', [
+                'client' => $this->client->id, 'tab' => 'medical', 'medical_section' => $section, 'return_to' => $source,
+            ]));
+        }
+        $this->get(route('clients.medical.show', ['client' => $this->client->id, 'section' => 'medications', 'return_to' => $source]))
+            ->assertRedirect(EmarUrl::medications($this->client, ['site_id' => $this->site->id, 'return_to' => $source]));
+        $this->get(route('clients.medical.show', ['client' => $this->client->id, 'section' => 'unknown', 'return_to' => '//example.com']))
+            ->assertRedirect(route('operations.clients.show', ['client' => $this->client->id, 'tab' => 'medical', 'medical_section' => 'profile']));
+    }
+
+    public function test_medication_operations_authority_does_not_grant_a_general_medical_profile_editor(): void
+    {
+        $actor = $this->makeRoleUser('support_worker');
+        $this->createEmployeeProfile($actor);
+        foreach (['medications.view' => true, 'medications.stock.update' => true,
+            'clients.viewAny' => false, 'clients.viewAssigned' => true] as $key => $allowed) {
+            $this->grantPermissionOverride($actor, $key, $allowed);
+        }
+        $actor = $actor->fresh();
+        $this->actingAs($actor)->get(route('clients.medical.show', ['client' => $this->client->id, 'section' => 'conditions']))
+            ->assertForbidden();
+        $this->get(route('clients.medical.show', ['client' => $this->client->id, 'section' => 'medications']))
+            ->assertRedirect(EmarUrl::medications($this->client, ['site_id' => $this->site->id]));
+    }
+
+    public function test_general_medical_sections_require_the_medical_section_read_grant(): void
+    {
+        $actor = $this->makeRoleUser('support_worker');
+        $this->createEmployeeProfile($actor);
+        $this->grantPermissionOverride($actor, 'clients.viewAssigned', true);
+        $this->grantPermissionOverride($actor, 'medications.view', false);
+        $this->client->supportWorkers()->attach($actor->id);
+        $this->actingAs($actor->fresh());
+        $this->assertTrue($actor->fresh()->can('view', $this->client));
+        foreach (['profile', 'conditions', 'emergency_contacts'] as $section) {
+            $this->get(route('clients.medical.show', ['client' => $this->client->id, 'section' => $section]))
+                ->assertForbidden();
+        }
+        $this->get(route('clients.medical.show', ['client' => $this->client->id, 'section' => 'medications']))->assertForbidden();
     }
 
     public function test_client_medical_stock_endpoint_rejects_controlled_medication_without_effects(): void

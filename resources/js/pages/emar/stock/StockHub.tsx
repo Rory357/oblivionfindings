@@ -1,4 +1,5 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { MedicationJourneyReturn } from '@/components/emar/medication-journey-return';
 import {
     FilePreviewDialog,
     type PreviewFile,
@@ -25,6 +26,7 @@ import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { ReviewCard, ReviewRow, WizardShell } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTime } from '@/lib/datetime';
+import { medicationReturnParams } from '@/lib/medication-navigation';
 import { Head, router } from '@inertiajs/react';
 import {
     ArrowLeftRight,
@@ -125,6 +127,8 @@ type Props = {
         site_id: number | null;
         client_id?: number | null;
         show?: string;
+        lot_id?: number | null;
+        medication_id?: number | null;
     };
     metrics: {
         tracked: number;
@@ -172,6 +176,10 @@ export default function StockHub({
     const [search, setSearch] = useState(filters.search);
     const [modal, setModal] = useState<Modal>(null);
     useEffect(() => {
+        if (filters.medication_id)
+            setModal({ kind: 'item', id: filters.medication_id });
+    }, [filters.medication_id]);
+    useEffect(() => {
         if (focused_count) setModal({ kind: 'count', record: focused_count });
     }, [focused_count]);
     const refresh = () =>
@@ -190,7 +198,12 @@ export default function StockHub({
         router.get(
             '/emar/stock/packs',
             Object.fromEntries(
-                Object.entries({ ...filters, search, ...changes }).filter(
+                Object.entries({
+                    ...filters,
+                    ...medicationReturnParams(),
+                    search,
+                    ...changes,
+                }).filter(
                     ([, value]) =>
                         value !== null && value !== undefined && value !== '',
                 ),
@@ -277,7 +290,10 @@ export default function StockHub({
                   {
                       label: 'Open the controlled register',
                       icon: ShieldCheck,
-                      onClick: () => router.visit('/emar/controlled'),
+                      onClick: () =>
+                          router.visit(
+                              `/emar/controlled?client_id=${item.client_id}&client_medication_id=${item.id}${item.site_id ? '&site_id=' + item.site_id : ''}`,
+                          ),
                   },
               ]
             : []),
@@ -362,6 +378,7 @@ export default function StockHub({
                     subline="Person-owned medicines, deliveries and counts"
                     actions={
                         <>
+                            <MedicationJourneyReturn />
                             <ConnectedServicesMenu
                                 clientId={filters.client_id ?? undefined}
                             />
@@ -761,6 +778,11 @@ export default function StockHub({
             {modal?.kind === 'item' && (
                 <ItemWorkspace
                     id={modal.id}
+                    initialLotId={
+                        filters.medication_id === modal.id
+                            ? filters.lot_id
+                            : null
+                    }
                     initialAction={modal.action}
                     order={modal.order}
                     pharmacies={pharmacies}
@@ -800,6 +822,7 @@ export default function StockHub({
 
 function ItemWorkspace({
     id,
+    initialLotId,
     initialAction,
     order,
     pharmacies,
@@ -809,6 +832,7 @@ function ItemWorkspace({
     onSaved,
 }: {
     id: number;
+    initialLotId?: number | null;
     initialAction?:
         | 'receive'
         | 'count'
@@ -833,7 +857,7 @@ function ItemWorkspace({
         null,
     );
     const [setupConfirm, setSetupConfirm] = useState(false);
-    const [section, setSection] = useState(0);
+    const [section, setSection] = useState(initialLotId ? 1 : 0);
     const [file, setFile] = useState<PreviewFile | null>(null);
     const command = useStockCommand();
     useEffect(() => {
@@ -1179,7 +1203,9 @@ function ItemWorkspace({
                                     <Button
                                         variant="outline"
                                         onClick={() =>
-                                            router.visit('/emar/controlled')
+                                            router.visit(
+                                                `/emar/controlled?client_id=${item.client_id}&client_medication_id=${item.id}${item.site_id ? '&site_id=' + item.site_id : ''}`,
+                                            )
                                         }
                                     >
                                         Open the controlled register
@@ -1190,64 +1216,78 @@ function ItemWorkspace({
                     )}
                     {section === 1 &&
                         (item.packs.length ? (
-                            item.packs.map((pack) => (
-                                <ReviewCard
-                                    key={pack.id}
-                                    icon={Package}
-                                    title={
-                                        pack.batch_number ??
-                                        (pack.batch_not_printed
-                                            ? 'Batch not printed on the pack'
-                                            : 'Batch unknown')
-                                    }
-                                >
-                                    <ReviewRow
-                                        label="Remaining"
-                                        value={`${pack.quantity_remaining} ${item.unit}`}
-                                    />
-                                    <ReviewRow
-                                        label="Expiry"
-                                        value={
-                                            pack.expiry_date
-                                                ? formatDateOnly(
-                                                      pack.expiry_date.slice(
-                                                          0,
-                                                          10,
-                                                      ),
-                                                  )
-                                                : pack.expiry_not_printed
-                                                  ? 'Not printed on the pack'
-                                                  : 'Unknown'
+                            [...item.packs]
+                                .sort(
+                                    (a, b) =>
+                                        Number(b.id === initialLotId) -
+                                        Number(a.id === initialLotId),
+                                )
+                                .map((pack) => (
+                                    <ReviewCard
+                                        key={pack.id}
+                                        icon={Package}
+                                        title={
+                                            pack.batch_number ??
+                                            (pack.batch_not_printed
+                                                ? 'Batch not printed on the pack'
+                                                : 'Batch unknown')
                                         }
-                                    />
-                                    <ReviewRow
-                                        label="Source"
-                                        value={
-                                            pack.source_reference ??
-                                            pack.source.replaceAll('_', ' ')
-                                        }
-                                    />
-                                    <ReviewRow
-                                        label="Recorded"
-                                        value={formatDateTime(pack.received_at)}
-                                    />
-                                    <ReviewRow
-                                        label="Pack state"
-                                        value={
-                                            pack.state === 'quarantined'
-                                                ? 'Out of use'
-                                                : 'Open'
-                                        }
-                                    />
-                                    {pack.source === 'recorded_balance' && (
-                                        <p className="text-caption">
-                                            Carried forward from the recorded
-                                            balance. Original receipt date and
-                                            label checks are unknown.
-                                        </p>
-                                    )}
-                                </ReviewCard>
-                            ))
+                                    >
+                                        {pack.id === initialLotId && (
+                                            <StatusBadge variant="info">
+                                                Selected pack from calendar
+                                            </StatusBadge>
+                                        )}
+                                        <ReviewRow
+                                            label="Remaining"
+                                            value={`${pack.quantity_remaining} ${item.unit}`}
+                                        />
+                                        <ReviewRow
+                                            label="Expiry"
+                                            value={
+                                                pack.expiry_date
+                                                    ? formatDateOnly(
+                                                          pack.expiry_date.slice(
+                                                              0,
+                                                              10,
+                                                          ),
+                                                      )
+                                                    : pack.expiry_not_printed
+                                                      ? 'Not printed on the pack'
+                                                      : 'Unknown'
+                                            }
+                                        />
+                                        <ReviewRow
+                                            label="Source"
+                                            value={
+                                                pack.source_reference ??
+                                                pack.source.replaceAll('_', ' ')
+                                            }
+                                        />
+                                        <ReviewRow
+                                            label="Recorded"
+                                            value={formatDateTime(
+                                                pack.received_at,
+                                            )}
+                                        />
+                                        <ReviewRow
+                                            label="Pack state"
+                                            value={
+                                                pack.state === 'quarantined'
+                                                    ? 'Out of use'
+                                                    : 'Open'
+                                            }
+                                        />
+                                        {pack.source === 'recorded_balance' && (
+                                            <p className="text-caption">
+                                                Carried forward from the
+                                                recorded balance. Original
+                                                receipt date and label checks
+                                                are unknown.
+                                            </p>
+                                        )}
+                                    </ReviewCard>
+                                ))
                         ) : (
                             <EmptyState
                                 icon={Package}

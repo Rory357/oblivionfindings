@@ -9,6 +9,7 @@ use App\Domain\Clinical\Services\ClinicalSiteAccessService;
 use App\Models\Client;
 use App\Models\ClientMedicalProfile;
 use App\Models\User;
+use App\Services\Medication\ClientAllergyRecordService;
 
 /**
  * Aggregates clinical data for a client into a health summary.
@@ -26,15 +27,19 @@ class HealthSummaryService
     {
         $this->siteAccess->assertCanAccessClient($user, $client);
         $profile = ClientMedicalProfile::where('client_id', $client->id)->first();
+        $allergyRecords = app(ClientAllergyRecordService::class);
+        $allergies = $allergyRecords->summary($client);
 
         return [
             'medical_profile' => $profile ? [
                 'gp_name' => $profile->gp_name,
                 'gp_practice' => $profile->gp_practice,
-                'allergies' => $profile->allergies,
+                'allergies' => array_column($allergies['entries'], 'allergen'),
                 'disabilities' => $profile->disabilities,
                 'blood_type' => $profile->blood_type,
             ] : null,
+            'allergy_record' => $allergies,
+            'allergy_management_url' => $allergyRecords->managementUrl($client, $user),
             'recent_observations' => $this->recentObservations($user, $client),
             'active_protocols' => $this->activeProtocols($user, $client),
             'recent_events' => $this->recentEvents($user, $client),

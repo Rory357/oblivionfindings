@@ -14,6 +14,7 @@ import {
 import { EntryList } from '@/components/emar/controlled/record-views';
 import { useControlledDialogs } from '@/components/emar/controlled/workspace-dialogs';
 import { EmarHubRail } from '@/components/emar/emar-hub-rail';
+import { MedicationJourneyReturn } from '@/components/emar/medication-journey-return';
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { compactMenu, type MenuItem } from '@/components/lists/entity-menu';
 import { ListCaption } from '@/components/lists/list-caption';
@@ -50,7 +51,7 @@ import {
     ShieldCheck,
     Undo2,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type View = 'register' | 'discrepancies' | 'losses' | 'destructions';
 const VIEWS = [
@@ -86,6 +87,19 @@ export default function ControlledRegister({
     const [filters, setFilters] = useState(() => initialFilters(pageUrl));
     useEffect(() => setFilters(initialFilters(pageUrl)), [pageUrl]);
     const payload = workspace.payload;
+    const openedSelection = useRef<string | null>(null);
+    useEffect(() => {
+        const selection = `${payload?.selected_entry_id ?? ''}:${payload?.selected_destruction_id ?? ''}`;
+        if (selection === openedSelection.current) return;
+        openedSelection.current = selection;
+        if (payload?.selected_entry_id)
+            dialogs.detail({ kind: 'entry', id: payload.selected_entry_id });
+        else if (payload?.selected_destruction_id)
+            dialogs.detail({
+                kind: 'destruction',
+                id: payload.selected_destruction_id,
+            });
+    }, [payload?.selected_entry_id, payload?.selected_destruction_id, dialogs]);
     const change = (patch: Partial<typeof filters>) => {
         const next = { ...filters, ...patch };
         const siteChanged =
@@ -220,6 +234,7 @@ export default function ControlledRegister({
             subline="Current stock, counts and follow-up · register history by NZ date"
             actions={
                 <>
+                    <MedicationJourneyReturn />
                     <PageHeaderSearch
                         value={filters.search}
                         onChange={(search) => change({ search })}

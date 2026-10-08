@@ -839,6 +839,23 @@ class MedicationReviewWorkflowTest extends TestCase
         $this->assertSame($before, $this->persistedEvidence($item));
     }
 
+    public function test_exact_recommendation_selection_requires_same_review_person_and_controlled_authority(): void
+    {
+        ['site' => $site, 'client' => $client] = $this->context();
+        $reader = $this->userAt($site, ['medications.view'], personScoped: true);
+        $client->supportWorkers()->attach($reader->id);
+        $review = MedicationReview::create(['client_id' => $client->id, 'review_type' => 'triggered', 'status' => 'completed', 'scheduled_date' => '2026-10-01']);
+        $otherReview = MedicationReview::create(['client_id' => $client->id, 'review_type' => 'triggered', 'status' => 'completed', 'scheduled_date' => '2026-10-01']);
+        $item = MedicationReviewItem::create(['review_id' => $review->id, 'client_id' => $client->id, 'name_snapshot' => 'Synthetic medicine',
+            'controlled_snapshot' => false, 'classification_pending' => false, 'outcome' => 'change', 'recommendation' => 'Synthetic recommendation']);
+        $this->actingAs($reader)->get('/emar/reviews?'.http_build_query(['review' => $review->id, 'item' => $item->id, 'view' => 'due', 'return_to' => '/emar/record?client_id='.$client->id]))
+            ->assertOk()->assertInertia(fn ($page) => $page->where('selected.id', $review->id)->where('selected_item_id', $item->id)->where('filters.return_to', '/emar/record?client_id='.$client->id));
+        $this->get('/emar/reviews?'.http_build_query(['review' => $otherReview->id, 'item' => $item->id]))->assertNotFound();
+        $this->get('/emar/reviews?item='.$item->id)->assertNotFound();
+        $item->update(['controlled_snapshot' => true]);
+        $this->get('/emar/reviews?'.http_build_query(['review' => $review->id, 'item' => $item->id, 'return_to' => '/emar/record?client_id='.$client->id]))->assertNotFound();
+    }
+
     public function test_reader_pagination_meters_and_direct_selection_follow_the_same_person_boundary(): void
     {
         ['site' => $site, 'client' => $client] = $this->context();

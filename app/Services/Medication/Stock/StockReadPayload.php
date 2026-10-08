@@ -25,6 +25,7 @@ final class StockReadPayload
 
     public function page(Request $request): array
     {
+        $request->validate(['lot_id' => ['nullable', 'integer', 'min:1']]);
         $actor = $request->user();
         $site = $request->filled('site_id') ? $request->integer('site_id') : null;
         $clientId = null;
@@ -51,6 +52,21 @@ final class StockReadPayload
             $selectedMedicine = $this->access->medication($actor, $medicineId);
             abort_if($clientId !== null && (int) $selectedMedicine->client_id !== $clientId, 404, 'The requested medication record was not found.');
             $medications->whereKey($medicineId);
+        }
+        $lotId = $request->filled('lot_id') ? $request->integer('lot_id') : null;
+        if ($lotId !== null) {
+            // An exact pack entry intersects every requested boundary before
+            // deriving its owner. A stale or contradictory link cannot widen scope.
+            $selectedLot = MedicationStockLot::query()
+                ->whereHas('stock', fn ($query) => $query->whereIn('client_medication_id', (clone $medications)->select('id')))
+                ->with('stock.medication')->findOrFail($lotId);
+            $medicineId = (int) $selectedLot->stock->client_medication_id;
+            $medications->whereKey($medicineId);
+            $clientId = (int) $selectedLot->stock->medication->client_id;
+            $selectedClient ??= $this->access->client($actor, $clientId);
+            $clientIds = [$clientId];
+            $site = (int) $selectedClient->site_id;
+            $siteIds = [$site];
         }
         $medicationIds = (clone $medications)->select('id');
         $stocks = ClientMedicationStock::whereIn('client_medication_id', $medicationIds);
@@ -99,9 +115,10 @@ final class StockReadPayload
 
         return [
             'items' => $items, 'orders' => $ordersPage, 'counts' => $countsPage, 'movements' => $movements, 'focused_count' => $focusedCount,
+            'focused_lot_id' => $lotId,
             'sites' => $this->scope->sitePicker($allSites)->map->only(['id', 'name']),
             'pharmacies' => (clone $orders)->distinct()->orderBy('pharmacy_name')->pluck('pharmacy_name')->filter()->values(),
-            'filters' => ['view' => $view, 'search' => $search, 'site_id' => $site, 'client_id' => $clientId, 'show' => $show, 'medication_id' => $medicineId],
+            'filters' => ['view' => $view, 'search' => $search, 'site_id' => $site, 'client_id' => $clientId, 'show' => $show, 'medication_id' => $medicineId, 'lot_id' => $lotId],
             'selected_client' => $selectedClient ? ['id' => (int) $selectedClient->id, 'name' => $selectedClient->full_name] : null,
             'metrics' => [
                 'tracked' => (clone $stocks)->count(), 'out' => (clone $stocks)->whereRaw('('.$quantitySql.') <= 0', [$today])->count(),
@@ -182,7 +199,8 @@ final class StockReadPayload
         $state = $onHand === null ? 'unknown' : (Qty::equals($onHand, 0) ? 'out' : ($expired ? 'expired' : ($stock?->reorder_level !== null && Qty::lessThanOrEqual($onHand, $stock->reorder_level) ? 'low' : 'ok')));
 
         return [
-            'id' => $med->id, 'name' => $med->name, 'client_name' => $med->client->full_name, 'site_name' => $med->client->site?->name,
+            'id' => $med->id, 'name' => $med->name, 'client_id' => (int) $med->client_id, 'site_id' => (int) $med->client->site_id,
+            'client_name' => $med->client->full_name, 'site_name' => $med->client->site?->name,
             'controlled' => (bool) $med->controlled_drug, 'active' => (bool) $med->active && $med->state === 'active',
             'stock_id' => $stock?->id, 'physical_on_hand' => $stock?->on_hand, 'usable_on_hand' => $stock ? app(StockAvailability::class)->usableQuantity($stock) : null, 'on_hand' => $onHand === null ? null : Qty::toFloat($onHand), 'unit' => $stock?->unit,
             'reorder_level' => $stock?->reorder_level, 'last_counted_at' => $stock?->last_counted_at, 'lots_started' => $started,

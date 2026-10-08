@@ -14,6 +14,7 @@ use App\Http\Controllers\Emar\MedicationErrorController;
 use App\Http\Controllers\Emar\MedicationFollowupController;
 use App\Http\Controllers\Emar\MedicationOrdersController;
 use App\Http\Controllers\Emar\MedicationReportsController;
+use App\Http\Controllers\Emar\MedicationRecordingStatusController;
 use App\Http\Controllers\Emar\MedicationReviewController;
 use App\Http\Controllers\Emar\MedicationSecondPersonConfirmationController;
 use App\Http\Controllers\Emar\MedicationSettingsController;
@@ -87,6 +88,9 @@ Route::middleware(['auth'])->group(function () {
 
     // eMAR P01 — what recording a dose needs and allows (the recording
     // dialog's safety checks, blocks and second-person candidates).
+    Route::get('/meds/today/recording-status', MedicationRecordingStatusController::class)
+        ->name('meds.today.recording_status');
+
     Route::get('/meds/today/doses/requirements', [DoseRequirementsController::class, 'scheduled'])
         ->middleware('permission:medications.administer.record')
         ->name('meds.today.requirements');

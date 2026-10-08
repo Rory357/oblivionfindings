@@ -5,14 +5,20 @@ namespace Tests\Feature\Emar;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationDestruction;
+use App\Models\MedicationError;
+use App\Models\MedicationPharmacyOrder;
 use App\Models\MedicationPrescriberOrder;
 use App\Models\Permission;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Tests\Support\ReadsRetainedMedicationAuditEvidence;
 use Tests\TestCase;
 
@@ -140,6 +146,50 @@ class MedicationPrescriberOrderAuditVisibilityTest extends TestCase
             'status' => 'reported',
         ]);
         $this->assertDatabaseCount('medication_errors', 2);
+    }
+
+    public function test_historical_source_links_keep_exact_dose_day_prescriber_and_ordinary_disposal_ids(): void
+    {
+        $this->seed(RbacSeeder::class);
+        $site = Site::factory()->create(['is_active' => true]);
+        $person = Client::factory()->create(['site_id' => $site->id]);
+        $reader = $this->reader($site);
+        $this->coveringShift($reader, $person, $site);
+        $medicine = $this->medication($person, 'Synthetic source medicine');
+        $scheduled = Carbon::parse('2026-09-27 00:05', 'Pacific/Auckland')->utc();
+        $dose = ClientMedicationAdministration::create(['client_id' => $person->id, 'client_medication_id' => $medicine->id,
+            'scheduled_for' => $scheduled, 'administered_at' => $scheduled->copy()->addMinutes(5), 'administered_by' => $reader->id,
+            'status' => 'given', 'dose_given' => '1 tablet']);
+        $order = $this->order($person, 'Synthetic unlinked source order', null, false);
+        $disposal = MedicationDestruction::create(['client_id' => $person->id, 'site_id' => $site->id, 'client_medication_id' => $medicine->id,
+            'medication_name' => $medicine->name, 'quantity' => 1, 'unit' => 'tablet', 'reason' => 'expired', 'disposal_method' => 'pharmacy_return',
+            'is_controlled_drug' => false, 'witness_1_id' => $reader->id, 'destroyed_by' => $reader->id, 'destroyed_at' => $scheduled]);
+        $receipt = MedicationPharmacyOrder::create(['client_id' => $person->id, 'client_medication_id' => $medicine->id, 'pharmacy_name' => 'Synthetic pharmacy',
+            'quantity_ordered' => 1, 'quantity_received' => 1, 'status' => 'delivered', 'ordered_by' => $reader->id, 'delivered_at' => $scheduled]);
+        $error = MedicationError::create(['client_id' => $person->id, 'client_medication_id' => $medicine->id, 'error_type' => 'wrong_dose',
+            'severity' => 'minor', 'description' => 'Synthetic error source', 'reported_by' => $reader->id, 'reported_at' => $scheduled, 'status' => 'reported']);
+        $events = collect($this->retainedAuditFeed($reader)->assertOk()->inertiaProps('events'))->keyBy('id');
+        $doseLink = $events['admin_'.$dose->id]['source_href'];
+        $this->assertStringContainsString('date=2026-09-27', $doseLink);
+        $this->assertStringContainsString('dose_id='.$dose->id, $doseLink);
+        $orderLink = $events['order_'.$order->id]['source_href'];
+        $this->assertStringContainsString('/emar/prescriptions/legacy?', $orderLink);
+        $this->assertStringContainsString('prescriber_order_id='.$order->id, $orderLink);
+        $this->actingAs($reader)->get($orderLink)->assertOk()->assertInertia(fn ($page) => $page->where('selected_prescriber_order.id', $order->id));
+        $this->assertStringContainsString('error='.$error->id, $events['err_'.$error->id]['source_href']);
+        $this->get($events['err_'.$error->id]['source_href'])->assertOk()->assertInertia(fn ($page) => $page->where('detail.id', $error->id));
+        $this->assertNull($events['stock_recv_'.$receipt->id]['source_href']);
+        $this->assertNull($events['dest_'.$disposal->id]['source_href'], 'Readers without stock or controlled access have no inaccessible source action');
+        $reader->permissionOverrides()->syncWithoutDetaching([Permission::where('key', 'medications.stock.update')->sole()->id => ['allowed' => true]]);
+        Cache::flush();
+        $events = collect($this->retainedAuditFeed($reader->fresh())->assertOk()->inertiaProps('events'))->keyBy('id');
+        $receiptLink = $events['stock_recv_'.$receipt->id]['source_href'];
+        $this->assertStringContainsString('pharmacy_order_id='.$receipt->id, $receiptLink);
+        $this->get($receiptLink)->assertOk()->assertInertia(fn ($page) => $page->where('selected_pharmacy_order.id', $receipt->id));
+        $link = $events['dest_'.$disposal->id]['source_href'];
+        $this->assertStringContainsString('/emar/destructions?', $link);
+        $this->assertStringContainsString('destruction_id='.$disposal->id, $link);
+        $this->get($link)->assertOk()->assertInertia(fn ($page) => $page->where('selected_destruction_id', $disposal->id));
     }
 
     private function medication(Client $client, string $name, bool $controlled = false): ClientMedication

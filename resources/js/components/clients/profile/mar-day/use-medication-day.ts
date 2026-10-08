@@ -1,3 +1,4 @@
+import { onMedicationRecorded } from '@/lib/medication-record-events';
 import axios from 'axios';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -72,6 +73,10 @@ export function useMedicationDay(clientId: number, date: string | null) {
         window.addEventListener('focus', refresh);
         return () => window.removeEventListener('focus', refresh);
     }, [fetchDay]);
+    useEffect(
+        () => onMedicationRecorded(clientId, () => void fetchDay()),
+        [clientId, fetchDay],
+    );
 
     const load: DayLoad =
         state.clientId === clientId

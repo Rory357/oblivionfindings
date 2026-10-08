@@ -13,6 +13,7 @@ import type { Handover } from './shared';
 function makeHandover(over: Partial<Handover> = {}): Handover {
     return {
         id: 1,
+        mar_url: '/emar/mar?client_id=7&date=2026-06-16&site_id=2',
         status: 'draft',
         handover_notes: 'note',
         client_mood: null,
@@ -164,6 +165,7 @@ describe('buildItems (handover context menu)', () => {
             buildItems(
                 makeHandover({
                     client: null,
+                    mar_url: null,
                     outgoing_shift: null,
                     outgoing_staff: null,
                     incoming_staff: null,

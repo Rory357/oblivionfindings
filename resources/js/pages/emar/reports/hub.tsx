@@ -455,7 +455,12 @@ export default function ReportsHub(props: Props) {
                             {can.history && filters.view === 'audit' && (
                                 <PageHeaderGlassButton
                                     onClick={() =>
-                                        router.visit('/emar/reports/history')
+                                        router.get('/emar/reports/history', {
+                                            date_from: filters.date_from,
+                                            date_to: filters.date_to,
+                                            site_id: filters.site_id,
+                                            client_id: filters.client_id,
+                                        })
                                     }
                                 >
                                     Clinical history

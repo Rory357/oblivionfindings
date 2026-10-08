@@ -2,6 +2,7 @@
    bordered surfaces (not Card/Button), and the hero carries the white pill search
    on the dark band (native input/button); all colours are semantic tokens. */
 import { EmarHubRail } from '@/components/emar/emar-hub-rail';
+import { MedicationJourneyReturn } from '@/components/emar/medication-journey-return';
 import { OrderDetailDialog } from '@/components/emar/prescriptions/order-detail-dialog';
 import {
     countersignHoursLeft,
@@ -61,6 +62,7 @@ import {
     X,
 } from 'lucide-react';
 import {
+    useEffect,
     useMemo,
     useState,
     type KeyboardEvent as ReactKeyboardEvent,
@@ -100,6 +102,7 @@ type Modal =
 
 type Props = {
     orders: GovernedPrescriptionOrder[];
+    selected_prescriber_order?: GovernedPrescriptionOrder | null;
     covert: GovernedCovertAuth[];
     clients: SiteBoundClientOption[];
     staff: SiteBoundStaffOption[];
@@ -272,6 +275,13 @@ export default function Prescriptions(props: Props) {
     );
     const [clientFilter, setClientFilter] = useState<number | null>(null);
     const [modal, setModal] = useState<Modal>(null);
+    useEffect(() => {
+        if (props.selected_prescriber_order)
+            setModal({
+                type: 'detail',
+                order: props.selected_prescriber_order,
+            });
+    }, [props.selected_prescriber_order]);
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
@@ -687,6 +697,7 @@ export default function Prescriptions(props: Props) {
                     }
                     actions={
                         <>
+                            <MedicationJourneyReturn />
                             <PageHeaderSearch
                                 value={search}
                                 onChange={setSearch}

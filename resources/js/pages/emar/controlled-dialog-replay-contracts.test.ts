@@ -285,7 +285,7 @@ describe('controlled mutation dialog replay contracts', () => {
             'const replay = useRef(createMedicationMutationReplayState());',
         );
         expect(recordDoseSource).toContain(
-            'replay.current = prepareMedicationMutationReplayState(',
+            'prepareMedicationMutationReplayState(replay.current, material)',
         );
         expect(recordDoseSource).toContain(
             'delete material.witness_credential;',

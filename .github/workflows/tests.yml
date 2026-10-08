@@ -116,6 +116,8 @@ jobs:
         run: |
           npx tsc --noEmit
           npx vitest run resources/js/pages/emar resources/js/lib/emar-navigation.test.ts resources/js/pages/settings/profile.test.tsx
+          npx vitest run resources/js/components/emar resources/js/lib/medication-navigation.test.ts resources/js/lib/medication-record-events.test.ts resources/js/components/client-safety-ribbon.test.tsx resources/js/pages/operations/clients/index.test.tsx resources/js/pages/sites/calendar/SiteCalendar.ssr.test.tsx
+          npx vitest run resources/js/pages/health-clinical/ClientSummary.ssr.test.tsx resources/js/pages/operations/shifts/show.ssr.test.tsx resources/js/pages/meds/today resources/js/test/client-profile-navigation.test.tsx
 
       - name: Copy Environment File
         run: cp .env.example .env
@@ -170,6 +172,9 @@ jobs:
           tests/Feature/Emar/StockPacksWorkflowTest.php
           tests/Feature/Emar/StockManagementTest.php
           tests/Feature/Emar/StockManagementPaginationTest.php
+          tests/Feature/Emar/ProfileAllergySafetyTest.php
+          tests/Feature/Emar/CanonicalAllergyProjectionTest.php
+          tests/Feature/ClientMedicalControllerTest.php
           tests/Feature/Emar/ControlledProductTest.php
           tests/Feature/FleetAssets/ResidentTransportMedicationTransitTest.php
           tests/Feature/FleetAssets/ResidentTransportJourneySecurityTest.php
@@ -186,6 +191,8 @@ jobs:
           tests/Feature/Medication/ControlledDrugStockTruthTest.php
           tests/Unit/MedicationPaperRecoveryMigrationTest.php
           tests/Feature/Emar/DoseTimingSettingsTest.php
+          tests/Feature/Emar/UnifiedMedicationReportsTest.php
+          tests/Feature/Emar/PrescriptionsPageTest.php
           tests/Feature/It/ItTicketTriageTest.php
           tests/Feature/Incidents/IncidentJourneyPresenterTest.php
           tests/Feature/FrontlineLifecycleDemoSeederReplayTest.php

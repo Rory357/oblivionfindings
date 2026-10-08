@@ -1,3 +1,4 @@
+import { setOfflineQueueActor } from '@/lib/offline-queue';
 import {
     fireEvent,
     render,
@@ -6,6 +7,13 @@ import {
     within,
 } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { PendingDose } from './record-dose-dialog';
+import {
+    clearDoseRecovery,
+    doseRecoveryKey,
+    findDoseRecovery,
+    keepDoseRecovery,
+} from './recovery';
 
 import {
     blockAllCopy,
@@ -154,6 +162,10 @@ function requirements(
 function open(
     req: DoseRequirements | BlockedRequirements,
     target?: DoseTarget,
+    dialogProps: {
+        onClose?: () => void;
+        returnFocus?: () => HTMLElement | null;
+    } = {},
 ) {
     getMock.mockResolvedValue({ data: req });
     return render(
@@ -168,6 +180,7 @@ function open(
             entry="meds-today"
             signedAs={{ name: 'Priya Shah', role_label: 'Support worker' }}
             onClose={() => {}}
+            {...dialogProps}
         />,
     );
 }
@@ -200,8 +213,310 @@ function controlled(
 
 describe('RecordDoseDialog (P01)', () => {
     beforeEach(() => {
+        setOfflineQueueActor(null);
+        setOfflineQueueActor(71);
         getMock.mockReset();
         submitMock.mockReset();
+    });
+
+    async function submitUnknown(
+        req = requirements(),
+        dialogProps: Parameters<typeof open>[2] = {},
+    ) {
+        submitMock.mockResolvedValueOnce({
+            status: 'rejected',
+            data: { unexpected: 'response' },
+        });
+        const view = open(req, undefined, dialogProps);
+        await screen.findByText('Losartan 50mg');
+        fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+        fireEvent.click(await screen.findByRole('button', { name: /^Given/ }));
+        fireEvent.change(
+            screen.getByRole('textbox', { name: 'What happened (optional)' }),
+            { target: { value: 'Original observed outcome.' } },
+        );
+        fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+        fireEvent.click(
+            screen.getByRole('button', { name: /^record outcome$/i }),
+        );
+        await screen.findByText('Not confirmed — check before trying again');
+        return view;
+    }
+
+    it('retains an unknown response across close/reopen and retries the frozen request', async () => {
+        const req = requirements();
+        const first = await submitUnknown(req);
+        const original = submitMock.mock.calls[0][1];
+        first.unmount();
+        getMock.mockImplementation((url: string) =>
+            Promise.resolve({
+                data: url.includes('recording-status')
+                    ? { status: 'unconfirmed' }
+                    : req,
+            }),
+        );
+        render(
+            <RecordDoseDialog
+                target={{
+                    kind: 'scheduled',
+                    orderId: 41,
+                    scheduledFor: req.due!.due_at,
+                }}
+                entry="client-profile"
+                signedAs={{ name: 'Priya Shah', role_label: 'Support worker' }}
+                onClose={() => {}}
+            />,
+        );
+        fireEvent.click(
+            await screen.findByRole('button', {
+                name: 'Review original attempt',
+            }),
+        );
+        expect(
+            screen.getByText('Original observed outcome.'),
+        ).toBeInTheDocument();
+        submitMock.mockResolvedValueOnce({
+            status: 'processed',
+            data: { administration: { id: 10 } },
+        });
+        fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+        await screen.findByText('Recorded');
+        expect(submitMock.mock.calls[1][1]).toEqual(original);
+        expect(findDoseRecovery(41, req.due!.due_at)).toBeNull();
+    });
+
+    it('checks a saved result directly from the open uncertain form without submitting another dose', async () => {
+        const req = requirements();
+        render(<button>Record medication</button>);
+        const opener = screen.getByRole('button', {
+            name: 'Record medication',
+        });
+        opener.focus();
+        const view = await submitUnknown(req, {
+            onClose: () => view.unmount(),
+            returnFocus: () => opener,
+        });
+        const original = findDoseRecovery<PendingDose>(41, req.due!.due_at)!;
+        const historyLink = screen.getByRole('link', {
+            name: 'Open medication history',
+        });
+        const history = new URL(
+            historyLink.getAttribute('href')!,
+            'https://medication.invalid',
+        );
+        expect(history.searchParams.get('tab')).toBe('history');
+        expect(history.searchParams.get('client_id')).toBe('201');
+        getMock.mockResolvedValueOnce({
+            data: {
+                status: 'recorded',
+                administration_id: 90,
+                chart_url: '/emar/mar?client_id=201&tab=history&dose_id=90',
+            },
+        });
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Check saved result' }),
+        );
+        expect(
+            await screen.findByRole('link', { name: 'Open the recorded dose' }),
+        ).toHaveAttribute(
+            'href',
+            '/emar/mar?client_id=201&tab=history&dose_id=90',
+        );
+        expect(getMock).toHaveBeenLastCalledWith(
+            '/meds/today/recording-status',
+            expect.objectContaining({
+                params: {
+                    client_medication_id: 41,
+                    client_request_uuid: original.draft.uuid,
+                },
+            }),
+        );
+        expect(submitMock).toHaveBeenCalledOnce();
+        expect(findDoseRecovery(41, req.due!.due_at)).toBeNull();
+        await waitFor(() =>
+            expect(
+                screen.getByRole('dialog', {
+                    name: 'Check an unconfirmed dose',
+                }),
+            ).toContainElement(document.activeElement as HTMLElement),
+        );
+        fireEvent.click(
+            screen.getAllByRole('button', { name: 'Close' }).at(-1)!,
+        );
+        await waitFor(() => expect(opener).toHaveFocus());
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('keeps focus in the original form when reviewing an unconfirmed saved-result check', async () => {
+        const req = requirements();
+        await submitUnknown(req);
+        const original = findDoseRecovery<PendingDose>(41, req.due!.due_at)!;
+        getMock.mockResolvedValueOnce({ data: { status: 'unconfirmed' } });
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Check saved result' }),
+        );
+        fireEvent.click(
+            await screen.findByRole('button', {
+                name: 'Review original attempt',
+            }),
+        );
+        await screen.findByText('Original observed outcome.');
+        await waitFor(() =>
+            expect(screen.getByRole('dialog')).toContainElement(
+                document.activeElement as HTMLElement,
+            ),
+        );
+        expect(
+            findDoseRecovery<PendingDose>(41, req.due!.due_at)?.draft.uuid,
+        ).toBe(original.draft.uuid);
+        expect(submitMock).toHaveBeenCalledOnce();
+    });
+
+    it('retains the original UUID when the open-form result check is unavailable', async () => {
+        const req = requirements();
+        await submitUnknown(req);
+        const original = findDoseRecovery<PendingDose>(41, req.due!.due_at)!;
+        getMock.mockRejectedValueOnce({ response: { status: 404 } });
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Check saved result' }),
+        );
+        await screen.findByText(
+            'The result could not be checked with your current access or connection.',
+        );
+        expect(
+            findDoseRecovery<PendingDose>(41, req.due!.due_at)?.draft.uuid,
+        ).toBe(original.draft.uuid);
+        expect(submitMock).toHaveBeenCalledOnce();
+        expect(
+            screen.queryByRole('button', { name: 'Review original attempt' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Check again' }),
+        ).toBeInTheDocument();
+    });
+
+    it('keeps an uncertain request frozen after a later access denial', async () => {
+        const req = requirements();
+        await submitUnknown(req);
+        submitMock.mockRejectedValueOnce({
+            isAxiosError: true,
+            response: { status: 403, data: { message: 'Access changed.' } },
+        });
+        fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+        await screen.findByText('Access changed.');
+        expect(findDoseRecovery(41, req.due!.due_at)?.draft).toBeTruthy();
+        expect(submitMock.mock.calls[1][1]).toEqual(
+            submitMock.mock.calls[0][1],
+        );
+        expect(
+            screen.queryByRole('button', { name: /^Back$/ }),
+        ).not.toBeInTheDocument();
+    });
+
+    it('closes a mounted attempt when the signed-in staff member changes', async () => {
+        const onClose = vi.fn();
+        getMock.mockResolvedValue({ data: requirements() });
+        render(
+            <RecordDoseDialog
+                target={{ kind: 'prn', orderId: 41 }}
+                entry="mar"
+                signedAs={{ name: 'Priya', role_label: null }}
+                onClose={onClose}
+            />,
+        );
+        await screen.findByText('Losartan 50mg');
+        setOfflineQueueActor(72);
+        expect(onClose).toHaveBeenCalledOnce();
+        expect(submitMock).not.toHaveBeenCalled();
+    });
+
+    it('keeps the submitted dose visible when an order changes before recovery', async () => {
+        const req = requirements();
+        (await submitUnknown(req)).unmount();
+        const changed = {
+            ...req,
+            order: {
+                ...req.order,
+                name: 'Amended order',
+                dosage: '2 tablets',
+                version: 2,
+            },
+        };
+        getMock.mockImplementation((url: string) =>
+            Promise.resolve({
+                data: url.includes('recording-status')
+                    ? { status: 'unconfirmed' }
+                    : changed,
+            }),
+        );
+        render(
+            <RecordDoseDialog
+                target={{
+                    kind: 'scheduled',
+                    orderId: 41,
+                    scheduledFor: req.due!.due_at,
+                }}
+                entry="mar"
+                signedAs={{ name: 'Priya', role_label: null }}
+                onClose={() => {}}
+            />,
+        );
+        expect(
+            await screen.findByText('Losartan 50mg · 1 tablet'),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Review original attempt' }),
+        ).not.toBeInTheDocument();
+        expect(submitMock).toHaveBeenCalledOnce();
+    });
+
+    it('preserves a confirmed recovery when requirements finish later', async () => {
+        const req = requirements();
+        (await submitUnknown(req)).unmount();
+        let finish!: (result: { data: DoseRequirements }) => void;
+        const delayed = new Promise<{ data: DoseRequirements }>((resolve) => {
+            finish = resolve;
+        });
+        getMock.mockImplementation((url: string) =>
+            url.includes('recording-status')
+                ? Promise.resolve({
+                      data: {
+                          status: 'recorded',
+                          administration_id: 10,
+                          chart_url:
+                              '/emar/mar?client_id=201&tab=history&dose_id=10',
+                      },
+                  })
+                : delayed,
+        );
+        render(
+            <RecordDoseDialog
+                target={{
+                    kind: 'scheduled',
+                    orderId: 41,
+                    scheduledFor: req.due!.due_at,
+                }}
+                entry="mar"
+                signedAs={{ name: 'Priya', role_label: null }}
+                onClose={() => {}}
+            />,
+        );
+        expect(
+            await screen.findByRole('link', { name: 'Open the recorded dose' }),
+        ).toHaveAttribute(
+            'href',
+            '/emar/mar?client_id=201&tab=history&dose_id=10',
+        );
+        finish({ data: req });
+        await waitFor(() =>
+            expect(
+                screen.getByRole('link', { name: 'Open the recorded dose' }),
+            ).toBeInTheDocument(),
+        );
+        expect(
+            screen.queryByRole('button', { name: /Continue/ }),
+        ).not.toBeInTheDocument();
+        expect(submitMock).toHaveBeenCalledOnce();
     });
 
     it('requires a PRN reason and check time, retains them through review, and saves through the PRN contract', async () => {
@@ -419,6 +734,91 @@ describe('RecordDoseDialog (P01)', () => {
             await screen.findByRole('option', { name: /Mere Kahu/ }),
         );
     }
+
+    it('confirms an original PRN after current requirements become interval-blocked', async () => {
+        const req = requirements();
+        (await submitUnknown(req)).unmount();
+        const original = findDoseRecovery<PendingDose>(41, req.due!.due_at)!;
+        clearDoseRecovery(original.key);
+        keepDoseRecovery(doseRecoveryKey(201, 41, 'prn'), {
+            ...original.draft,
+            target: { kind: 'prn', orderId: 41 },
+            display: { ...req, kind: 'prn' },
+        });
+        getMock.mockImplementation((url: string) =>
+            Promise.resolve({
+                data: url.includes('recording-status')
+                    ? {
+                          status: 'recorded',
+                          administration_id: 90,
+                          chart_url:
+                              '/emar/mar?client_id=201&tab=history&dose_id=90',
+                      }
+                    : {
+                          kind: 'prn',
+                          block_all: { key: 'prnLimit', facts: {} },
+                          checked_at: req.checked_at,
+                      },
+            }),
+        );
+        render(
+            <RecordDoseDialog
+                target={{ kind: 'prn', orderId: 41 }}
+                entry="mar"
+                signedAs={{ name: 'Priya', role_label: null }}
+                onClose={() => {}}
+            />,
+        );
+        expect(
+            await screen.findByRole('link', { name: 'Open the recorded dose' }),
+        ).toHaveAttribute(
+            'href',
+            '/emar/mar?client_id=201&tab=history&dose_id=90',
+        );
+        expect(submitMock).toHaveBeenCalledOnce();
+        expect(findDoseRecovery(41, 'prn')).toBeNull();
+    });
+
+    it('removes the witness PIN from the retained attempt and requires fresh PIN entry for retry', async () => {
+        const req = requirements({
+            second_person: {
+                kind: 'rule',
+                rule_sentences: [],
+                anyone_available: true,
+                may_go_unconfirmed: false,
+                candidates: [{ id: 5, name: 'Mere Kahu', can_confirm: true }],
+            },
+        });
+        submitMock.mockResolvedValueOnce({ status: 'rejected', data: {} });
+        await openForgottenPin(req);
+        fireEvent.change(screen.getByLabelText(/Their 6-digit PIN/), {
+            target: { value: '123456' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+        fireEvent.click(
+            screen.getByRole('button', { name: /^record outcome$/i }),
+        );
+        await screen.findByText('Not confirmed — check before trying again');
+        const saved = findDoseRecovery<PendingDose>(41, req.due!.due_at)!;
+        expect(saved.draft.form.second.pin).toBe('');
+        expect(saved.draft.body).not.toHaveProperty('witness_credential');
+        expect(screen.getByLabelText(/Colleague’s PIN/)).toHaveValue('');
+        fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+        expect(submitMock).toHaveBeenCalledOnce();
+        fireEvent.change(screen.getByLabelText(/Colleague’s PIN/), {
+            target: { value: '654321' },
+        });
+        submitMock.mockResolvedValueOnce({
+            status: 'processed',
+            data: { administration: { id: 91 } },
+        });
+        fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+        await screen.findByText('Recorded');
+        expect(submitMock.mock.calls[1][1]).toEqual({
+            ...submitMock.mock.calls[0][1],
+            witness_credential: '654321',
+        });
+    });
 
     it('keeps separate confirmation pending, omits the PIN and requires the colleague to have been present', async () => {
         submitMock.mockResolvedValue({

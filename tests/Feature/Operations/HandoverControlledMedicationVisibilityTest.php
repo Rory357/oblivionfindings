@@ -10,6 +10,7 @@ use App\Models\ShiftHandover;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\ShiftHandoverService;
+use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -134,6 +135,47 @@ class HandoverControlledMedicationVisibilityTest extends TestCase
                 ->where('handover.cd_verification.result', 'discrepancy')
                 ->where('handover.cd_verification.notes', 'Morphine balance requires reconciliation.')
             );
+    }
+
+    public function test_handover_mar_link_uses_the_outgoing_shift_nz_day_and_exact_person_authority(): void
+    {
+        $viewer = $this->viewer(canViewControlled: false);
+        $shift = $this->handover->outgoingShift;
+        // 11:30 UTC is already the following New Zealand daylight-saving day.
+        $shift->update(['starts_at' => Carbon::parse('2026-10-04 11:30:00', 'UTC'),
+            'ends_at' => Carbon::parse('2026-10-04 15:30:00', 'UTC')]);
+        $url = route('operations.handovers.show', $this->handover);
+        $this->actingAs($viewer)->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('handover.medication_date', '2026-10-05')->where('handover.mar_url', null));
+
+        $this->handover->client->supportWorkers()->attach($viewer->id);
+        $source = '/operations/handovers?site_id='.$this->site->id;
+        $response = $this->actingAs($viewer->fresh())->get($url.'?'.http_build_query(['return_to' => $source]))->assertOk();
+        parse_str(parse_url($response->inertiaProps('handover.mar_url'), PHP_URL_QUERY), $query);
+        $this->assertSame((string) $this->handover->client_id, $query['client_id']);
+        $this->assertSame((string) $this->site->id, $query['site_id']);
+        $this->assertSame('2026-10-05', $query['date']);
+        $this->assertSame($source, $query['return_to']);
+    }
+
+    public function test_handover_controlled_register_link_requires_exact_person_and_controlled_reader_and_keeps_day(): void
+    {
+        $viewer = $this->viewer(canViewControlled: true);
+        $this->handover->outgoingShift->update(['starts_at' => Carbon::parse('2026-10-04 11:30:00', 'UTC'),
+            'ends_at' => Carbon::parse('2026-10-04 15:30:00', 'UTC')]);
+        $url = route('operations.handovers.show', $this->handover);
+        $this->actingAs($viewer)->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page->where('handover.cd_register_url', null));
+        $this->handover->client->supportWorkers()->attach($viewer->id);
+        $source = '/operations/handovers?site_id='.$this->site->id;
+        $response = $this->actingAs($viewer->fresh())->get($url.'?'.http_build_query(['return_to' => $source]))->assertOk();
+        $link = $response->inertiaProps('handover.cd_register_url');
+        $this->assertSame('/emar/controlled', parse_url($link, PHP_URL_PATH));
+        parse_str(parse_url($link, PHP_URL_QUERY), $query);
+        $this->assertSame(['client_id' => (string) $this->handover->client_id, 'site_id' => (string) $this->site->id,
+            'date' => '2026-10-05', 'return_to' => $source], $query);
+        $this->get($link)->assertOk();
+        $viewer->permissionOverrides()->syncWithoutDetaching([Permission::where('key', 'medications.controlled.view')->sole()->id => ['allowed' => false]]);
+        $this->actingAs($viewer->fresh())->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page->where('handover.cd_register_url', null));
     }
 
     private function viewer(bool $canViewControlled): User

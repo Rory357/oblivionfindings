@@ -205,8 +205,14 @@ class ClientController extends Controller
                 'deleted_at',
             ]);
 
-        $clients = $clients->map(function (Client $c) use ($user) {
-            $sectionAccess = app(ClientProfileSectionAccess::class)->for($user, $c);
+        $sectionAccessByClient = $clients->mapWithKeys(fn (Client $client): array => [
+            $client->id => app(ClientProfileSectionAccess::class)->for($user, $client),
+        ]);
+        $allergyRecordsByClient = app(ClientAllergyRecordService::class)->summariesForClients(
+            $clients->filter(fn (Client $client): bool => $sectionAccessByClient->get($client->id)['medical'])->pluck('id')->all(),
+        );
+        $clients = $clients->map(function (Client $c) use ($user, $sectionAccessByClient, $allergyRecordsByClient) {
+            $sectionAccess = $sectionAccessByClient->get($c->id);
             $summary = $this->buildOnboardingSummaryFromCounts($c);
             $hasRespite = ((int) ($c->respite_bookings_count ?? 0) + (int) ($c->respite_booking_requests_count ?? 0)) > 0;
 
@@ -248,6 +254,7 @@ class ClientController extends Controller
                     $c,
                     includeMedical: $sectionAccess['medical'],
                     includeRisks: $sectionAccess['risks'],
+                    allergyRecord: $allergyRecordsByClient[$c->id] ?? null,
                 ),
             ];
         })->values();
@@ -2728,11 +2735,11 @@ class ClientController extends Controller
     {
         $this->authorize('update', $client);
 
-        $client->loadMissing([
-            'medicalProfile',
-            'conditions',
-            'emergencyContacts',
-        ]);
+        $canReadMedical = $request->user()->can('view', $client)
+            && $request->user()->can('viewMedications', $client);
+        if ($canReadMedical) {
+            $client->loadMissing(['medicalProfile', 'conditions', 'emergencyContacts']);
+        }
 
         $currentSiteId = is_numeric($client->site_id) ? (int) $client->site_id : null;
         $availableSiteIds = app(UserSiteAccessService::class)->accessibleSiteIds(
@@ -2803,9 +2810,11 @@ class ClientController extends Controller
                 'phone', 'email', 'address_line_1', 'address_line_2', 'suburb', 'city', 'postcode',
                 'profile_photo_path', 'funding_type', 'funding_notes',
             ]),
+            'can_edit_medical' => $canReadMedical,
             'initialValues' => $this->clientWizardInitialValues(
                 $client,
                 $geofences->pluck('id')->map(fn (mixed $id): int => (int) $id)->all(),
+                $canReadMedical,
             ),
             'sites' => $sites,
             'serviceContexts' => $serviceContexts,
@@ -2821,7 +2830,7 @@ class ClientController extends Controller
         // no standalone Inertia page exists. Return JSON when the modal
         // requests it; otherwise send users back to the client detail view.
         if ($request->wantsJson() || $request->boolean('modal')) {
-            return response()->json($payload);
+            return response()->json($payload)->header('Cache-Control', 'private, no-store');
         }
 
         return redirect()->route('operations.clients.show', $client);
@@ -2829,14 +2838,14 @@ class ClientController extends Controller
 
     /** @return array<string, mixed> */
     /** @param list<int>|null $eligibleGeofenceIds */
-    private function clientWizardInitialValues(Client $client, ?array $eligibleGeofenceIds = null): array
+    private function clientWizardInitialValues(Client $client, ?array $eligibleGeofenceIds = null, bool $canReadMedical = true): array
     {
         $stringId = fn (mixed $value): string => filled($value)
             ? (string) $value
             : '';
-        $medical = $client->medicalProfile;
+        $medical = $canReadMedical ? $client->medicalProfile : null;
 
-        return [
+        $values = [
             '_modal' => true,
             'site_id' => $stringId($client->site_id),
             'room_id' => $stringId($client->room_id),
@@ -2890,7 +2899,7 @@ class ClientController extends Controller
                 'immunisation_notes' => $medical?->immunisation_notes ?? '',
                 'notes' => $medical?->notes ?? '',
             ],
-            'conditions' => $client->conditions->map(fn ($condition) => [
+            'conditions' => ($canReadMedical ? $client->conditions : collect())->map(fn ($condition) => [
                 'label' => $condition->label ?? '',
                 'severity' => $condition->severity ?? 'Mild',
                 'notes' => $condition->notes ?? '',
@@ -2905,7 +2914,7 @@ class ClientController extends Controller
                     : '',
             'funding_type' => $client->funding_type ?? '',
             'funding_notes' => $client->funding_notes ?? '',
-            'emergency_contacts' => $client->emergencyContacts->map(fn ($contact) => [
+            'emergency_contacts' => ($canReadMedical ? $client->emergencyContacts : collect())->map(fn ($contact) => [
                 'name' => $contact->name ?? '',
                 'relationship' => $contact->relationship ?? '',
                 'phone' => $contact->phone ?? '',
@@ -2921,11 +2930,17 @@ class ClientController extends Controller
                 'can_receive_updates' => (bool) $contact->can_receive_updates,
             ])->values(),
         ];
+
+        return $canReadMedical ? $values : array_diff_key($values, array_flip(['medical', 'conditions', 'emergency_contacts']));
     }
 
     public function update(UpdateClientRequest $request, Client $client)
     {
         $this->authorize('update', $client);
+        if ($request->hasAny(['medical', 'conditions', 'emergency_contacts'])) {
+            $this->authorize('view', $client);
+            $this->authorize('viewMedications', $client);
+        }
 
         try {
             $data = $request->validated();
@@ -2968,6 +2983,12 @@ class ClientController extends Controller
                 $syncEmergencyContacts,
                 $previousRoomId
             ) {
+                if ($syncMedical || $syncConditions || $syncEmergencyContacts) {
+                    $client = Client::query()->whereKey($client->id)->lockForUpdate()->firstOrFail();
+                    $this->authorize('view', $client);
+                    $this->authorize('viewMedications', $client);
+                    $this->authorize('update', $client);
+                }
                 $client->update($clientFields);
                 $this->syncClientRoomAssignment($client->refresh(), $previousRoomId);
 
@@ -2984,10 +3005,16 @@ class ClientController extends Controller
                 }
             });
 
-            app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'client', $client, $client, [
-                'title' => "Client updated: {$client->first_name} {$client->last_name}",
-                'url' => url("/clients/{$client->id}"),
-            ]);
+            try {
+                app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'client', $client, $client, [
+                    'data' => $syncMedical || $syncConditions || $syncEmergencyContacts
+                        ? ['recipient_scope' => 'client_medical'] : [],
+                    'title' => "Client updated: {$client->first_name} {$client->last_name}",
+                    'url' => url("/clients/{$client->id}"),
+                ]);
+            } catch (\Throwable $notificationFailure) {
+                report($notificationFailure);
+            }
 
             // Modal submissions want to stay on the current page so the
             // dialog can close and the caller can reload fresh data.
@@ -2998,6 +3025,8 @@ class ClientController extends Controller
             return redirect()
                 ->route('clients.index')
                 ->with('success', 'Client updated successfully.');
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             report($e);
 
@@ -3009,35 +3038,43 @@ class ClientController extends Controller
 
     private function syncClientMedicalProfile(Client $client, array $medical): void
     {
-        $canonical = $client->medicalProfile()->whereNotNull('allergies_canonical_at')->exists();
-        if ($canonical) {
-            app(ClientAllergyRecordService::class)->guardLegacyEdit($client, $medical['allergies'] ?? []);
-        }
-        $medicalFilled = collect($medical)->contains(
-            fn ($v) => is_array($v) ? count($v) > 0 : (filled($v) && $v !== false && $v !== '0')
-        );
+        DB::transaction(function () use ($client, $medical): void {
+            // A medical-only or unchanged client save may issue no UPDATE.
+            // Share the canonical command lock before reading or deleting the
+            // profile, including when no profile existed in an older snapshot.
+            $client = Client::query()->whereKey($client->id)->lockForUpdate()->firstOrFail();
+            $profile = $client->medicalProfile()->lockForUpdate()->first();
+            $canonical = $profile?->allergies_canonical_at !== null;
+            if ($canonical) {
+                app(ClientAllergyRecordService::class)->guardLegacyEdit($client, $medical['allergies'] ?? [], $profile);
+            }
+            $medicalFilled = collect($medical)->contains(
+                fn ($v) => is_array($v) ? count($v) > 0 : (filled($v) && $v !== false && $v !== '0')
+            );
 
-        if (! $medicalFilled && ! $canonical) {
-            $client->medicalProfile()->delete();
+            if (! $medicalFilled && ! $canonical) {
+                $profile?->delete();
 
-            return;
-        }
+                return;
+            }
 
-        $client->medicalProfile()->updateOrCreate([], [
-            'gp_name' => $medical['gp_name'] ?? null,
-            'gp_practice' => $medical['gp_practice'] ?? null,
-            'gp_phone' => $medical['gp_phone'] ?? null,
-            'hospital_preference' => $medical['hospital_preference'] ?? null,
-            'blood_type' => $medical['blood_type'] ?? null,
-            'organ_donor' => (bool) ($medical['organ_donor'] ?? false),
-            'allergies' => $medical['allergies'] ?? [],
-            'disabilities' => $medical['disabilities'] ?? [],
-            'medical_history' => $medical['medical_history'] ?? null,
-            'mental_health_history' => $medical['mental_health_history'] ?? null,
-            'surgical_history' => $medical['surgical_history'] ?? null,
-            'immunisation_notes' => $medical['immunisation_notes'] ?? null,
-            'notes' => $medical['notes'] ?? null,
-        ]);
+            $profile ??= $client->medicalProfile()->make();
+            $profile->fill([
+                'gp_name' => $medical['gp_name'] ?? null,
+                'gp_practice' => $medical['gp_practice'] ?? null,
+                'gp_phone' => $medical['gp_phone'] ?? null,
+                'hospital_preference' => $medical['hospital_preference'] ?? null,
+                'blood_type' => $medical['blood_type'] ?? null,
+                'organ_donor' => (bool) ($medical['organ_donor'] ?? false),
+                'allergies' => $medical['allergies'] ?? [],
+                'disabilities' => $medical['disabilities'] ?? [],
+                'medical_history' => $medical['medical_history'] ?? null,
+                'mental_health_history' => $medical['mental_health_history'] ?? null,
+                'surgical_history' => $medical['surgical_history'] ?? null,
+                'immunisation_notes' => $medical['immunisation_notes'] ?? null,
+                'notes' => $medical['notes'] ?? null,
+            ])->saveOrFail();
+        });
     }
 
     private function syncClientConditions(Client $client, array $conditions): void

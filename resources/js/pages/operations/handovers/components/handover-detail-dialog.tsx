@@ -1,4 +1,5 @@
 import HandoverPersonNotes from '@/components/handover-person-notes';
+import { withMedicationReturn } from '@/lib/medication-navigation';
 /* Handover detail pop-up — full record with flow, lists, audit trail + actions. */
 import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import { Link } from '@inertiajs/react';
@@ -444,12 +445,18 @@ export function HandoverDetailDialog({
                                             ? '— discrepancy found'
                                             : 'verified'}
                                     </span>
-                                    <Link
-                                        href="/emar/controlled"
-                                        className="ml-auto text-[12px] font-semibold text-primary hover:underline"
-                                    >
-                                        CD register
-                                    </Link>
+                                    {h.cd_register_url && (
+                                        <Link
+                                            href={withMedicationReturn(
+                                                h.cd_register_url,
+                                                window.location.pathname +
+                                                    window.location.search,
+                                            )}
+                                            className="ml-auto text-[12px] font-semibold text-primary hover:underline"
+                                        >
+                                            CD register
+                                        </Link>
+                                    )}
                                 </div>
                                 <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11.5px] text-muted-foreground">
                                     {h.cd_verification.witness_name ? (
@@ -686,11 +693,8 @@ export function HandoverDetailDialog({
                                     {inc.name.split(' ')[0]} · incoming
                                 </OptionLink>
                             ) : null}
-                            {h.client && medicationSnapshotUrl ? (
-                                <OptionLink
-                                    href={`/emar/mar?client_id=${h.client.id}`}
-                                    icon={Pill}
-                                >
+                            {h.mar_url ? (
+                                <OptionLink href={h.mar_url} icon={Pill}>
                                     Open on MAR chart
                                 </OptionLink>
                             ) : null}

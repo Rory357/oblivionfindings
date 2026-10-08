@@ -16,6 +16,7 @@ use App\Services\Medication\MedicationRecordDayService;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Medication\SecondPersonConfirmationPayload;
 use App\Services\Medication\Support\MedicationSupport;
+use App\Support\MedicationJourney;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -31,7 +32,8 @@ final class MedicationRecordHubController extends Controller
         abort_unless($actor && in_array($view, ['charts', 'medicines', 'asneeded'], true), 403);
         $now = Carbon::now(app(MarScheduleService::class)->workerTimezone());
         $data = $request->validate(['site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'],
-            'date' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:'.$now->toDateString()], 'q' => ['nullable', 'string', 'max:100'],
+            'date' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:'.$now->copy()->addDay()->toDateString()], 'q' => ['nullable', 'string', 'max:100'],
+            'work' => ['nullable', 'in:all,due,overdue'], 'return_to' => ['nullable', 'string', 'max:2048'],
             'status' => ['nullable', 'in:current,stopped'], 'range' => ['nullable', 'integer', 'in:7,30,90'], 'page' => ['nullable', 'integer', 'min:1']]);
         $scope = app(MedicationGovernanceScopeService::class);
         $access = app(MedicationRecordAccess::class);
@@ -47,6 +49,9 @@ final class MedicationRecordHubController extends Controller
         $orders = ClientMedication::withTrashed()->whereIn('client_id', $ids)->when(! $controlled, fn ($q) => $q->where('controlled_drug', false))->orderBy('name')->get();
         $current = $orders->reject(fn ($order) => $this->stopped($order));
         $date = $data['date'] ?? $now->toDateString();
+        $work = $view === 'charts' ? ($data['work'] ?? 'all') : 'all';
+        $returnTo = MedicationJourney::returnTo($data['return_to'] ?? null)
+            ?? MedicationJourney::returnTo($request->getRequestUri());
         $day = Carbon::parse($date, $now->timezone)->startOfDay();
         $board = app(MedsBoardPayloadService::class);
         $scheduleRows = function (Carbon $forDay) use ($board, $ids, $controlled, $now) {
@@ -61,35 +66,37 @@ final class MedicationRecordHubController extends Controller
                 : $board->scheduleForDate($ids, $forDay, $now, $bySlot, $controlled, $hidden));
         };
         $todayRows = $scheduleRows($now->copy()->startOfDay());
+        $selectedRows = $date === $now->toDateString() ? $todayRows : $scheduleRows($day);
         $query = mb_strtolower(trim($data['q'] ?? ''));
         if ($view === 'charts') {
-            $scheduled = $date === $now->toDateString() ? $todayRows : $scheduleRows($day);
+            $scheduled = $selectedRows;
             $prn = $date === $now->toDateString() ? collect($board->prnMedications($ids, $now, $controlled)) : collect(app(MedicationRecordDayService::class)->prn($ids, $day))->when(! $controlled, fn ($items) => $items->where('is_controlled', false));
             $workIds = $scheduled->pluck('client_id')->merge($prn->pluck('client_id'));
             if ($date === $now->toDateString()) {
                 $workIds = $workIds->merge($current->pluck('client_id'));
             }
             $authority = $actor->canDo('medications.administer.record') ? app(MedicationScopeDecisionService::class)->clientIdsWithCurrentAuthority($actor, $ids, $now) : [];
-            $rows = $people->only($workIds->unique()->all())->map(function ($person) use ($scheduled, $date, $now, $authority) {
+            $rows = $people->only($workIds->unique()->all())->map(function ($person) use ($scheduled, $date, $now, $authority, $returnTo) {
                 $doses = $scheduled->where('client_id', $person->id);
                 $staff = $doses->reject(fn ($row) => in_array($row['state'] ?? '', ['self_managed', 'away', 'pending_check', 'not_due', 'upcoming'], true));
                 $next = $doses->filter(fn ($row) => in_array($row['state'] ?? '', ['not_due', 'upcoming'], true))->sortBy('scheduled_for')->first();
 
-                return $this->identity($person) + ['key' => 'person'.$person->id, 'id' => $person->id, 'href' => '/emar/mar?client_id='.$person->id.'&date='.$date,
+                return $this->identity($person) + ['key' => 'person'.$person->id, 'id' => $person->id, 'href' => $this->recordHref($person, $date, $returnTo),
                     'due' => $doses->filter(fn ($row) => ($row['state'] ?? '') === 'due' && $row['recorded'] === null)->count(), 'overdue' => $doses->where('status', 'overdue')->count(),
                     'recorded' => $staff->filter(fn ($row) => $row['recorded'] !== null)->count(), 'so_far' => $staff->count(), 'waiting' => $doses->where('status', 'pending_check')->count(), 'next' => $next['time'] ?? null,
                     'can_record' => $date === $now->toDateString() && in_array((int) $person->id, $authority, true)];
-            })->filter(fn ($row) => ! $query || str_contains(mb_strtolower($row['person']), $query))->sortBy('person')->values();
+            })->filter(fn ($row) => ! $query || str_contains(mb_strtolower($row['person']), $query))
+                ->filter(fn ($row) => $work === 'all' || $row[$work] > 0)->sortBy('person')->values();
         } elseif ($view === 'medicines') {
             $policy = app(MedicationSupport::class);
             $words = ['self_managed' => 'Self-managed', 'prompted' => 'Prompt', 'assisted' => 'Assist', 'staff_given' => 'Administer'];
-            $rows = $orders->filter(fn ($order) => $this->stopped($order) === (($data['status'] ?? 'current') === 'stopped'))->map(function ($order) use ($people, $policy, $words) {
+            $rows = $orders->filter(fn ($order) => $this->stopped($order) === (($data['status'] ?? 'current') === 'stopped'))->map(function ($order) use ($people, $policy, $words, $date, $returnTo) {
                 $person = $people->get($order->client_id);
 
                 return $this->identity($person) + ['key' => 'medicine'.$order->id, 'id' => $order->id, 'name' => $order->historicalDisplayName(), 'dosage' => $order->dosage, 'route' => $order->route,
                     'when' => $order->is_prn ? 'As needed' : collect($order->dose_times ?? [])->join(' · '), 'support' => $words[$policy->mode($order)] ?? 'Administer',
                     'state' => $this->stopped($order) ? 'Stopped / replaced' : (! $order->isVerifiedForAdministration() ? 'awaiting' : ($order->state === 'paused' || ! $order->active ? 'Paused' : 'Active')),
-                    'href' => '/emar/mar?client_id='.$person->id.'&tab=medicines&'.($this->stopped($order) ? 'view=stopped&' : '').'medication_id='.$order->id];
+                    'href' => $this->recordHref($person, $date, $returnTo, ['tab' => 'medicines', 'view' => $this->stopped($order) ? 'stopped' : 'current', 'medication_id' => $order->id])];
             })->filter(fn ($row) => ! $query || str_contains(mb_strtolower($row['person'].' '.$row['name']), $query))->values();
         } else {
             $from = $day->copy()->subDays(($data['range'] ?? 30) - 1)->utc();
@@ -99,7 +106,7 @@ final class MedicationRecordHubController extends Controller
                 ->when($query, fn ($q) => $q->where(fn ($q) => $q->whereHas('medication', fn ($med) => $med->where('name', 'like', '%'.$query.'%'))->orWhereHas('client', fn ($person) => $person->where('first_name', 'like', '%'.$query.'%')->orWhere('last_name', 'like', '%'.$query.'%'))))
                 ->with(['medication', 'administeredBy:id,name', 'witnessedBy:id,name', 'prnEffectiveness', SecondPersonConfirmationPayload::RELATION])->latest('administered_at')->latest('id')->paginate(25)->withQueryString();
             $followups = app(MedicationFollowupService::class)->visibleQuery($actor)->where('type', 'effect')->whereIn('administration_id', $rows->pluck('id'))->get()->keyBy('administration_id');
-            $rows->setCollection($rows->getCollection()->map(function ($dose) use ($people, $followups, $actor) {
+            $rows->setCollection($rows->getCollection()->map(function ($dose) use ($people, $followups, $actor, $returnTo, $now) {
                 $effect = $dose->prnEffectiveness;
                 if ($effect && ((int) $effect->client_id !== (int) $dose->client_id || (int) $effect->client_medication_id !== (int) $dose->client_medication_id)) {
                     $effect = null;
@@ -110,17 +117,26 @@ final class MedicationRecordHubController extends Controller
                     'at' => $dose->administered_at->toIso8601String(), 'by' => $dose->administeredBy?->name, 'dose' => $dose->dose_given, 'reason' => $dose->reason,
                     ...app(SecondPersonConfirmationPayload::class)->forAdministration($dose),
                     'effect_status' => $effect ? 'recorded' : 'pending', 'effect' => $effect ? $effect->effectiveness_label.' · '.($effect->observations ?? '') : ($followup?->due_at ? 'Due '.$followup->due_at->timezone('Pacific/Auckland')->format('j M, g:i a') : 'Time not set'),
-                    'can_record' => ! $effect && $actor->canDo('medications.administer.record'), 'href' => '/emar/mar?client_id='.$dose->client_id.'&tab=history&dose_id='.$dose->id];
+                    'can_record' => ! $effect && $actor->canDo('medications.administer.record'),
+                    'href' => $this->recordHref($people->get($dose->client_id), $dose->administered_at->copy()->timezone($now->timezone)->toDateString(), $returnTo, ['tab' => 'history', 'dose_id' => $dose->id])];
             }));
         }
         $pageNumber = $data['page'] ?? 1;
         $page = $rows instanceof LengthAwarePaginator ? $rows : new LengthAwarePaginator($rows->forPage($pageNumber, 25)->values(), $rows->count(), 25, $pageNumber, ['path' => $request->url(), 'query' => $request->query()]);
 
-        return Inertia::render('emar/record/hub', ['view' => $view, 'filters' => ['site_id' => $siteId, 'client_id' => $clientId, 'date' => $date, 'q' => $data['q'] ?? '', 'status' => $data['status'] ?? 'current', 'range' => $data['range'] ?? 30],
+        return Inertia::render('emar/record/hub', ['view' => $view, 'filters' => ['site_id' => $siteId, 'client_id' => $clientId, 'date' => $date, 'q' => $data['q'] ?? '', 'status' => $data['status'] ?? 'current', 'range' => $data['range'] ?? 30, 'work' => $work, 'return_to' => MedicationJourney::returnTo($data['return_to'] ?? null)],
             'page' => $page, 'sites' => $scope->sitePicker($sites)->map->only(['id', 'name'])->values(), 'today' => $now->toDateString(), 'as_at' => $now->toIso8601String(), 'controlled_left_out' => ! $controlled,
             'can_report' => $actor->canDo('medications.reports.view') && $actor->canDo('medications.reports.export'),
             'coverage' => app(DoseSlotCoverage::class)->forPeriod($date, CarbonImmutable::now()), 'meters' => ['people' => $current->pluck('client_id')->unique()->count(), 'medicines' => $current->count(),
-                'due' => $todayRows->filter(fn ($row) => ($row['state'] ?? '') === 'due' && $row['recorded'] === null)->count(), 'overdue' => $todayRows->where('status', 'overdue')->count()]]);
+                'due' => $selectedRows->filter(fn ($row) => ($row['state'] ?? '') === 'due' && $row['recorded'] === null)->count(), 'overdue' => $selectedRows->where('status', 'overdue')->count()]]);
+    }
+
+    private function recordHref(Client $person, string $date, ?string $returnTo, array $params = []): string
+    {
+        return '/emar/mar?'.http_build_query(array_filter([
+            ...$params, 'client_id' => (int) $person->id, 'site_id' => $person->site_id,
+            'date' => $date, 'return_to' => $returnTo,
+        ], fn ($value) => $value !== null && $value !== ''), '', '&', PHP_QUERY_RFC3986);
     }
 
     private function identity(Client $person): array

@@ -7,6 +7,7 @@ import {
     type MouseEvent,
     type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
+import { roundMenuAt } from './round-actions';
 import { RoundStatusBadge, roundArcColor } from './round-bits';
 import { roundCounts, roundStatusMeta, type RoundSummary } from './types';
 
@@ -155,8 +156,15 @@ export default function RoundTimeline({
                                     type="button"
                                     title={`${r.name} · ${r.scheduled_time}`}
                                     aria-label={`${r.name}, ${r.scheduled_time}, ${roundStatusMeta(r.status).label}, ${counts.pct}% recorded — ${completed ? 'review round' : canRecord ? 'open guided round' : 'recording unavailable'}`}
-                                    onClick={() => canOpen && onOpen(r.id)}
-                                    disabled={!canOpen}
+                                    onClick={(event) =>
+                                        canOpen
+                                            ? onOpen(r.id)
+                                            : roundMenuAt(
+                                                  event.currentTarget,
+                                                  r,
+                                                  onContext,
+                                              )
+                                    }
                                     onContextMenu={(e) => onContext(e, r)}
                                     onKeyDown={(e) => openMenuFromKey(e, r)}
                                     className="absolute top-1 flex -translate-x-1/2 flex-col items-center gap-1 bg-transparent disabled:cursor-default disabled:opacity-60"

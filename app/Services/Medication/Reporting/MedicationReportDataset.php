@@ -135,7 +135,17 @@ final class MedicationReportDataset
         } elseif ($report === 'controlled') {
             abort_unless($actor->canDo('medications.controlled.view'), 403);
             $entries = $this->canonical(ClientControlledDrugEntry::query(), $siteIds, $clientIds)->whereBetween('recorded_at', $period->bounds())->with('medication')->orderBy('recorded_at')->get();
-            $rows = $entries->map(fn ($e) => $this->person($clients->get($e->client_id), $period, $actor) + ['reference' => 'register:'.$e->id, 'date' => $e->recorded_at->timezone('Pacific/Auckland')->toDateString(), 'medicine' => $e->medication?->historicalDisplayName(), 'movement' => $e->entry_type, 'quantity' => (float) $e->quantity, 'balance' => $e->on_hand_after === null ? null : (float) $e->on_hand_after, 'witnessed' => $e->witnessed_by !== null ? 1 : 0])->values();
+            $rows = $entries->map(function ($e) use ($clients, $period, $actor) {
+                $day = $e->recorded_at->timezone('Pacific/Auckland')->toDateString();
+                $person = $this->person($clients->get($e->client_id), $period, $actor);
+                $href = $person['href'] !== null ? '/emar/controlled?'.http_build_query([
+                    'client_id' => $e->client_id, 'client_medication_id' => $e->client_medication_id, 'date' => $day, 'entry_id' => $e->id,
+                ]) : null;
+
+                return array_merge($person, ['href' => $href, 'reference' => 'register:'.$e->id, 'date' => $day,
+                    'medicine' => $e->medication?->historicalDisplayName(), 'movement' => $e->entry_type, 'quantity' => (float) $e->quantity,
+                    'balance' => $e->on_hand_after === null ? null : (float) $e->on_hand_after, 'witnessed' => $e->witnessed_by !== null ? 1 : 0]);
+            })->values();
             // P07's real witnessed ledger entry is the count evidence. A task
             // marked complete is not a substitute for a recorded count.
             $counts = $entries->where('entry_type', 'balance_check')->count();
@@ -236,7 +246,7 @@ final class MedicationReportDataset
     }
 
     /** Source-level scheduled doses for the builder and omission audit. */
-    public function doseRows(User $actor, MedicationReportPeriod $period, array $siteIds, ?int $clientId = null): array
+    public function doseRows(User $actor, MedicationReportPeriod $period, array $siteIds, ?int $clientId = null, ?int $roundId = null): array
     {
         $ids = $this->access->clientIds($actor, $siteIds);
         if ($clientId !== null) {
@@ -244,8 +254,17 @@ final class MedicationReportDataset
             $ids = [$clientId];
         }
         $rows = $this->projection->rows(DoseSlotReaderScope::forAuthorisedClients($actor, $ids), $period->from, $period->to, CarbonImmutable::now('UTC'));
-        $this->limit($rows->count());
         $clients = Client::query()->whereIn('id', $ids)->with('site:id,name')->get()->keyBy('id');
+        if ($roundId !== null) {
+            $round = MedicationRound::query()->whereIn('site_id', $siteIds)->findOrFail($roundId);
+            abort_unless($period->from === $period->to && $round->round_date->toDateString() === $period->from, 404);
+            $at = $round->scheduledAt();
+            abort_unless($at !== null, 422, 'This round has no scheduled time.');
+            $rows = $rows->filter(fn ($slot) => (int) $clients->get($slot['client_id'])?->site_id === (int) $round->site_id
+                && (! $round->service_context_id || (int) $clients->get($slot['client_id'])?->service_context_id === (int) $round->service_context_id)
+                && CarbonImmutable::parse($slot['due_at'])->betweenIncluded($at->copy()->subMinutes($round->windowMinutes()), $round->windowEndsAt()))->values();
+        }
+        $this->limit($rows->count());
         $medicines = ClientMedication::withTrashed()->whereIn('id', $rows->pluck('client_medication_id')->filter()->unique())->get()->keyBy('id');
         $checked = MedicationOrderRevision::query()->whereIn('client_medication_id', $medicines->keys())->whereIn('client_id', $ids)->whereNotNull('checked_at')->whereIn('status', ['checked', 'checked_alone'])->with('version')->orderByDesc('checked_at')->orderByDesc('id')->get()->groupBy('client_medication_id');
 

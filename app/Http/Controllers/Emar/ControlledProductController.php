@@ -134,9 +134,9 @@ final class ControlledProductController extends Controller
 
     private function read(Request $request): array
     {
-        $filters = $request->validate(['site_id' => ['nullable', 'integer', 'min:1'], 'client_medication_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'], 'date' => ['nullable', 'date_format:Y-m-d']]);
+        $filters = $request->validate(['site_id' => ['nullable', 'integer', 'min:1'], 'client_medication_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'], 'date' => ['nullable', 'date_format:Y-m-d'], 'entry_id' => ['nullable', 'integer', 'min:1'], 'destruction_id' => ['nullable', 'integer', 'min:1']]);
 
-        return $this->payload->forActor($request->user(), isset($filters['site_id']) ? (int) $filters['site_id'] : null, isset($filters['client_medication_id']) ? (int) $filters['client_medication_id'] : null, isset($filters['client_id']) ? (int) $filters['client_id'] : null, $filters['date'] ?? null);
+        return $this->payload->forActor($request->user(), isset($filters['site_id']) ? (int) $filters['site_id'] : null, isset($filters['client_medication_id']) ? (int) $filters['client_medication_id'] : null, isset($filters['client_id']) ? (int) $filters['client_id'] : null, $filters['date'] ?? null, isset($filters['entry_id']) ? (int) $filters['entry_id'] : null, isset($filters['destruction_id']) ? (int) $filters['destruction_id'] : null);
     }
 
     private function redirectRead(Request $request, string $view)

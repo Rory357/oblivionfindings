@@ -33,6 +33,7 @@ import {
     createMedicationMutationReplayState,
     prepareMedicationMutationReplayState,
 } from '@/lib/emar-offline';
+import { medsTodayHref } from '@/lib/meds-today-location';
 import { cn } from '@/lib/utils';
 import {
     WITNESS_PIN_LENGTH,
@@ -80,7 +81,7 @@ export function scheduledDoseRecordLink(
     can: EmarNavigationPermissions | undefined,
 ): { href: string; place: string } {
     return isFrontlineMedication(can)
-        ? { href: '/meds/today', place: 'Meds today' }
+        ? { href: medsTodayHref(clientId), place: 'Meds today' }
         : { href: `/emar/mar?client_id=${clientId}`, place: 'the MAR chart' };
 }
 

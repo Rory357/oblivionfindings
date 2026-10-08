@@ -161,9 +161,13 @@ export default function HistoricalChangeLogs(props: Props) {
                                 ariaLabel="Search loaded medication changes"
                             />
                             <PageHeaderGlassButton
-                                className="min-h-11"
                                 onClick={() =>
-                                    router.visit('/emar/reports/history')
+                                    router.get('/emar/reports/history', {
+                                        date_from: props.filters.date_from,
+                                        date_to: props.filters.date_to,
+                                        site_id: props.filters.site_id,
+                                        client_id: props.filters.client_id,
+                                    })
                                 }
                             >
                                 Clinical history

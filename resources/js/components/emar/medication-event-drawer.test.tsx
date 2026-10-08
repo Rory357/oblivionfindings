@@ -165,7 +165,7 @@ describe('history event destinations', () => {
     it.each([null, 0, -1, 1.5])(
         'omits an absent or invalid person identifier (%s)',
         (client_id) => {
-            expect(eventPrimaryLink(event({ client_id })).href).toBe(
+            expect(eventPrimaryLink(event({ client_id }))?.href).toBe(
                 '/emar/medications',
             );
         },
@@ -252,12 +252,10 @@ describe('history drawer touch controls', () => {
     it('keeps secondary phone actions available in the compact menu', async () => {
         vi.stubGlobal(
             'fetch',
-            vi
-                .fn()
-                .mockResolvedValue({
-                    ok: true,
-                    json: async () => ({ backed: true }),
-                }),
+            vi.fn().mockResolvedValue({
+                ok: true,
+                json: async () => ({ backed: true }),
+            }),
         );
         const onExport = vi.fn();
         render(
@@ -332,7 +330,10 @@ describe('history drawer touch controls', () => {
 
     it.each([
         { flags: ['no_actor'], href: '/emar/medications?client_id=42' },
-        { flags: ['missing_witness'], href: '/emar/controlled?client_id=42' },
+        {
+            flags: ['missing_witness'],
+            href: '/emar/mar?client_id=42&date=2026-10-08&tab=history&dose_id=8',
+        },
     ])(
         'presents the gap navigation as one truthful source-record link ($flags)',
         ({ flags, href }) => {
@@ -342,7 +343,11 @@ describe('history drawer touch controls', () => {
             );
             render(
                 <MedicationEventDrawer
-                    event={event({ flags })}
+                    event={event({
+                        flags,
+                        source_href: href,
+                        source_label: 'Open source record',
+                    })}
                     onClose={vi.fn()}
                 />,
             );

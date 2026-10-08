@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\SanitizesCsvOutput;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientMedication;
+use App\Models\MedicationRound;
 use App\Models\User;
 use App\Services\AuthorizationEvidenceLockService;
 use App\Services\CurrentAuthorizationReads;
@@ -128,16 +129,39 @@ class MedicationReportsController extends Controller
     /** Small context endpoint for the shared record-page export prompt (P02). */
     public function exportOptions(Request $request)
     {
-        $data = $request->validate(['type' => ['required', Rule::in(['mar', 'cd_register', 'round_sheet', 'doses', 'errors', 'stock', 'audit', 'syringe_drivers'])], 'site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1']]);
+        $data = $request->validate([
+            'type' => ['required', Rule::in(['mar', 'cd_register', 'round_sheet', 'doses', 'errors', 'stock', 'audit', 'syringe_drivers'])],
+            'site_id' => ['nullable', 'integer', 'min:1'],
+            'client_id' => ['nullable', 'integer', 'min:1'],
+            'round_id' => ['nullable', 'integer', 'min:1', Rule::prohibitedIf($request->input('type') !== 'round_sheet')],
+        ]);
         $actor = $request->user();
         $type = $data['type'];
         abort_unless($this->access->canExport($actor, $type), 403);
-        $period = MedicationReportPeriod::fromRequest($request);
         $sites = $this->access->siteIds($actor, $request->integer('site_id') ?: null, $request->integer('client_id') ?: null, $type === 'stock' ? 'stock' : ($type === 'cd_register' ? 'controlled' : 'doses'));
+        $selectedRound = null;
+        if ($request->integer('round_id')) {
+            $round = MedicationRound::query()->whereIn('site_id', $sites)->findOrFail($request->integer('round_id'));
+            $day = $round->round_date->toDateString();
+            $request->validate([
+                'date_from' => ['nullable', 'date_format:Y-m-d'],
+                'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+            ]);
+            abort_if(($request->filled('date_from') && $request->input('date_from') !== $day)
+                || ($request->filled('date_to') && $request->input('date_to') !== $day), 404);
+            if ($request->filled('period') && $request->input('period') !== 'custom') {
+                $requestedPeriod = MedicationReportPeriod::fromRequest($request);
+                abort_unless($requestedPeriod->from === $day && $requestedPeriod->to === $day, 404);
+            }
+            $request->merge(['site_id' => $round->site_id, 'period' => 'custom', 'date_from' => $day, 'date_to' => $day]);
+            $sites = [(int) $round->site_id];
+            $selectedRound = ['id' => (int) $round->id, 'name' => $round->name, 'site_id' => (int) $round->site_id, 'date' => $day];
+        }
+        $period = MedicationReportPeriod::fromRequest($request);
         $people = Client::query()->whereIn('id', $this->access->clientIds($actor, $sites))->when($request->integer('client_id'), fn ($q) => $q->whereKey($request->integer('client_id')))->orderBy('first_name')->limit(100)->get()->map(fn ($p) => ['id' => $p->id, 'name' => trim($p->first_name.' '.$p->last_name)]);
         $spec = ['mar' => ['MAR chart', 'PDF', 'One person, up to 31 NZ days. Ceased and superseded medicines stay in the period.'], 'cd_register' => ['Controlled drug register', 'PDF', 'One person and one medicine, up to 31 NZ days.'], 'round_sheet' => ['Round sheet', 'PDF', 'One house and one NZ day.'], 'doses' => ['Doses', 'CSV', 'Scheduled dose slots, including Away.'], 'errors' => ['Medication errors', 'CSV', 'Factual accounts, with in-error records excluded unless requested.'], 'stock' => ['Stock', 'CSV', 'Stock as at now.'], 'syringe_drivers' => ['Syringe drivers', 'CSV', 'Recorded driver use and canonical medicine contents; free-text notes are excluded.'], 'audit' => ['Audit trail', 'CSV', 'Filtered events over the selected period.']][$type];
 
-        return response()->json(['filters' => ['view' => 'exports', 'report' => 'doses', 'sub' => 'events', 'period' => 'custom', 'date_from' => $period->from, 'date_to' => $period->to, 'site_id' => count($sites) === 1 ? $sites[0] : null, 'client_id' => $request->integer('client_id') ?: null, 'kind' => '', 'q' => ''], 'sites' => app(MedicationGovernanceScopeService::class)->sitePicker($sites)->map->only(['id', 'name'])->values(), 'people' => $people, 'finance' => $this->access->financeOnly($actor), 'exports' => [['type' => $type, 'label' => $spec[0], 'format' => $spec[1], 'description' => $spec[2], 'allowed' => true]], 'purposes' => MedicationExportAudit::PURPOSES], 200, ['Cache-Control' => 'no-store']);
+        return response()->json(['filters' => ['view' => 'exports', 'report' => 'doses', 'sub' => 'events', 'period' => 'custom', 'date_from' => $period->from, 'date_to' => $period->to, 'site_id' => count($sites) === 1 ? $sites[0] : null, 'client_id' => $request->integer('client_id') ?: null, 'round_id' => $selectedRound['id'] ?? null, 'kind' => '', 'q' => ''], 'selected_round' => $selectedRound, 'sites' => app(MedicationGovernanceScopeService::class)->sitePicker($sites)->map->only(['id', 'name'])->values(), 'people' => $people, 'finance' => $this->access->financeOnly($actor), 'exports' => [['type' => $type, 'label' => $spec[0], 'format' => $spec[1], 'description' => $spec[2], 'allowed' => true]], 'purposes' => MedicationExportAudit::PURPOSES], 200, ['Cache-Control' => 'no-store']);
     }
 
     public function verify(Request $request)
@@ -160,7 +184,7 @@ class MedicationReportsController extends Controller
 
     public function export(Request $request)
     {
-        $data = $request->validate(['type' => ['required', Rule::in(['mar', 'cd_register', 'round_sheet', 'doses', 'errors', 'stock', 'audit', 'syringe_drivers'])], 'site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'], 'medication_id' => ['nullable', 'integer', 'min:1'], 'kind' => ['nullable', 'string', 'max:100'], 'q' => ['nullable', 'string', 'max:80'], 'include_in_error' => ['nullable', 'boolean'], 'include_prn' => ['nullable', 'boolean']]);
+        $data = $request->validate(['type' => ['required', Rule::in(['mar', 'cd_register', 'round_sheet', 'doses', 'errors', 'stock', 'audit', 'syringe_drivers'])], 'site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'], 'medication_id' => ['nullable', 'integer', 'min:1'], 'round_id' => ['nullable', 'integer', 'min:1'], 'kind' => ['nullable', 'string', 'max:100'], 'q' => ['nullable', 'string', 'max:80'], 'include_in_error' => ['nullable', 'boolean'], 'include_prn' => ['nullable', 'boolean']]);
         $actor = $request->user();
         $type = $data['type'];
         abort_unless($this->access->canExport($actor, $type), 403);
@@ -170,11 +194,11 @@ class MedicationReportsController extends Controller
         $clientId = $request->integer('client_id') ?: null;
         $sites = $this->access->siteIds($actor, $request->integer('site_id') ?: null, $clientId, $type === 'stock' ? 'stock' : ($type === 'cd_register' ? 'controlled' : 'doses'));
         if (in_array($type, ['mar', 'cd_register', 'round_sheet'], true)) {
-            $read = fn (User $current) => app(MedicationPdfDataset::class)->read($current, $type, $period, $sites, $clientId, $request->integer('medication_id') ?: null, ! $request->has('include_prn') || $request->boolean('include_prn'));
+            $read = fn (User $current) => app(MedicationPdfDataset::class)->read($current, $type, $period, $sites, $clientId, $request->integer('medication_id') ?: null, ! $request->has('include_prn') || $request->boolean('include_prn'), $type === 'round_sheet' ? ($request->integer('round_id') ?: null) : null);
             $evidence = $read($actor);
             $digest = hash('sha256', json_encode($evidence, JSON_THROW_ON_ERROR));
             $bytes = Pdf::setOption(['defaultFont' => 'DejaVu Sans', 'isRemoteEnabled' => false])->loadView('pdf.medication-report', ['evidence' => $evidence, 'actor' => $actor, 'generated' => CarbonImmutable::now('UTC'), 'purpose' => $purpose])->setPaper('a4', 'landscape')->output();
-            app(MedicationExportAudit::class)->record($actor, $type, $sites, $period, $purpose, $clientId, ['rows' => count($evidence['rows']), 'include_prn' => ! $request->has('include_prn') || $request->boolean('include_prn'), 'medication_id' => $request->integer('medication_id') ?: null], function (User $current) use ($read, $digest) {
+            app(MedicationExportAudit::class)->record($actor, $type, $sites, $period, $purpose, $clientId, ['rows' => count($evidence['rows']), 'include_prn' => ! $request->has('include_prn') || $request->boolean('include_prn'), 'medication_id' => $request->integer('medication_id') ?: null, 'round_id' => $type === 'round_sheet' ? ($request->integer('round_id') ?: null) : null], function (User $current) use ($read, $digest) {
                 abort_unless(hash_equals($digest, hash('sha256', json_encode($read($current), JSON_THROW_ON_ERROR))), 409, 'The records or your access changed while the file was being prepared. Refresh and try again.');
             });
 
@@ -211,7 +235,15 @@ class MedicationReportsController extends Controller
 
     public function legacyRoundSheet(Request $request)
     {
+        $request->validate(['date' => ['nullable', 'date_format:Y-m-d'], 'site_id' => ['nullable', 'integer', 'min:1'], 'round_id' => ['nullable', 'integer', 'min:1']]);
         $day = $request->input('date', CarbonImmutable::now('Pacific/Auckland')->toDateString());
+        if ($request->integer('round_id')) {
+            $sites = $this->access->siteIds($request->user(), $request->integer('site_id') ?: null);
+            $round = MedicationRound::query()->whereIn('site_id', $sites)->findOrFail($request->integer('round_id'));
+            abort_if($request->filled('date') && $day !== $round->round_date->toDateString(), 404);
+            $day = $round->round_date->toDateString();
+            $request->merge(['site_id' => $round->site_id]);
+        }
         $request->merge(['type' => 'round_sheet', 'period' => 'custom', 'date_from' => $day, 'date_to' => $day]);
 
         return $this->export($request);

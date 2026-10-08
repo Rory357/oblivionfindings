@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationScopeDecisionService;
 use Carbon\Carbon;
+use Database\Factories\UserFactory;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -28,8 +29,6 @@ use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use RuntimeException;
 use Tests\TestCase;
-use Database\Factories\UserFactory;
-use App\Services\Medication\WitnessPinService;
 
 /**
  * The retained supply and dispensing reader serves the prescriber-order payload.
@@ -1934,6 +1933,16 @@ class PrescriptionsPageTest extends TestCase
             ]);
             $shiftClient = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
             $breakGlassClient = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+            // Person assignments permit reading; neither grants current work authority.
+            $shiftClient->supportWorkers()->attach($actor->id);
+            $breakGlassClient->supportWorkers()->attach($actor->id);
+            $this->assertTrue($actor->can('viewMedications', $shiftClient));
+            $this->assertTrue($actor->can('viewMedications', $breakGlassClient));
+            $this->assertSame([], app(MedicationScopeDecisionService::class)->clientIdsWithCurrentAuthority(
+                $actor,
+                [$shiftClient->id, $breakGlassClient->id],
+                now(),
+            ));
             $recorder = $this->makeRoleUser('support_worker');
             HrEmployeeProfile::factory()->create([
                 'user_id' => $recorder->id,
@@ -2237,7 +2246,12 @@ class PrescriptionsPageTest extends TestCase
             'client_id' => $foreignClient->id,
             'name' => 'FORGED foreign linked order medication',
             'controlled_drug' => false,
+            'active' => true,
+            'state' => 'active',
+            'approval_status' => 'verified',
         ]);
+        // Same-Site membership and order permissions do not reveal an unassigned chart.
+        $this->assertFalse($user->can('viewMedications', $foreignClient));
         $createOrder = fn (array $attributes): MedicationPrescriberOrder => MedicationPrescriberOrder::query()->create([
             'client_id' => $client->id,
             'order_type' => 'new',
@@ -2349,12 +2363,16 @@ class PrescriptionsPageTest extends TestCase
                         && $names->doesntContain('FORGED cross-client order')
                         && $names->doesntContain('FORGED foreign Site order');
                 })
-                ->where('medications', function ($medications) use ($ordinaryMedication, $foreignMedication): bool {
-                    $actual = collect($medications)->pluck('id')->map(fn ($id) => (int) $id)->sort()->values();
-                    $expected = collect([$ordinaryMedication->id, $foreignMedication->id])->map(fn ($id) => (int) $id)->sort()->values();
+                ->where('clients', fn ($clients): bool => collect($clients)->pluck('id')->map(fn ($id) => (int) $id)->all() === [(int) $client->id])
+                ->where('medications', function ($medications) use ($ordinaryMedication): bool {
+                    $ids = collect($medications)->pluck('id')->map(fn ($id) => (int) $id);
 
-                    return $actual->all() === $expected->all();
+                    return $ids->all() === [(int) $ordinaryMedication->id];
                 }));
+
+        $this->actingAs($user)
+            ->get(route('emar.prescriptions.legacy', ['client_id' => $foreignClient->id]))
+            ->assertNotFound();
 
         $this->actingAs($user)
             ->get(route('emar.prescriptions.legacy'))

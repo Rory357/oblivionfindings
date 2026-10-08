@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { formatTime } from '@/lib/datetime';
 import { router } from '@inertiajs/react';
 import { ExternalLink, Info, Lock, Pill } from 'lucide-react';
-import { useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 
 import {
     EntityContextMenu,
@@ -71,6 +71,18 @@ export function MarDayGrid({
     onOpenDose: (dose: DayDose, medicine: DayMedicine) => void;
     onMedicineDetails: (medicine: DayMedicine) => void;
 }) {
+    const focusMedicine =
+        Number(
+            new URLSearchParams(
+                typeof window === 'undefined' ? '' : window.location.search,
+            ).get('focus_medication_id'),
+        ) || null;
+    useEffect(() => {
+        if (focusMedicine)
+            document
+                .getElementById('mar-medicine-' + focusMedicine)
+                ?.focus({ preventScroll: false });
+    }, [focusMedicine, day.date, day.medicines]);
     const isToday = day.date === day.today;
     const { ctx, open, close } = useEntityContextMenu<DayMedicine>();
 
@@ -161,7 +173,13 @@ export function MarDayGrid({
                             <tr
                                 key={medicine.key ?? medicine.id}
                                 onContextMenu={(event) => open(event, medicine)}
-                                className="group"
+                                id={`mar-medicine-${medicine.id}`}
+                                tabIndex={-1}
+                                className={cn(
+                                    'group outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                                    medicine.id === focusMedicine &&
+                                        'bg-primary/5',
+                                )}
                             >
                                 <th
                                     scope="row"

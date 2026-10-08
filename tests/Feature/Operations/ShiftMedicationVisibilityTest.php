@@ -63,12 +63,16 @@ class ShiftMedicationVisibilityTest extends TestCase
 
     public function test_record_only_frontline_reader_keeps_ordinary_medication_visibility(): void
     {
-        [$actor, $shift] = $this->context(['medications.view' => false]);
+        [$actor, $shift] = $this->context(['medications.view' => false, 'clients.viewAssigned' => true]);
         $this->assertFalse($actor->canDo('medications.view'));
         $this->assertTrue($actor->canDo('medications.administer.record'));
         $before = MedicationEvent::count();
         $response = $this->actingAs($actor)->get(route('operations.shifts.show', $shift))->assertOk();
         $this->assertTrue($response->inertiaProps('can.view_medication'));
+        $this->assertNull($response->inertiaProps('medications.mar_url'));
+        $this->assertTrue($actor->can('view', $this->client));
+        $this->assertFalse($actor->can('viewMedications', $this->client));
+        $this->assertNull($response->inertiaProps('medications.medical_url'));
         $this->assertStringContainsString('Ordinary PRN', json_encode($response->inertiaProps('medications')));
         $this->assertStringNotContainsString('Controlled PRN', json_encode($response->inertiaProps()));
         $this->assertSame($before, MedicationEvent::count());
@@ -112,6 +116,33 @@ class ShiftMedicationVisibilityTest extends TestCase
         $before = MedicationEvent::count();
         $this->actingAs($actor->fresh())->get(route('operations.shifts.show', $shift))->assertForbidden();
         $this->assertSame($before, MedicationEvent::count());
+    }
+
+    public function test_shift_medication_links_keep_the_nz_shift_day_person_and_return_tab(): void
+    {
+        [$actor, $shift] = $this->context(['clients.viewAssigned' => true]);
+        $shift->update(['starts_at' => Carbon::parse('2026-10-04 11:30:00', 'UTC'),
+            'ends_at' => Carbon::parse('2026-10-04 15:30:00', 'UTC'),
+            'actual_starts_at' => Carbon::parse('2026-10-04 11:30:00', 'UTC'),
+            'actual_ends_at' => Carbon::parse('2026-10-04 15:30:00', 'UTC'), 'status' => 'completed']);
+        $response = $this->actingAs($actor)->get(route('operations.shifts.show', $shift))->assertOk();
+        $this->assertSame('2026-10-05', $response->inertiaProps('medications.date'));
+        parse_str(parse_url($response->inertiaProps('medications.mar_url'), PHP_URL_QUERY), $query);
+        $this->assertSame((string) $this->client->id, $query['client_id']);
+        $this->assertSame((string) $this->site->id, $query['site_id']);
+        $this->assertSame('2026-10-05', $query['date']);
+        $this->assertSame('/operations/shifts/'.$shift->id.'?tab=medications', $query['return_to']);
+        parse_str(parse_url($response->inertiaProps('medications.medical_url'), PHP_URL_QUERY), $medicalQuery);
+        $this->assertSame('medical', $medicalQuery['tab']);
+        $this->assertSame($query['return_to'], $medicalQuery['return_to']);
+    }
+
+    public function test_medication_authority_on_a_shift_does_not_grant_the_general_medical_profile(): void
+    {
+        [$actor, $shift] = $this->context(['clients.viewAssigned' => false, 'clients.viewAny' => false]);
+        $response = $this->actingAs($actor)->get(route('operations.shifts.show', $shift))->assertOk();
+        $this->assertNotNull($response->inertiaProps('medications.mar_url'));
+        $this->assertNull($response->inertiaProps('medications.medical_url'));
     }
 
     private function context(array $permissions = []): array

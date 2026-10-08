@@ -681,14 +681,14 @@ class MedicationControllerTest extends TestCase
     {
         $this->actingAs($this->admin)
             ->get("/clients/{$this->client->id}/medical")
-            ->assertRedirect(EmarUrl::medications($this->client));
+            ->assertRedirect(route('operations.clients.show', ['client' => $this->client->id, 'tab' => 'medical', 'medical_section' => 'profile']));
     }
 
     public function test_client_medical_show_accessible_by_assigned_support_worker(): void
     {
         $this->actingAs($this->supportWorker)
             ->get("/clients/{$this->client->id}/medical")
-            ->assertRedirect(EmarUrl::medications($this->client));
+            ->assertRedirect(route('operations.clients.show', ['client' => $this->client->id, 'tab' => 'medical', 'medical_section' => 'profile']));
     }
 
     public function test_client_medical_show_forbidden_for_unassigned_support_worker(): void
@@ -2050,7 +2050,7 @@ class MedicationControllerTest extends TestCase
         // Without break-glass, verify they can access (provider_manager has clients.viewAny)
         $this->actingAs($otherWorker)
             ->get("/clients/{$this->client->id}/medical")
-            ->assertRedirect(EmarUrl::medications($this->client));
+            ->assertRedirect(route('operations.clients.show', ['client' => $this->client->id, 'tab' => 'medical', 'medical_section' => 'profile']));
 
         // Create break-glass access
         ClientBreakGlassAccess::create([
@@ -2063,7 +2063,7 @@ class MedicationControllerTest extends TestCase
         // Should still be accessible
         $this->actingAs($otherWorker)
             ->get("/clients/{$this->client->id}/medical")
-            ->assertRedirect(EmarUrl::medications($this->client));
+            ->assertRedirect(route('operations.clients.show', ['client' => $this->client->id, 'tab' => 'medical', 'medical_section' => 'profile']));
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -2733,7 +2733,7 @@ class MedicationControllerTest extends TestCase
         // via the clients.update middleware, but let's verify they can at least view
         $this->actingAs($this->coordinator)
             ->get("/clients/{$this->client->id}/medical")
-            ->assertRedirect(EmarUrl::medications($this->client));
+            ->assertRedirect(route('operations.clients.show', ['client' => $this->client->id, 'tab' => 'medical', 'medical_section' => 'profile']));
     }
 
     // ══════════════════════════════════════════════════════════════

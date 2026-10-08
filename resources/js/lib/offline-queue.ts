@@ -172,6 +172,10 @@ let lastBroadcast: OfflineQueueState = {
 let lastPendingSignature = '';
 let storageOverride: QueueStorage | null = null;
 let currentActorId: string | null = null;
+/** Shared actor boundary for in-memory medication recovery; never infer it from a name. */
+export function getOfflineQueueActorId(): string | null {
+    return currentActorId;
+}
 const notifiedQueueWarnings = new Set<string>();
 let lastKnownSafeQueue: OfflineSubmission[] = [];
 
@@ -309,6 +313,8 @@ export function setOfflineQueueActor(actorId: unknown): void {
     if (nextActorId === currentActorId) return;
 
     currentActorId = nextActorId;
+    if (typeof window !== 'undefined')
+        window.dispatchEvent(new Event('emar:actor-changed'));
     lastKnownSafeQueue = [];
     lastBroadcast = {
         online: typeof navigator === 'undefined' ? true : navigator.onLine,
@@ -536,8 +542,12 @@ export async function getPendingCount(): Promise<number> {
  * recorded. Only items the server definitively refused are removed.
  */
 /** Dismiss one definitively rejected item belonging to the current actor. */
-export async function dismissRejectedOfflineSubmission(id: string): Promise<void> {
-    const item = (await listQueue()).find((entry) => entry.id === id && entry.rejected);
+export async function dismissRejectedOfflineSubmission(
+    id: string,
+): Promise<void> {
+    const item = (await listQueue()).find(
+        (entry) => entry.id === id && entry.rejected,
+    );
     if (item) await removeQueueItem(item.id);
     await broadcastState();
 }

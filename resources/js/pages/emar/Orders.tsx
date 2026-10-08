@@ -1,3 +1,4 @@
+import { MedicationJourneyReturn } from '@/components/emar/medication-journey-return';
 import {
     EntityContextMenu,
     useEntityContextMenu,
@@ -123,6 +124,7 @@ type Props = {
     clients: ClientChoice[];
     covert: Covert[];
     reconciliations: Reconciliation[];
+    selected_reconciliation?: Reconciliation | null;
     can: {
         manage: boolean;
         verify: boolean;
@@ -134,7 +136,14 @@ type Props = {
     review_default: string;
     review_handoff: ReviewHandoff | null;
     prefill_client_id: number | null;
-    filters: { view?: View; show?: string; search?: string; site_id?: string };
+    filters: {
+        view?: View;
+        show?: string;
+        search?: string;
+        site_id?: string;
+        client_id?: number | null;
+        return_to?: string | null;
+    };
     respite_stays: RespiteStayChoice[];
     open_order_id: number | null;
     open_order_action: OpeningAction;
@@ -161,6 +170,13 @@ export default function Orders(props: Props) {
         setModal(null);
     };
     useEffect(() => () => request.current?.abort(), []);
+    useEffect(() => {
+        if (props.selected_reconciliation)
+            setModal({
+                type: 'reconciliation',
+                record: props.selected_reconciliation,
+            });
+    }, [props.selected_reconciliation]);
     const filter = (change: Partial<Props['filters']>) =>
         router.get(
             '/emar/prescriptions',
@@ -419,6 +435,7 @@ export default function Orders(props: Props) {
                     subline={`Prescriber’s instructions, checks and transitions · loaded ${formatDateTime(props.loaded_at)}`}
                     actions={
                         <>
+                            <MedicationJourneyReturn />
                             <ConnectedServicesMenu
                                 clientId={
                                     Number(

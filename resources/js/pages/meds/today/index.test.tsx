@@ -1,7 +1,14 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { renderToString } from 'react-dom/server';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { MedsTodayProps, ScheduleRow } from './types';
+
+const pageContext = vi.hoisted(() => ({ url: '/meds/today' }));
+afterEach(() => {
+    vi.unstubAllGlobals();
+    pageContext.url = '/meds/today';
+});
 
 vi.mock('@/layouts/app-layout', () => ({
     default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -45,7 +52,7 @@ vi.mock('@inertiajs/react', () => ({
         visit: vi.fn(),
         on: vi.fn(() => () => undefined),
     },
-    usePage: () => ({ props: {}, url: '/meds/today' }),
+    usePage: () => ({ props: {}, url: pageContext.url }),
 }));
 // The one recording dialog is tested on its own; here we check what the page opens.
 vi.mock('@/components/emar/record-dose/record-dose-dialog', () => ({
@@ -1029,6 +1036,27 @@ describe('visible MAR entry point', () => {
     beforeEach(() =>
         window.history.replaceState(null, '', '/meds/today?site_id=5'),
     );
+    it('server-renders the chart link with the original house, person, day and return view', () => {
+        pageContext.url =
+            '/meds/today?site_id=5&client_id=1&date=2026-04-30&view=asneeded';
+        vi.stubGlobal('window', undefined);
+        const container = document.createElement('div');
+        container.innerHTML = renderToString(
+            <MedsToday {...props()} selected_client_id={1} />,
+        );
+        const link = [...container.querySelectorAll('a')].find((item) =>
+            item.textContent?.includes('Open MAR chart'),
+        );
+        const target = new URL(
+            link!.getAttribute('href')!,
+            'https://medication.invalid',
+        );
+        expect(target.pathname).toBe('/emar/mar');
+        expect(target.searchParams.get('client_id')).toBe('1');
+        expect(target.searchParams.get('site_id')).toBe('5');
+        expect(target.searchParams.get('date')).toBe('2026-04-30');
+        expect(target.searchParams.get('return_to')).toBe(pageContext.url);
+    });
     it('opens the selected person’s chart with the same NZ date and house', () => {
         render(<MedsToday {...props()} selected_client_id={1} />);
         const link = screen.getByRole('link', { name: 'Open MAR chart' });
@@ -1038,6 +1066,7 @@ describe('visible MAR entry point', () => {
             date: '2026-04-30',
             client_id: '1',
             site_id: '5',
+            return_to: '/meds/today?site_id=5',
         });
     });
     it('hides the shortcut when the worker has no MAR access', () => {

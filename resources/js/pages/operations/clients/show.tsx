@@ -3,12 +3,19 @@ import ClientLocationTab, {
     type ClientLocationData,
 } from '@/components/client-location-tab';
 import RecentClientsStrip from '@/components/client-profile/recent-clients-strip';
-import { type ClientSafety } from '@/components/client-safety-ribbon';
+import {
+    allergyReviewCaption,
+    type ClientSafety,
+} from '@/components/client-safety-ribbon';
 import type { AbcEntryRow } from '@/components/clients/profile/abc-dialog';
 import {
     ProfileDialogs,
     type ProfileDialogState,
 } from '@/components/clients/profile/dialog-host';
+import {
+    MedicalDialogs,
+    type MedicalSection,
+} from '@/components/clients/profile/medical-dialogs';
 import {
     buildAboutTiles,
     OverviewDesignGrid,
@@ -70,6 +77,10 @@ import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { ageOnWorkerDay, formatDateTimeLong } from '@/lib/datetime';
 import { formatDateTime as formatDT } from '@/lib/fleet-utils';
+import {
+    medicationReturnTo,
+    withMedicationReturn,
+} from '@/lib/medication-navigation';
 import type { WitnessPickerOption } from '@/lib/witness-pin';
 import { ClientClinicalRecordLaunchers } from '@/pages/health-clinical/components/client-clinical-launchers';
 import { DailyNoteWizard } from '@/pages/operations/clients/dialogs/daily-note-wizard';
@@ -862,6 +873,25 @@ export default function ClientShow({
     transport,
 }: Props) {
     const pageProps = usePage().props as any;
+    const profileUrl = usePage().url;
+    const medicalSection = new URLSearchParams(
+        profileUrl.split('?')[1]?.split('#')[0],
+    ).get('medical_section');
+    const [medicalDialog, setMedicalDialog] = useState<MedicalSection | null>(
+        null,
+    );
+    const closeMedicalDialog = () => {
+        setMedicalDialog(null);
+        if (medicalSection) {
+            const url = new URL(profileUrl, window.location.origin);
+            url.searchParams.delete('medical_section');
+            router.replace({
+                url: url.pathname + url.search + url.hash,
+                preserveState: true,
+                preserveScroll: true,
+            });
+        }
+    };
     const { auth, labels } = pageProps;
     const profileSectionAccess =
         profileSectionAccessProp ??
@@ -877,6 +907,19 @@ export default function ClientShow({
             ),
         [pageProps, profileSectionAccess],
     );
+    const canEditLoadedMedical = Boolean(
+        can.update_client && canShowProfileTab('medical') && pageProps.medical,
+    );
+    useEffect(() => {
+        if (
+            canEditLoadedMedical &&
+            ['profile', 'conditions', 'emergency_contacts'].includes(
+                medicalSection ?? '',
+            )
+        )
+            setMedicalDialog(medicalSection as MedicalSection);
+        if (!canEditLoadedMedical) setMedicalDialog(null);
+    }, [medicalSection, canEditLoadedMedical]);
     const safety = pageProps.safety as ClientSafety | null | undefined;
     const createShiftLauncher = useCreateShiftLauncher();
     const nextShiftSummary = shifts_summary?.next ?? null;
@@ -1764,8 +1807,13 @@ export default function ClientShow({
         client.risk_level === 'high' ||
         client.risk_level === 'critical'
             ? 'critical'
-            : 'success';
+            : safety?.allergy_record &&
+                (!safety.allergy_record.reviewed ||
+                    safety.allergy_record.status === 'none')
+              ? 'warning'
+              : 'success';
     const safetyCaption = [
+        allergyReviewCaption(safety?.allergy_record),
         client.risk_level ? `${client.risk_level} risk` : null,
         ...(client.safeguarding_flag ? ['Safeguarding'] : []),
         ...(safety?.allergies ?? []).map((a) => `Allergy: ${a.label}`),
@@ -2073,7 +2121,13 @@ export default function ClientShow({
                 hero={
                     <PageHeader
                         variant="profile"
-                        backHref="/operations/clients"
+                        backHref={
+                            medicationReturnTo(
+                                new URLSearchParams(
+                                    profileUrl.split('?')[1],
+                                ).get('return_to'),
+                            ) ?? '/operations/clients'
+                        }
                         mark={
                             <span className="eh-mark-ring text-[17px] font-bold tracking-tight">
                                 {client.avatar || client.profile_photo_url ? (
@@ -2404,7 +2458,7 @@ export default function ClientShow({
                                             </PageHeaderMeterBig>
                                             <PageHeaderMeterCaption>
                                                 {safetyCaption ||
-                                                    'no allergies or active alerts recorded'}
+                                                    'No safety alerts shown'}
                                             </PageHeaderMeterCaption>
                                         </PageHeaderMeterBlock>
                                     ) : null}
@@ -3566,7 +3620,12 @@ export default function ClientShow({
                                             className="gap-1.5 text-xs"
                                             asChild
                                         >
-                                            <Link href="/emar">
+                                            <Link
+                                                href={withMedicationReturn(
+                                                    `/emar/mar?client_id=${client.id}`,
+                                                    profileUrl,
+                                                )}
+                                            >
                                                 <Pill className="h-3.5 w-3.5" />{' '}
                                                 Open eMAR
                                             </Link>
@@ -3652,17 +3711,18 @@ export default function ClientShow({
                                                         </div>
                                                         Medical Profile
                                                     </div>
-                                                    {can.edit && (
+                                                    {can.update_client && (
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
-                                                            asChild
+                                                            onClick={() =>
+                                                                setMedicalDialog(
+                                                                    'profile',
+                                                                )
+                                                            }
                                                         >
-                                                            <Link
-                                                                href={`/operations/clients/${client.id}/medical`}
-                                                            >
-                                                                Edit
-                                                            </Link>
+                                                            {' '}
+                                                            Edit{' '}
                                                         </Button>
                                                     )}
                                                 </CardTitle>
@@ -3853,18 +3913,18 @@ export default function ClientShow({
                                                         </div>
                                                         Conditions
                                                     </div>
-                                                    {can.edit && (
+                                                    {can.update_client && (
                                                         <Button
-                                                            variant="ghost"
+                                                            variant="outline"
                                                             size="sm"
-                                                            className="h-6 text-xs"
-                                                            asChild
+                                                            onClick={() =>
+                                                                setMedicalDialog(
+                                                                    'conditions',
+                                                                )
+                                                            }
                                                         >
-                                                            <Link
-                                                                href={`/operations/clients/${client.id}/medical?section=conditions`}
-                                                            >
-                                                                Manage
-                                                            </Link>
+                                                            {' '}
+                                                            Manage{' '}
                                                         </Button>
                                                     )}
                                                 </CardTitle>
@@ -3932,18 +3992,18 @@ export default function ClientShow({
                                                         </div>
                                                         Emergency Contacts
                                                     </div>
-                                                    {can.edit && (
+                                                    {can.update_client && (
                                                         <Button
-                                                            variant="ghost"
+                                                            variant="outline"
                                                             size="sm"
-                                                            className="h-6 text-xs"
-                                                            asChild
+                                                            onClick={() =>
+                                                                setMedicalDialog(
+                                                                    'emergency_contacts',
+                                                                )
+                                                            }
                                                         >
-                                                            <Link
-                                                                href={`/operations/clients/${client.id}/medical?section=emergency_contacts`}
-                                                            >
-                                                                Manage
-                                                            </Link>
+                                                            {' '}
+                                                            Manage{' '}
                                                         </Button>
                                                     )}
                                                 </CardTitle>
@@ -6875,6 +6935,15 @@ export default function ClientShow({
                 }}
             />
 
+            {canEditLoadedMedical && medicalDialog && (
+                <MedicalDialogs
+                    key={`${client.id}:${medicalDialog}`}
+                    clientId={client.id}
+                    section={medicalDialog}
+                    medical={medical}
+                    onClose={closeMedicalDialog}
+                />
+            )}
             {createShiftLauncher.dialog}
         </AppLayout>
     );

@@ -41,6 +41,9 @@ export type CdVerification = {
 };
 
 export type Handover = {
+    medication_date?: string | null;
+    mar_url?: string | null;
+    cd_register_url?: string | null;
     worker_notes?: HandoverWorkerNotes | null;
     id: number;
     status: HandoverStatus | string;

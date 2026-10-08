@@ -763,6 +763,7 @@ export type AddClientDialogProps = {
     defaultServiceContextId?: number | null;
     clientSingular?: string;
     clientId?: number;
+    canEditMedical?: boolean;
     initialValues?: Partial<ClientWizardForm>;
     onSaved?: (clientId: number) => void;
 };
@@ -803,10 +804,17 @@ function AddClientBody({
     clientSingular = 'Client',
     clientId,
     initialValues,
+    canEditMedical = true,
     onSaved,
 }: AddClientDialogProps) {
     const page = usePage<{ flash?: { created_client_id?: number | null } }>();
     const isEditMode = clientId != null;
+    const steps =
+        isEditMode && !canEditMedical
+            ? STEPS.filter(
+                  (step) => step.key !== 'health' && step.key !== 'contacts',
+              )
+            : STEPS;
     const form = useForm<ClientWizardForm>(
         formWithInitialValues(defaultServiceContextId, initialValues),
     );
@@ -816,7 +824,7 @@ function AddClientBody({
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [done, setDone] = useState(false);
 
-    const cur = STEPS[stepIndex];
+    const cur = steps[stepIndex];
     const pct = useMemo(() => completionPct(data), [data]);
 
     const set = <K extends keyof ClientWizardForm>(
@@ -838,7 +846,7 @@ function AddClientBody({
         errors[name] ?? (form.errors as Record<string, string>)[name];
 
     const goToStep = (key: StepKey) => {
-        const idx = STEPS.findIndex((s) => s.key === key);
+        const idx = steps.findIndex((s) => s.key === key);
         if (idx >= 0) setStepIndex(idx);
     };
 
@@ -846,7 +854,7 @@ function AddClientBody({
         const e = validateStep(cur.key, data);
         setErrors(e);
         if (Object.keys(e).length) return;
-        setStepIndex((i) => Math.min(i + 1, STEPS.length - 1));
+        setStepIndex((i) => Math.min(i + 1, steps.length - 1));
     };
     const back = () => setStepIndex((i) => Math.max(i - 1, 0));
 
@@ -862,7 +870,7 @@ function AddClientBody({
     const submit = (addAnother: boolean) => {
         // Re-validate every gating step; jump to the first that fails.
         const all: Record<string, string> = {};
-        for (const s of STEPS) Object.assign(all, validateStep(s.key, data));
+        for (const s of steps) Object.assign(all, validateStep(s.key, data));
         if (Object.keys(all).length) {
             setErrors(all);
             goToStep(stepForError(Object.keys(all)[0]));
@@ -898,11 +906,15 @@ function AddClientBody({
         };
 
         if (isEditMode && clientId) {
-            form.transform((payload) => ({
-                ...payload,
-                _method: 'put',
-                _modal: true,
-            }));
+            form.transform((payload) => {
+                const permitted = { ...payload } as Partial<ClientWizardForm>;
+                if (!canEditMedical) {
+                    delete permitted.medical;
+                    delete permitted.conditions;
+                    delete permitted.emergency_contacts;
+                }
+                return { ...permitted, _method: 'put', _modal: true };
+            });
             form.post(`/operations/clients/${clientId}`, options);
         } else {
             form.transform((payload) => payload);
@@ -966,7 +978,7 @@ function AddClientBody({
                     </div>
                 </div>
 
-                {STEPS.map((s, i) => {
+                {steps.map((s, i) => {
                     const active = i === stepIndex;
                     const complete = i < stepIndex;
                     const Icon = s.icon;
@@ -1035,7 +1047,7 @@ function AddClientBody({
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                 <header className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3.5">
                     <div className="text-[13px] font-semibold text-muted-foreground">
-                        Step {stepIndex + 1} of {STEPS.length} ·{' '}
+                        Step {stepIndex + 1} of {steps.length} ·{' '}
                         <span className="text-foreground">{cur.label}</span>
                     </div>
                     <button
@@ -1053,14 +1065,19 @@ function AddClientBody({
                     <div
                         className="h-full bg-primary transition-[width] duration-300"
                         style={{
-                            width: `${((stepIndex + 1) / STEPS.length) * 100}%`,
+                            width: `${((stepIndex + 1) / steps.length) * 100}%`,
                         }}
                     />
                 </div>
 
                 <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-6 py-6">
                     {isReview ? (
-                        <ReviewStep ctx={ctx} pct={pct} goToStep={goToStep} />
+                        <ReviewStep
+                            ctx={ctx}
+                            pct={pct}
+                            goToStep={goToStep}
+                            canEditMedical={!isEditMode || canEditMedical}
+                        />
                     ) : (
                         <StepBody stepKey={cur.key} ctx={ctx} />
                     )}
@@ -2478,10 +2495,12 @@ function ReviewCard({
 }
 
 function ReviewStep({
+    canEditMedical,
     ctx,
     pct,
     goToStep,
 }: {
+    canEditMedical: boolean;
     ctx: StepCtx;
     pct: number;
     goToStep: (k: StepKey) => void;
@@ -2600,38 +2619,40 @@ function ReviewStep({
                     />
                 </ReviewCard>
 
-                <ReviewCard
-                    icon={Stethoscope}
-                    title="Health & medical"
-                    onEdit={() => goToStep('health')}
-                >
-                    <ReviewRow
-                        label="GP"
-                        value={
-                            data.medical.gp_name
-                                ? `${data.medical.gp_name}${data.medical.gp_practice ? ' · ' + data.medical.gp_practice : ''}`
-                                : ''
-                        }
-                    />
-                    <ReviewRow
-                        label="Blood type"
-                        value={data.medical.blood_type}
-                    />
-                    <ReviewRow
-                        label="Allergies"
-                        value={data.medical.allergies.join(', ')}
-                    />
-                    <ReviewRow
-                        label="Disabilities"
-                        value={data.medical.disabilities.join(', ')}
-                    />
-                    <ReviewRow
-                        label="Conditions"
-                        value={conds
-                            .map((c) => `${c.label} (${c.severity})`)
-                            .join(', ')}
-                    />
-                </ReviewCard>
+                {canEditMedical && (
+                    <ReviewCard
+                        icon={Stethoscope}
+                        title="Health & medical"
+                        onEdit={() => goToStep('health')}
+                    >
+                        <ReviewRow
+                            label="GP"
+                            value={
+                                data.medical.gp_name
+                                    ? `${data.medical.gp_name}${data.medical.gp_practice ? ' · ' + data.medical.gp_practice : ''}`
+                                    : ''
+                            }
+                        />
+                        <ReviewRow
+                            label="Blood type"
+                            value={data.medical.blood_type}
+                        />
+                        <ReviewRow
+                            label="Allergies"
+                            value={data.medical.allergies.join(', ')}
+                        />
+                        <ReviewRow
+                            label="Disabilities"
+                            value={data.medical.disabilities.join(', ')}
+                        />
+                        <ReviewRow
+                            label="Conditions"
+                            value={conds
+                                .map((c) => `${c.label} (${c.severity})`)
+                                .join(', ')}
+                        />
+                    </ReviewCard>
+                )}
 
                 <ReviewCard
                     icon={ClipboardCheck}
@@ -2675,47 +2696,49 @@ function ReviewStep({
                     <ReviewRow label="Funding" value={data.funding_type} />
                 </ReviewCard>
 
-                <ReviewCard
-                    icon={Phone}
-                    title={`Emergency contacts (${namedContacts.length})`}
-                    onEdit={() => goToStep('contacts')}
-                    span
-                >
-                    {namedContacts.length === 0 ? (
-                        <span className="text-[13px] text-muted-foreground">
-                            None added.
-                        </span>
-                    ) : (
-                        <div className="grid gap-2">
-                            {namedContacts.map((c, i) => (
-                                <div
-                                    key={i}
-                                    className="flex flex-wrap items-center gap-2 text-[13px]"
-                                >
-                                    <span className="grid h-5 w-5 place-items-center rounded-full bg-muted text-[11px] font-bold">
-                                        {i + 1}
-                                    </span>
-                                    <strong>{c.name || '—'}</strong>
-                                    {c.relationship ? (
-                                        <span className="text-muted-foreground">
-                                            · {c.relationship}
+                {canEditMedical && (
+                    <ReviewCard
+                        icon={Phone}
+                        title={`Emergency contacts (${namedContacts.length})`}
+                        onEdit={() => goToStep('contacts')}
+                        span
+                    >
+                        {namedContacts.length === 0 ? (
+                            <span className="text-[13px] text-muted-foreground">
+                                None added.
+                            </span>
+                        ) : (
+                            <div className="grid gap-2">
+                                {namedContacts.map((c, i) => (
+                                    <div
+                                        key={i}
+                                        className="flex flex-wrap items-center gap-2 text-[13px]"
+                                    >
+                                        <span className="grid h-5 w-5 place-items-center rounded-full bg-muted text-[11px] font-bold">
+                                            {i + 1}
                                         </span>
-                                    ) : null}
-                                    {c.phone ? (
-                                        <span className="text-muted-foreground">
-                                            · {c.phone}
-                                        </span>
-                                    ) : null}
-                                    {c.can_view_medical ? (
-                                        <StatusBadge variant="success">
-                                            Health-info OK
-                                        </StatusBadge>
-                                    ) : null}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </ReviewCard>
+                                        <strong>{c.name || '—'}</strong>
+                                        {c.relationship ? (
+                                            <span className="text-muted-foreground">
+                                                · {c.relationship}
+                                            </span>
+                                        ) : null}
+                                        {c.phone ? (
+                                            <span className="text-muted-foreground">
+                                                · {c.phone}
+                                            </span>
+                                        ) : null}
+                                        {c.can_view_medical ? (
+                                            <StatusBadge variant="success">
+                                                Health-info OK
+                                            </StatusBadge>
+                                        ) : null}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </ReviewCard>
+                )}
             </div>
         </div>
     );

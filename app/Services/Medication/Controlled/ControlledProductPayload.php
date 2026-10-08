@@ -38,7 +38,7 @@ final class ControlledProductPayload
         private readonly WitnessPinService $pins,
     ) {}
 
-    public function forActor(User $actor, ?int $siteId = null, ?int $medicationId = null, ?int $clientId = null, ?string $date = null): array
+    public function forActor(User $actor, ?int $siteId = null, ?int $medicationId = null, ?int $clientId = null, ?string $date = null, ?int $entryId = null, ?int $destructionId = null): array
     {
         $siteIds = $this->scope->readerSiteIds($actor, 'medications.controlled.view', $siteId);
         if ($siteId !== null) {
@@ -67,6 +67,10 @@ final class ControlledProductPayload
                 ->where('recorded_at', '<', $start->addDay()->utc());
         }
         $entries = (clone $historyQuery)->with(['recordedBy:id,name', 'witnessedBy:id,name'])->withExists('destructions')->latest('id')->limit(self::HISTORY_LIMIT)->get();
+        if ($entryId !== null) {
+            $selectedEntry = (clone $historyQuery)->with(['recordedBy:id,name', 'witnessedBy:id,name'])->withExists('destructions')->findOrFail($entryId);
+            $entries = $entries->push($selectedEntry)->unique('id')->sortByDesc('id')->values();
+        }
         $latest = (clone $entriesQuery)->selectRaw('client_medication_id, MAX(id) AS latest_id')->groupBy('client_medication_id')->pluck('latest_id', 'client_medication_id');
         $counts = app(ControlledCountStatus::class)->latestWitnessedCounts($ids, $siteIds);
         $reversals = $this->scope->scopeCanonicalClientMedicationRows(ClientControlledDrugEntry::query(), $siteIds, false)
@@ -81,8 +85,14 @@ final class ControlledProductPayload
         $discrepancies = $this->retainOutstanding($discrepancyQuery, fn ($q) => $q->whereIn('status', ['open', 'under_review']), ['reportedBy:id,name', 'witnessedBy:id,name', 'resolvedBy:id,name']);
         $lossQuery = $this->scope->scopeCanonicalClientMedicationRows(ControlledDrugLossReport::query(), $siteIds, false)->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds);
         $losses = $this->retainOutstanding($lossQuery, fn ($q) => $q->whereIn('investigation_status', ['reported', 'investigating']), ['discoveredBy:id,name', 'resolvedBy:id,name']);
-        $destructionQuery = $this->scope->scopeCanonicalClientMedicationRows(MedicationDestruction::query(), $siteIds, false)->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds)->where('is_controlled_drug', true);
+        $destructionQuery = $this->scope->scopeCanonicalClientMedicationRows(MedicationDestruction::query(), $siteIds, false)->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds)->where('is_controlled_drug', true)
+            ->where(fn ($q) => $q->whereNull('medication_destructions.site_id')->orWhereHas('client', fn ($c) => $c->whereColumn('clients.site_id', 'medication_destructions.site_id')));
         $destructions = $this->retainOutstanding($destructionQuery, fn ($q) => $q->whereNull('voided_at')->where('disposal_method', 'pharmacy_return')->whereNull('pharmacy_received_at'), ['destroyedByUser:id,name', 'witness1:id,name', 'witness2:id,name']);
+        if ($destructionId !== null) {
+            $selectedDestruction = (clone $destructionQuery)->with(['destroyedByUser:id,name', 'witness1:id,name', 'witness2:id,name'])->findOrFail($destructionId);
+            abort_if($date !== null && $selectedDestruction->destroyed_at?->timezone('Pacific/Auckland')->toDateString() !== $date, 404);
+            $destructions = $destructions->push($selectedDestruction)->unique('id')->sortByDesc('id')->values();
+        }
         $overrideQuery = ControlledWitnessOverride::query()->whereIn('site_id', $siteIds)->whereIn('client_medication_id', $ids);
         $overrides = $this->retainOutstanding($overrideQuery, fn ($q) => $q->whereIn('status', ['waiting', 'approved'])->whereNull('signed_off_at'));
         $overrideDoses = $this->scopeOverrideDoses(ClientMedicationAdministration::query(), $siteIds, $ids, $clientIds)
@@ -122,6 +132,7 @@ final class ControlledProductPayload
 
         return [
             'filters' => ['site_id' => $siteId, 'client_medication_id' => $medicationId, 'client_id' => $clientId, 'date' => $date], 'people' => $people,
+            'selected_entry_id' => $entryId, 'selected_destruction_id' => $destructionId,
             'current_user_id' => $actor->id, 'current_user_name' => $actor->name,
             'sites' => $siteRows->map(fn (Site $site): array => $site->only(['id', 'name'])),
             'site_brand_colour' => $activeSite?->brand_colour,

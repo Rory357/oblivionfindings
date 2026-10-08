@@ -3,6 +3,7 @@
 import { ClientAvatar } from '@/components/meds/board-bits';
 import { cn } from '@/lib/utils';
 import type { MouseEvent } from 'react';
+import { RoundActions, roundMenuKey } from './round-actions';
 import { DoseDot } from './round-bits';
 import {
     doseStatusMeta,
@@ -53,7 +54,10 @@ export default function RoundChart({
                                 key={r.id}
                                 className="min-w-[108px] border-l px-2 py-2 text-[11px] font-semibold text-foreground"
                             >
-                                <div>{shortName(r.name)}</div>
+                                <div className="flex items-center justify-center gap-1">
+                                    {shortName(r.name)}
+                                    <RoundActions round={r} open={onContext} />
+                                </div>
                                 <div className="text-[10.5px] font-medium text-muted-foreground">
                                     {r.scheduled_time}
                                 </div>
@@ -108,6 +112,20 @@ export default function RoundChart({
                                 return (
                                     <td
                                         key={r.id}
+                                        tabIndex={0}
+                                        role="button"
+                                        aria-label={`${res.name}, ${r.name}, ${r.scheduled_time}${canOpen ? ' — open round' : ' — use round actions for audit'}`}
+                                        onKeyDown={(event) => {
+                                            roundMenuKey(event, r, onContext);
+                                            if (
+                                                (event.key === 'Enter' ||
+                                                    event.key === ' ') &&
+                                                canOpen
+                                            ) {
+                                                event.preventDefault();
+                                                onOpen(r.id);
+                                            }
+                                        }}
                                         onClick={() => canOpen && onOpen(r.id)}
                                         onContextMenu={(e) => onContext(e, r)}
                                         className={cn(

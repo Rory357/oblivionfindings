@@ -28,6 +28,7 @@ use App\Services\Timeline\TimelineEmitter;
 use App\Services\UserSiteAccessService;
 use App\Support\EmarUrl;
 use App\Support\Medication\MedicationStockQuantity;
+use App\Support\MedicationJourney;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
@@ -92,14 +93,31 @@ class ClientMedicalController extends Controller
 
     public function show(Request $request, Client $client)
     {
-        $this->authorize('viewMedications', $client);
+        $returnTo = MedicationJourney::returnTo($request->query('return_to'));
+        if ($request->query('section') === 'medications') {
+            $this->authorize('viewMedications', $client);
 
-        return redirect()->to(EmarUrl::medications($client));
+            return redirect()->to(EmarUrl::medications($client, [
+                'site_id' => $client->site_id, 'return_to' => $returnTo,
+            ]));
+        }
+
+        // General medical history, conditions and emergency contacts follow
+        // client-profile access; their write endpoints separately require update.
+        $this->authorize('view', $client);
+        $this->authorize('viewMedications', $client);
+        $section = in_array($request->query('section'), ['profile', 'conditions', 'emergency_contacts'], true)
+            ? $request->query('section') : 'profile';
+
+        return redirect()->route('operations.clients.show', array_filter([
+            'client' => $client->id, 'tab' => 'medical', 'medical_section' => $section,
+            'return_to' => $returnTo,
+        ], fn ($value) => $value !== null));
     }
 
     public function updateProfile(Request $request, Client $client)
     {
-        $this->authorize('update', $client);
+        $this->authorizeMedicalUpdate($client);
 
         $data = $request->validate([
             'medical_history' => ['nullable', 'string'],
@@ -130,7 +148,7 @@ class ClientMedicalController extends Controller
             // A copy either sees the saved labels, or this writer sees the
             // completed copy before deciding whether labels may change.
             $lockedClient = Client::query()->whereKey($client->id)->lockForUpdate()->firstOrFail();
-            $this->authorize('update', $lockedClient);
+            $this->authorizeMedicalUpdate($lockedClient);
             $profile = ClientMedicalProfile::query()->where('client_id', $lockedClient->id)->lockForUpdate()->first()
                 ?? new ClientMedicalProfile(['client_id' => $lockedClient->id]);
             if (array_key_exists('allergies', $data)) {
@@ -145,7 +163,7 @@ class ClientMedicalController extends Controller
             return [$profile, $lockedClient];
         }, 5);
 
-        app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'medical profile', $profile, $client, [
+        $this->notifyMedicalCrud($request->user(), 'updated', 'medical profile', $profile, $client, [
             'title' => 'Medical profile updated',
             'url' => url("/clients/{$client->id}/medical"),
         ]);
@@ -989,7 +1007,7 @@ class ClientMedicalController extends Controller
 
     public function storeCondition(Request $request, Client $client)
     {
-        $this->authorize('update', $client);
+        $this->authorizeMedicalUpdate($client);
 
         $data = $request->validate([
             'label' => ['required', 'string', 'max:255'],
@@ -998,28 +1016,32 @@ class ClientMedicalController extends Controller
         ]);
 
         try {
-            $c = new ClientCondition;
-            $c->client_id = $client->id;
-            $c->fill($data);
-            $c->save();
+            $c = DB::transaction(function () use ($client, $data, $request): ClientCondition {
+                $c = new ClientCondition;
+                $c->client_id = $client->id;
+                $c->fill($data);
+                $c->saveOrFail();
 
-            app(TimelineEmitter::class)->record([
-                'source_type' => ClientCondition::class,
-                'source_id' => $c->id,
-                'occurred_at' => now(),
-                'type' => 'condition_added',
-                'actor_user_id' => $request->user()?->id,
-                'client_id' => $client->id,
-                'site_id' => $client->site_id,
-                'subject' => 'Condition added: '.$c->label,
-                'body' => $c->notes,
-                'meta' => array_filter(['severity' => $c->severity]),
-                'visibility' => 'internal',
-                'is_pinned' => false,
-                'created_by' => $request->user()?->id,
-            ]);
+                app(TimelineEmitter::class)->record([
+                    'source_type' => ClientCondition::class,
+                    'source_id' => $c->id,
+                    'occurred_at' => now(),
+                    'type' => 'condition_added',
+                    'actor_user_id' => $request->user()?->id,
+                    'client_id' => $client->id,
+                    'site_id' => $client->site_id,
+                    'subject' => 'Condition added: '.$c->label,
+                    'body' => $c->notes,
+                    'meta' => array_filter(['severity' => $c->severity]),
+                    'visibility' => 'internal',
+                    'is_pinned' => false,
+                    'created_by' => $request->user()?->id,
+                ]);
 
-            app(NotificationService::class)->notifyCrud($request->user(), 'created', 'condition', $c, $client, [
+                return $c;
+            }, 5);
+
+            $this->notifyMedicalCrud($request->user(), 'created', 'condition', $c, $client, [
                 'title' => 'Condition added: '.$c->label,
                 'url' => url("/clients/{$client->id}/medical"),
             ]);
@@ -1034,7 +1056,7 @@ class ClientMedicalController extends Controller
 
     public function updateCondition(Request $request, Client $client, ClientCondition $condition)
     {
-        $this->authorize('update', $client);
+        $this->authorizeMedicalUpdate($client);
         abort_unless($condition->client_id === $client->id, 404);
 
         $data = $request->validate([
@@ -1045,9 +1067,9 @@ class ClientMedicalController extends Controller
 
         try {
             $condition->fill($data);
-            $condition->save();
+            $condition->saveOrFail();
 
-            app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'condition', $condition, $client, [
+            $this->notifyMedicalCrud($request->user(), 'updated', 'condition', $condition, $client, [
                 'title' => 'Condition updated: '.$condition->label,
                 'url' => url("/clients/{$client->id}/medical"),
             ]);
@@ -1062,12 +1084,12 @@ class ClientMedicalController extends Controller
 
     public function destroyCondition(Request $request, Client $client, ClientCondition $condition)
     {
-        $this->authorize('update', $client);
+        $this->authorizeMedicalUpdate($client);
         abort_unless($condition->client_id === $client->id, 404);
 
         try {
-            $condition->delete();
-            app(NotificationService::class)->notifyCrud($request->user(), 'deleted', 'condition', $condition, $client, [
+            DB::transaction(fn () => $condition->delete());
+            $this->notifyMedicalCrud($request->user(), 'deleted', 'condition', $condition, $client, [
                 'title' => 'Condition removed: '.($condition->label ?? 'Condition'),
                 'url' => url("/clients/{$client->id}/medical"),
             ]);
@@ -1082,7 +1104,7 @@ class ClientMedicalController extends Controller
 
     public function storeEmergencyContact(Request $request, Client $client)
     {
-        $this->authorize('update', $client);
+        $this->authorizeMedicalUpdate($client);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -1105,9 +1127,9 @@ class ClientMedicalController extends Controller
             $e = new ClientEmergencyContact;
             $e->client_id = $client->id;
             $e->fill($data);
-            $e->save();
+            $e->saveOrFail();
 
-            app(NotificationService::class)->notifyCrud($request->user(), 'created', 'emergency contact', $e, $client, [
+            $this->notifyMedicalCrud($request->user(), 'created', 'emergency contact', $e, $client, [
                 'title' => 'Emergency contact added: '.$e->name,
                 'url' => url("/clients/{$client->id}/medical"),
             ]);
@@ -1122,7 +1144,7 @@ class ClientMedicalController extends Controller
 
     public function updateEmergencyContact(Request $request, Client $client, ClientEmergencyContact $contact)
     {
-        $this->authorize('update', $client);
+        $this->authorizeMedicalUpdate($client);
         abort_unless($contact->client_id === $client->id, 404);
 
         $data = $request->validate([
@@ -1144,9 +1166,9 @@ class ClientMedicalController extends Controller
 
         try {
             $contact->fill($data);
-            $contact->save();
+            $contact->saveOrFail();
 
-            app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'emergency contact', $contact, $client, [
+            $this->notifyMedicalCrud($request->user(), 'updated', 'emergency contact', $contact, $client, [
                 'title' => 'Emergency contact updated: '.$contact->name,
                 'url' => url("/clients/{$client->id}/medical"),
             ]);
@@ -1161,12 +1183,12 @@ class ClientMedicalController extends Controller
 
     public function destroyEmergencyContact(Request $request, Client $client, ClientEmergencyContact $contact)
     {
-        $this->authorize('update', $client);
+        $this->authorizeMedicalUpdate($client);
         abort_unless($contact->client_id === $client->id, 404);
 
         try {
-            $contact->delete();
-            app(NotificationService::class)->notifyCrud($request->user(), 'deleted', 'emergency contact', $contact, $client, [
+            DB::transaction(fn () => $contact->delete());
+            $this->notifyMedicalCrud($request->user(), 'deleted', 'emergency contact', $contact, $client, [
                 'title' => 'Emergency contact removed: '.($contact->name ?? 'Contact'),
                 'url' => url("/clients/{$client->id}/medical"),
             ]);
@@ -1176,6 +1198,25 @@ class ClientMedicalController extends Controller
             report($e);
 
             return back()->with('error', 'Failed to remove emergency contact: '.$e->getMessage());
+        }
+    }
+
+    /** The Medical section requires both profile and medication-record reads. */
+    private function authorizeMedicalUpdate(Client $client): void
+    {
+        $this->authorize('view', $client);
+        $this->authorize('viewMedications', $client);
+        $this->authorize('update', $client);
+    }
+
+    /** Delivery failure cannot turn a committed medical save into a save error. */
+    private function notifyMedicalCrud(...$arguments): void
+    {
+        try {
+            $arguments[5]['data']['recipient_scope'] = 'client_medical';
+            app(NotificationService::class)->notifyCrud(...$arguments);
+        } catch (\Throwable $notificationFailure) {
+            report($notificationFailure);
         }
     }
 

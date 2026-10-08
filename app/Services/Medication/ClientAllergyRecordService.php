@@ -8,17 +8,15 @@ use App\Models\MedicationAllergy;
 use App\Models\User;
 use App\Services\CurrentAuthorizationReads;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * One read of a person's recorded allergies from both places staff record
- * them (EM-07):
- *
- *  - the medication allergy register (`medication_allergies`, with severity
- *    and reaction; written through the medications API), and
- *  - the health profile (`client_medical_profiles.allergies`, option keys or
- *    free text, no severity; written by ClientMedicalController::updateProfile).
+ * One current read of the person's canonical health-profile allergy record,
+ * including severity, reaction and review evidence. The old medication
+ * register and profile labels remain readable until copied into that record.
+ * All supported allergy commands now write through the canonical path.
  *
  * The health profile is canonical. Legacy entries remain readable until
  * copied without deleting their source. Only a lead's recorded review can
@@ -31,9 +29,9 @@ class ClientAllergyRecordService
     public const SOURCE_PROFILE = 'health_profile';
 
     /**
-     * Every recorded allergy for the person, register entries first. A
-     * profile entry already present in the register (same allergen text) is
-     * not repeated.
+     * Current canonical entries followed by uncopied legacy evidence. Only
+     * exact normalized content is deduplicated; removed copied entries never
+     * reappear from their preserved register source.
      *
      * @return list<array{allergen: string, severity: ?string, reaction: ?string, source: string, allergy: MedicationAllergy}>
      */
@@ -99,7 +97,15 @@ class ClientAllergyRecordService
             if (! empty($record['removed_at'])) {
                 continue;
             }
-            $entries[] = [...$record, 'source' => self::SOURCE_PROFILE, 'allergy' => new MedicationAllergy(['client_id' => $clientId, 'allergen' => $record['allergen'] ?? '', 'severity' => $record['severity'] ?? null, 'reaction' => $record['reaction'] ?? null])];
+            $entries[] = [
+                'severity' => null, 'reaction' => null, 'notes' => null, 'identified_date' => null, 'identified_by' => null,
+                ...$record,
+                'source' => self::SOURCE_PROFILE,
+                'allergy' => new MedicationAllergy([
+                    'client_id' => $clientId, 'allergen' => $record['allergen'] ?? '',
+                    'severity' => $record['severity'] ?? null, 'reaction' => $record['reaction'] ?? null,
+                ]),
+            ];
         }
 
         foreach ($register as $allergy) {
@@ -199,18 +205,63 @@ class ClientAllergyRecordService
         return $profile;
     }
 
-    public function summary(Client $client): array
+    public function summary(Client $client, ?array $entries = null): array
     {
-        $entries = $this->forClient($client);
+        $entries ??= $this->forClient($client);
         $profile = ClientMedicalProfile::query()->where('client_id', $client->id)->first();
-        $reviewed = $profile?->allergies_reviewed_at && hash_equals((string) $profile->allergies_review_digest, $this->digest($entries));
+        $reviewer = $profile?->allergies_reviewed_by
+            ? User::query()->whereKey($profile->allergies_reviewed_by)->value('name') : null;
+
+        return $this->summariseEntries($entries, $profile, $reviewer);
+    }
+
+    /** Project supplied evidence without database reads (also used for unsaved intake values). */
+    public function summaryFromEvidence(int $clientId, Collection $register, ?ClientMedicalProfile $profile, ?string $reviewer = null): array
+    {
+        return $this->summariseEntries($this->combine($clientId, $register, $profile), $profile, $reviewer);
+    }
+
+    /** @param list<int> $clientIds @return array<int, array> */
+    public function summariesForClients(array $clientIds): array
+    {
+        if ($clientIds === []) {
+            return [];
+        }
+        $register = MedicationAllergy::query()->whereIn('client_id', $clientIds)->orderBy('id')->get()->groupBy('client_id');
+        $profiles = ClientMedicalProfile::query()->whereIn('client_id', $clientIds)->get()->keyBy('client_id');
+        $reviewers = User::query()->whereIn('id', $profiles->pluck('allergies_reviewed_by')->filter()->unique())->pluck('name', 'id');
+        $summaries = [];
+        foreach ($clientIds as $clientId) {
+            $profile = $profiles->get($clientId);
+            $summaries[(int) $clientId] = $this->summaryFromEvidence(
+                (int) $clientId, $register->get($clientId, collect()), $profile,
+                $reviewers->get($profile?->allergies_reviewed_by),
+            );
+        }
+
+        return $summaries;
+    }
+
+    private function summariseEntries(array $entries, ?ClientMedicalProfile $profile, ?string $reviewer): array
+    {
+        $digest = $this->digest($entries);
+        $reviewed = $profile?->allergies_reviewed_at && hash_equals((string) $profile->allergies_review_digest, $digest);
 
         return [
             'status' => $entries ? 'recorded' : ($reviewed && $profile->allergies_review_status === 'no_known' ? 'no_known' : 'none'),
             'entries' => array_map(fn ($entry) => array_intersect_key($entry, array_flip(['key', 'allergen', 'severity', 'reaction', 'notes', 'identified_date', 'identified_by', 'source'])), $entries),
-            'reviewed' => $reviewed ? ['at' => $profile->allergies_reviewed_at->toIso8601String(), 'by' => User::query()->whereKey($profile->allergies_reviewed_by)->value('name'), 'how' => $profile->allergies_review_method] : null,
-            'digest' => $this->digest($entries),
+            'reviewed' => $reviewed ? ['at' => $profile->allergies_reviewed_at->toIso8601String(), 'by' => $reviewer, 'how' => $profile->allergies_review_method] : null,
+            'digest' => $digest,
         ];
+    }
+
+    /** Profile access is a separate permission from temporary medication access. */
+    public function managementUrl(Client $client, User $actor): ?string
+    {
+        return Gate::forUser($actor)->allows('view', $client)
+            && Gate::forUser($actor)->allows('viewMedications', $client)
+            ? '/operations/clients/'.$client->id.'?tab=medical#allergy-record'
+            : null;
     }
 
     public function digest(array $entries): string
