@@ -1,5 +1,4 @@
 import {
-    PageHeader,
     PageHeaderFilterButton,
     PageHeaderGlassButton,
     PageHeaderMeterBig,
@@ -82,6 +81,7 @@ import ViewTimesheetDialog, {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { WorkforcePageHeader } from '@/components/workforce/workforce-page-header';
 import AppLayout from '@/layouts/app-layout';
 import { WORKER_TIMEZONE } from '@/lib/datetime';
 import { index as rosteringIndex } from '@/routes/operations/rostering';
@@ -2241,7 +2241,7 @@ export default function RosteringIndex(props: Props) {
         );
 
     const header = (
-        <PageHeader
+        <WorkforcePageHeader
             icon={CalendarDays}
             title="Rostering"
             titleChip={titleChip}
@@ -2413,6 +2413,7 @@ export default function RosteringIndex(props: Props) {
                         onClick={() => goWeek(7)}
                     />
                     <EntityFilter
+                        compact
                         onDark
                         label="Staff"
                         pluralLabel="staff"
@@ -2423,6 +2424,7 @@ export default function RosteringIndex(props: Props) {
                         className="box-border h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
                     />
                     <EntityFilter
+                        compact
                         onDark
                         label="Client"
                         allLabel="All clients"

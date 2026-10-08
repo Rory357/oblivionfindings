@@ -1,5 +1,5 @@
 import {
-    PageHeader,
+    PageHeaderFilterButton,
     PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
@@ -15,6 +15,7 @@ import {
     formatWeekRange,
     weekNumberISO,
 } from '@/components/rostering';
+import { WorkforcePageHeader } from '@/components/workforce/workforce-page-header';
 import { formatDateTimeInZone } from '@/lib/datetime';
 import {
     ArrowLeftRight,
@@ -124,9 +125,8 @@ export function HandoversHero({
     ];
     return (
         <>
-            <PageHeader
+            <WorkforcePageHeader
                 variant="index"
-                frontline
                 title="Handovers"
                 icon={ArrowLeftRight}
                 subline={`${fmt(weekStart)} → ${fmt(range.end)} · ${evidence.timezone} · Review recorded handovers and incoming responsibilities`}
@@ -169,7 +169,7 @@ export function HandoversHero({
                     </>
                 }
                 meters={
-                    <div className="grid w-full min-w-0 grid-cols-2 gap-2 xl:grid-cols-4">
+                    <div className="grid w-full min-w-0 grid-cols-2 gap-2 lg:grid-cols-4">
                         {stats.map(([key, label, value, caption]) => (
                             <PageHeaderMeterBlock
                                 key={key}
@@ -191,22 +191,33 @@ export function HandoversHero({
                         ))}
                     </div>
                 }
+                details={
+                    <p className="text-caption" role="status">
+                        {loading
+                            ? 'Updating handovers…'
+                            : (readNotice ?? rangeLabel)}{' '}
+                        · Counts cover all matching records across every page ·
+                        Updated{' '}
+                        {formatDateTimeInZone(
+                            evidence.checked_at,
+                            evidence.timezone,
+                        )}
+                    </p>
+                }
                 filters={
                     <fieldset
                         disabled={loading}
-                        className="flex w-full min-w-0 flex-wrap items-center justify-between gap-3"
+                        className="flex w-full min-w-0 flex-wrap items-center justify-end gap-1.5"
                     >
-                        <div className="flex flex-wrap items-center gap-2">
-                            <PageHeaderGlassButton
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            <PageHeaderFilterButton
                                 icon={ChevronLeft}
                                 onClick={() =>
                                     onWeekChange(addDaysWP(weekStart, -7))
                                 }
                                 aria-label="Previous week"
-                            >
-                                Previous
-                            </PageHeaderGlassButton>
-                            <PageHeaderGlassButton
+                            />
+                            <PageHeaderFilterButton
                                 ref={weekBtnRef}
                                 icon={CalendarRange}
                                 onClick={() => setPickerOpen(!pickerOpen)}
@@ -214,19 +225,18 @@ export function HandoversHero({
                                 aria-expanded={pickerOpen}
                             >
                                 Week {weekNumberISO(weekStart)} · Choose week
-                            </PageHeaderGlassButton>
-                            <PageHeaderGlassButton
+                            </PageHeaderFilterButton>
+                            <PageHeaderFilterButton
                                 icon={ChevronRight}
                                 onClick={() =>
                                     onWeekChange(addDaysWP(weekStart, 7))
                                 }
                                 aria-label="Next week"
-                            >
-                                Next
-                            </PageHeaderGlassButton>
+                            />
                         </div>
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
                             <EntityFilter
+                                compact
                                 onDark
                                 label="Staff"
                                 allLabel="All staff"
@@ -244,6 +254,7 @@ export function HandoversHero({
                                 onChange={(staff) => onFilter({ staff })}
                             />
                             <EntityFilter
+                                compact
                                 onDark
                                 label="Client"
                                 allLabel="All clients"
@@ -259,6 +270,7 @@ export function HandoversHero({
                                 onChange={(client) => onFilter({ client })}
                             />
                             <EntityFilter
+                                compact
                                 onDark
                                 label="Site"
                                 allLabel="All sites"
@@ -274,7 +286,7 @@ export function HandoversHero({
                                 onChange={(site) => onFilter({ site })}
                             />
                         </div>
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
                             <PageHeaderViewToggle
                                 value={view}
                                 onChange={onView}
@@ -297,29 +309,14 @@ export function HandoversHero({
                                     },
                                 ]}
                             />
-                            {hasFilters ? (
-                                <PageHeaderGlassButton
-                                    icon={X}
-                                    onClick={onClear}
-                                >
-                                    Clear filters
-                                </PageHeaderGlassButton>
-                            ) : null}
+                            <PageHeaderFilterButton
+                                icon={X}
+                                onClick={onClear}
+                                disabled={!hasFilters}
+                                aria-label="Clear filters"
+                                title="Clear filters"
+                            />
                         </div>
-                        <p
-                            className="text-caption w-full text-band-foreground!"
-                            role="status"
-                        >
-                            {loading
-                                ? 'Updating handovers…'
-                                : (readNotice ?? rangeLabel)}{' '}
-                            · Counts cover all matching records across every
-                            page · Updated{' '}
-                            {formatDateTimeInZone(
-                                evidence.checked_at,
-                                evidence.timezone,
-                            )}
-                        </p>
                     </fieldset>
                 }
                 rail={rail}

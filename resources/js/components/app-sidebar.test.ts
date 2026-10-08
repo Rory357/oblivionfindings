@@ -8,6 +8,57 @@ import {
 } from './app-sidebar';
 
 describe('app sidebar workforce navigation', () => {
+    it.each([
+        ['/operations/workforce-settings', '/operations/workforce-settings'],
+        [
+            '/operations/workforce-settings/?tab=safety',
+            '/operations/workforce-settings',
+        ],
+        [
+            '/operations/availability?week=2026-10-12',
+            '/operations/availability',
+        ],
+        ['/operations/rostering?tab=availability', '/operations/rostering'],
+        ['/operations/shifts/42', '/operations/shifts'],
+        ['/attendance', '/attendance'],
+    ])('keeps %s out of the Operations dashboard match', (url, href) => {
+        expect(isSubItemActive(url, '/operations')).toBe(false);
+        expect(isSubItemActive(url, href)).toBe(true);
+        expect(
+            isIconActive(
+                url,
+                { id: 'operations', subPanel: true } as any,
+                [
+                    {
+                        label: 'Overview',
+                        items: [{ title: 'Dashboard', href: '/operations' }],
+                    },
+                ] as any,
+            ),
+        ).toBe(false);
+        expect(
+            isIconActive(
+                url,
+                { id: 'workforce', subPanel: true } as any,
+                [
+                    {
+                        label: 'Workforce',
+                        items: [{ title: 'Current page', href }],
+                    },
+                ] as any,
+            ),
+        ).toBe(true);
+    });
+
+    it.each([
+        '/operations',
+        '/operations/clients/42',
+        '/operations/workforce-settings-history',
+    ])(
+        'preserves Operations matching for %s outside Workforce route boundaries',
+        (url) => expect(isSubItemActive(url, '/operations')).toBe(true),
+    );
+
     it.each(['viewAny', 'availabilityUpdateSelf', 'availabilityUpdateAny'])(
         'keeps %s discoverable without granting roster navigation',
         (permission) => {

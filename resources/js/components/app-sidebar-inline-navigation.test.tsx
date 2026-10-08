@@ -68,10 +68,83 @@ vi.mock('@/hooks/use-initials', () => ({
 }));
 
 describe('inline application navigation', () => {
+    it.each([
+        [
+            '/operations/workforce-settings?tab=safety',
+            'Workforce settings',
+            { rostering: { viewAny: true } },
+        ],
+        [
+            '/operations/availability?week=2026-10-12',
+            'Availability',
+            { staff: { availabilityUpdateSelf: true } },
+        ],
+    ])(
+        'opens only Workforce automatically on %s',
+        async (url, label, workforceCan) => {
+            const original = usePage<SharedData>();
+            const storageKey = 'oblivionfindings:sidebar-groups';
+            const savedGroups = window.localStorage.getItem(storageKey);
+            window.localStorage.setItem(storageKey, '[]');
+            try {
+                vi.mocked(usePage).mockReturnValue({
+                    ...original,
+                    url,
+                    props: {
+                        ...original.props,
+                        auth: {
+                            ...original.props.auth,
+                            can: {
+                                operations: { dashboard: true },
+                                clients: { viewAny: true },
+                                ...workforceCan,
+                            },
+                        },
+                    },
+                } as never);
+                render(<AppSidebar collapsed={false} />);
+                const operations = screen.getByRole('button', {
+                    name: 'Operations menu',
+                });
+                await waitFor(() =>
+                    expect(
+                        screen.getByRole('button', { name: 'Workforce menu' }),
+                    ).toHaveAttribute('aria-expanded', 'true'),
+                );
+                expect(operations).toHaveAttribute('aria-expanded', 'false');
+                expect(
+                    screen.getByRole('link', { name: label }),
+                ).toHaveAttribute('aria-current', 'page');
+                fireEvent.click(operations);
+                const group = within(
+                    screen.getByRole('group', {
+                        name: 'Operations navigation',
+                    }),
+                );
+                expect(
+                    group.getByRole('link', { name: 'Dashboard' }),
+                ).not.toHaveAttribute('aria-current');
+                expect(
+                    screen.getByRole('link', { name: label }),
+                ).toHaveAttribute('aria-current', 'page');
+            } finally {
+                vi.mocked(usePage).mockReturnValue(original);
+                if (savedGroups === null)
+                    window.localStorage.removeItem(storageKey);
+                else window.localStorage.setItem(storageKey, savedGroups);
+            }
+        },
+    );
+
     it('discovers register-only access in IT and selects filtered credential deep links without activating Sites', async () => {
         const original = usePage<SharedData>();
         try {
-            for (const [canVendors, canCredentials, currentUrl, canContracts] of [
+            for (const [
+                canVendors,
+                canCredentials,
+                currentUrl,
+                canContracts,
+            ] of [
                 [
                     false,
                     true,
@@ -91,7 +164,10 @@ describe('inline application navigation', () => {
                             ...original.props.auth,
                             can: {
                                 sites: { viewAny: true },
-                                vendors: { view: canVendors, contracts_view: canContracts },
+                                vendors: {
+                                    view: canVendors,
+                                    contracts_view: canContracts,
+                                },
                                 credentials: { view: canCredentials },
                             },
                         },

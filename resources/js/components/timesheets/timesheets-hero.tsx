@@ -1,5 +1,5 @@
 import {
-    PageHeader,
+    PageHeaderFilterButton,
     PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
@@ -8,6 +8,7 @@ import {
     PageHeaderSearch,
 } from '@/components/page';
 import { EntityFilter, WeekPicker } from '@/components/rostering';
+import { WorkforcePageHeader } from '@/components/workforce/workforce-page-header';
 import { formatDateOnly, formatDateTimeInZone } from '@/lib/datetime';
 import { Link } from '@inertiajs/react';
 import {
@@ -118,9 +119,8 @@ export default function TimesheetsHero({
     ];
     return (
         <>
-            <PageHeader
+            <WorkforcePageHeader
                 variant="index"
-                frontline
                 title={ownOnly ? 'My timesheets' : 'Timesheets'}
                 icon={FileText}
                 subline={`${period} · ${summary.evidence.timezone} · Review recorded work, hours and approval decisions`}
@@ -173,7 +173,7 @@ export default function TimesheetsHero({
                     </>
                 }
                 meters={
-                    <div className="grid w-full min-w-0 grid-cols-2 gap-2 xl:grid-cols-4">
+                    <div className="grid w-full min-w-0 grid-cols-2 gap-2 lg:grid-cols-4">
                         {meters.map(([tab, label, caption]) => (
                             <PageHeaderMeterBlock
                                 key={tab}
@@ -193,20 +193,46 @@ export default function TimesheetsHero({
                         ))}
                     </div>
                 }
+                details={
+                    <>
+                        {' '}
+                        <p className="text-caption">
+                            Week of {formatDateOnly(summary.week_start)} →{' '}
+                            {formatDateOnly(summary.week_end)}:{' '}
+                            {summary.hours_this_week}h recorded with the current
+                            filters, before status.{' '}
+                            {summary.hours_target === null
+                                ? 'Rostered hours are unavailable for a text search.'
+                                : `${summary.hours_target}h planned in assigned shifts starting that week.`}{' '}
+                            {dated ? '' : 'The list includes all weeks.'}
+                        </p>
+                        <p role="status" className="text-caption">
+                            {loading ? 'Loading timesheets…' : rangeLabel} ·
+                            Updated{' '}
+                            {formatDateTimeInZone(
+                                summary.evidence.checked_at,
+                                summary.evidence.timezone,
+                            )}
+                        </p>
+                        {notice && (
+                            <p role="alert" className="text-caption">
+                                {notice}
+                            </p>
+                        )}
+                    </>
+                }
                 filters={
                     <div className="w-full min-w-0 space-y-3">
                         <fieldset
                             disabled={loading}
-                            className="flex flex-wrap items-center gap-2"
+                            className="flex flex-wrap items-center justify-end gap-1.5"
                         >
-                            <PageHeaderGlassButton
+                            <PageHeaderFilterButton
                                 icon={ChevronLeft}
                                 onClick={onPrevWeek}
                                 aria-label="Previous week"
-                            >
-                                Previous
-                            </PageHeaderGlassButton>
-                            <PageHeaderGlassButton
+                            />
+                            <PageHeaderFilterButton
                                 ref={weekRef}
                                 icon={CalendarRange}
                                 onClick={() => setPickerOpen(!pickerOpen)}
@@ -214,20 +240,19 @@ export default function TimesheetsHero({
                                 aria-expanded={pickerOpen}
                             >
                                 Week {summary.week_number} · Choose week
-                            </PageHeaderGlassButton>
-                            <PageHeaderGlassButton
+                            </PageHeaderFilterButton>
+                            <PageHeaderFilterButton
                                 icon={ChevronRight}
                                 onClick={onNextWeek}
                                 aria-label="Next week"
-                            >
-                                Next
-                            </PageHeaderGlassButton>
+                            />
                             {dated && (
-                                <PageHeaderGlassButton onClick={onClearWeek}>
+                                <PageHeaderFilterButton onClick={onClearWeek}>
                                     All weeks
-                                </PageHeaderGlassButton>
+                                </PageHeaderFilterButton>
                             )}
                             <EntityFilter
+                                compact
                                 onDark
                                 label="Client"
                                 allLabel="All clients"
@@ -243,6 +268,7 @@ export default function TimesheetsHero({
                             />
                             {(!ownOnly || filters.staff_id !== null) && (
                                 <EntityFilter
+                                    compact
                                     onDark
                                     label="Staff"
                                     allLabel="All staff"
@@ -257,44 +283,14 @@ export default function TimesheetsHero({
                                     }
                                 />
                             )}
-                            {hasFilters && (
-                                <PageHeaderGlassButton
-                                    icon={X}
-                                    onClick={onClear}
-                                >
-                                    Clear filters
-                                </PageHeaderGlassButton>
-                            )}
+                            <PageHeaderFilterButton
+                                icon={X}
+                                onClick={onClear}
+                                disabled={!hasFilters}
+                                aria-label="Clear filters"
+                                title="Clear filters"
+                            />
                         </fieldset>
-                        <p className="text-caption text-band-foreground!">
-                            Week of {formatDateOnly(summary.week_start)} →{' '}
-                            {formatDateOnly(summary.week_end)}:{' '}
-                            {summary.hours_this_week}h recorded with the current
-                            filters, before status.{' '}
-                            {summary.hours_target === null
-                                ? 'Rostered hours are unavailable for a text search.'
-                                : `${summary.hours_target}h planned in assigned shifts starting that week.`}{' '}
-                            {dated ? '' : 'The list includes all weeks.'}
-                        </p>
-                        <p
-                            role="status"
-                            className="text-caption text-band-foreground!"
-                        >
-                            {loading ? 'Loading timesheets…' : rangeLabel} ·
-                            Updated{' '}
-                            {formatDateTimeInZone(
-                                summary.evidence.checked_at,
-                                summary.evidence.timezone,
-                            )}
-                        </p>
-                        {notice && (
-                            <p
-                                role="alert"
-                                className="text-caption text-band-foreground!"
-                            >
-                                {notice}
-                            </p>
-                        )}
                     </div>
                 }
                 rail={rail}

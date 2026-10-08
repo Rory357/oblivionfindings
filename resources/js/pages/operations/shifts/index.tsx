@@ -1,3 +1,4 @@
+import { WorkforcePageHeader } from '@/components/workforce/workforce-page-header';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
     AlertCircle,
@@ -19,7 +20,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ListCaption } from '@/components/lists';
 import {
-    PageHeader,
     PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderMeterBig,
@@ -586,7 +586,7 @@ export default function ShiftsIndex({
         heroStatusFilter.length === 1 ? heroStatusFilter[0] : 'all';
 
     const header = (
-        <PageHeader
+        <WorkforcePageHeader
             icon={Calendar}
             title={shiftPlural}
             titleChip={titleChip}

@@ -586,6 +586,11 @@
 }
 
 @layer base {
+    /* Keep page widths stable when switching between short and long views. */
+    html {
+        scrollbar-gutter: stable;
+    }
+
     * {
         @apply border-border;
     }

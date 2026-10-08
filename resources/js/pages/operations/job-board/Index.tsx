@@ -258,13 +258,24 @@ export default function JobBoardIndex({
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Operations', href: '/operations' },
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Workforce', href: '/operations/job-board' },
                 { title: 'Job Board', href: '/operations/job-board' },
             ]}
         >
             <Head title="Job Board" />
-            <div className="space-y-4 p-4">
+            <div className="space-y-5">
                 <JobBoardHero
+                    rail={
+                        <ScopeTabs
+                            scope={scope}
+                            counts={counts}
+                            onScopeChange={handleScopeChange}
+                            showApprovals={!!viewer?.can_approve}
+                        />
+                    }
+                    onScopeChange={handleScopeChange}
+                    canApprove={!!viewer?.can_approve}
                     firstName={firstName}
                     week={fallbackWeek}
                     stats={effectiveStats}
@@ -282,13 +293,6 @@ export default function JobBoardIndex({
                     canPostPosition={!!viewer?.can_post_position}
                     sitesCount={effectiveStats.sites}
                     sitesWorkedThisWeek={effectiveStats.sites_worked_this_week}
-                />
-
-                <ScopeTabs
-                    scope={scope}
-                    counts={counts}
-                    onScopeChange={handleScopeChange}
-                    showApprovals={!!viewer?.can_approve}
                 />
 
                 {scope === 'for-you' ? (
@@ -309,7 +313,7 @@ export default function JobBoardIndex({
                         </h2>
                     </header>
 
-                    <div className="grid [grid-template-columns:repeat(auto-fill,minmax(340px,1fr))] gap-4">
+                    <div className="grid grid-cols-1 gap-4 md:[grid-template-columns:repeat(auto-fill,minmax(340px,1fr))]">
                         {visibleJobs.length === 0 ? (
                             <GuardrailCard
                                 unstyled

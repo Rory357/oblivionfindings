@@ -1,6 +1,5 @@
 import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
 import {
-    PageHeader,
     PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
@@ -30,6 +29,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { WorkforcePageHeader } from '@/components/workforce/workforce-page-header';
 import AppLayout from '@/layouts/app-layout';
 import type { SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
@@ -313,7 +313,7 @@ function WorkforceSettingsBody({
         >
             <Head title="Workforce settings" />
             <div className="space-y-5">
-                <PageHeader
+                <WorkforcePageHeader
                     icon={Settings}
                     title="Workforce settings"
                     subline="Roster preferences, active safety rules and connected settings"

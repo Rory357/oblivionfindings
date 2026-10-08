@@ -1,5 +1,4 @@
 import {
-    PageHeader,
     PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
@@ -51,6 +50,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { WorkforcePageHeader } from '@/components/workforce/workforce-page-header';
 import AppLayout from '@/layouts/app-layout';
 import { useCreateShiftLauncher } from '@/pages/operations/shifts/components/use-create-shift-launcher';
 import { Head, router, usePage } from '@inertiajs/react';
@@ -727,7 +727,7 @@ export default function RosteringConflicts(props: ConflictsProps) {
     ];
 
     const header = (
-        <PageHeader
+        <WorkforcePageHeader
             variant="profile"
             backHref="/operations/rostering"
             icon={AlertTriangle}

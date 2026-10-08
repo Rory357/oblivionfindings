@@ -161,6 +161,7 @@ export function PageHeader({
                     <div className="flex flex-col px-[22px] pt-[18px]">
                         {/* top row — identity left, search/actions right */}
                         <div
+                            data-slot="page-header-top"
                             className={cn(
                                 'flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6',
                                 (wrapTitle || frontline) && 'lg:flex-wrap',
@@ -206,7 +207,15 @@ export function PageHeader({
                                         {titleChip}
                                     </div>
                                     {subline ? (
-                                        <p className="mt-[3px] text-[13px] text-band-foreground/65">
+                                        <p
+                                            data-slot="page-header-subline"
+                                            title={
+                                                typeof subline === 'string'
+                                                    ? subline
+                                                    : undefined
+                                            }
+                                            className="mt-[3px] text-[13px] text-band-foreground/65"
+                                        >
                                             {subline}
                                         </p>
                                     ) : null}
@@ -254,7 +263,10 @@ export function PageHeader({
                         >
                             {/* the meter row — full width, every block a link */}
                             {meters ? (
-                                <div className="mt-[13px] flex min-h-[80px] flex-wrap items-stretch gap-2">
+                                <div
+                                    data-slot="page-header-meters"
+                                    className="mt-[13px] flex min-h-[80px] flex-wrap items-stretch gap-2"
+                                >
                                     {meters}
                                 </div>
                             ) : null}
@@ -896,7 +908,7 @@ export function PageHeaderFilterButton({
             type="button"
             {...rest}
             className={cn(
-                'inline-flex items-center gap-1 px-2',
+                'inline-flex items-center gap-1 px-2 disabled:pointer-events-none disabled:opacity-50',
                 FILTER_FIELD,
                 children == null && 'w-[23px] justify-center px-0',
                 active
@@ -914,6 +926,7 @@ export function PageHeaderFilterButton({
 
 /** Glass dropdown filter chip (label + chevron; ✕ clears when active). */
 export function PageHeaderFilterSelect({
+    testId,
     icon: Icon,
     label,
     value,
@@ -921,6 +934,7 @@ export function PageHeaderFilterSelect({
     options,
     onChange,
 }: {
+    testId?: string;
     icon?: IconType;
     label: string;
     value: string;
@@ -950,6 +964,7 @@ export function PageHeaderFilterSelect({
                 <PopoverTrigger asChild>
                     <button
                         type="button"
+                        data-test={testId}
                         className={cn(
                             'inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none',
                             active ? 'pr-1' : 'pr-2',
@@ -1106,6 +1121,7 @@ export function PageHeaderViewToggle<K extends string>({
 /* ------------------------------------------------------------------ */
 
 export interface PageHeaderRailItem<K extends string = string> {
+    testId?: string;
     key: K;
     label: string;
     icon?: IconType;
@@ -1389,6 +1405,7 @@ export function PageHeaderRail<K extends string>({
                             key={it.key}
                             type="button"
                             role="tab"
+                            data-test={it.testId}
                             aria-selected={on}
                             ref={(button) => {
                                 if (button)

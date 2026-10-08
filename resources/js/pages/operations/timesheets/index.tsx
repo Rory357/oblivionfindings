@@ -800,6 +800,7 @@ export default function TimesheetsIndex({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 {
                     title: isOwnOnlyView ? 'My timesheets' : 'Timesheets',
                     href: '/operations/timesheets',

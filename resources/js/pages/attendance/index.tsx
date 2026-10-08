@@ -1,16 +1,17 @@
+import { StatusBadge } from '@/components/ui/status-badge';
+import { WorkforcePageHeader } from '@/components/workforce/workforce-page-header';
 /* Attendance — shared page header and connected Sessions / On the clock / Handovers views, with
  * right-click context menus on every list row. Clock workflows are multi-step
  * wizards on the shared wizard shell; the Handover wizard and ReasonDialog are
  * the existing shared components, not duplicates. */
 import { AddClientDialog } from '@/components/clients/add-client-dialog';
 import {
-    PageHeader,
+    PageHeaderFilterButton,
     PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
     PageHeaderRail,
-    PageHeaderStatusChip,
 } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { PageHeaderPrimaryButton } from '@/components/page/page-header';
@@ -1282,7 +1283,7 @@ export default function AttendanceIndex({
             <Head title="Attendance" />
 
             <PageShell>
-                <PageHeader
+                <WorkforcePageHeader
                     variant="profile"
                     icon={Timer}
                     title={
@@ -1438,19 +1439,47 @@ export default function AttendanceIndex({
                             </PageHeaderMeterBlock>
                         </>
                     }
+                    details={
+                        <div className="flex w-full flex-wrap gap-2">
+                            {heroBadges.map((badge, index) =>
+                                badge.onClick ? (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        key={index}
+                                        onClick={badge.onClick}
+                                    >
+                                        {badge.icon && (
+                                            <badge.icon className="size-4" />
+                                        )}
+                                        {badge.label}
+                                    </Button>
+                                ) : (
+                                    <StatusBadge
+                                        key={index}
+                                        variant={
+                                            badge.tone === 'default'
+                                                ? 'neutral'
+                                                : (badge.tone ?? 'neutral')
+                                        }
+                                    >
+                                        {badge.label}
+                                    </StatusBadge>
+                                ),
+                            )}
+                        </div>
+                    }
                     filters={
-                        <div className="flex w-full flex-wrap items-center justify-between gap-3">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <PageHeaderGlassButton
+                        <div className="flex w-full flex-wrap items-center justify-end gap-1.5">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                <PageHeaderFilterButton
                                     icon={ChevronLeft}
                                     onClick={() =>
                                         goWeek(addDaysWP(weekStartDate, -7))
                                     }
                                     aria-label="Previous week"
-                                >
-                                    {prevLab}
-                                </PageHeaderGlassButton>
-                                <PageHeaderGlassButton
+                                />
+                                <PageHeaderFilterButton
                                     ref={weekBtnRef}
                                     icon={CalendarRange}
                                     onClick={() => setPickerOpen(!pickerOpen)}
@@ -1460,16 +1489,14 @@ export default function AttendanceIndex({
                                     {curLab} · {weekCompactRange(weekStartDate)}{' '}
                                     {weekStartDate.getFullYear()}
                                     {isCurrentWeek ? ' · this week' : ''}
-                                </PageHeaderGlassButton>
-                                <PageHeaderGlassButton
+                                </PageHeaderFilterButton>
+                                <PageHeaderFilterButton
                                     icon={ChevronRight}
                                     onClick={() =>
                                         goWeek(addDaysWP(weekStartDate, 7))
                                     }
                                     aria-label="Next week"
-                                >
-                                    {nextLab}
-                                </PageHeaderGlassButton>
+                                />
                             </div>
                             {canManageAny ? (
                                 <Select
@@ -1488,7 +1515,7 @@ export default function AttendanceIndex({
                                 >
                                     <SelectTrigger
                                         aria-label="Whose sessions"
-                                        className="w-48"
+                                        className="h-[23px] w-48 rounded-[8px] border-band-foreground/20 bg-band-foreground/10 px-2 py-0 text-[11.5px] text-band-foreground"
                                     >
                                         <SelectValue placeholder="My sessions" />
                                     </SelectTrigger>
@@ -1507,30 +1534,6 @@ export default function AttendanceIndex({
                                     </SelectContent>
                                 </Select>
                             ) : null}
-                            <div className="flex w-full flex-wrap gap-2">
-                                {heroBadges.map((badge, index) =>
-                                    badge.onClick ? (
-                                        <PageHeaderGlassButton
-                                            key={index}
-                                            icon={badge.icon}
-                                            onClick={badge.onClick}
-                                        >
-                                            {badge.label}
-                                        </PageHeaderGlassButton>
-                                    ) : (
-                                        <PageHeaderStatusChip
-                                            key={index}
-                                            variant={
-                                                badge.tone === 'default'
-                                                    ? 'neutral'
-                                                    : (badge.tone ?? 'neutral')
-                                            }
-                                        >
-                                            {badge.label}
-                                        </PageHeaderStatusChip>
-                                    ),
-                                )}
-                            </div>
                         </div>
                     }
                     rail={

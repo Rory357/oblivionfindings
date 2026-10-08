@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -83,9 +83,51 @@ function job(overrides: Partial<JobPost> = {}): JobPost {
 }
 
 describe('job board audit fixes', () => {
+    it('keeps the new header filters and scoped meters connected without asserting unknown compliance', () => {
+        const change = vi.fn(),
+            scope = vi.fn(),
+            weekChange = vi.fn();
+        render(
+            <JobBoardHero
+                week={week}
+                stats={stats}
+                availableSkills={['all', 'Hoist']}
+                filters={{ skill: 'all' }}
+                onFilterChange={change}
+                onWeekChange={weekChange}
+                onScopeChange={scope}
+            />,
+        );
+        expect(
+            screen.getByRole('heading', { name: 'Job Board' }),
+        ).toBeVisible();
+        expect(
+            screen.queryByText(/Your compliance is current|refreshed just now/),
+        ).toBeNull();
+        expect(
+            screen.queryByRole('button', { name: 'View pending' }),
+        ).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: 'View my claims' }));
+        expect(scope).toHaveBeenCalledWith('mine');
+        fireEvent.click(screen.getByRole('button', { name: 'Previous week' }));
+        expect(weekChange).toHaveBeenCalledWith(week.prev);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Clear All skills' }),
+        );
+        expect(change).toHaveBeenCalledWith('skill', null);
+        fireEvent.change(screen.getByRole('searchbox'), {
+            target: { value: 'North' },
+        });
+        expect(change).toHaveBeenCalledWith('q', 'North');
+        expect(
+            document.querySelector('[data-test="job-board-skill-filter"]'),
+        ).toHaveTextContent('all');
+    });
+
     it('uses pending approval count for the Pending hero stat', () => {
         render(
             <JobBoardHero
+                canApprove
                 firstName="Sheila"
                 week={week}
                 stats={stats}
@@ -96,9 +138,9 @@ describe('job board audit fixes', () => {
             />,
         );
 
-        expect(screen.getByText('Pending').parentElement).toHaveTextContent(
-            '2',
-        );
+        expect(
+            screen.getByRole('link', { name: 'View pending' }),
+        ).toHaveTextContent('2');
     });
 
     it('shows the combined week number and date range in the picker button', () => {

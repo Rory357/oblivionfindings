@@ -319,6 +319,12 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
     const normalizedCurrentPath = normalizePath(currentPath);
     const normalizedItemPath = normalizePath(itemPath);
 
+    // Workforce retains legacy /operations URLs, but belongs to its own module.
+    // Apply this to child links too, even when Operations is manually expanded.
+    if (normalizedItemPath === '/operations' && isWorkforceUrl(current)) {
+        return -1;
+    }
+
     if (normalizedItemPath === '/vendors') {
         const selected = vendorRegisterTab(current);
         return selected ? 3000 + item.length : -1;
@@ -375,6 +381,8 @@ const WORKFORCE_ROUTE_PREFIXES = [
     '/operations/shifts',
     '/operations/job-board',
     '/operations/rostering',
+    '/operations/workforce-settings',
+    '/operations/availability',
     '/operations/handovers',
     '/operations/shift-notes',
     '/operations/timesheets',

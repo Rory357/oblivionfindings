@@ -1,5 +1,5 @@
 import {
-    PageHeader,
+    PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
     PageHeaderMeterBig,
@@ -21,6 +21,7 @@ import {
 import { ErrorState } from '@/components/ui/error-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { LoadingState } from '@/components/ui/loading-state';
+import { WorkforcePageHeader } from '@/components/workforce/workforce-page-header';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTimeInZone } from '@/lib/datetime';
 import { Head } from '@inertiajs/react';
@@ -236,9 +237,8 @@ export default function ShiftNotesIndex({
         >
             <Head title="Shift notes" />
             <PageShell>
-                <PageHeader
+                <WorkforcePageHeader
                     variant="index"
-                    frontline
                     icon={NotebookPen}
                     title="Shift notes"
                     subline={`${formatDateOnly(weekStart)} → ${formatDateOnly(weekEnd)} · ${evidence.timezone} · Read and document support for each shift`}
@@ -293,7 +293,7 @@ export default function ShiftNotesIndex({
                         </>
                     }
                     meters={
-                        <div className="grid w-full min-w-0 grid-cols-2 gap-2 xl:grid-cols-4">
+                        <div className="grid w-full min-w-0 grid-cols-2 gap-2 lg:grid-cols-4">
                             {meters.map(([key, label, value, caption]) => (
                                 <PageHeaderMeterBlock
                                     key={key}
@@ -314,21 +314,32 @@ export default function ShiftNotesIndex({
                             ))}
                         </div>
                     }
+                    details={
+                        <p role="status" className="text-caption">
+                            {query.loading
+                                ? 'Updating notes…'
+                                : (readNotice ?? rangeLabel)}{' '}
+                            · Counts cover all matching records before the
+                            status filter · Updated{' '}
+                            {formatDateTimeInZone(
+                                evidence.checked_at,
+                                evidence.timezone,
+                            )}
+                        </p>
+                    }
                     filters={
                         <fieldset
                             disabled={query.loading}
-                            className="flex w-full min-w-0 flex-wrap items-center gap-3"
+                            className="flex w-full min-w-0 flex-wrap items-center justify-end gap-1.5"
                         >
-                            <PageHeaderGlassButton
+                            <PageHeaderFilterButton
                                 icon={ChevronLeft}
                                 aria-label="Previous week"
                                 onClick={() =>
                                     goWeek(addDaysWP(weekStartDate, -7))
                                 }
-                            >
-                                Previous
-                            </PageHeaderGlassButton>
-                            <PageHeaderGlassButton
+                            />
+                            <PageHeaderFilterButton
                                 ref={weekButton}
                                 icon={CalendarDays}
                                 aria-haspopup="dialog"
@@ -337,17 +348,16 @@ export default function ShiftNotesIndex({
                             >
                                 Week {weekNumberISO(weekStartDate)} · Choose
                                 week
-                            </PageHeaderGlassButton>
-                            <PageHeaderGlassButton
+                            </PageHeaderFilterButton>
+                            <PageHeaderFilterButton
                                 icon={ChevronRight}
                                 aria-label="Next week"
                                 onClick={() =>
                                     goWeek(addDaysWP(weekStartDate, 7))
                                 }
-                            >
-                                Next
-                            </PageHeaderGlassButton>
+                            />
                             <EntityFilter
+                                compact
                                 onDark
                                 label="Client"
                                 allLabel="All clients"
@@ -365,6 +375,7 @@ export default function ShiftNotesIndex({
                                 }
                             />
                             <EntityFilter
+                                compact
                                 onDark
                                 label="Author"
                                 allLabel="All authors"
@@ -379,6 +390,7 @@ export default function ShiftNotesIndex({
                                 }
                             />
                             <EntityFilter
+                                compact
                                 onDark
                                 label="Site"
                                 allLabel="All sites"
@@ -425,38 +437,23 @@ export default function ShiftNotesIndex({
                                     },
                                 ]}
                             />
-                            {hasFilters && (
-                                <PageHeaderGlassButton
-                                    icon={X}
-                                    onClick={query.clear}
-                                >
-                                    Clear filters
-                                </PageHeaderGlassButton>
-                            )}
+                            <PageHeaderFilterButton
+                                icon={X}
+                                onClick={query.clear}
+                                disabled={!hasFilters}
+                                aria-label="Clear filters"
+                                title="Clear filters"
+                            />
                             {(filters.date_from || filters.date_to) && (
-                                <PageHeaderGlassButton
+                                <PageHeaderFilterButton
                                     icon={CalendarDays}
                                     onClick={() => selectDay(null)}
                                 >
                                     {formatDateOnly(filters.date_from)} →{' '}
                                     {formatDateOnly(filters.date_to)} · Whole
                                     week
-                                </PageHeaderGlassButton>
+                                </PageHeaderFilterButton>
                             )}
-                            <p
-                                role="status"
-                                className="text-caption w-full text-band-foreground!"
-                            >
-                                {query.loading
-                                    ? 'Updating notes…'
-                                    : (readNotice ?? rangeLabel)}{' '}
-                                · Counts cover all matching records before the
-                                status filter · Updated{' '}
-                                {formatDateTimeInZone(
-                                    evidence.checked_at,
-                                    evidence.timezone,
-                                )}
-                            </p>
                         </fieldset>
                     }
                     rail={

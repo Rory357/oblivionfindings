@@ -32,6 +32,7 @@ export type EntityFilterProps = {
     onChange: (next: number | null) => void;
     onDark?: boolean;
     className?: string;
+    compact?: boolean;
     /**
      * Plural label used in placeholders/empty states.
      * Defaults to `label + 's'` (e.g. "client" → "clients"),
@@ -48,6 +49,7 @@ export function EntityFilter({
     onChange,
     onDark = false,
     className,
+    compact = false,
     pluralLabel,
 }: EntityFilterProps) {
     const [open, setOpen] = useState(false);
@@ -67,7 +69,8 @@ export function EntityFilter({
           )
         : cn(
               'inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent',
-              selected && 'border-primary-fill bg-primary-fill text-primary-fill-foreground',
+              selected &&
+                  'border-primary-fill bg-primary-fill text-primary-fill-foreground',
           );
 
     return (
@@ -76,14 +79,24 @@ export function EntityFilter({
                 {/* The pill is a wrapper, not a button, so the clear action can
                     sit as a sibling of the trigger rather than nested inside it
                     (nested <button>s are invalid HTML and break hydration). */}
-                <div className={cn(triggerClass, className)}>
+                <div
+                    className={cn(
+                        triggerClass,
+                        compact &&
+                            'box-border h-[23px] rounded-[8px] px-2 py-0 text-[11.5px] max-md:h-auto',
+                        className,
+                    )}
+                >
                     <PopoverTrigger asChild>
                         <button
                             type="button"
                             aria-haspopup="listbox"
                             aria-expanded={open}
                             aria-label={`${label} filter: ${selected ? selected.name : `${allLabel} · ${items.length}`}`}
-                            className="inline-flex items-center gap-1.5 rounded-full"
+                            className={cn(
+                                'inline-flex items-center gap-1.5 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                                compact && 'min-w-0 max-md:min-h-11',
+                            )}
                         >
                             <Search
                                 className="h-3.5 w-3.5"
@@ -105,7 +118,8 @@ export function EntityFilter({
                             type="button"
                             aria-label={`Clear ${label} filter`}
                             className={cn(
-                                'inline-flex h-4 w-4 items-center justify-center rounded-full',
+                                'inline-flex h-4 w-4 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                                compact && 'max-md:min-h-11 max-md:min-w-11',
                                 onDark
                                     ? 'hover:bg-primary/30'
                                     : 'hover:bg-primary-foreground/20',

@@ -1,41 +1,33 @@
+import { type PageHeroBadge } from '@/components/page';
 import {
-    AlertTriangle,
-    Bell,
-    Briefcase,
-    Calendar,
-    CalendarDays,
-    CalendarRange,
-    Check,
-    ChevronDown,
-    ChevronLeft,
-    ChevronRight,
-    MapPin,
-    Plus,
-    Search,
-    UserCheck,
-} from 'lucide-react';
-import { useRef, useState, type ReactNode } from 'react';
-
-import { PageHero, type PageHeroBadge } from '@/components/page';
-import { PageHeaderPrimaryButton } from '@/components/page/page-header';
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+} from '@/components/page/page-header';
 import {
     WeekPicker,
     weekLabel as isoWeekLabel,
     ymd,
 } from '@/components/rostering/week-picker';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { WorkforcePageHeader } from '@/components/workforce/workforce-page-header';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-
-import type { JobBoardStats, JobBoardWeek } from './types';
-
-const ANY = '__ANY__';
+    AlertTriangle,
+    Bell,
+    Briefcase,
+    Calendar,
+    CalendarRange,
+    ChevronLeft,
+    ChevronRight,
+    Plus,
+} from 'lucide-react';
+import { useRef, useState, type ReactNode } from 'react';
+import type { JobBoardScope, JobBoardStats, JobBoardWeek } from './types';
 
 export interface JobBoardFilters {
     q?: string;
@@ -43,9 +35,8 @@ export interface JobBoardFilters {
     skill?: string;
     fit?: string;
 }
-
 interface JobBoardHeroProps {
-    firstName: string;
+    firstName?: string;
     week: JobBoardWeek;
     stats: JobBoardStats;
     availableSkills: string[];
@@ -61,10 +52,11 @@ interface JobBoardHeroProps {
     onPostPosition?: () => void;
     onAlertMe?: () => void;
     alertsEnabled?: boolean;
+    rail?: ReactNode;
+    onScopeChange?: (scope: JobBoardScope) => void;
+    canApprove?: boolean;
 }
-
 export function JobBoardHero({
-    firstName,
     week,
     stats,
     availableSkills,
@@ -80,263 +72,240 @@ export function JobBoardHero({
     onPostPosition,
     onAlertMe,
     alertsEnabled = false,
+    rail,
+    onScopeChange,
+    canApprove = false,
 }: JobBoardHeroProps) {
-    const weekRange = `${week.start_label} → ${week.end_label}`;
-    const openCount = stats.open;
+    const weekRange = week.start_label + ' → ' + week.end_label;
     const pickerBtnRef = useRef<HTMLButtonElement>(null);
     const [pickerOpen, setPickerOpen] = useState(false);
-    const selectedWeekStart = new Date(`${week.start}T00:00:00`);
-    const pickerLabel = `${isoWeekLabel(selectedWeekStart)} · ${weekRange}`;
-
-    const badges: PageHeroBadge[] = [
-        complianceBadge ?? {
-            label: 'Your compliance is current',
-            tone: 'success',
-            icon: Check,
-        },
-        sleepoverBlockedBadge ?? null,
-        availabilityBadge ?? null,
-    ].filter(Boolean) as PageHeroBadge[];
-
-    const liveTitle: ReactNode = (
-        <span>
-            <span className="mb-2 flex items-center gap-2 text-[10.5px] font-semibold tracking-wider text-primary-foreground/80 uppercase">
-                <span
-                    aria-hidden="true"
-                    className="relative inline-flex h-2 w-2"
-                >
-                    <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-status-success/70" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success ring-2 ring-status-success/30" />
-                </span>
-                Live board · refreshed just now · {openCount} open shifts
-            </span>
-            <span className="block">
-                <span className="font-normal text-primary-foreground/80">
-                    Kia ora {firstName}, shifts ready to claim —
-                </span>{' '}
-                <span className="border-b-2 border-primary-foreground/40 pb-0.5">
-                    {weekRange}
-                </span>
-            </span>
-        </span>
-    );
-
+    const selectedWeekStart = new Date(week.start + 'T12:00:00');
+    const badges = [
+        complianceBadge,
+        sleepoverBlockedBadge,
+        availabilityBadge,
+    ].filter((badge): badge is PageHeroBadge => Boolean(badge));
+    const meters: [JobBoardScope, string, number, string][] = [
+        ['all', 'Open', stats.open, 'Open positions this week'],
+        [
+            'for-you',
+            'For you',
+            stats.eligible_for_you,
+            'Match your recorded eligibility',
+        ],
+        [
+            canApprove ? 'approvals' : 'mine',
+            canApprove ? 'Pending' : 'My claims',
+            canApprove ? stats.pending_approval : stats.mine,
+            canApprove
+                ? 'Claims awaiting approval'
+                : 'Positions you have claimed',
+        ],
+        [
+            'replacements',
+            'Replacements',
+            stats.replacements,
+            'Requests for replacement cover',
+        ],
+    ];
     return (
-        <PageHero
-            category="ops"
-            icon={Briefcase}
-            title={liveTitle}
-            description={
-                <span>
-                    {stats.open} open position{stats.open === 1 ? '' : 's'} this
-                    week,{' '}
-                    <strong>
-                        {stats.eligible_for_you} match your eligibility
-                    </strong>
-                    , and {stats.expiring_soon} expire within the hour.
-                </span>
-            }
-            meta={[
-                {
-                    icon: CalendarDays,
-                    label: `${weekRange} · Mon–Sun`,
-                },
-                {
-                    icon: MapPin,
-                    label: `${sitesCount ?? 0} site${sitesCount === 1 ? '' : 's'} · ${sitesWorkedThisWeek} site${sitesWorkedThisWeek === 1 ? '' : 's'} you've worked at this week`,
-                },
-                {
-                    icon: UserCheck,
-                    label: `${stats.eligible_for_you} eligible · ${stats.expiring_soon} expiring soon`,
-                },
-            ]}
-            badges={badges}
-            stats={[
-                { label: 'Open', value: stats.open },
-                { label: 'For you', value: stats.eligible_for_you },
-                { label: 'Pending', value: stats.pending_approval },
-                { label: 'Filled today', value: stats.filled_today },
-            ]}
-            actions={
-                <>
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        data-test="job-board-alert-me"
-                        title={
-                            alertsEnabled
-                                ? 'Notifications on — click to mute'
-                                : 'Get notified when matching shifts open'
-                        }
-                        className={
-                            alertsEnabled
-                                ? 'border-status-success/60 bg-status-success/15 text-primary-foreground hover:bg-status-success/25'
-                                : 'border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10'
-                        }
-                        onClick={onAlertMe}
-                    >
-                        <Bell className="mr-1 h-4 w-4" />
-                        {alertsEnabled ? 'Alerts on' : 'Alert me'}
-                    </Button>
-                    {canPostPosition ? (
-                        <PageHeaderPrimaryButton
-                            icon={Plus}
-                            onClick={onPostPosition}
+        <>
+            <WorkforcePageHeader
+                title="Job Board"
+                icon={Briefcase}
+                subline={
+                    weekRange +
+                    ' · ' +
+                    (sitesCount ?? 0) +
+                    ' sites · Find and claim available shifts'
+                }
+                actions={
+                    <>
+                        <PageHeaderSearch
+                            value={filters.q ?? ''}
+                            onChange={(value) =>
+                                onFilterChange('q', value || null)
+                            }
+                            placeholder="Search title, client, suburb…"
+                        />
+                        <PageHeaderGlassButton
+                            icon={Bell}
+                            data-test="job-board-alert-me"
+                            active={alertsEnabled}
+                            title={
+                                alertsEnabled
+                                    ? 'Notifications on — click to mute'
+                                    : 'Get notified when matching shifts open'
+                            }
+                            onClick={onAlertMe}
                         >
-                            Post position
-                        </PageHeaderPrimaryButton>
-                    ) : null}
-                </>
-            }
-            footer={
-                <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                        <Button
-                            unstyled
-                            type="button"
+                            {alertsEnabled ? 'Alerts on' : 'Alert me'}
+                        </PageHeaderGlassButton>
+                        {canPostPosition ? (
+                            <PageHeaderPrimaryButton
+                                icon={Plus}
+                                onClick={onPostPosition}
+                            >
+                                Post position
+                            </PageHeaderPrimaryButton>
+                        ) : null}
+                    </>
+                }
+                meters={
+                    <>
+                        {meters.map(([scope, label, value, caption]) => (
+                            <PageHeaderMeterBlock
+                                key={scope}
+                                label={label}
+                                ariaLabel={'View ' + label.toLowerCase()}
+                                {...(onScopeChange
+                                    ? { onClick: () => onScopeChange(scope) }
+                                    : {
+                                          href:
+                                              '/operations/job-board?scope=' +
+                                              scope +
+                                              '&week=' +
+                                              week.start,
+                                      })}
+                            >
+                                <PageHeaderMeterBig>{value}</PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    {caption}
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                        ))}
+                    </>
+                }
+                filters={
+                    <>
+                        <PageHeaderFilterButton
+                            icon={ChevronLeft}
                             data-test="job-board-week-prev"
-                            className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20"
+                            aria-label="Previous week"
                             onClick={() => onWeekChange(week.prev)}
-                        >
-                            <ChevronLeft className="h-3.5 w-3.5" /> Prev week
-                        </Button>
-                        <Button
-                            unstyled
+                        />
+                        <PageHeaderFilterButton
                             ref={pickerBtnRef}
-                            type="button"
+                            icon={CalendarRange}
                             data-test="job-board-week-pick"
-                            className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/35 bg-primary-foreground/20 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/30"
-                            onClick={() => setPickerOpen((v) => !v)}
+                            onClick={() => setPickerOpen((value) => !value)}
                             aria-haspopup="dialog"
                             aria-expanded={pickerOpen}
                         >
-                            <CalendarRange className="h-3.5 w-3.5" />
-                            {pickerLabel} · pick week
-                            <ChevronDown className="h-3 w-3" />
-                        </Button>
-                        <Button
-                            unstyled
-                            type="button"
+                            {isoWeekLabel(selectedWeekStart)} · {weekRange} ·
+                            pick week
+                        </PageHeaderFilterButton>
+                        <PageHeaderFilterButton
+                            icon={ChevronRight}
                             data-test="job-board-week-next"
-                            className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20"
+                            aria-label="Next week"
                             onClick={() => onWeekChange(week.next)}
-                        >
-                            Next week <ChevronRight className="h-3.5 w-3.5" />
-                        </Button>
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-end gap-2">
-                        <div className="relative">
-                            <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-primary-foreground/60" />
-                            <Input
-                                placeholder="Search title, client, suburb…"
-                                className="h-8 w-[220px] border-primary-foreground/30 bg-primary-foreground/10 pl-8 text-xs text-primary-foreground placeholder:text-primary-foreground/55"
-                                value={filters.q ?? ''}
-                                onChange={(event) =>
-                                    onFilterChange(
-                                        'q',
-                                        event.target.value || null,
-                                    )
-                                }
-                            />
-                        </div>
-                        <Select
-                            value={filters.date_range ?? ANY}
-                            onValueChange={(value) =>
+                        />
+                        <PageHeaderFilterSelect
+                            testId="job-board-date-filter"
+                            label="Any date"
+                            allValue="__ANY__"
+                            value={filters.date_range ?? '__ANY__'}
+                            onChange={(value) =>
                                 onFilterChange(
                                     'date_range',
-                                    value === ANY ? null : value,
+                                    value === '__ANY__' ? null : value,
                                 )
                             }
-                        >
-                            <SelectTrigger
-                                data-test="job-board-date-filter"
-                                className="h-8 w-[130px] border-primary-foreground/30 bg-primary-foreground/10 text-xs text-primary-foreground [&>svg]:text-primary-foreground/80"
-                            >
-                                <SelectValue placeholder="Any date" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value={ANY}>Any date</SelectItem>
-                                <SelectItem value="next_7_days">
-                                    Next 7 days
-                                </SelectItem>
-                                <SelectItem value="this_weekend">
-                                    This weekend
-                                </SelectItem>
-                                <SelectItem value="tonight">Tonight</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <Select
-                            value={filters.skill ?? ANY}
-                            onValueChange={(value) =>
+                            options={[
+                                { value: '__ANY__', label: 'Any date' },
+                                { value: 'next_7_days', label: 'Next 7 days' },
+                                {
+                                    value: 'this_weekend',
+                                    label: 'This weekend',
+                                },
+                                { value: 'tonight', label: 'Tonight' },
+                            ]}
+                        />
+                        <PageHeaderFilterSelect
+                            testId="job-board-skill-filter"
+                            label="All skills"
+                            allValue="__ANY__"
+                            value={filters.skill ?? '__ANY__'}
+                            onChange={(value) =>
                                 onFilterChange(
                                     'skill',
-                                    value === ANY ? null : value,
+                                    value === '__ANY__' ? null : value,
                                 )
                             }
-                        >
-                            <SelectTrigger
-                                data-test="job-board-skill-filter"
-                                className="h-8 w-[140px] border-primary-foreground/30 bg-primary-foreground/10 text-xs text-primary-foreground [&>svg]:text-primary-foreground/80"
-                            >
-                                <SelectValue placeholder="All skills" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value={ANY}>All skills</SelectItem>
-                                {availableSkills.map((skill) => (
-                                    <SelectItem key={skill} value={skill}>
-                                        {skill}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <Select
+                            options={[
+                                { value: '__ANY__', label: 'All skills' },
+                                ...availableSkills.map((skill) => ({
+                                    value: skill,
+                                    label: skill,
+                                })),
+                            ]}
+                        />
+                        <PageHeaderFilterSelect
+                            testId="job-board-fit-filter"
+                            label="Any fit"
                             value={filters.fit ?? 'all'}
-                            onValueChange={(value) =>
+                            onChange={(value) =>
                                 onFilterChange(
                                     'fit',
                                     value === 'all' ? null : value,
                                 )
                             }
-                        >
-                            <SelectTrigger
-                                data-test="job-board-fit-filter"
-                                className="h-8 w-[170px] border-primary-foreground/30 bg-primary-foreground/10 text-xs text-primary-foreground [&>svg]:text-primary-foreground/80"
-                            >
-                                <SelectValue placeholder="Any fit" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">Any fit</SelectItem>
-                                <SelectItem value="eligible">
-                                    Eligible only
-                                </SelectItem>
-                                <SelectItem value="no-conflict">
-                                    No double bookings
-                                </SelectItem>
-                                <SelectItem value="site">
-                                    Sites I've worked at
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    {pickerOpen ? (
-                        <WeekPicker
-                            selectedWeekStart={selectedWeekStart}
-                            anchorRef={pickerBtnRef}
-                            onSelect={(nextMonday) => {
-                                setPickerOpen(false);
-                                onWeekChange(ymd(nextMonday));
-                            }}
-                            onClose={() => setPickerOpen(false)}
+                            options={[
+                                { value: 'all', label: 'Any fit' },
+                                { value: 'eligible', label: 'Eligible only' },
+                                {
+                                    value: 'no-conflict',
+                                    label: 'No double bookings',
+                                },
+                                {
+                                    value: 'site',
+                                    label: "Sites I've worked at",
+                                },
+                            ]}
                         />
-                    ) : null}
-                </div>
-            }
-        />
+                    </>
+                }
+                rail={rail}
+                details={
+                    <>
+                        <p>
+                            {stats.filled_today} filled today ·{' '}
+                            {stats.expiring_soon} expiring within an hour ·{' '}
+                            {sitesWorkedThisWeek} sites worked this week
+                        </p>
+                        {badges.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                                {badges.map((badge, index) => (
+                                    <StatusBadge
+                                        key={index}
+                                        variant={
+                                            badge.tone === 'default'
+                                                ? 'neutral'
+                                                : (badge.tone ?? 'neutral')
+                                        }
+                                    >
+                                        {badge.label}
+                                    </StatusBadge>
+                                ))}
+                            </div>
+                        ) : null}
+                    </>
+                }
+            />
+            {pickerOpen ? (
+                <WeekPicker
+                    selectedWeekStart={selectedWeekStart}
+                    anchorRef={pickerBtnRef}
+                    onSelect={(date) => {
+                        setPickerOpen(false);
+                        onWeekChange(ymd(date));
+                    }}
+                    onClose={() => setPickerOpen(false)}
+                />
+            ) : null}
+        </>
     );
 }
-
-// Re-export Calendar for the badge fallback caller.
 export const HeroBadgeIcons = { Calendar, AlertTriangle };
-
 export default JobBoardHero;

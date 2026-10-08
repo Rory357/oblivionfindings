@@ -121,7 +121,7 @@ export function ConflictQueueList({
         : [];
 
     return (
-        <div className="rounded-2xl border bg-card">
+        <div className="min-w-0 rounded-2xl border bg-card">
             <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
                 <span className="text-sm font-semibold">{headerLabel}</span>
                 <span className="text-xs text-muted-foreground">
