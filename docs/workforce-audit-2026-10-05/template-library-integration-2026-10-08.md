@@ -39,3 +39,13 @@ Finish this gate and browser verification, then integrate verified work into loc
 The read-only browser journey confirmed all template row details and selected-week retention. Its screenshot exposed duplicate close controls (the shared Dialog default plus the existing labelled custom button); the redundant default is disabled in source, awaiting the next template visual build. This is outside the header-only delivery.
 
 After the duplicate Close correction, the three template suites pass36/36 in test-results/template-library-ui-sixth-20261008.json. The current header-only delivery is on local/GitHub main atbc22a918e7d67217c8f844d4af11594a33a45f0a; it does not deliver this pending template unit.
+
+## Layout follow-up — 8 October, 13:43 NZ
+
+The standalone template workspace now reuses WorkforcePageHeader. The detail viewer only reserves the Apply side column when the actor can apply, and its single close control has the existing 44px touch target and keyboard focus style. The earlier removal of the duplicate default close button is now built and visually verified.
+
+Focused affected UI suites pass17/17 (`template-library-ui-seventh-20261008.json`: library/dialogs only; an unmatched command-test filename is not counted). The previous36-case command/library/dialog acceptance is historical; this is not a new36-case run. Full TypeScript and scoped ESLint exit0. The normal build exits0 in7m36s with app-B9Nu--_O.js and the existing chunk-size advisory.
+
+Actual read-only browser at isolated8768, intended integration checkout, passes1440/390/320px: no page/dialog horizontal overflow, one Close, one full-width row column when Apply is unavailable, and Escape closes after animation. At320px keyboard Enter also closes and the compact28px drawing has a44px pseudo-element hit target. Browser script pins the loaded app-B9Nu--_O.js. Evidence: `test-results/template-layout-browser-20261008.log`, `template-close-browser-20261008.log`, and `output/playwright/workforce-headers-final-20261008/template-detail-final-*.png`.
+
+Existing preview's four canonical template permission definitions are absent; Demo Admin's read-only projection is correct. User-authorized seeded-login use did not change any shared grant. A new disposable environment with normal seeders and a separate limited-reader fixture is being prepared for positive save and standalone-reader browser journeys. Those journeys and main integration remain pending at this checkpoint.

@@ -1543,14 +1543,19 @@ function DetailBody({
                         type="button"
                         onClick={() => onOpenChange(false)}
                         aria-label="Close"
-                        className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted"
+                        className="frontline-hit grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
                     >
                         <X className="h-5 w-5" />
                     </button>
                 </div>
             </header>
 
-            <div className="grid min-h-0 flex-1 gap-0 overflow-hidden lg:grid-cols-[1fr_320px]">
+            <div
+                className={cn(
+                    'grid min-h-0 min-w-0 flex-1 gap-0 overflow-hidden',
+                    canApply && 'lg:grid-cols-[minmax(0,1fr)_320px]',
+                )}
+            >
                 {/* Rows */}
                 <div className="min-h-0 overflow-y-auto px-5 py-4">
                     {template.description ? (

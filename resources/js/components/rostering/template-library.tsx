@@ -1,5 +1,4 @@
 import {
-    PageHeader,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderPrimaryButton,
@@ -16,6 +15,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { WorkforcePageHeader } from '@/components/workforce/workforce-page-header';
 import { usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -130,7 +130,7 @@ function LibraryBody({
     return (
         <div className="space-y-4">
             {standalone ? (
-                <PageHeader
+                <WorkforcePageHeader
                     icon={LayoutTemplate}
                     title="Roster templates"
                     subline={
