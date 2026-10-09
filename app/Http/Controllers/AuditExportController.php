@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\ClientIncident;
+use App\Services\Medication\MedicationGeneralAuditPrivacy;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -100,11 +101,15 @@ class AuditExportController extends Controller
             ->limit(2000)
             ->get();
 
-        $audit = AuditLog::query()
+        // EA-150: medication audit rows never leave in this zip. They are
+        // exported from eMAR › Reports › Audit, which asks for a purpose,
+        // applies the person rule and controlled view, and records the export.
+        $auditQuery = AuditLog::query()
             ->where('client_id', $client->id)
             ->orderByDesc('created_at')
-            ->limit(5000)
-            ->get();
+            ->limit(5000);
+        app(MedicationGeneralAuditPrivacy::class)->nonMedication($auditQuery);
+        $audit = $auditQuery->get();
 
         $filename = 'audit_client_'.$client->id.'_'.now()->format('Ymd_His').'.zip';
 
@@ -114,6 +119,7 @@ class AuditExportController extends Controller
                 'type' => 'client',
                 'client_id' => $client->id,
                 'client_name' => trim($client->first_name.' '.$client->last_name),
+                'medication_audit' => 'Not included. Medication audit is exported from eMAR › Reports › Audit trail, which records the purpose of each export.',
             ];
             $zip->addFromString('manifest.json', json_encode($manifest, JSON_PRETTY_PRINT));
             $zip->addFromString('client.json', json_encode($client->toArray(), JSON_PRETTY_PRINT));
