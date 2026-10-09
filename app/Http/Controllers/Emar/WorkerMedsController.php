@@ -1255,7 +1255,9 @@ class WorkerMedsController extends Controller
      * selected day (or the day after, so late shifts crossing midnight keep
      * their context) whom they may open — the person rule My Day and the
      * badge use (C6): people they're assigned to at their Sites, or on a
-     * shift they're clocked in to now. So before clock-in a worker sees no
+     * shift they're clocked in to now. A shift at a house also brings in
+     * every resident there the worker is assigned to support, whoever the
+     * shift names (EA-006, D1). So before clock-in a worker sees no
      * other person's medicines unless they're assigned to them. With no
      * shift context (e.g. a medication lead opening the worker view) the
      * board falls back to the people at their Sites they may open.
@@ -1275,7 +1277,7 @@ class WorkerMedsController extends Controller
         }
 
         try {
-            $shiftClientIds = Shift::where('user_id', $user->id)
+            $shifts = Shift::where('user_id', $user->id)
                 ->where('starts_at', '<=', $to)
                 ->where(function ($overlap) use ($from): void {
                     $overlap
@@ -1295,9 +1297,34 @@ class WorkerMedsController extends Controller
                         });
                 })
                 ->where('status', '!=', 'cancelled')
-                ->whereHas('client', fn ($clients) => $clients->whereIn('site_id', $siteIds))
+                ->where(function ($house) use ($siteIds): void {
+                    $house->whereIn('site_id', $siteIds)
+                        ->orWhere(fn ($derived) => $derived->whereNull('site_id')
+                            ->whereHas('client', fn ($clients) => $clients->whereIn('site_id', $siteIds)));
+                })
+                ->with('client:id,site_id')
+                ->get(['id', 'client_id', 'site_id']);
+
+            // EA-006 (D1): a shift at a house covers every resident there the
+            // worker is assigned to support, whoever the shift names.
+            $houseIds = $shifts
+                ->map(fn (Shift $shift): ?int => $shift->site_id !== null ? (int) $shift->site_id : ($shift->client?->site_id !== null ? (int) $shift->client->site_id : null))
+                ->filter(fn (?int $siteId): bool => $siteId !== null && in_array($siteId, $siteIds, true))
+                ->unique()
+                ->values()
+                ->all();
+            $supported = $houseIds === [] ? [] : Client::query()
+                ->whereIn('site_id', $houseIds)
+                ->whereHas('supportWorkers', fn ($workers) => $workers->whereKey($user->id))
+                ->orderBy('id')
+                ->pluck('id')
+                ->all();
+            $shiftClientIds = $shifts
+                ->filter(fn (Shift $shift): bool => $shift->client !== null && in_array((int) $shift->client->site_id, $siteIds, true))
                 ->pluck('client_id')
+                ->merge($supported)
                 ->filter()
+                ->map(fn ($id): int => (int) $id)
                 ->unique()
                 ->values()
                 ->all();

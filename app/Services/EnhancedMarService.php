@@ -966,14 +966,24 @@ class EnhancedMarService
 
                 $shift = null;
                 if ($shiftId !== null) {
+                    // EA-006 (D1): the worker's shift at the person's house
+                    // also counts when they're assigned to support the
+                    // person, whoever the shift names.
                     $shift = Shift::query()
                         ->whereKey($shiftId)
                         ->where('user_id', $userId)
-                        ->where('client_id', $client->id)
+                        ->where(function ($binding) use ($client, $userId): void {
+                            $binding->where('client_id', $client->id)
+                                ->orWhereExists(fn ($assigned) => $assigned->selectRaw('1')
+                                    ->from('client_user')
+                                    ->where('client_user.client_id', $client->id)
+                                    ->where('client_user.user_id', $userId));
+                        })
                         ->where(function ($query) use ($client): void {
                             $query
                                 ->where('site_id', $client->site_id)
-                                ->orWhereNull('site_id');
+                                ->orWhere(fn ($derived) => $derived->whereNull('site_id')
+                                    ->whereHas('client', fn ($clients) => $clients->where('site_id', $client->site_id)));
                         })
                         ->lockForUpdate()
                         ->first();

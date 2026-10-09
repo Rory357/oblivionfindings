@@ -552,7 +552,7 @@ class MedicationScopeDecisionService
                                     });
                             });
                     })
-                    ->where(function ($binding): void {
+                    ->where(function ($binding) use ($performer): void {
                         $binding->whereColumn('shifts.client_id', 'clients.id');
 
                         if (Schema::hasTable('shift_clients')) {
@@ -563,6 +563,15 @@ class MedicationScopeDecisionService
                                     ->whereColumn('shift_clients.client_id', 'clients.id');
                             });
                         }
+
+                        // EA-006 (D1): clocked in at the person's house and
+                        // assigned to support them — whoever the shift names.
+                        $binding->orWhereExists(function ($assigned) use ($performer): void {
+                            $assigned->selectRaw('1')
+                                ->from('client_user')
+                                ->whereColumn('client_user.client_id', 'clients.id')
+                                ->where('client_user.user_id', $performer->id);
+                        });
                     });
             })
             ->pluck('clients.id')
@@ -890,8 +899,19 @@ class MedicationScopeDecisionService
             $this->siteAccess->accessibleSiteIds($performer, ['clinical.accessAllSites', 'sites.viewAll']),
             true,
         ));
-        $shiftQuery = $this->coveringShiftQuery($performer, $siteId, $actionAt)
-            ->where(function (Builder $scope) use ($client): void {
+        $shiftQuery = $this->coveringShiftQuery($performer, $siteId, $actionAt);
+        // EA-006 (D1): a worker clocked in at the person's house who is
+        // assigned to support them records for them, whoever the shift
+        // names. A locking read, so the assignment is current and can't be
+        // removed until this decision commits; then any covering shift at
+        // the house counts (coveringShiftQuery already pins the house).
+        $assigned = DB::table('client_user')
+            ->where('client_id', $client->id)
+            ->where('user_id', $performer->id)
+            ->sharedLock()
+            ->exists();
+        if (! $assigned) {
+            $shiftQuery->where(function (Builder $scope) use ($client): void {
                 $scope->where('client_id', $client->id);
 
                 if (Schema::hasTable('shift_clients')) {
@@ -903,6 +923,7 @@ class MedicationScopeDecisionService
                     });
                 }
             });
+        }
 
         if ($submittedShiftId !== null) {
             $shiftQuery->whereKey($submittedShiftId);
