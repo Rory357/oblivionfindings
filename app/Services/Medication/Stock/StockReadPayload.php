@@ -126,8 +126,8 @@ final class StockReadPayload
                 'orders' => (clone $orders)->whereNotIn('status', PharmacySupplyRules::CLOSED)->count(),
                 'counts' => (clone $counts)->where('state', 'needs_review')->count(),
             ],
-            // Permission scope stays unchanged pending the exact receive-role grant.
-            'can' => ['receive' => config('medications.stock_lots_enabled', false) && $actor->canDo('medications.stock.update'), 'manage' => config('medications.stock_lots_enabled', false) && $actor->canDo('medications.stock.update'), 'receive_controlled' => config('medications.stock_lots_enabled', false) && $actor->canDo('medications.stock.update') && $actor->canDo('medications.controlled.view') && $actor->canDo('medications.controlled.record') && $siteIds !== [], 'controlled' => $actor->canDo('medications.controlled.view')],
+            // Approved P06 Q5: receive-level actions with either key; the rest stay stock.update.
+            'can' => ['receive' => config('medications.stock_lots_enabled', false) && ($actor->canDo('medications.stock.update') || $actor->canDo('medications.stock.receive')), 'manage' => config('medications.stock_lots_enabled', false) && $actor->canDo('medications.stock.update'), 'receive_controlled' => config('medications.stock_lots_enabled', false) && $actor->canDo('medications.stock.update') && $actor->canDo('medications.controlled.view') && $actor->canDo('medications.controlled.record') && $siteIds !== [], 'controlled' => $actor->canDo('medications.controlled.view')],
             'lots_enabled' => (bool) config('medications.stock_lots_enabled', false),
         ];
     }

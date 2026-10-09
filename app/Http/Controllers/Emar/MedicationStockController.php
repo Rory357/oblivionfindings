@@ -48,23 +48,31 @@ final class MedicationStockController extends Controller
         return response()->json($this->read->detail($request->user(), $medication))->header('Cache-Control', 'private, no-store');
     }
 
+    /**
+     * Approved P06 Q5: the actions holders of medications.stock.receive
+     * (house leads) may take. Everything else (supply orders, removals,
+     * count sign-off, carried-forward balances and controlled receipts) is
+     * medications.stock.update.
+     */
+    public const RECEIVE_ACTIONS = ['receive', 'count', 'going_out', 'coming_back'];
+
     public function command(Request $request)
     {
-        // Existing scope only. The newly approved receive grant is held by
-        // automatic approval review and is not silently added here.
-        abort_unless($request->user()->canDo('medications.stock.update'), 403);
-        abort_unless(config('medications.stock_lots_enabled', false), 422, 'Stock pack workflows are disabled for this installation.');
         $action = $request->string('action')->toString();
+        $capability = self::capabilityFor($request->user(), $action);
+        abort_unless(config('medications.stock_lots_enabled', false), 422, 'Stock pack workflows are disabled for this installation.');
         $rules = $this->rules($action);
         $data = $request->validate([
             'action' => 'required|string', 'client_medication_id' => 'required|integer|min:1',
             'request_uuid' => 'required|uuid', 'witnessed_by' => 'nullable|integer|min:1', 'witness_credential' => 'nullable|string|max:255', ...$rules,
         ]);
 
-        return DB::transaction(fn () => $this->scope->forMedication($request->user(), $data['client_medication_id'], 'medications.stock.update',
-            function (Client $client, ClientMedication $med, User $actor, Collection $lockedUsers) use ($data, $action) {
+        return DB::transaction(fn () => $this->scope->forMedication($request->user(), $data['client_medication_id'], $capability,
+            function (Client $client, ClientMedication $med, User $actor, Collection $lockedUsers) use ($data, $action, $capability) {
                 $this->access->assertReadable($actor, $client);
                 abort_if($med->controlled_drug && ! $actor->canDo('medications.controlled.view'), 404);
+                // P06: a controlled delivery is the house lead's, with a witness.
+                abort_if($med->controlled_drug && $capability !== MedicationGovernanceScopeService::STOCK_CAPABILITY, 403);
                 // Controlled receipt uses P07's witness + ledger transaction.
                 abort_if($med->controlled_drug && ! in_array($action, ['initialise', 'receive', 'order', 'order_update'], true), 422, 'Use the witnessed controlled-drug workflow for this action.');
                 $med->setRelation('client', $client);
@@ -117,6 +125,24 @@ final class MedicationStockController extends Controller
 
                 return response()->json($payload);
             }, authorizationUserIds: array_values(array_filter([(int) ($data['witnessed_by'] ?? 0)]))), 5);
+    }
+
+    /**
+     * The key this actor uses for this action: stock.update covers every
+     * action; stock.receive only the receive-level ones. 403 otherwise.
+     */
+    public static function capabilityFor(User $actor, string $action): string
+    {
+        if ($actor->canDo(MedicationGovernanceScopeService::STOCK_CAPABILITY)) {
+            return MedicationGovernanceScopeService::STOCK_CAPABILITY;
+        }
+        abort_unless(
+            in_array($action, self::RECEIVE_ACTIONS, true)
+                && $actor->canDo(MedicationGovernanceScopeService::STOCK_RECEIVE_CAPABILITY),
+            403,
+        );
+
+        return MedicationGovernanceScopeService::STOCK_RECEIVE_CAPABILITY;
     }
 
     private function execute(ClientMedication $med, User $actor, string $action, array $data, Collection $lockedUsers, array &$auditEvents): array

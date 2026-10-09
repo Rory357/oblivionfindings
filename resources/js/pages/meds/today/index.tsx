@@ -1115,6 +1115,7 @@ export default function MedsToday(props: MedsTodayProps) {
                         <StockTab
                             alerts={stock_alerts}
                             canManage={board_can.manage_stock}
+                            canReceive={board_can.receive_stock ?? false}
                         />
                     ) : null}
                     {view === 'activity' ? (

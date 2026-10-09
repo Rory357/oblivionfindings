@@ -27,9 +27,8 @@ final class MedicationStockPhotoController extends Controller
 
     public function store(Request $request, int $lot)
     {
-        // Existing stock-update authority only until the exact receive-role
-        // grant has been approved and integrated. Do not broaden role access.
-        abort_unless($request->user()->canDo('medications.stock.update'), 403);
+        // Approved P06 Q5: staff who receive stock photograph the pack.
+        $capability = MedicationStockController::capabilityFor($request->user(), 'receive');
         $data = $request->validate([
             'request_uuid' => 'required|uuid',
             'photo' => 'required|file|image|mimes:jpg,jpeg,png,webp|max:8192|dimensions:max_width=12000,max_height=12000',
@@ -38,8 +37,8 @@ final class MedicationStockPhotoController extends Controller
         $submitted = MedicationStockLot::with('stock')->findOrFail($lot);
         $writtenPath = null;
         try {
-            $response = DB::transaction(function () use ($request, $submitted, $lot, $data, &$writtenPath) {
-                return $this->scope->forMedication($request->user(), $submitted->stock->client_medication_id, 'medications.stock.update',
+            $response = DB::transaction(function () use ($request, $submitted, $lot, $data, $capability, &$writtenPath) {
+                return $this->scope->forMedication($request->user(), $submitted->stock->client_medication_id, $capability,
                 function (Client $client, ClientMedication $med, User $actor) use ($lot, $data, $request, &$writtenPath) {
                     $this->access->assertReadable($actor, $client);
                     abort_if($med->controlled_drug && ! $actor->canDo('medications.controlled.view'), 404);

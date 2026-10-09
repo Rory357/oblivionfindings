@@ -41,6 +41,9 @@ final class MedicationGovernanceScopeService
 
     public const STOCK_CAPABILITY = 'medications.stock.update';
 
+    /** Approved P06 Q5: receive, photograph, count, going out and coming back. */
+    public const STOCK_RECEIVE_CAPABILITY = 'medications.stock.receive';
+
     /**
      * Explicit application-wide Site permissions. They broaden Site visibility
      * only; they never replace the action capability checked by this service.
@@ -63,6 +66,7 @@ final class MedicationGovernanceScopeService
         'medications.controlled.manage',
         'medications.controlled.override',
         'medications.stock.update',
+        'medications.stock.receive',
         'medications.pharmacy.send',
         'medications.pharmacy.connect.manage',
         'medications.orders.manage',

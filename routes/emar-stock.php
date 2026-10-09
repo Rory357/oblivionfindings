@@ -4,9 +4,12 @@ use App\Http\Controllers\Emar\MedicationStockController;
 use App\Http\Controllers\Emar\MedicationStockPhotoController;
 use Illuminate\Support\Facades\Route;
 
-// Reviewable P06 workspace. Existing /emar/stock stays in place until Main
-// connects every stock writer. No receive-role expansion is made here.
-Route::middleware(['auth', 'permission:medications.view', 'permission:medications.stock.update'])
+// The P06 Stock hub (Lane C4). House leads hold medications.stock.receive
+// (receive, photograph, count, going out and coming back) and stock.update
+// (everything); coordinators and finance hold stock.update (Stephan, 10 Oct).
+// MedicationStockController::command checks each action's key, and every
+// command is scoped to the houses and people the actor can open.
+Route::middleware(['auth', 'permission:medications.view', 'permission:medications.stock.receive|medications.stock.update'])
     ->prefix('emar/stock/packs')->group(function (): void {
         Route::get('/', [MedicationStockController::class, 'index'])->name('emar.stock.packs');
         Route::get('/medicine/{medication}', [MedicationStockController::class, 'detail'])->whereNumber('medication')->name('emar.stock.packs.detail');
