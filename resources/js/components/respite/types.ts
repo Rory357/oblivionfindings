@@ -93,6 +93,10 @@ export interface RespiteReferralRow {
     carerStrainLevel: string | null;
     carerBreakdown: boolean;
     clientProfileComplete: boolean;
+    /** May save the client profile (Complete profile). */
+    clientProfileCanComplete: boolean;
+    /** May open the Medical section; the wizard skips health and contacts otherwise. */
+    clientProfileCanEditMedical: boolean;
     clientProfilePrefill: Partial<ClientWizardForm> | null;
 }
 
@@ -131,6 +135,10 @@ export interface RespiteRequestRow {
     bookingId: number | null;
     onboarded: boolean;
     clientProfileComplete: boolean;
+    /** May save the client profile (Complete profile). */
+    clientProfileCanComplete: boolean;
+    /** May open the Medical section; the wizard skips health and contacts otherwise. */
+    clientProfileCanEditMedical: boolean;
     clientProfilePrefill: Partial<ClientWizardForm> | null;
 }
 
@@ -198,6 +206,8 @@ export interface RespiteStayRow {
     openIncidents: number;
     openComplaints: number;
     criticalAlerts: CriticalAlert[];
+    /** A life-threatening allergy is recorded: check-in needs the acknowledgement. */
+    anaphylaxisCheckRequired: boolean;
     requiresAdmissionMedRec: boolean;
     admissionMedRecStatus: string | null;
 }

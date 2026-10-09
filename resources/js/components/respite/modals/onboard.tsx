@@ -128,38 +128,43 @@ export function OnboardModal({
                             </div>
                         ) : null}
 
-                        <div className="rounded-xl border border-border bg-muted/30 p-3.5">
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <div className="text-sm font-semibold">
-                                        {request.clientProfileComplete
-                                            ? 'Client profile is complete'
-                                            : 'Complete full client profile'}
+                        {request.clientProfileCanComplete ? (
+                            <div className="rounded-xl border border-border bg-muted/30 p-3.5">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <div className="text-sm font-semibold">
+                                            {request.clientProfileComplete
+                                                ? 'Client profile is complete'
+                                                : 'Complete full client profile'}
+                                        </div>
+                                        <p className="mt-1 text-[12.5px] leading-snug text-muted-foreground">
+                                            Capture support needs, health
+                                            details, contacts and care setup on
+                                            the existing client record before
+                                            the stay starts.
+                                        </p>
                                     </div>
-                                    <p className="mt-1 text-[12.5px] leading-snug text-muted-foreground">
-                                        Capture support needs, health details,
-                                        contacts and care setup on the existing
-                                        client record before the stay starts.
-                                    </p>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant={
+                                            request.clientProfileComplete
+                                                ? 'outline'
+                                                : 'default'
+                                        }
+                                        onClick={() =>
+                                            onCompleteProfile(request)
+                                        }
+                                        disabled={!request.clientId}
+                                    >
+                                        <ClipboardCheck className="h-3.5 w-3.5" />
+                                        {request.clientProfileComplete
+                                            ? 'Review profile'
+                                            : 'Complete profile'}
+                                    </Button>
                                 </div>
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant={
-                                        request.clientProfileComplete
-                                            ? 'outline'
-                                            : 'default'
-                                    }
-                                    onClick={() => onCompleteProfile(request)}
-                                    disabled={!request.clientId}
-                                >
-                                    <ClipboardCheck className="h-3.5 w-3.5" />
-                                    {request.clientProfileComplete
-                                        ? 'Review profile'
-                                        : 'Complete profile'}
-                                </Button>
                             </div>
-                        </div>
+                        ) : null}
 
                         <dl className="rounded-xl border border-border px-3.5">
                             {rows.map(([k, v], i) => (
