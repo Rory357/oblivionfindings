@@ -71,8 +71,39 @@ export function deviceStateFor(
     return null;
 }
 
+/**
+ * A pending saved dose that stopped retrying on its own (walk finding,
+ * 10 Oct): the worker checks the chart and retries it from the banner.
+ */
+export function deviceNeedsManualRetry(
+    row: ScheduleRow,
+    queue: Pick<
+        OfflineQueueState,
+        'pendingSubmissions'
+    > = getOfflineQueueSnapshot(),
+): boolean {
+    const due = slotInstant(row.scheduled_for);
+    return (
+        !row.recorded &&
+        due !== null &&
+        (queue.pendingSubmissions ?? []).some(
+            (item) =>
+                item.needsAttention === true &&
+                (item.action === 'administration' ||
+                    item.action === 'round_admin') &&
+                Number(item.payload.client_medication_id) ===
+                    row.medication_id &&
+                slotInstant(item.payload.scheduled_for) === due,
+        )
+    );
+}
+
 function useDeviceState(row: ScheduleRow) {
     return deviceStateFor(row, useOfflineQueueState());
+}
+
+function useDeviceNeedsManualRetry(row: ScheduleRow) {
+    return deviceNeedsManualRetry(row, useOfflineQueueState());
 }
 
 export const TZ = 'Pacific/Auckland';
@@ -335,6 +366,7 @@ export function DoseStateCell({
     const opens = nzTime(row.window_opens_at);
     const ends = nzTime(row.window_ends_at);
     const device = useDeviceState(row);
+    const manualRetry = useDeviceNeedsManualRetry(row);
     if (device === 'pending')
         return (
             <span className="flex flex-col items-start gap-1 py-0.5">
@@ -346,8 +378,9 @@ export function DoseStateCell({
                     Saved on this device
                 </StatusBadge>
                 <Line tone="warning">
-                    Not on the chart yet — it sends automatically. Don’t record
-                    it again.
+                    {manualRetry
+                        ? 'Not on the chart yet — it stopped retrying. Check the chart, then use “Retry safely” at the top. Don’t record it again.'
+                        : 'Not on the chart yet — it sends automatically. Don’t record it again.'}
                 </Line>
             </span>
         );

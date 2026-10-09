@@ -88,6 +88,16 @@ class LaneAOfflineReplayTest extends TestCase
         // The same queued item sent again does not raise a second follow-up.
         $this->postJson('/meds/today/record', $queued)->assertStatus(409);
         $this->assertSame(1, MedicationFollowup::count());
+
+        // Walk finding: the device then reports the parked item. The server
+        // already raised the follow-up, so the report is accepted, not a 404.
+        $this->postJson('/meds/today/offline-review', [
+            'client_request_uuid' => $queued['client_request_uuid'], 'client_medication_id' => $order->id,
+            'captured_by_user_id' => $this->worker->id, 'status' => 'given', 'http_status' => 409,
+            'reason' => 'Someone else recorded this dose while you were offline — a lead must review it.',
+            'scheduled_for' => $queued['scheduled_for'], 'captured_offline_at' => $queued['captured_offline_at'],
+        ])->assertOk()->assertJsonPath('status', 'reported');
+        $this->assertSame(1, MedicationFollowup::count());
     }
 
     /** EA-004: the worker's own queued item coming back is still confirmed as theirs. */

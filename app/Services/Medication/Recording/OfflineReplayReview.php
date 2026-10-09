@@ -113,6 +113,15 @@ final class OfflineReplayReview
         ?ClientMedicationAdministration $existing = null,
     ): MedicationFollowup {
         $uuid = (string) $data['client_request_uuid'];
+        // Whichever side raised it first — the server refusing the replay,
+        // or the device reporting it — the other gets the same follow-up
+        // (walk finding: the device's report after a 409 conflict was a 404).
+        $already = MedicationFollowup::query()->where('source_key', 'offline-review:'.$uuid)->first();
+        if ($already !== null) {
+            abort_unless((int) $already->client_id === (int) $client->id && $already->type === self::TYPE, 404);
+
+            return $already;
+        }
 
         return $this->followups->ensure(
             'offline-review:'.$uuid,
