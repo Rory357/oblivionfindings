@@ -61,9 +61,34 @@ export interface Observation {
     fields: string[];
 }
 
+/** One version of an order, as the "Order changed" notice compares it (P01 v2). */
+export interface OrderVersionFacts {
+    dosage: string | null;
+    dose_amount: number | null;
+    dose_unit: string | null;
+    route?: string | null;
+    frequency?: string | null;
+    dose_times?: string[] | null;
+    instructions?: string | null;
+}
+
+/** The order was checked at a new version after its last recorded dose (EA-059). */
+export interface OrderChange {
+    version: number | null;
+    prescriber: string | null;
+    changed_at: string | null;
+    verified_at: string | null;
+    verified_by: string | null;
+    before: OrderVersionFacts | null;
+    now: OrderVersionFacts;
+}
+
 export interface DoseRequirements {
     stock_tracking?: { lots_started: boolean; offline_given_allowed: boolean };
     live_recording_context?: string | null;
+    /** The order this dialog shows; a save is refused if it changed (EA-008). */
+    order_fingerprint?: string | null;
+    order_change?: OrderChange | null;
     stock_packs?:
         | import('@/components/medications/stock-pack-fields').PackStockContext
         | null;

@@ -2,7 +2,7 @@
  * DoseRecordingRequirements) when the dialog opens. Read-only; saving
  * checks everything again. */
 import axios from 'axios';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DoseTarget, RequirementsAnswer } from './types';
 
 export type RequirementsState =
@@ -23,12 +23,25 @@ export function requirementsUrl(target: DoseTarget): string {
     return `/meds/today/doses/requirements?${query.toString()}`;
 }
 
-export function useDoseRequirements(target: DoseTarget | null): RequirementsState & { reload: () => void } {
+/** Header that carries the open dialog's own connected review when it is refreshed (EA-060). */
+export const RENEW_REVIEW_HEADER = 'X-Live-Recording-Context';
+
+export function useDoseRequirements(target: DoseTarget | null): RequirementsState & {
+    reload: () => void;
+    /**
+     * Fetch the current requirements again while the open form keeps its
+     * draft (EA-008, EA-060). The answer replaces the shown requirements only
+     * when it arrives; nothing is cleared while it loads.
+     */
+    refresh: (renewReview?: string | null) => Promise<RequirementsAnswer | null>;
+} {
     const [state, setState] = useState<RequirementsState>({ status: 'loading' });
     const [attempt, setAttempt] = useState(0);
     const url = target ? requirementsUrl(target) : null;
+    const currentUrl = useRef(url);
 
     useEffect(() => {
+        currentUrl.current = url;
         if (!url) return;
         let cancelled = false;
         setState({ status: 'loading' });
@@ -50,5 +63,27 @@ export function useDoseRequirements(target: DoseTarget | null): RequirementsStat
 
     const reload = useCallback(() => setAttempt((n) => n + 1), []);
 
-    return { ...state, reload };
+    const refresh = useCallback(async (renewReview?: string | null): Promise<RequirementsAnswer | null> => {
+        const requested = currentUrl.current;
+        if (!requested) return null;
+        try {
+            const response = await axios.get<RequirementsAnswer>(requested, {
+                headers: {
+                    Accept: 'application/json',
+                    ...(renewReview ? { [RENEW_REVIEW_HEADER]: renewReview } : {}),
+                },
+            });
+            if (currentUrl.current !== requested) return null;
+            setState({ status: 'ready', data: response.data });
+
+            return response.data;
+        } catch (error: unknown) {
+            const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+            if (status === 404 || status === 403) setState({ status: 'not_found' });
+
+            return null;
+        }
+    }, []);
+
+    return { ...state, reload, refresh };
 }

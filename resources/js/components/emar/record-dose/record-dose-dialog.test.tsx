@@ -1368,6 +1368,198 @@ describe('RecordDoseDialog (P01)', () => {
         });
     });
 
+    async function recordGivenWithNote(note: string) {
+        fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+        fireEvent.click(await screen.findByRole('button', { name: /^Given/ }));
+        fireEvent.change(
+            screen.getByRole('textbox', { name: 'What happened (optional)' }),
+            { target: { value: note } },
+        );
+        fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+        fireEvent.click(
+            await screen.findByRole('button', { name: /^Record outcome$/i }),
+        );
+    }
+
+    it('saves the order it showed, and on “Order changed” shows the new order and keeps the draft (EA-008)', async () => {
+        const shown = requirements({ order_fingerprint: 'order-v1' });
+        const changed = requirements({
+            order_fingerprint: 'order-v2',
+            order: {
+                ...shown.order,
+                dosage: '25 mg',
+                dose_amount: 25,
+                dose_unit: 'mg',
+                version: 2,
+            },
+        });
+        getMock.mockResolvedValueOnce({ data: shown });
+        getMock.mockResolvedValueOnce({ data: changed });
+        submitMock.mockRejectedValueOnce({
+            isAxiosError: true,
+            response: {
+                status: 422,
+                data: {
+                    success: false,
+                    error: 'Order changed — check the new instructions',
+                    error_field: 'order_changed',
+                    order_changed: true,
+                    sync: { status: 'rejected' },
+                },
+            },
+        });
+        render(
+            <RecordDoseDialog
+                target={{
+                    kind: 'scheduled',
+                    orderId: 41,
+                    scheduledFor: shown.due!.due_at,
+                }}
+                entry="meds-today"
+                signedAs={{ name: 'Priya Shah', role_label: 'Support worker' }}
+                onClose={() => {}}
+            />,
+        );
+        await screen.findByText('Losartan 50mg');
+        await recordGivenWithNote('Taken with water.');
+        await waitFor(() => expect(submitMock).toHaveBeenCalledOnce());
+        expect(submitMock.mock.calls[0][1]).toMatchObject({
+            order_fingerprint: 'order-v1',
+        });
+
+        expect(
+            await screen.findByText(/check the new instructions/),
+        ).toBeInTheDocument();
+        expect(screen.getByText(/Before: 1 tablet/)).toBeInTheDocument();
+        expect(screen.getByText('25 mg')).toBeInTheDocument();
+        const proceed = screen.getByRole('button', { name: /continue/i });
+        expect(proceed).toBeDisabled();
+        fireEvent.click(
+            screen.getByRole('checkbox', {
+                name: 'I’ve checked the new instructions and the label',
+            }),
+        );
+        expect(proceed).toBeEnabled();
+        fireEvent.click(proceed);
+        // The draft survived the reload.
+        expect(
+            await screen.findByRole('textbox', {
+                name: 'What happened (optional)',
+            }),
+        ).toHaveValue('Taken with water.');
+        submitMock.mockResolvedValueOnce({
+            status: 'processed',
+            data: { administration: { id: 17 } },
+        });
+        fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+        fireEvent.click(
+            await screen.findByRole('button', { name: /^Record outcome$/i }),
+        );
+        await waitFor(() => expect(submitMock).toHaveBeenCalledTimes(2));
+        expect(submitMock.mock.calls[1][1]).toMatchObject({
+            order_fingerprint: 'order-v2',
+            amount_mode: 'as_ordered',
+        });
+    });
+
+    it('shows an order changed since the last dose and needs the acknowledgement (EA-059)', async () => {
+        open(
+            requirements({
+                order_change: {
+                    version: 2,
+                    prescriber: 'Dr Lena Chen',
+                    changed_at: null,
+                    verified_at: new Date().toISOString(),
+                    verified_by: 'Jordan Tipene',
+                    before: {
+                        dosage: '500 mg',
+                        dose_amount: 500,
+                        dose_unit: 'mg',
+                        dose_times: ['08:00', '20:00'],
+                    },
+                    now: {
+                        dosage: '750 mg',
+                        dose_amount: 750,
+                        dose_unit: 'mg',
+                        dose_times: ['08:00', '20:00'],
+                    },
+                },
+            }),
+        );
+        await screen.findByText('Losartan 50mg');
+        expect(
+            screen.getByText(/This order changed at .* — check the new instructions/),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Before: 500 mg · 8:00 am and 8:00 pm'),
+        ).toBeInTheDocument();
+        expect(screen.getByText(/Jordan Tipene verified the new order/)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /continue/i })).toBeDisabled();
+        expect(
+            screen.getByText('Confirm you’ve checked the new instructions'),
+        ).toBeInTheDocument();
+    });
+
+    it('refreshes an expired pack review inside the open dialog and saves with the new review (EA-060)', async () => {
+        const first = requirements({
+            stock_tracking: { lots_started: true, offline_given_allowed: false },
+            live_recording_context: 'review-at-open',
+        });
+        open(first);
+        await screen.findByText('Losartan 50mg');
+        submitMock.mockRejectedValueOnce({
+            isAxiosError: true,
+            response: {
+                status: 422,
+                data: {
+                    success: false,
+                    error: 'The connected recording review expired after 30 minutes.',
+                    error_field: 'live_recording_context',
+                    sync: { status: 'rejected' },
+                },
+            },
+        });
+        await recordGivenWithNote('Given at the table.');
+        const refresh = await screen.findByRole('button', {
+            name: 'Refresh the safety check',
+        });
+        expect(
+            screen.getByRole('button', { name: /^Record outcome$/i }),
+        ).toBeDisabled();
+        getMock.mockResolvedValueOnce({
+            data: { ...first, live_recording_context: 'review-renewed' },
+        });
+        fireEvent.click(refresh);
+        await waitFor(() =>
+            expect(
+                screen.queryByRole('button', {
+                    name: 'Refresh the safety check',
+                }),
+            ).not.toBeInTheDocument(),
+        );
+        expect(getMock).toHaveBeenLastCalledWith(
+            expect.stringContaining('/meds/today/doses/requirements'),
+            expect.objectContaining({
+                headers: expect.objectContaining({
+                    'X-Live-Recording-Context': 'review-at-open',
+                }),
+            }),
+        );
+        submitMock.mockResolvedValueOnce({
+            status: 'processed',
+            data: { administration: { id: 18 } },
+        });
+        fireEvent.click(
+            screen.getByRole('button', { name: /^Record outcome$/i }),
+        );
+        await waitFor(() => expect(submitMock).toHaveBeenCalledTimes(2));
+        expect(submitMock.mock.calls[1][1]).toMatchObject({
+            live_recording_context: 'review-renewed',
+            administered_at: submitMock.mock.calls[0][1].administered_at,
+            notes: 'Given at the table.',
+        });
+    });
+
     it('doesn’t offer less than ordered on a controlled medicine counted in other units', async () => {
         open(controlled('mL', { dose_unit: 'mg', dose_amount: 5 }));
         await screen.findByText('Clonazepam 0.5mg');

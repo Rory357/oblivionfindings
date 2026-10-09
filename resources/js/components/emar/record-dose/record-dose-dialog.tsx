@@ -129,7 +129,10 @@ import {
     type DoseRequirements,
     type DoseTarget,
     type EntryPoint,
+    type OrderChange,
+    type OrderVersionFacts,
     type RecordMode,
+    type RequirementsAnswer,
     type SecondPersonKind,
 } from './types';
 import { useDoseRequirements } from './use-dose-requirements';
@@ -184,6 +187,8 @@ interface FormState {
     /** Controlled medicines: what's left in the stock after this dose (Q-C2a, counted). */
     cdBalance: string;
     packChecked: boolean;
+    /** "I've checked the new instructions and the label" (P01 v2, EA-059). */
+    changeAck?: boolean;
 }
 export type PendingDose = {
     form: FormState;
@@ -236,6 +241,30 @@ const timeLabel = (iso: string | null | undefined) =>
               timeZone: TZ,
           })
         : '—';
+/** One order version in the words the "Order changed" notice uses (P01 v2). */
+function orderVersionWords(v: OrderVersionFacts): string {
+    const amount =
+        v.dosage ??
+        (v.dose_amount != null ? formatAmount(v.dose_amount, v.dose_unit) : null);
+    const times = v.dose_times?.length
+        ? v.dose_times
+              .map((t) => {
+                  const [h, m] = t.split(':').map(Number);
+                  if (!Number.isFinite(h)) return t;
+                  return `${h % 12 === 0 ? 12 : h % 12}:${String(m || 0).padStart(2, '0')} ${h >= 12 ? 'pm' : 'am'}`;
+              })
+              .join(' and ')
+        : (v.frequency ?? null);
+    return [amount ?? 'Dose not recorded', times].filter(Boolean).join(' · ');
+}
+const orderFacts = (o: DoseRequirements['order']): OrderVersionFacts => ({
+    dosage: o.dosage,
+    dose_amount: o.dose_amount,
+    dose_unit: o.dose_unit,
+    route: o.route,
+    instructions: o.instructions,
+});
+
 /** "NZDT" or "NZST" — the zone the times are in, as the approved review shows it. */
 const nzZone = (date: Date = new Date()) =>
     new Intl.DateTimeFormat('en-NZ', { timeZone: TZ, timeZoneName: 'short' })
@@ -419,6 +448,7 @@ export function RecordDoseDialog({
             shiftContext={shiftContext}
             onClose={onClose}
             onRecorded={onRecorded}
+            onRefresh={requirements.refresh}
             onCheckSaved={() => {
                 const original = findDoseRecovery<PendingDose>(
                     target.orderId,
@@ -672,6 +702,7 @@ function RecordDoseForm({
     shiftContext,
     onClose,
     onRecorded,
+    onRefresh,
     onCheckSaved,
     onEligibility,
     onNext,
@@ -688,6 +719,8 @@ function RecordDoseForm({
     shiftContext?: ShiftRecordingContext;
     onClose: () => void;
     onRecorded?: (result: RecordedResult) => void;
+    /** Fetch the current requirements again, keeping this draft (EA-008, EA-060). */
+    onRefresh?: (renewReview?: string | null) => Promise<RequirementsAnswer | null>;
     onCheckSaved: () => boolean;
     onEligibility?: () => void;
     onNext?: () => void;
@@ -761,6 +794,13 @@ function RecordDoseForm({
         reference: string | null;
         incidentId: number | null;
     } | null>(null);
+    // EA-008: the order the worker was shown before the server said it changed.
+    const [orderChangedFrom, setOrderChangedFrom] = useState<
+        DoseRequirements['order'] | null
+    >(null);
+    // EA-060: the pack review expired inside this open dialog.
+    const [reviewExpired, setReviewExpired] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const dirty = useRef(Boolean(recovered));
     const bodyRef = useRef<HTMLDivElement>(null);
     const replay = useRef(createMedicationMutationReplayState());
@@ -1130,6 +1170,8 @@ function RecordDoseForm({
                   : null;
         const base: Record<string, unknown> = {
             live_recording_context: req.live_recording_context ?? undefined,
+            // EA-008: the order shown here; the server refuses a "given" if it changed.
+            order_fingerprint: req.order_fingerprint ?? undefined,
             client_medication_id: req.order.id,
             administered_at: givenLike ? `${f.when}:00` : `${nowLocal}:00`,
             notes: f.note.trim() || null,
@@ -1497,6 +1539,19 @@ function RecordDoseForm({
                   errors?: Record<string, string[] | string>;
               }
             | undefined;
+        // EA-008: the order changed while this dialog was open. Nothing was
+        // saved; show the new order beside the one given and ask again.
+        if (body?.error_field === 'order_changed' && onRefresh) {
+            void reloadForOrderChange(body.error ?? null);
+            return;
+        }
+        // EA-060: the pack review expired. Keep the draft and offer a refresh.
+        if (body?.error_field === 'live_recording_context' && onRefresh) {
+            setReviewExpired(true);
+            setServerMessage(null);
+            setPhase('edit');
+            return;
+        }
         const fieldErrors: Errors = {};
         if (
             readServerSyncOutcome(body).kind === 'rejected' &&
@@ -1524,6 +1579,61 @@ function RecordDoseForm({
         }
         setServerMessage(body?.error ?? body?.message ?? null);
         setPhase('rejected');
+    }
+
+    async function reloadForOrderChange(message: string | null) {
+        const shown = req.order;
+        setRefreshing(true);
+        const next = await onRefresh?.();
+        setRefreshing(false);
+        if (!next) {
+            setServerMessage(
+                `${message ?? 'Order changed — check the new instructions'}. The new order couldn’t be loaded. Close this dose and open it again.`,
+            );
+            setPhase('rejected');
+            return;
+        }
+        if (isBlockedAnswer(next)) return;
+        setOrderChangedFrom(shown);
+        setErrors({});
+        setServerMessage(null);
+        setF((x) => ({
+            ...x,
+            step: mode === 'record' ? 0 : 1,
+            changeAck: false,
+            // The dose and amount use the new order; anything else stays.
+            amount: {
+                ...x.amount,
+                mode: 'asOrdered',
+                amount: next.order.dose_amount,
+            },
+            second: { ...x.second, pin: '' },
+        }));
+        setPhase('edit');
+    }
+
+    async function refreshReview() {
+        setRefreshing(true);
+        const next = await onRefresh?.(req.live_recording_context ?? null);
+        setRefreshing(false);
+        if (next && !isBlockedAnswer(next)) {
+            setReviewExpired(false);
+            setServerMessage(null);
+            // A witness PIN is never kept: the colleague enters it again.
+            if (secondKind && !unconfirmed && f.second.id && !forgottenPin) {
+                const e: Errors = {
+                    pin: 'Your colleague enters their PIN again, then record the outcome.',
+                };
+                setErrors(e);
+                setF((x) => ({ ...x, step: 1 }));
+                focusFirst(e);
+            }
+            return;
+        }
+        if (!next)
+            setServerMessage(
+                'The safety check couldn’t be refreshed. Check your connection and try again.',
+            );
     }
 
     function requestClose() {
@@ -1749,6 +1859,66 @@ function RecordDoseForm({
         return null;
     })();
 
+    // EA-059 / EA-008: the order changed since its last recorded dose, or
+    // while this dialog was open. "Before" is what the worker was shown.
+    const change: OrderChange | null = (() => {
+        if (!req.order_change && !orderChangedFrom) return null;
+        const server = req.order_change;
+        return {
+            version: server?.version ?? req.order.version,
+            prescriber: server?.prescriber ?? req.order.prescriber,
+            changed_at: server?.changed_at ?? null,
+            verified_at: server?.verified_at ?? req.order.verified?.at ?? null,
+            verified_by: server?.verified_by ?? req.order.verified?.by ?? null,
+            before: orderChangedFrom
+                ? orderFacts(orderChangedFrom)
+                : (server?.before ?? null),
+            now: server?.now ?? orderFacts(req.order),
+        };
+    })();
+    const changeTime = change?.verified_at ?? change?.changed_at ?? null;
+    const changeNotice = change ? (
+        <Notice
+            tone="warning"
+            live="alert"
+            title={`This order changed${changeTime ? ` at ${timeLabel(changeTime)}` : ''} — check the new instructions`}
+        >
+            <p>
+                {change.prescriber ?? 'The prescriber'} changed {p}’s {med}
+                {change.changed_at ? ` at ${timeLabel(change.changed_at)}` : ''}
+                {orderChangedFrom ? ', while this dose was open' : ''}.
+                {change.verified_by
+                    ? ` ${change.verified_by} verified the new order${change.verified_at ? ` at ${timeLabel(change.verified_at)}` : ''}.`
+                    : ''}
+                {orderChangedFrom
+                    ? ' Nothing was recorded for this dose yet.'
+                    : ''}
+            </p>
+            <ul className="mt-1 list-disc pl-5">
+                {change.before ? (
+                    <li>Before: {orderVersionWords(change.before)}</li>
+                ) : null}
+                <li>
+                    Now: <strong>{orderVersionWords(change.now)}</strong> — the
+                    dose and amount below use the new order
+                </li>
+            </ul>
+            <div
+                className="mt-2 flex items-center gap-2"
+                data-field="changeAck"
+            >
+                <Checkbox
+                    id="rd-change-ack"
+                    checked={f.changeAck === true}
+                    onCheckedChange={(v) => set({ changeAck: v === true })}
+                />
+                <Label htmlFor="rd-change-ack" className="text-sm font-normal">
+                    I’ve checked the new instructions and the label
+                </Label>
+            </div>
+        </Notice>
+    ) : null;
+
     const step0 = (
         <div className="space-y-4">
             {entry === 'transport' && transport ? (
@@ -1763,6 +1933,7 @@ function RecordDoseForm({
                 </Notice>
             ) : null}
             <IdentityHeader req={req} />
+            {changeNotice}
             <AllergyNotice req={req} />
             {req.allergy.match && !req.block_given ? (
                 <Notice
@@ -1871,6 +2042,7 @@ function RecordDoseForm({
     const step1 = (
         <div className="space-y-4">
             <IdentityHeader req={req} compact />
+            {mode !== 'record' ? changeNotice : null}
             <AllergyNotice req={req} compact />
             {reofferClosed ? (
                 <Notice
@@ -2315,6 +2487,33 @@ function RecordDoseForm({
     const step2 = (
         <div className="space-y-4">
             <IdentityHeader req={req} compact />
+            {reviewExpired ? (
+                <Notice
+                    tone="warning"
+                    live="alert"
+                    title="The pack safety check expired — nothing was saved"
+                    actions={
+                        <Button
+                            type="button"
+                            onClick={() => void refreshReview()}
+                            disabled={refreshing}
+                        >
+                            {refreshing ? (
+                                <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
+                            ) : (
+                                <RefreshCw className="size-4" />
+                            )}
+                            Refresh the safety check
+                        </Button>
+                    }
+                >
+                    This medicine’s packs are checked against the current stock
+                    when the dose is opened, and that check lasts 30 minutes.
+                    Refresh it to keep everything you entered, including the
+                    time it was given, then record the outcome.
+                    {serverMessage ? <p>{serverMessage}</p> : null}
+                </Notice>
+            ) : null}
             {phase === 'sending' ? (
                 <Notice
                     tone="info"
@@ -2595,12 +2794,17 @@ function RecordDoseForm({
 
     /* ── footer ── */
     // An as-needed dose is only ever "given", so a block on "given" stops it.
+    const changeStep = mode === 'record' ? 0 : 1;
     const blockedContinue =
         f.step === 0 && isPrn && givenWhy
             ? `Can’t continue: ${givenWhy.charAt(0).toLowerCase()}${givenWhy.slice(1)}`
             : f.step === 0 && entry === 'transport' && !f.packChecked
               ? 'Tick the pack check to continue'
-              : null;
+              : f.step === changeStep && change && f.changeAck !== true
+                ? 'Confirm you’ve checked the new instructions'
+                : f.step === 2 && reviewExpired
+                  ? 'Refresh the safety check first'
+                  : null;
     const lockedForward = mode !== 'record' && f.step === 1;
     const footerStart =
         phase === 'duplicate' ? null : f.step > 0 &&
@@ -2656,7 +2860,10 @@ function RecordDoseForm({
                 <Button
                     type="button"
                     onClick={() => void save()}
-                    disabled={phase === 'sending'}
+                    disabled={
+                        phase === 'sending' || refreshing || !!blockedContinue
+                    }
+                    aria-describedby={blockedContinue ? 'rd-cant' : undefined}
                 >
                     {phase === 'sending' ? (
                         <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
