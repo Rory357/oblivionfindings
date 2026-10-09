@@ -318,3 +318,13 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
 - **Still open for Stephan (D7):**
   - Office order changes without a covering shift.
   - Whether finance keeps `stock.update`.
+- **D4 clarified by Stephan (9 Oct):** "were we not supposed to have a feature where staff can take pictures of medications? the third party integration is optional".
+  - **Staff medicine photos are a core feature.** They were approved in P06 as a photo taken when a pack is received. On main, pack photos exist in the P06 StockHub (`/emar/stock/packs`), but four gaps remain:
+    - the menu lands on the legacy `/emar/stock` page instead;
+    - photos are not shown on the person record (P02 Medicines › Photos);
+    - photos are not shown when a dose is recorded (the approved P01 "Photo of the supplied pack" card);
+    - the receipt photo prompt needs verifying.
+  - **Third-party sources are optional.** The picture catalogue and pharmacy bridge are shown only when configured, and a catalogue picture is labelled as a reference image.
+  - **Work assigned:**
+    - Lane C, C11: stock landing, receipt prompt, photo history and the P02 Photos view.
+    - Lane A, A11: the photo card in the recording dialog.
