@@ -76,6 +76,9 @@ final class MedicationGovernanceScopeService
         'medications.orders.verify',
         'medications.breakglass',
         'medications.breakglass.end',
+        // Paper reconciliation re-checks the reviewer's downtime authority on
+        // the locked actor (Lane C1, EA-090).
+        'medications.downtime.manage',
         'medications.audit.view',
         // Per-person medication readers re-check these capabilities on the locked actor.
         'clients.viewAny',

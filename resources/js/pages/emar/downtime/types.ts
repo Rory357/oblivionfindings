@@ -32,7 +32,7 @@ export type Dose = {
     entry_id: number | null;
     resolution: { reason: string; resolved_by: string } | null;
     resolution_choices: {
-        kind: 'clinical' | 'paper';
+        kind: 'clinical' | 'paper' | 'order_changed';
         id: number;
         label: string;
         href: string | null;
@@ -82,6 +82,8 @@ export type RecoveryStock = {
     }[];
     unavailable?: string | null;
     clinical_unavailable?: string | null;
+    /** D2: when pack tracking started (ISO), or null when it hasn't. */
+    lots_started_at?: string | null;
     can_record_settlement: boolean;
     reviewed_counts: {
         id: number;
@@ -100,6 +102,8 @@ export type Reconciliation = {
     unavailable: string | null;
     can_reconcile: boolean;
     preview_token: string;
+    /** D2: pack tracking hadn't started at the paper time; posts clinically, then a recount. */
+    untracked_stock?: boolean;
     stock_evidence?: RecoveryStock | null;
     missing_evidence?: string[];
     missing_actual_fields?: { key: string; label: string }[];
@@ -155,7 +159,16 @@ export type CollectionPreview = {
     can_submit: boolean;
     giver_confirmation_needed: boolean;
     second_person_required: boolean;
+    untracked_stock?: boolean;
     notice: string;
+};
+/** D2: a posted paper dose whose stock still needs its counted recount. */
+export type Recount = {
+    paper_entry_id: number;
+    person: string | null;
+    medicine: string | null;
+    controlled: boolean;
+    url: string;
 };
 export type PackPreview = {
     site: Site;

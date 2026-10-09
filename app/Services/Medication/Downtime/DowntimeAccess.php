@@ -18,15 +18,27 @@ final class DowntimeAccess
 {
     public function __construct(private readonly UserSiteAccessService $sites, private readonly MedicationRecordAccess $records) {}
 
+    /** Lane C1 (EA-090): a permission, granted to the roles named here before. */
+    public const MANAGE = 'medications.downtime.manage';
+
     public function manages(User $actor): bool
     {
-        return $actor->canDo('medications.view')
-            && $actor->hasRole('admin', 'provider_manager', 'coordinator', 'clinical_lead', 'team_lead');
+        return $actor->canDo('medications.view') && $actor->canDo(self::MANAGE);
+    }
+
+    /**
+     * Approved P10 (EA-027): house leads and clinical leads make the
+     * downtime pack, as well as report exporters. Both need report read access.
+     */
+    public function canMakePack(User $actor): bool
+    {
+        return $actor->canDo('medications.reports.view')
+            && ($actor->canDo('medications.reports.export') || $this->manages($actor));
     }
 
     public function siteIds(User $actor, bool $pack = false, ?CurrentAuthorizationReads $reads = null): array
     {
-        abort_unless($pack ? $actor->canDo('medications.reports.export') : ($this->manages($actor) || $actor->canDo('medications.administer.record')), 403);
+        abort_unless($pack ? $this->canMakePack($actor) : ($this->manages($actor) || $actor->canDo('medications.administer.record')), 403);
 
         return $this->sites->accessibleSiteIds($actor, MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS, $reads);
     }

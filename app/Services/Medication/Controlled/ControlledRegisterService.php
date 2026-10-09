@@ -159,6 +159,12 @@ final class ControlledRegisterService
                         'override_request', 'override_decide', 'override_signoff' => $this->override($lockedActor, $medication, $action, $input, $auditEvents),
                         default => abort(404),
                     };
+                    if ($action === 'count') {
+                        // D2 (Lane C1): a witnessed count settles any paper dose
+                        // posted without pack evidence for this medicine.
+                        app(\App\Services\Medication\Downtime\PaperStockTracking::class)
+                            ->completeRecounts($medication, $lockedActor, ['count_entry_id' => (int) $result['entry_id']], $auditEvents);
+                    }
                     DB::table('controlled_product_requests')->insert([
                         'actor_id' => $lockedActor->id, 'request_uuid' => $input['client_request_uuid'],
                         'fingerprint' => $fingerprint, 'result' => json_encode($result, JSON_THROW_ON_ERROR),

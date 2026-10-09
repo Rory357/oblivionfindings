@@ -133,6 +133,10 @@ final class MedicationStockController extends Controller
                                 ['count_id' => $count->id, 'source_url' => '/emar/stock/packs?view=counts&count_id='.$count->id],
                             );
                         }
+                        // D2 (Lane C1): this counted recount settles any paper dose
+                        // posted without pack evidence; a difference has its own review.
+                        app(\App\Services\Medication\Downtime\PaperStockTracking::class)
+                            ->completeRecounts($med, $actor, ['count_id' => (int) $count->id], $auditEvents);
                     } elseif ($action === 'count_review') {
                         // All source locks, writes and the durable receipt are done.
                         // Collect completion audit before appending this whole batch.
