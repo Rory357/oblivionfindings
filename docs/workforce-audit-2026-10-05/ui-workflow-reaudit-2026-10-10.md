@@ -1,6 +1,6 @@
 # Workforce UI and workflow re-audit — 10 October 2026
 
-Status: the bounded UI/navigation and historical-trend follow-up has passed the checks below and is ready for integration. This is a re-audit of the actual delivery checkout after automated tests, not a whole-programme sign-off. Control Room remains independent and Claude's eMAR checkout/processes are untouched.
+Status: the bounded UI/navigation and historical-trend follow-up passed the checks below and was integrated into local main and GitHub main as **0cc164355** on 10 October. GitHub workflows were still running at the post-push check. This is a re-audit of the actual delivery checkout after automated tests, not a whole-programme sign-off. Control Room remains independent and Claude's eMAR checkout/processes are untouched.
 
 ## Confirmed user-impacting findings
 
@@ -34,6 +34,7 @@ Evidence: delivery `output/playwright/workforce-reaudit-20261010/` and `test-res
 - The final Availability-boundary correction passes lint, full TypeScript and production build **app-2zSJfqV2.js**. Deliberately held full reads from direct Availability entry into Analytics and Open shifts kept Availability visible until success, returned four history weeks and included candidate eligibility. The delayed Availability → Capacity test also passed through refresh. Evidence: `entry-final-correlated.log` and `tab-race-final.log`. The earlier entry log passed its assertions but its result field was later overwritten by background inbox polling; the correlated check explicitly excludes those partial reads.
 - The final build also passed the complete ten-view navigation loop: Shifts, Calendar, Open shifts, Coverage, Time off, Availability, Capacity heatmap, Analytics, Templates and Recurring. Each settled URL and selected tab agreed, with a 250.5px header and no desktop page overflow. Evidence: `tabs-settled-final.log`.
 - Prior 72-case qualification/access acceptance and the 50-case frontend checkpoint remain separate evidence and were pushed as main **6317cdce1**. The 30 roster cases above are a repeat subset of the 52 frontend cases, not additional unique cases. Production builds retain the existing large-chunk advisory.
+- After verification, the exactly owned preview process was stopped. Its synthetic database was preserved, and the protected eMAR preview's identity remained unchanged. No product data migration or medication administration formed part of this UI follow-up.
 
 ## Further work not certified by this increment
 
