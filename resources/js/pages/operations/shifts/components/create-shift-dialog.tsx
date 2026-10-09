@@ -2710,7 +2710,7 @@ function StatusPicker({
             label: 'Scheduled',
             icon: CheckCircle2,
             hint: canSchedule
-                ? 'Publish to the worker.'
+                ? 'Include in the roster.'
                 : 'Assign a staff member first.',
         },
     ];

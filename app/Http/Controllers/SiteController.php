@@ -22,9 +22,12 @@ use App\Models\SiteHouseRoom;
 use App\Models\SiteStaffRequirement;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\AuthorizationEvidenceLockService;
+use App\Services\CurrentAuthorizationReads;
 use App\Services\Eligibility\WorkforceRequirementMapping;
 use App\Services\Fleet\BoundaryService;
 use App\Services\NotificationService;
+use App\Services\Operations\WorkforceMutationGuard;
 use App\Services\Sites\SiteContactService;
 use App\Services\Sites\SitePhysicalRoomService;
 use App\Services\Sites\SiteReadinessService;
@@ -555,6 +558,7 @@ class SiteController extends Controller
         // after the Site exists (see persist* helpers below).
         $coverage = $validated['coverage'] ?? [];
         $credentials = $validated['credentials'] ?? [];
+        $copyFrom = isset($validated['copy_from']) ? (int) $validated['copy_from'] : null;
         $geofence = $validated['geofence'] ?? null;
         // Documents come from the multipart request with UploadedFile
         // instances; saveDocuments() reads them directly from $request.
@@ -573,6 +577,7 @@ class SiteController extends Controller
             $validated['documents'],
             $validated['coverage'],
             $validated['credentials'],
+            $validated['copy_from'],
             $validated['geofence'],
             $validated['weekly_food_budget'],
         );
@@ -581,7 +586,8 @@ class SiteController extends Controller
             unset($validated['weekly_food_budget_cents']);
         }
 
-        $site = DB::transaction(function () use ($validated, $contacts, $rooms, $resources, $zones, $assets, $checklists, $coverage, $credentials, $geofence, $request, $user) {
+        $site = DB::transaction(function () use ($validated, $contacts, $rooms, $resources, $zones, $assets, $checklists, $coverage, $credentials, $copyFrom, $geofence, $request, $user) {
+            $copiedUnset = $this->verifiedCopiedUnsetRequirements($credentials, $copyFrom, $user);
             $site = Site::create($validated);
 
             $this->siteContacts->sync($site, $contacts);
@@ -593,7 +599,7 @@ class SiteController extends Controller
 
             // Rostering + geofence fan-out (all reuse existing models).
             $this->persistCoverageRequirements($site, $coverage, $user);
-            $this->persistStaffRequirements($site, $credentials, $user);
+            $this->persistStaffRequirements($site, $credentials, $user, $copiedUnset);
             $this->persistSiteGeofence($site, $geofence, $user);
 
             // Documents last so disk writes only happen once every DB op succeeds.
@@ -692,7 +698,7 @@ class SiteController extends Controller
      *
      * @param  array<int, array<string, mixed>>  $credentials
      */
-    private function persistStaffRequirements(Site $site, array $credentials, ?User $user): void
+    private function persistStaffRequirements(Site $site, array $credentials, ?User $user, array $copiedUnset = []): void
     {
         foreach ($credentials as $index => $cred) {
             $expiry = $cred['expiry_period_months'] ?? null;
@@ -701,7 +707,7 @@ class SiteController extends Controller
             $requirement = SiteStaffRequirement::firstOrNew(
                 ['site_id' => $site->id, 'requirement_name' => $cred['name']],
             );
-            $choice = SiteStaffRequirement::applicabilityValues(
+            $choice = isset($copiedUnset[$index]) ? ['applicability_mode' => null, 'minimum_qualified_staff' => null] : SiteStaffRequirement::applicabilityValues(
                 $cred, app(HrEligibilityRuleSettings::class)->values()['house_qualification_approach'],
                 $requirement->exists ? $requirement : null, 'credentials.'.$index.'.',
             );
@@ -718,6 +724,59 @@ class SiteController extends Controller
                 throw ValidationException::withMessages(['credentials.'.$index => 'The staff requirement could not be saved.']);
             }
         }
+    }
+
+    /** Only a current, unchanged legacy source may preserve an unset copied choice. */
+    private function verifiedCopiedUnsetRequirements(array $credentials, ?int $copyFrom, User $user): array
+    {
+        $unset = collect($credentials)->filter(fn (array $credential) => array_key_exists('applicability_mode', $credential)
+            && $credential['applicability_mode'] === null);
+        if ($copyFrom === null || $unset->isEmpty()) {
+            return [];
+        }
+
+        app(WorkforceMutationGuard::class)->lock();
+        $actor = app(AuthorizationEvidenceLockService::class)->lockForUserWithoutWaiting($user, [
+            'sites.create', 'sites.viewAny', 'sites.viewAll', 'sites.type.head_office.view',
+            'sites.type.house.view', 'sites.type.facility.view',
+        ]);
+        abort_unless($actor->isApproved() && $actor->canDo('sites.create'), 403);
+        Gate::forUser($actor)->authorize('viewAny', Site::class);
+
+        return CurrentAuthorizationReads::within(function (CurrentAuthorizationReads $reads) use ($actor, $copyFrom, $unset): array {
+            $sites = $reads->query(Site::query())->whereKey($copyFrom)
+                ->whereIn('type', $this->allowedSiteTypes($actor))->where('archived', false);
+            if (! $this->siteAccess()->canBypass($actor, self::SITE_BYPASS_PERMISSIONS)) {
+                $sites->whereIn('id', $this->siteAccess()->accessibleSiteIds($actor, reads: $reads));
+            }
+            $sourceSite = $sites->firstOrFail();
+            $sources = $reads->query(SiteStaffRequirement::query())
+                ->where('site_id', $sourceSite->id)->where('is_active', true)
+                ->whereIn('id', $unset->pluck('source_requirement_id')->filter()->all())
+                ->orderBy('id')->get()->keyBy('id');
+            $verified = [];
+            foreach ($unset as $index => $credential) {
+                $source = $sources->get((int) ($credential['source_requirement_id'] ?? 0));
+                $expiry = $credential['expiry_period_months'] ?? null;
+                $sourceExpiry = $source?->expiry_period_months;
+                $matches = $source && $source->applicability_mode === null && $source->minimum_qualified_staff === null
+                    && hash_equals($source->copyRevision(), $credential['source_revision'] ?? '')
+                    && $credential['name'] === $source->requirement_name && $credential['category'] === $source->category
+                    && (($expiry !== null && (int) $expiry > 0) ? (int) $expiry : null)
+                        === (($sourceExpiry !== null && (int) $sourceExpiry > 0) ? (int) $sourceExpiry : null)
+                    && (isset($credential['hr_compliance_requirement_id']) ? (int) $credential['hr_compliance_requirement_id'] : null)
+                        === $source->hr_compliance_requirement_id
+                    && ($credential['minimum_qualified_staff'] ?? null) === null;
+                if (! $matches) {
+                    throw ValidationException::withMessages([
+                        'credentials.'.$index.'.applicability_mode' => 'This copied requirement changed or is no longer available. Choose an applicability option or copy it again.',
+                    ]);
+                }
+                $verified[$index] = true;
+            }
+
+            return $verified;
+        });
     }
 
     /**
@@ -1087,6 +1146,8 @@ class SiteController extends Controller
                     'service_context_id' => $r->service_context_id,
                 ])->values(),
                 'credentials' => $s->staffRequirements->map(fn ($r) => [
+                    'source_requirement_id' => (int) $r->id,
+                    'source_revision' => $r->copyRevision(),
                     'name' => $r->requirement_name,
                     'category' => $r->category,
                     'expiry_period_months' => $r->expiry_period_months,
@@ -1501,9 +1562,9 @@ class SiteController extends Controller
         ][$region] ?? [];
     }
 
-    private function allowedSiteTypes(Request $request): array
+    private function allowedSiteTypes(Request|User $request): array
     {
-        $user = $request->user();
+        $user = $request instanceof User ? $request : $request->user();
         $map = [
             'head_office' => 'sites.type.head_office.view',
             'house' => 'sites.type.house.view',

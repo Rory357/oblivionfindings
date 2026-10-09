@@ -503,6 +503,7 @@ export function WorkforceEligibilityRules({
             </div>
             {review ? (
                 <SettingsModal
+                    frontline
                     title="Review qualification rule"
                     description="Review qualification warnings and the default choices for new House requirements."
                     onClose={() => {
@@ -569,6 +570,7 @@ export function WorkforceEligibilityRules({
             rules.can_view_history &&
             rules.urls.history ? (
                 <SettingsModal
+                    frontline
                     title="Qualification rule change history"
                     description="Saved changes to qualification warnings and House requirement defaults."
                     onClose={() => setHistoryPage(null)}

@@ -94,6 +94,15 @@ class SiteStaffRequirement extends Model
     }
 
     // Scopes
+    /** Bind a displayed copy to the complete persisted source, including legacy nulls. */
+    public function copyRevision(): string
+    {
+        $source = $this->getRawOriginal();
+        ksort($source);
+
+        return hash('sha256', json_encode($source, JSON_THROW_ON_ERROR));
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);

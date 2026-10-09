@@ -693,10 +693,12 @@ function WizardBody({
                 }
             >
                 <WizardStepPane>
-                    <TemplateCommandNotice
-                        command={command}
-                        onReload={reload}
-                    />
+                    {command.notice?.kind !== 'confirmed' ? (
+                        <TemplateCommandNotice
+                            command={command}
+                            onReload={reload}
+                        />
+                    ) : null}
                     {uncertain && recoveryRows && !command.needsRead ? (
                         <Alert className="mb-4">
                             <AlertTitle>Check the saved library</AlertTitle>
@@ -1361,6 +1363,7 @@ export type TemplateDetailDialogProps = {
     actionsBlocked: boolean;
     onEdit: (template: RosterTemplateRow) => void;
     onDelete: (template: RosterTemplateRow) => void;
+    onCloseAutoFocus?: (event: Event) => void;
 };
 
 export function TemplateDetailDialog({
@@ -1373,12 +1376,14 @@ export function TemplateDetailDialog({
     actionsBlocked,
     onEdit,
     onDelete,
+    onCloseAutoFocus,
 }: TemplateDetailDialogProps) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent
                 showCloseButton={false}
-                className="max-h-[92vh] overflow-hidden p-0"
+                className="frontline-dialog max-h-[92vh] min-w-0 grid-cols-1 overflow-hidden p-0"
+                onCloseAutoFocus={onCloseAutoFocus}
                 style={{
                     maxWidth: 'min(94vw, 940px)',
                     width: 'min(94vw, 940px)',
@@ -1388,7 +1393,9 @@ export function TemplateDetailDialog({
                     {template?.name ?? 'Roster template'}
                 </DialogTitle>
                 <DialogDescription className="sr-only">
-                    Review the template rows and apply the pattern to a week.
+                    {canApply
+                        ? 'Review the template rows and apply the pattern to a week.'
+                        : 'Review the saved template rows and support details.'}
                 </DialogDescription>
                 {open && template ? (
                     <DetailBody
@@ -1488,10 +1495,10 @@ function DetailBody({
     };
 
     return (
-        <div className="flex max-h-[92vh] min-h-0 flex-col">
-            <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-5 py-4">
-                <div className="min-w-0">
-                    <h2 className="truncate text-lg font-bold tracking-tight">
+        <div className="flex max-h-[92vh] min-h-0 min-w-0 flex-col">
+            <header className="relative min-w-0 shrink-0 border-b border-border px-5 py-4">
+                <div className="min-w-0 pr-[52px] [overflow-wrap:anywhere]">
+                    <h2 className="text-lg font-bold tracking-tight">
                         {template.name}
                     </h2>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
@@ -1517,37 +1524,43 @@ function DetailBody({
                         </span>
                     </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                    {canManage ? (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={actionsBlocked || applyForm.processing}
-                            onClick={() => onEdit(template)}
-                        >
-                            <Pencil className="h-3.5 w-3.5" /> Edit
-                        </Button>
-                    ) : null}
-                    {canDelete ? (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-status-critical hover:text-status-critical"
-                            disabled={actionsBlocked || applyForm.processing}
-                            onClick={() => onDelete(template)}
-                        >
-                            <Trash2 className="h-3.5 w-3.5" /> Delete
-                        </Button>
-                    ) : null}
-                    <button
-                        type="button"
-                        onClick={() => onOpenChange(false)}
-                        aria-label="Close"
-                        className="frontline-hit grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                        <X className="h-5 w-5" />
-                    </button>
-                </div>
+                {canManage || canDelete ? (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {canManage ? (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={
+                                    actionsBlocked || applyForm.processing
+                                }
+                                onClick={() => onEdit(template)}
+                            >
+                                <Pencil className="h-3.5 w-3.5" /> Edit
+                            </Button>
+                        ) : null}
+                        {canDelete ? (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-status-critical hover:text-status-critical"
+                                disabled={
+                                    actionsBlocked || applyForm.processing
+                                }
+                                onClick={() => onDelete(template)}
+                            >
+                                <Trash2 className="h-3.5 w-3.5" /> Delete
+                            </Button>
+                        ) : null}
+                    </div>
+                ) : null}
+                <button
+                    type="button"
+                    onClick={() => onOpenChange(false)}
+                    aria-label="Close"
+                    className="absolute top-3 right-3 grid h-[44px] w-[44px] place-items-center rounded-md text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                    <X className="h-5 w-5" />
+                </button>
             </header>
 
             <div
@@ -1557,7 +1570,7 @@ function DetailBody({
                 )}
             >
                 {/* Rows */}
-                <div className="min-h-0 overflow-y-auto px-5 py-4">
+                <div className="min-h-0 min-w-0 overflow-y-auto px-5 py-4 [overflow-wrap:anywhere]">
                     {template.description ? (
                         <p className="mb-3 text-sm text-muted-foreground">
                             {template.description}
@@ -1579,7 +1592,7 @@ function DetailBody({
                 {/* Apply panel */}
                 {canApply ? (
                     <div
-                        className="min-h-0 overflow-y-auto border-t border-border bg-muted/20 px-5 py-4 lg:border-t-0 lg:border-l"
+                        className="min-h-0 min-w-0 overflow-y-auto border-t border-border bg-muted/20 px-5 py-4 lg:border-t-0 lg:border-l"
                         data-test="template-apply-card"
                     >
                         <div className="flex items-center gap-2 text-sm font-bold">
@@ -1744,7 +1757,7 @@ function DetailRow({ shift }: { shift: RosterTemplateShiftRow }) {
     const dayLabel =
         DAY_LABELS[shift.day_of_week] ?? `Day ${shift.day_of_week}`;
     return (
-        <div className="rounded-lg border border-border p-3">
+        <div className="min-w-0 rounded-lg border border-border p-3 [overflow-wrap:anywhere]">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-sm font-semibold">
                     {dayLabel} · {shift.start_time}–{shift.end_time}
@@ -1775,7 +1788,7 @@ function DetailRow({ shift }: { shift: RosterTemplateShiftRow }) {
                     ) : null}
                 </div>
             </div>
-            <div className="mt-2 grid gap-x-4 gap-y-1 text-[13px] text-muted-foreground sm:grid-cols-2">
+            <div className="mt-2 grid min-w-0 grid-cols-1 gap-x-4 gap-y-1 text-[13px] text-muted-foreground sm:grid-cols-2">
                 <span>
                     Client:{' '}
                     <span className="font-medium text-foreground">

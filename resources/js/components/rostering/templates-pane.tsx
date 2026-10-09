@@ -199,7 +199,7 @@ function TemplateCard({
                 }
             }}
             className={cn(
-                'group flex cursor-pointer flex-col gap-3 rounded-[14px] border border-border bg-card p-4 text-left shadow-sm transition-colors',
+                'group flex min-w-0 cursor-pointer flex-col gap-3 rounded-[14px] border border-border bg-card p-4 text-left shadow-sm transition-colors',
                 'hover:border-primary/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                 !template.is_active && 'opacity-75',
             )}
@@ -270,7 +270,7 @@ function TemplateCard({
             </div>
 
             {template.description ? (
-                <p className="line-clamp-2 text-[13px] leading-snug text-muted-foreground">
+                <p className="line-clamp-2 text-[13px] leading-snug [overflow-wrap:anywhere] text-muted-foreground">
                     {template.description}
                 </p>
             ) : null}
@@ -474,7 +474,7 @@ export function TemplatesPane({
                 </>
             ) : null}
             {filtered.length > 0 ? (
-                <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+                <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-3">
                     {filtered.map((template) => (
                         <TemplateCard
                             actionsBlocked={actionsBlocked}

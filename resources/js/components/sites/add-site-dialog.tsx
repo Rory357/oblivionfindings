@@ -113,6 +113,8 @@ export type AddSiteCopyableSite = {
     type: string;
     coverage: AddSiteCopyableCoverage[];
     credentials: (Partial<HouseQualificationValues> & {
+        source_requirement_id?: number;
+        source_revision?: string;
         mapping?: QualificationMapping;
         name: string;
         category: string;
@@ -153,7 +155,11 @@ export type CoverageRule = {
     roles: { caregiver: number; driver: number; med_competent: number };
 };
 export type CredentialRow = HouseQualificationValues & {
+    source_requirement_id?: number;
+    source_revision?: string;
     mapping?: QualificationMapping;
+    /** Only an unchanged copied legacy blank may remain unresolved. */
+    copied_unset_applicability?: boolean;
     key: string;
     name: string;
     category: 'mandatory' | 'recommended';
@@ -414,6 +420,11 @@ function validateStep(key: StepKey, d: SiteWizardForm): Record<string, string> {
                 !c.ends_time,
         );
         d.credentials.forEach((credential, index) => {
+            if (
+                credential.copied_unset_applicability &&
+                credential.applicability_mode === null
+            )
+                return;
             for (const [key, message] of Object.entries(
                 houseQualificationErrors(credential),
             )) {
@@ -432,6 +443,7 @@ function validateStep(key: StepKey, d: SiteWizardForm): Record<string, string> {
 }
 
 const STEP_FOR_PREFIX: { prefix: string; step: StepKey }[] = [
+    { prefix: 'copy_from', step: 'rostering' },
     { prefix: 'coverage', step: 'rostering' },
     { prefix: 'credentials', step: 'rostering' },
     { prefix: 'address_', step: 'location' },
@@ -1872,6 +1884,12 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
         }
         const credentials: CredentialRow[] = source.credentials.map((c) => ({
             ...copyHouseQualification(c),
+            source_requirement_id: c.source_requirement_id,
+            source_revision: c.source_revision,
+            copied_unset_applicability:
+                c.applicability_mode == null &&
+                c.source_requirement_id != null &&
+                c.source_revision != null,
             mapping: c.mapping,
             key: credentialKeyForName(c.name, ref.credentialCatalogue),
             name: c.name,
@@ -1923,7 +1941,13 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
         set(
             'credentials',
             data.credentials.map((c) =>
-                c.key === key ? { ...c, ...patch } : c,
+                c.key === key
+                    ? {
+                          ...c,
+                          ...patch,
+                          copied_unset_applicability: false,
+                      }
+                    : c,
             ),
         );
 
@@ -1940,6 +1964,7 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
                     <Field
                         label="Copy a pattern"
                         hint="clone coverage & credentials from another site"
+                        error={err('copy_from')}
                         span
                     >
                         <SelectInput
@@ -2072,6 +2097,23 @@ function StepRostering({ ctx }: { ctx: SiteStepCtx }) {
                                     <h4 className="text-sm font-semibold">
                                         {c.name}
                                     </h4>
+                                    {err(`credentials.${index}`) ||
+                                    err(
+                                        `credentials.${index}.source_requirement_id`,
+                                    ) ||
+                                    err(
+                                        `credentials.${index}.source_revision`,
+                                    ) ? (
+                                        <FieldErr>
+                                            {err(`credentials.${index}`) ??
+                                                err(
+                                                    `credentials.${index}.source_requirement_id`,
+                                                ) ??
+                                                err(
+                                                    `credentials.${index}.source_revision`,
+                                                )}
+                                        </FieldErr>
+                                    ) : null}
                                     <Segmented
                                         value={c.category}
                                         onChange={(v) =>

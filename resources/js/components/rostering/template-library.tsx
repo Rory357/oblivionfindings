@@ -100,6 +100,7 @@ function LibraryBody({
         data: NonNullable<ReturnType<typeof currentTemplateLibrary>>;
     } | null>(null);
     const [detailId, setDetailId] = useState<number | null>(null);
+    const detailTrigger = useRef<HTMLElement | null>(null);
     const [deleting, setDeleting] = useState<RosterTemplateRow | null>(null);
     const [deleteAttempted, setDeleteAttempted] = useState(false);
     const [query, setQuery] = useState(''),
@@ -128,7 +129,7 @@ function LibraryBody({
         setQuery('');
     };
     return (
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
             {standalone ? (
                 <WorkforcePageHeader
                     icon={LayoutTemplate}
@@ -235,7 +236,13 @@ function LibraryBody({
                     library &&
                     setEditor({ template: null, data: library })
                 }
-                onView={(row) => setDetailId(row.id)}
+                onView={(row) => {
+                    detailTrigger.current =
+                        document.activeElement instanceof HTMLElement
+                            ? document.activeElement
+                            : null;
+                    setDetailId(row.id);
+                }}
                 onEdit={edit}
                 onDelete={requestDelete}
                 onDuplicate={(row) => {
@@ -270,6 +277,15 @@ function LibraryBody({
             <TemplateDetailDialog
                 open={detail !== null}
                 onOpenChange={(open) => !open && setDetailId(null)}
+                onCloseAutoFocus={(event) => {
+                    event.preventDefault();
+                    if (
+                        !editor &&
+                        !deleting &&
+                        detailTrigger.current?.isConnected
+                    )
+                        detailTrigger.current.focus();
+                }}
                 template={detail}
                 canManage={Boolean(
                     capabilities.can_edit &&

@@ -58,6 +58,7 @@ class RosteringController extends Controller
         abort_unless($auth && $auth->canDo('rostering.viewAny'), 403);
 
         $canManageAny = $auth->canDo('shifts.manageAny');
+        $canReadAnyShifts = $canManageAny || $auth->canDo('shifts.viewAny');
         $fatiguePolicy = app(HrFatiguePolicySettings::class)->values();
         $availabilityCapabilities = [
             'view_any' => $canManageAny || $auth->canDo('staff.viewAny') || $auth->canDo('staff.availability.updateAny'),
@@ -112,8 +113,12 @@ class RosteringController extends Controller
         // pickers too, and it is gated on the broader $canManageTemplates. Load the
         // datasets for either gate so a roster_templates.create user who is not a
         // shifts.manageAny manager doesn't open the wizard to empty dropdowns.
-        if ($canManageAny || $canManageTemplates) {
-            $siteBypassPermissions = ['rostering.viewAny', 'shifts.manageAny'];
+        if ($canReadAnyShifts || $canManageTemplates) {
+            // Preserve the existing template/manager picker contract; the new
+            // scoped Shift reader does not gain the legacy roster Site bypass.
+            $siteBypassPermissions = $canManageAny || $canManageTemplates
+                ? ['rostering.viewAny', 'shifts.manageAny']
+                : ['shifts.manageAny'];
             $accessibleSiteIds = $this->siteAccess->accessibleSiteIds($auth, $siteBypassPermissions);
 
             $staff = $this->siteAccess->applyStaffScope(User::query(), $auth, $siteBypassPermissions)
@@ -175,9 +180,37 @@ class RosteringController extends Controller
         // Normalise the site_id filter once — may be null, a single int, or an int[].
         $siteFilter = $request->siteFilter();
 
-        if (! $canManageAny) {
+        if (! $canReadAnyShifts) {
             $query->where('user_id', $auth->id);
         } else {
+            if (! $canManageAny) {
+                $this->siteAccess->applyShiftScope($query, $auth, ['shifts.manageAny']);
+                $readSiteIds = $this->siteAccess->accessibleSiteIds($auth, ['shifts.manageAny']);
+                // A visible occurrence cannot disclose a foreign recurring source.
+                // Keep legacy Client fallback and manual explicit-Site provenance.
+                $query->where(function ($linkedSeries) use ($auth, $readSiteIds): void {
+                    $linkedSeries->whereNull('shift_series_id')->orWhereHas('series', function ($series) use ($auth, $readSiteIds): void {
+                        $series->where(function ($provenance) use ($auth, $readSiteIds): void {
+                            $provenance->where(fn ($manual) => $manual->whereNull('client_id')->whereIn('site_id', $readSiteIds))
+                                ->orWhereHas('client', function ($client) use ($auth): void {
+                                    $this->siteAccess->applyClientScope($client, $auth, ['shifts.manageAny'])
+                                        ->where(fn ($agreement) => $agreement->whereNull('shift_series.site_id')
+                                            ->orWhereColumn('clients.site_id', 'shift_series.site_id'));
+                                });
+                        });
+                    });
+                });
+                // Existing integrity keeps historical participant existence;
+                // no new participant employment or Site policy is introduced.
+                $query->with(['replacementRequests' => fn ($replacement) => $this->siteAccess
+                    ->applyShiftReplacementIntegrityScope($replacement->getQuery())->active()->with([
+                        'requester:id,name', 'currentStaff:id,name', 'replacementStaff:id,name',
+                        'openPosition' => fn ($position) => $this->siteAccess
+                            ->applyShiftOpenPositionIntegrityScope($position->getQuery())
+                            ->select(['id', 'replacement_request_id', 'status', 'claimed_by', 'approved_by', 'expires_at']),
+                        'openPosition.claimer:id,name',
+                    ])]);
+            }
             if (! empty($data['staff_id'])) {
                 $query->where('user_id', $data['staff_id']);
             }
@@ -538,11 +571,18 @@ class RosteringController extends Controller
         $selectedRosterPeriod = null;
         $selectedRosterPeriodDiffSummary = null;
 
-        if ($publishEnabled && $canManageAny && $selectedSiteId) {
-            $selectedRosterPeriod = $this->rosterPeriods->activeFor((int) $selectedSiteId, $weekStart)
-                ?? $this->rosterPeriods->findOrCreate((int) $selectedSiteId, $weekStart);
+        if ($publishEnabled && $selectedSiteId && ($canManageAny || $auth->canDo('rostering.publish'))) {
+            if (! $canManageAny) {
+                $this->siteAccess->assertCanAccessSiteId($auth, (int) $selectedSiteId, ['shifts.manageAny']);
+            }
+            $selectedRosterPeriod = $this->rosterPeriods->activeFor((int) $selectedSiteId, $weekStart);
+            // Scoped publication entry only reads an existing period. Keep the
+            // legacy manager GET creation path unchanged.
+            if (! $selectedRosterPeriod && $canManageAny) {
+                $selectedRosterPeriod = $this->rosterPeriods->findOrCreate((int) $selectedSiteId, $weekStart);
+            }
 
-            if ($selectedRosterPeriod->snapshot) {
+            if ($selectedRosterPeriod?->snapshot) {
                 $selectedRosterPeriodDiffSummary = $this->publishing->diff($selectedRosterPeriod)['summary'];
             }
         }

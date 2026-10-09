@@ -197,6 +197,30 @@ beforeEach(() => {
     };
 });
 describe('template library dialogs', () => {
+    it('does not present the previous command as confirmation of a new edit', () => {
+        const actions = command({
+            notice: { kind: 'confirmed', message: 'Previous template saved.' },
+        });
+        render(<TemplateWizardDialog {...wizardProps} command={actions} />);
+        fireEvent.change(screen.getByRole('textbox', { name: 'Description' }), {
+            target: { value: 'New unsaved guidance' },
+        });
+        openReview();
+        expect(screen.getByText('New unsaved guidance')).toBeInTheDocument();
+        expect(
+            screen.queryByText('Template confirmed'),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByText('Previous template saved.'),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Done' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Save changes' }),
+        ).toBeEnabled();
+        expect(actions.submit).not.toHaveBeenCalled();
+    });
     it('reviews and submits every saved support field without shifting overnight minutes', () => {
         const actions = command();
         render(<TemplateWizardDialog {...wizardProps} command={actions} />);
@@ -425,6 +449,14 @@ describe('template library dialogs', () => {
             />,
         );
         expect(screen.getByText('Keep handover detail')).toBeInTheDocument();
+        expect(screen.getAllByRole('button', { name: 'Close' })).toHaveLength(
+            1,
+        );
+        expect(
+            screen.getByText(
+                'Review the saved template rows and support details.',
+            ),
+        ).toBeInTheDocument();
         expect(
             screen.queryByRole('button', { name: 'Edit' }),
         ).not.toBeInTheDocument();
@@ -464,6 +496,24 @@ describe('template library dialogs', () => {
 });
 
 describe('shared library entry point', () => {
+    it('returns keyboard focus to the template opener when its detail closes', async () => {
+        transport.props = {
+            ...transport.props,
+            templateCapabilities: readOnly,
+            rosterTemplates: [{ ...template, capabilities: readOnly }],
+        };
+        render(<TemplateLibrary standalone />);
+        const opener = screen.getByRole('button', { name: 'View template' });
+        opener.focus();
+        fireEvent.click(opener);
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+        await waitFor(() =>
+            expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+        );
+        await waitFor(() => expect(opener).toHaveFocus());
+        expect(transport.visit).not.toHaveBeenCalled();
+    });
     it.each([false, true])(
         'preserves the selected week when deleting from standalone=%s',
         async (standalone) => {

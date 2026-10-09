@@ -109,7 +109,10 @@ class StoreSiteRequest extends FormRequest
             'coverage.*.roles.med_competent' => ['nullable', 'integer', 'min:0', 'max:12'],
 
             // Rostering — required staff credentials → SiteStaffRequirement
+            'copy_from' => ['nullable', 'integer', 'min:1'],
             'credentials' => ['nullable', 'array'],
+            'credentials.*.source_requirement_id' => ['nullable', 'integer', 'min:1'],
+            'credentials.*.source_revision' => ['nullable', 'string', 'regex:/^[a-f0-9]{64}$/'],
             'credentials.*.key' => ['required_with:credentials', 'string', 'max:50'],
             'credentials.*.name' => ['required_with:credentials', 'string', 'max:255'],
             'credentials.*.category' => ['required_with:credentials', 'in:mandatory,recommended'],
