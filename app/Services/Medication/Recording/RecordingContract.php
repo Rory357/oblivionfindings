@@ -130,4 +130,26 @@ final class RecordingContract
     {
         return array_keys(self::rules());
     }
+
+    /**
+     * EA-058: the free-text reason a not-given outcome carries. "Other (say
+     * what happened)" is said in the dialog's one note field, so when no
+     * separate reason is sent the worker's note is the reason.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public static function notGivenReason(array $data): ?string
+    {
+        $reason = trim((string) ($data['reason'] ?? ''));
+        if ($reason !== '') {
+            return $reason;
+        }
+        if (($data['status'] ?? null) !== 'given' && ($data['reason_code'] ?? null) === 'other') {
+            $note = trim((string) ($data['notes'] ?? ''));
+
+            return $note !== '' ? mb_substr($note, 0, 500) : null;
+        }
+
+        return null;
+    }
 }

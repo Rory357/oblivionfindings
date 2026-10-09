@@ -1136,7 +1136,26 @@ function RecordDoseForm({
             medication_round_id: roundId,
             shift_id: shiftContext?.shiftId,
             ...(controlledGiven && req.stock_packs?.lots_started
-                ? { pack_lines: f.packLines }
+                ? {
+                      pack_lines: f.packLines,
+                      // EA-009: when the dose and stock units can't be
+                      // compared, the waste is what each pack says, in the
+                      // stock unit; the server never converts it.
+                      ...(fromOrder
+                          ? {}
+                          : {
+                                quantity_wasted: Number(
+                                    f.packLines
+                                        .reduce(
+                                            (sum, line) =>
+                                                sum +
+                                                Number(line.quantity_wasted),
+                                            0,
+                                        )
+                                        .toFixed(2),
+                                ),
+                            }),
+                  }
                 : {}),
             ...(givenLike && shiftContext?.scanVerification
                 ? toMedicationScanPayload(scanCapture)
@@ -1209,6 +1228,11 @@ function RecordDoseForm({
                 target.kind === 'scheduled' ? target.scheduledFor : null,
             status,
             reason_code: reasonCode,
+            // EA-058: "Other (say what happened)" is said in the note.
+            reason:
+                f.outcome === 'withheld' && f.reason === 'other'
+                    ? f.note.trim().slice(0, 500) || null
+                    : null,
             late_reason: givenLike && outsideWindow ? f.lateReason : null,
             follow_up_due_at:
                 f.outcome === 'refused' ? f.followBy || null : null,

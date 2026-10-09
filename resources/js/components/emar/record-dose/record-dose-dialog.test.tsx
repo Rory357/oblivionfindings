@@ -1264,6 +1264,110 @@ describe('RecordDoseDialog (P01)', () => {
         });
     });
 
+    it('sends the per-pack waste total when a controlled dose is counted in another stock unit (EA-009)', async () => {
+        submitMock.mockResolvedValue({
+            status: 'processed',
+            data: { administration: { id: 13 } },
+        });
+        const req = controlled('mL', { dose_unit: 'mg', dose_amount: 25 });
+        req.stock_packs = {
+            stock_id: 4,
+            unit: 'mL',
+            lots_started: true,
+            lots: [
+                {
+                    id: 9,
+                    batch_number: 'LIQUID',
+                    expiry_date: null,
+                    state: 'open',
+                    quantity_remaining: 100,
+                    revision: 2,
+                    usable: true,
+                },
+            ],
+        };
+        open(req);
+        await screen.findByText('Clonazepam 0.5mg');
+        fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+        fireEvent.click(await screen.findByRole('button', { name: /^Given/ }));
+        fireEvent.click(
+            screen.getByRole('combobox', {
+                name: /Who is witnessing|Choose a colleague|Witness/i,
+            }),
+        );
+        fireEvent.click(
+            await screen.findByRole('option', { name: /Mere Kahu/ }),
+        );
+        fireEvent.change(screen.getByLabelText(/Witness’s 6-digit PIN/), {
+            target: { value: '123456' },
+        });
+        fireEvent.change(
+            screen.getByLabelText(/Taken from the stock for this dose/),
+            { target: { value: '5' } },
+        );
+        fireEvent.change(
+            screen.getByLabelText(/Balance left after this dose/),
+            { target: { value: '95' } },
+        );
+        fireEvent.pointerDown(
+            screen.getByRole('combobox', { name: 'Add a pack' }),
+            { button: 0, ctrlKey: false, pointerType: 'mouse' },
+        );
+        fireEvent.click(screen.getByRole('option', { name: /Batch LIQUID/ }));
+        fireEvent.change(screen.getByLabelText('Amount (mL)'), {
+            target: { value: '5' },
+        });
+        fireEvent.change(screen.getByLabelText('Wasted (mL)'), {
+            target: { value: '0' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+        fireEvent.click(
+            await screen.findByRole('button', { name: /^Record outcome$/i }),
+        );
+        await waitFor(() => expect(submitMock).toHaveBeenCalledOnce());
+        expect(submitMock.mock.calls[0][1]).toMatchObject({
+            quantity_administered: 5,
+            quantity_wasted: 0,
+            pack_lines: [
+                { lot_id: 9, revision: 2, quantity: '5', quantity_wasted: '0' },
+            ],
+        });
+    });
+
+    it('saves “Withheld › Other” with the note as its reason (EA-058)', async () => {
+        submitMock.mockResolvedValue({
+            status: 'processed',
+            data: { administration: { id: 16 } },
+        });
+        open(requirements());
+        await screen.findByText('Losartan 50mg');
+        fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+        fireEvent.click(
+            await screen.findByRole('button', { name: /^Withheld/ }),
+        );
+        fireEvent.pointerDown(
+            screen.getByRole('combobox', { name: /Reason for withholding/ }),
+            { button: 0, ctrlKey: false, pointerType: 'mouse' },
+        );
+        fireEvent.click(
+            screen.getByRole('option', { name: 'Other (say what happened)' }),
+        );
+        fireEvent.change(screen.getByRole('textbox', { name: /What happened/ }), {
+            target: { value: '  GP phoned to hold it until the INR is back ' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+        fireEvent.click(
+            await screen.findByRole('button', { name: /^Record outcome$/i }),
+        );
+        await waitFor(() => expect(submitMock).toHaveBeenCalledOnce());
+        expect(submitMock.mock.calls[0][1]).toMatchObject({
+            status: 'withheld',
+            reason_code: 'other',
+            reason: 'GP phoned to hold it until the INR is back',
+            notes: 'GP phoned to hold it until the INR is back',
+        });
+    });
+
     it('doesn’t offer less than ordered on a controlled medicine counted in other units', async () => {
         open(controlled('mL', { dose_unit: 'mg', dose_amount: 5 }));
         await screen.findByText('Clonazepam 0.5mg');

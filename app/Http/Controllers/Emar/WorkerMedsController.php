@@ -690,7 +690,7 @@ class WorkerMedsController extends Controller
                     $medication,
                     [
                         'status' => $data['status'],
-                        'reason' => $data['reason'] ?? null,
+                        'reason' => RecordingContract::notGivenReason($data),
                         'reason_code' => $data['status'] === 'given' ? null : ($data['reason_code'] ?? null),
                         'dose_given' => $data['status'] === 'given' ? $medication->dosage : null,
                         'quantity_administered' => $data['quantity_administered'] ?? null,
@@ -934,17 +934,11 @@ class WorkerMedsController extends Controller
                         'queued_offline' => (bool) ($data['queued_offline'] ?? false),
                         'administered_at' => $submittedAdministrationAt,
                         'scope_authorized' => true,
-                        // P01 C1: amount, second person and the effect-check time.
-                        ...Arr::only($data, [
-                            'amount_mode',
-                            'amount_reason',
-                            'quantity_given',
-                            'more_severity',
-                            'more_immediate_action',
-                            'second_person_unavailable',
-                            'second_person_pin_forgotten',
-                            'effect_check_due_at',
-                        ]),
+                        // P01 C1 recording contract, exactly as a scheduled
+                        // dose forwards it (EA-003): the amount, second
+                        // person and effect-check time, plus the actual pack
+                        // lines, waste and the connected recording review.
+                        ...Arr::only($data, RecordingContract::fields()),
                         ...$scan,
                     ],
                     $user->id,
