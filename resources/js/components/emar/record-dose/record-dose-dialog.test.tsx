@@ -1511,6 +1511,124 @@ describe('RecordDoseDialog (P01)', () => {
         ).toBeInTheDocument();
     });
 
+    it('shows the photo of the supplied pack on the safety checks step (A11)', async () => {
+        open(
+            requirements({
+                pack_photo: {
+                    kind: 'staff',
+                    url: '/emar/stock/packs/7/photo',
+                    taken_at: '2026-10-03T02:00:00Z',
+                    taken_by: 'Aroha Ngata',
+                    pack: 'Box of 28',
+                    pharmacy: 'Synthetic Pharmacy',
+                },
+                pack_photo_policy: { show: true, no_photo: 'tick' },
+            }),
+        );
+        await screen.findByText('Losartan 50mg');
+        expect(
+            screen.getByText('Photo of the supplied pack'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                'Taken 3 October 2026 by Aroha Ngata · Box of 28 · Synthetic Pharmacy',
+            ),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Check the label — the picture is a guide only.'),
+        ).toBeInTheDocument();
+        // A photo means no tick is asked for.
+        expect(screen.getByRole('button', { name: /continue/i })).toBeEnabled();
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'View the photo of Losartan 50mg larger',
+            }),
+        );
+        expect(
+            await screen.findByText(
+                'Losartan 50mg — photo of the supplied pack',
+            ),
+        ).toBeInTheDocument();
+    });
+
+    it('asks for “I’ve checked the label” before continuing when there’s no photo and the organisation wants a tick (A11)', async () => {
+        open(
+            requirements({
+                pack_photo: null,
+                pack_photo_policy: { show: true, no_photo: 'tick' },
+            }),
+        );
+        await screen.findByText('Losartan 50mg');
+        expect(
+            screen.getByText('No photo — check the label'),
+        ).toBeInTheDocument();
+        // No receipt prompt exists, so the dialog promises none.
+        expect(
+            screen.queryByText(/when stock is received/),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: /continue/i }),
+        ).toBeDisabled();
+        expect(
+            screen.getByText('Tick “I’ve checked the label” to continue'),
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('checkbox', { name: /I’ve checked the label/ }),
+        );
+        expect(screen.getByRole('button', { name: /continue/i })).toBeEnabled();
+    });
+
+    it('shows no photo card until the server sends photos, and a warning never blocks (A11)', async () => {
+        const { unmount } = open(requirements());
+        await screen.findByText('Losartan 50mg');
+        expect(
+            screen.queryByText('No photo — check the label'),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByText('Photo of the supplied pack'),
+        ).not.toBeInTheDocument();
+        unmount();
+
+        open(
+            requirements({
+                pack_photo: null,
+                pack_photo_policy: { show: true, no_photo: 'warn' },
+            }),
+        );
+        await screen.findByText('Losartan 50mg');
+        expect(
+            screen.getByText('It’s optional and never blocks recording.'),
+        ).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /continue/i })).toBeEnabled();
+    });
+
+    it('labels a configured catalogue picture as a reference image (A11)', async () => {
+        open(
+            requirements({
+                pack_photo: {
+                    kind: 'reference',
+                    url: '/emar/catalogue/images/12',
+                    taken_at: null,
+                    taken_by: null,
+                    pack: null,
+                    pharmacy: null,
+                    source: 'Synthetic medicine catalogue',
+                },
+                pack_photo_policy: { show: true, no_photo: 'warn' },
+            }),
+        );
+        await screen.findByText('Losartan 50mg');
+        expect(
+            screen.getByText('Reference image — not a photo of this pack'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Synthetic medicine catalogue'),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText('Photo of the supplied pack'),
+        ).not.toBeInTheDocument();
+    });
+
     it('refreshes an expired pack review inside the open dialog and saves with the new review (EA-060)', async () => {
         const first = requirements({
             stock_tracking: {

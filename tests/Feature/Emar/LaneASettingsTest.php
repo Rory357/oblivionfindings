@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\Recording\OfflineReplayReview;
+use App\Services\Medication\Recording\PackPhotoSettings;
 use App\Services\Medication\Settings\MedicationSettingsRegistry;
 use App\Services\Medication\WitnessPinSettings;
 use Carbon\CarbonImmutable;
@@ -141,6 +142,30 @@ class LaneASettingsTest extends TestCase
             ->assertSessionHasNoErrors();
         $this->assertSame(20, app(WitnessPinSettings::class)->confirmWithinMinutes());
         $this->assertSame(3, MedicationSettingChange::query()->where('setting_group', 'forgotten')->count());
+    }
+
+    public function test_the_pack_photo_at_recording_settings_default_to_shown_with_a_warning(): void
+    {
+        $registry = app(MedicationSettingsRegistry::class);
+        $show = $registry->definition('packPhoto', 'show');
+        $noPhoto = $registry->definition('packPhoto', 'no_photo');
+        $this->assertSame(['yes', 'warn'], [$show->default, $noPhoto->default]);
+        $this->assertSame(MedicationSettingsRegistry::VIEW_RULES, $registry->group('packPhoto')->view);
+        $this->assertTrue($show->loosens('yes', 'no'));
+        $this->assertTrue($noPhoto->loosens('tick', 'warn'));
+        $this->assertFalse($noPhoto->loosens('warn', 'tick'));
+        $this->assertSame(['show' => true, 'no_photo' => 'warn'], app(PackPhotoSettings::class)->policy());
+
+        $manager = $this->organisationManager();
+        $this->actingAs($manager)
+            ->put('/emar/settings/changes', $this->save('rules', [['packPhoto', 'no_photo', 'tick', 'warn']]))
+            ->assertSessionHasNoErrors();
+        $this->assertSame(['show' => true, 'no_photo' => 'tick'], app(PackPhotoSettings::class)->policy());
+
+        $this->actingAs($manager)
+            ->put('/emar/settings/changes', $this->save('rules', [['packPhoto', 'show', 'no', 'yes']]))
+            ->assertSessionHasErrors('confirm_loosening');
+        $this->assertTrue(app(PackPhotoSettings::class)->showAtRecording());
     }
 
     private function save(string $view, array $changes): array

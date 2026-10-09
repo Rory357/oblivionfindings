@@ -92,6 +92,7 @@ import {
     OnCallDialogHost,
     type OnCallData,
 } from './settings/_oncall';
+import { MedicinePhotos } from './settings/_photos';
 import { ReachDialogHost, type ReachGap } from './settings/_reach';
 import { RecordsReporting } from './settings/_records-reporting';
 import { ReviewCadenceSettings } from './settings/_reviews';
@@ -180,6 +181,7 @@ const VIEW_ICON: Record<ViewKey, LucideIcon> = {
 /** Tabs whose settings are saved through the save bar. */
 const SAVED_SECTIONS = [
     'safety',
+    'photos',
     'reviews',
     'timing',
     'competency',
@@ -313,6 +315,7 @@ export default function EmarSettings(props: Props) {
                       'medicines',
                       'safety',
                       ...(s.groups.review_cadence ? ['reviews'] : []),
+                      ...(s.groups.packPhoto ? ['photos'] : []),
                       'records',
                       ...(props.controlledSettingsAccess.view
                           ? ['controlled']
@@ -354,6 +357,7 @@ export default function EmarSettings(props: Props) {
             props.controlledSettingsAccess.view,
             alertAccess.view,
             s.groups.review_cadence,
+            s.groups.packPhoto,
         ],
     );
     const [route, setRoute] = useState(() =>
@@ -926,6 +930,15 @@ export default function EmarSettings(props: Props) {
                 houses={props.sites}
                 houseIds={props.controlledSettingsAccess.manageable_site_ids}
                 readOnlyAudit={readOnlyAudit}
+            />
+        ) : view === 'rules' && sec === 'photos' ? (
+            <MedicinePhotos
+                q={query}
+                show={f.show}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
             />
         ) : view === 'rules' && sec === 'records' ? (
             <RecordsReporting q={query} show={f.show} />

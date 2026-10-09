@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SettingsCtx, type SettingsContext } from './_context';
 import type { Draft, SettingDefinition, SettingsPayload } from './_model';
+import { MedicinePhotos } from './_photos';
 import { WitnessPins } from './_sections';
 import { DoseTiming } from './_timing';
 
@@ -102,8 +103,40 @@ const offline = {
     ),
 };
 
+const packPhoto = {
+    show: def(
+        'packPhoto',
+        'show',
+        'photos',
+        'Show the pack photo when a dose is recorded',
+        {
+            default: 'yes',
+            rank: ['no', 'yes'],
+            options: [
+                { value: 'no', label: 'Off' },
+                { value: 'yes', label: 'On' },
+            ],
+        },
+    ),
+    no_photo: def('packPhoto', 'no_photo', 'photos', 'When there’s no photo', {
+        default: 'warn',
+        rank: ['warn', 'tick'],
+        options: [
+            { value: 'warn', label: 'Warn' },
+            { value: 'tick', label: 'Ask for a tick' },
+        ],
+    }),
+};
+
 const payload = (): SettingsPayload => ({
     groups: {
+        packPhoto: {
+            key: 'packPhoto',
+            view: 'rules',
+            effect: 'From the next dose recorded, at every house',
+            audit_event: 'medications.pack_photo.updated',
+            keys: Object.keys(packPhoto),
+        },
         pin: {
             key: 'pin',
             view: 'staff',
@@ -126,7 +159,7 @@ const payload = (): SettingsPayload => ({
             keys: Object.keys(offline),
         },
     },
-    definitions: { pin, forgotten, offline },
+    definitions: { pin, forgotten, offline, packPhoto },
     values: {
         pin: {
             max_attempts: '5',
@@ -135,6 +168,7 @@ const payload = (): SettingsPayload => ({
         },
         forgotten: { forgotten_fallback: 'yes', confirm_minutes: '30' },
         offline: { max_hours: '12' },
+        packPhoto: { show: 'yes', no_photo: 'warn' },
     },
     reviewed: {
         pin: {
@@ -144,6 +178,7 @@ const payload = (): SettingsPayload => ({
         },
         forgotten: { forgotten_fallback: null, confirm_minutes: null },
         offline: { max_hours: null },
+        packPhoto: { show: null, no_photo: null },
     },
     site_values: {},
     site_reviewed: {},
@@ -224,5 +259,29 @@ describe('Dose timing › Saved on a device (Lane A settings)', () => {
         expect(
             screen.getByLabelText('Can still be sent for'),
         ).toBeInTheDocument();
+    });
+});
+
+describe('Medicine photos › At recording (Lane A11 settings)', () => {
+    it('asks for a tick instead of a warning, and hides the choice when photos are off', () => {
+        const { draft } = renderWith(
+            <MedicinePhotos q="" show="all" clear={vi.fn()} />,
+        );
+        expect(screen.getByText('At recording')).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'Ask for “I’ve checked the label”',
+            }),
+        );
+        expect(draft()).toEqual({ packPhoto: { no_photo: 'tick' } });
+
+        fireEvent.click(
+            screen.getByRole('switch', {
+                name: 'Show the pack photo when a dose is recorded',
+            }),
+        );
+        expect(draft()).toEqual({
+            packPhoto: { no_photo: 'tick', show: 'no' },
+        });
     });
 });

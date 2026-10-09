@@ -10,6 +10,7 @@ use App\Services\Medication\DoseTimingSettings;
 use App\Services\Medication\MedicationErrorWorkflow;
 use App\Services\Medication\MedicationSafetyPolicySettings;
 use App\Services\Medication\Recording\OfflineReplayReview;
+use App\Services\Medication\Recording\PackPhotoSettings;
 use App\Services\Medication\Reviews\MedicationReviewCadence;
 use App\Services\Medication\WitnessPinSettings;
 
@@ -135,6 +136,7 @@ class MedicationSettingsRegistry
     {
         return [
             $this->safetyChecks(),
+            $this->packPhotoAtRecording(),
             $this->doseTiming(),
             $this->offlineReplay(),
             $this->competencyPolicy(),
@@ -620,6 +622,54 @@ class MedicationSettingsRegistry
                     numeric: ['direction' => MedicationSettingDefinition::HIGHER_IS_LOOSER, 'off' => null, 'off_is_loosest' => false],
                     range: $pins::CONFIRM_MINUTES_RANGE,
                     unit: 'minutes',
+                ),
+            ],
+        );
+    }
+
+    /**
+     * Lane A11 settings (P11 v5 Medication rules › Medicine photos; Stephan
+     * 9 Oct: staff medicine photos are core). What the recording dialog does
+     * with the latest photo of the supplied pack. Hiding it, or going from a
+     * tick back to a warning, loosens.
+     */
+    private function packPhotoAtRecording(): MedicationSettingGroup
+    {
+        $photos = PackPhotoSettings::class;
+
+        return new MedicationSettingGroup(
+            key: 'packPhoto',
+            view: self::VIEW_RULES,
+            effect: 'From the next dose recorded, at every house',
+            auditEvent: 'medications.pack_photo.updated',
+            definitions: [
+                new MedicationSettingDefinition(
+                    group: 'packPhoto',
+                    key: 'show',
+                    storageKey: $photos::SHOW,
+                    scope: MedicationSettingDefinition::SCOPE_ORGANISATION,
+                    section: 'photos',
+                    label: 'Show the pack photo when a dose is recorded',
+                    options: [
+                        'no' => 'Off — the recording dialog shows no photo',
+                        'yes' => 'On — the latest photo of the supplied pack, with “Check the label”',
+                    ],
+                    default: $photos::SHOW_DEFAULT,
+                    rank: ['no', 'yes'],
+                ),
+                new MedicationSettingDefinition(
+                    group: 'packPhoto',
+                    key: 'no_photo',
+                    storageKey: $photos::NO_PHOTO,
+                    scope: MedicationSettingDefinition::SCOPE_ORGANISATION,
+                    section: 'photos',
+                    label: 'When there’s no photo',
+                    options: [
+                        'warn' => 'Warn — “No photo — check the label”',
+                        'tick' => 'Ask for a tick — “I’ve checked the label” before continuing',
+                    ],
+                    default: $photos::NO_PHOTO_DEFAULT,
+                    rank: ['warn', 'tick'],
                 ),
             ],
         );

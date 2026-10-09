@@ -103,6 +103,7 @@ import {
     type Errors,
     type SecondState,
 } from './fields';
+import { PackPhotoCard, packLabelTickNeeded } from './pack-photo';
 import {
     AllergyNotice,
     BlockedPanel,
@@ -189,6 +190,8 @@ interface FormState {
     packChecked: boolean;
     /** "I've checked the new instructions and the label" (P01 v2, EA-059). */
     changeAck?: boolean;
+    /** A11: "I’ve checked the label" when there's no pack photo and the organisation asks for it. */
+    labelChecked?: boolean;
 }
 export type PendingDose = {
     form: FormState;
@@ -1758,6 +1761,13 @@ function RecordDoseForm({
                     <SupportChip support={req.support} />
                 </div>
             </div>
+            <PackPhotoCard
+                photo={req.pack_photo}
+                policy={req.pack_photo_policy}
+                medicine={med}
+                labelChecked={f.labelChecked === true}
+                onLabelChecked={(v) => set({ labelChecked: v })}
+            />
             <KV
                 rows={[
                     [
@@ -2862,11 +2872,15 @@ function RecordDoseForm({
             ? `Can’t continue: ${givenWhy.charAt(0).toLowerCase()}${givenWhy.slice(1)}`
             : f.step === 0 && entry === 'transport' && !f.packChecked
               ? 'Tick the pack check to continue'
-              : f.step === changeStep && change && f.changeAck !== true
-                ? 'Confirm you’ve checked the new instructions'
-                : f.step === 2 && reviewExpired
-                  ? 'Refresh the safety check first'
-                  : null;
+              : f.step === 0 &&
+                  packLabelTickNeeded(req.pack_photo, req.pack_photo_policy) &&
+                  f.labelChecked !== true
+                ? 'Tick “I’ve checked the label” to continue'
+                : f.step === changeStep && change && f.changeAck !== true
+                  ? 'Confirm you’ve checked the new instructions'
+                  : f.step === 2 && reviewExpired
+                    ? 'Refresh the safety check first'
+                    : null;
     const lockedForward = mode !== 'record' && f.step === 1;
     const footerStart =
         phase === 'duplicate' ? null : f.step > 0 &&

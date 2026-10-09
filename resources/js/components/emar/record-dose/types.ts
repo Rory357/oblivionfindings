@@ -83,7 +83,43 @@ export interface OrderChange {
     now: OrderVersionFacts;
 }
 
+/**
+ * The latest photo of the pack supplied for this order (P01 v2 "Photo of the
+ * supplied pack"; Lane C serves it, with controlled-medicine concealment).
+ * A staff photo is the pack actually supplied; a reference image comes from
+ * a configured catalogue and is labelled as such — never this pack.
+ */
+export interface PackPhoto {
+    kind: 'staff' | 'reference';
+    /** Same-origin, authenticated image address. */
+    url: string;
+    taken_at: string | null;
+    taken_by: string | null;
+    pack: string | null;
+    pharmacy: string | null;
+    /** The supplied pack or brand changed since the photo was taken. */
+    pack_changed?: boolean;
+    now_pack?: string | null;
+    /** Where a reference image comes from, e.g. the catalogue's name. */
+    source?: string | null;
+}
+
+/** Medication settings › Medicine photos › At recording (Lane A settings). */
+export interface PackPhotoPolicy {
+    show: boolean;
+    /** No photo: just warn, or ask for "I’ve checked the label" first. */
+    no_photo: 'warn' | 'tick';
+    /** A receipt prompt exists, so the no-photo state may say so. */
+    receipt_prompt?: boolean;
+}
+
 export interface DoseRequirements {
+    /**
+     * A11: absent until the server sends photos (the card stays hidden);
+     * null when there's no photo for this order.
+     */
+    pack_photo?: PackPhoto | null;
+    pack_photo_policy?: PackPhotoPolicy;
     stock_tracking?: { lots_started: boolean; offline_given_allowed: boolean };
     live_recording_context?: string | null;
     /** The order this dialog shows; a save is refused if it changed (EA-008). */
