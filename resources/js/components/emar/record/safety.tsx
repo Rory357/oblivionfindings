@@ -1,5 +1,4 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { EntityTable } from '@/components/lists/entity-table';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { formatDateTime } from '@/lib/datetime';
@@ -9,6 +8,7 @@ import { BellRing, ClipboardCheck, Pill, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { AllergyRecord } from './allergy-record';
 import { ReadingState } from './reading';
+import { RecordTable } from './record-table';
 import { isConcealed, type MaybeConcealed } from './types';
 import { concealedIdentity, SectionCard } from './ui';
 import { useRecordJson } from './use-record-json';
@@ -69,7 +69,7 @@ export function SafetySection({
                         not establish that other interactions are absent.
                     </p>
                     {data.interactions.rows.length ? (
-                        <EntityTable
+                        <RecordTable
                             rows={data.interactions.rows}
                             rowKey={(row) => row.key}
                             identityLabel="Medicines"
@@ -144,7 +144,7 @@ export function SafetySection({
                         .
                     </p>
                     {data.alerts.length ? (
-                        <EntityTable
+                        <RecordTable
                             rows={data.alerts}
                             rowKey={(row) => row.key}
                             identityLabel="Alert"

@@ -2,8 +2,8 @@ import { AdministrationFollowupDialog } from '@/components/emar/followups/admini
 import { MedicationExportButton } from '@/components/emar/medication-export-button';
 import { MedicationJourneyReturn } from '@/components/emar/medication-journey-return';
 import { RecordDoseLaunch } from '@/components/emar/record/record-dose-launch';
+import { RecordTable } from '@/components/emar/record/record-table';
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
-import { EntityTable } from '@/components/lists/entity-table';
 import {
     PageHeader,
     PageHeaderFilterButton,
@@ -17,6 +17,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
@@ -87,6 +88,7 @@ type Props = {
         from: number | null;
         to: number | null;
         total: number;
+        links?: { url: string | null; label: string; active: boolean }[];
     };
     meters: { people: number; medicines: number; due: number; overdue: number };
     controlled_left_out: boolean;
@@ -393,7 +395,7 @@ export default function MedicationRecordHub(props: Props) {
                         </p>
                     </div>
                     {rows.length ? (
-                        <EntityTable
+                        <RecordTable
                             rows={rows}
                             rowKey={(row) => row.key}
                             identityLabel={
@@ -661,32 +663,13 @@ export default function MedicationRecordHub(props: Props) {
                             description="Change the house, date or search to see permitted medication work."
                         />
                     )}
-                    <div className="mt-4 flex items-center justify-between gap-3">
-                        <Button
-                            variant="outline"
-                            disabled={props.page.current_page <= 1}
-                            onClick={() =>
-                                visit({ page: props.page.current_page - 1 })
-                            }
-                        >
-                            Previous
-                        </Button>
-                        <span className="text-caption">
-                            Page {props.page.current_page} of{' '}
-                            {props.page.last_page}
-                        </span>
-                        <Button
-                            variant="outline"
-                            disabled={
-                                props.page.current_page >= props.page.last_page
-                            }
-                            onClick={() =>
-                                visit({ page: props.page.current_page + 1 })
-                            }
-                        >
-                            Next
-                        </Button>
-                    </div>
+                    {/* EA-207 (Lane C9): the shared paginator, filters kept. */}
+                    <LaravelPagination
+                        className="mt-4"
+                        links={props.page.links ?? []}
+                        lastPage={props.page.last_page}
+                        preserveScroll
+                    />
                 </Card>
             </div>
             {effectDose !== null && (
