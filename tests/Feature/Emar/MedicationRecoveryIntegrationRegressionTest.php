@@ -64,7 +64,8 @@ class MedicationRecoveryIntegrationRegressionTest extends TestCase
         Queue::fake();
         Cache::flush();
         $this->seed(RbacSeeder::class);
-        config(['medications.witness_pin.forgotten_fallback_enabled' => true]);
+        // The forgotten-PIN fallback is off until a manager switches it on (Stephan, 9 Oct).
+        AppSetting::query()->updateOrCreate(['key' => \App\Services\Medication\WitnessPinSettings::FORGOTTEN_FALLBACK], ['value' => 'yes']);
         $this->site = Site::factory()->create([
             'name' => 'Synthetic recovery house', 'type' => 'house',
             'is_active' => true, 'archived' => false, 'archived_at' => null,

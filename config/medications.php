@@ -54,9 +54,9 @@ return [
         // them. On by default (Stephan, 30 Sep 2026: approved with PIN-1).
         'login_check_to_set' => (bool) env('MEDICATION_WITNESS_PIN_LOGIN_CHECK', true),
 
-        // Eligible non-controlled doses can request confirmation in the colleague's
-        // own session. Pending, disputed and expired states remain explicit.
-        'forgotten_fallback_enabled' => (bool) env('MEDICATION_FORGOTTEN_PIN_ENABLED', true),
+        // The forgotten-PIN fallback is an organisation setting (Medication
+        // settings › Staff & PINs › Witness PINs), off until a manager turns
+        // it on (Stephan, 9 Oct 2026). WitnessPinSettings::FORGOTTEN_FALLBACK.
 
         // Server-managed PIN pepper; never reuse the login/session APP_KEY.
         // Existing pin_v1 hashes remain valid until the owner sets a new PIN.
@@ -70,9 +70,4 @@ return [
         // Planned or legacy date-only leave never suppresses a due dose.
         'from_leave' => (bool) env('MEDICATION_AWAY_FROM_LEAVE', true),
     ],
-
-    // eMAR audit Lane A3 (EA-131): a dose saved on a device and sent later
-    // than this is not added to the chart as a new record; it is refused for
-    // reviewed paper recovery and a lead gets a follow-up.
-    'offline_replay_max_hours' => (int) env('MEDICATION_OFFLINE_REPLAY_MAX_HOURS', 12),
 ];

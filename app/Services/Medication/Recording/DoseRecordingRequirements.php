@@ -30,6 +30,7 @@ use App\Services\Medication\MedicationSecondPersonService;
 use App\Services\Medication\Settings\MedicineRuleWording;
 use App\Services\Medication\Stock\MedicationStockService;
 use App\Services\Medication\WitnessPinService;
+use App\Services\Medication\WitnessPinSettings;
 use App\Services\MedicationRuleService;
 use App\Services\MedicationSafetyService;
 use App\Services\UserSiteAccessService;
@@ -325,7 +326,7 @@ final class DoseRecordingRequirements
                 'forgotten_pin_amount_allowed' => app(ForgottenWitnessPinService::class)->available()
                     && ! $order->controlled_drug
                     && ! $order->requiresWitness(),
-                'confirm_within_minutes' => ForgottenWitnessPinService::CONFIRM_WITHIN_MINUTES,
+                'confirm_within_minutes' => app(WitnessPinSettings::class)->confirmWithinMinutes(),
                 'rule_sentences' => $detail && $kind === RecordingContract::SECOND_RULE
                     ? $this->ruleSentences($adminRules, true)
                     : [],

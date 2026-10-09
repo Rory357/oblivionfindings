@@ -2,6 +2,7 @@
 
 namespace App\Services\Medication\Recording;
 
+use App\Models\AppSetting;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
@@ -36,15 +37,33 @@ final class OfflineReplayReview
 
     public const NOT_RECORDED = 'not_recorded';
 
+    /** Medication settings › Rounds & timing › "Saved on a device" (Lane A settings). */
+    public const MAX_AGE_SETTING = 'medications.offline_replay.max_hours';
+
+    public const DEFAULT_MAX_AGE_HOURS = '12';
+
+    /** Whole hours an organisation may choose; longer is looser. */
+    public const MAX_AGE_RANGE = [1, 48];
+
     public function __construct(
         private readonly MedicationFollowupService $followups,
         private readonly MarScheduleService $schedule,
     ) {}
 
-    /** Hours after which a dose saved on a device is too old to send (EA-131). */
+    /**
+     * Hours after which a dose saved on a device is too old to send (EA-131):
+     * the organisation's saved setting, or 12 hours until someone saves one.
+     * A stored value out of range reads as the default.
+     */
     public static function maxAgeHours(): int
     {
-        return max(1, (int) config('medications.offline_replay_max_hours', 12));
+        $stored = AppSetting::query()->where('key', self::MAX_AGE_SETTING)->value('value');
+        $stored = is_int($stored) ? (string) $stored : $stored;
+        [$min, $max] = self::MAX_AGE_RANGE;
+
+        return is_string($stored) && preg_match('/^\d{1,3}$/', $stored) === 1 && (int) $stored >= $min && (int) $stored <= $max
+            ? (int) $stored
+            : (int) self::DEFAULT_MAX_AGE_HOURS;
     }
 
     /**
