@@ -25,6 +25,7 @@ use App\Support\Medication\MedicationStockQuantity as Quantity;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 final class ControlledProductPayload
 {
@@ -45,19 +46,27 @@ final class ControlledProductPayload
             $siteIds = [$siteId];
         }
         $clientIds = $this->access->readableClientIds($actor, Client::query()->whereIn('site_id', $siteIds)->pluck('id'));
+        // EA-012: an archived person stays in the register, under the same
+        // person rule, until their controlled stock is cleared.
+        $archivedIds = Client::onlyTrashed()->whereIn('site_id', $siteIds)->get()
+            ->filter(fn (Client $person) => Gate::forUser($actor)->allows('viewMedications', $person))
+            ->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $holding = app(ControlledStockHolding::class);
+        $archivedIds = array_values(array_filter($archivedIds, fn (int $id) => $holding->heldByClients([$id])->isNotEmpty()));
+        $clientIds = array_values(array_unique([...$clientIds, ...$archivedIds]));
         // Narrow within the existing person boundary; conceal unreadable IDs.
         abort_if($clientId !== null && ! in_array($clientId, $clientIds, true), 404);
-        $people = Client::query()->whereIn('id', $clientIds)->orderBy('first_name')->orderBy('last_name')
-            ->get(['id', 'first_name', 'last_name'])->map(fn ($person) => ['id' => $person->id, 'name' => $person->full_name])->values();
+        $people = Client::withTrashed()->whereIn('id', $clientIds)->orderBy('first_name')->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name', 'deleted_at'])->map(fn ($person) => ['id' => $person->id, 'name' => $person->full_name.($person->trashed() ? ' (archived)' : '')])->values();
         if ($clientId !== null) {
             $clientIds = [$clientId];
         }
         $meds = ClientMedication::withTrashed()->where('controlled_drug', true)->whereIn('client_id', $clientIds)
             ->when($medicationId !== null, fn ($q) => $q->whereKey($medicationId))
-            ->with(['client.site', 'stock'])->orderBy('name')->get();
+            ->with(['client' => fn ($query) => $query->withTrashed()->with('site'), 'stock'])->orderBy('name')->get();
         abort_if($medicationId !== null && $meds->isEmpty(), 404);
         $ids = $meds->pluck('id');
-        $entriesQuery = $this->scope->scopeCanonicalClientMedicationRows(ClientControlledDrugEntry::query(), $siteIds, false)->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds);
+        $entriesQuery = $this->scope->scopeCanonicalClientMedicationRows(ClientControlledDrugEntry::query(), $siteIds, false, true)->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds);
         // History dates never change current stock, count evidence or the
         // optimistic entry version used by witnessed commands.
         $historyQuery = clone $entriesQuery;
@@ -73,7 +82,7 @@ final class ControlledProductPayload
         }
         $latest = (clone $entriesQuery)->selectRaw('client_medication_id, MAX(id) AS latest_id')->groupBy('client_medication_id')->pluck('latest_id', 'client_medication_id');
         $counts = app(ControlledCountStatus::class)->latestWitnessedCounts($ids, $siteIds);
-        $reversals = $this->scope->scopeCanonicalClientMedicationRows(ClientControlledDrugEntry::query(), $siteIds, false)
+        $reversals = $this->scope->scopeCanonicalClientMedicationRows(ClientControlledDrugEntry::query(), $siteIds, false, true)
             ->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds)
             ->whereIn('reverses_entry_id', $entries->pluck('id'))
             ->whereExists(fn ($q) => $q->selectRaw('1')->from('client_controlled_drug_entries as original')
@@ -81,12 +90,12 @@ final class ControlledProductPayload
                 ->whereColumn('original.client_id', 'client_controlled_drug_entries.client_id')
                 ->whereColumn('original.client_medication_id', 'client_controlled_drug_entries.client_medication_id'))
             ->with(['recordedBy:id,name', 'witnessedBy:id,name'])->get()->keyBy('reverses_entry_id');
-        $discrepancyQuery = $this->scope->scopeCanonicalClientMedicationRows(ClientControlledDrugDiscrepancy::query(), $siteIds, false)->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds);
+        $discrepancyQuery = $this->scope->scopeCanonicalClientMedicationRows(ClientControlledDrugDiscrepancy::query(), $siteIds, false, true)->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds);
         $discrepancies = $this->retainOutstanding($discrepancyQuery, fn ($q) => $q->whereIn('status', ['open', 'under_review']), ['reportedBy:id,name', 'witnessedBy:id,name', 'resolvedBy:id,name']);
-        $lossQuery = $this->scope->scopeCanonicalClientMedicationRows(ControlledDrugLossReport::query(), $siteIds, false)->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds);
+        $lossQuery = $this->scope->scopeCanonicalClientMedicationRows(ControlledDrugLossReport::query(), $siteIds, false, true)->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds);
         $losses = $this->retainOutstanding($lossQuery, fn ($q) => $q->whereIn('investigation_status', ['reported', 'investigating']), ['discoveredBy:id,name', 'resolvedBy:id,name']);
-        $destructionQuery = $this->scope->scopeCanonicalClientMedicationRows(MedicationDestruction::query(), $siteIds, false)->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds)->where('is_controlled_drug', true)
-            ->where(fn ($q) => $q->whereNull('medication_destructions.site_id')->orWhereHas('client', fn ($c) => $c->whereColumn('clients.site_id', 'medication_destructions.site_id')));
+        $destructionQuery = $this->scope->scopeCanonicalClientMedicationRows(MedicationDestruction::query(), $siteIds, false, true)->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds)->where('is_controlled_drug', true)
+            ->where(fn ($q) => $q->whereNull('medication_destructions.site_id')->orWhereHas('client', fn ($c) => $c->withTrashed()->whereColumn('clients.site_id', 'medication_destructions.site_id')));
         $destructions = $this->retainOutstanding($destructionQuery, fn ($q) => $q->whereNull('voided_at')->where('disposal_method', 'pharmacy_return')->whereNull('pharmacy_received_at'), ['destroyedByUser:id,name', 'witness1:id,name', 'witness2:id,name']);
         if ($destructionId !== null) {
             $selectedDestruction = (clone $destructionQuery)->with(['destroyedByUser:id,name', 'witness1:id,name', 'witness2:id,name'])->findOrFail($destructionId);
@@ -153,7 +162,7 @@ final class ControlledProductPayload
                 };
                 $canRecord = $record && in_array((int) $m->client->site_id, $presentSites, true) && (($m->deleted_at === null && $m->superseded_by === null));
 
-                return ['id' => $m->id, 'client_id' => $m->client_id, 'client_name' => $m->client->full_name, 'site_id' => $m->client->site_id, 'site_name' => $m->client->site?->name ?? '',
+                return ['id' => $m->id, 'client_id' => $m->client_id, 'client_name' => $m->client->full_name.($m->client->trashed() ? ' (archived)' : ''), 'client_archived' => $m->client->trashed(), 'site_id' => $m->client->site_id, 'site_name' => $m->client->site?->name ?? '',
                     'pack_stock' => app(MedicationStockService::class)->packOptions($m),
                     'name' => $m->name, 'unit' => $m->stock?->unit ?? '', 'balance' => $m->stock?->on_hand === null ? null : Quantity::toFloat($m->stock->on_hand),
                     'entry_version' => $latest[$m->id] ?? null, 'nz_class' => $m->nz_controlled_class, 'class_review_required' => $m->controlled_class_reviewed_at === null,
@@ -228,7 +237,7 @@ final class ControlledProductPayload
     /** A dose belongs to its canonical owner and to the override's listed medicines at that house. */
     private function scopeOverrideDoses($query, ?array $siteIds, Collection $medicationIds, array $clientIds)
     {
-        return $this->scope->scopeCanonicalClientMedicationRows($query, $siteIds, false)
+        return $this->scope->scopeCanonicalClientMedicationRows($query, $siteIds, false, true)
             ->whereIn('client_medication_id', $medicationIds)->whereIn('client_id', $clientIds)
             ->whereExists(fn ($parent) => $parent->selectRaw('1')->from('controlled_witness_overrides')
                 ->join('clients as dose_owner', 'dose_owner.site_id', '=', 'controlled_witness_overrides.site_id')

@@ -229,8 +229,8 @@ export default function StockHub({
                       disabled:
                           !item.lots_started && item.stock_id !== null
                               ? 'Pack tracking has not been set up.'
-                              : !item.active
-                                ? 'This medicine is no longer active.'
+                              : !(item.receivable ?? item.active)
+                                ? 'This medicine has been stopped.'
                                 : undefined,
                   },
                   {
@@ -257,8 +257,8 @@ export default function StockHub({
                       label: 'Receive a witnessed delivery',
                       icon: Truck,
                       onClick: () => openItem(item, 'receive'),
-                      disabled: !item.active
-                          ? 'This medicine is no longer active.'
+                      disabled: !(item.receivable ?? item.active)
+                          ? 'This medicine has been stopped.'
                           : !item.lots_started && item.stock_id !== null
                             ? 'Pack tracking has not been set up.'
                             : undefined,
@@ -271,8 +271,8 @@ export default function StockHub({
                       label: 'Order from the pharmacy',
                       icon: Truck,
                       onClick: () => openItem(item, 'order'),
-                      disabled: !item.active
-                          ? 'This medicine is no longer active.'
+                      disabled: !(item.receivable ?? item.active)
+                          ? 'This medicine has been stopped.'
                           : undefined,
                   },
                   {
@@ -1134,7 +1134,7 @@ function ItemWorkspace({
                                 {can.receive_controlled && item.controlled && (
                                     <Button
                                         disabled={
-                                            !item.active ||
+                                            !(item.receivable ?? item.active) ||
                                             (!item.lots_started &&
                                                 item.stock_id !== null)
                                         }

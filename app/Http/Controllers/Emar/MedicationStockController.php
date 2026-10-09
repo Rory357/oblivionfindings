@@ -187,7 +187,7 @@ final class MedicationStockController extends Controller
     private function execute(ClientMedication $med, User $actor, string $action, array $data, Collection $lockedUsers, array &$auditEvents): array
     {
         if ($action === 'order') {
-            abort_unless($med->active && $med->state === 'active', 422, 'This medicine is no longer active.');
+            abort_unless(MedicationStockService::receivable($med), 422, 'This medicine has been stopped. Check the current order before ordering supply.');
             $order = MedicationPharmacyOrder::create([
                 'client_id' => $med->client_id, 'client_medication_id' => $med->id, 'pharmacy_name' => $data['pharmacy_name'],
                 'quantity_ordered' => $data['quantity_ordered'], 'needed_by' => $data['needed_by'],

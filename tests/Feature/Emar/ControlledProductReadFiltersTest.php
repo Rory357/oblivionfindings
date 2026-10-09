@@ -193,11 +193,8 @@ class ControlledProductReadFiltersTest extends TestCase
     {
         $filters = ['site_id' => $this->site->id, 'client_medication_id' => $this->medicine->id,
             'client_id' => $this->person->id, 'date' => '2020-01-01'];
-        $page = $this->actingAs($this->reader)->get(route('emar.destructions', $filters))->assertOk();
-        $this->assertEquals($filters, $page->inertiaProps('filters'));
-        $this->assertSame([], $page->inertiaProps('destructions'));
-        $this->actingAs($this->reader)->get(route('emar.destructions', ['client_id' => 999999999]))->assertNotFound();
-        foreach (['emar.cd_loss.index' => 'losses'] as $route => $view) {
+        // Lane C2: the old Destructions page lands on the register's view.
+        foreach (['emar.cd_loss.index' => 'losses', 'emar.destructions' => 'destructions'] as $route => $view) {
             $this->actingAs($this->reader)->get(route($route, $filters))->assertRedirect(
                 '/emar/controlled?'.http_build_query(['view' => $view, ...$filters]),
             );
@@ -215,13 +212,14 @@ class ControlledProductReadFiltersTest extends TestCase
                 'unit' => 'tablet', 'reason' => 'expired', 'disposal_method' => 'pharmacy_return',
                 'is_controlled_drug' => $medicine->controlled_drug, 'witness_1_id' => $this->reader->id, 'destroyed_by' => $this->reader->id, 'destroyed_at' => now()]);
         }
-        $all = $this->actingAs($this->reader)->get(route('emar.destructions'))->assertOk();
-        $this->assertCount(2, $all->inertiaProps('destructions'));
+        // Lane C2: a controlled reader lands on the register's Destructions view.
+        $this->actingAs($this->reader)->get(route('emar.destructions'))->assertRedirect('/emar/controlled?view=destructions');
         $this->reader->permissionOverrides()->syncWithoutDetaching(Permission::whereIn('key', ['medications.controlled.view', 'medications.controlled.record', 'medications.stock.update'])
             ->get()->mapWithKeys(fn ($p) => [$p->id => ['allowed' => $p->key === 'medications.stock.update']])->all());
         Cache::flush();
         $this->reader = $this->reader->fresh();
         $before = $this->clinicalSnapshot();
+        // A stock-only reader keeps the ordinary disposal history (Lane C2).
         $page = $this->actingAs($this->reader)->get(route('emar.destructions'))->assertOk();
         $this->assertSame([$ordinary->id], array_column($page->inertiaProps('medications'), 'id'));
         $this->assertSame(['Synthetic ordinary medicine'], array_column($page->inertiaProps('destructions'), 'medication_name'));

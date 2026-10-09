@@ -13,6 +13,9 @@ export type StockItem = {
     site_name: string | null;
     controlled: boolean;
     active: boolean;
+    /** EA-073: active or held (a held medicine can still be received and reordered). */
+    receivable?: boolean;
+    held?: boolean;
     stock_id: number | null;
     on_hand: number | null;
     physical_on_hand?: number | string | null;

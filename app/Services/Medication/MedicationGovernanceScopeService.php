@@ -223,6 +223,9 @@ final class MedicationGovernanceScopeService
         Builder $query,
         ?array $siteIds,
         bool $allowNullMedication = true,
+        // EA-012: the controlled register keeps an archived person's rows
+        // while their controlled stock is still being cleared.
+        bool $includeArchivedClients = false,
     ): Builder {
         $table = $query->getModel()->getTable();
         $medicationMatchesClient = fn (QueryBuilder $medication) => $medication
@@ -233,10 +236,12 @@ final class MedicationGovernanceScopeService
 
         $query->whereHas(
             'client',
-            fn (Builder $client) => $client->when(
-                $siteIds !== null,
-                fn (Builder $query) => $query->whereIn('site_id', $siteIds),
-            ),
+            fn (Builder $client) => $client
+                ->when($includeArchivedClients, fn (Builder $query) => $query->withTrashed())
+                ->when(
+                    $siteIds !== null,
+                    fn (Builder $query) => $query->whereIn('site_id', $siteIds),
+                ),
         );
 
         if (! $allowNullMedication) {
@@ -466,8 +471,11 @@ final class MedicationGovernanceScopeService
         array $authorizationUserIds = [],
         ?CarbonInterface $authorizationEffectiveAt = null,
         bool $currentOnly = true,
+        // EA-012: only the controlled register opts in, to clear stock an
+        // archived person still holds. Site scope and every check still apply.
+        bool $allowArchivedClient = false,
     ): mixed {
-        return DB::transaction(function () use ($actor, $medicationId, $capability, $callback, $expectedClientId, $authorizationUserIds, $authorizationEffectiveAt, $currentOnly) {
+        return DB::transaction(function () use ($actor, $medicationId, $capability, $callback, $expectedClientId, $authorizationUserIds, $authorizationEffectiveAt, $currentOnly, $allowArchivedClient) {
             $this->assertCapability($actor, $capability);
 
             $snapshot = ClientMedication::withTrashed()
@@ -479,7 +487,8 @@ final class MedicationGovernanceScopeService
             $clientId = (int) $snapshot->client_id;
             $this->notFoundUnless($expectedClientId === null || $clientId === $expectedClientId);
 
-            $client = Client::query()->whereKey($clientId)->lockForUpdate()->first();
+            $client = Client::query()->when($allowArchivedClient, fn ($query) => $query->withTrashed())
+                ->whereKey($clientId)->lockForUpdate()->first();
             $this->notFoundUnless($client !== null && $this->positiveId($client->site_id) !== null);
 
             $medication = ClientMedication::withTrashed()

@@ -45,6 +45,9 @@ final class ControlledRegisterService
 
     private const MANAGE_ACTIONS = ['void', 'resolve', 'loss_close', 'destruction_receipt', 'destruction_void', 'class_review', 'override_signoff'];
 
+    /** EA-012: what can still be recorded for an archived person until their controlled stock is cleared. */
+    public const ARCHIVED_CLOSE_OUT_ACTIONS = ['count', 'movement', 'void', 'resolve', 'loss_report', 'loss_note', 'loss_notify', 'loss_close', 'destruction', 'destruction_receipt', 'destruction_void'];
+
     private ?string $newPhotoPath = null;
 
     private bool $lastRequestWasReplay = false;
@@ -77,6 +80,12 @@ final class ControlledRegisterService
                 $actor, (int) $input['client_medication_id'], $capability,
                 function (Client $client, ClientMedication $medication, User $lockedActor, Collection $lockedUsers) use ($action, $input): array {
                     abort_unless($medication->controlled_drug && $lockedActor->canDo('medications.controlled.view'), 404);
+                    // EA-012: an archived person's controlled stock stays accountable
+                    // until it is cleared — close-out work only, and only while held.
+                    if ($client->trashed()) {
+                        abort_unless(in_array($action, self::ARCHIVED_CLOSE_OUT_ACTIONS, true)
+                            && app(ControlledStockHolding::class)->heldByClients([(int) $client->id])->isNotEmpty(), 404);
+                    }
                     $medication->setRelation('client', $client);
                     $this->access->assertReadable($lockedActor, $client);
                     $auditEvents = [];
@@ -171,6 +180,7 @@ final class ControlledRegisterService
                 authorizationEffectiveAt: now(),
                 // Historical maintenance retains its original evidence; new ceased-order disposal requires actual retained packs above.
                 currentOnly: ! in_array($action, ['count', 'void', 'resolve', 'loss_note', 'loss_notify', 'loss_close', 'destruction_receipt', 'destruction_void', 'class_review', 'override_signoff'], true),
+                allowArchivedClient: in_array($action, self::ARCHIVED_CLOSE_OUT_ACTIONS, true),
             );
         } catch (\Throwable $exception) {
             if ($this->newPhotoPath !== null) {
@@ -201,6 +211,10 @@ final class ControlledRegisterService
             'pharmacy_order_id' => $input['pharmacy_order_id'] ?? null,
             'batch_number' => $input['batch_number'] ?? null, 'expiry_date' => $input['expiry_date'] ?? null,
             'source_type' => 'pharmacy_receipt', 'source_id' => $input['receipt_id'] ?? null,
+            // Entries are append-only, so delivery notes are written with the
+            // entry (EA-092). The request identifier binds replay through the
+            // governance idempotency record and the P09 event, not the entry.
+            ...array_filter(['notes' => $input['delivery_notes'] ?? null], fn ($value) => $value !== null && $value !== ''),
         ]);
         $attachLot($entry, $quantity);
 

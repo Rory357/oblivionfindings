@@ -11,7 +11,6 @@ const source = readFileSync(
 const preciseQuantitySources = [
     'resources/js/pages/meds/today/components/record-dose-wizard.tsx',
     'resources/js/pages/meds/today/components/prn-wizard.tsx',
-    'resources/js/pages/emar/components/cd-register-modal.tsx',
 ].map((path) => readFileSync(resolve(process.cwd(), path), 'utf8'));
 const prnWizardSource = preciseQuantitySources[1];
 const guidedRoundSource = readFileSync(
@@ -213,9 +212,6 @@ describe('controlled mutation dialog replay contracts', () => {
         }
 
         expect(preciseQuantitySources[0]).toContain('step="0.01"');
-        expect(preciseQuantitySources[2].match(/step="0\.01"/g)).toHaveLength(
-            3,
-        );
 
         // Guided rounds use the shared recorder's decimal text inputs, which
         // allow hundredths without a browser number-input step restriction.

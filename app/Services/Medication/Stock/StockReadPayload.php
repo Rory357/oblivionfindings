@@ -217,6 +217,8 @@ final class StockReadPayload
             'id' => $med->id, 'name' => $med->name, 'client_id' => (int) $med->client_id, 'site_id' => (int) $med->client->site_id,
             'client_name' => $med->client->full_name, 'site_name' => $med->client->site?->name,
             'controlled' => (bool) $med->controlled_drug, 'active' => (bool) $med->active && $med->state === 'active',
+            // EA-073: a held medicine can still be received and reordered.
+            'receivable' => MedicationStockService::receivable($med), 'held' => $med->state === 'paused',
             'stock_id' => $stock?->id, 'physical_on_hand' => $stock?->on_hand, 'usable_on_hand' => $stock ? app(StockAvailability::class)->usableQuantity($stock) : null, 'on_hand' => $onHand === null ? null : Qty::toFloat($onHand), 'unit' => $stock?->unit,
             'reorder_level' => $stock?->reorder_level, 'last_counted_at' => $stock?->last_counted_at, 'lots_started' => $started,
             'pack_count' => $lots->where('quantity_remaining', '>', 0)->count(), 'next_batch' => $stock?->currentBatchNumber(),
