@@ -298,3 +298,23 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
   - Set up mail.
   - Set the backup qpdf path.
   - Assign the 6 connected-care keys, if D4 keeps those surfaces.
+
+## 6. Decisions recorded on 9 Oct
+
+- **D1 shared houses: Stephan chose "clocked in + assigned".** A worker clocked in at a house may record for every resident there whom they are assigned to support, and house rounds cover everyone. Built in Lane A as A10, inside the safe zone. It does not write shift_clients.
+- **D3 grants: Stephan chose "apply both".**
+  - team_lead gets `medications.orders.manage`.
+  - A new key, `medications.stock.receive`, is created.
+  - team_lead gets `stock.update` at their own houses.
+  - All of this is done by grant migration only (Lane C, C4).
+- **D4 connected care: Stephan said "PLEASE COMPLETE IT if you can".** The prescriber portal, pharmacy bridge, picture catalogue, protected backups and provider transfers stay live. Completing them, including the governance and security fixes from the audit, becomes a work package. The catalogue now stands with Stephan's approval and replaces the 29 Sep "no picture library" note.
+- **D5 AI.** Stephan: "we will need it later when we implement AI why did it build ai things now".
+  - Codex did NOT build these. AI search (ClientRagIndexer) and AI summaries came with the original "Stable version" commit `af1eba59a` (23 Jan 2026).
+  - They only call OpenAI when an `OPENAI_API_KEY` is set; the default driver is `local`.
+  - Decision: keep the code for later. Medication data stays out of the AI index and summaries behind a config switch, `llm.include_medication_data`, which defaults to off. When it is on, the person rule applies and controlled medicines are excluded (Lane B, B3).
+- **D6 Away with no return: Main decided under delegation.** Away lasts at most 24 h from an actual departure with no recorded return. After that the doses are owed again, and the house gets a lead follow-up to record the return (Lane A, A8).
+- **D2 paper doses: Main decided under delegation.** Paper doses can be posted without pack evidence and are flagged for a counted stock recount (Lane C, C1).
+- **D8 maintenance windows: Main decided under delegation.** Maintenance windows never silence medication alerts. This is coordinated with the H&S lane, which already made that change in its paused work.
+- **Still open for Stephan (D7):**
+  - Office order changes without a covering shift.
+  - Whether finance keeps `stock.update`.
