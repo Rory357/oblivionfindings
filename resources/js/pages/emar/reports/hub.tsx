@@ -498,7 +498,12 @@ export default function ReportsHub(props: Props) {
                                     title={
                                         filters.site_id
                                             ? 'Check this house’s event chain'
-                                            : 'Choose one house to check its event chain'
+                                            : undefined
+                                    }
+                                    aria-describedby={
+                                        filters.site_id
+                                            ? undefined
+                                            : 'check-chain-reason'
                                     }
                                 >
                                     Check chain
@@ -824,6 +829,12 @@ export default function ReportsHub(props: Props) {
                         />
                     }
                 />
+                {/* EA-187 (Lane C9): say why Check chain is unavailable. */}
+                {can.verify && filters.view === 'audit' && !filters.site_id && (
+                    <p className="text-subtle" id="check-chain-reason">
+                        Choose one house to check its event chain.
+                    </p>
+                )}
                 {!online && (
                     <p className="text-subtle" role="status">
                         You’re offline. Loaded records remain available;

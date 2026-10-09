@@ -211,8 +211,22 @@ function AvailableRecord({
                     }
                     title={person.name}
                     titleChip={
-                        <PageHeaderStatusChip variant="neutral">
-                            {person.status ?? 'Record'}
+                        // EA-216 (Lane C9): the person's status in words and
+                        // tone, as on their profile — never the raw value.
+                        <PageHeaderStatusChip
+                            variant={
+                                person.status === 'active'
+                                    ? 'success'
+                                    : person.status === 'onboarding' ||
+                                        person.status === 'respite'
+                                      ? 'warning'
+                                      : 'neutral'
+                            }
+                        >
+                            {person.status
+                                ? person.status.charAt(0).toUpperCase() +
+                                  person.status.slice(1).replaceAll('_', ' ')
+                                : 'Record'}
                         </PageHeaderStatusChip>
                     }
                     subline={

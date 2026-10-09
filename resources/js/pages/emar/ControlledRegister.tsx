@@ -621,7 +621,7 @@ export default function ControlledRegister({
                     right={
                         payload.can.record ? (
                             <Button
-                                className="min-h-11"
+                                className="frontline-tap"
                                 onClick={() =>
                                     dialogs.action({ action: 'loss_report' })
                                 }

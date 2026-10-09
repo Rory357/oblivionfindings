@@ -19,6 +19,7 @@ import { EntityFilter } from '@/components/rostering/entity-filter';
 import { type RosterTabItem } from '@/components/rostering/tab-strip';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly } from '@/lib/datetime';
@@ -295,18 +296,15 @@ const SEVERITY_CHIP: Record<Severity, string> = {
     info: 'bg-status-info-bg text-status-info',
 };
 
-const SEVERITY_PILL: Record<Severity, string> = {
-    critical:
-        'border-status-critical/30 bg-status-critical-bg text-status-critical',
-    warning:
-        'border-status-warning/30 bg-status-warning-bg text-status-warning',
-    info: 'border-status-info/30 bg-status-info-bg text-status-info',
-};
-
-const SEVERITY_BTN: Record<Severity, string> = {
-    critical: 'bg-status-critical text-white hover:bg-status-critical/90',
-    warning: 'bg-status-warning text-white hover:bg-status-warning/90',
-    info: 'bg-primary-fill text-primary-fill-foreground hover:bg-primary-fill/90',
+/**
+ * EA-155 (Lane C9): severity is carried by the row's StatusBadge and left
+ * accent. A critical action is the destructive button; warning and info
+ * actions are outline buttons — never a recoloured primary (DESIGN.md).
+ */
+const SEVERITY_BTN_VARIANT: Record<Severity, 'destructive' | 'outline'> = {
+    critical: 'destructive',
+    warning: 'outline',
+    info: 'outline',
 };
 
 const OUTCOME_COLOR: Record<string, string> = {
@@ -859,9 +857,15 @@ export default function EmarHome(props: Props) {
                                         <AlertTriangle className="h-3.5 w-3.5" />
                                         Report error
                                     </Button>
-                                    <span className="rounded-full border border-status-critical/30 bg-status-critical-bg px-2.5 py-0.5 text-[11px] font-bold text-status-critical">
+                                    <StatusBadge
+                                        variant={
+                                            acCounts.all > 0
+                                                ? 'critical'
+                                                : 'neutral'
+                                        }
+                                    >
                                         {acCounts.all} shown
-                                    </span>
+                                    </StatusBadge>
                                 </div>
                             </div>
                             <div
@@ -927,16 +931,13 @@ export default function EmarHome(props: Props) {
                                                 <span className="truncate text-[13.5px] font-bold">
                                                     {it.title}
                                                 </span>
-                                                <span
-                                                    className={cn(
-                                                        'shrink-0 rounded-full border px-2 py-0.5 text-[10.5px] font-semibold',
-                                                        SEVERITY_PILL[
-                                                            it.severity
-                                                        ],
-                                                    )}
+                                                <StatusBadge
+                                                    size="sm"
+                                                    variant={it.severity}
+                                                    className="shrink-0"
                                                 >
                                                     {it.status}
-                                                </span>
+                                                </StatusBadge>
                                             </div>
                                             <p className="truncate text-xs text-muted-foreground">
                                                 {it.summary}
@@ -949,12 +950,12 @@ export default function EmarHome(props: Props) {
                                                 <Button
                                                     asChild
                                                     size="sm"
-                                                    className={cn(
-                                                        'shrink-0',
-                                                        SEVERITY_BTN[
+                                                    variant={
+                                                        SEVERITY_BTN_VARIANT[
                                                             it.severity
-                                                        ],
-                                                    )}
+                                                        ]
+                                                    }
+                                                    className="shrink-0"
                                                 >
                                                     <Link
                                                         href={
@@ -974,12 +975,12 @@ export default function EmarHome(props: Props) {
                                                 can.record_controlled) ? (
                                                 <Button
                                                     size="sm"
-                                                    className={cn(
-                                                        'shrink-0',
-                                                        SEVERITY_BTN[
+                                                    variant={
+                                                        SEVERITY_BTN_VARIANT[
                                                             it.severity
-                                                        ],
-                                                    )}
+                                                        ]
+                                                    }
+                                                    className="shrink-0"
                                                     onClick={() =>
                                                         setRecordWizard(
                                                             it.record ?? null,
@@ -993,10 +994,12 @@ export default function EmarHome(props: Props) {
                                             <Button
                                                 asChild
                                                 size="sm"
-                                                className={cn(
-                                                    'shrink-0',
-                                                    SEVERITY_BTN[it.severity],
-                                                )}
+                                                variant={
+                                                    SEVERITY_BTN_VARIANT[
+                                                        it.severity
+                                                    ]
+                                                }
+                                                className="shrink-0"
                                             >
                                                 <Link href={actionHref(it)}>
                                                     {it.action}
@@ -1048,7 +1051,7 @@ export default function EmarHome(props: Props) {
                             </CardHeader>
                             <CardContent>
                                 <div className="flex items-end gap-2">
-                                    <span className="text-3xl font-bold tracking-tight">
+                                    <span className="text-page-title tabular-nums">
                                         {adminRateLabel}
                                     </span>
                                     <span
@@ -1340,29 +1343,44 @@ export default function EmarHome(props: Props) {
                                             />
                                         </div>
                                         <div className="flex flex-wrap gap-1.5 text-[10.5px]">
-                                            <span className="rounded-full bg-status-success-bg px-1.5 py-0.5 font-semibold text-status-success">
+                                            <StatusBadge
+                                                size="sm"
+                                                variant="success"
+                                            >
                                                 {c.given} given
-                                            </span>
+                                            </StatusBadge>
                                             {c.pending > 0 ? (
-                                                <span className="rounded-full bg-muted px-1.5 py-0.5 font-semibold text-muted-foreground">
+                                                <StatusBadge
+                                                    size="sm"
+                                                    variant="neutral"
+                                                >
                                                     {c.pending} pending
-                                                </span>
+                                                </StatusBadge>
                                             ) : null}
                                             {c.overdue > 0 ? (
-                                                <span className="rounded-full bg-status-critical-bg px-1.5 py-0.5 font-semibold text-status-critical">
+                                                <StatusBadge
+                                                    size="sm"
+                                                    variant="critical"
+                                                >
                                                     {c.overdue} overdue
-                                                </span>
+                                                </StatusBadge>
                                             ) : null}
                                             {c.missed > 0 ? (
-                                                <span className="rounded-full bg-status-critical-bg px-1.5 py-0.5 font-semibold text-status-critical">
+                                                <StatusBadge
+                                                    size="sm"
+                                                    variant="critical"
+                                                >
                                                     {c.missed} missed
-                                                </span>
+                                                </StatusBadge>
                                             ) : null}
                                             {c.pending_check > 0 ? (
-                                                <span className="rounded-full bg-status-info-bg px-1.5 py-0.5 font-semibold text-status-info">
+                                                <StatusBadge
+                                                    size="sm"
+                                                    variant="info"
+                                                >
                                                     {c.pending_check} waiting
                                                     for the order check
-                                                </span>
+                                                </StatusBadge>
                                             ) : null}
                                         </div>
                                     </Link>

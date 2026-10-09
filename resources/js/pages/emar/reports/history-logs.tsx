@@ -176,7 +176,7 @@ export default function HistoricalChangeLogs(props: Props) {
                             </PageHeaderGlassButton>
                             {props.can_export_history && (
                                 <PageHeaderPrimaryButton
-                                    className="min-h-11"
+                                    className="frontline-tap"
                                     icon={Download}
                                     onClick={() => setExportOpen(true)}
                                 >
@@ -282,7 +282,7 @@ export default function HistoricalChangeLogs(props: Props) {
                                         required
                                     />
                                     <Button
-                                        className="mt-3 min-h-11 w-full"
+                                        className="frontline-tap mt-3 w-full"
                                         disabled={!from || !to}
                                         onClick={() => {
                                             if (from && to)

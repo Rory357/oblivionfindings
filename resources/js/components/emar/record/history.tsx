@@ -17,7 +17,7 @@ import {
 import axios from 'axios';
 import { ClipboardCheck, History, Info, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
-import { ReadingState } from './reading';
+import { ReadingState, StaleNotice } from './reading';
 import { isConcealed, type MaybeConcealed } from './types';
 import { concealedIdentity, SectionCard } from './ui';
 import { useDraftClose } from './use-draft-close';
@@ -82,7 +82,7 @@ export function HistorySection({
     initialDoseId?: number | null;
     onDetailClose?: () => void;
 }) {
-    const { data, load, reload } = useRecordJson<HistoryData>(
+    const { data, load, reload, stale, loadedAt } = useRecordJson<HistoryData>(
         `/emar/clients/${clientId}/record/history?view=${view}&page=${page}`,
     );
     const [detail, setDetail] = useState<number | null>(initialDoseId ?? null);
@@ -105,6 +105,7 @@ export function HistorySection({
                       : 'Dose history'
             }
         >
+            <StaleNotice stale={stale} loadedAt={loadedAt} reload={reload} />
             <p className="text-caption text-muted-foreground">
                 {caption} · newest first · Pacific/Auckland
             </p>
