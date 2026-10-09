@@ -736,6 +736,8 @@ class WorkerMedsController extends Controller
                                     'errors' => [$field => [$message]],
                                     'competency_state' => $result['competency_state'] ?? null,
                                     'safety_check' => $result['safety_check'] ?? null,
+                                    // EA-008: the dialog reloads and shows the new order.
+                                    'order_changed' => ($result['order_changed'] ?? false) ? true : null,
                                 ], fn ($value) => $value !== null),
                                 $data,
                                 'rejected',
@@ -963,6 +965,7 @@ class WorkerMedsController extends Controller
                                     'errors' => [$field => [$message]],
                                     'competency_state' => $result['competency_state'] ?? null,
                                     'safety_check' => $result['safety_check'] ?? null,
+                                    'order_changed' => ($result['order_changed'] ?? false) ? true : null,
                                 ], fn ($value) => $value !== null),
                                 $data,
                                 'rejected',

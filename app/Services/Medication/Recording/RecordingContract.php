@@ -108,6 +108,8 @@ final class RecordingContract
             'pack_lines.*.quantity' => ['required', 'numeric', 'decimal:0,2', 'min:0.01', 'max:99999999.99'],
             'pack_lines.*.quantity_wasted' => ['required', 'numeric', 'decimal:0,2', 'min:0', 'max:99999999.99'],
             'live_recording_context' => ['nullable', 'string', 'max:4096'],
+            // EA-008: the order the dialog showed (DoseRecordingRequirements).
+            'order_fingerprint' => ['nullable', 'string', 'max:128'],
             'quantity_wasted' => ['nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:99999999.99'],
             'waste_reason' => ['nullable', 'string', 'max:4000'],
             'late_reason' => ['nullable', 'string', Rule::in(array_keys(self::LATE_REASONS))],

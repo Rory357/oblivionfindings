@@ -23,6 +23,7 @@ use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Medication\Downtime\HistoricalPaperContext;
 use App\Services\Medication\Downtime\PaperAdministrationWriter;
+use App\Services\Medication\Downtime\PaperEntryService;
 use App\Services\Medication\Downtime\PaperReconciliationRules;
 use App\Services\Medication\Followups\MedicationFollowupService;
 use App\Services\Medication\ForgottenWitnessPinService;
@@ -1264,6 +1265,21 @@ class EnhancedMarService
                     }
                 }
 
+                // EA-008: a "given" records the order the dialog showed. If the
+                // order was checked at a new version (or otherwise changed)
+                // while the dialog was open, nothing is saved: the worker sees
+                // the new instructions first. Exact replays resolved above.
+                if (($data['status'] ?? null) === 'given'
+                    && filled($data['order_fingerprint'] ?? null)
+                    && ! hash_equals((string) $data['order_fingerprint'], PaperEntryService::orderFingerprint($medication))) {
+                    return [
+                        'success' => false,
+                        'error_field' => 'order_changed',
+                        'error' => 'Order changed — check the new instructions',
+                        'order_changed' => true,
+                    ];
+                }
+
                 // Exact retained replay has resolved above. A connected form may
                 // retain its server-issued review time while checks are completed;
                 // an offline or earlier paper dose must never guess today's FEFO.
@@ -2104,6 +2120,8 @@ class EnhancedMarService
             $data['witness_credential'],
             $data['scope_authorized'],
             $data['live_recording_context'],
+            // A precondition on the order shown, like the connected review.
+            $data['order_fingerprint'],
             $data['shift_id'],
         );
 
