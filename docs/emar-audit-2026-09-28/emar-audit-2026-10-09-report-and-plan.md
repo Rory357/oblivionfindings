@@ -328,3 +328,23 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
   - **Work assigned:**
     - Lane C, C11: stock landing, receipt prompt, photo history and the P02 Photos view.
     - Lane A, A11: the photo card in the recording dialog.
+- **Standing rule from Stephan (9 Oct): "keep edge case in mind if it needs a toggle setting add it to the settings".**
+  - Any policy choice an organisation could reasonably want differently becomes an org setting in Medication Settings (P11 registry). Each setting gets:
+    - a safe default;
+    - a loosens() rank;
+    - a history entry;
+    - Fleet-pattern UI.
+  - Safety and privacy floors stay hard-coded and can't be toggled: the person rule, controlled concealment, an unconfirmed controlled witness, and maintenance windows never silencing medication alerts.
+  - Settings assigned so far:
+    - Away cap with no return recorded;
+    - maximum age for offline replays;
+    - forgotten-PIN fallback (moving from env to settings);
+    - pack photo at recording;
+    - pack photo prompt on receipt, and whether a controlled pack needs a photo;
+    - paper-dose recount before a downtime record can close;
+    - clock-out medication check (off, warn or block);
+    - downtime pack makers;
+    - allergy-class map;
+    - a switch for each optional connected-care feature;
+    - two-person reviews;
+    - backup retention and schedule.
