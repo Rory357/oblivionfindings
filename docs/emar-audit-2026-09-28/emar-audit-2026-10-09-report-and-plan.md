@@ -348,3 +348,4 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
     - a switch for each optional connected-care feature;
     - two-person reviews;
     - backup retention and schedule.
+- **Forgotten-PIN fallback default (Stephan, 9 Oct): OFF until a manager turns it on in Settings.** Codex had switched it on through an env default. Controlled drugs never allow the fallback.
