@@ -2815,8 +2815,15 @@ class EmarController extends Controller
         $sites = $this->governanceScope->sitePicker($accessibleSiteIds);
         $activeSite = $siteFilter ? $sites->firstWhere('id', $siteFilter) : null;
 
+        // EA-053 (Lane C3): these are old prescriber-order records, read only.
+        // New orders, changes and stops are entered and checked in Orders (P04).
+        $orders = array_map(fn (array $order): array => [...$order, 'can_confirm' => false, 'can_countersign' => false,
+            'can_dispense' => false, 'can_link' => false, 'can_cancel' => false], $orders);
+        $canCreateManualOrders = false;
+
         return Inertia::render('emar/Prescriptions', [
             'orders' => $orders,
+            'read_only' => true,
             'selected_prescriber_order_id' => $request->integer('prescriber_order_id') ?: null,
             'selected_prescriber_order' => collect($orders)->firstWhere('id', $request->integer('prescriber_order_id')),
             'covert' => $covert,

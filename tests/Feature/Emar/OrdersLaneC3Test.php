@@ -12,6 +12,7 @@ use App\Models\MedicationEvent;
 use App\Models\MedicationFollowup;
 use App\Models\MedicationOrderAction;
 use App\Models\MedicationOrderRevision;
+use App\Models\MedicationPrescriberOrder;
 use App\Models\MedicationReconciliation;
 use App\Models\MedicationReview;
 use App\Models\MedicationReviewEvent;
@@ -214,6 +215,51 @@ class OrdersLaneC3Test extends TestCase
 
         $this->assertTrue(app(MedicationSafetyService::class)->checkAllergies($this->client, $order)['has_match']);
         $this->assertSame('Synthetic formulary', app(\App\Services\Medication\OrderAllergyMatcher::class)->inspect($this->client, 'Cefalexin')['matches'][0]['match_source']);
+    }
+
+    public function test_the_old_prescriber_order_register_is_read_only(): void
+    {
+        // EA-053: a confirmed Change never reached the chart; a Cease bypassed P04.
+        $order = $this->order(['name' => 'Metformin', 'dosage' => '500 mg']);
+        $legacy = MedicationPrescriberOrder::query()->create(['client_id' => $this->client->id, 'client_medication_id' => $order->id,
+            'controlled_drug_snapshot' => false, 'order_type' => 'change', 'status' => 'pending', 'prescriber_name' => 'Dr Test',
+            'medication_name' => 'Metformin', 'dose' => '1 g', 'route' => 'oral', 'frequency' => 'Twice daily', 'order_date' => today(),
+            'requires_countersign' => false, 'received_by' => $this->enterer->id]);
+
+        $this->actingAs($this->checker)->postJson('/emar/prescriptions/'.$legacy->id.'/confirm', ['confirmation' => true])->assertStatus(409);
+        $this->assertSame('pending', $legacy->fresh()->status);
+        $this->actingAs($this->enterer)->postJson('/emar/prescriptions', ['client_id' => $this->client->id, 'order_type' => 'new',
+            'prescriber_name' => 'Dr Test', 'medication_name' => 'Quetiapine', 'dose' => '25 mg', 'route' => 'oral', 'frequency' => 'Nightly'])->assertStatus(409);
+        $this->assertSame(1, MedicationPrescriberOrder::query()->count());
+        foreach (['countersign', 'dispense', 'cancel'] as $action) {
+            $this->actingAs($this->checker)->postJson('/emar/prescriptions/'.$legacy->id.'/'.$action, [])->assertStatus(409);
+        }
+        $this->assertSame('500 mg', $order->fresh()->dosage);
+
+        $this->actingAs($this->checker)->get('/emar/prescriptions/legacy')->assertOk()->assertInertia(fn ($page) => $page
+            ->where('can_create_manual_order', false)->where('orders.0.can_confirm', false)->where('orders.0.can_cancel', false));
+    }
+
+    public function test_the_person_profile_cannot_write_orders_outside_p04(): void
+    {
+        // EA-023: a held anticoagulant could be made active again with no
+        // prescriber instruction; a create skipped the version and its check.
+        $held = $this->order(['name' => 'Warfarin']);
+        $this->actingAs($this->enterer)->post('/emar/orders/'.$held->id.'/hold', ['reason' => 'Hold until the INR result.'])->assertSessionHasNoErrors();
+        // The profile routes sit behind clients.update as well.
+        $this->enterer->permissionOverrides()->syncWithoutDetaching([Permission::where('key', 'clients.update')->firstOrFail()->id => ['allowed' => true]]);
+        $this->enterer = $this->enterer->fresh();
+        $this->actingAs($this->enterer)->putJson('/clients/'.$this->client->id.'/medical/medications/'.$held->id, ['name' => 'Warfarin', 'state' => 'active'])
+            ->assertStatus(409);
+        $this->assertSame('paused', $held->fresh()->state);
+        $this->assertFalse($held->fresh()->active);
+
+        $before = ClientMedication::query()->count();
+        $this->actingAs($this->enterer)->postJson('/clients/'.$this->client->id.'/medical/medications', ['name' => 'Quetiapine', 'dosage' => '25 mg', 'frequency' => 'Nightly', 'route' => 'oral'])
+            ->assertStatus(409);
+        $this->actingAs($this->enterer)->postJson('/emar/medications/import', ['csv_file' => UploadedFile::fake()->createWithContent('orders.csv', "client_id,name,dosage\n".$this->client->id.",Morphine,10 mg\n")])
+            ->assertStatus(409);
+        $this->assertSame($before, ClientMedication::query()->count());
     }
 
     private function startReconciliation(): MedicationReconciliation

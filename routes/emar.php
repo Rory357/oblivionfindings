@@ -330,20 +330,22 @@ Route::middleware(['auth', ShareConnectedCareSwitches::class])->prefix('emar')->
 
     // ─── CRUD Routes (permission-gated) ─────────────────────
 
-    Route::post('/prescriptions/{order}/confirm', [EmarController::class, 'confirmPrescription'])
+    // EA-053 (Lane C3): the old prescriber-order register is read only; its
+    // writes answer with LegacyPrescriberOrderController (orders go through P04).
+    Route::post('/prescriptions/{order}/confirm', [\App\Http\Controllers\Emar\LegacyPrescriberOrderController::class, 'refuse'])
         ->middleware('permission:medications.orders.verify')
         ->name('emar.prescriptions.confirm');
-    Route::post('/prescriptions/{order}/countersign', [EmarController::class, 'countersignPrescription'])
+    Route::post('/prescriptions/{order}/countersign', [\App\Http\Controllers\Emar\LegacyPrescriberOrderController::class, 'refuse'])
         ->middleware('permission:medications.orders.verify')
         ->name('emar.prescriptions.countersign');
 
     Route::middleware('permission:medications.orders.manage')->group(function () {
 
         // Prescriber Orders
-        Route::post('/prescriptions', [EmarController::class, 'storePrescription'])->name('emar.prescriptions.store');
-        Route::put('/prescriptions/{order}', [EmarController::class, 'updatePrescription'])->name('emar.prescriptions.update');
-        Route::post('/prescriptions/{order}/dispense', [EmarController::class, 'dispensePrescription'])->name('emar.prescriptions.dispense');
-        Route::post('/prescriptions/{order}/cancel', [EmarController::class, 'cancelPrescription'])->name('emar.prescriptions.cancel');
+        Route::post('/prescriptions', [\App\Http\Controllers\Emar\LegacyPrescriberOrderController::class, 'refuse'])->name('emar.prescriptions.store');
+        Route::put('/prescriptions/{order}', [\App\Http\Controllers\Emar\LegacyPrescriberOrderController::class, 'refuse'])->name('emar.prescriptions.update');
+        Route::post('/prescriptions/{order}/dispense', [\App\Http\Controllers\Emar\LegacyPrescriberOrderController::class, 'refuse'])->name('emar.prescriptions.dispense');
+        Route::post('/prescriptions/{order}/cancel', [\App\Http\Controllers\Emar\LegacyPrescriberOrderController::class, 'refuse'])->name('emar.prescriptions.cancel');
 
         // Covert Authorisations
         Route::post('/prescriptions/covert', [EmarController::class, 'storeCovert'])->name('emar.covert.store');
@@ -382,7 +384,8 @@ Route::middleware(['auth', ShareConnectedCareSwitches::class])->prefix('emar')->
 
         // Medications CRUD
         Route::post('/medications', [EmarController::class, 'storeMedication'])->name('emar.medications.store');
-        Route::post('/medications/import', [EmarController::class, 'importMedications'])->name('emar.medications.import');
+        // EA-023 (Lane C3): no bulk import outside P04; each order is entered and checked.
+        Route::post('/medications/import', [\App\Http\Controllers\Emar\LegacyPrescriberOrderController::class, 'refuseImport'])->name('emar.medications.import');
         Route::put('/medications/{medication}', [EmarController::class, 'updateMedication'])->name('emar.medications.update');
         Route::post('/medications/{medication}/discontinue', [EmarController::class, 'discontinueMedication'])->name('emar.medications.discontinue');
 
