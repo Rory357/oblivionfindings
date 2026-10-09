@@ -182,7 +182,10 @@ final class MedicationReviewWorkflow
                     'earlier_review_date' => ['nullable', 'date_format:Y-m-d', 'after:'.WorkerClock::today()->toDateString()],
                     'source' => $this->sourceRules(),
                 ])->validate();
-                $orders = ClientMedication::query()->current()->active()->where('client_id', $client->id)->lockForUpdate()->get();
+                // EA-113 (Lane C3): held orders and orders still waiting for a
+                // check are reviewed too; only stopped orders are left out.
+                $orders = ClientMedication::query()->current()->where('state', '!=', 'ceased')->whereNull('ceased_at')
+                    ->where('client_id', $client->id)->lockForUpdate()->get();
                 $posted = collect($data['items'])->keyBy('client_medication_id');
                 // Foreign, deleted and concealed order IDs share direct-object denial.
                 foreach ($posted->keys() as $orderId) {

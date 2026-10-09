@@ -964,13 +964,28 @@ class ClientMedicalController extends Controller
         );
 
         try {
-            $discontinued = app(MedicationOrderLifecycleService::class)->discontinue(
-                $user,
-                $medication,
-                $request->input('reason'),
-                (int) $client->id,
-                requestKey: $request->input('request_key'),
-            );
+            // EA-135 (Lane C3): the profile stops an order through P04, so the
+            // stop is recorded, its order checks close and order.stopped is
+            // appended — the same as Orders › Stop.
+            $orders = app(\App\Services\Medication\MedicationOrderWorkflow::class);
+            $discontinued = $orders->forMedication($user, (int) $medication->id, 'medications.orders.manage',
+                function (Client $scoped, ClientMedication $order, $actor) use ($request, $client, $orders): ClientMedication {
+                    app(\App\Services\Medication\MedicationRecordAccess::class)->assertReadable($actor, $scoped);
+                    $orders->assertControlled($actor, $order);
+                    $alreadyStopped = $order->state === 'ceased';
+                    $ended = app(MedicationOrderLifecycleService::class)->discontinue(
+                        $actor,
+                        $order,
+                        $request->input('reason'),
+                        (int) $client->id,
+                        requestKey: $request->input('request_key'),
+                    );
+                    if (! $alreadyStopped) {
+                        $orders->action($actor, $ended, 'stopped', ['version' => $ended->version, 'reason' => $ended->ceased_reason]);
+                    }
+
+                    return $ended;
+                }, expectedClientId: (int) $client->id);
 
             if ($discontinued->wasChanged('state')) {
                 try {

@@ -32,6 +32,8 @@ export type ReviewOrder = {
     dosage: string | null;
     frequency: string | null;
     controlled_hidden: boolean;
+    /** EA-113: held and waiting orders are reviewed too. */
+    order_state?: 'active' | 'held' | 'waiting_check' | 'sent_back';
 };
 export type ReviewItem = {
     id: number;
