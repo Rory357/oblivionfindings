@@ -21,17 +21,29 @@ final class MedicationTimelineVisibilityService
      * medication capability, canonical Client/Site ownership, and durable
      * controlled classification for every medication-linked event.
      *
+     * $includeMedication = false keeps only non-medication events whatever
+     * the viewer holds; $includeControlled = false drops controlled-medicine
+     * events even for controlled readers (AI search and summaries, D5).
+     *
      * @return Builder<*>
      */
-    public function applyVisibleScope(Builder $query, User $viewer): Builder
-    {
+    public function applyVisibleScope(
+        Builder $query,
+        ?User $viewer,
+        bool $includeMedication = true,
+        bool $includeControlled = true,
+    ): Builder {
         $table = $query->getModel()->getTable();
         $administrationType = (new ClientMedicationAdministration)->getMorphClass();
         $medicationType = (new ClientMedication)->getMorphClass();
         $incidentType = (new ClientIncident)->getMorphClass();
         $directMedicationSourceTypes = [$administrationType, $medicationType];
-        $canViewMedication = $viewer->canDo(MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY);
-        $canViewControlled = $viewer->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY);
+        $canViewMedication = $includeMedication
+            && $viewer !== null
+            && $viewer->canDo(MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY);
+        $canViewControlled = $includeControlled
+            && $viewer !== null
+            && $viewer->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY);
         $siteIds = $this->siteAccess->accessibleSiteIds(
             $viewer,
             MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS,

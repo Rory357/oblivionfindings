@@ -97,14 +97,16 @@ class RagController extends Controller
             $client->forceFill(['openai_vector_store_id' => $vsId])->save();
         }
 
-        // Build a fresh knowledge snapshot for this client (rolling)
-        $md = $indexer->buildMarkdown($client, 120);
+        // Build a fresh knowledge snapshot for this asker (D5: no medication
+        // data by default; the person rule and no controlled medicines when on).
+        $md = $indexer->buildMarkdown($client, 120, $user);
         $path = 'rag/client_'.$client->id.'_latest.md';
         Storage::disk('local')->put($path, $md);
         $abs = Storage::disk('local')->path($path);
 
-        // Upload & attach snapshot (best-effort)
+        // Upload, then replace every earlier snapshot in the store with it.
         $fileId = $openai->uploadFile($abs, basename($path));
+        $openai->removeVectorStoreFiles($client->openai_vector_store_id, $fileId);
         if ($fileId) {
             $openai->attachFileToVectorStore($client->openai_vector_store_id, $fileId);
         }

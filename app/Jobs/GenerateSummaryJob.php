@@ -7,6 +7,7 @@ use App\Models\Site;
 use App\Models\Summary;
 use App\Models\TimelineEvent;
 use App\Models\User;
+use App\Services\Llm\AiMedicationDataPolicy;
 use App\Services\Llm\LlmClient;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
@@ -32,7 +33,7 @@ class GenerateSummaryJob implements ShouldQueue
 
     public function handle(): void
     {
-        $this->authorizeCurrentRequester();
+        $requester = $this->authorizeCurrentRequester();
 
         $start = Carbon::parse($this->periodStartIso);
         $end = Carbon::parse($this->periodEndIso);
@@ -43,11 +44,21 @@ class GenerateSummaryJob implements ShouldQueue
 
         if ($this->scopeType === 'staff') {
             $query->where('actor_user_id', $this->scopeId);
+            // A worker's events at houses the requester can't open stay out.
+            if ($requester !== null) {
+                $siteIds = app(UserSiteAccessService::class)->accessibleSiteIds($requester, UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS);
+                $query->where(fn ($sites) => $sites->whereNull('site_id')->orWhereIn('site_id', $siteIds === [] ? [0] : $siteIds));
+            }
         } elseif ($this->scopeType === 'client') {
             $query->where('client_id', $this->scopeId);
         } elseif ($this->scopeType === 'site') {
             $query->where('site_id', $this->scopeId);
         }
+
+        // D5: no medication events unless llm.include_medication_data is on,
+        // and then only non-controlled ones for people the requester may open.
+        $medicationData = app(AiMedicationDataPolicy::class);
+        $medicationData->scopeTimeline($query, $requester);
 
         $events = $query->limit(500)->get();
 
@@ -81,17 +92,20 @@ class GenerateSummaryJob implements ShouldQueue
                 'model' => $model,
                 'prompt_version' => $promptVersion,
                 'summary_text' => $summaryText,
-                'sources' => ['timeline_event_ids' => $events->pluck('id')->values()->all()],
+                'sources' => [
+                    'timeline_event_ids' => $events->pluck('id')->values()->all(),
+                    'medication_data' => $medicationData->enabled() ? 'person_rule_no_controlled' : 'excluded',
+                ],
                 'generated_at' => now(),
                 'generated_by' => $this->generatedByUserId,
             ]
         );
     }
 
-    private function authorizeCurrentRequester(): void
+    private function authorizeCurrentRequester(): ?User
     {
         if ($this->generatedByUserId === null) {
-            return;
+            return null;
         }
 
         $requester = User::query()->find($this->generatedByUserId);
@@ -113,6 +127,8 @@ class GenerateSummaryJob implements ShouldQueue
         if (! $authorized) {
             throw new AuthorizationException('Summary scope is not authorized.');
         }
+
+        return $requester;
     }
 
     private function canAccessCurrentStaff(UserSiteAccessService $siteAccess, User $requester): bool
