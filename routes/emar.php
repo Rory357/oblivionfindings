@@ -19,6 +19,7 @@ use App\Http\Controllers\Emar\MedicationReviewController;
 use App\Http\Controllers\Emar\MedicationSecondPersonConfirmationController;
 use App\Http\Controllers\Emar\MedicationSettingsController;
 use App\Http\Controllers\Emar\MedicationSupportController;
+use App\Http\Controllers\Emar\OfflineReplayReviewController;
 use App\Http\Controllers\Emar\PersonMedicationClinicalController;
 use App\Http\Controllers\Emar\PersonMedicationCorrectionController;
 use App\Http\Controllers\Emar\PersonMedicationRecordController;
@@ -90,6 +91,12 @@ Route::middleware(['auth'])->group(function () {
     // dialog's safety checks, blocks and second-person candidates).
     Route::get('/meds/today/recording-status', MedicationRecordingStatusController::class)
         ->name('meds.today.recording_status');
+
+    // eMAR audit Lane A3 (EA-049, EA-050): a device reports a dose it saved
+    // that the server refused, so a lead gets a follow-up.
+    Route::post('/meds/today/offline-review', [OfflineReplayReviewController::class, 'store'])
+        ->middleware('permission:medications.administer.record')->middleware('throttle:60,1')
+        ->name('meds.today.offline_review');
 
     Route::get('/meds/today/doses/requirements', [DoseRequirementsController::class, 'scheduled'])
         ->middleware('permission:medications.administer.record')

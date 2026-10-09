@@ -8,6 +8,11 @@ import { EntityChip } from '@/components/lists/entity-cells';
 import { compactMenu, type MenuItem } from '@/components/lists/entity-menu';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { useOfflineQueueState } from '@/hooks/use-offline-queue';
+import {
+    getOfflineQueueSnapshot,
+    type OfflineQueueState,
+} from '@/lib/offline-queue';
 import { cn } from '@/lib/utils';
 import {
     AlertTriangle,
@@ -15,6 +20,7 @@ import {
     CheckCircle2,
     ClipboardList,
     Clock3,
+    CloudUpload,
     Flag,
     HelpCircle,
     Info,
@@ -30,6 +36,44 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { ScheduleRow } from './types';
+
+/* ───────────── saved on this device (EA-010, EA-116) ───────────── */
+const slotInstant = (value: unknown): string | null => {
+    if (typeof value !== 'string') return null;
+    const time = Date.parse(value);
+    return Number.isFinite(time) ? new Date(time).toISOString() : null;
+};
+
+/**
+ * A dose recorded on this device that hasn't reached the chart: "pending"
+ * while it waits to send, "refused" when the server refused it. Matched by
+ * order and due time, the same identity the dialog sends.
+ */
+export function deviceStateFor(
+    row: ScheduleRow,
+    queue: Pick<
+        OfflineQueueState,
+        'pendingSubmissions' | 'rejectedSubmissions'
+    > = getOfflineQueueSnapshot(),
+): 'pending' | 'refused' | null {
+    if (row.recorded) return null;
+    const due = slotInstant(row.scheduled_for);
+    const matches = (item: {
+        action: string;
+        payload: Record<string, unknown>;
+    }) =>
+        (item.action === 'administration' || item.action === 'round_admin') &&
+        Number(item.payload.client_medication_id) === row.medication_id &&
+        due !== null &&
+        slotInstant(item.payload.scheduled_for) === due;
+    if ((queue.pendingSubmissions ?? []).some(matches)) return 'pending';
+    if ((queue.rejectedSubmissions ?? []).some(matches)) return 'refused';
+    return null;
+}
+
+function useDeviceState(row: ScheduleRow) {
+    return deviceStateFor(row, useOfflineQueueState());
+}
 
 export const TZ = 'Pacific/Auckland';
 
@@ -290,6 +334,30 @@ export function DoseStateCell({
     const open = isOpen(row);
     const opens = nzTime(row.window_opens_at);
     const ends = nzTime(row.window_ends_at);
+    const device = useDeviceState(row);
+    if (device === 'pending')
+        return (
+            <span className="flex flex-col items-start gap-1 py-0.5">
+                <StatusBadge
+                    variant="info"
+                    className="rounded-[8px] font-semibold"
+                >
+                    <CloudUpload className="size-3" aria-hidden="true" />
+                    Saved on this device
+                </StatusBadge>
+                <Line tone="warning">
+                    Not on the chart yet — it sends automatically. Don’t record
+                    it again.
+                </Line>
+            </span>
+        );
+    if (device === 'refused')
+        lines.push(
+            <Line key="device" tone="critical">
+                Saved on this device but refused when sent — not recorded. Check
+                the banner and tell your lead.
+            </Line>,
+        );
     if (r) {
         const word = r.reoffer_of_id
             ? r.status === 'given'
@@ -510,6 +578,7 @@ export function mainAction(
     can: RowPermissions,
     a: RowActions,
 ): (() => void) | null {
+    if (deviceStateFor(row) === 'pending') return null;
     if (isOpen(row) && can.canRecord(row)) {
         if (blockOf(row)) return () => a.why(row);
         if (needsHelp(row)) return () => a.notGiven(row);
@@ -536,6 +605,20 @@ export function DoseActionCell({
         fn();
     };
     const recordable = can.canRecord(row);
+    const device = useDeviceState(row);
+    // EA-116: recording again would double the dose; it sends on its own.
+    if (device === 'pending')
+        return (
+            <Button
+                data-return={row.key}
+                variant="outline"
+                className="frontline-tap"
+                disabled
+            >
+                <CloudUpload className="size-4" aria-hidden="true" /> Waiting to
+                send
+            </Button>
+        );
     if (isOpen(row) && recordable && blockOf(row))
         return (
             <Button
@@ -615,7 +698,9 @@ export function doseMenu(
 ): MenuItem[] {
     const items: (MenuItem | false)[] = [];
     const recordable = can.canRecord(row);
-    if (isOpen(row) && recordable) {
+    if (deviceStateFor(row) === 'pending') {
+        // Saved on this device: nothing to record until it sends.
+    } else if (isOpen(row) && recordable) {
         if (blockOf(row)) {
             if (!row.req?.block_all)
                 items.push({

@@ -27,9 +27,11 @@ use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\Followups\LegacyEffectFollowupAdapter;
 use App\Services\Medication\ForgottenWitnessPinService;
 use App\Services\Medication\MarLinkService;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Medication\Recording\DoseRecordingRequirements;
+use App\Services\Medication\Recording\OfflineReplayReview;
 use App\Services\Medication\Recording\PrnEffectCheckQueue;
 use App\Services\Medication\Recording\RecordingContract;
 use App\Services\Medication\Reporting\MedicationReportAccess;
@@ -49,6 +51,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -665,6 +668,9 @@ class WorkerMedsController extends Controller
         $actionAt = $this->scheduleService->parseWorkerDateTime((string) (
             $submittedAdministrationAt ?? now()->toIso8601String()
         ));
+        if ($changed = $this->refuseQueuedDoseForChangedOrder($request, $user, $medication, $data)) {
+            return $changed;
+        }
 
         return $this->medicationScope->forAdministration(
             $user,
@@ -677,6 +683,9 @@ class WorkerMedsController extends Controller
             function (MedicationScopeDecision $scope) use ($request, $user, $data, $submittedAdministrationAt) {
                 $medication = $scope->medication;
                 $shiftId = $scope->shiftId();
+                if ($tooOld = $this->refuseTooOldQueuedDose($request, $scope, $user, $data)) {
+                    return $tooOld;
+                }
                 $scan = $this->validatedRecordingScan($scope, $data);
 
                 $notes = trim((string) ($data['notes'] ?? ''));
@@ -724,6 +733,7 @@ class WorkerMedsController extends Controller
                 if (! ($result['success'] ?? false)) {
                     $field = $result['error_field'] ?? 'status';
                     $message = $result['error'] ?? 'Could not record this dose.';
+                    $this->raiseOfflineReview($scope, $user, $data, OfflineReplayReview::reasonForStatus(422, $field), $message);
 
                     if ($request->expectsJson()) {
                         return response()->json(
@@ -754,6 +764,11 @@ class WorkerMedsController extends Controller
                 $clientName = trim(($medication->client->first_name ?? '').' '.($medication->client->last_name ?? ''));
 
                 if ($result['duplicate'] ?? false) {
+                    // EA-004: a dose saved on a device while someone else
+                    // recorded this one is a conflict for a lead, never "sent".
+                    if (! (bool) ($result['replayed'] ?? false) && (bool) ($data['queued_offline'] ?? false)) {
+                        return $this->queuedDuplicateConflict($request, $scope, $user, $data, $result);
+                    }
                     // P01 (JSON): someone else's record for this dose is
                     // "Already recorded"; a retry of this same request is the
                     // worker's own record coming back, so it confirms it.
@@ -900,6 +915,9 @@ class WorkerMedsController extends Controller
         $actionAt = $this->scheduleService->parseWorkerDateTime((string) (
             $submittedAdministrationAt ?? now()->toIso8601String()
         ));
+        if ($changed = $this->refuseQueuedDoseForChangedOrder($request, $user, $medication, $data)) {
+            return $changed;
+        }
 
         return $this->medicationScope->forAdministration(
             $user,
@@ -912,6 +930,9 @@ class WorkerMedsController extends Controller
             function (MedicationScopeDecision $scope) use ($request, $user, $data, $submittedAdministrationAt) {
                 $medication = $scope->medication;
                 $shiftId = $scope->shiftId();
+                if ($tooOld = $this->refuseTooOldQueuedDose($request, $scope, $user, $data)) {
+                    return $tooOld;
+                }
                 $scan = $this->validatedRecordingScan($scope, $data);
 
                 $result = $this->marService->recordAdministration(
@@ -953,6 +974,7 @@ class WorkerMedsController extends Controller
                 if (! ($result['success'] ?? false)) {
                     $field = $result['error_field'] ?? 'reason';
                     $message = $result['error'] ?? 'Could not record this PRN dose.';
+                    $this->raiseOfflineReview($scope, $user, $data, OfflineReplayReview::reasonForStatus(422, $field), $message);
 
                     if ($request->expectsJson()) {
                         return response()->json(
@@ -1027,6 +1049,134 @@ class WorkerMedsController extends Controller
      *
      * @return array<string, mixed>
      */
+    /**
+     * eMAR audit Lane A3 (EA-049, EA-050, EA-131): a dose saved on a device
+     * that the server refuses gets ONE lead follow-up with what the device
+     * captured. Online submissions are answered in the open dialog instead.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function raiseOfflineReview(
+        MedicationScopeDecision $scope,
+        User $user,
+        array $data,
+        string $reasonKey,
+        string $reason,
+        ?ClientMedicationAdministration $existing = null,
+    ): void {
+        if (! (bool) ($data['queued_offline'] ?? false) || blank($data['client_request_uuid'] ?? null)) {
+            return;
+        }
+
+        app(OfflineReplayReview::class)->raise($scope->client, $scope->medication, $user, $data, $reasonKey, $reason, $existing);
+    }
+
+    /** @param  array<string, mixed>  $data */
+    private function queuedRefusal(Request $request, array $data, string $field, string $message, int $status = 422): JsonResponse|RedirectResponse
+    {
+        if (! $request->expectsJson()) {
+            return back()->withErrors([$field => $message]);
+        }
+
+        return response()->json($this->withMedicationSync([
+            'success' => false,
+            'message' => $message,
+            'error' => $message,
+            'error_field' => $field,
+            'errors' => [$field => [$message]],
+        ], $data, 'rejected', false, $message), $status);
+    }
+
+    /**
+     * EA-131: a dose saved on a device longer ago than the policy allows is
+     * not added to the chart as new; it goes to reviewed paper recovery. A
+     * request that already reached the chart is still replayed as itself.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function refuseTooOldQueuedDose(Request $request, MedicationScopeDecision $scope, User $user, array $data): JsonResponse|RedirectResponse|null
+    {
+        $review = app(OfflineReplayReview::class);
+        if (! $review->tooOld($data)) {
+            return null;
+        }
+        if (ClientMedicationAdministration::withTrashed()->where('client_request_uuid', (string) ($data['client_request_uuid'] ?? ''))->exists()) {
+            return null;
+        }
+        $message = OfflineReplayReview::tooOldMessage();
+        $review->raise($scope->client, $scope->medication, $user, $data, OfflineReplayReview::TOO_OLD, $message);
+
+        return $this->queuedRefusal($request, $data, 'queued_offline', $message);
+    }
+
+    /**
+     * EA-050: a dose saved on a device before its order was changed (the
+     * order row was superseded) gets a clear refusal and a lead follow-up,
+     * not a bare "not found" retried forever. Only someone who could record
+     * for this person learns why; anyone else still gets "not found".
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function refuseQueuedDoseForChangedOrder(Request $request, User $user, ClientMedication $medication, array $data): JsonResponse|RedirectResponse|null
+    {
+        if (! (bool) ($data['queued_offline'] ?? false) || $medication->superseded_by === null || blank($data['client_request_uuid'] ?? null)) {
+            return null;
+        }
+        if ($medication->controlled_drug && ! $user->canDo('medications.controlled.record')) {
+            return null;
+        }
+        if (! in_array(
+            (int) $medication->client->site_id,
+            $this->siteAccess->accessibleSiteIds($user, MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS),
+            true,
+        )) {
+            return null;
+        }
+        if (ClientMedicationAdministration::withTrashed()->where('client_request_uuid', (string) $data['client_request_uuid'])->exists()) {
+            return null;
+        }
+        $message = 'Not recorded — this order changed after the dose was saved on the device. Check the new order. If the dose was given, record it on paper and tell your lead; they have a follow-up.';
+        DB::transaction(function () use ($user, $medication, $data, $message): void {
+            $client = Client::query()->whereKey($medication->client_id)->lockForUpdate()->firstOrFail();
+            $locked = ClientMedication::query()->whereKey($medication->id)->where('client_id', $client->id)->lockForUpdate()->firstOrFail();
+            app(OfflineReplayReview::class)->raise($client, $locked, $user, $data, OfflineReplayReview::ORDER_CHANGED, $message);
+        });
+
+        return $this->queuedRefusal($request, $data, 'client_medication_id', $message);
+    }
+
+    /**
+     * EA-004: someone else recorded this dose while this one waited on a
+     * device. Nothing is saved; the worker and a lead are told, with what
+     * each recorded, so a double dose or a wrong outcome is reviewed.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $result
+     */
+    private function queuedDuplicateConflict(Request $request, MedicationScopeDecision $scope, User $user, array $data, array $result): JsonResponse|RedirectResponse
+    {
+        $message = 'Someone else recorded this dose while you were offline — a lead must review it.';
+        $existing = ($result['administration'] ?? null) instanceof ClientMedicationAdministration ? $result['administration'] : null;
+        $this->raiseOfflineReview($scope, $user, $data, OfflineReplayReview::DUPLICATE, $message, $existing);
+        if (! $request->expectsJson()) {
+            return back()->with('warning', $message);
+        }
+
+        return response()->json($this->withMedicationSync([
+            'success' => false,
+            'message' => $message,
+            'error' => $message,
+            'error_field' => 'scheduled_for',
+            'duplicate_of' => $result['duplicate_of'] ?? null,
+            'scheduled_for' => $data['scheduled_for'] ?? null,
+            'captured' => array_filter([
+                'status' => $data['status'] ?? null,
+                'administered_at' => $data['administered_at'] ?? null,
+                'captured_offline_at' => $data['captured_offline_at'] ?? null,
+            ], fn ($value) => $value !== null),
+        ], $data, 'conflict', false, $message), 409);
+    }
+
     private function appendDoseEvent(MedicationScopeDecision $scope, ClientMedicationAdministration $administration): void
     {
         // Last domain write in the authorized source transaction. A recorder

@@ -1352,9 +1352,14 @@ describe('RecordDoseDialog (P01)', () => {
         fireEvent.click(
             screen.getByRole('option', { name: 'Other (say what happened)' }),
         );
-        fireEvent.change(screen.getByRole('textbox', { name: /What happened/ }), {
-            target: { value: '  GP phoned to hold it until the INR is back ' },
-        });
+        fireEvent.change(
+            screen.getByRole('textbox', { name: /What happened/ }),
+            {
+                target: {
+                    value: '  GP phoned to hold it until the INR is back ',
+                },
+            },
+        );
         fireEvent.click(screen.getByRole('button', { name: /continue/i }));
         fireEvent.click(
             await screen.findByRole('button', { name: /^Record outcome$/i }),
@@ -1488,13 +1493,19 @@ describe('RecordDoseDialog (P01)', () => {
         );
         await screen.findByText('Losartan 50mg');
         expect(
-            screen.getByText(/This order changed at .* — check the new instructions/),
+            screen.getByText(
+                /This order changed at .* — check the new instructions/,
+            ),
         ).toBeInTheDocument();
         expect(
             screen.getByText('Before: 500 mg · 8:00 am and 8:00 pm'),
         ).toBeInTheDocument();
-        expect(screen.getByText(/Jordan Tipene verified the new order/)).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /continue/i })).toBeDisabled();
+        expect(
+            screen.getByText(/Jordan Tipene verified the new order/),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: /continue/i }),
+        ).toBeDisabled();
         expect(
             screen.getByText('Confirm you’ve checked the new instructions'),
         ).toBeInTheDocument();
@@ -1502,7 +1513,10 @@ describe('RecordDoseDialog (P01)', () => {
 
     it('refreshes an expired pack review inside the open dialog and saves with the new review (EA-060)', async () => {
         const first = requirements({
-            stock_tracking: { lots_started: true, offline_given_allowed: false },
+            stock_tracking: {
+                lots_started: true,
+                offline_given_allowed: false,
+            },
             live_recording_context: 'review-at-open',
         });
         open(first);
@@ -1557,6 +1571,46 @@ describe('RecordDoseDialog (P01)', () => {
             live_recording_context: 'review-renewed',
             administered_at: submitMock.mock.calls[0][1].administered_at,
             notes: 'Given at the table.',
+        });
+    });
+
+    it('says “not sent” when nothing left the browser, keeping the entries and no recovery (EA-149)', async () => {
+        submitMock.mockResolvedValueOnce({
+            status: 'storage_unavailable',
+            clientRequestUuid: 'x',
+            sent: false,
+        });
+        const req = requirements();
+        open(req);
+        await screen.findByText('Losartan 50mg');
+        await recordGivenWithNote('Taken with lunch.');
+        expect(
+            await screen.findByText('Not sent — nothing was saved'),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText('Not confirmed — check before trying again'),
+        ).not.toBeInTheDocument();
+        expect(findDoseRecovery(41, req.due!.due_at)).toBeNull();
+        expect(
+            screen.getByRole('button', { name: /^Record outcome$/i }),
+        ).toBeEnabled();
+    });
+
+    it('describes a saved dose for the device and says the server didn’t answer while online (EA-010, EA-046)', async () => {
+        submitMock.mockResolvedValueOnce({ status: 'queued' });
+        open(requirements());
+        await screen.findByText('Losartan 50mg');
+        await recordGivenWithNote('Taken with lunch.');
+        await waitFor(() => expect(submitMock).toHaveBeenCalledOnce());
+        expect(submitMock.mock.calls[0][2]).toMatchObject({
+            unansweredMessage: expect.stringContaining(
+                'The server didn’t answer',
+            ),
+            display: {
+                person: 'Aroha',
+                medicine: 'Losartan 50mg 1 tablet',
+                outcome: 'Given',
+            },
         });
     });
 

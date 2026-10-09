@@ -70,4 +70,9 @@ return [
         // Planned or legacy date-only leave never suppresses a due dose.
         'from_leave' => (bool) env('MEDICATION_AWAY_FROM_LEAVE', true),
     ],
+
+    // eMAR audit Lane A3 (EA-131): a dose saved on a device and sent later
+    // than this is not added to the chart as a new record; it is refused for
+    // reviewed paper recovery and a lead gets a follow-up.
+    'offline_replay_max_hours' => (int) env('MEDICATION_OFFLINE_REPLAY_MAX_HOURS', 12),
 ];

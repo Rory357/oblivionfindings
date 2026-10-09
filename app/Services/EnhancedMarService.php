@@ -1425,15 +1425,21 @@ class EnhancedMarService
                             $client,
                             $medication,
                         );
-                        $this->rememberAdministrationReplay(
-                            $existing,
-                            $client,
-                            $medication,
-                            $userId,
-                            $shiftId,
-                            $clientRequestUuid,
-                            $requestFingerprint,
-                        );
+                        // EA-004: a dose saved on a device while someone else
+                        // recorded this one was NOT recorded. Its request is
+                        // never bound to their record, so sending it again
+                        // still says "someone else recorded this", not "sent".
+                        if (! (bool) ($data['queued_offline'] ?? false)) {
+                            $this->rememberAdministrationReplay(
+                                $existing,
+                                $client,
+                                $medication,
+                                $userId,
+                                $shiftId,
+                                $clientRequestUuid,
+                                $requestFingerprint,
+                            );
+                        }
 
                         return [
                             'success' => true,

@@ -245,7 +245,9 @@ const timeLabel = (iso: string | null | undefined) =>
 function orderVersionWords(v: OrderVersionFacts): string {
     const amount =
         v.dosage ??
-        (v.dose_amount != null ? formatAmount(v.dose_amount, v.dose_unit) : null);
+        (v.dose_amount != null
+            ? formatAmount(v.dose_amount, v.dose_unit)
+            : null);
     const times = v.dose_times?.length
         ? v.dose_times
               .map((t) => {
@@ -720,7 +722,9 @@ function RecordDoseForm({
     onClose: () => void;
     onRecorded?: (result: RecordedResult) => void;
     /** Fetch the current requirements again, keeping this draft (EA-008, EA-060). */
-    onRefresh?: (renewReview?: string | null) => Promise<RequirementsAnswer | null>;
+    onRefresh?: (
+        renewReview?: string | null,
+    ) => Promise<RequirementsAnswer | null>;
     onCheckSaved: () => boolean;
     onEligibility?: () => void;
     onNext?: () => void;
@@ -801,6 +805,8 @@ function RecordDoseForm({
     // EA-060: the pack review expired inside this open dialog.
     const [reviewExpired, setReviewExpired] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    // EA-149: the last attempt never left the browser (what to do next).
+    const [notSent, setNotSent] = useState<string | null>(null);
     const dirty = useRef(Boolean(recovered));
     const bodyRef = useRef<HTMLDivElement>(null);
     const replay = useRef(createMedicationMutationReplayState());
@@ -1345,6 +1351,7 @@ function RecordDoseForm({
         saveInFlight.current = true;
         setPhase('sending');
         setServerMessage(null);
+        setNotSent(null);
         try {
             const outcome = await submitEmarMutation<Record<string, unknown>>(
                 isPrn ? '/meds/today/prn' : '/meds/today/record',
@@ -1362,13 +1369,29 @@ function RecordDoseForm({
                                 req.stock_packs?.lots_started)
                         ),
                     queuedMessage: `Saved on this device — ${med} for ${p} isn’t on the chart yet. It will send when you reconnect. Don’t record it again.`,
+                    // EA-010: online, this is the server not answering.
+                    unansweredMessage: `The server didn’t answer. ${med} for ${p} is saved on this device and isn’t on the chart yet — we’ll keep trying. Don’t record it again.`,
+                    // EA-046: what a waiting or refused item says it was.
+                    display: {
+                        person: p,
+                        medicine: [med, req.order.dosage]
+                            .filter(Boolean)
+                            .join(' '),
+                        outcome:
+                            tiles.find((t) => t.key === f.outcome)?.label ??
+                            'Recorded',
+                        at:
+                            target.kind === 'scheduled'
+                                ? target.scheduledFor
+                                : new Date().toISOString(),
+                    },
                 },
             );
             if (
                 !actorChanged.current &&
                 getOfflineQueueActorId() === actorAtOpen.current
             )
-                handleOutcome(outcome.status, outcome.data);
+                handleOutcome(outcome.status, outcome.data, outcome.sent);
         } catch (error) {
             if (
                 !actorChanged.current &&
@@ -1383,6 +1406,7 @@ function RecordDoseForm({
     function handleOutcome(
         status: string,
         data: Record<string, unknown> | undefined,
+        sent?: boolean,
     ) {
         if (status === 'queued') {
             clearDoseRecovery(recoveryKey);
@@ -1395,6 +1419,34 @@ function RecordDoseForm({
             status === 'storage_unavailable' ||
             status === 'requires_authentication'
         ) {
+            // EA-149: nothing left the browser, so nothing was saved. Keep
+            // the entries and say so; "may already have been saved" is only
+            // for a request that was actually sent.
+            if (sent === false) {
+                clearDoseRecovery(recoveryKey);
+                submitted.current = null;
+                setNotSent(
+                    status === 'requires_authentication'
+                        ? 'Sign in again, then record the outcome.'
+                        : status === 'storage_unavailable'
+                          ? 'This device can’t keep it either. Reconnect, then record the outcome.'
+                          : 'Reconnect, then record the outcome.',
+                );
+                setPhase('edit');
+                // A witness PIN is never kept: the colleague enters it again.
+                if (
+                    secondKind &&
+                    !unconfirmed &&
+                    f.second.id &&
+                    !forgottenPin
+                ) {
+                    setErrors({
+                        pin: 'Not sent — your colleague enters their PIN again once you’re connected.',
+                    });
+                    setF((x) => ({ ...x, step: 1 }));
+                }
+                return;
+            }
             setPhase('uncertain');
             return;
         }
@@ -2487,6 +2539,16 @@ function RecordDoseForm({
     const step2 = (
         <div className="space-y-4">
             <IdentityHeader req={req} compact />
+            {notSent && phase === 'edit' ? (
+                <Notice
+                    tone="warning"
+                    live="alert"
+                    title="Not sent — nothing was saved"
+                >
+                    This dose isn’t on the chart and wasn’t saved on this
+                    device. Your entries are kept. {notSent}
+                </Notice>
+            ) : null}
             {reviewExpired ? (
                 <Notice
                     tone="warning"
