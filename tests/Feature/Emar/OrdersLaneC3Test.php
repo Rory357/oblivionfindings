@@ -5,6 +5,7 @@ namespace Tests\Feature\Emar;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
+use App\Models\MedicationAllergy;
 use App\Models\MedicationDoseScheduleVersion;
 use App\Models\MedicationDoseSlot;
 use App\Models\MedicationEvent;
@@ -20,10 +21,13 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\CheckedOrderAllergyConfirmation;
+use App\Services\MedicationSafetyService;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -177,6 +181,39 @@ class OrdersLaneC3Test extends TestCase
         $again = MedicationOrderRevision::latest('id')->firstOrFail();
         $this->assertNotSame($sent->id, $again->id);
         $this->assertSame($again->medication_order_version_id, $item->refresh()->linked_order_version_id);
+    }
+
+    public function test_a_class_allergy_match_asks_the_prescriber_at_the_order_check_and_then_allows_the_dose(): void
+    {
+        // EA-052: the order check and the dose check use one matcher.
+        MedicationAllergy::create(['client_id' => $this->client->id, 'allergen' => 'Penicillin', 'severity' => 'severe', 'reaction' => 'Synthetic rash', 'recorded_by' => $this->enterer->id]);
+        $revision = $this->enter(null, ['name' => 'Amoxicillin']);
+        $this->actingAs($this->checker)->postJson('/emar/order-revisions/'.$revision->id.'/check',
+            ['source_matches' => true, 'dose_route_times_checked' => true, 'allergies_interactions_checked' => true])
+            ->assertUnprocessable()->assertJsonValidationErrors('allergy');
+        $this->actingAs($this->enterer)->post('/emar/order-revisions/'.$revision->id.'/allergy-confirmation', ['prescriber' => 'Dr Test', 'method' => 'phone',
+            'confirmed_at' => '2026-10-03T10:40', 'instruction' => 'Confirmed amoxicillin is safe after review of the recorded penicillin reaction.'])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->check($revision);
+
+        $order = $revision->medication->refresh();
+        $this->assertNotNull(app(CheckedOrderAllergyConfirmation::class)->forOrder($order));
+        $safety = app(MedicationSafetyService::class)->performSafetyCheck($this->client, $order);
+        $allergyWarnings = collect($safety['warnings'] ?? [])->where('type', 'allergy');
+        $this->assertCount(1, $allergyWarnings);
+        $this->assertSame('warning', $allergyWarnings->first()['severity'], 'The prescriber-confirmed class match no longer blocks the dose.');
+    }
+
+    public function test_a_reviewed_class_rule_also_applies_at_the_dose(): void
+    {
+        // EA-052, the reverse: a maintained class rule isn't only an order-time rule.
+        DB::table('medication_allergy_class_rules')->insert(['allergen' => 'Cephalosporin', 'medicine' => 'Cefalexin', 'source' => 'Synthetic formulary',
+            'source_version' => '2026.1', 'reviewed_at' => now()->subDay(), 'expires_at' => now()->addYear()]);
+        MedicationAllergy::create(['client_id' => $this->client->id, 'allergen' => 'Cephalosporin', 'severity' => 'moderate', 'reaction' => 'Synthetic hives', 'recorded_by' => $this->enterer->id]);
+        $order = $this->order(['name' => 'Cefalexin']);
+
+        $this->assertTrue(app(MedicationSafetyService::class)->checkAllergies($this->client, $order)['has_match']);
+        $this->assertSame('Synthetic formulary', app(\App\Services\Medication\OrderAllergyMatcher::class)->inspect($this->client, 'Cefalexin')['matches'][0]['match_source']);
     }
 
     private function startReconciliation(): MedicationReconciliation

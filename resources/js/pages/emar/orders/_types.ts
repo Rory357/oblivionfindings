@@ -95,7 +95,8 @@ export type AllergyInspection = {
         source: string;
     }[];
     matches: { allergen: string; severity: string | null }[];
-    class_matching: string;
+    /** EA-052: the same matcher as the dose check. */
+    class_matching: 'built_in' | 'configured' | string;
 };
 export type Detail = {
     summary: Order;

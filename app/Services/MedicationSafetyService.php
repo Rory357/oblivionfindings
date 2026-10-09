@@ -311,9 +311,11 @@ class MedicationSafetyService
         $records = ($this->allergyRecords ?? app(ClientAllergyRecordService::class))->forClient($client);
         $matches = [];
         $sources = [];
+        // EA-052: one matcher with the order check; the class rules load once.
+        $classRules = $records === [] ? collect() : \App\Services\Medication\AllergyMatching::activeRules();
 
         foreach ($records as $record) {
-            if ($record['allergy']->matchesMedication($medication->name)) {
+            if ($record['allergy']->matchesMedication($medication->name, $classRules)) {
                 $matches[] = $record['allergy'];
                 $sources[] = $record['source'];
             }
