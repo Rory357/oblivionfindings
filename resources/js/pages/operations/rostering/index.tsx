@@ -24,9 +24,7 @@ import {
     CapacityHeatmapPane,
     CopyToDayDialog,
     type CopyToDayShift,
-    type CoverageCellState,
     CoveragePane,
-    type CoverageRow,
     EntityFilter,
     type EntityFilterOption,
     type FillBySite,
@@ -559,6 +557,7 @@ function rangesOverlap(aS: string, aE: string, bS: string, bE: string) {
 }
 
 export default function RosteringIndex(props: Props) {
+    const conflictQueueHref = `/operations/rostering/conflicts?week=${encodeURIComponent(props.weekStart)}`;
     const rosterPage = usePage();
     const { auth } = rosterPage.props as {
         auth?: { user?: { name?: string }; can?: any };
@@ -586,6 +585,8 @@ export default function RosteringIndex(props: Props) {
     const [tab, setTab] = useState<RosterTab>(() =>
         initialRosterTab(props.workforcePreferences?.default_tab),
     );
+    const tabRequest = useRef<{ cancel: () => void } | null>(null);
+    useEffect(() => () => tabRequest.current?.cancel(), []);
     useEffect(() => {
         const requested = new URL(
             rosterPage.url,
@@ -750,7 +751,7 @@ export default function RosteringIndex(props: Props) {
             // Keep the active tab in the URL across filter/week navigations so
             // a refresh (or share) after filtering doesn't bounce to Shifts.
             // Callers that switch tabs (handleTabChange) override this key.
-            ...(tab !== 'shifts' ? { tab } : {}),
+            tab,
         };
     };
 
@@ -759,6 +760,30 @@ export default function RosteringIndex(props: Props) {
             return;
         }
 
+        // A late lazy-tab response must not restore a view the user has left.
+        tabRequest.current?.cancel();
+        tabRequest.current = null;
+        // Availability has different staff/site pickers and deliberately omits
+        // historical trends and candidate eligibility. A complete read on either
+        // boundary restores the destination's authoritative data before showing
+        // it; an empty skipped map must never mean an eligible candidate.
+        if (next === 'availability' || tab === 'availability') {
+            if (next === 'availability') setLoadingAvailability(true);
+            router.get(
+                rosteringIndex.url(),
+                { ...filterPayload(), tab: next },
+                {
+                    preserveState: true,
+                    preserveScroll: true,
+                    replace: true,
+                    onCancelToken: (token) => {
+                        tabRequest.current = token;
+                    },
+                    onFinish: () => setLoadingAvailability(false),
+                },
+            );
+            return;
+        }
         setTab(next);
 
         if (next === 'templates' && !props.rosterTemplates) {
@@ -771,6 +796,9 @@ export default function RosteringIndex(props: Props) {
                     preserveState: true,
                     preserveScroll: true,
                     replace: true,
+                    onCancelToken: (token) => {
+                        tabRequest.current = token;
+                    },
                     onFinish: () => setLoadingTemplates(false),
                 },
             );
@@ -787,28 +815,24 @@ export default function RosteringIndex(props: Props) {
                     preserveState: true,
                     preserveScroll: true,
                     replace: true,
+                    onCancelToken: (token) => {
+                        tabRequest.current = token;
+                    },
                     onFinish: () => setLoadingSeries(false),
                 },
             );
             return;
         }
 
-        if (next !== 'availability' || props.staffAvailabilitySummary) {
-            return;
-        }
-
-        setLoadingAvailability(true);
-        router.get(
-            rosteringIndex.url(),
-            { ...filterPayload(), tab: 'availability' },
-            {
-                only: ['staffAvailabilitySummary'],
-                preserveState: true,
-                preserveScroll: true,
-                replace: true,
-                onFinish: () => setLoadingAvailability(false),
-            },
-        );
+        const destination = new URL(rosterPage.url, window.location.origin);
+        destination.searchParams.set('tab', next);
+        // Explicitly retain Shifts too: removing it would reapply the user's
+        // saved starting view on refresh instead of their current choice.
+        router.replace({
+            url: destination.pathname + destination.search,
+            preserveState: true,
+            preserveScroll: true,
+        });
     };
 
     // Open a recurring series in the detail pop-up; lazy-loads its full payload.
@@ -1048,6 +1072,7 @@ export default function RosteringIndex(props: Props) {
 
     // -------- Top-level stats / breakdowns for hero + donut cards --------
     const total = props.stats.total;
+    const activeShiftCount = Math.max(0, total - props.stats.cancelled);
     const openCount = props.stats.open;
     const coverageRate = Math.max(0, Math.round(props.analytics.coverageRate));
     const staffRostered = props.analytics.staffRostered;
@@ -1122,11 +1147,10 @@ export default function RosteringIndex(props: Props) {
         },
     ].filter((s) => s.value > 0);
 
-    const totalWindows =
-        (props.coverageSites ?? []).reduce(
-            (acc, s) => acc + s.total_windows,
-            0,
-        ) || 1;
+    const totalWindows = (props.coverageSites ?? []).reduce(
+        (acc, s) => acc + s.total_windows,
+        0,
+    );
     const underWindows = (props.coverageSites ?? []).reduce(
         (acc, s) => acc + s.under_covered_windows,
         0,
@@ -1310,76 +1334,25 @@ export default function RosteringIndex(props: Props) {
         },
     ];
 
-    // -------- Coverage pane --------
-    const coverageWindowLabels = ['AM 07–15', 'PM 15–23', 'Night 23–07'];
-    const coverageRows: CoverageRow[] = useMemo(() => {
-        return (props.coverageSites ?? []).map((site) => {
-            const buckets: Array<{
-                label: 'AM 07–15' | 'PM 15–23' | 'Night 23–07';
-                cells: CoverageAlert[];
-            }> = [
-                { label: 'AM 07–15', cells: [] },
-                { label: 'PM 15–23', cells: [] },
-                { label: 'Night 23–07', cells: [] },
-            ];
-            for (const a of site.alerts ?? []) {
-                if (!a.starts_at) continue;
-                const h = new Date(a.starts_at).getHours();
-                if (h >= 7 && h < 15) buckets[0].cells.push(a);
-                else if (h >= 15 && h < 23) buckets[1].cells.push(a);
-                else buckets[2].cells.push(a);
-            }
-            const windows = buckets.map((b) => {
-                if (b.cells.length === 0) {
-                    return {
-                        state: 'ok' as CoverageCellState,
-                        label: '—',
-                        sub: 'No alerts',
-                    };
-                }
-                const worst = b.cells.reduce(
-                    (max, a) => (a.missing_staff > max.missing_staff ? a : max),
-                    b.cells[0],
-                );
-                const state: CoverageCellState =
-                    worst.missing_staff <= 0
-                        ? 'ok'
-                        : worst.coverage_state === 'gap'
-                          ? 'gap'
-                          : 'partial';
-                return {
-                    state,
-                    label: `${worst.assigned_staff}/${worst.required_staff}`,
-                    sub: worst.window_label,
-                };
-            });
-            return {
-                site: site.site_name,
-                windows,
-            };
-        });
-    }, [props.coverageSites]);
-
+    // -------- Coverage pane: exact configured-window totals --------
     const coverageStats: MicroStat[] = [
+        { label: 'Windows assessed', value: totalWindows, tone: 'info' },
         {
-            label: 'Coverage rate',
-            value: coverageRate,
-            suffix: '%',
+            label: 'Under-covered windows',
+            value: underWindows,
+            tone: underWindows > 0 ? 'warn' : 'info',
+        },
+        {
+            label: 'At required staff number',
+            value: exactWindows,
             tone: 'info',
         },
-        { label: 'Windows tracked', value: totalWindows, tone: 'info' },
         {
-            label: 'Partial windows',
-            value: Math.max(0, underWindows - (props.stats.coverage_gaps ?? 0)),
-            tone: 'warn',
-        },
-        {
-            label: 'Hard gaps',
-            value: props.stats.coverage_gaps ?? 0,
-            tone: 'crit',
+            label: 'Above required staff number',
+            value: overWindows,
+            tone: 'info',
         },
     ];
-
     // -------- Time off pane --------
     // Two streams combined:
     //   1. StaffTimeOff blocks (props.timeOffs) — self-managed one-off unavailability,
@@ -1585,48 +1558,53 @@ export default function RosteringIndex(props: Props) {
     ];
 
     // -------- Analytics pane --------
-    const trendPoints: AnalyticsTrendPoint[] = (
-        props.analytics?.historicalTrend ?? []
-    ).map((p) => ({
-        week: p.week,
-        coverage: p.total
-            ? Math.max(80, Math.round((p.completed / p.total) * 100))
-            : 95,
+    const history = props.analytics?.historicalTrend ?? [];
+    const historicalTotal = history.reduce(
+        (sum, point) => sum + point.total,
+        0,
+    );
+    const historicalCompleted = history.reduce(
+        (sum, point) => sum + point.completed,
+        0,
+    );
+    const trendPoints: AnalyticsTrendPoint[] = history.map((point) => ({
+        week: point.week,
+        completion:
+            point.total > 0
+                ? Math.round((point.completed / point.total) * 100)
+                : null,
     }));
     const shiftTypeSlices: ShiftTypeSlice[] = (
         props.analytics?.shiftTypeDistribution ?? []
     )
-        .filter((t) => t.value > 0)
-        .map((t, i) => ({
-            key: t.type,
-            label: t.type.replace(/_/g, ' '),
-            value: t.value,
-            color: SHIFT_TYPE_COLORS[i % SHIFT_TYPE_COLORS.length],
+        .filter((type) => type.value > 0)
+        .map((type, index) => ({
+            key: type.type,
+            label: type.type.replace(/_/g, ' '),
+            value: type.value,
+            color: SHIFT_TYPE_COLORS[index % SHIFT_TYPE_COLORS.length],
         }));
-    const fillBySite: FillBySite[] = (props.coverageSites ?? []).map((s) => {
-        const rate = s.total_windows
-            ? Math.round(
-                  ((s.exact_windows + s.overstaffed_windows) /
-                      s.total_windows) *
-                      100,
-              )
-            : 100;
-        return { site: s.site_name, rate };
-    });
-    const overtimeTrend: number[] = (
-        props.analytics?.historicalTrend ?? []
-    ).map((p) => Math.max(0, Math.round(p.total * 0.05 + (p.cancelled ?? 0))));
+    const fillBySite: FillBySite[] = (props.coverageSites ?? [])
+        .filter((site) => site.total_windows > 0)
+        .map((site) => ({
+            site: site.site_name,
+            rate: Math.round(
+                ((site.exact_windows + site.overstaffed_windows) /
+                    site.total_windows) *
+                    100,
+            ),
+        }));
+    // No recorded-hours overtime series is supplied by this endpoint.
+    const overtimeTrend: number[] = [];
     const analyticsStats: MicroStat[] = [
         {
-            label: 'Avg coverage · 8w',
-            value: trendPoints.length
-                ? Math.round(
-                      trendPoints.reduce((s, p) => s + p.coverage, 0) /
-                          trendPoints.length,
-                  )
-                : coverageRate,
-            suffix: '%',
-            tone: 'ok',
+            label: `Completed · ${trendPoints.length} weeks`,
+            value:
+                historicalTotal > 0
+                    ? Math.round((historicalCompleted / historicalTotal) * 100)
+                    : '—',
+            suffix: historicalTotal > 0 ? '%' : undefined,
+            tone: 'info',
         },
         {
             label: 'Staff rostered',
@@ -1658,7 +1636,7 @@ export default function RosteringIndex(props: Props) {
         [props.capacity],
     );
 
-    const signals: Signal[] = useMemo(() => {
+    const signals: Signal[] = (() => {
         const list: Signal[] = [];
         if (openCount > 0) {
             list.push({
@@ -1666,16 +1644,16 @@ export default function RosteringIndex(props: Props) {
                 title: `${openCount} open shift${openCount === 1 ? '' : 's'}`,
                 body: 'Need cover this week — assign from eligible staff.',
                 cta: 'Review open shifts',
-                onClick: () => setTab('open'),
+                onClick: () => handleTabChange('open'),
             });
         }
         if ((props.stats.coverage_gaps ?? 0) > 0) {
             list.push({
                 tone: 'critical',
-                title: `${props.stats.coverage_gaps} coverage gap${(props.stats.coverage_gaps ?? 0) === 1 ? '' : 's'}`,
-                body: 'Hard gaps where demand exceeds supply.',
+                title: `${props.stats.coverage_gaps} coverage alert${(props.stats.coverage_gaps ?? 0) === 1 ? '' : 's'}`,
+                body: 'Returned coverage windows need review.',
                 cta: 'View coverage',
-                onClick: () => setTab('coverage'),
+                onClick: () => handleTabChange('coverage'),
             });
         }
         if (props.stats.staff_overlaps > 0) {
@@ -1684,7 +1662,7 @@ export default function RosteringIndex(props: Props) {
                 title: `${props.stats.staff_overlaps} staff overlap${props.stats.staff_overlaps === 1 ? '' : 's'}`,
                 body: 'Resolve double-bookings in the Conflict queue.',
                 cta: 'Open conflicts',
-                href: '/operations/rostering/conflicts',
+                href: conflictQueueHref,
             });
         }
         if (props.stats.client_overlaps > 0) {
@@ -1693,7 +1671,7 @@ export default function RosteringIndex(props: Props) {
                 title: `${props.stats.client_overlaps} client overlap${props.stats.client_overlaps === 1 ? '' : 's'}`,
                 body: 'Client double-booked — adjust times or staff.',
                 cta: 'Open conflicts',
-                href: '/operations/rostering/conflicts',
+                href: conflictQueueHref,
             });
         }
         if (props.stats.incidents > 0) {
@@ -1720,7 +1698,7 @@ export default function RosteringIndex(props: Props) {
                 title: `${eligibleCounts.blocked} blocked candidate${eligibleCounts.blocked === 1 ? '' : 's'}`,
                 body: 'Eligibility rules blocking auto-assignment.',
                 cta: 'View open shifts',
-                onClick: () => setTab('open'),
+                onClick: () => handleTabChange('open'),
             });
         }
         const driftCount =
@@ -1732,7 +1710,7 @@ export default function RosteringIndex(props: Props) {
                 title: `${driftCount} recurring pattern${driftCount === 1 ? '' : 's'} drifting`,
                 body: 'Coverage rules and recurring series are out of sync.',
                 cta: 'View coverage',
-                onClick: () => setTab('coverage'),
+                onClick: () => handleTabChange('coverage'),
             });
         }
         const recurringCount = props.recurringPatterns?.length ?? 0;
@@ -1749,7 +1727,7 @@ export default function RosteringIndex(props: Props) {
                         ? `${recurringOpen} recurring occurrence${recurringOpen === 1 ? '' : 's'} still need cover.`
                         : 'Recurring patterns are generating this week.',
                 cta: 'Open recurring series',
-                href: '/operations/rostering?tab=recurring',
+                onClick: () => handleTabChange('recurring'),
             });
         }
         const expired = props.analytics?.complianceExpired ?? 0;
@@ -1763,14 +1741,7 @@ export default function RosteringIndex(props: Props) {
             });
         }
         return list;
-    }, [
-        openCount,
-        props.stats,
-        eligibleCounts,
-        props.recurringCoverageAlignment,
-        props.recurringPatterns,
-        props.analytics?.complianceExpired,
-    ]);
+    })();
 
     // -------- Publish ---------
     const publishBlockCount =
@@ -2219,8 +2190,8 @@ export default function RosteringIndex(props: Props) {
                 {curLab} {props.rosterPeriod.status.replace(/_/g, ' ')}
             </PageHeaderStatusChip>
         ) : (
-            <PageHeaderStatusChip variant="success">
-                On track
+            <PageHeaderStatusChip variant="neutral">
+                Week overview
             </PageHeaderStatusChip>
         );
 
@@ -2244,10 +2215,8 @@ export default function RosteringIndex(props: Props) {
                     <PageHeaderGlassButton
                         icon={AlertTriangle}
                         aria-label="Conflict queue"
-                        title="Conflict queue"
-                        onClick={() =>
-                            router.visit('/operations/rostering/conflicts')
-                        }
+                        title="Conflict queue for this week"
+                        onClick={() => router.visit(conflictQueueHref)}
                     />
                     {props.rosteringFeatures.auto_schedule &&
                     props.canAutoScheduleRoster ? (
@@ -2300,20 +2269,23 @@ export default function RosteringIndex(props: Props) {
             meters={
                 <>
                     <PageHeaderMeterBlock
-                        label="Coverage"
-                        ariaLabel="View coverage"
-                        onClick={() => handleTabChange('coverage')}
+                        label="Shifts assigned"
+                        ariaLabel="View assigned shifts"
+                        onClick={() => handleTabChange('shifts')}
                     >
-                        <PageHeaderMeterDonut
-                            percent={coverageRate}
-                            caption={
-                                <>
-                                    filled vs
-                                    <br />
-                                    demand
-                                </>
-                            }
-                        />
+                        {activeShiftCount > 0 ? (
+                            <PageHeaderMeterDonut
+                                percent={coverageRate}
+                                caption="of active shifts"
+                            />
+                        ) : (
+                            <>
+                                <PageHeaderMeterBig>—</PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    No active shifts
+                                </PageHeaderMeterCaption>
+                            </>
+                        )}
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="Shifts"
@@ -2346,7 +2318,7 @@ export default function RosteringIndex(props: Props) {
                                 : 'success'
                         }
                         ariaLabel="Open the conflict queue"
-                        href="/operations/rostering/conflicts"
+                        href={conflictQueueHref}
                     >
                         <PageHeaderMeterBig>
                             {props.stats.staff_overlaps}
@@ -2441,7 +2413,7 @@ export default function RosteringIndex(props: Props) {
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Operations', href: '/operations' },
+                { title: 'Workforce', href: rosteringIndex.url() },
                 { title: 'Rostering', href: rosteringIndex.url() },
             ]}
         >
@@ -2463,7 +2435,7 @@ export default function RosteringIndex(props: Props) {
                             />
                         </div>
                     )}
-                <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
                     <div className="min-w-0">
                         {tab === 'shifts' ? (
                             <WeekGridPane
@@ -2753,8 +2725,7 @@ export default function RosteringIndex(props: Props) {
                         {tab === 'coverage' ? (
                             <CoveragePane
                                 stats={coverageStats}
-                                windowLabels={coverageWindowLabels}
-                                rows={coverageRows}
+                                sites={props.coverageSites ?? []}
                                 alerts={props.coverageAlerts}
                             />
                         ) : null}
@@ -2805,7 +2776,7 @@ export default function RosteringIndex(props: Props) {
                         {tab === 'analytics' ? (
                             <AnalyticsPane
                                 stats={analyticsStats}
-                                coverageTrend={trendPoints}
+                                completionTrend={trendPoints}
                                 dailyCoverage={
                                     props.analytics?.dailyCoverage ?? []
                                 }
@@ -2855,7 +2826,7 @@ export default function RosteringIndex(props: Props) {
                         });
                     }}
                     onOpenQueue={() => {
-                        router.visit('/operations/rostering/conflicts');
+                        router.visit(conflictQueueHref);
                     }}
                 />
 
@@ -3129,7 +3100,7 @@ export default function RosteringIndex(props: Props) {
                                 View Operations Reports
                             </Button>
                         </Link>
-                        <Link href="/operations/rostering/conflicts">
+                        <Link href={conflictQueueHref}>
                             <Button size="sm" variant="outline">
                                 Conflict queue
                             </Button>

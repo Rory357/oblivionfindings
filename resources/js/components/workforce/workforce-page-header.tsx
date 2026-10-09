@@ -11,6 +11,7 @@ export function WorkforcePageHeader({
     filters,
     details,
     className,
+    mobileSummary = 'Overview',
     ...props
 }: Omit<PageHeaderProps, 'frontline'> & { details?: ReactNode }) {
     const isMobile = useIsMobile();
@@ -19,6 +20,7 @@ export function WorkforcePageHeader({
             <PageHeader
                 {...props}
                 frontline={isMobile}
+                mobileSummary={mobileSummary}
                 className={cn(
                     'max-lg:[&_.eh-meter]:min-w-0! max-lg:[&_[data-slot=page-header-meters]]:grid max-lg:[&_[data-slot=page-header-meters]]:grid-cols-2 max-lg:[&_[data-slot=page-header-meters]>div]:col-span-2 lg:[&_[data-slot=page-header-subline]]:truncate lg:[&_[data-slot=page-header-top]]:min-h-12',
                     className,

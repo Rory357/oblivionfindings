@@ -1,6 +1,6 @@
 # Workforce qualification rules — 8 October 2026
 
-Status: delivery follow-up passes native/frontend checks and the corrected House-copy browser journey. Main/GitHub delivery remains pending while the separate UI/workflow re-audit continues. This increment does not complete the full Workforce programme.
+Status: the qualification/access follow-up passed native/frontend checks and the corrected House-copy browser journey, and was integrated into local main and GitHub main as **6317cdce1** on 10 October. The separate UI/workflow re-audit continues; see `ui-workflow-reaudit-2026-10-10.md`. This increment does not complete the full Workforce programme.
 
 ## Current delivery checkpoint — 10 October
 
@@ -8,7 +8,7 @@ The historical acceptance below is retained. The final House-copy and Shift-acti
 
 The delivery branch is based on GitHub main `1c7f7ec5f`, retaining newer medication privacy, exact-medication links, Client safety payload and medication-tab return behaviour. Eight selected Workforce increments and the 22-path follow-up are assembled there, excluding the unrelated Fleet test and older cross-module fixture commits. The two known wizard files and lifecycle-test conflict use the reviewed resolutions and retain main's immediate preview cancellation.
 
-On this actual merged source, **50 frontend cases across five suites, full TypeScript and four-file scoped lint pass**. The production build passed with `assets/app-B4jEz--a.js` and the existing large-chunk advisory. The native result is retained at `test-results/delivery-native-20261010/result.json` (`PASSED_CLEAN`); the build result is at `test-results/delivery-build-20261010.json`. Existing historical qualification/native acceptance below remains separate. No full-programme acceptance or main push is claimed.
+On this actual merged source, **50 frontend cases across five suites, full TypeScript and four-file scoped lint pass**. The production build passed with `assets/app-B4jEz--a.js` and the existing large-chunk advisory. The native result is retained at `test-results/delivery-native-20261010/result.json` (`PASSED_CLEAN`); the build result is at `test-results/delivery-build-20261010.json`. Existing historical qualification/native acceptance below remains separate. The subsequent main push is recorded above; no full-programme acceptance is claimed.
 
 ## User choices and resulting behaviour
 

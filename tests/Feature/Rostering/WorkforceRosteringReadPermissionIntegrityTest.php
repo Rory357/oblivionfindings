@@ -22,6 +22,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia as Assert;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class WorkforceRosteringReadPermissionIntegrityTest extends TestCase
@@ -230,6 +231,101 @@ class WorkforceRosteringReadPermissionIntegrityTest extends TestCase
         $this->assertSame($queue, $this->queueState());
     }
 
+    #[DataProvider('historicalTrendWeeks')]
+    public function test_historical_trend_uses_worker_local_half_open_weeks_and_exact_record_counts(string $week): void
+    {
+        $reader = $this->reader(false);
+        $worker = $this->person($this->site, ['shifts.viewAssigned']);
+        $selected = Carbon::parse($week, 'Pacific/Auckland');
+        $first = $selected->copy()->subWeeks(3);
+        foreach (['completed', 'cancelled', 'scheduled', 'completed'] as $i => $status) {
+            $start = $first->copy()->addWeeks($i)->utc();
+            $this->shift($worker, ['starts_at' => $start, 'ends_at' => $start->copy()->addMinutes(30), 'status' => $status]);
+        }
+        // Sunday local belongs to the preceding bucket; Monday local can still be Sunday UTC.
+        foreach ([[$selected->copy()->subSecond(), 'completed'], [$first->copy()->subSecond(), 'cancelled'], [$selected->copy()->addWeek(), 'cancelled']] as [$local, $status]) {
+            $start = $local->copy()->utc();
+            $this->shift($worker, ['starts_at' => $start, 'ends_at' => $start->copy()->addMinutes(30), 'status' => $status]);
+        }
+        $expected = [];
+        foreach ([[1, 0, 1], [0, 1, 1], [1, 0, 2], [1, 0, 1]] as $i => [$completed, $cancelled, $total]) {
+            $expected[] = ['week' => $first->copy()->addWeeks($i)->format('d M'), 'completed' => $completed, 'cancelled' => $cancelled, 'total' => $total];
+        }
+        $state = $this->state();
+        $queue = $this->queueState();
+        $this->actingAs($reader)->get($this->url(['tab' => 'analytics', 'week' => $week]))->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('analytics.historicalTrend', $expected));
+        $this->assertSame($state, $this->state());
+        $this->assertSame($queue, $this->queueState());
+    }
+
+    public static function historicalTrendWeeks(): array
+    {
+        return ['NZ daylight starts' => ['2026-09-28'], 'NZ daylight ends' => ['2026-04-06']];
+    }
+
+    public function test_historical_trend_preserves_current_scope_and_selected_site_staff_client_filters(): void
+    {
+        $reader = $this->reader(false);
+        $secondSite = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
+        $secondClient = Client::factory()->create(['site_id' => $secondSite->id, 'service_context_id' => $this->context->id]);
+        $otherClient = Client::factory()->create(['site_id' => $this->site->id, 'service_context_id' => $this->context->id]);
+        $reader->hrEmployeeProfile->update(['secondary_site_ids' => [$secondSite->id]]);
+        $reader = $reader->fresh();
+        $firstWorker = $this->person($this->site, ['shifts.viewAssigned']);
+        $firstWorker->hrEmployeeProfile->update(['secondary_site_ids' => [$secondSite->id]]);
+        $secondWorker = $this->person($this->site, ['shifts.viewAssigned']);
+        $foreignWorker = $this->person($this->foreignSite, ['shifts.viewAssigned']);
+        $this->shift($firstWorker, ['status' => 'completed']);
+        $this->shift($secondWorker, ['status' => 'cancelled']);
+        $this->shift($firstWorker, ['site_id' => $secondSite->id, 'client_id' => $secondClient->id]);
+        $this->shift($firstWorker, ['client_id' => $otherClient->id, 'status' => 'completed']);
+        $this->shift($foreignWorker, ['site_id' => $this->foreignSite->id, 'client_id' => $this->foreignClient->id, 'status' => 'completed']);
+        $this->shift($firstWorker, ['client_id' => $this->foreignClient->id, 'status' => 'completed']);
+        $ended = $this->person($this->site, ['shifts.viewAssigned']);
+        $ended->hrEmployeeProfile->update(['is_active' => false]);
+        $this->shift($ended, ['status' => 'completed']);
+        $badSeries = ShiftSeries::create(['client_id' => $this->foreignClient->id, 'site_id' => $this->foreignSite->id,
+            'user_id' => $foreignWorker->id, 'service_context_id' => $this->context->id, 'start_date' => '2026-10-26', 'end_date' => '2026-11-02',
+            'timezone' => 'Pacific/Auckland', 'by_weekday' => [2], 'starts_time' => '09:00', 'ends_time' => '10:00', 'status' => 'scheduled']);
+        $this->shift($firstWorker, ['shift_series_id' => $badSeries->id, 'status' => 'completed']);
+        $state = $this->state();
+        $queue = $this->queueState();
+        foreach ([
+            [[], [2, 1, 4]],
+            [['site_id' => [$this->site->id]], [2, 1, 3]],
+            [['staff_id' => $firstWorker->id], [2, 0, 3]],
+            [['client_id' => $this->client->id], [1, 1, 2]],
+            [['site_id' => [$secondSite->id], 'staff_id' => $firstWorker->id, 'client_id' => $secondClient->id], [0, 0, 1]],
+            [['site_id' => [$this->foreignSite->id]], [0, 0, 0]],
+        ] as [$filters, [$completed, $cancelled, $total]]) {
+            $expected = array_map(fn ($week) => ['week' => $week, 'completed' => 0, 'cancelled' => 0, 'total' => 0], ['05 Oct', '12 Oct', '19 Oct']);
+            $expected[] = ['week' => '26 Oct', 'completed' => $completed, 'cancelled' => $cancelled, 'total' => $total];
+            $this->actingAs($reader)->get($this->url(['tab' => 'analytics', ...$filters]))->assertOk()
+                ->assertInertia(fn (Assert $page) => $page->where('analytics.historicalTrend', $expected));
+        }
+        $this->assertSame($state, $this->state());
+        $this->assertSame($queue, $this->queueState());
+    }
+
+    public function test_historical_trend_keeps_owner_only_and_availability_omission_and_zero_buckets(): void
+    {
+        $reader = $this->reader(false);
+        $owner = $this->person($this->site, ['rostering.viewAny', 'shifts.viewAssigned'], 'coordinator');
+        $this->shift($owner);
+        $state = $this->state();
+        $queue = $this->queueState();
+        $this->actingAs($owner)->get($this->url(['tab' => 'analytics']))->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('analytics.historicalTrend', []));
+        $this->actingAs($reader)->get($this->url(['tab' => 'availability']))->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('analytics.historicalTrend', []));
+        $expected = array_map(fn ($week) => ['week' => $week, 'completed' => 0, 'cancelled' => 0, 'total' => 0], ['04 Jan', '11 Jan', '18 Jan', '25 Jan']);
+        $this->get($this->url(['tab' => 'analytics', 'week' => '2027-01-25']))->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('analytics.historicalTrend', $expected));
+        $this->assertSame($state, $this->state());
+        $this->assertSame($queue, $this->queueState());
+    }
+
     private function reader(bool $publish = true): User
     {
         return $this->person($this->site, ['rostering.viewAny', 'shifts.viewAny', 'staff.viewAny', ...($publish ? ['rostering.publish'] : [])], 'coordinator');
@@ -247,11 +343,17 @@ class WorkforceRosteringReadPermissionIntegrityTest extends TestCase
 
     private function shift(?User $worker, array $values = []): Shift
     {
-        return Shift::factory()->create(['client_id' => $this->client->id, 'site_id' => $this->site->id,
+        $attributes = ['client_id' => $this->client->id, 'site_id' => $this->site->id,
             'service_context_id' => $this->context->id, 'user_id' => $worker?->id, 'created_by' => $worker?->id,
             'starts_at' => Carbon::parse('2026-10-27 09:00:00', 'Pacific/Auckland')->utc(),
             'ends_at' => Carbon::parse('2026-10-27 10:00:00', 'Pacific/Auckland')->utc(),
-            'status' => 'scheduled', 'published_at' => null, 'roster_period_id' => null, ...$values])->fresh();
+            'status' => 'scheduled', 'published_at' => null, 'roster_period_id' => null, ...$values];
+        if ($attributes['status'] === 'completed') {
+            $attributes['actual_starts_at'] ??= $attributes['starts_at'];
+            $attributes['actual_ends_at'] ??= $attributes['ends_at'];
+        }
+
+        return Shift::factory()->create($attributes)->fresh();
     }
 
     private function period(Site $site, User $creator): RosterPeriod

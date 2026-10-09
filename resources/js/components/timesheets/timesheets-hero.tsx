@@ -239,7 +239,10 @@ export default function TimesheetsHero({
                                 aria-haspopup="dialog"
                                 aria-expanded={pickerOpen}
                             >
-                                Week {summary.week_number} · Choose week
+                                {dated
+                                    ? `Week ${summary.week_number}`
+                                    : 'All weeks'}{' '}
+                                · Choose week
                             </PageHeaderFilterButton>
                             <PageHeaderFilterButton
                                 icon={ChevronRight}

@@ -400,41 +400,55 @@ class RosteringController extends Controller
                 ->count();
         }
 
-        // 4-week historical trend (shifts completed vs cancelled per week).
-        // Collapsed into a single GROUP BY week-bucket query and organization
-        // scoped to match the sibling analytics above (Shift carries an
-        // organization_id column). The bucket index is the number of whole
-        // 7-day windows from the trend start (weekStart - 3 weeks); because all
-        // window boundaries land on startOfDay, DATEDIFF (date-only) reproduces
-        // the original half-open [wStart, wEnd) buckets exactly.
-        // Skipped on the availability-tab landing: only the analytics pane reads
-        // analytics.historicalTrend, and that tab body is not rendered there.
+        // Four worker-local reporting weeks ending in the selected week.
+        // These are visible recorded Shift starts/completions/cancellations,
+        // not staffing coverage or overtime. Preserve the availability fast path.
         $historicalTrend = [];
-        if ($canManageAny && ! $isAvailabilityTab) {
-            $trendStart = (clone $weekStart)->subWeeks(3);
-            $trendEnd = (clone $weekStart)->addDays(7);
+        if ($canReadAnyShifts && ! $isAvailabilityTab) {
+            $trendWeekStart = $this->rosterPeriods->weekStart($data['week'] ?? null);
+            $trendStart = $trendWeekStart->copy()->subWeeks(3);
+            $trendEnd = $trendWeekStart->copy()->addDays(7);
+            $trendQuery = $this->siteAccess->applyShiftScope(Shift::query(), $auth, ['shifts.manageAny'])
+                ->where('starts_at', '>=', $trendStart->copy()->utc())
+                ->where('starts_at', '<', $trendEnd->copy()->utc());
 
-            $bucketRows = Shift::query()
-                ->when($organizationId, fn ($q) => $q->where('organization_id', $organizationId))
-                ->where('starts_at', '>=', $trendStart)
-                ->where('starts_at', '<', $trendEnd)
-                ->selectRaw('FLOOR(DATEDIFF(starts_at, ?) / 7) as week_bucket', [$trendStart->toDateString()])
-                ->selectRaw("SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed")
-                ->selectRaw("SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled")
-                ->selectRaw('COUNT(*) as total')
-                ->groupBy('week_bucket')
-                ->get()
-                ->keyBy(fn ($row) => (int) $row->week_bucket);
+            if (! $canManageAny) {
+                // Match the scoped roster's whole linked-series visibility.
+                $trendQuery->where(function ($linkedSeries) use ($auth, $readSiteIds): void {
+                    $linkedSeries->whereNull('shift_series_id')->orWhereHas('series', function ($series) use ($auth, $readSiteIds): void {
+                        $series->where(function ($provenance) use ($auth, $readSiteIds): void {
+                            $provenance->where(fn ($manual) => $manual->whereNull('client_id')->whereIn('site_id', $readSiteIds))
+                                ->orWhereHas('client', function ($client) use ($auth): void {
+                                    $this->siteAccess->applyClientScope($client, $auth, ['shifts.manageAny'])
+                                        ->where(fn ($agreement) => $agreement->whereNull('shift_series.site_id')
+                                            ->orWhereColumn('clients.site_id', 'shift_series.site_id'));
+                                });
+                        });
+                    });
+                });
+            }
+            if (! empty($data['staff_id'])) {
+                $trendQuery->where('user_id', $data['staff_id']);
+            }
+            if (! empty($data['client_id'])) {
+                $trendQuery->where('client_id', $data['client_id']);
+            }
+            if ($siteFilter !== null) {
+                is_array($siteFilter)
+                    ? $trendQuery->whereIn('site_id', $siteFilter)
+                    : $trendQuery->where('site_id', $siteFilter);
+            }
+            $trendShifts = $trendQuery->get(['id', 'starts_at', 'status']);
 
             for ($w = 3; $w >= 0; $w--) {
-                $wStart = (clone $weekStart)->subWeeks($w);
-                $bucketIndex = 3 - $w;
-                $row = $bucketRows->get($bucketIndex);
+                $wStart = $trendWeekStart->copy()->subWeeks($w);
+                $wEnd = $wStart->copy()->addDays(7);
+                $rows = $trendShifts->filter(fn (Shift $shift) => $shift->starts_at->gte($wStart) && $shift->starts_at->lt($wEnd));
                 $historicalTrend[] = [
                     'week' => $wStart->format('d M'),
-                    'completed' => (int) ($row?->completed ?? 0),
-                    'cancelled' => (int) ($row?->cancelled ?? 0),
-                    'total' => (int) ($row?->total ?? 0),
+                    'completed' => $rows->where('status', 'completed')->count(),
+                    'cancelled' => $rows->where('status', 'cancelled')->count(),
+                    'total' => $rows->count(),
                 ];
             }
         }

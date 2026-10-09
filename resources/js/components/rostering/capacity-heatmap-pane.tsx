@@ -57,6 +57,7 @@ export function CapacityHeatmapPane({
 }: CapacityHeatmapPaneProps) {
     const totals = rows.map((r) => r.days.reduce((s, x) => s + x, 0));
     const totalScheduled = totals.reduce((s, x) => s + x, 0);
+    const gridMinWidth = 340 + days.length * 80;
     const dayTotals = Array.from({ length: days.length }, (_, di) =>
         rows.reduce((s, r) => s + (r.days[di] ?? 0), 0),
     );
@@ -65,11 +66,17 @@ export function CapacityHeatmapPane({
         <div className="space-y-4">
             <MicroStats stats={stats} />
 
-            <div className="overflow-hidden rounded-[14px] border border-border bg-card">
+            <div
+                role="region"
+                aria-label="Staff capacity grid, scroll across for all days"
+                tabIndex={0}
+                className="overflow-x-auto rounded-[14px] border border-border bg-card focus-visible:ring-2 focus-visible:ring-ring"
+            >
                 <div
                     className="grid border-b border-border bg-muted/50"
                     style={{
                         gridTemplateColumns: `220px repeat(${days.length}, minmax(0, 1fr)) 120px`,
+                        minWidth: gridMinWidth,
                     }}
                 >
                     <div className="px-3 py-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
@@ -125,6 +132,7 @@ export function CapacityHeatmapPane({
                                 className="grid"
                                 style={{
                                     gridTemplateColumns: `220px repeat(${days.length}, minmax(0, 1fr)) 120px`,
+                                    minWidth: gridMinWidth,
                                 }}
                             >
                                 <div className="flex items-center gap-2 px-3 py-2">
@@ -200,6 +208,7 @@ export function CapacityHeatmapPane({
                         className="grid border-t border-border bg-muted/30"
                         style={{
                             gridTemplateColumns: `220px repeat(${days.length}, minmax(0, 1fr)) 120px`,
+                            minWidth: gridMinWidth,
                         }}
                     >
                         <div className="px-3 py-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">

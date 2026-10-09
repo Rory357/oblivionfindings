@@ -43,7 +43,7 @@ beforeEach(() => {
 });
 function reviewCalendar() {
     fireEvent.click(screen.getByLabelText('Starting view'));
-    fireEvent.click(screen.getByRole('option', { name: 'Month calendar' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Calendar' }));
     fireEvent.click(screen.getByRole('button', { name: 'Review changes' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save preferences' }));
 }
@@ -80,7 +80,7 @@ it('uses its matching preference receipt instead of a newer unrelated projection
     });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Starting view')).toHaveTextContent(
-        'Month calendar',
+        'Calendar',
     );
     expect(screen.getByLabelText('Roster layout')).toHaveTextContent(
         'Week grid',
@@ -124,7 +124,7 @@ it('keeps choices after an unknown save and failed then successful current-state
         reload.mock.calls[1][0].onFinish();
     });
     expect(screen.getByLabelText('Starting view')).toHaveTextContent(
-        'Month calendar',
+        'Calendar',
     );
     expect(screen.getByText(/does not confirm the earlier save/)).toBeVisible();
     expect(patch).toHaveBeenCalledOnce();
@@ -133,12 +133,12 @@ it('keeps choices after an unknown save and failed then successful current-state
 it('reviews and submits both personal choices together', () => {
     render(<WorkforceSettings {...props} />);
     fireEvent.click(screen.getByLabelText('Starting view'));
-    fireEvent.click(screen.getByRole('option', { name: 'Month calendar' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Calendar' }));
     fireEvent.click(screen.getByLabelText('Roster layout'));
     fireEvent.click(screen.getByRole('option', { name: 'List' }));
     fireEvent.click(screen.getByRole('button', { name: 'Review changes' }));
     const review = screen.getByRole('dialog');
-    expect(within(review).getByText('Roster → Month calendar')).toBeVisible();
+    expect(within(review).getByText('Shifts → Calendar')).toBeVisible();
     expect(within(review).getByText('Week grid → List')).toBeVisible();
     fireEvent.click(
         within(review).getByRole('button', { name: 'Save preferences' }),

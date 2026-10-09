@@ -169,8 +169,8 @@ function Row({
 const choiceLabel = (key: keyof Preferences, value: string) =>
     key === 'default_tab'
         ? value === 'calendar'
-            ? 'Month calendar'
-            : 'Roster'
+            ? 'Calendar'
+            : 'Shifts'
         : value === 'list'
           ? 'List'
           : 'Week grid';
@@ -492,10 +492,10 @@ function WorkforceSettingsBody({
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="shifts">
-                                                Roster
+                                                Shifts
                                             </SelectItem>
                                             <SelectItem value="calendar">
-                                                Month calendar
+                                                Calendar
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>
@@ -505,7 +505,7 @@ function WorkforceSettingsBody({
                                 query={query}
                                 id="workforce-roster-view"
                                 label="Roster layout"
-                                hint="Choose the initial layout inside the Roster view. You can still switch between week, day and list while working."
+                                hint="Choose the initial layout inside the Shifts view in Rostering. You can still switch between week, day and list while working."
                                 changed={
                                     draft.roster_view !== saved.roster_view
                                 }

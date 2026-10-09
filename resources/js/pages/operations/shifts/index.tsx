@@ -577,8 +577,8 @@ export default function ShiftsIndex({
                 {stats.in_progress} in progress
             </PageHeaderStatusChip>
         ) : (
-            <PageHeaderStatusChip variant="success">
-                Fully covered
+            <PageHeaderStatusChip variant="neutral">
+                {stats.total === 0 ? 'No shifts' : 'Shift overview'}
             </PageHeaderStatusChip>
         );
 
@@ -759,7 +759,7 @@ export default function ShiftsIndex({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Operations', href: '/operations' },
+                { title: 'Workforce', href: shiftsIndex.url() },
                 { title: shiftPlural, href: shiftsIndex.url() },
             ]}
         >

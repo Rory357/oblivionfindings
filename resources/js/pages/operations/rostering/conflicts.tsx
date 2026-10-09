@@ -2,7 +2,6 @@ import {
     PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
-    PageHeaderMeterBar,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
@@ -23,6 +22,7 @@ import {
     formatWeekRange,
     startOfWeek,
     weekLabel,
+    weekPickerYmd,
 } from '@/components/rostering';
 import {
     ConflictConfirmDialog,
@@ -121,7 +121,6 @@ export default function RosteringConflicts(props: ConflictsProps) {
     const {
         counts,
         blocking,
-        seedTotal,
         resolvedToday,
         open,
         visible,
@@ -663,14 +662,10 @@ export default function RosteringConflicts(props: ConflictsProps) {
         );
     }, [visible, search]);
 
-    const progressPct = seedTotal
-        ? Math.round((resolvedToday / seedTotal) * 100)
-        : 0;
-
     const goToWeek = (date: Date) => {
         router.get(
             '/operations/rostering/conflicts',
-            { week: date.toISOString().slice(0, 10) },
+            { week: weekPickerYmd(date) },
             { preserveScroll: true },
         );
     };
@@ -736,7 +731,7 @@ export default function RosteringConflicts(props: ConflictsProps) {
             subline={`${range.startLabel} → ${rangeEndLabel} · ${pluralise(
                 queue.siteOptions.length,
                 'site',
-            )} · ${resolvedToday} resolved today`}
+            )} · ${resolvedToday} actions in this session`}
             actions={
                 <>
                     <PageHeaderSearch
@@ -840,14 +835,13 @@ export default function RosteringConflicts(props: ConflictsProps) {
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Resolved today"
-                        value={`${resolvedToday}/${seedTotal}`}
+                        label="This session"
                         ariaLabel="View all conflicts"
                         onClick={() => queue.setFilter('all')}
                     >
-                        <PageHeaderMeterBar percent={progressPct} />
+                        <PageHeaderMeterBig>{resolvedToday}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            {progressPct}% of today's queue cleared
+                            {resolvedToday} actions in this session
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                 </>
@@ -909,8 +903,14 @@ export default function RosteringConflicts(props: ConflictsProps) {
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Operations', href: '/operations' },
-                { title: 'Rostering', href: '/operations/rostering' },
+                {
+                    title: 'Workforce',
+                    href: `/operations/rostering?week=${encodeURIComponent(props.weekStart)}`,
+                },
+                {
+                    title: 'Rostering',
+                    href: `/operations/rostering?week=${encodeURIComponent(props.weekStart)}`,
+                },
                 {
                     title: 'Conflict queue',
                     href: '/operations/rostering/conflicts',
