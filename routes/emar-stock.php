@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Emar\MedicationStockController;
 use App\Http\Controllers\Emar\MedicationStockPhotoController;
+use App\Http\Controllers\Emar\PersonMedicationPhotosController;
 use Illuminate\Support\Facades\Route;
 
 // The P06 Stock hub (Lane C4). House leads hold medications.stock.receive
@@ -14,8 +15,17 @@ Route::middleware(['auth', 'permission:medications.view', 'permission:medication
         Route::get('/', [MedicationStockController::class, 'index'])->name('emar.stock.packs');
         Route::get('/medicine/{medication}', [MedicationStockController::class, 'detail'])->whereNumber('medication')->name('emar.stock.packs.detail');
         Route::post('/commands', [MedicationStockController::class, 'command'])->name('emar.stock.packs.command');
-        Route::post('/{lot}/photos', [MedicationStockPhotoController::class, 'store'])->whereNumber('lot')->name('emar.stock.photos.store');
     });
+// P02 person record › Medicines › Photos (Lane C11): the per-person record gate
+// and controlled concealment, like every other record view.
+Route::middleware(['auth', 'permission:medications.view'])->get('/emar/clients/{client}/record/photos', [PersonMedicationPhotosController::class, 'index'])
+    ->whereNumber('client')->name('emar.record.photos');
+// Who may take a pack photo is the Medicine photos setting (P11 Q18):
+// anyone who can receive stock (default), leads only, or anyone who records
+// doses. The controller checks it with the same Site and person scope.
+Route::middleware(['auth', 'permission:medications.view'])->prefix('emar/stock/packs')->group(function (): void {
+    Route::post('/{lot}/photos', [MedicationStockPhotoController::class, 'store'])->whereNumber('lot')->name('emar.stock.photos.store');
+});
 // Photo viewing matches the existing chart-reader scope; each request checks
 // canonical person/medicine ownership and controlled-drug concealment.
 Route::middleware(['auth', 'permission:medications.view'])->prefix('emar/stock/packs/photos')->group(function (): void {

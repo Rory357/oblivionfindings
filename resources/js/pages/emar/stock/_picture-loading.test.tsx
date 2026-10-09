@@ -68,7 +68,28 @@ function showStock(view: 'stock' | 'expiring' = 'stock') {
 
 beforeEach(() => {
     vi.spyOn(axios, 'get').mockResolvedValue({
-        data: { status: 'unlinked', can_manage: false, medicine_version: 1 },
+        data: {
+            status: 'matched',
+            can_manage: false,
+            medicine_version: 1,
+            catalogue_configured: true,
+            product: {
+                id: 4,
+                code_system: 'nzulm',
+                code: '1',
+                name: 'Synthetic medicine 13',
+                strength: '5 mg',
+                form: 'tablet',
+                has_photo: true,
+                photo_url: '/emar/catalogue/products/4/photo',
+            },
+            source: {
+                source_name: 'Synthetic catalogue',
+                source_version: '1',
+                attribution: 'Synthetic',
+                expires_at: '2027-01-01T00:00:00Z',
+            },
+        },
     });
     vi.stubGlobal(
         'fetch',
@@ -93,7 +114,7 @@ describe('Stock pictures load for the opened medicine', () => {
                 within(screen.getByRole('table')).getAllByRole('row'),
             ).toHaveLength(26);
             expect(
-                screen.queryByText('Verified product picture'),
+                screen.queryByText('Reference image'),
             ).not.toBeInTheDocument();
             expect(axios.get).not.toHaveBeenCalled();
             expect(fetch).not.toHaveBeenCalled();
@@ -101,7 +122,7 @@ describe('Stock pictures load for the opened medicine', () => {
             fireEvent.click(
                 within(screen.getByRole('table')).getByText(detail.name),
             );
-            await screen.findByText('Verified product picture');
+            await screen.findByText('Reference image');
             expect(fetch).toHaveBeenCalledExactlyOnceWith(
                 '/emar/stock/packs/medicine/13',
                 expect.objectContaining({ credentials: 'same-origin' }),
@@ -112,7 +133,7 @@ describe('Stock pictures load for the opened medicine', () => {
             );
             expect(
                 await screen.findByText(
-                    'A picture alone does not confirm a dose.',
+                    'Check the label — the picture is a guide only.',
                     {
                         exact: false,
                     },
@@ -130,6 +151,47 @@ describe('Stock pictures load for the opened medicine', () => {
         },
     );
 
+    it('shows no catalogue UI when no catalogue is configured, even for a catalogue manager', async () => {
+        vi.mocked(axios.get).mockResolvedValue({
+            data: {
+                status: 'unavailable',
+                can_manage: true,
+                medicine_version: 1,
+                catalogue_configured: false,
+                message:
+                    'No package-label product has been confirmed for this medicine.',
+            },
+        });
+        showStock();
+        fireEvent.click(
+            within(screen.getByRole('table')).getByText(detail.name),
+        );
+        await waitFor(() => expect(axios.get).toHaveBeenCalledTimes(1));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(screen.queryByText('Reference image')).not.toBeInTheDocument();
+        expect(
+            screen.queryByText('Review product link'),
+        ).not.toBeInTheDocument();
+    });
+
+    it('shows a configured but unbound catalogue only to someone who can link it', async () => {
+        vi.mocked(axios.get).mockResolvedValue({
+            data: {
+                status: 'unavailable',
+                can_manage: false,
+                medicine_version: 1,
+                catalogue_configured: true,
+            },
+        });
+        showStock();
+        fireEvent.click(
+            within(screen.getByRole('table')).getByText(detail.name),
+        );
+        await waitFor(() => expect(axios.get).toHaveBeenCalledTimes(1));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(screen.queryByText('Reference image')).not.toBeInTheDocument();
+    });
+
     it('does not request a picture when the stock detail is denied', async () => {
         vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
         showStock();
@@ -138,8 +200,6 @@ describe('Stock pictures load for the opened medicine', () => {
         );
         await screen.findByText('We cannot show this record');
         expect(axios.get).not.toHaveBeenCalled();
-        expect(
-            screen.queryByText('Verified product picture'),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByText('Reference image')).not.toBeInTheDocument();
     });
 });

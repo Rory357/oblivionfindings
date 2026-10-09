@@ -8,6 +8,7 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationStock;
 use App\Models\MedicationPharmacyOrder;
 use App\Models\MedicationStockCountRecord;
+use App\Models\MedicationStockLot;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Medication\Audit\MedicationEventData;
@@ -18,6 +19,8 @@ use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\PharmacyConnect\PharmacyDispatchGuard;
 use App\Services\Medication\Stock\MedicationStockService;
+use App\Services\Medication\Stock\PackPhotoReceiptSettings;
+use App\Services\Medication\Stock\PackPhotoWriter;
 use App\Services\Medication\Stock\StockReadPayload;
 use App\Support\Medication\MedicationStockQuantity as Qty;
 use App\Support\Medication\PharmacySupplyRules;
@@ -25,9 +28,12 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use InvalidArgumentException;
+use Throwable;
 
 final class MedicationStockController extends Controller
 {
@@ -66,65 +72,98 @@ final class MedicationStockController extends Controller
             'action' => 'required|string', 'client_medication_id' => 'required|integer|min:1',
             'request_uuid' => 'required|uuid', 'witnessed_by' => 'nullable|integer|min:1', 'witness_credential' => 'nullable|string|max:255', ...$rules,
         ]);
+        // C11: a pack photo travels with its receipt, so a required photo and
+        // the stock it shows are saved together or not at all.
+        $photo = $action === 'receive' ? $request->file('photo') : null;
+        unset($data['photo']);
+        abort_if($photo !== null && ! app(PackPhotoReceiptSettings::class)->canPhotograph($request->user()), 403);
+        $writtenPath = null;
 
-        return DB::transaction(fn () => $this->scope->forMedication($request->user(), $data['client_medication_id'], $capability,
-            function (Client $client, ClientMedication $med, User $actor, Collection $lockedUsers) use ($data, $action, $capability) {
-                $this->access->assertReadable($actor, $client);
-                abort_if($med->controlled_drug && ! $actor->canDo('medications.controlled.view'), 404);
-                // P06: a controlled delivery is the house lead's, with a witness.
-                abort_if($med->controlled_drug && $capability !== MedicationGovernanceScopeService::STOCK_CAPABILITY, 403);
-                // Controlled receipt uses P07's witness + ledger transaction.
-                abort_if($med->controlled_drug && ! in_array($action, ['initialise', 'receive', 'order', 'order_update'], true), 422, 'Use the witnessed controlled-drug workflow for this action.');
-                $med->setRelation('client', $client);
-                if ($med->controlled_drug && in_array($action, ['initialise', 'receive'], true)) {
-                    abort_unless($actor->canDo('medications.controlled.record'), 403);
-                    app(ControlledRegisterService::class)->assertPresent($actor, (int) $client->site_id, true);
-                    $this->scope->confirmedControlledWitness($actor, $client, (int) ($data['witnessed_by'] ?? 0), $data['witness_credential'] ?? null, lockedUsers: $lockedUsers);
-                }
-                $binding = $data;
-                unset($binding['witness_credential']);
-                $fingerprint = hash('sha256', json_encode(['actor' => $actor->id, 'data' => $binding], JSON_THROW_ON_ERROR));
-                $replay = ['client_request_uuid' => $data['request_uuid']];
-                $stored = $this->scope->idempotencyResult('emar-p06-command', $replay, $fingerprint, durable: true);
-                if ($stored) {
-                    return response()->json([...$stored, 'duplicate' => true]);
-                }
-                $auditEvents = [];
-                $result = $this->execute($med, $actor, $action, $data, $lockedUsers, $auditEvents);
-                $payload = ['success' => true, ...$result];
-                $this->scope->rememberIdempotencyResult('emar-p06-command', $replay, $payload, $fingerprint, durable: true);
-                if ($action === 'count') {
-                    $count = MedicationStockCountRecord::findOrFail($result['count_id']);
-                    if ($count->state === 'needs_review') {
-                        app(MedicationFollowupService::class)->ensureForSource(
-                            'stock-discrepancy', $count->id, $client, $med, null, null, null,
-                            ['count_id' => $count->id, 'source_url' => '/emar/stock/packs?view=counts&count_id='.$count->id],
+        try {
+            return DB::transaction(fn () => $this->scope->forMedication($request->user(), $data['client_medication_id'], $capability,
+                function (Client $client, ClientMedication $med, User $actor, Collection $lockedUsers) use ($data, $action, $capability, $photo, &$writtenPath) {
+                    $this->access->assertReadable($actor, $client);
+                    abort_if($med->controlled_drug && ! $actor->canDo('medications.controlled.view'), 404);
+                    // P06: a controlled delivery is the house lead's, with a witness.
+                    abort_if($med->controlled_drug && $capability !== MedicationGovernanceScopeService::STOCK_CAPABILITY, 403);
+                    // Controlled receipt uses P07's witness + ledger transaction.
+                    abort_if($med->controlled_drug && ! in_array($action, ['initialise', 'receive', 'order', 'order_update'], true), 422, 'Use the witnessed controlled-drug workflow for this action.');
+                    $med->setRelation('client', $client);
+                    // Settings › Medicine photos: a controlled delivery may need its
+                    // photo first. Checked before the witness PIN is spent.
+                    if ($action === 'receive' && $med->controlled_drug && $photo === null && app(PackPhotoReceiptSettings::class)->controlledPhotoRequired()) {
+                        throw ValidationException::withMessages(['photo' => 'Add a photo of the pack and its label. Your organisation needs one before a controlled delivery is received.']);
+                    }
+                    if ($med->controlled_drug && in_array($action, ['initialise', 'receive'], true)) {
+                        abort_unless($actor->canDo('medications.controlled.record'), 403);
+                        app(ControlledRegisterService::class)->assertPresent($actor, (int) $client->site_id, true);
+                        $this->scope->confirmedControlledWitness($actor, $client, (int) ($data['witnessed_by'] ?? 0), $data['witness_credential'] ?? null, lockedUsers: $lockedUsers);
+                    }
+                    $binding = $data;
+                    unset($binding['witness_credential']);
+                    if ($photo !== null) {
+                        $binding['photo'] = hash_file('sha256', $photo->getRealPath());
+                    }
+                    $fingerprint = hash('sha256', json_encode(['actor' => $actor->id, 'data' => $binding], JSON_THROW_ON_ERROR));
+                    $replay = ['client_request_uuid' => $data['request_uuid']];
+                    $stored = $this->scope->idempotencyResult('emar-p06-command', $replay, $fingerprint, durable: true);
+                    if ($stored) {
+                        return response()->json([...$stored, 'duplicate' => true]);
+                    }
+                    $auditEvents = [];
+                    $result = $this->execute($med, $actor, $action, $data, $lockedUsers, $auditEvents);
+                    $photoEvents = [];
+                    if ($photo !== null) {
+                        $lotIds = $result['lot_ids'] ?? array_filter([$result['lot_id'] ?? null]);
+                        $lotId = $lotIds[(int) ($data['photo_pack'] ?? 0)] ?? ($lotIds[0] ?? null);
+                        $pack = MedicationStockLot::query()->lockForUpdate()->findOrFail($lotId);
+                        $saved = app(PackPhotoWriter::class)->create(
+                            $actor, $client, $med, $pack, $photo, (string) Str::uuid(), $data['photo_description'] ?? null,
+                            (bool) ($data['pack_changed'] ?? false), $writtenPath, $photoEvents,
+                        );
+                        $result['photo_id'] = (int) $saved->id;
+                    }
+                    $payload = ['success' => true, ...$result];
+                    $this->scope->rememberIdempotencyResult('emar-p06-command', $replay, $payload, $fingerprint, durable: true);
+                    if ($action === 'count') {
+                        $count = MedicationStockCountRecord::findOrFail($result['count_id']);
+                        if ($count->state === 'needs_review') {
+                            app(MedicationFollowupService::class)->ensureForSource(
+                                'stock-discrepancy', $count->id, $client, $med, null, null, null,
+                                ['count_id' => $count->id, 'source_url' => '/emar/stock/packs?view=counts&count_id='.$count->id],
+                            );
+                        }
+                    } elseif ($action === 'count_review') {
+                        // All source locks, writes and the durable receipt are done.
+                        // Collect completion audit before appending this whole batch.
+                        app(MedicationFollowupService::class)->completeFromSource(
+                            'stock-discrepancy:'.$result['count_id'], $actor, 'count_reviewed',
+                            ['count_id' => $result['count_id']], $auditEvents,
                         );
                     }
-                } elseif ($action === 'count_review') {
-                    // All source locks, writes and the durable receipt are done.
-                    // Collect completion audit before appending this whole batch.
-                    app(MedicationFollowupService::class)->completeFromSource(
-                        'stock-discrepancy:'.$result['count_id'], $actor, 'count_reviewed',
-                        ['count_id' => $result['count_id']], $auditEvents,
+                    $subjectKey = array_key_first($result);
+                    $auditEvents[] = new MedicationEventData(
+                        siteId: (int) $client->site_id, kind: 'stock.'.$action,
+                        subjectType: match ($subjectKey) {
+                            'lot_id' => 'stock_lot', 'order_id' => 'pharmacy_supply', 'count_id' => 'stock_count', 'movement_id' => 'stock_movement', default => 'stock'
+                        },
+                        subjectId: (string) ($result[$subjectKey] ?? $med->id), actorId: $actor->id, occurredAt: CarbonImmutable::now('UTC'),
+                        summary: match ($action) {
+                            'receive' => 'Stock received', 'order' => 'Pharmacy supply record created', 'order_update' => 'Pharmacy supply evidence updated', 'count' => 'Stock counted', 'count_review' => 'Stock count reviewed', 'initialise' => 'Recorded stock balance carried forward', default => 'Stock movement recorded'
+                        },
+                        facts: ['request_uuid' => $data['request_uuid'], 'client_medication_id' => $med->id, ...$result], clientId: $client->id, controlled: (bool) $med->controlled_drug,
                     );
-                }
-                $subjectKey = array_key_first($result);
-                $auditEvents[] = new MedicationEventData(
-                    siteId: (int) $client->site_id, kind: 'stock.'.$action,
-                    subjectType: match ($subjectKey) {
-                        'lot_id' => 'stock_lot', 'order_id' => 'pharmacy_supply', 'count_id' => 'stock_count', 'movement_id' => 'stock_movement', default => 'stock'
-                    },
-                    subjectId: (string) ($result[$subjectKey] ?? $med->id), actorId: $actor->id, occurredAt: CarbonImmutable::now('UTC'),
-                    summary: match ($action) {
-                        'receive' => 'Stock received', 'order' => 'Pharmacy supply record created', 'order_update' => 'Pharmacy supply evidence updated', 'count' => 'Stock counted', 'count_review' => 'Stock count reviewed', 'initialise' => 'Recorded stock balance carried forward', default => 'Stock movement recorded'
-                    },
-                    facts: ['request_uuid' => $data['request_uuid'], 'client_medication_id' => $med->id, ...$result], clientId: $client->id, controlled: (bool) $med->controlled_drug,
-                );
-                app(MedicationEventRecorder::class)->appendMany($auditEvents);
+                    app(MedicationEventRecorder::class)->appendMany([...$auditEvents, ...$photoEvents]);
 
-                return response()->json($payload);
-            }, authorizationUserIds: array_values(array_filter([(int) ($data['witnessed_by'] ?? 0)]))), 5);
+                    return response()->json($payload);
+                }, authorizationUserIds: array_values(array_filter([(int) ($data['witnessed_by'] ?? 0)]))), 5);
+        } catch (Throwable $error) {
+            // Rollback removes the photo row, not its bytes: delete only this call's file.
+            if ($writtenPath) {
+                Storage::disk('private')->delete($writtenPath);
+            }
+            throw $error;
+        }
     }
 
     /**
@@ -274,6 +313,8 @@ final class MedicationStockController extends Controller
                 'short_expiry_reason' => 'nullable|string|max:2000', 'notes' => 'nullable|string|max:2000', 'label_checked' => 'accepted',
                 'source' => 'required|in:pharmacy,family,hospital,respite,other', 'source_reference' => 'required|string|max:255',
                 'pharmacy_order_id' => 'nullable|integer|min:1',
+                'photo' => 'nullable|'.PackPhotoWriter::RULES, 'photo_pack' => 'nullable|integer|min:0|max:24',
+                'photo_description' => 'nullable|string|max:1000', 'pack_changed' => 'nullable|boolean',
             ],
             'move' => ['lot_id' => 'required|integer|min:1', 'kind' => 'required|in:returned_pharmacy,removed_expired,damaged,quarantined', 'quantity' => $positive, ...$reason],
             'going_out' => ['lot_id' => 'required|integer|min:1', 'quantity' => $positive, ...$reason],

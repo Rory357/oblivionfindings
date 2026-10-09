@@ -303,6 +303,12 @@ final class DoseRecordingRequirements
         $result = [
             'kind' => $order->is_prn ? 'prn' : 'scheduled',
             'order' => $orderFacts,
+            // C11: the latest staff photo of the supplied pack (else a bound
+            // catalogue reference image, else null), concealed for a
+            // controlled medicine the viewer can't see. Merge note for Lane
+            // A11: pack_photo_policy also carries A11's {show, no_photo}.
+            'pack_photo' => app(\App\Services\Medication\Stock\PackPhotoReader::class)->forOrder($viewer, $order),
+            'pack_photo_policy' => ['receipt_prompt' => app(\App\Services\Medication\Stock\PackPhotoReceiptSettings::class)->receiptPromptOn()],
             'due' => $due,
             'block_all' => null,
             'block_given' => $blockGiven,

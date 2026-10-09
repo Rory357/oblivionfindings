@@ -959,9 +959,15 @@ function ItemWorkspace({
                 onSaved={onSaved}
             />
         );
-    const photos = item.packs.flatMap((pack) =>
-        pack.photos.map((photo) => ({ pack, photo })),
-    );
+    // C11: newest first, like the person record's Medicines › Photos.
+    const photos = item.packs
+        .flatMap((pack) => pack.photos.map((photo) => ({ pack, photo })))
+        .sort(
+            (a, b) =>
+                b.photo.taken_at.localeCompare(a.photo.taken_at) ||
+                b.photo.id - a.photo.id,
+        );
+    const canPhotograph = item.photo_policy?.can_photograph ?? can.manage;
     const setup = async () => {
         const result = await command.run({
             action: 'initialise',
@@ -1388,67 +1394,83 @@ function ItemWorkspace({
                             />
                         ))}
                     {section === 4 && (
-                        <>
-                            {can.manage && item.packs.length > 0 && (
+                        <div className="space-y-3">
+                            {canPhotograph && item.packs.length > 0 && (
                                 <Button onClick={() => setAction('photo')}>
                                     Add or replace a pack photo
                                 </Button>
                             )}
-                            <SettingsNotice role="note">
-                                Photos are supplemental identification. Check
-                                the current order and pack label. A changed pack
-                                or brand needs a new photo.
-                            </SettingsNotice>
                             {photos.length ? (
-                                photos.map(({ pack, photo }) => (
-                                    <ReviewCard
-                                        key={photo.id}
-                                        icon={Camera}
-                                        title={photo.original_name}
-                                    >
-                                        <ReviewRow
-                                            label="Pack"
-                                            value={
-                                                pack.batch_number ??
-                                                'Batch unknown'
-                                            }
-                                        />
-                                        <ReviewRow
-                                            label="Added"
-                                            value={`${formatDateTime(photo.taken_at)} · ${photo.taken_by_name ?? 'Unknown'}`}
-                                        />
-                                        <Button
-                                            variant="outline"
-                                            onClick={() =>
-                                                setFile({
-                                                    id: photo.id,
-                                                    name: 'Medicine pack photo',
-                                                    filename:
-                                                        photo.original_name,
-                                                    mime: photo.mime,
-                                                    bytes: photo.bytes,
-                                                    source:
-                                                        pack.batch_number ??
-                                                        'Batch unknown',
-                                                    previewUrl:
-                                                        photo.preview_url,
-                                                    downloadUrl:
-                                                        photo.download_url,
-                                                })
-                                            }
+                                <div className="grid gap-3 sm:grid-cols-3">
+                                    {photos.map(({ pack, photo }) => (
+                                        <figure
+                                            key={photo.id}
+                                            className="space-y-1.5"
                                         >
-                                            View and download
-                                        </Button>
-                                    </ReviewCard>
-                                ))
+                                            <Button
+                                                unstyled
+                                                type="button"
+                                                className="block w-full rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                                aria-label={`View the pack photo taken ${formatDateTime(photo.taken_at)}`}
+                                                onClick={() =>
+                                                    setFile({
+                                                        id: photo.id,
+                                                        name: `${item.name} — photo of the supplied pack`,
+                                                        filename:
+                                                            photo.original_name,
+                                                        mime: photo.mime,
+                                                        bytes: photo.bytes,
+                                                        source: `Taken ${formatDateTime(photo.taken_at)} by ${photo.taken_by_name ?? 'Unknown'} · ${pack.label ?? pack.batch_number ?? 'Batch unknown'}`,
+                                                        previewUrl:
+                                                            photo.preview_url,
+                                                        downloadUrl:
+                                                            photo.download_url,
+                                                    })
+                                                }
+                                            >
+                                                <img
+                                                    src={photo.preview_url}
+                                                    alt={`Pack photo — ${pack.label ?? pack.batch_number ?? 'pack'}`}
+                                                    className="aspect-[4/3] w-full rounded-lg border object-cover"
+                                                />
+                                            </Button>
+                                            <figcaption className="text-caption">
+                                                {formatDateTime(photo.taken_at)}{' '}
+                                                ·{' '}
+                                                {photo.taken_by_name ??
+                                                    'Unknown'}{' '}
+                                                ·{' '}
+                                                {pack.batch_number ??
+                                                    'no batch'}
+                                                <br />
+                                                {photo.description ??
+                                                    (photo.pack_changed
+                                                        ? 'Pack looks different from last time'
+                                                        : 'Pack as received')}
+                                                {pack.supplier
+                                                    ? ` · ${pack.supplier}`
+                                                    : ''}
+                                            </figcaption>
+                                        </figure>
+                                    ))}
+                                </div>
                             ) : (
-                                <EmptyState
-                                    icon={Camera}
-                                    title="No pack photos yet"
-                                    description="A receipt can be saved without a photo."
-                                />
+                                <p className="text-sm text-muted-foreground">
+                                    {item.photo_policy?.mode === 'off'
+                                        ? 'No pack photo yet.'
+                                        : 'No pack photo yet. The next receipt prompts for one.'}
+                                </p>
                             )}
-                        </>
+                            <p className="text-caption">
+                                Photos are stored privately
+                                {item.controlled
+                                    ? ', and shown only to people with controlled-medicine access'
+                                    : ''}
+                                . The latest is shown in the dose dialog.
+                                Earlier photos are kept. Check the label — the
+                                picture is a guide only.
+                            </p>
+                        </div>
                     )}
                 </div>
             </WizardShell>

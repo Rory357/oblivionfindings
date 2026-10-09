@@ -145,6 +145,8 @@ class MedicationSettingsRegistry
             MedicationReviewCadence::settingsGroup(),
             ...ControlledSettingsFragment::groups(),
             \App\Services\Medication\Reporting\RecordsReportingSettings::group(),
+            // Lane C11: Medication rules › Medicine photos (P11 Q18, P06 Q6).
+            \App\Services\Medication\Stock\PackPhotoReceiptSettings::group(),
             $this->emergencyPolicy(),
         ];
     }

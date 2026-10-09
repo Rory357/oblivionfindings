@@ -3,6 +3,7 @@ import {
     Activity,
     BellRing,
     CalendarDays,
+    Camera,
     ClipboardList,
     History,
     Pill,
@@ -17,7 +18,6 @@ import {
  * The record's sections (the header rail) and their views (the tier-2
  * strip), from the approved P02 v1. A section joins the rail when its build
  * chunk lands — never as an empty or placeholder tab (hide unbuilt).
- * Pack photos (Medicines › Photos) wait for P06's capture at stock receipt.
  */
 export type RecordTab =
     | 'chart'
@@ -51,6 +51,8 @@ export const RECORD_SECTIONS: RecordSection[] = [
         views: [
             { key: 'current', label: 'Current', icon: Pill },
             { key: 'stopped', label: 'Stopped', icon: History },
+            // C11: staff photos of the packs supplied (P06 capture at receipt).
+            { key: 'photos', label: 'Photos', icon: Camera },
         ],
     },
     {
