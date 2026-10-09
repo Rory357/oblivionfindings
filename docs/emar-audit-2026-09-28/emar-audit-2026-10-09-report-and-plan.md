@@ -349,3 +349,25 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
     - two-person reviews;
     - backup retention and schedule.
 - **Forgotten-PIN fallback default (Stephan, 9 Oct): OFF until a manager turns it on in Settings.** Codex had switched it on through an env default. Controlled drugs never allow the fallback.
+
+## 7. Build progress
+- **10 Oct: Lane B B1 + B3 are LIVE as `1c7f7ec5f`** (a fast-forward from `58a7cae79`).
+  - B1 (EA-011) covers the respite workspace:
+    - Site scope and the person rule;
+    - Medical gates;
+    - canonical allergies, now also at the check-in anaphylaxis gate.
+  - B3 (EA-013, EA-014) keeps medication data out of AI search and summaries by default (`llm.include_medication_data`). The Str::squish crash is fixed.
+  - Tests:
+    - B1: RespiteWorkspaceMedicationPrivacyTest; Feature/Respite 146 passing; RespiteWorkspaceTest rerun green.
+    - B3: AiMedicationDataExclusionTest.
+- **Lane A: the A1–A4 live walk passed on all six P0 paths.**
+  - The paths covered:
+    - mismatched units (methadone, register 100→95 mL);
+    - controlled PRN with packs;
+    - an order changed mid-dialog (422, then re-check, then saved at the new dose);
+    - an offline duplicate (409 plus a lead follow-up, no second record);
+    - an online timeout retry (one record only);
+    - a shared-device logout (warning, then purge).
+  - Walk fixes F1 (follow-up idempotency) and F2 (copy) are being committed.
+  - F3 is decided by Main: the pack-start check uses minute precision.
+  - Independent review of A1–A4 comes next, before the push.
