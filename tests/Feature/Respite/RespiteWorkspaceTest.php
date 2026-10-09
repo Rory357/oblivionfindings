@@ -6,6 +6,7 @@ use App\Models\RespiteBookingRequest;
 use App\Models\RespiteReferral;
 use App\Models\RespiteTask;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -20,7 +21,7 @@ beforeEach(function () {
 });
 
 test('the respite workspace renders one payload with pipeline lists, homes and counts', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => Site::factory()->create()->id]);
     $requestedStart = now()->addDays(5)->setTime(10, 0);
     $requestedEnd = now()->addDays(12)->setTime(10, 0);
 
@@ -72,7 +73,7 @@ test('the respite workspace renders one payload with pipeline lists, homes and c
 });
 
 test('the complete-profile prefill derives the canonical macron ethnicity from a Māori referral', function () {
-    $client = Client::factory()->create(['ethnicity' => null]);
+    $client = Client::factory()->create(['ethnicity' => null, 'site_id' => Site::factory()->create()->id]);
 
     RespiteReferral::create([
         'client_id' => $client->id,

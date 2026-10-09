@@ -243,7 +243,10 @@ function ReferralCard({
                             booking request
                         </Button>
                     ) : null}
-                    {can.update && r.clientId && !r.clientProfileComplete ? (
+                    {can.update &&
+                    r.clientId &&
+                    r.clientProfileCanComplete &&
+                    !r.clientProfileComplete ? (
                         <Button
                             size="sm"
                             variant="outline"

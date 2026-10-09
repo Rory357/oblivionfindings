@@ -5,10 +5,10 @@ namespace App\Http\Controllers\Respite;
 use App\Domain\Governance\Models\NotifiableIncident;
 use App\Events\Respite\RespiteEvent;
 use App\Http\Controllers\Controller;
+use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\DataBreachLog;
-use App\Models\MedicationAllergy;
 use App\Models\RespiteBooking;
 use App\Models\RespiteComplaint;
 use App\Models\RespiteMedicationReconciliation;
@@ -17,6 +17,7 @@ use App\Models\RestraintEvent;
 use App\Models\ServiceAgreement;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\References\ReferenceNumberGenerator;
+use App\Services\Respite\RespiteMedicalDisclosure;
 use App\Services\Respite\RespiteShiftSync;
 use App\Services\Respite\RespiteStateTransitionService;
 use App\Services\Respite\RespiteStayScope;
@@ -628,10 +629,9 @@ class RespiteStayController extends Controller
      */
     private function guardAnaphylaxisAcknowledgement(RespiteStay $stay, array $validated): void
     {
-        $allergies = MedicationAllergy::query()
-            ->where('client_id', $stay->client_id)
-            ->where('severity', 'life_threatening')
-            ->get(['id', 'allergen', 'reaction', 'severity']);
+        // The canonical allergy record (EA-011), not the legacy register alone.
+        $client = $stay->relationLoaded('client') ? $stay->client : Client::query()->find($stay->client_id);
+        $allergies = collect($client ? app(RespiteMedicalDisclosure::class)->lifeThreateningAllergies($client) : []);
 
         if ($allergies->isEmpty()) {
             return;
@@ -661,11 +661,13 @@ class RespiteStayController extends Controller
             'epipen_location' => $validated['epipen_location'],
             'escalation_note' => $validated['anaphylaxis_escalation_note'],
             'allergies' => $allergies
-                ->map(fn (MedicationAllergy $allergy) => [
-                    'id' => $allergy->id,
-                    'allergen' => $allergy->allergen,
-                    'reaction' => $allergy->reaction,
-                    'severity' => $allergy->severity,
+                ->map(fn (array $entry) => [
+                    'id' => $entry['allergy']->id ?? null,
+                    'key' => $entry['key'] ?? null,
+                    'allergen' => $entry['allergen'],
+                    'reaction' => $entry['reaction'] ?? null,
+                    'severity' => $entry['severity'],
+                    'source' => $entry['source'] ?? null,
                 ])
                 ->values()
                 ->all(),

@@ -8,8 +8,6 @@ use App\Models\AssetGeofence;
 use App\Models\BehaviourSupportPlan;
 use App\Models\Client;
 use App\Models\ClientIncident;
-use App\Models\ClientMedicationAlert;
-use App\Models\MedicationAllergy;
 use App\Models\RespiteBooking;
 use App\Models\RespiteBookingRequest;
 use App\Models\RespiteComplaint;
@@ -22,8 +20,12 @@ use App\Models\ServiceAgreement;
 use App\Models\ServiceContext;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Respite\RespiteMedicalDisclosure;
+use App\Services\Respite\RespiteStayScope;
 use App\Support\Respite\RespiteFundingSource;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -42,9 +44,27 @@ class RespiteWorkspaceController extends Controller
     /** @var array<int,array<int,array{type:string,label:string,detail:?string,severity:string,requiresAcknowledgement:bool}>> */
     private array $criticalAlertCache = [];
 
-    public function index(): Response
+    private ?User $viewer = null;
+
+    public function __construct(
+        private readonly RespiteStayScope $scope,
+        private readonly RespiteMedicalDisclosure $medical,
+    ) {}
+
+    /**
+     * EA-011: every list is limited to the viewer's approved houses and
+     * people (the same boundary the respite record pages enforce), and
+     * medical content (allergies, chart alerts, the medical profile) passes
+     * the per-person Medical-section gate.
+     */
+    public function index(Request $request): Response
     {
+        $this->viewer = $request->user();
+        $viewer = $this->viewer;
+        $clientScope = fn ($clients) => $this->scope->applyAccessibleClientScope($clients, $viewer);
+
         $referrals = RespiteReferral::query()
+            ->whereHas('client', $clientScope)
             ->with([
                 'client' => fn ($query) => $query
                     ->select($this->clientProfileColumns())
@@ -58,7 +78,7 @@ class RespiteWorkspaceController extends Controller
             ->map(fn (RespiteReferral $r) => $this->mapReferral($r))
             ->values();
 
-        $requestModels = RespiteBookingRequest::query()
+        $requestModels = $this->scope->applyAccessibleBookingRequestScope(RespiteBookingRequest::query(), $viewer)
             ->with([
                 'client' => fn ($query) => $query
                     ->select($this->clientProfileColumns())
@@ -82,7 +102,7 @@ class RespiteWorkspaceController extends Controller
             ->map(fn (RespiteBookingRequest $rq) => $this->mapRequest($rq, $bookingByRequest->get($rq->id)))
             ->values();
 
-        $bookings = RespiteBooking::query()
+        $bookings = $this->scope->applyAccessibleBookingScope(RespiteBooking::query(), $viewer)
             ->with([
                 'client:id,first_name,last_name,site_id',
                 'client.site:id,name',
@@ -98,7 +118,7 @@ class RespiteWorkspaceController extends Controller
             ->map(fn (RespiteBooking $b) => $this->mapBooking($b))
             ->values();
 
-        $stays = RespiteStay::query()
+        $stays = $this->scope->applyAccessibleStayScope(RespiteStay::query(), $request)
             ->with([
                 'client:id,first_name,last_name,site_id',
                 'client.site:id,name',
@@ -126,9 +146,9 @@ class RespiteWorkspaceController extends Controller
             'stays' => $stays,
             'homes' => $this->homes(),
             'tasks' => auth()->user()?->canDo('respite.tasks.view') ? $this->tasks() : [],
-            'stats' => $this->stats(),
+            'stats' => $this->stats($request),
             // Lookup data for the create / onboard pop-ups.
-            'clients' => Client::query()
+            'clients' => $this->scope->applyAccessibleClientScope(Client::query(), $viewer)
                 ->with('site:id,name')
                 ->orderBy('last_name')->orderBy('first_name')
                 ->get(['id', 'first_name', 'last_name', 'date_of_birth', 'nhi_number', 'site_id'])
@@ -293,12 +313,34 @@ class RespiteWorkspaceController extends Controller
             && (int) ($client->emergency_contacts_count ?? $client->emergencyContacts()->count()) > 0;
     }
 
+    /** "Complete profile" saves through the client update route, so it needs that authority. */
+    private function canCompleteProfile(?Client $client): bool
+    {
+        return $client !== null
+            && $this->viewer !== null
+            && Gate::forUser($this->viewer)->allows('update', $client);
+    }
+
+    /**
+     * The "Complete profile" prefill, only for readers who may save it. The
+     * medical profile, conditions and contacts are the Medical section: they
+     * go only to readers who may open it (the same split as the client edit
+     * dialog and ClientController::update), and the wizard then skips them.
+     */
     private function clientProfilePrefill(?Client $client, array $context = []): ?array
     {
-        if (! $client) {
+        if (! $this->canCompleteProfile($client)) {
             return null;
         }
+        $prefill = $this->fullClientProfilePrefill($client, $context);
 
+        return $this->medical->canReadMedical($this->viewer, $client)
+            ? $prefill
+            : array_diff_key($prefill, array_flip(['medical', 'conditions', 'emergency_contacts']));
+    }
+
+    private function fullClientProfilePrefill(Client $client, array $context): array
+    {
         $cultural = $context['cultural'] ?? [];
         $carer = $context['carer'] ?? [];
         $languages = $this->stringList($client->languages);
@@ -490,9 +532,19 @@ class RespiteWorkspaceController extends Controller
     }
 
     /** Headline counts for the hero + tab badges. */
-    private function stats(): array
+    private function stats(Request $request): array
     {
-        $inHouse = RespiteStay::whereIn('status', ['active', 'extended'])->count();
+        // Pipeline counts are counted from the same scoped lists the panes
+        // show; bed capacity and occupancy stay organisation-wide (homes).
+        $viewer = $request->user();
+        $referralRows = fn () => RespiteReferral::query()
+            ->whereHas('client', fn ($clients) => $this->scope->applyAccessibleClientScope($clients, $viewer));
+        $requestRows = fn () => $this->scope->applyAccessibleBookingRequestScope(RespiteBookingRequest::query(), $viewer);
+        $bookingRows = fn () => $this->scope->applyAccessibleBookingScope(RespiteBooking::query(), $viewer);
+        $inHouse = $this->scope->applyAccessibleStayScope(RespiteStay::query(), $request)
+            ->whereIn('status', ['active', 'extended'])
+            ->count();
+        $bedsOccupied = RespiteStay::whereIn('status', ['active', 'extended'])->count();
         $respiteIncidentIds = ClientIncident::query()
             ->whereNotNull('respite_stay_id')
             ->pluck('id');
@@ -518,7 +570,7 @@ class RespiteWorkspaceController extends Controller
             ->where('within_support_plan', true)
             ->whereNull('behaviour_support_plan_id')
             ->count();
-        $missingConsentRights = RespiteBooking::query()
+        $missingConsentRights = $bookingRows()
             ->whereIn('status', ['pending', 'confirmed'])
             ->where(function ($query) {
                 $query->whereNull('consent_authority')
@@ -533,7 +585,7 @@ class RespiteWorkspaceController extends Controller
             })
             ->count();
         $openComplaints = RespiteComplaint::whereNotIn('status', ['resolved'])->count();
-        $fundingAttention = RespiteBooking::query()
+        $fundingAttention = $bookingRows()
             ->whereIn('status', ['pending', 'confirmed'])
             ->where(function ($query) {
                 $query->whereNotIn('funding_status', ['approved', 'not_required'])
@@ -547,18 +599,18 @@ class RespiteWorkspaceController extends Controller
         $fullHomes = $this->homes()->where('full', true)->count();
 
         return [
-            'newReferrals' => RespiteReferral::where('status', 'received')->count(),
-            'toTriage' => RespiteReferral::whereIn('status', ['received', 'triaged'])->count(),
-            'crisisOpen' => RespiteReferral::where('urgency', 'crisis')
+            'newReferrals' => $referralRows()->where('status', 'received')->count(),
+            'toTriage' => $referralRows()->whereIn('status', ['received', 'triaged'])->count(),
+            'crisisOpen' => $referralRows()->where('urgency', 'crisis')
                 ->whereNotIn('status', ['accepted', 'declined'])->count(),
-            'carerCrisisAttention' => RespiteReferral::where('carer_breakdown_flag', true)
+            'carerCrisisAttention' => $referralRows()->where('carer_breakdown_flag', true)
                 ->whereNotIn('status', ['accepted', 'declined'])->count(),
-            'awaitingReview' => RespiteBookingRequest::whereIn('status', ['submitted', 'under_review'])->count(),
-            'waitlisted' => RespiteBookingRequest::where('status', 'waitlisted')->count(),
-            'confirmedUpcoming' => RespiteBooking::where('status', 'confirmed')->count(),
+            'awaitingReview' => $requestRows()->whereIn('status', ['submitted', 'under_review'])->count(),
+            'waitlisted' => $requestRows()->where('status', 'waitlisted')->count(),
+            'confirmedUpcoming' => $bookingRows()->where('status', 'confirmed')->count(),
             'inHouse' => $inHouse,
             'bedsTotal' => (int) Site::where('offers_respite', true)->sum('respite_capacity'),
-            'bedsOccupied' => $inHouse,
+            'bedsOccupied' => $bedsOccupied,
             'fullHomes' => $fullHomes,
             'fundingAttention' => $fundingAttention,
             'complianceAttention' => $restraintsAwaitingReview
@@ -629,6 +681,8 @@ class RespiteWorkspaceController extends Controller
             'carerStrainLevel' => $r->carer_strain_level,
             'carerBreakdown' => (bool) $r->carer_breakdown_flag,
             'clientProfileComplete' => $this->clientProfileComplete($client),
+            'clientProfileCanComplete' => $this->canCompleteProfile($client),
+            'clientProfileCanEditMedical' => $this->medical->canReadMedical($this->viewer, $client),
             'clientProfilePrefill' => $this->clientProfilePrefill($client, [
                 'cultural' => [
                     'is_maori' => (bool) $r->is_maori,
@@ -691,6 +745,8 @@ class RespiteWorkspaceController extends Controller
             // it then surfaces in Bookings, the Calendar and Stays.
             'onboarded' => $confirmed,
             'clientProfileComplete' => $this->clientProfileComplete($client),
+            'clientProfileCanComplete' => $this->canCompleteProfile($client),
+            'clientProfileCanEditMedical' => $this->medical->canReadMedical($this->viewer, $client),
             'clientProfilePrefill' => $this->clientProfilePrefill($client, [
                 'cultural' => $rq->intake_snapshot['cultural'] ?? [],
                 'carer' => $rq->intake_snapshot['carer'] ?? [],
@@ -774,6 +830,12 @@ class RespiteWorkspaceController extends Controller
             'openIncidents' => (int) ($s->open_incident_count ?? 0),
             'openComplaints' => (int) ($s->open_complaint_count ?? 0),
             'criticalAlerts' => $this->criticalAlerts($client),
+            // Safety floor: whoever can check the guest in is told an
+            // anaphylaxis check is needed (canonical record), without the
+            // allergen unless they may read the Medical section.
+            'anaphylaxisCheckRequired' => $client !== null
+                && $this->viewer?->canDo('respite.stays.manage')
+                && $this->medical->requiresAnaphylaxisAcknowledgement($client),
             'requiresAdmissionMedRec' => $this->hasLoadedActiveMedications($client),
             'admissionMedRecStatus' => $s->medicationReconciliations
                 ->firstWhere('type', 'admission')
@@ -854,30 +916,9 @@ class RespiteWorkspaceController extends Controller
             return $this->criticalAlertCache[$client->id];
         }
 
-        $allergies = MedicationAllergy::query()
-            ->where('client_id', $client->id)
-            ->severe()
-            ->get(['id', 'allergen', 'reaction', 'severity'])
-            ->map(fn (MedicationAllergy $allergy) => [
-                'type' => 'allergy',
-                'label' => $allergy->allergen,
-                'detail' => $allergy->reaction,
-                'severity' => $allergy->severity === 'life_threatening' ? 'critical' : 'high',
-                'requiresAcknowledgement' => $allergy->severity === 'life_threatening',
-            ]);
-
-        $medicationAlerts = ClientMedicationAlert::query()
-            ->where('client_id', $client->id)
-            ->enabled()
-            ->unresolved()
-            ->get(['id', 'title', 'detail', 'prompt_on_open'])
-            ->map(fn (ClientMedicationAlert $alert) => [
-                'type' => 'medication_alert',
-                'label' => $alert->title,
-                'detail' => $alert->detail,
-                'severity' => $alert->prompt_on_open ? 'high' : 'medium',
-                'requiresAcknowledgement' => (bool) $alert->prompt_on_open,
-            ]);
+        // Canonical severe allergies and eMAR chart alerts (controlled
+        // concealment applied), only for readers of the Medical section.
+        $medical = collect($this->medical->criticalMedicalAlerts($this->viewer, $client));
 
         $safeguardingAlerts = SafeguardingAlert::query()
             ->where('alertable_type', Client::class)
@@ -892,8 +933,7 @@ class RespiteWorkspaceController extends Controller
                 'requiresAcknowledgement' => in_array($alert->severity, ['high', 'critical'], true),
             ]);
 
-        return $this->criticalAlertCache[$client->id] = $allergies
-            ->concat($medicationAlerts)
+        return $this->criticalAlertCache[$client->id] = $medical
             ->concat($safeguardingAlerts)
             ->values()
             ->all();

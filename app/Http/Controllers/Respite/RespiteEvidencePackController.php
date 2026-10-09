@@ -5,11 +5,12 @@ namespace App\Http\Controllers\Respite;
 use App\Domain\Governance\Models\NotifiableIncident;
 use App\Events\Respite\RespiteEvent;
 use App\Http\Controllers\Controller;
+use App\Models\Client;
 use App\Models\ClientMedication;
-use App\Models\MedicationAllergy;
 use App\Models\RespiteAuditLog;
 use App\Models\RespiteEvidencePack;
 use App\Models\RespiteStay;
+use App\Services\Respite\RespiteMedicalDisclosure;
 use App\Services\Respite\RespiteStayScope;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -568,10 +569,11 @@ class RespiteEvidencePackController extends Controller
             && filled($booking->rights_format_provided)
             && filled($booking->rights_recorded_at);
         $consentComplete = (bool) $booking?->consent_authority && $agreementSigned && $rightsComplete;
-        $lifeThreateningAllergies = MedicationAllergy::query()
-            ->where('client_id', $stay->client_id)
-            ->where('severity', 'life_threatening')
-            ->count();
+        // The canonical allergy record, matching the check-in gate (EA-011).
+        $allergyClient = $stay->relationLoaded('client') ? $stay->client : Client::query()->find($stay->client_id);
+        $lifeThreateningAllergies = $allergyClient
+            ? count(app(RespiteMedicalDisclosure::class)->lifeThreateningAllergies($allergyClient))
+            : 0;
         $anaphylaxisAcknowledged = filled(data_get($stay->admission_risk_screen, 'anaphylaxis_acknowledgement.recorded_at'));
         $openComplaints = $stay->complaints->whereNotIn('status', ['resolved'])->count();
         $withinPlanRestraints = $stay->restraintEvents->where('within_support_plan', true);
