@@ -27,6 +27,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { SkeletonTable } from '@/components/ui/skeleton-table';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import {
@@ -59,6 +60,8 @@ export default function WitnessOverrides({
     product?: ControlledProductPayload;
     initialPayload?: ControlledProductPayload;
 }) {
+    // EA-079 (Lane C8): Home-rooted, in the rail's own labels.
+    const breadcrumbs = useEmarBreadcrumbs();
     const workspace = useControlledProduct(product ?? initialPayload);
     const dialogs = useControlledDialogs(workspace);
     const payload = workspace.payload;
@@ -236,17 +239,7 @@ export default function WitnessOverrides({
         );
     const totals = payload?.meters;
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Home', href: '/dashboard' },
-                { title: 'Medication', href: '/meds/today' },
-                { title: 'Safety & oversight', href: '/emar' },
-                {
-                    title: 'Witness overrides',
-                    href: '/emar/safety/witness-overrides',
-                },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Witness overrides" />
             <div className="space-y-5">
                 <PageHeader

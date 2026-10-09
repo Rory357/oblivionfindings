@@ -1,5 +1,6 @@
 import { AdministrationFollowupDialog } from '@/components/emar/followups/administration-followup-dialog';
 import { MedicationExportButton } from '@/components/emar/medication-export-button';
+import { MedicationJourneyReturn } from '@/components/emar/medication-journey-return';
 import { RecordDoseLaunch } from '@/components/emar/record/record-dose-launch';
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { EntityTable } from '@/components/lists/entity-table';
@@ -33,6 +34,7 @@ import {
     History,
     Pill,
     Users,
+    X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -121,12 +123,21 @@ export default function MedicationRecordHub(props: Props) {
                 ...(view !== props.view
                     ? { q: '', work: 'all', page: null }
                     : {}),
+                // EA-108 (Lane C8): the MAR charts tab is everyone's charts;
+                // it never carries one person's filter back into their record.
+                ...(view === 'charts' && view !== props.view
+                    ? { client_id: null }
+                    : {}),
                 ...extra,
             },
             { preserveScroll: true },
         );
     const title = RAIL.find((item) => item.key === props.view)!.label;
     const rows = props.page.data;
+    // EA-108: a person filter is always shown, and removable.
+    const personFilterName =
+        rows.find((row) => row.client_id === props.filters.client_id)?.person ??
+        'One person';
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${title} · MAR & medicines`} />
@@ -139,6 +150,7 @@ export default function MedicationRecordHub(props: Props) {
                     subline="Open a person’s medication record from their chart, medicine or as-needed dose."
                     actions={
                         <>
+                            <MedicationJourneyReturn />
                             <form
                                 onSubmit={(event) => {
                                     event.preventDefault();
@@ -292,6 +304,17 @@ export default function MedicationRecordHub(props: Props) {
                                     </PageHeaderFilterButton>
                                 }
                             />
+                            {props.filters.client_id !== null && (
+                                <PageHeaderFilterButton
+                                    active
+                                    icon={X}
+                                    className="shrink-0"
+                                    aria-label={`Show everyone, not only ${personFilterName}`}
+                                    onClick={() => visit({ client_id: null })}
+                                >
+                                    {personFilterName}
+                                </PageHeaderFilterButton>
+                            )}
                             {props.view === 'medicines' && (
                                 <PageHeaderFilterSelect
                                     label="Medicines"

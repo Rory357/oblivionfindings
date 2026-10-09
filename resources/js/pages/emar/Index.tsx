@@ -808,7 +808,7 @@ export default function EmarHome(props: Props) {
                     aria-label="Other medication work"
                 >
                     <Button variant="link" asChild>
-                        <Link href="/emar/competency">
+                        <Link href="/emar/safety/eligibility?view=renewals">
                             {stats.competenciesExpiring} staff competencies
                             expiring within 30 days
                         </Link>

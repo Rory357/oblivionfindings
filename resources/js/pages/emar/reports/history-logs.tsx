@@ -19,6 +19,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTime } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
@@ -102,6 +103,8 @@ function changedFields(row: Log): string {
     return fields.length ? fields.join(', ') : 'Fields not recorded';
 }
 export default function HistoricalChangeLogs(props: Props) {
+    // EA-079 (Lane C8): Home-rooted, in the rail's own labels.
+    const historyCrumbs = useEmarBreadcrumbs('/emar/reports/history');
     const [search, setSearch] = useState('');
     const visibleLogs = props.logs.filter((row) =>
         [
@@ -141,8 +144,7 @@ export default function HistoricalChangeLogs(props: Props) {
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Reports & audit', href: '/emar/reports' },
-                { title: 'Clinical history', href: '/emar/reports/history' },
+                ...historyCrumbs,
                 { title: 'Change log', href: '/emar/reports/history/logs' },
             ]}
         >
@@ -170,7 +172,7 @@ export default function HistoricalChangeLogs(props: Props) {
                                     })
                                 }
                             >
-                                Clinical history
+                                Medication history
                             </PageHeaderGlassButton>
                             {props.can_export_history && (
                                 <PageHeaderPrimaryButton

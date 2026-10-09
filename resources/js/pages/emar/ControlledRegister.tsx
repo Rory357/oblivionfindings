@@ -36,6 +36,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { SkeletonTable } from '@/components/ui/skeleton-table';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly } from '@/lib/datetime';
 import { Head, router, usePage } from '@inertiajs/react';
@@ -82,6 +83,8 @@ export default function ControlledRegister({
     initialPayload?: ControlledProductPayload;
 }) {
     const { url: pageUrl } = usePage();
+    // EA-079/EA-091 (Lane C8): the trail opens pages this viewer can open.
+    const breadcrumbs = useEmarBreadcrumbs(pageUrl);
     const workspace = useControlledProduct(product ?? initialPayload, pageUrl);
     const dialogs = useControlledDialogs(workspace);
     const [filters, setFilters] = useState(() => initialFilters(pageUrl));
@@ -859,14 +862,7 @@ export default function ControlledRegister({
             </>
         );
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Home', href: '/dashboard' },
-                { title: 'Medication', href: '/meds/today' },
-                { title: 'Stock & controlled drugs', href: '/emar/stock' },
-                { title: 'Controlled register', href: '/emar/controlled' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Controlled register" />
             <div className="space-y-5">
                 {header}

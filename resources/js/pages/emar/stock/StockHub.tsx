@@ -24,6 +24,7 @@ import { ErrorState } from '@/components/ui/error-state';
 import { SkeletonTable } from '@/components/ui/skeleton-table';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { ReviewCard, ReviewRow, WizardShell } from '@/components/wizard/shell';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTime } from '@/lib/datetime';
 import { medicationReturnParams } from '@/lib/medication-navigation';
@@ -173,6 +174,8 @@ export default function StockHub({
     selected_client = null,
     focused_count = null,
 }: Props) {
+    // EA-079 (Lane C8): Home-rooted, in the rail's own labels.
+    const breadcrumbs = useEmarBreadcrumbs();
     const [search, setSearch] = useState(filters.search);
     const [modal, setModal] = useState<Modal>(null);
     useEffect(() => {
@@ -354,16 +357,7 @@ export default function StockHub({
             : []),
     ];
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Home', href: '/dashboard' },
-                { title: 'Medication', href: '/emar' },
-                {
-                    title: 'Stock & controlled drugs',
-                    href: '/emar/stock/packs',
-                },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Stock & controlled drugs" />
             <div className="grid min-w-0 grid-cols-1 gap-5">
                 <PageHeader

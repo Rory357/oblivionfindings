@@ -51,39 +51,50 @@ import { medicationReturnTo } from '@/lib/medication-navigation';
 
 export default function PersonMedicationRecord(props: RecordPageProps) {
     if (props.unavailable)
-        return (
-            <AppLayout
-                breadcrumbs={[
-                    { title: 'Home', href: '/dashboard' },
-                    { title: 'Medication', href: '/emar' },
-                ]}
-            >
-                <Head title="Medication record" />
-                <Card className="p-2">
-                    <EmptyState
-                        icon={
-                            props.unavailable === 'no_access'
-                                ? AlertTriangle
-                                : Pill
-                        }
-                        title={
-                            props.unavailable === 'no_access'
-                                ? 'You don’t have medication-record access'
-                                : 'Medication record not found'
-                        }
-                        description="Check your medication permissions and the person’s current house."
-                        action={
-                            <Button variant="outline" asChild>
-                                <Link href="/dashboard">
-                                    <Home className="size-4" /> Home
-                                </Link>
-                            </Button>
-                        }
-                    />
-                </Card>
-            </AppLayout>
-        );
+        return <UnavailableRecord unavailable={props.unavailable} />;
     return <AvailableRecord key={props.person.id} {...props} />;
+}
+
+/**
+ * EA-079 (Lane C8): the same Home-rooted record trail as an open record —
+ * frontline staff go back to Meds today, never to the lead Overview.
+ */
+function UnavailableRecord({
+    unavailable,
+}: {
+    unavailable: NonNullable<RecordPageProps['unavailable']>;
+}) {
+    const page = usePage();
+    const breadcrumbs = useEmarRecordBreadcrumbs({
+        title: 'Medication record',
+        href: page.url,
+    });
+    const props = { unavailable };
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Medication record" />
+            <Card className="p-2">
+                <EmptyState
+                    icon={
+                        props.unavailable === 'no_access' ? AlertTriangle : Pill
+                    }
+                    title={
+                        props.unavailable === 'no_access'
+                            ? 'You don’t have medication-record access'
+                            : 'Medication record not found'
+                    }
+                    description="Check your medication permissions and the person’s current house."
+                    action={
+                        <Button variant="outline" asChild>
+                            <Link href="/dashboard">
+                                <Home className="size-4" /> Home
+                            </Link>
+                        </Button>
+                    }
+                />
+            </Card>
+        </AppLayout>
+    );
 }
 
 function AvailableRecord({
@@ -104,6 +115,8 @@ function AvailableRecord({
         ),
         'https://emar.invalid',
     );
+    // EA-108 (Lane C8): back to everyone in the house, not a one-person list.
+    hubUrl.searchParams.delete('client_id');
     const backHref =
         medicationReturnTo(query.get('return_to')) ??
         hubUrl.pathname + hubUrl.search;
