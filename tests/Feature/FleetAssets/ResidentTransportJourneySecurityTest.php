@@ -120,6 +120,10 @@ class ResidentTransportJourneySecurityTest extends TestCase
         $clientA = Client::factory()->create(['site_id' => $siteA->id, 'first_name' => 'PickerA', 'last_name' => 'Resident']);
         $clientAOther = Client::factory()->create(['site_id' => $siteA->id, 'first_name' => 'PickerOther', 'last_name' => 'Resident']);
         $clientB = Client::factory()->create(['site_id' => $siteB->id, 'first_name' => 'PickerB', 'last_name' => 'Resident']);
+        // EA-002: transit medicines follow the eMAR person rule, so this
+        // ordinary reader supports both local residents.
+        $clientA->supportWorkers()->syncWithoutDetaching([$viewer->id]);
+        $clientAOther->supportWorkers()->syncWithoutDetaching([$viewer->id]);
         $vehicleA = $this->vehicle($siteA, 'Picker vehicle A');
         $vehicleAOtherResident = Asset::factory()->vehicle()->forSite($siteA)->create([
             'name' => 'Picker resident-bound vehicle',
@@ -1153,7 +1157,9 @@ class ResidentTransportJourneySecurityTest extends TestCase
     public function test_refusal_unavailability_and_correction_append_provenance_without_erasure(): void
     {
         $site = Site::factory()->create();
-        $actor = $this->siteUser($site, ['fleet.viewAny', 'fleet.medication.manage']);
+        // Reading the packing history (medicine names) needs eMAR read access
+        // to the person (EA-002); packing itself stays a Fleet logistics key.
+        $actor = $this->siteUser($site, ['fleet.viewAny', 'fleet.medication.manage', 'medications.view', 'clients.viewAny', 'medications.controlled.view']);
         $client = Client::factory()->create(['site_id' => $site->id]);
         $transport = $this->transport($site, $client, $this->vehicle($site, 'Attestation history vehicle'), $actor);
         $medication = $this->medication($client, 'Attestation history medication', true);

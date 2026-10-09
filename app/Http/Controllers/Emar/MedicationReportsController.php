@@ -22,6 +22,7 @@ use App\Services\Medication\Reporting\MedicationPdfDataset;
 use App\Services\Medication\Reporting\MedicationReportAccess;
 use App\Services\Medication\Reporting\MedicationReportDataset;
 use App\Services\Medication\Reporting\MedicationReportPeriod;
+use App\Services\Medication\Transit\MedicationTransitExport;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -130,7 +131,7 @@ class MedicationReportsController extends Controller
     public function exportOptions(Request $request)
     {
         $data = $request->validate([
-            'type' => ['required', Rule::in(['mar', 'cd_register', 'round_sheet', 'doses', 'errors', 'stock', 'audit', 'syringe_drivers'])],
+            'type' => ['required', Rule::in(['mar', 'cd_register', 'round_sheet', 'doses', 'errors', 'stock', 'audit', 'syringe_drivers', 'transit'])],
             'site_id' => ['nullable', 'integer', 'min:1'],
             'client_id' => ['nullable', 'integer', 'min:1'],
             'round_id' => ['nullable', 'integer', 'min:1', Rule::prohibitedIf($request->input('type') !== 'round_sheet')],
@@ -159,7 +160,7 @@ class MedicationReportsController extends Controller
         }
         $period = MedicationReportPeriod::fromRequest($request);
         $people = Client::query()->whereIn('id', $this->access->clientIds($actor, $sites))->when($request->integer('client_id'), fn ($q) => $q->whereKey($request->integer('client_id')))->orderBy('first_name')->limit(100)->get()->map(fn ($p) => ['id' => $p->id, 'name' => trim($p->first_name.' '.$p->last_name)]);
-        $spec = ['mar' => ['MAR chart', 'PDF', 'One person, up to 31 NZ days. Ceased and superseded medicines stay in the period.'], 'cd_register' => ['Controlled drug register', 'PDF', 'One person and one medicine, up to 31 NZ days.'], 'round_sheet' => ['Round sheet', 'PDF', 'One house and one NZ day.'], 'doses' => ['Doses', 'CSV', 'Scheduled dose slots, including Away.'], 'errors' => ['Medication errors', 'CSV', 'Factual accounts, with in-error records excluded unless requested.'], 'stock' => ['Stock', 'CSV', 'Stock as at now.'], 'syringe_drivers' => ['Syringe drivers', 'CSV', 'Recorded driver use and canonical medicine contents; free-text notes are excluded.'], 'audit' => ['Audit trail', 'CSV', 'Filtered events over the selected period.']][$type];
+        $spec = ['mar' => ['MAR chart', 'PDF', 'One person, up to 31 NZ days. Ceased and superseded medicines stay in the period.'], 'cd_register' => ['Controlled drug register', 'PDF', 'One person and one medicine, up to 31 NZ days.'], 'round_sheet' => ['Round sheet', 'PDF', 'One house and one NZ day.'], 'doses' => ['Doses', 'CSV', 'Scheduled dose slots, including Away.'], 'errors' => ['Medication errors', 'CSV', 'Factual accounts, with in-error records excluded unless requested.'], 'stock' => ['Stock', 'CSV', 'Stock as at now.'], 'syringe_drivers' => ['Syringe drivers', 'CSV', 'Recorded driver use and canonical medicine contents; free-text notes are excluded.'], 'audit' => ['Audit trail', 'CSV', 'Filtered events over the selected period.'], 'transit' => ['Medicines in transit', 'CSV', 'Medicines packed for Fleet journeys, with custody times in NZ time.']][$type];
 
         return response()->json(['filters' => ['view' => 'exports', 'report' => 'doses', 'sub' => 'events', 'period' => 'custom', 'date_from' => $period->from, 'date_to' => $period->to, 'site_id' => count($sites) === 1 ? $sites[0] : null, 'client_id' => $request->integer('client_id') ?: null, 'round_id' => $selectedRound['id'] ?? null, 'kind' => '', 'q' => ''], 'selected_round' => $selectedRound, 'sites' => app(MedicationGovernanceScopeService::class)->sitePicker($sites)->map->only(['id', 'name'])->values(), 'people' => $people, 'finance' => $this->access->financeOnly($actor), 'exports' => [['type' => $type, 'label' => $spec[0], 'format' => $spec[1], 'description' => $spec[2], 'allowed' => true]], 'purposes' => MedicationExportAudit::PURPOSES], 200, ['Cache-Control' => 'no-store']);
     }
@@ -184,7 +185,7 @@ class MedicationReportsController extends Controller
 
     public function export(Request $request)
     {
-        $data = $request->validate(['type' => ['required', Rule::in(['mar', 'cd_register', 'round_sheet', 'doses', 'errors', 'stock', 'audit', 'syringe_drivers'])], 'site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'], 'medication_id' => ['nullable', 'integer', 'min:1'], 'round_id' => ['nullable', 'integer', 'min:1'], 'kind' => ['nullable', 'string', 'max:100'], 'q' => ['nullable', 'string', 'max:80'], 'include_in_error' => ['nullable', 'boolean'], 'include_prn' => ['nullable', 'boolean']]);
+        $data = $request->validate(['type' => ['required', Rule::in(['mar', 'cd_register', 'round_sheet', 'doses', 'errors', 'stock', 'audit', 'syringe_drivers', 'transit'])], 'site_id' => ['nullable', 'integer', 'min:1'], 'client_id' => ['nullable', 'integer', 'min:1'], 'medication_id' => ['nullable', 'integer', 'min:1'], 'round_id' => ['nullable', 'integer', 'min:1'], 'kind' => ['nullable', 'string', 'max:100'], 'q' => ['nullable', 'string', 'max:80'], 'include_in_error' => ['nullable', 'boolean'], 'include_prn' => ['nullable', 'boolean']]);
         $actor = $request->user();
         $type = $data['type'];
         abort_unless($this->access->canExport($actor, $type), 403);
@@ -262,6 +263,8 @@ class MedicationReportsController extends Controller
                 abort_if(count($rows) > MedicationReportDataset::MAX_ROWS, 422, 'Choose a shorter period; no partial result was created.');
                 usort($rows, fn ($a, $b) => [$a['date'], $a['recorded_at'] ?? $a['due_at'], $a['reference']] <=> [$b['date'], $b['recorded_at'] ?? $b['due_at'], $b['reference']]);
             }
+        } elseif ($type === 'transit') {
+            $rows = app(MedicationTransitExport::class)->rows($actor, $period, $sites, $clientId);
         } else {
             $rows = $this->datasets->read($actor, $type, $period, $sites, $clientId)['rows'];
             if ($type === 'errors' && ! $includeInError) {
