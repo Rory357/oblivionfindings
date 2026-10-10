@@ -4,9 +4,8 @@ it('keeps every medication administration controller behind the authoritative sc
     $controllers = [
         'app/Http/Controllers/Api/MedicationsApiController.php',
         'app/Http/Controllers/ClientMedicalController.php',
-        'app/Http/Controllers/Emar/GuidedRoundController.php',
+        // EA-151 (Lane C10): GuidedRoundController no longer records doses.
         'app/Http/Controllers/Emar/WorkerMedsController.php',
-        'app/Http/Controllers/MyDayMedicationsController.php',
     ];
 
     foreach ($controllers as $controller) {
@@ -19,69 +18,9 @@ it('keeps every medication administration controller behind the authoritative sc
     }
 });
 
-it('keeps crossed My Day actor witness pairs on one canonical administration lock path', function () {
-    $source = (string) file_get_contents(
-        dirname(__DIR__, 2).'/app/Http/Controllers/MyDayMedicationsController.php',
-    );
-    $administer = substr(
-        $source,
-        (int) strpos($source, 'public function administer('),
-        (int) strpos($source, 'public function refuse(')
-            - (int) strpos($source, 'public function administer('),
-    );
-    $refuse = substr(
-        $source,
-        (int) strpos($source, 'public function refuse('),
-        (int) strpos($source, 'public function snooze(')
-            - (int) strpos($source, 'public function refuse('),
-    );
-
-    expect(substr_count($administer, '->forAdministration('))->toBe(1)
-        ->and(substr_count($refuse, '->forAdministration('))->toBe(1)
-        ->and($administer)->not->toContain('->forMedication(')
-        ->and($refuse)->not->toContain('->forMedication(')
-        ->and($administer)->toContain(
-            'scopedInputResolver:',
-            "'payload' => \$data",
-            "'witnessed_by'",
-            'prelockedPresenceShifts:',
-            'prelockedPresenceEffectiveAt:',
-        )
-        ->and($refuse)->toContain(
-            'scopedInputResolver:',
-            "'payload' => \$data",
-            'prelockedPresenceShifts:',
-            'prelockedPresenceEffectiveAt:',
-        );
-});
-
-it('keeps prescription medication and prn effectiveness mutations on the same scope boundary', function () {
-    $root = dirname(__DIR__, 2);
-    $source = (string) file_get_contents(
-        $root.'/app/Http/Controllers/Emar/EmarController.php',
-    );
-
-    expect($source)
-        ->toContain('MedicationScopeDecisionService')
-        ->toContain('->forClient(')
-        ->toContain('->forPrescription(')
-        ->toContain('->forMedication(')
-        ->toContain('app(LegacyEffectFollowupAdapter::class)->save($request, $this->medicationScope)');
-
-    $adapter = (string) file_get_contents($root.'/app/Services/Medication/Followups/LegacyEffectFollowupAdapter.php');
-    expect($adapter)->toContain(
-        '$work->assertAdministrationReadable($actor, (int) $id)',
-        '$work->prepareAdministration($actor, (int) $id)',
-        '$work->transition($actor, (int) $row->id, $data)',
-    )->not->toContain('PrnEffectiveness::', '->forPrnEffectiveness(');
-
-    $workflow = (string) file_get_contents($root.'/app/Services/Medication/Followups/MedicationFollowupService.php');
-    expect($workflow)->toContain(
-        '$this->clinicalScope->lockLatestGrant($actor, $client)',
-        '$this->governance->lockCurrentMedicationSite((int) $client->site_id)',
-        '$this->records->assertReadable($lockedActor, $client)',
-        '->lockForUpdate()->firstOrFail()',
-    );
+// EA-125 (Lane C10): MyDayMedicationsController (the My Day quick actions) is retired.
+it('keeps the retired My Day medication actions retired', function () {
+    expect(file_exists(dirname(__DIR__, 2).'/app/Http/Controllers/MyDayMedicationsController.php'))->toBeFalse();
 });
 
 it('does not reintroduce nullable best effort shift lookup in medication write controllers', function () {
@@ -90,7 +29,6 @@ it('does not reintroduce nullable best effort shift lookup in medication write c
         'app/Http/Controllers/ClientMedicalController.php',
         'app/Http/Controllers/Emar/GuidedRoundController.php',
         'app/Http/Controllers/Emar/WorkerMedsController.php',
-        'app/Http/Controllers/MyDayMedicationsController.php',
     ])->map(
         fn (string $path): string => (string) file_get_contents(dirname(__DIR__, 2).DIRECTORY_SEPARATOR.$path),
     )->implode("\n");
@@ -134,7 +72,7 @@ it('locks round context current participants and site before the constrained rou
     $assign = substr(
         $controller,
         (int) strpos($controller, 'public function assignRound('),
-        (int) strpos($controller, 'public function storeSelfAdmin(')
+        (int) strpos($controller, 'public function storeDestruction(')
             - (int) strpos($controller, 'public function assignRound('),
     );
     expect($assign)

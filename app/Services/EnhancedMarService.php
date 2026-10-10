@@ -905,8 +905,8 @@ class EnhancedMarService
             if (! $windowCheck['valid']
                 && ($data['status'] ?? null) === 'given'
                 && empty($data['reason'])
-                && empty($data['late_reason'])
-                && ! ($data['override_window'] ?? false)) {
+                // EA-106/EA-151 (Lane C10): no caller can skip this any more.
+                && empty($data['late_reason'])) {
                 return [
                     'success' => false,
                     'error' => 'Outside time window: '.$windowCheck['message'].'. Please provide a reason.',

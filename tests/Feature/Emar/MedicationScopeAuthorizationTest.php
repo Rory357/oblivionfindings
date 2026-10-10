@@ -175,61 +175,35 @@ class MedicationScopeAuthorizationTest extends TestCase
         $this->assertDatabaseCount('client_medication_administrations', 0);
     }
 
-    public function test_guided_round_rejects_a_medication_from_another_site_before_any_effect(): void
+    /**
+     * EA-151 (Lane C10): the guided round's own item writer is retired — round
+     * doses record through Meds today. Any item post, for this house or
+     * another, live or queued offline, is refused with nothing written.
+     */
+    public function test_the_retired_guided_round_item_writer_records_nothing(): void
     {
         $round = $this->round();
         $otherSite = Site::factory()->create(['is_active' => true]);
-        $otherClient = Client::factory()->create([
+        $otherMedication = $this->scheduledMedication(Client::factory()->create([
             'site_id' => $otherSite->id,
             'service_context_id' => $this->serviceContext->id,
-        ]);
-        $otherMedication = $this->scheduledMedication($otherClient);
+        ]));
 
-        $this->actingAs($this->worker)
-            ->postJson(
-                "/emar/rounds/{$round->id}/guided/items/{$otherMedication->id}",
-                [
-                    'status' => 'given',
-                    'scheduled_for' => now()->toIso8601String(),
-                ],
-            )
-            ->assertNotFound();
+        foreach ([$this->medication->id, $otherMedication->id] as $medicationId) {
+            foreach ([false, true] as $queued) {
+                $this->actingAs($this->worker)
+                    ->postJson("/emar/rounds/{$round->id}/guided/items/{$medicationId}", [
+                        'status' => 'given', 'scheduled_for' => now()->toIso8601String(),
+                        'client_request_uuid' => '145511d4-772d-42b5-8cfa-6e72426cfbd9', 'queued_offline' => $queued,
+                    ])
+                    ->assertConflict()
+                    ->assertJsonPath('success', false)
+                    ->assertJsonPath('message', \App\Http\Controllers\Emar\GuidedRoundController::RETIRED_MESSAGE);
+            }
+        }
 
         $this->assertDatabaseCount('client_medication_administrations', 0);
         $this->assertSame(0, $this->administrationTimelineCount());
-    }
-
-    public function test_a_durable_replay_identifier_cannot_be_reused_for_another_round_medication(): void
-    {
-        $round = $this->round();
-        $otherMedication = $this->scheduledMedication($this->client, ['name' => 'Second scheduled medicine']);
-        $uuid = '145511d4-772d-42b5-8cfa-6e72426cfbd9';
-        $payload = [
-            'status' => 'given',
-            'scheduled_for' => now()->toIso8601String(),
-            'client_request_uuid' => $uuid,
-            'queued_offline' => false,
-        ];
-
-        $this->actingAs($this->worker)
-            ->postJson("/emar/rounds/{$round->id}/guided/items/{$this->medication->id}", $payload)
-            ->assertOk()
-            ->assertJsonPath('success', true);
-
-        $this->actingAs($this->worker)
-            ->postJson("/emar/rounds/{$round->id}/guided/items/{$otherMedication->id}", $payload)
-            ->assertConflict()
-            ->assertJsonPath(
-                'errors.client_request_uuid.0',
-                'This submission identifier was already used with different medication administration details.',
-            );
-
-        $this->assertDatabaseCount('client_medication_administrations', 1);
-        $this->assertSame(1, $this->administrationTimelineCount());
-        $this->assertDatabaseHas('client_medication_administrations', [
-            'client_medication_id' => $this->medication->id,
-            'client_request_uuid' => $uuid,
-        ]);
     }
 
     public function test_unassigned_and_foreign_site_prn_effectiveness_ids_are_not_disclosed_or_mutated(): void
