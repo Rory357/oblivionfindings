@@ -11,6 +11,7 @@ use App\Models\MedicationOrderFile;
 use App\Models\MedicationOrderVersion;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Medication\Connected\ConnectedCareAlerts;
 use App\Services\Medication\MedicationOrderWorkflow;
 use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\OrderAllergyMatcher;
@@ -80,6 +81,8 @@ final class ExternalClinicalProposals
                     'source_file_sha256' => $file ? hash_file('sha256', $file->getRealPath()) : null,
                 ]);
                 AuditLogger::logOrFail('medications.external.proposal_submitted', $proposal, ['actor_id' => $locked->id, 'kind' => $data['kind'], 'grant_id' => $grant->id]);
+                // EA-025: a prescriber's request reaches the people who decide it.
+                app(ConnectedCareAlerts::class)->prescriberRequest((int) $proposal->id);
 
                 return $proposal;
             }, write: true);
@@ -113,7 +116,8 @@ final class ExternalClinicalProposals
                     $this->records->assertReadable($locked, $client);
                     $proposal = MedicationExternalProposal::query()->whereKey($id)->where('client_id', $client->id)->lockForUpdate()->firstOrFail();
                     $this->orders->assertControlled($locked, (bool) $proposal->controlled);
-                    $data = Validator::make($input, ['decision' => 'required|in:accept,reject,link_stop', 'decision_note' => 'required|string|max:2000'])->validate();
+                    // EA-084: decision_note is the reply the prescriber sees; internal_note never leaves the organisation.
+                    $data = Validator::make($input, ['decision' => 'required|in:accept,reject,link_stop', 'decision_note' => 'required|string|max:2000', 'internal_note' => 'nullable|string|max:2000'])->validate();
                     $sourceForHash = $input['source'] ?? null;
                     if (is_array($sourceForHash)) {
                         unset($sourceForHash['witness_pin']);
@@ -128,7 +132,8 @@ final class ExternalClinicalProposals
                         }
                         abort(409, 'This proposal already has a recorded decision.');
                     }
-                    $evidence = ['decision' => $data['decision'], 'payload_sha256' => $decisionHash];
+                    $evidence = ['decision' => $data['decision'], 'payload_sha256' => $decisionHash]
+                        + (filled($data['internal_note'] ?? null) ? ['internal_note' => trim((string) $data['internal_note'])] : []);
                     if ($data['decision'] !== 'reject') {
                         Validator::make($input, ['source_confirmed' => 'required|accepted'])->validate();
                         $profile = MedicationExternalClinician::query()->whereKey($proposal->clinician_id)->lockForUpdate()->firstOrFail();
@@ -176,6 +181,7 @@ final class ExternalClinicalProposals
                     $proposal->forceFill(['status' => $data['decision'] === 'reject' ? 'rejected' : 'accepted',
                         'decided_by' => $locked->id, 'decided_at' => now(), 'decision_note' => $data['decision_note'], 'decision_evidence' => $evidence])->save();
                     AuditLogger::logOrFail('medications.external.proposal_decided', $proposal, ['actor_id' => $locked->id, 'decision' => $data['decision'], 'order_revision_id' => $proposal->revision_id]);
+                    app(ConnectedCareAlerts::class)->prescriberRequestDecided((int) $proposal->id);
 
                     return $proposal;
                 });

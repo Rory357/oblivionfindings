@@ -76,11 +76,24 @@ final class MedicationPharmacyConnectionController extends Controller
     {
         return $this->respond(function () use ($request, $connection): array {
             // No user session authenticates this endpoint. The signature binds the raw body and this exact connection.
-            $record = MedicationPharmacyConnection::findOrFail($connection);
-            $partner = $this->partners->partner($record->partner_key);
+            // EA-137: an unknown connection, an unconfigured partner and a bad
+            // signature all answer the same 401, after the same signature
+            // check, so the endpoint reveals nothing before authentication.
+            $record = MedicationPharmacyConnection::query()->find($connection);
+            $secret = null;
+            if ($record !== null) {
+                try {
+                    $secret = $this->partners->partner($record->partner_key)['acknowledgment_secret'];
+                } catch (PharmacyConnectionException) {
+                    $secret = null;
+                }
+            }
             $body = $request->getContent();
             $data = $this->acknowledgments->verify($connection, $body, (string) $request->header('X-Pharmacy-Timestamp'),
-                (string) $request->header('X-Pharmacy-Signature'), $partner['acknowledgment_secret']);
+                (string) $request->header('X-Pharmacy-Signature'), $secret ?? bin2hex(random_bytes(32)));
+            if ($record === null || $secret === null) {
+                throw new PharmacyConnectionException('acknowledgment_unauthenticated', 'The pharmacy acknowledgment could not be authenticated.', 401);
+            }
 
             return $this->dispatches->acknowledge($record, $data, hash('sha256', $body));
         });

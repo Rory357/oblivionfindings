@@ -35,6 +35,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Fortify\Contracts\TwoFactorLoginResponse;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\CommittedFixtureCleanup;
+use Tests\Support\ConnectedCareSwitches;
 use Tests\Support\ExternalClinicalFixtures;
 use Tests\TestCase;
 
@@ -45,6 +46,10 @@ final class ExternalClinicalAccessTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // D4: the portal and handovers run only while switched on. These single-
+        // person flows predate the two-person rule, switched back on in the test_b10_ tests below.
+        ConnectedCareSwitches::on('prescriber_portal', 'provider_transfers');
+        ConnectedCareSwitches::off('two_person_identity', 'two_person_handover');
         $this->connectedFixtures();
     }
 
@@ -315,6 +320,59 @@ final class ExternalClinicalAccessTest extends TestCase
         $this->assertSame($identity, $this->identity->fresh()->getRawOriginal());
         $this->assertSame($grant, $this->grant->fresh()->getRawOriginal());
         $this->assertSame(0, AuditLog::query()->where('action', 'medications.external.identity_revoked')->count());
+    }
+
+    /** EA-083 + EA-085: a portal chart view is a logged disclosure and says what it leaves out. */
+    public function test_b10_portal_chart_view_is_logged_and_says_how_many_controlled_medicines_are_hidden(): void
+    {
+        $this->chart();
+        $this->chart(['name' => 'Synthetic controlled medicine', 'controlled_drug' => true]);
+        $this->actingAs($this->clinician)->get('/clinical-portal?client_id='.$this->person->id)->assertOk()
+            ->assertInertia(fn (Assert $p) => $p->has('selected_client.medications', 1)
+                ->where('selected_client.hidden_controlled_count', 1)
+                ->where('selected_client.allergy_status.status', 'none'));
+        $view = \App\Models\MedicationEvent::query()->where('kind', 'external.chart_viewed')->sole();
+        $this->assertSame((int) $this->clinician->id, (int) $view->actor_id);
+        $this->assertSame((int) $this->person->id, (int) $view->client_id);
+        $this->assertSame((string) $this->grant->id, (string) $view->subject_id);
+        $this->actingAs($this->manager)->get('/emar/connected-care?client_id='.$this->person->id)->assertOk()
+            ->assertInertia(fn (Assert $p) => $p->where('grants.0.views', 1));
+    }
+
+    /** EA-104: with the two-person rule on (its default), whoever verified a prescriber doesn't also grant them a chart. */
+    public function test_b10_the_verifier_cannot_also_grant_chart_access(): void
+    {
+        ConnectedCareSwitches::on('two_person_identity');
+        app(ExternalClinicalAccess::class)->revokeGrant($this->manager, $this->grant->id, ['reason' => 'Synthetic regrant check']);
+        $input = ['clinician_id' => $this->identity->id, 'client_id' => $this->person->id, 'purpose' => 'Medication review',
+            'expires_at' => now()->addDays(20)->toIso8601String(), 'can_propose' => false, 'include_controlled' => false];
+        $this->actingAs($this->manager)->postJson('/emar/connected-care/grants', $input)->assertUnprocessable()->assertJsonValidationErrors('clinician_id');
+        $this->assertSame(1, MedicationExternalGrant::query()->count());
+        $this->actingAs($this->connectedStaff())->postJson('/emar/connected-care/grants', $input)->assertSuccessful();
+        $this->assertSame(2, MedicationExternalGrant::query()->count());
+    }
+
+    /** EA-084 + EA-025: the prescriber sees only the reply; the request alerts order managers until decided. */
+    public function test_b10_internal_note_stays_internal_and_a_request_alerts_until_decided(): void
+    {
+        $proposal = app(ExternalClinicalProposals::class)->submit($this->clinician, $this->person->id, [
+            'kind' => 'start', 'prescription' => $this->prescription(), 'reason' => 'Start for review', 'request_key' => 'b10-note',
+        ], null);
+        $alert = \App\Models\MedicationAlert::query()->where('type', 'prescriberRequest')->where('client_id', $this->person->id)->sole();
+        $this->assertNotNull($alert->open_key);
+        $this->actingAs($this->manager)->get('/emar/connected-care')->assertOk()
+            ->assertInertia(fn (Assert $p) => $p->where('selected_client', null)->where('proposals.0.id', $proposal->id));
+
+        $this->postJson('/emar/connected-care/proposals/'.$proposal->id.'/decision', [
+            'decision' => 'reject', 'decision_note' => 'Please phone the house first.', 'internal_note' => 'Synthetic family concern note',
+        ])->assertSuccessful();
+
+        $this->assertNull($alert->fresh()->open_key);
+        $this->actingAs($this->manager)->get('/emar/connected-care?client_id='.$this->person->id)->assertOk()
+            ->assertInertia(fn (Assert $p) => $p->where('proposals.0.internal_note', 'Synthetic family concern note'));
+        $portal = $this->actingAs($this->clinician)->get('/clinical-portal')->assertOk();
+        $portal->assertInertia(fn (Assert $p) => $p->where('proposals.0.decision_note', 'Please phone the house first.'));
+        $this->assertStringNotContainsString('Synthetic family concern note', (string) $portal->getContent());
     }
 
     private function allowGlobalIdentityWithdrawal(User $actor, string $permission): User

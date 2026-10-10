@@ -2,15 +2,28 @@
 
 namespace App\Services\Medication\PharmacyConnect;
 
+use App\Services\Medication\Connected\ConnectedCareSettings;
 use Illuminate\Contracts\Config\Repository;
 
 final class PharmacyPartnerRegistry
 {
     public function __construct(private readonly Repository $config) {}
 
-    public function enabled(): bool
+    /** The installation's platform switch (deployment config). */
+    public function configured(): bool
     {
         return $this->config->get('emar-pharmacy-connect.enabled', false) === true;
+    }
+
+    /**
+     * The bridge runs: configured for this installation AND switched on in
+     * Settings › Connected services (D4). Every send, retry, connection page
+     * and acknowledgement honours this (EA-137 kill switch).
+     */
+    public function enabled(): bool
+    {
+        return $this->configured()
+            && app(ConnectedCareSettings::class)->switchedOn(ConnectedCareSettings::PHARMACY);
     }
 
     public function assertEnabled(): void

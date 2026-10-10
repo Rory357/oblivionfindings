@@ -96,10 +96,25 @@ export function PharmacyDispatch({
         },
         [base],
     );
+    // EA-172: poll only while the bridge runs or a dispatch is still open;
+    // a bridge that is switched off or not set up is never polled.
+    const polling = useRef(true);
+    useEffect(() => {
+        if (status) {
+            polling.current =
+                status.enabled ||
+                (status.dispatch !== null &&
+                    !['accepted', 'rejected', 'failed', 'cancelled'].includes(
+                        status.dispatch.state,
+                    ));
+        }
+    }, [status]);
     useEffect(() => {
         const controller = new AbortController();
         void refresh(controller.signal);
-        const timer = setInterval(() => void refresh(controller.signal), 15000);
+        const timer = setInterval(() => {
+            if (polling.current) void refresh(controller.signal);
+        }, 15000);
         return () => {
             controller.abort();
             clearInterval(timer);
@@ -132,6 +147,9 @@ export function PharmacyDispatch({
             onSaved();
         }
     };
+    // EA-172 / hide-unbuilt: no card for a bridge that isn't running, unless
+    // this order already has a dispatch to settle.
+    if (status && !status.enabled && !status.dispatch) return null;
     return (
         <ReviewCard icon={Send} title="Connected pharmacy delivery">
             {loadError && (

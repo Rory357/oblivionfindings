@@ -7,10 +7,13 @@ use App\Models\MedicationBackupAttempt;
 use App\Models\MedicationBackupDelivery;
 use App\Models\MedicationBackupRecipient;
 use App\Models\MedicationBackupSchedule;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\AuthorizationEvidenceLockService;
 use App\Services\Medication\Audit\MedicationEventData;
 use App\Services\Medication\Audit\MedicationEventRecorder;
+use App\Services\Medication\Connected\ConnectedCareAlerts;
+use App\Services\Medication\Connected\ConnectedCareSettings;
 use App\Services\Medication\Downtime\DowntimePackPdf;
 use App\Services\Medication\Downtime\DowntimePackService;
 use Carbon\CarbonImmutable;
@@ -42,6 +45,11 @@ class BackupDeliveryService
             abort_unless(($schedule?->version ?? 0) === $version, 409, 'The backup schedule changed. Reload before editing.');
             $this->clock->resolve(now(BackupScheduleClock::TIMEZONE)->toDateString(), $data['local_time']);
             abort_unless(is_bool($data['enabled']) && is_int($data['retention_days']) && $data['retention_days'] >= 1 && $data['retention_days'] <= 30, 422);
+            // EA-143: a daily schedule is never switched on while backups can't
+            // be produced — never without the reviewed encryption.
+            if ($data['enabled'] && ! app(ConnectedCareSettings::class)->enabled(ConnectedCareSettings::BACKUPS)) {
+                throw ValidationException::withMessages(['enabled' => 'Protected backups need strong PDF encryption, which isn’t set up yet. Save the schedule switched off until it is.']);
+            }
             $schedule ??= new MedicationBackupSchedule(['site_id' => $siteId, 'version' => 0]);
             $schedule->forceFill(['timezone' => BackupScheduleClock::TIMEZONE, 'local_time' => $data['local_time'], 'enabled' => $data['enabled'], 'retention_days' => $data['retention_days'], 'approved_by' => $current->id, 'version' => $version + 1])->saveOrFail();
 
@@ -94,6 +102,12 @@ class BackupDeliveryService
             }
             $recipients = $this->recipients($schedule);
             $delivery = MedicationBackupDelivery::query()->where('schedule_id', $schedule->id)->where('nz_date', $day)->lockForUpdate()->first();
+            // EA-142: the every-minute job doesn't rebuild and resend a failed
+            // backup straight away — at most once an hour. A manager can still
+            // retry by hand at any time.
+            if ($scheduled && $delivery?->state === 'failed' && $delivery->updated_at?->greaterThan(now()->subHour())) {
+                return $delivery;
+            }
             // An author can refresh their own stale unsent chart. Only the scheduler
             // may replace another author's chart under the current due approver.
             $replaceReady = $delivery?->state === 'ready' && $delivery->claim_token === null
@@ -207,7 +221,8 @@ class BackupDeliveryService
                 abort_unless(hash_equals($row->artifact_sha256, hash('sha256', $bytes)), 409);
                 $this->packs->release($current, $pack, function () use ($row, $current, $token, $recipients, $bytes, &$submissionStarted): void {
                     $submissionStarted = true;
-                    $this->transport->send(array_values($recipients), $bytes, $row->nz_date);
+                    // EA-140: the email and file say which house and which backup.
+                    $this->transport->send(array_values($recipients), $bytes, $row->nz_date, $this->houseName($row), self::reference($row));
                     $row->forceFill(['state' => 'sent', 'sent_at' => now(), 'failure_code' => null, 'claim_token' => null, 'claimed_at' => null, 'version' => $row->version + 1])->saveOrFail();
                     MedicationBackupAttempt::query()->where('token', $token)->update(['state' => 'sent', 'result_code' => 'accepted', 'finished_at' => now()]);
                     $this->event($row, $current, 'sent');
@@ -216,10 +231,19 @@ class BackupDeliveryService
         } catch (Throwable $exception) {
             $knownUnsent = ! $submissionStarted || $exception instanceof MailNotSubmitted;
             $this->finishFailedAttempt($id, $token, $knownUnsent ? 'failed' : 'uncertain', $knownUnsent ? 'not_submitted' : 'submission_unknown');
+            // EA-138: a failed or uncertain send is surfaced, not left on this page.
+            $failed = MedicationBackupDelivery::query()->find($id);
+            if ($failed !== null && in_array($failed->state, ['failed', 'uncertain'], true)) {
+                $this->alerts()->backupProblem((int) $failed->schedule_id, (string) $failed->nz_date, $failed->state, self::reference($failed));
+            }
             throw $exception;
         }
+        $sent = MedicationBackupDelivery::query()->findOrFail($id);
+        if ($sent->state === 'sent') {
+            $this->alerts()->backupDelivered((int) $sent->site_id, (string) $sent->nz_date);
+        }
 
-        return MedicationBackupDelivery::query()->findOrFail($id);
+        return $sent;
     }
 
     public function retry(User $actor, int $id, int $version): MedicationBackupDelivery
@@ -337,24 +361,48 @@ class BackupDeliveryService
         $this->encryption->cleanupStale();
         $day = now(BackupScheduleClock::TIMEZONE)->toDateString();
         $results = ['prepared' => 0, 'sent' => 0, 'failed' => 0, 'disabled' => 0];
+        // Settings › Connected services: switched off, the job makes nothing (D4).
+        if (! app(ConnectedCareSettings::class)->switchedOn(ConnectedCareSettings::BACKUPS)) {
+            $this->purgeExpired();
+
+            return ['prepared' => 0, 'sent' => 0, 'failed' => 0, 'disabled' => 1, 'feature' => 'off'];
+        }
         foreach (MedicationBackupSchedule::query()->where('enabled', true)->orderBy('id')->get() as $schedule) {
             if ($this->clock->resolve($day, $schedule->local_time)['instant']->isFuture()) {
                 continue;
             }
+            // EA-142: the schedule runs as whoever last saved it. When they can no
+            // longer manage this house's backups, say so and alert — never a
+            // silent counter.
+            $actor = User::query()->find($schedule->approved_by);
+            if ($actor === null || ! $this->stillManages($actor, (int) $schedule->site_id)) {
+                $results['failed']++;
+                $this->recordRun($schedule, $day, 'authority_lapsed', 'schedule_owner_cannot_manage_backups');
+
+                continue;
+            }
+            if (! app(ConnectedCareSettings::class)->enabled(ConnectedCareSettings::BACKUPS)) {
+                $results['failed']++;
+                $this->recordRun($schedule, $day, 'not_configured', 'encryption_not_ready');
+
+                continue;
+            }
             try {
-                $actor = User::query()->findOrFail($schedule->approved_by);
                 $row = $this->prepareArtifact($actor, $schedule->site_id, $day, $schedule->version, scheduled: true);
                 if ($row->state === 'ready') {
                     $results['prepared']++;
                     if (config('emar-catalogue-backups.send_enabled', false)) {
-                        $this->send($actor, $row->id, $row->version);
+                        $row = $this->send($actor, $row->id, $row->version);
                         $results['sent']++;
                     } else {
                         $results['disabled']++;
                     }
                 }
+                $this->recordRun($schedule, $day, $row->state === 'ready' ? 'prepared_not_emailed' : $row->state, $row->failure_code, $row);
             } catch (Throwable) {
                 $results['failed']++; // Aggregate only; no subject, person, medicine, mailbox or secret.
+                $row = MedicationBackupDelivery::query()->where('schedule_id', $schedule->id)->where('nz_date', $day)->first();
+                $this->recordRun($schedule, $day, in_array($row?->state, ['uncertain', 'sending'], true) ? 'uncertain' : 'failed', $row?->failure_code ?? 'preparation_failed', $row);
             }
         }
         $this->purgeExpired();
@@ -362,12 +410,52 @@ class BackupDeliveryService
         return $results;
     }
 
+    private function stillManages(User $actor, int $siteId): bool
+    {
+        try {
+            DB::transaction(fn () => $this->access->manager($actor, $siteId), 1);
+
+            return true;
+        } catch (HttpExceptionInterface) {
+            return false;
+        }
+    }
+
+    /**
+     * EA-142/EA-143: what the job last did for this house, shown on the page;
+     * the first problem of the NZ day alerts the house (later minutes of the
+     * same problem tell nobody again).
+     */
+    private function recordRun(MedicationBackupSchedule $schedule, string $day, string $state, ?string $code, ?MedicationBackupDelivery $row = null): void
+    {
+        $code = $code !== null ? Str::limit($code, 60, '') : null;
+        try {
+            MedicationBackupSchedule::query()->whereKey($schedule->id)
+                ->where(fn ($q) => $q->whereNull('last_run_nz_date')->orWhere('last_run_nz_date', '!=', $day)
+                    ->orWhereNull('last_run_state')->orWhere('last_run_state', '!=', $state)
+                    ->orWhereRaw('COALESCE(last_run_code, \'\') != ?', [$code ?? '']))
+                ->update(['last_run_nz_date' => $day, 'last_run_state' => $state, 'last_run_code' => $code, 'last_run_at' => now()]);
+        } catch (Throwable) {
+            // The run itself stands; the status line catches up next minute.
+        }
+        if (in_array($state, ['failed', 'uncertain', 'authority_lapsed', 'not_configured'], true)) {
+            $this->alerts()->backupProblem($schedule, $day, $state, $row ? self::reference($row) : null);
+        } elseif ($state === 'sent') {
+            $this->alerts()->backupDelivered((int) $schedule->site_id, $day);
+        }
+    }
+
+    private function alerts(): ConnectedCareAlerts
+    {
+        return app(ConnectedCareAlerts::class);
+    }
+
     public function dto(MedicationBackupDelivery $row, User $actor): array
     {
         $manager = $actor->canDo('medications.backups.manage');
         $alive = $row->expires_at?->isFuture() && $row->artifact_path !== null && in_array($row->state, ['ready', 'sent', 'failed', 'uncertain'], true);
 
-        return ['id' => (int) $row->id, 'site_id' => (int) $row->site_id, 'nz_date' => $row->nz_date, 'state' => $row->state, 'version' => $row->version, 'attempt_count' => $row->attempt_count, 'failure_code' => $row->failure_code, 'created_at' => $row->created_at?->toIso8601String(), 'sent_at' => $row->sent_at?->toIso8601String(), 'expires_at' => $row->expires_at?->toIso8601String(), 'can_send' => $manager && $row->prepared_by === $actor->id && $row->state === 'ready' && $row->claim_token === null && $alive && (bool) config('emar-catalogue-backups.send_enabled', false), 'can_retry' => $manager && config('emar-catalogue-backups.send_enabled', false) && $row->state === 'failed' && $row->claim_token === null && $row->nz_date === now(BackupScheduleClock::TIMEZONE)->toDateString(), 'can_download' => (bool) $alive, 'can_reveal' => (bool) $alive];
+        return ['id' => (int) $row->id, 'reference' => self::reference($row), 'site_id' => (int) $row->site_id, 'nz_date' => $row->nz_date, 'state' => $row->state, 'version' => $row->version, 'attempt_count' => $row->attempt_count, 'failure_code' => $row->failure_code, 'created_at' => $row->created_at?->toIso8601String(), 'sent_at' => $row->sent_at?->toIso8601String(), 'expires_at' => $row->expires_at?->toIso8601String(), 'can_send' => $manager && $row->prepared_by === $actor->id && $row->state === 'ready' && $row->claim_token === null && $alive && (bool) config('emar-catalogue-backups.send_enabled', false), 'can_retry' => $manager && config('emar-catalogue-backups.send_enabled', false) && $row->state === 'failed' && $row->claim_token === null && $row->nz_date === now(BackupScheduleClock::TIMEZONE)->toDateString(), 'can_download' => (bool) $alive, 'can_reveal' => (bool) $alive];
     }
 
     private function artifactMatches(MedicationBackupDelivery $row): bool
@@ -409,7 +497,8 @@ class BackupDeliveryService
         foreach ($rows as $row) {
             $user = $this->access->recipient(User::query()->findOrFail($row->user_id), $schedule->site_id);
             abort_unless($this->access->emailHashMatches($user, $row->email_sha256), 409, 'A recipient mailbox changed. Review the recipient again.');
-            $result[(int) $user->id] = $user->email;
+            // Fixed rule: the HR work email only, never the sign-in email.
+            $result[(int) $user->id] = (string) $this->access->workEmail($user);
         }
 
         return $result;
@@ -418,6 +507,45 @@ class BackupDeliveryService
     private function recipientDigest(array $recipients): string
     {
         return $this->access->recipientDigest($recipients);
+    }
+
+    /** "B123" — the delivery reference shown on the page, in the email and in the file name. */
+    public static function reference(MedicationBackupDelivery $row): string
+    {
+        return 'B'.$row->id;
+    }
+
+    public function houseName(MedicationBackupDelivery $row): string
+    {
+        return (string) (Site::query()->whereKey($row->site_id)->value('name') ?? 'House '.$row->site_id);
+    }
+
+    /** "chart-backup-kowhai-house-2026-10-09-B123.pdf": the house and reference, no resident names. */
+    public function filename(MedicationBackupDelivery $row): string
+    {
+        return BackupMailTransport::filename($this->houseName($row), (string) $row->nz_date, self::reference($row));
+    }
+
+    /**
+     * EA-057: who opened a readable copy of a whole-house chart, and when —
+     * a download or a password reveal — on the medication event chain (Reports
+     * › Export history). Call inside the transaction that checked access.
+     */
+    public function recordDisclosure(MedicationBackupDelivery $row, User $actor, string $action): void
+    {
+        abort_unless(in_array($action, ['downloaded', 'password_revealed'], true), 500);
+        $pack = is_array($row->source_snapshot) ? $row->source_snapshot : [];
+        app(MedicationEventRecorder::class)->append(new MedicationEventData(
+            siteId: (int) $row->site_id,
+            kind: 'backup.'.$action,
+            subjectType: 'medication_backup',
+            subjectId: (string) $row->id,
+            actorId: (int) $actor->id,
+            occurredAt: CarbonImmutable::now('UTC'),
+            summary: $action === 'downloaded' ? 'Protected chart backup downloaded' : 'Protected chart backup password revealed',
+            facts: ['delivery' => self::reference($row), 'nz_date' => $row->nz_date, 'controlled_pages_included' => (bool) ($pack['controlled_pages_included'] ?? false)],
+            controlled: (bool) ($pack['controlled_pages_included'] ?? false),
+        ));
     }
 
     private function event(MedicationBackupDelivery $row, User $actor, string $action): void

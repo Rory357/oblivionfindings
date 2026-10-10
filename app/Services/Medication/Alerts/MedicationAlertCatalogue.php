@@ -2,6 +2,8 @@
 
 namespace App\Services\Medication\Alerts;
 
+use App\Services\Medication\Connected\ConnectedCareSettings;
+
 /**
  * The medication alerts Medication Settings › Alerts & access controls (eMAR
  * P11 v5 `data.ts` ALERTS): what each is, which recipient groups it offers,
@@ -32,6 +34,12 @@ final class MedicationAlertCatalogue
 
     public const EA_REVIEWERS = 'eaReviewers';
 
+    /** B10 (EA-138, EA-142): people who manage protected backups at the house. */
+    public const BACKUP_MANAGERS = 'backupManagers';
+
+    /** B10 (EA-025): people who manage medicine orders at the house. */
+    public const ORDER_MANAGERS = 'orderManagers';
+
     public const STAFF_MEMBER = 'staffMember';
 
     public const ON_CALL = 'onCall';
@@ -46,6 +54,8 @@ final class MedicationAlertCatalogue
         self::OVERRIDE_GRANTERS => ['label' => 'People who can grant witness overrides', 'description' => 'The new witness-override permission, at the house'],
         self::EA_REVIEWERS => ['label' => 'People who review emergency access here', 'description' => 'Anyone who reviews emergency access at the house'],
         self::STAFF_MEMBER => ['label' => 'The staff member', 'description' => 'The person the alert is about'],
+        self::BACKUP_MANAGERS => ['label' => 'People who manage protected backups here', 'description' => 'Anyone who manages protected backups at the house'],
+        self::ORDER_MANAGERS => ['label' => 'People who manage orders here', 'description' => 'Anyone who manages medicine orders at the house'],
         // P11 Q9: off on every alert until a manager turns it on.
         self::ON_CALL => ['label' => 'On-call person (from the roster)', 'description' => 'Whoever is the house’s on-call contact at the time'],
     ];
@@ -65,6 +75,8 @@ final class MedicationAlertCatalogue
         self::STOCK_STAFF,
         self::EA_REVIEWERS,
         self::STAFF_MEMBER,
+        self::BACKUP_MANAGERS,
+        self::ORDER_MANAGERS,
     ];
 
     public const OVERDUE = 'overdue';
@@ -94,6 +106,15 @@ final class MedicationAlertCatalogue
     public const CD_CHECK = 'cdCheck';
 
     public const REVIEW_DUE = 'reviewDue';
+
+    /** B10 (EA-138): offered only while the pharmacy bridge runs. */
+    public const PHARMACY_ORDER = 'pharmacyOrder';
+
+    /** B10 (EA-138, EA-142): offered only while protected backups run. */
+    public const BACKUP_FAILED = 'backupFailed';
+
+    /** B10 (EA-025): offered only while the outside prescriber portal runs. */
+    public const PRESCRIBER_REQUEST = 'prescriberRequest';
 
     /**
      * Every alert in v5's order. `controlled`: always about a controlled
@@ -271,6 +292,50 @@ final class MedicationAlertCatalogue
             'until' => 'Until reviewed',
             'built' => true,
         ],
+        // B10 (EA-138): a connected pharmacy rejected an order, or a send's result
+        // is unknown — stock can run out before anyone opens the order. Offered
+        // only while the pharmacy bridge runs (Settings › Connected services).
+        self::PHARMACY_ORDER => [
+            'label' => 'Pharmacy order needs checking',
+            'subline' => 'A connected pharmacy rejects an order, its send has an unknown result, or it answers after staff settled the order by hand',
+            'groups' => [self::STOCK_STAFF, self::HOUSE_LEAD, self::CLINICAL_LEAD],
+            'default' => [self::STOCK_STAFF, self::HOUSE_LEAD],
+            'locked' => [],
+            'controlled' => false,
+            'follow_up' => false,
+            'until' => 'Until the order is settled',
+            'built' => true,
+            'feature' => 'pharmacy_bridge',
+        ],
+        // B10 (EA-138, EA-142): a house's daily protected backup failed, has an
+        // unknown send result, or stopped because whoever runs it lost access.
+        self::BACKUP_FAILED => [
+            'label' => 'Protected backup failed',
+            'subline' => 'A house’s daily protected chart backup fails, its email result is unknown, or the schedule’s owner lost access',
+            'groups' => [self::BACKUP_MANAGERS, self::HOUSE_LEAD, self::PROVIDER_MANAGER],
+            'default' => [self::BACKUP_MANAGERS],
+            'locked' => [],
+            'controlled' => false,
+            'follow_up' => false,
+            'until' => 'Until a backup is delivered or the schedule is fixed',
+            'built' => true,
+            'feature' => 'protected_backups',
+        ],
+        // B10 (EA-025): an outside prescriber asked to start, change or stop a
+        // medicine. The chart doesn't change until someone decides, so the
+        // people who manage orders at the house are told.
+        self::PRESCRIBER_REQUEST => [
+            'label' => 'Prescriber request waiting',
+            'subline' => 'An outside prescriber asks to start, change or stop a medicine through the portal',
+            'groups' => [self::ORDER_MANAGERS, self::CLINICAL_LEAD, self::HOUSE_LEAD],
+            'default' => [self::ORDER_MANAGERS],
+            'locked' => [],
+            'controlled' => false,
+            'follow_up' => false,
+            'until' => 'Until someone decides the request',
+            'built' => true,
+            'feature' => 'prescriber_portal',
+        ],
     ];
 
     /** Channels that send today (email and push since P11 B2 chunk 2). */
@@ -285,12 +350,23 @@ final class MedicationAlertCatalogue
     /** @return list<string> Alerts something real raises today, in v5's order. */
     public static function built(): array
     {
-        return array_keys(array_filter(self::ALERTS, fn (array $alert): bool => $alert['built']));
+        return array_keys(array_filter(self::ALERTS, fn (array $alert, string $key): bool => self::isBuilt($key), ARRAY_FILTER_USE_BOTH));
     }
 
+    /**
+     * Raised by something real today. A connected-care alert counts only
+     * while its feature is switched on in Settings › Connected services —
+     * otherwise nothing can raise it, so it isn't offered. (Switched on but
+     * not configured still alerts: that is when a backup silently stops.)
+     */
     public static function isBuilt(string $key): bool
     {
-        return (self::ALERTS[$key]['built'] ?? false) === true;
+        $alert = self::ALERTS[$key] ?? null;
+        if ($alert === null || $alert['built'] !== true) {
+            return false;
+        }
+
+        return ! isset($alert['feature']) || app(ConnectedCareSettings::class)->switchedOn($alert['feature']);
     }
 
     /** @return list<string> The groups an alert offers that resolve to people today. */

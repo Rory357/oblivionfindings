@@ -152,7 +152,9 @@ class MedicationAlertRecipients
             };
             $groups = [];
             foreach (MedicationAlertCatalogue::GROUPS_BUILT as $group) {
-                if ($group === MedicationAlertCatalogue::STAFF_MEMBER) {
+                if ($group === MedicationAlertCatalogue::STAFF_MEMBER
+                    || ($group === MedicationAlertCatalogue::BACKUP_MANAGERS && ! MedicationAlertCatalogue::isBuilt(MedicationAlertCatalogue::BACKUP_FAILED))
+                    || ($group === MedicationAlertCatalogue::ORDER_MANAGERS && ! MedicationAlertCatalogue::isBuilt(MedicationAlertCatalogue::PRESCRIBER_REQUEST))) {
                     continue;
                 }
                 $subject = new MedicationAlertSubject(key: '', siteId: (int) $siteId, title: '', message: '', shortMessage: '');
@@ -314,6 +316,8 @@ class MedicationAlertRecipients
             MedicationAlertCatalogue::PROVIDER_MANAGER => $this->withRole('provider_manager'),
             MedicationAlertCatalogue::STOCK_STAFF => $this->withPermission('medications.stock.update'),
             MedicationAlertCatalogue::EA_REVIEWERS => $this->withPermission('medications.audit.view'),
+            MedicationAlertCatalogue::BACKUP_MANAGERS => $this->withPermission('medications.backups.manage'),
+            MedicationAlertCatalogue::ORDER_MANAGERS => $this->withPermission('medications.orders.manage'),
             MedicationAlertCatalogue::STAFF_MEMBER => $subject->staffUserId === null
                 ? collect()
                 : $this->approved([$subject->staffUserId]),

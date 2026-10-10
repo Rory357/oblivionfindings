@@ -78,8 +78,8 @@ class MedicationReportsController extends Controller
                 $page = $this->paginate($rows, $request);
                 $data['totals'] = ['not_recorded' => count($rows)];
             } else {
-                $query = $this->events->query($actor, $siteIds, $period, $clientId, $sub === 'exports' ? 'export.created' : (($filters['kind'] ?? '') ?: null), $filters['q'] ?? '');
-                $data['totals'] = ['events' => (clone $query)->count(), 'exports' => (clone $query)->where('kind', 'export.created')->count(), 'doses' => (clone $query)->where('kind', 'like', 'dose.%')->count(), 'errors' => (clone $query)->where('kind', 'like', 'error.%')->count()];
+                $query = $this->events->query($actor, $siteIds, $period, $clientId, $sub === 'exports' ? MedicationEventReader::DISCLOSURE_KINDS : (($filters['kind'] ?? '') ?: null), $filters['q'] ?? '');
+                $data['totals'] = ['events' => (clone $query)->count(), 'exports' => (clone $query)->whereIn('kind', MedicationEventReader::DISCLOSURE_KINDS)->count(), 'doses' => (clone $query)->where('kind', 'like', 'dose.%')->count(), 'errors' => (clone $query)->where('kind', 'like', 'error.%')->count()];
                 $paginator = $query->paginate(50)->withQueryString();
                 $paginator->setCollection($paginator->getCollection()->map(fn ($e) => $this->events->present($actor, $e)));
                 $page = $paginator->toArray();

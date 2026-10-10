@@ -16,6 +16,7 @@ use App\Services\AuditLogger;
 use App\Services\AuthorizationEvidenceLockService;
 use App\Services\Medication\Audit\MedicationEventData;
 use App\Services\Medication\Audit\MedicationEventRecorder;
+use App\Services\Medication\Connected\ConnectedCareAlerts;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
 use Carbon\CarbonImmutable;
@@ -271,10 +272,32 @@ final class PharmacyDispatchService
             }
             $applied = (bool) $dispatch->acknowledgment_applied;
             $code = $dispatch->acknowledgment_code ?? 'supply_state_retained';
+            // EA-136: staff already settled this order by hand (confirmed not
+            // received, or recorded their own phone, email or fax contact).
+            // A late acceptance is kept as conflicting evidence; it never
+            // replaces what staff recorded or flips the dispatch.
+            $contradicts = ($dispatch->state === 'failed' && $dispatch->result_code === 'pharmacy_confirmed_not_received')
+                || ($order->communication_method !== null && $order->communication_method !== 'secure_message');
+            if ($contradicts) {
+                MedicationPharmacyAcknowledgment::create(['connection_id' => $connection->id, 'dispatch_id' => $dispatch->id,
+                    'event_id' => $data['event_id'], 'fingerprint' => $bodyFingerprint, 'outcome' => $data['outcome'],
+                    'supplier_reference' => $data['supplier_reference'], 'applied' => false, 'processing_code' => 'contradicts_recorded_check', 'received_at' => now()]);
+                $dispatch->forceFill(['acknowledgment_outcome' => $data['outcome'], 'acknowledgment_applied' => false,
+                    'acknowledgment_code' => 'contradicts_recorded_check', 'supplier_reference' => $data['supplier_reference'],
+                    'acknowledged_at' => now(), 'result_code' => 'authenticated_pharmacy_'.$data['outcome'].'_after_manual_check'])->save();
+                $this->event($client, $medication, $order, $dispatch, null, 'acknowledged');
+
+                return ['received' => true, 'duplicate' => false, 'applied' => false, 'code' => 'contradicts_recorded_check'];
+            }
+            // EA-137: with the bridge switched off (or not configured) the
+            // evidence is kept and nothing about the order changes.
+            if (! $this->partners->enabled()) {
+                $code = 'connection_disabled';
+            }
             try {
                 $partner = $this->partners->forSite($connection->partner_key, (int) $client->site_id);
                 $current = $this->snapshots->capture($client, $medication, $order, $partner);
-                $currentAuthority = $senderCurrent && $siteCurrent && $connection->enabled && $connection->version === $dispatch->connection_version
+                $currentAuthority = $this->partners->enabled() && $senderCurrent && $siteCurrent && $connection->enabled && $connection->version === $dispatch->connection_version
                     && in_array((int) $client->site_id, $connection->site_ids ?? [], true)
                     && $this->active($medication) && ! $client->trashed()
                     && hash_equals($dispatch->snapshot_fingerprint, $this->snapshots->fingerprint($current))
@@ -288,10 +311,10 @@ final class PharmacyDispatchService
                     $applied = true;
                     $code = 'pharmacy_acceptance_recorded';
                 } elseif (! $currentAuthority) {
-                    $code = 'snapshot_or_connection_changed';
+                    $code = $this->partners->enabled() ? 'snapshot_or_connection_changed' : 'connection_disabled';
                 }
             } catch (PharmacyConnectionException) {
-                $code = 'snapshot_or_connection_changed';
+                $code = $this->partners->enabled() ? 'snapshot_or_connection_changed' : 'connection_disabled';
             }
             $dispatch->forceFill(['state' => $data['outcome'], 'acknowledgment_outcome' => $data['outcome'],
                 'acknowledgment_applied' => $applied, 'acknowledgment_code' => $code, 'supplier_reference' => $data['supplier_reference'],
@@ -449,6 +472,9 @@ final class PharmacyDispatchService
         if ($event !== null) {
             $this->events->append($event);
         }
+        // EA-138: a rejected, unknown or contradicted dispatch alerts the house;
+        // a settled one closes its alert (after this record commits).
+        app(ConnectedCareAlerts::class)->dispatchChanged((int) $dispatch->id);
     }
 
     /** Build captured-site evidence for the caller's final medication audit batch. */

@@ -31,6 +31,7 @@ use App\Http\Controllers\MedicationAuditController;
 use App\Http\Controllers\MedicationsController;
 use App\Http\Controllers\MedicationsReportController;
 use App\Http\Middleware\MedicationExportGuard;
+use App\Http\Middleware\ShareConnectedCareSwitches;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -100,7 +101,7 @@ Route::middleware(['auth'])->group(function () {
         ->name('meds.today.prn_requirements');
 });
 
-Route::middleware(['auth'])->prefix('emar')->group(function () {
+Route::middleware(['auth', ShareConnectedCareSwitches::class])->prefix('emar')->group(function () {
     // Dashboard
     Route::get('/', [EmarController::class, 'dashboard'])
         ->middleware('permission:medications.view')

@@ -16,6 +16,7 @@ import {
     Repeat,
     Shield,
     ShieldCheck,
+    ToggleRight,
     UserCheck,
     Users,
     type LucideIcon,
@@ -26,7 +27,13 @@ export const SET_VIEWS: Record<
     ViewKey,
     { label: string; secs: [string, string][] }
 > = {
-    connections: {label:'Connected services',secs:[['overview','Overview']]},
+    connections: {
+        label: 'Connected services',
+        secs: [
+            ['overview', 'Overview'],
+            ['services', 'Switches and checks'],
+        ],
+    },
     rules: {
         label: 'Medication rules',
         secs: [
@@ -100,6 +107,7 @@ const SECTION_ICON: Record<string, LucideIcon> = {
     oncall: Bell,
     log: History,
     emergency: LockKeyhole,
+    services: ToggleRight,
 };
 
 export const sectionLabel = (view: ViewKey, sec: string) =>

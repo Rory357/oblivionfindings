@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\ConnectedCareSwitches;
 use Tests\TestCase;
 
 final class PharmacyConnectionTest extends TestCase
@@ -41,6 +42,8 @@ final class PharmacyConnectionTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // D4: the bridge runs only while switched on (and configured below).
+        ConnectedCareSwitches::on('pharmacy_bridge');
         foreach (['medications.view', 'medications.stock.update', 'medications.pharmacy.send', 'medications.settings.manage',
             'medications.pharmacy.connect.manage', 'medications.controlled.view', 'medications.controlled.record',
             'medications.audit.view', 'clinical.accessAllSites', 'sites.viewAll'] as $key) {
@@ -761,6 +764,63 @@ final class PharmacyConnectionTest extends TestCase
             'client_medication_id' => $this->fixture['medication']->id, 'request_uuid' => (string) Str::uuid(),
             'order_id' => $this->fixture['order']->id, 'next' => 'cancelled', 'reason' => 'Synthetic local closure']]
             : [$this->dispatchUrl($dispatch).'/cancel', ['request_uuid' => (string) Str::uuid(), 'expected_state' => $dispatch->state]];
+    }
+
+    /** EA-136: a late acceptance after staff settled the order by hand is kept as conflicting evidence. */
+    public function test_b10_late_acceptance_never_overwrites_a_manual_check_and_raises_a_duplicate_supply_alert(): void
+    {
+        Http::fake(fn () => throw new ConnectionException('Synthetic uncertain transport'));
+        $dispatch = $this->queue();
+        app(PharmacyDispatchService::class)->send($dispatch->id);
+        $this->actingAs($this->fixture['actor'])->postJson($this->dispatchUrl($dispatch).'/resolve', ['request_uuid' => (string) Str::uuid(),
+            'expected_state' => 'unknown', 'confirmed_not_received' => true, 'reference' => 'CALL-SYNTHETIC-1'])->assertOk();
+        $this->fixture['order']->forceFill(['communication_method' => 'phone', 'communication_reference' => 'PHONE-SYNTHETIC-1',
+            'communication_recorded_by' => $this->fixture['actor']->id, 'communication_recorded_at' => now()])->save();
+
+        $this->ack($dispatch)->assertOk()->assertJsonPath('applied', false)->assertJsonPath('code', 'contradicts_recorded_check');
+
+        $order = $this->fixture['order']->fresh();
+        $this->assertSame('phone', $order->communication_method);
+        $this->assertSame('PHONE-SYNTHETIC-1', $order->communication_reference);
+        $this->assertSame('failed', $dispatch->fresh()->state);
+        $this->assertTrue(\App\Models\MedicationAlert::query()->where('type', 'pharmacyOrder')->where('client_id', $this->fixture['order']->client_id)->exists());
+    }
+
+    /** EA-137 (a): with the bridge switched off, a signed acceptance is evidence only. */
+    public function test_b10_switched_off_bridge_keeps_acknowledgments_as_evidence_without_changing_orders(): void
+    {
+        $dispatch = $this->queue();
+        app(PharmacyDispatchService::class)->send($dispatch->id);
+        $this->assertSame('submitted', $this->fixture['order']->fresh()->status);
+        config(['emar-pharmacy-connect.enabled' => false]);
+
+        $this->ack($dispatch)->assertOk()->assertJsonPath('applied', false)->assertJsonPath('code', 'connection_disabled');
+
+        $this->assertSame('submitted', $this->fixture['order']->fresh()->status);
+        $this->assertDatabaseCount('medication_pharmacy_acknowledgments', 1);
+    }
+
+    /** EA-137 (b): nothing about the setup is revealed before the signature is checked. */
+    public function test_b10_acknowledgment_endpoint_answers_one_401_for_unknown_connections_and_unready_partners(): void
+    {
+        $dispatch = $this->queue();
+        $body = json_encode(['event_id' => 'EVENT-X', 'dispatch_uuid' => $dispatch->uuid, 'outcome' => 'accepted', 'supplier_reference' => 'X'], JSON_THROW_ON_ERROR);
+        $headers = ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json', 'HTTP_X_PHARMACY_TIMESTAMP' => (string) time(), 'HTTP_X_PHARMACY_SIGNATURE' => 'v1=deadbeef'];
+        $this->call('POST', '/api/emar/pharmacy-connections/999999/acknowledgments', [], [], [], $headers, $body)->assertUnauthorized();
+        config(['emar-pharmacy-connect.partners' => []]);
+        $this->call('POST', '/api/emar/pharmacy-connections/'.$dispatch->connection_id.'/acknowledgments', [], [], [], $headers, $body)->assertUnauthorized();
+    }
+
+    /** EA-138: a rejection reaches the people who update stock at the house. */
+    public function test_b10_pharmacy_rejection_raises_an_alert(): void
+    {
+        $dispatch = $this->queue();
+        app(PharmacyDispatchService::class)->send($dispatch->id);
+        $this->ack($dispatch, 'rejected')->assertOk();
+        $this->assertSame('rejected', $dispatch->fresh()->state);
+        $alert = \App\Models\MedicationAlert::query()->where('type', 'pharmacyOrder')->where('client_id', $this->fixture['order']->client_id)->sole();
+        $this->assertSame('/emar/stock?view=orders', $alert->action_url);
+        $this->assertStringNotContainsString('ZZZ1234', (string) $alert->message.$alert->short_message);
     }
 
     private function queue(): MedicationPharmacyDispatch

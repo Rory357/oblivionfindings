@@ -8,6 +8,7 @@ use App\Models\MedicationExternalGrant;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Medication\Connected\ConnectedCareSettings;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
 use Carbon\CarbonImmutable;
@@ -57,6 +58,13 @@ final class ExternalClinicalAccess
 
         return $this->internal($actor, (int) ($input['client_id'] ?? 0), function (Client $client, User $locked) use ($input, $submitted) {
             $profile = MedicationExternalClinician::query()->whereKey($submitted->id)->lockForUpdate()->firstOrFail();
+            // EA-104: the person who verified the prescriber's identity and
+            // registration doesn't also grant them a chart (a Settings ›
+            // Connected services switch, on by default).
+            if (app(ConnectedCareSettings::class)->twoPerson(ConnectedCareSettings::TWO_PERSON_IDENTITY)
+                && (int) $profile->verified_by === (int) $locked->id) {
+                $this->invalid('clinician_id', 'Another person grants access. You verified this prescriber, so you can’t also grant them access.');
+            }
             $this->assertIdentity($profile, User::query()->whereKey($profile->user_id)->lockForUpdate()->firstOrFail(), requireSetup: false);
             $data = Validator::make($input, ['purpose' => 'required|string|max:2000', 'expires_at' => 'required|date|after:now',
                 'can_propose' => 'required|boolean', 'include_controlled' => 'required|boolean'])->validate();

@@ -53,7 +53,7 @@ trait ExternalClinicalFixtures
     {
         $user = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
         foreach (array_merge(['medications.view', 'medications.orders.manage', 'medications.orders.verify',
-            'medications.external.manage', 'medications.transfers.manage', 'medications.reports.export'], $extra) as $key) {
+            'medications.external.manage', 'medications.transfers.manage', 'medications.reports.view', 'medications.reports.export'], $extra) as $key) {
             $permission = Permission::firstOrCreate(['key' => $key], ['description' => $key, 'group' => 'medications']);
             $user->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
         }

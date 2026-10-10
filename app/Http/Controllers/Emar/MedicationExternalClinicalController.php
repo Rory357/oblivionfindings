@@ -7,11 +7,14 @@ use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\MedicationExternalClinician;
 use App\Models\MedicationExternalGrant;
+use App\Models\MedicationEvent;
 use App\Models\MedicationExternalProposal;
 use App\Models\MedicationOrderRevision;
 use App\Models\MedicationProviderTransfer;
 use App\Models\User;
 use App\Services\CurrentAuthorizationReads;
+use App\Services\Medication\Audit\MedicationEventData;
+use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\ExternalClinical\ExternalClinicalAccess;
 use App\Services\Medication\ExternalClinical\ExternalClinicalPrescription;
@@ -21,8 +24,13 @@ use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationOrderWorkflow;
 use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\Medication\Reporting\MedicationExportAudit;
+use App\Services\Medication\Reporting\MedicationReportPeriod;
 use App\Support\MedicationJourney;
+use App\Support\WorkerClock;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 final class MedicationExternalClinicalController extends Controller
@@ -57,6 +65,9 @@ final class MedicationExternalClinicalController extends Controller
         $canTransfer = $actor->canDo('medications.transfers.manage');
         $grantPage = $canAccess ? MedicationExternalGrant::with(['clinician.user', 'client'])->whereIn('client_id', $selectedIds)->orderByDesc('id')->paginate(100, ['*'], 'grants_page') : null;
         $grants = $grantPage?->getCollection() ?? collect();
+        $views = $grants->isEmpty() ? collect() : MedicationEvent::query()->where('subject_type', 'external_grant')->where('kind', 'external.chart_viewed')
+            ->whereIn('subject_id', $grants->pluck('id')->map(fn ($id) => (string) $id))->selectRaw('subject_id, COUNT(*) AS views, MAX(occurred_at) AS last_viewed_at')
+            ->groupBy('subject_id')->get()->keyBy('subject_id');
         $profilePage = $canAccess ? MedicationExternalClinician::with('user')
             ->when(! $canRevokeIdentity, fn ($q) => $q->where(fn ($q) => $q->where('verified_by', $actor->id)
                 ->orWhereHas('grants', fn ($g) => $g->whereIn('client_id', $selectedIds))))
@@ -79,7 +90,10 @@ final class MedicationExternalClinicalController extends Controller
             'grants' => $grants->map(fn ($g) => ['id' => $g->id, 'clinician_id' => $g->clinician_id, 'clinician_name' => $g->clinician->user->name,
                 'client_id' => $g->client_id, 'site_id' => $g->site_id, 'purpose' => $g->purpose, 'can_propose' => $g->can_propose,
                 'include_controlled' => $g->include_controlled, 'expires_at' => $g->expires_at?->toIso8601String(), 'revoked_at' => $g->revoked_at?->toIso8601String(),
-                'active' => $this->grantAvailability($g) === 'ready', 'availability' => $this->grantAvailability($g)])->all(),
+                'active' => $this->grantAvailability($g) === 'ready', 'availability' => $this->grantAvailability($g),
+                // EA-083: how often the prescriber opened this person's chart, and when last.
+                'views' => (int) ($views->get((string) $g->id)?->views ?? 0),
+                'last_viewed_at' => ($last = $views->get((string) $g->id)?->last_viewed_at) ? CarbonImmutable::parse($last, 'UTC')->toIso8601String() : null])->all(),
             'proposals' => $proposals->map(fn ($p) => $this->proposal($p, $actor))->all(),
             'transfers' => $transfers->map(fn ($t) => $this->transfer($t))->all(),
             'can' => ['manage_access' => $canAccess, 'revoke_identity' => $canRevokeIdentity, 'manage_orders' => $canOrders, 'transfer' => $canTransfer, 'export' => $actor->canDo('medications.reports.export')],
@@ -101,13 +115,26 @@ final class MedicationExternalClinicalController extends Controller
                     ClientMedication::query()->current()->where('client_id', $client->id)->where('state', '!=', 'ceased')
                         ->when(! $grant->include_controlled, fn ($q) => $q->where('controlled_drug', false))->orderBy('name')
                 )->get());
-                $selected = [...$this->person($client), 'medications' => $meds->map(fn ($m) => [
+                // EA-085: say how many controlled medicines this grant leaves out.
+                $hiddenControlled = $grant->include_controlled ? 0 : CurrentAuthorizationReads::within(fn (CurrentAuthorizationReads $reads) => $reads->query(
+                    ClientMedication::query()->current()->where('client_id', $client->id)->where('state', '!=', 'ceased')->where('controlled_drug', true)
+                )->count());
+                $allergySummary = CurrentAuthorizationReads::within(fn (CurrentAuthorizationReads $reads) => app(ClientAllergyRecordService::class)
+                    ->summary($client, app(ClientAllergyRecordService::class)->forClient($client, $reads)));
+                $selected = [...$this->person($client), 'hidden_controlled_count' => $hiddenControlled,
+                    'allergy_status' => ['status' => $allergySummary['status'], 'reviewed_at' => $allergySummary['reviewed']['at'] ?? null],
+                    'medications' => $meds->map(fn ($m) => [
                     ...ExternalClinicalPrescription::normalise($this->orders->payload($m)), 'id' => $m->id,
                     'version' => $m->version, 'state' => $m->state, 'approval_status' => $m->approval_status,
                 ])->all(), 'allergies' => CurrentAuthorizationReads::within(fn (CurrentAuthorizationReads $reads) => array_map(
                     fn (array $entry) => array_intersect_key($entry, array_flip(['allergen', 'reaction', 'severity'])),
                     app(ClientAllergyRecordService::class)->forClient($client, $reads)
                 ))];
+                // EA-083: an outside prescriber's view of a chart is a disclosure.
+                $this->disclosed((int) $client->site_id, (int) $client->id, $actor, 'external.chart_viewed', 'external_grant', (int) $grant->id,
+                    'Outside prescriber viewed the medication chart', ['grant_id' => (int) $grant->id, 'clinician_id' => (int) $profile->id,
+                        'include_controlled' => (bool) $grant->include_controlled, 'medication_count' => $meds->count(), 'hidden_controlled_count' => $hiddenControlled],
+                    $meds->contains(fn ($m) => (bool) $m->controlled_drug));
             }
             $proposalPage = CurrentAuthorizationReads::within(fn (CurrentAuthorizationReads $reads) => $reads->query(
                 MedicationExternalProposal::query()->where('clinician_id', $profile->id)
@@ -180,9 +207,11 @@ final class MedicationExternalClinicalController extends Controller
     public function source(Request $r, int $proposal)
     {
         $record = MedicationExternalProposal::query()->findOrFail($proposal);
-        $this->records->client($r->user(), $record->client_id);
+        $client = $this->records->client($r->user(), $record->client_id);
         $this->orders->assertControlled($r->user(), (bool) $record->controlled);
         $file = $this->proposals->source($record);
+        $this->disclosed((int) $client->site_id, (int) $record->client_id, $r->user(), 'external.source_downloaded', 'external_proposal', (int) $record->id,
+            'Prescriber request source file downloaded', ['proposal_id' => (int) $record->id, 'by' => 'staff'], (bool) $record->controlled);
 
         return response()->download($file->getRealPath(), $record->source_file_name, ['Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff']);
     }
@@ -194,6 +223,8 @@ final class MedicationExternalClinicalController extends Controller
         return $this->external->external($r->user(), $record->client_id, function (Client $client, User $locked, MedicationExternalClinician $profile, MedicationExternalGrant $grant) use ($record) {
             abort_unless((int) $record->clinician_id === (int) $profile->id && (! $record->controlled || $grant->include_controlled), 404);
             $file = $this->proposals->source($record);
+            $this->disclosed((int) $client->site_id, (int) $client->id, $locked, 'external.source_downloaded', 'external_proposal', (int) $record->id,
+                'Prescriber request source file downloaded', ['proposal_id' => (int) $record->id, 'grant_id' => (int) $grant->id, 'by' => 'outside_prescriber'], (bool) $record->controlled);
 
             return response()->download($file->getRealPath(), $record->source_file_name, ['Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff']);
         });
@@ -202,16 +233,15 @@ final class MedicationExternalClinicalController extends Controller
     public function packet(Request $r, int $transfer)
     {
         $record = $this->transfers->reviewed($r->user(), $transfer);
+        // EA-087: a handover packet leaves the organisation — recorded in Reports ›
+        // Export history with the transfer's purpose and disclosure basis.
+        $today = WorkerClock::today()->toDateString();
+        app(MedicationExportAudit::class)->record($r->user(), 'provider_handover', [(int) $record->site_id], new MedicationReportPeriod($today, $today),
+            trim((string) $record->purpose.' — '.(string) $record->disclosure_basis, ' —'), (int) $record->client_id,
+            ['transfer_id' => (int) $record->id, 'transfer_version' => (int) $record->version, 'provider' => (string) $record->provider_name]);
 
         return response()->json($this->transfers->packet($record))->header('Content-Disposition', 'attachment; filename="medication-handover-'.$record->id.'-v'.$record->version.'.json"')
             ->header('Cache-Control', 'private, no-store')->header('X-Content-Type-Options', 'nosniff');
-    }
-
-    public function handover(Request $r, int $transfer)
-    {
-        $record = $this->transfers->reviewed($r->user(), $transfer);
-
-        return response()->json($this->transfers->packet($record))->header('Cache-Control', 'private, no-store');
     }
 
     private function mutation(Request $request, $record, string $message)
@@ -258,6 +288,15 @@ final class MedicationExternalClinicalController extends Controller
         ])];
     }
 
+    /** EA-083: who outside (or inside) the organisation took medication records, on the event chain. */
+    private function disclosed(int $siteId, int $clientId, User $actor, string $kind, string $subjectType, int $subjectId, string $summary, array $facts, bool $controlled): void
+    {
+        DB::transaction(fn () => app(MedicationEventRecorder::class)->append(new MedicationEventData(
+            siteId: $siteId, kind: $kind, subjectType: $subjectType, subjectId: (string) $subjectId, actorId: (int) $actor->id,
+            occurredAt: CarbonImmutable::now('UTC'), summary: $summary, facts: $facts, clientId: $clientId, controlled: $controlled,
+        )), 3);
+    }
+
     private function grantAvailability(MedicationExternalGrant $grant): string
     {
         if ($grant->revoked_at !== null) {
@@ -300,6 +339,8 @@ final class MedicationExternalClinicalController extends Controller
             'kind' => $p->kind, 'medication_id' => $p->medication_id, 'expected_version' => $p->expected_version,
             'prescription' => $p->prescription, 'reason' => $p->reason, 'status' => $p->status, 'submitted_at' => $p->submitted_at?->toIso8601String(),
             'revision_id' => $p->revision_id, 'decision_note' => $p->decision_note, 'has_source_file' => $p->source_file_path !== null]
+            // EA-084: the internal note is for staff only — never in the portal.
+            + ($actor !== null ? ['internal_note' => $p->decision_evidence['internal_note'] ?? null] : [])
             + ($actor !== null ? $this->orderContinuation($p, $actor) : ['order_id' => null, 'order_url' => null]);
     }
 

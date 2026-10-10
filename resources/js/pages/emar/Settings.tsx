@@ -54,6 +54,10 @@ import {
     type AlertPreview,
 } from './settings/_alerts';
 import {
+    ConnectedServicesSettings,
+    type ConnectedStatus,
+} from './settings/_connected';
+import {
     SettingsCtx,
     type Dialog,
     type SettingsContext,
@@ -165,6 +169,8 @@ type Props = {
     /** People with a contact gap: Who can't be reached (B2 C5). */
     alertReachGaps: ReachGap[];
     emergencyPolicyAccess: boolean;
+    /** Settings › Connected services: whether each feature is set up (D4). */
+    connectedStatus?: ConnectedStatus;
     alertLog: AlertLogPage | null;
     alertLogSummary: { recent: number; open: number };
 };
@@ -188,6 +194,8 @@ const SAVED_SECTIONS = [
     'alerts',
     'delivery',
     'emergency',
+    // Connected services › Switches and checks (D4).
+    'services',
 ];
 const SHOW_OPTIONS = [
     { value: 'all', label: 'All settings' },
@@ -343,7 +351,11 @@ export default function EmarSettings(props: Props) {
                       'log',
                   ]
                 : [],
-            connections: hasConnections ? ['overview'] : [],
+            // D4: link cards for connected-service managers; the switches for settings managers.
+            connections: [
+                ...(hasConnections ? ['overview'] : []),
+                ...(settingsAccess ? ['services'] : []),
+            ],
             history: settingsAccess ? ['decide', 'changes'] : [],
         }),
         [
@@ -891,7 +903,13 @@ export default function EmarSettings(props: Props) {
     }));
     const clearQ = () => setQuery('');
     const body =
-        view === 'connections' ? (
+        view === 'connections' && sec === 'services' ? (
+            <ConnectedServicesSettings
+                q={query}
+                show={f.show}
+                status={props.connectedStatus ?? {}}
+            />
+        ) : view === 'connections' ? (
             <ConnectedEntryPoints />
         ) : view === 'rules' && sec === 'overview' ? (
             <RulesOverview data={ruleData} q={query} />

@@ -31,6 +31,9 @@ class MedicationSettingsRegistry
 
     public const VIEW_ALERTS = 'alerts';
 
+    /** Settings › Connected services: the optional third-party features (D4). */
+    public const VIEW_CONNECTIONS = 'connections';
+
     /** Who gets each alert, organisation-wide: `medications.alerts.{alert}`. */
     public const ALERT_STORAGE_PREFIX = 'medications.alerts.';
 
@@ -146,6 +149,7 @@ class MedicationSettingsRegistry
             ...ControlledSettingsFragment::groups(),
             \App\Services\Medication\Reporting\RecordsReportingSettings::group(),
             $this->emergencyPolicy(),
+            \App\Services\Medication\Connected\ConnectedCareSettings::group(),
         ];
     }
 

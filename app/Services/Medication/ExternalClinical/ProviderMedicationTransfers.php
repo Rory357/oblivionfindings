@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\CurrentAuthorizationReads;
 use App\Services\Medication\ClientAllergyRecordService;
+use App\Services\Medication\Connected\ConnectedCareSettings;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationOrderWorkflow;
 use App\Services\Medication\MedicationReconciliationWorkflow;
@@ -99,6 +100,12 @@ final class ProviderMedicationTransfers
             switch ($data['action']) {
                 case 'review':
                     $this->requireState($record, ['draft']);
+                    // EA-104: a second person reviews a handover (a Settings ›
+                    // Connected services switch, on by default).
+                    if (app(ConnectedCareSettings::class)->twoPerson(ConnectedCareSettings::TWO_PERSON_HANDOVER)
+                        && (int) $record->created_by === (int) $locked->id) {
+                        $this->invalid('action', 'Another person reviews this handover. You made it, so you can’t also review it.');
+                    }
                     if ($record->direction === 'outgoing') {
                         $this->assertFresh($locked, $client, $record);
                     }
@@ -222,8 +229,11 @@ final class ProviderMedicationTransfers
             fn (array $entry) => array_intersect_key($entry, array_flip(['allergen', 'reaction', 'severity', 'notes'])),
             app(ClientAllergyRecordService::class)->forClient($client, $reads)
         ));
+        // EA-085: "no known allergies, reviewed" and "never assessed" are not the same.
+        $allergySummary = app(ClientAllergyRecordService::class)->summary($client);
         $facts = ['person' => ['name' => $client->full_name, 'date_of_birth' => $client->date_of_birth?->toDateString(), 'nhi_number' => $client->nhi_number],
-            'medications' => $medicines, 'allergies' => $allergies];
+            'medications' => $medicines, 'allergies' => $allergies,
+            'allergy_status' => ['status' => $allergySummary['status'] === 'none' ? 'not_assessed' : $allergySummary['status'], 'reviewed_at' => $allergySummary['reviewed']['at'] ?? null]];
 
         return ['captured_at' => now()->utc()->toIso8601String(), ...$facts, 'clinical_sha256' => $this->digest($facts),
             'limitations' => ['Source-provider evidence only; receiving provider must verify identity and reconcile medication and allergy facts.',
