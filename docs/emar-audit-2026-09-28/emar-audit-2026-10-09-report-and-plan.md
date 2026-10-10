@@ -387,3 +387,23 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
   - The main repo's `node_modules` is a junction into `C:/Users/steph/.codex/worktrees/workforce-improvements/oblivionfindings/node_modules`. It was created on 8 Oct, during the Codex work. Every worktree's tsc and vitest runs therefore read through, and cache into, that Codex folder. If that folder is ever deleted, every build breaks.
   - Once the lanes finish, replace the junction with a physical `npm ci` in the main repo.
 - **Workforce delivery is active on main.** `codex/workforce-delivery-20261010` was merged into main as `94e31596c` on 10 Oct. eMAR lanes merge main before each report.
+- **10 Oct: Lane B B5–B10 are LIVE as `f64208e41`** (a fast-forward).
+  - **Tests:** pm1 271, pm2 149, pm3 421, frontend 49/49.
+  - **B5:** Transport tab, Shift card and summary API follow the person rule.
+  - **B6:** Emergency-access oversight is Site-scoped; an out-of-scope request returns 404.
+  - **B7:** The Overview follows the person rule.
+  - **B8:** Alert recipients follow the person rule, and escalations are scoped.
+  - **B9:** Legacy reads, the My Day briefing, the door card and the family portal are fixed, and the transport filter uses NZ days.
+  - **B10, connected care completed:**
+    - Five service switches, all off by default: prescriber_portal, provider_transfers, pharmacy_bridge, picture_catalogue and protected_backups. A service can't be switched on until it is configured.
+    - Three two-person switches, all on by default.
+    - Backups go to the HR work email only, and recipients need authenticator 2FA.
+    - Expiry reminders run daily at 07:00 NZ.
+    - Three new alerts.
+  - **Decisions now open for Stephan:**
+    - EA-141: how backup recipients get the password during an outage.
+    - EA-104: whether prescriber registration is recorded as a structured MCNZ/NCNZ check.
+  - **Deferred:**
+    - EA-025: a "request waiting" marker on the MAR.
+    - EA-138: dispatch state on order rows.
+    - EA-136: the duplicate-supply alert does not close on its own.
