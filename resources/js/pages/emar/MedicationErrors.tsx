@@ -1,10 +1,10 @@
-import { MedicationExportButton } from '@/components/emar/medication-export-button';
 import { EmarHubRail } from '@/components/emar/emar-hub-rail';
+import { MedicationExportButton } from '@/components/emar/medication-export-button';
 import {
     EntityContextMenu,
     EntityKebab,
-    type MenuItem,
     useEntityContextMenu,
+    type MenuItem,
 } from '@/components/lists/entity-menu';
 import { EntityTable } from '@/components/lists/entity-table';
 import { ListCaption } from '@/components/lists/list-caption';
@@ -15,7 +15,6 @@ import {
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
-    PageHeaderMeterDonut,
     PageHeaderPrimaryButton,
     PageHeaderSearch,
 } from '@/components/page/page-header';
@@ -49,6 +48,36 @@ type Filters = {
     reach: string;
     site_id: number | null;
 };
+type ErrorMeters = {
+    triage_overdue: number;
+    triage_next_due: string | null;
+    open_with_harm: number;
+    open_moderate_or_worse: number;
+    investigation_next_due: string | null;
+    actions_due: number;
+    actions_overdue: number;
+    actions_next_due: string | null;
+    incidents_ready: number;
+    can_close_incidents: boolean;
+    mine_open: number;
+    mine_closed: number;
+    closed_recent: number;
+};
+const NO_METERS: ErrorMeters = {
+    triage_overdue: 0,
+    triage_next_due: null,
+    open_with_harm: 0,
+    open_moderate_or_worse: 0,
+    investigation_next_due: null,
+    actions_due: 0,
+    actions_overdue: 0,
+    actions_next_due: null,
+    incidents_ready: 0,
+    can_close_incidents: false,
+    mine_open: 0,
+    mine_closed: 0,
+    closed_recent: 0,
+};
 type Props = {
     errors: ErrorRecord[];
     detail: ErrorRecord | null;
@@ -60,6 +89,8 @@ type Props = {
         to: number | null;
         last_page: number;
     };
+    /** EA-154: the approved P08b meter figures. */
+    meters?: ErrorMeters;
     stats: {
         triage: number;
         investigating: number;
@@ -106,6 +137,7 @@ export default function MedicationErrors({
     detail,
     filters,
     pagination,
+    meters: m = NO_METERS,
     stats,
     clients,
     staff,
@@ -226,70 +258,156 @@ export default function MedicationErrors({
                         </>
                     }
                     meters={
-                        <>
-                            {(
-                                [
-                                    ['triage', 'To triage'],
-                                    ['investigating', 'Investigating'],
-                                    ['actions', 'Actions & close'],
-                                    ['closed', 'Closed'],
-                                ] as const
-                            ).map(([key, label]) => (
+                        // EA-154 (Lane C9): the approved P08b meters. The
+                        // 90-day split lives on the Trends view.
+                        can.all ? (
+                            <>
                                 <PageHeaderMeterBlock
-                                    key={key}
-                                    label={label}
-                                    onClick={() => visit({ tab: key })}
+                                    label="To triage"
                                     tone={
-                                        key === 'triage' && stats.triage
+                                        m.triage_overdue
+                                            ? 'critical'
+                                            : stats.triage
+                                              ? 'warning'
+                                              : 'brand'
+                                    }
+                                    ariaLabel={`View ${stats.triage} errors to triage`}
+                                    onClick={() => visit({ tab: 'triage' })}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {stats.triage}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {m.triage_overdue
+                                            ? `${m.triage_overdue} overdue`
+                                            : stats.triage && m.triage_next_due
+                                              ? `Due ${formatDateTime(m.triage_next_due)}`
+                                              : 'None waiting'}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Open with harm"
+                                    tone={
+                                        m.open_moderate_or_worse
                                             ? 'warning'
                                             : 'brand'
                                     }
+                                    ariaLabel={`${m.open_with_harm} open errors that reached the person with harm`}
+                                    onClick={() =>
+                                        visit({ tab: 'investigating' })
+                                    }
                                 >
                                     <PageHeaderMeterBig>
-                                        {stats[key]}
+                                        {m.open_with_harm}
                                     </PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
-                                        {key === 'actions'
-                                            ? 'Errors to finish or close'
-                                            : 'In your permitted scope'}
+                                        {m.open_with_harm
+                                            ? `${m.open_moderate_or_worse} moderate or worse`
+                                            : 'None open'}
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
-                            ))}
-                            <PageHeaderMeterBlock
-                                label="Near misses · 90 days"
-                                onClick={() =>
-                                    visit({ tab: 'trends', reach: 'no' })
-                                }
-                                value={stats.near_miss}
-                            >
-                                <PageHeaderMeterDonut
-                                    percent={
-                                        stats.recent
-                                            ? (100 * stats.near_miss) /
-                                              stats.recent
-                                            : 0
+                                <PageHeaderMeterBlock
+                                    label="Investigating"
+                                    ariaLabel={`View ${stats.investigating} errors being investigated`}
+                                    onClick={() =>
+                                        visit({ tab: 'investigating' })
                                     }
-                                    caption={`${stats.near_miss} of ${stats.recent} reports`}
-                                />
-                            </PageHeaderMeterBlock>
-                            <PageHeaderMeterBlock
-                                label="Reached · 90 days"
-                                onClick={() =>
-                                    visit({ tab: 'trends', reach: 'yes' })
-                                }
-                                value={stats.reached}
-                            >
-                                <PageHeaderMeterDonut
-                                    percent={
-                                        stats.recent
-                                            ? (100 * stats.reached) /
-                                              stats.recent
-                                            : 0
+                                >
+                                    <PageHeaderMeterBig>
+                                        {stats.investigating}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {stats.investigating &&
+                                        m.investigation_next_due
+                                            ? `Next due ${formatDateTime(m.investigation_next_due)}`
+                                            : 'None'}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Actions due"
+                                    tone={
+                                        m.actions_overdue ? 'critical' : 'brand'
                                     }
-                                    caption={`${stats.reached} of ${stats.recent} reports`}
-                                />
-                            </PageHeaderMeterBlock>
-                        </>
+                                    ariaLabel={`View ${m.actions_due} actions due in the next 7 days or overdue`}
+                                    onClick={() => visit({ tab: 'actions' })}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {m.actions_due}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {m.actions_overdue
+                                            ? `${m.actions_overdue} overdue`
+                                            : m.actions_due &&
+                                                m.actions_next_due
+                                              ? `Next ${formatDateTime(m.actions_next_due)}`
+                                              : 'None in 7 days'}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Incidents to close"
+                                    tone={
+                                        m.incidents_ready &&
+                                        m.can_close_incidents
+                                            ? 'warning'
+                                            : 'brand'
+                                    }
+                                    ariaLabel={`View ${m.incidents_ready} incidents ready to close`}
+                                    onClick={() => visit({ tab: 'incidents' })}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {m.incidents_ready}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {m.incidents_ready
+                                            ? m.can_close_incidents
+                                                ? 'Ready for you to close'
+                                                : 'For a manager to close'
+                                            : 'None ready'}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Closed"
+                                    ariaLabel={`View ${m.closed_recent} errors closed, from the last 90 days`}
+                                    onClick={() => visit({ tab: 'closed' })}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {m.closed_recent}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Last 90 days
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        ) : (
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Your open reports"
+                                    ariaLabel={`${m.mine_open} of your reports are open`}
+                                    onClick={() => visit({ tab: 'mine' })}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {m.mine_open}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Being looked into
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Closed"
+                                    ariaLabel={`${m.mine_closed} of your reports are closed`}
+                                    onClick={() => visit({ tab: 'mine' })}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {m.mine_closed}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {m.mine_closed
+                                            ? 'You were told the outcome'
+                                            : 'None yet'}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        )
                     }
                 />
                 {!can.controlled && (
@@ -469,7 +587,7 @@ export default function MedicationErrors({
                                             >
                                                 <div className="flex items-start justify-between gap-2">
                                                     <Button
-                                                        className="frontline-tap min-w-0 flex-1 justify-start whitespace-normal text-left"
+                                                        className="frontline-tap min-w-0 flex-1 justify-start text-left whitespace-normal"
                                                         variant="ghost"
                                                         onClick={() => open(e)}
                                                     >

@@ -373,6 +373,32 @@ class MedicationErrorWorkflowTest extends TestCase
         $this->assertNotNull($error->fresh()->sac_confirmed_at);
     }
 
+    /** EA-154 (Lane C9): the approved P08b meters, counted across the viewer's whole read scope. */
+    public function test_p08b_meters_count_triage_harm_actions_and_recent_closures(): void
+    {
+        $harm = $this->report(['reached_client' => 'yes', 'harm_level' => 'moderate']);
+        $this->triage($harm);
+        $this->actingAs($this->manager)->post('/emar/errors/'.$harm->id.'/actions', ['owner_id' => $this->manager->id,
+            'due_at' => now('Pacific/Auckland')->addDay()->format('Y-m-d\TH:i'), 'description' => 'Synthetic action'])->assertRedirect()->assertSessionHasNoErrors();
+        $closed = $this->report(['separate_reason' => 'A separate synthetic event.']);
+        $this->triage($closed);
+        $this->actingAs($this->manager)->post('/emar/errors/'.$closed->id.'/close', ['close_note' => 'Synthetic near miss close'])->assertRedirect()->assertSessionHasNoErrors();
+        $this->report(['separate_reason' => 'Another separate synthetic event.']);
+
+        $this->actingAs($this->manager)->get('/emar/errors')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('meters.triage_overdue', 0)->whereNot('meters.triage_next_due', null)
+            ->where('meters.open_with_harm', 1)->where('meters.open_moderate_or_worse', 1)
+            ->where('meters.actions_due', 1)->where('meters.actions_overdue', 0)->whereNot('meters.actions_next_due', null)
+            ->where('meters.closed_recent', 1));
+        $this->actingAs($this->reporter)->get('/emar/errors')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('meters.mine_open', 2)->where('meters.mine_closed', 1));
+
+        // Two days on, the action and the untriaged report are overdue.
+        $this->travel(2)->days();
+        $this->actingAs($this->manager)->get('/emar/errors')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('meters.triage_overdue', 1)->where('meters.actions_due', 1)->where('meters.actions_overdue', 1));
+    }
+
     public function test_near_miss_never_receives_sac_even_when_enabled(): void
     {
         AppSetting::query()->updateOrCreate(['key' => RecordsReportingSettings::SAC], ['value' => 'on']);
