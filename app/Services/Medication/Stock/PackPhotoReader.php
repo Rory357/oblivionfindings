@@ -80,7 +80,9 @@ final class PackPhotoReader
     public function history(User $viewer, Collection $orders): array
     {
         $concealment = MedicationConcealment::for($viewer);
-        $orders = $orders->keyBy(fn (ClientMedication $order): int => (int) $order->id);
+        // A base collection: Eloquent's except() matches model keys and
+        // re-indexes, which lost every medicine but one (and its name).
+        $orders = collect($orders->all())->keyBy(fn (ClientMedication $order): int => (int) $order->id);
         $hidden = $orders->filter(fn (ClientMedication $order): bool => $concealment->hides((bool) $order->controlled_drug));
         $visible = $orders->except($hidden->keys()->all());
         $photos = $this->photoQuery($visible->keys()->all())
