@@ -2,12 +2,14 @@
 
 namespace App\Services\Medication\Alerts;
 
+use App\Models\Client;
 use App\Models\Shift;
 use App\Models\User;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\UserSiteAccessService;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * Who is told about one medication alert (eMAR P11 B2): the groups switched
@@ -57,6 +59,12 @@ class MedicationAlertRecipients
     /** @var array<int, array<string, bool>> */
     private array $permissions = [];
 
+    /** @var array<int, Client|null> */
+    private array $clients = [];
+
+    /** @var array<int, array<int, bool>> */
+    private array $personAccess = [];
+
     public function __construct(
         private readonly MedicationAlertSettings $settings,
         private readonly UserSiteAccessService $siteAccess,
@@ -86,25 +94,29 @@ class MedicationAlertRecipients
         $add($this->approved($setting['people']), 'named');
         $add($this->approved($this->settings->extras($alert, $subject->siteId)), 'extra');
 
-        [$told, $notToldControlled] = $this->gated($candidates, $subject);
+        [$told, $notToldControlled, $notToldPerson] = $this->gated($candidates, $subject);
         $fallback = false;
         if ($told === []) {
             $managers = [];
             foreach ($this->withPermission(self::FALLBACK_PERMISSION) as $user) {
                 $managers[(int) $user->id] = ['user' => $user, 'reason' => self::FALLBACK];
             }
-            [$told, $managersWithoutControlled] = $this->gated($managers, $subject);
+            [$told, $managersWithoutControlled, $managersWithoutPerson] = $this->gated($managers, $subject);
             $fallback = $told !== [];
             $notToldControlled = array_values(array_unique([...$notToldControlled, ...$managersWithoutControlled]));
+            $notToldPerson = array_values(array_unique([...$notToldPerson, ...$managersWithoutPerson]));
         }
 
         return [
             'told' => $told,
             'not_told_controlled' => $notToldControlled,
+            // EA-015: in a group, but can't open this person's record.
+            'not_told_person' => $notToldPerson,
             'fallback' => $fallback,
             'nobody_reason' => $told === []
                 ? 'Nobody in its groups, and no medication settings manager with access to this house'
-                    .($subject->controlled ? ' and controlled-medicine access' : '').'.'
+                    .($subject->controlled ? ' and controlled-medicine access' : '')
+                    .($subject->clientId !== null ? ' who can open this person’s record' : '').'.'
                 : null,
         ];
     }
@@ -221,16 +233,19 @@ class MedicationAlertRecipients
     {
         $told = [];
         $notToldControlled = [];
+        $notToldPerson = [];
         foreach ($candidates as $candidate) {
             $gate = $this->gate($candidate['user'], $subject, $candidate['reason']);
             if ($gate === 'yes') {
                 $told[] = $candidate;
             } elseif ($gate === 'controlled') {
                 $notToldControlled[] = (int) $candidate['user']->id;
+            } elseif ($gate === 'person') {
+                $notToldPerson[] = (int) $candidate['user']->id;
             }
         }
 
-        return [$told, $notToldControlled];
+        return [$told, $notToldControlled, $notToldPerson];
     }
 
     /**
@@ -261,8 +276,25 @@ class MedicationAlertRecipients
         if ($subject->controlled && ! $this->can($user, MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
             return 'controlled';
         }
+        // EA-015: an alert about a person goes only to people who can open
+        // that person's record — the same gate as the bell and the record.
+        if ($subject->clientId !== null && ! $this->canOpenPerson($user, $subject->clientId)) {
+            return 'person';
+        }
 
         return 'yes';
+    }
+
+    /** ClientPolicy::viewMedications, asked once per person and client while resolving. */
+    private function canOpenPerson(User $user, int $clientId): bool
+    {
+        if (! array_key_exists($clientId, $this->clients)) {
+            $this->clients[$clientId] = Client::query()->find($clientId);
+        }
+        $client = $this->clients[$clientId];
+
+        return $this->personAccess[(int) $user->id][$clientId] ??= $client !== null
+            && Gate::forUser($user)->allows('viewMedications', $client);
     }
 
     /** canDo(), asked once per person and permission while resolving. */

@@ -251,6 +251,7 @@ class MedicationAlertLog
         [$what, $who] = match ($event->event) {
             MedicationAlertEvent::SENT => ($d['told'] ?? []) === [] ? [null, ''] : ['Sent', $people($d['told'])],
             MedicationAlertEvent::NOT_TOLD_CONTROLLED => ['Not told — no controlled-medicine access', $list($d['user_ids'] ?? [])],
+            MedicationAlertEvent::NOT_TOLD_PERSON => ['Not told — can’t open this person’s medicines', $list($d['user_ids'] ?? [])],
             MedicationAlertEvent::NOT_REACHABLE => ['Couldn’t be reached', $list($d['user_ids'] ?? []).' — in-app is off, and no work email or push is set up'],
             MedicationAlertEvent::FALLBACK => ['Nobody in its groups here — sent to medication settings managers', ''],
             MedicationAlertEvent::NOBODY_TOLD => ['Nobody could be told', (string) ($d['reason'] ?? '')],

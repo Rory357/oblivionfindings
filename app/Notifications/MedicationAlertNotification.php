@@ -3,7 +3,9 @@
 namespace App\Notifications;
 
 use App\Models\MedicationAlert;
+use App\Models\User;
 use App\Notifications\Channels\PushChannel;
+use App\Services\Medication\MarLinkService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -69,7 +71,7 @@ class MedicationAlertNotification extends Notification
             'title' => $this->title(),
             'message' => $this->alert->message,
             'severity' => $this->alert->severity,
-            'action_url' => $this->alert->action_url,
+            'action_url' => $this->actionUrlFor($notifiable),
             'controlled' => $this->alert->controlled,
             'follow_up_step' => $this->kind,
             'ack_required' => $this->ackRequired,
@@ -82,7 +84,7 @@ class MedicationAlertNotification extends Notification
         return (new MailMessage)
             ->subject($this->subject())
             ->line($this->body())
-            ->action('Open in Oblivion Care', url($this->alert->action_url ?: '/emar'))
+            ->action('Open in Oblivion Care', url($this->actionUrlFor($notifiable) ?: '/emar'))
             ->line(self::MAIL_FOOTER);
     }
 
@@ -93,13 +95,31 @@ class MedicationAlertNotification extends Notification
             'title' => $this->title(),
             'body' => $this->body(),
             'data' => [
-                'url' => (string) ($this->alert->action_url ?: '/emar'),
+                'url' => (string) ($this->actionUrlFor($notifiable) ?: '/emar'),
                 'medication_alert_id' => (string) $this->alert->id,
             ],
         ];
     }
 
     public const MAIL_FOOTER = 'Open Oblivion Care to see the details and respond.';
+
+    /**
+     * The link this person can open (EA-016). Stock pages need stock access,
+     * so a recipient without it gets the person's chart (MAR), or Meds today
+     * when the chart isn't theirs to open either. Never a link that 403s.
+     */
+    public function actionUrlFor(object $notifiable): ?string
+    {
+        $url = $this->alert->action_url;
+        if (! $notifiable instanceof User || ! is_string($url) || ! str_starts_with($url, '/emar/stock')) {
+            return $url;
+        }
+        if ($notifiable->canDo('medications.view') && $notifiable->canDo('medications.stock.update')) {
+            return $url;
+        }
+
+        return app(MarLinkService::class)->urlFor($notifiable, $this->alert->client_id) ?? '/meds/today';
+    }
 
     /**
      * The email subject: what happened; with privacy off, who or what it's

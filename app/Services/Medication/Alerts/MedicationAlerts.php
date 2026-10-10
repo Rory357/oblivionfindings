@@ -148,6 +148,9 @@ class MedicationAlerts
         if ($resolved['not_told_controlled'] !== []) {
             $this->event($alert, MedicationAlertEvent::NOT_TOLD_CONTROLLED, ['user_ids' => $resolved['not_told_controlled']]);
         }
+        if (($resolved['not_told_person'] ?? []) !== []) {
+            $this->event($alert, MedicationAlertEvent::NOT_TOLD_PERSON, ['user_ids' => $resolved['not_told_person']]);
+        }
         if ($resolved['fallback'] && $channels !== []) {
             $this->event($alert, MedicationAlertEvent::FALLBACK, [
                 'groups' => $setting['groups'] ?? [],
