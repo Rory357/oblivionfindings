@@ -421,3 +421,4 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
       - `captured_by` isn't set on every queued action;
       - the A11 settings are inert;
       - pressing Back after sign-out still shows medication pages.
+- **Stock receiving (Stephan, 10 Oct): team leads only.** Coordinators and finance keep stock.update as before. Support workers do NOT receive deliveries, so the support_worker `stock.receive` from approved P06 is not applied. C4 has been verified; its migrations are being renamed to real times before the push.
