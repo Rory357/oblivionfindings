@@ -749,8 +749,11 @@ class MedicationAlertService
         ?array $siteIds = null,
         bool $canViewControlled = false,
     ): array {
-        $today = now()->startOfDay();
-        $tomorrow = $today->copy()->addDay();
+        // EA-202 (Lane C7): the NZ day — today's calendar date for orders, and
+        // its UTC window for dose times (not 13:00–13:00 NZDT).
+        $nzToday = \App\Support\WorkerClock::today();
+        $today = $nzToday->toDateString();
+        [$dayStart, $dayEnd] = [$nzToday->utc(), $nzToday->endOfDay()->utc()];
 
         $scheduledQuery = ClientMedication::active()
             ->when($siteIds !== null, fn ($query) => $query->whereHas(
@@ -778,7 +781,7 @@ class MedicationAlertService
             ->effectiveClinicalEvidence()
             ->where('status', 'given')
             ->whereNotNull('scheduled_for')
-            ->whereBetween('scheduled_for', [$today, $tomorrow])
+            ->whereBetween('scheduled_for', [$dayStart, $dayEnd])
             ->whereHas('medication', function ($q) {
                 $q->active()->where('is_prn', false);
             });
@@ -797,7 +800,7 @@ class MedicationAlertService
         $refusedQuery = ClientMedicationAdministration::query()
             ->effectiveClinicalEvidence()
             ->where('status', 'refused')
-            ->whereBetween('scheduled_for', [$today, $tomorrow])
+            ->whereBetween('scheduled_for', [$dayStart, $dayEnd])
             ->whereHas('medication', function ($q) {
                 $q->active()->where('is_prn', false);
             });
@@ -812,7 +815,7 @@ class MedicationAlertService
         $missedQuery = ClientMedicationAdministration::query()
             ->effectiveClinicalEvidence()
             ->where('status', 'missed')
-            ->whereBetween('scheduled_for', [$today, $tomorrow])
+            ->whereBetween('scheduled_for', [$dayStart, $dayEnd])
             ->whereHas('medication', function ($q) {
                 $q->active()->where('is_prn', false);
             });

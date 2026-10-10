@@ -30,7 +30,7 @@ final class MedicationEventReader
         }
         $controlled = $actor->canDo('medications.controlled.view');
 
-        return MedicationEvent::query()->with(['client:id,first_name,last_name', 'actor:id,name'])->whereIn('site_id', $siteIds)
+        return MedicationEvent::query()->with(['client' => fn ($query) => $query->withTrashed()->select(['id', 'first_name', 'last_name', 'deleted_at']), 'actor:id,name'])->whereIn('site_id', $siteIds)
             ->where(fn ($q) => $q->whereIn('client_id', $ids)->when($clientId === null, fn ($q) => $q->orWhereNull('client_id')))
             ->whereBetween('occurred_at', $period->bounds())
             ->when(is_string($kind), fn ($q) => $q->where('kind', $kind))
@@ -44,12 +44,12 @@ final class MedicationEventReader
     public function present(User $actor, MedicationEvent $event, bool $detail = false): array
     {
         $concealed = $event->controlled && ! $actor->canDo('medications.controlled.view');
-        $event->loadMissing(['client:id,first_name,last_name', 'actor:id,name']);
+        $event->loadMissing(['client' => fn ($query) => $query->withTrashed()->select(['id', 'first_name', 'last_name', 'deleted_at']), 'actor:id,name']);
         $client = $event->client;
         $result = ['id' => $event->id, 'sequence' => $event->sequence, 'site_id' => $event->site_id, 'kind' => $event->kind,
             'occurred_at' => $event->occurred_at->toIso8601String(), 'recorded_at' => $event->recorded_at->toIso8601String(),
             'summary' => $concealed ? 'Controlled medicine — details need controlled-medicine access' : $event->summary,
-            'person' => $client ? trim($client->first_name.' '.$client->last_name) : null,
+            'person' => $client ? trim($client->first_name.' '.$client->last_name).($client->trashed() ? ' (archived)' : '') : null,
             'actor' => $event->actor_id ? $event->actor?->name : 'Automated', 'concealed' => $concealed];
         if ($detail) {
             $result += ['hash' => $event->hash, 'previous_hash' => $event->previous_hash, 'fingerprint_valid' => $event->hasValidFingerprint(),

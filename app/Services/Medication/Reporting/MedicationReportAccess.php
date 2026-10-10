@@ -33,7 +33,7 @@ final class MedicationReportAccess
             $ids = app(MedicationGovernanceScopeService::class)->reportSiteIds($actor, $siteId, $clientId, $report === 'controlled');
         }
         if ($clientId !== null) {
-            $query = Client::query()->whereIn('site_id', $ids);
+            $query = Client::query()->when($actor->canDo('medications.audit.view'), fn ($query) => $query->withTrashed())->whereIn('site_id', $ids);
             $client = ($reads ? $reads->query($query) : $query)->find($clientId);
             app(MedicationRecordAccess::class)->assertReportable($actor, $client);
             $ids = [(int) $client->site_id];
@@ -48,7 +48,9 @@ final class MedicationReportAccess
         if ($this->financeOnly($actor)) {
             return [];
         }
-        $clients = Client::query()->whereIn('site_id', $siteIds)->get();
+        // EA-062 (Lane C7): audit readers keep an archived person's record in reach.
+        $clients = Client::query()->when($actor->canDo('medications.audit.view'), fn ($query) => $query->withTrashed())
+            ->whereIn('site_id', $siteIds)->get();
         // Repeated release checks cannot use MarLinkService's request memo.
         // Evaluate the canonical person policy against the current model.
         return $clients->filter(fn ($client) => ! $actor->canDo('medications.view') || Gate::forUser($actor)->allows('viewMedications', $client))->pluck('id')->map(fn ($id) => (int) $id)->all();

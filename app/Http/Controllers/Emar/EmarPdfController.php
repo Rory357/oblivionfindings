@@ -123,8 +123,10 @@ class EmarPdfController extends Controller
             'date_to' => 'nullable|date|after_or_equal:date_from',
         ]);
 
-        $dateFrom = $request->input('date_from', Carbon::now()->startOfMonth()->toDateString());
-        $dateTo = $request->input('date_to', Carbon::now()->endOfMonth()->toDateString());
+        // EA-175 (Lane C7): NZ calendar days, like the export guard that audits them.
+        $nzNow = Carbon::now(\App\Support\WorkerClock::timezone());
+        $dateFrom = $request->input('date_from', $nzNow->copy()->startOfMonth()->toDateString());
+        $dateTo = $request->input('date_to', $nzNow->copy()->endOfMonth()->toDateString());
 
         $actor = $request->user();
         abort_unless($actor, 403);
@@ -144,8 +146,8 @@ class EmarPdfController extends Controller
             false,
         )
             ->whereBetween('recorded_at', [
-                Carbon::parse($dateFrom)->startOfDay(),
-                Carbon::parse($dateTo)->endOfDay(),
+                \App\Support\WorkerClock::dayStartUtc((string) $dateFrom),
+                \App\Support\WorkerClock::dayEndUtc((string) $dateTo),
             ])
             ->with(['medication', 'recordedBy', 'witnessedBy'])
             ->orderBy('recorded_at')

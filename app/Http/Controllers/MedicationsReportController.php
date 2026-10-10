@@ -285,8 +285,9 @@ class MedicationsReportController extends Controller
                     $clientName = trim(($a->client?->first_name ?? '').' '.($a->client?->last_name ?? ''));
                     $contextName = $a->serviceContext?->name ?? '';
                     $this->putCsv($out, [
-                        optional($a->administered_at)->toDateTimeString(),
-                        optional($a->scheduled_for)->toDateTimeString(),
+                        // EA-175 (Lane C7): NZ time with its zone, like the NZ-day filter.
+                        $a->administered_at ? \App\Support\WorkerClock::display($a->administered_at, 'Y-m-d H:i:s T') : '',
+                        $a->scheduled_for ? \App\Support\WorkerClock::display($a->scheduled_for, 'Y-m-d H:i:s T') : '',
                         $clientName,
                         $a->medication?->historicalDisplayName() ?? '',
                         $a->status,

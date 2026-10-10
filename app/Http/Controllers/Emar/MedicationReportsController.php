@@ -86,7 +86,7 @@ class MedicationReportsController extends Controller
             }
         }
         $allSites = $this->access->siteIds($actor, null, null, $finance ? 'stock' : 'doses');
-        $people = $finance ? collect() : Client::query()->whereIn('id', $this->access->clientIds($actor, $siteIds))->orderBy('first_name')->orderBy('last_name')->limit(100)->get(['id', 'first_name', 'last_name'])->map(fn ($c) => ['id' => $c->id, 'name' => trim($c->first_name.' '.$c->last_name)]);
+        $people = $finance ? collect() : Client::withTrashed()->whereIn('id', $this->access->clientIds($actor, $siteIds))->orderBy('first_name')->orderBy('last_name')->limit(100)->get(['id', 'first_name', 'last_name', 'deleted_at'])->map(fn ($c) => ['id' => $c->id, 'name' => trim($c->first_name.' '.$c->last_name).($c->trashed() ? ' (archived)' : '')]);
 
         return Inertia::render('emar/reports/hub', [
             'filters' => ['view' => $view, 'report' => $report, 'sub' => $sub, 'period' => $period->key, 'date_from' => $period->from, 'date_to' => $period->to, 'site_id' => $siteId, 'client_id' => $clientId, 'kind' => $filters['kind'] ?? '', 'q' => $filters['q'] ?? '', 'reached' => $reach],
@@ -104,7 +104,7 @@ class MedicationReportsController extends Controller
     {
         $data = $request->validate(['q' => ['nullable', 'string', 'max:80'], 'site_id' => ['nullable', 'integer', 'min:1']]);
         $sites = $this->access->siteIds($request->user(), $request->integer('site_id') ?: null);
-        $people = Client::query()->whereIn('id', $this->access->clientIds($request->user(), $sites))->where(fn ($q) => $q->where('first_name', 'like', '%'.($data['q'] ?? '').'%')->orWhere('last_name', 'like', '%'.($data['q'] ?? '').'%'))->orderBy('first_name')->limit(50)->get(['id', 'first_name', 'last_name'])->map(fn ($c) => ['id' => $c->id, 'name' => trim($c->first_name.' '.$c->last_name)]);
+        $people = Client::withTrashed()->whereIn('id', $this->access->clientIds($request->user(), $sites))->where(fn ($q) => $q->where('first_name', 'like', '%'.($data['q'] ?? '').'%')->orWhere('last_name', 'like', '%'.($data['q'] ?? '').'%'))->orderBy('first_name')->limit(50)->get(['id', 'first_name', 'last_name', 'deleted_at'])->map(fn ($c) => ['id' => $c->id, 'name' => trim($c->first_name.' '.$c->last_name).($c->trashed() ? ' (archived)' : '')]);
 
         return response()->json(['people' => $people]);
     }
@@ -159,7 +159,7 @@ class MedicationReportsController extends Controller
             $selectedRound = ['id' => (int) $round->id, 'name' => $round->name, 'site_id' => (int) $round->site_id, 'date' => $day];
         }
         $period = MedicationReportPeriod::fromRequest($request);
-        $people = Client::query()->whereIn('id', $this->access->clientIds($actor, $sites))->when($request->integer('client_id'), fn ($q) => $q->whereKey($request->integer('client_id')))->orderBy('first_name')->limit(100)->get()->map(fn ($p) => ['id' => $p->id, 'name' => trim($p->first_name.' '.$p->last_name)]);
+        $people = Client::withTrashed()->whereIn('id', $this->access->clientIds($actor, $sites))->when($request->integer('client_id'), fn ($q) => $q->whereKey($request->integer('client_id')))->orderBy('first_name')->limit(100)->get()->map(fn ($p) => ['id' => $p->id, 'name' => trim($p->first_name.' '.$p->last_name).($p->trashed() ? ' (archived)' : '')]);
         $spec = ['mar' => ['MAR chart', 'PDF', 'One person, up to 31 NZ days. Ceased and superseded medicines stay in the period.'], 'cd_register' => ['Controlled drug register', 'PDF', 'One person and one medicine, up to 31 NZ days.'], 'round_sheet' => ['Round sheet', 'PDF', 'One house and one NZ day.'], 'doses' => ['Doses', 'CSV', 'Scheduled dose slots, including Away.'], 'errors' => ['Medication errors', 'CSV', 'Factual accounts, with in-error records excluded unless requested.'], 'stock' => ['Stock', 'CSV', 'Stock as at now.'], 'syringe_drivers' => ['Syringe drivers', 'CSV', 'Recorded driver use and canonical medicine contents; free-text notes are excluded.'], 'audit' => ['Audit trail', 'CSV', 'Filtered events over the selected period.'], 'transit' => ['Medicines in transit', 'CSV', 'Medicines packed for Fleet journeys, with custody times in NZ time.']][$type];
 
         return response()->json(['filters' => ['view' => 'exports', 'report' => 'doses', 'sub' => 'events', 'period' => 'custom', 'date_from' => $period->from, 'date_to' => $period->to, 'site_id' => count($sites) === 1 ? $sites[0] : null, 'client_id' => $request->integer('client_id') ?: null, 'round_id' => $selectedRound['id'] ?? null, 'kind' => '', 'q' => ''], 'selected_round' => $selectedRound, 'sites' => app(MedicationGovernanceScopeService::class)->sitePicker($sites)->map->only(['id', 'name'])->values(), 'people' => $people, 'finance' => $this->access->financeOnly($actor), 'exports' => [['type' => $type, 'label' => $spec[0], 'format' => $spec[1], 'description' => $spec[2], 'allowed' => true]], 'purposes' => MedicationExportAudit::PURPOSES], 200, ['Cache-Control' => 'no-store']);
@@ -194,6 +194,18 @@ class MedicationReportsController extends Controller
         $data['reached'] = $request->validate(['reached' => ['nullable', Rule::in(['yes', 'no', 'unknown'])]])['reached'] ?? null;
         $clientId = $request->integer('client_id') ?: null;
         $sites = $this->access->siteIds($actor, $request->integer('site_id') ?: null, $clientId, $type === 'stock' ? 'stock' : ($type === 'cd_register' ? 'controlled' : 'doses'));
+        // EA-064 (Lane C7): the Doses file lists scheduled dose slots. Before
+        // slot coverage starts it holds only as-needed doses, so the file says
+        // so on its first line and the export event records the gap — it never
+        // looks like a complete dose register.
+        $coverageGap = null;
+        if ($type === 'doses') {
+            $coverage = app(\App\Services\Medication\DoseSlots\DoseSlotCoverage::class)->forPeriod($period->from, CarbonImmutable::now());
+            if (! $coverage['complete']) {
+                $coverageGap = ['available_from' => $coverage['available_from'],
+                    'note' => 'Note: scheduled doses are '.lcfirst((string) $coverage['notice']).'. This file lists only as-needed doses before that day.'];
+            }
+        }
         if (in_array($type, ['mar', 'cd_register', 'round_sheet'], true)) {
             $read = fn (User $current) => app(MedicationPdfDataset::class)->read($current, $type, $period, $sites, $clientId, $request->integer('medication_id') ?: null, ! $request->has('include_prn') || $request->boolean('include_prn'), $type === 'round_sheet' ? ($request->integer('round_id') ?: null) : null);
             $evidence = $read($actor);
@@ -213,6 +225,9 @@ class MedicationReportsController extends Controller
         // Build bytes before auditing so a rendering failure isn't an export.
         $handle = fopen('php://temp', 'w+b');
         fwrite($handle, "\xEF\xBB\xBF");
+        if ($coverageGap !== null) {
+            $this->putCsv($handle, [$coverageGap['note']]);
+        }
         $this->putCsv($handle, array_map(fn ($key) => str_replace('_', ' ', ucfirst($key)).(str_ends_with($key, '_at') ? ' (NZDT/NZST)' : ''), $columns));
         foreach ($rows as $row) {
             $this->putCsv($handle, array_map(function ($column) use ($row) {
@@ -227,7 +242,8 @@ class MedicationReportsController extends Controller
         rewind($handle);
         $bytes = stream_get_contents($handle);
         fclose($handle);
-        app(MedicationExportAudit::class)->record($actor, $type, $sites, $period, $purpose, $clientId, ['rows' => count($rows), 'include_prn' => ! $request->has('include_prn') || $request->boolean('include_prn'), 'include_in_error' => $request->boolean('include_in_error')], function (User $current) use ($read, $digest) {
+        app(MedicationExportAudit::class)->record($actor, $type, $sites, $period, $purpose, $clientId, ['rows' => count($rows), 'include_prn' => ! $request->has('include_prn') || $request->boolean('include_prn'), 'include_in_error' => $request->boolean('include_in_error')]
+            + ($coverageGap !== null ? ['scheduled_doses_from' => $coverageGap['available_from']] : []), function (User $current) use ($read, $digest) {
             abort_unless(hash_equals($digest, hash('sha256', json_encode($read($current), JSON_THROW_ON_ERROR))), 409, 'The report or your access changed while the file was being prepared. Refresh the report and try again.');
         });
 

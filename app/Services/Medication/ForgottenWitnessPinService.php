@@ -294,7 +294,7 @@ final class ForgottenWitnessPinService
                 'due_at' => $row->due_at->toIso8601String(),
                 'status' => $row->status,
             ],
-            clientId: $client->trashed() ? null : (int) $client->id,
+            clientId: (int) $client->id,
         );
     }
 

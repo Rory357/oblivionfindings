@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateOnly, formatDateTime } from '@/lib/datetime';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { BarChart3, Download, Eye, FileText } from 'lucide-react';
 
@@ -236,7 +237,18 @@ export default function ReportsIndex() {
                                 </div>
                                 <div className="mt-2 text-xs text-muted-foreground">
                                     Last activity:{' '}
-                                    {module.summary?.last_activity ?? 'N/A'}
+                                    {/* EA-061 (Lane C7): instants arrive as ISO and read in NZ time. */}
+                                    {module.summary?.last_activity
+                                        ? module.summary.last_activity.includes(
+                                              'T',
+                                          )
+                                            ? formatDateTime(
+                                                  module.summary.last_activity,
+                                              )
+                                            : formatDateOnly(
+                                                  module.summary.last_activity,
+                                              )
+                                        : 'N/A'}
                                 </div>
                                 <div className="mt-2 flex flex-wrap gap-1">
                                     {module.summary?.has_search_filter && (

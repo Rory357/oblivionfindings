@@ -44,7 +44,9 @@ export type CdDetailSubject =
     | { kind: 'destruction'; destruction: CdDestruction }
     | { kind: 'loss'; loss: CdLossReport };
 
-const CD_REGISTER_PDF = '/emar/pdf/controlled-register';
+// EA-175 (Lane C7): the register export is the P09 purpose-and-review flow
+// (cd_register, NZ days); the old PDF route needs a person and a purpose.
+const CD_REGISTER_EXPORTS = '/emar/reports?view=exports';
 
 function fmtTs(iso?: string | null): string | null {
     if (!iso) return null;
@@ -321,7 +323,7 @@ export function CdDetailDialog({
             key="export"
             type="button"
             variant="ghost"
-            onClick={() => window.open(CD_REGISTER_PDF, '_blank')}
+            onClick={() => router.visit(CD_REGISTER_EXPORTS)}
         >
             <Printer className="h-4 w-4" /> Export register
         </Button>,

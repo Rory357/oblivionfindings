@@ -402,8 +402,8 @@ export default function ControlledDrugs(props: Props) {
         setModal({ type: 'detail', subject });
     const viewClient = (id: number | null | undefined) =>
         id && router.visit(`/operations/clients/${id}?tab=mar`);
-    const exportRegister = () =>
-        window.open('/emar/pdf/controlled-register', '_blank');
+    // EA-175 (Lane C7): the P09 register export (purpose, review, NZ days).
+    const exportRegister = () => router.visit('/emar/reports?view=exports');
 
     /** Build + open the right-click menu for a row. `readOnly` (Audit tab) shows only
      * view/navigate actions — no record/resolve. */

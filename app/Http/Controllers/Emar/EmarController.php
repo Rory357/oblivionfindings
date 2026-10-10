@@ -2331,7 +2331,7 @@ class EmarController extends Controller
             ->map(fn (ClientMedicationAdministration $a) => [
                 'type' => 'administration',
                 'ts' => $a->administered_at?->getTimestamp() ?? 0,
-                'at' => $a->administered_at?->format('j M Y, g:ia'),
+                'at' => $a->administered_at ? \App\Support\WorkerClock::display($a->administered_at, 'j M Y, g:ia') : null,
                 'status' => $a->status,
                 'label' => $a->dose_given ?: ucfirst((string) ($a->status ?? 'dose')),
                 'by' => $a->administeredBy?->name,
@@ -2358,7 +2358,7 @@ class EmarController extends Controller
                     return [
                         'type' => 'count',
                         'ts' => $c->completed_at?->getTimestamp() ?? 0,
-                        'at' => $c->completed_at?->format('j M Y, g:ia'),
+                        'at' => $c->completed_at ? \App\Support\WorkerClock::display($c->completed_at, 'j M Y, g:ia') : null,
                         'status' => $hasDiscrepancy ? 'discrepancy' : 'counted',
                         'label' => 'Counted '.$c->actual_quantity.($c->expected_quantity !== null ? ' (expected '.$c->expected_quantity.')' : ''),
                         'by' => $c->completedBy?->name,
@@ -2534,11 +2534,12 @@ class EmarController extends Controller
                 'start_date' => $start,
                 // Verification / lifecycle audit (all pre-existing columns — no migration).
                 'created_by_name' => $m->createdByUser?->name,
-                'created_at' => $m->created_at?->format('j M Y, g:ia'),
+                // EA-205 (Lane C7): stored UTC instants shown in NZ time.
+                'created_at' => $m->created_at ? \App\Support\WorkerClock::display($m->created_at, 'j M Y, g:ia') : null,
                 'verified_by_name' => $m->verifiedByUser?->name,
-                'verified_at' => $m->verified_at?->format('j M Y, g:ia'),
+                'verified_at' => $m->verified_at ? \App\Support\WorkerClock::display($m->verified_at, 'j M Y, g:ia') : null,
                 'ceased_by_name' => $m->ceasedByUser?->name,
-                'ceased_at' => $m->ceased_at?->format('j M Y'),
+                'ceased_at' => $m->ceased_at ? \App\Support\WorkerClock::display($m->ceased_at, 'j M Y') : null,
                 'ceased_reason' => $m->ceased_reason,
                 'review_date' => $m->review_date?->format('j M Y'),
                 'stock' => $m->stock ? [
@@ -3185,7 +3186,8 @@ class EmarController extends Controller
                 'reason_code' => $a->reason_code,
                 'scheduled_for' => $a->scheduled_for?->toIso8601String(),
                 'administered_at' => $a->administered_at?->toIso8601String(),
-                'time' => $a->administered_at?->format('H:i'),
+                // EA-115 (Lane C7): the dose time in NZ, as the detail shows it.
+                'time' => $a->administered_at ? \App\Support\WorkerClock::display($a->administered_at, 'H:i') : null,
             ])
             ->all();
 

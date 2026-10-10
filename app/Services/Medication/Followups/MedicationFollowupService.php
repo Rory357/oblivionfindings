@@ -740,7 +740,7 @@ final class MedicationFollowupService
             actorId: $actor ? (int) $actor->id : null, occurredAt: CarbonImmutable::now('UTC'),
             summary: 'Medication follow-up completed in its source workflow.',
             facts: ['outcome' => $outcome, 'revision' => $row->revision],
-            clientId: $row->client->trashed() ? null : (int) $row->client_id, controlled: (bool) $row->medication?->controlled_drug,
+            clientId: (int) $row->client_id, controlled: (bool) $row->medication?->controlled_drug,
         );
         if ($auditEvents !== null) {
             $auditEvents[] = $audit;

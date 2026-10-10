@@ -499,7 +499,8 @@ class ForgottenWitnessPinTest extends TestCase
         $this->assertSame('expired', $confirmation->refresh()->status);
         $this->assertSame('done', MedicationFollowup::query()->where('source_key', 'confirm:'.$confirmation->id)->sole()->state);
         $this->assertSame(0, app(MedicationFollowupService::class)->visibleQuery($witness)->count());
-        $this->assertNull(MedicationEvent::query()->where('kind', 'second_person.expired')->sole()->client_id);
+        // EA-062 (Lane C7): the chain keeps the archived person, for audit readers.
+        $this->assertSame((int) $this->client->id, (int) MedicationEvent::query()->where('kind', 'second_person.expired')->sole()->client_id);
     }
 
     public function test_the_source_http_consumer_only_answers_in_the_named_colleagues_login(): void
