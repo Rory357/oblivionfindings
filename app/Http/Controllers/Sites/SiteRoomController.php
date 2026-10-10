@@ -7,9 +7,11 @@ use App\Models\Asset;
 use App\Models\ClientPersonalAsset;
 use App\Models\Site;
 use App\Models\SiteHouseRoom;
+use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Sites\SiteClientPlacementService;
 use App\Services\Sites\SitePhysicalRoomService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class SiteRoomController extends Controller
 {
@@ -376,10 +378,24 @@ class SiteRoomController extends Controller
             ]),
         ]);
 
+        // EA-169: the medical section (allergies, blood type) is the person's
+        // Medical section — only for readers who may open it — and allergies
+        // come from the canonical allergy record as plain labels.
+        $client = $room->assignedClient;
+        $canReadMedical = $client !== null && Gate::forUser($request->user())->allows('viewMedications', $client);
+        $allergyLabels = $canReadMedical
+            ? array_values(array_unique(array_map(
+                fn (array $entry): string => (string) $entry['allergen'],
+                app(ClientAllergyRecordService::class)->forClient($client),
+            )))
+            : [];
+
         return view('sites.rooms.door-card', [
             'site' => $site,
             'room' => $room,
-            'client' => $room->assignedClient,
+            'client' => $client,
+            'canReadMedical' => $canReadMedical,
+            'allergyLabels' => $allergyLabels,
             'generatedAt' => now(),
             'generatedBy' => $request->user(),
         ]);

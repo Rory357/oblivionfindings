@@ -25,6 +25,7 @@ use App\Services\MarScheduleService;
 use App\Services\Medication\ClientAllergyRecordCommands;
 use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Medication\Recording\RecordingContract;
@@ -186,12 +187,28 @@ class MedicationsApiController extends Controller
         );
     }
 
+    /**
+     * The people at $siteIds whose medicines $user may open (the P02 person
+     * rule): leads keep the house, support workers their own residents.
+     *
+     * @param  array<int, int>  $siteIds
+     * @return array<int, int>
+     */
+    private function readableClientIdsAt(User $user, array $siteIds): array
+    {
+        return app(MedicationRecordAccess::class)->readableClientIds(
+            $user,
+            Client::query()->whereIn('site_id', $siteIds === [] ? [0] : $siteIds)->pluck('id'),
+        );
+    }
+
     private function authorizeReadableMedication(
         Request $request,
         Client $client,
         ClientMedication $medication,
     ): void {
-        $this->authorize('viewMedications', $client);
+        // EA-203: out-of-scope people are "not found", like every eMAR read.
+        app(MedicationRecordAccess::class)->assertReadable($request->user(), $client);
         abort_unless((int) $medication->client_id === (int) $client->id, 404);
         abort_unless(
             ! (bool) $medication->controlled_drug
@@ -553,7 +570,7 @@ class MedicationsApiController extends Controller
      */
     public function getMar(Request $request, Client $client)
     {
-        $this->authorize('viewMedications', $client);
+        app(MedicationRecordAccess::class)->assertReadable($request->user(), $client); // EA-203: 404 when out of scope
 
         $date = $this->scheduleService->dateFromInput($request->input('date'));
 
@@ -726,7 +743,7 @@ class MedicationsApiController extends Controller
         Client $client,
         ClientMedicationAdministration $administration
     ) {
-        $this->authorize('viewMedications', $client);
+        app(MedicationRecordAccess::class)->assertReadable($request->user(), $client); // EA-203: 404 when out of scope
         abort_unless($administration->client_id === $client->id, 404);
         $this->assertCanAccessAttachmentTarget($request, $administration, true);
 
@@ -776,7 +793,7 @@ class MedicationsApiController extends Controller
 
     public function uploadSupportingAttachment(Request $request, Client $client)
     {
-        $this->authorize('viewMedications', $client);
+        app(MedicationRecordAccess::class)->assertReadable($request->user(), $client); // EA-203: 404 when out of scope
 
         $locator = $request->validate([
             'target_type' => ['required', 'string', 'in:administration,correction,discrepancy,loss_report,error'],
@@ -839,7 +856,7 @@ class MedicationsApiController extends Controller
         ClientMedicationAdministration $administration,
         MedicationMarAttachment $attachment
     ) {
-        $this->authorize('viewMedications', $client);
+        app(MedicationRecordAccess::class)->assertReadable($request->user(), $client); // EA-203: 404 when out of scope
         abort_unless($administration->client_id === $client->id, 404);
         $this->assertAdministrationAttachmentNested($attachment, $administration);
         $this->assertCanAccessAttachmentTarget($request, $administration, false);
@@ -852,7 +869,7 @@ class MedicationsApiController extends Controller
         Client $client,
         MedicationMarAttachment $attachment
     ) {
-        $this->authorize('viewMedications', $client);
+        app(MedicationRecordAccess::class)->assertReadable($request->user(), $client); // EA-203: 404 when out of scope
         abort_unless($attachment->client_id === $client->id, 404);
 
         $attachment->loadMissing('attachable');
@@ -869,7 +886,7 @@ class MedicationsApiController extends Controller
         ClientMedicationAdministration $administration,
         MedicationMarAttachment $attachment
     ) {
-        $this->authorize('viewMedications', $client);
+        app(MedicationRecordAccess::class)->assertReadable($request->user(), $client); // EA-203: 404 when out of scope
         abort_unless($administration->client_id === $client->id, 404);
         $this->assertAdministrationAttachmentNested($attachment, $administration);
         $this->assertCanAccessAttachmentTarget($request, $administration, true);
@@ -892,7 +909,7 @@ class MedicationsApiController extends Controller
         Client $client,
         MedicationMarAttachment $attachment
     ) {
-        $this->authorize('viewMedications', $client);
+        app(MedicationRecordAccess::class)->assertReadable($request->user(), $client); // EA-203: 404 when out of scope
         abort_unless($attachment->client_id === $client->id, 404);
 
         $attachment->loadMissing('attachable');
@@ -1507,8 +1524,15 @@ class MedicationsApiController extends Controller
             requestedClientId: $clientId,
         );
 
+        // EA-107: the P02 person rule, not just the house; one person asked
+        // for and not readable is "not found" (EA-203).
+        if ($client !== null) {
+            app(MedicationRecordAccess::class)->assertReadable($user, $client);
+        }
+        $readable = $this->readableClientIdsAt($user, $siteIds);
         $alertsQuery = MedicationDashboardAlert::query()
             ->active()
+            ->whereIn('client_id', $readable === [] ? [0] : $readable)
             ->when($clientId, fn ($query) => $query->where('client_id', $clientId));
         $alertsQuery = $this->governanceScope
             ->scopeCanonicalClientMedicationRows($alertsQuery, $siteIds)
@@ -1624,10 +1648,14 @@ class MedicationsApiController extends Controller
             requestedClientId: $clientId,
         );
 
+        if ($clientId !== null) {
+            app(MedicationRecordAccess::class)->assertReadable($user, Client::query()->find($clientId));
+        }
         $widgets = $this->alertService->getGlobalDashboardWidgets(
             $clientId,
             $siteIds,
             $user->canDo('medications.controlled.view'),
+            $this->readableClientIdsAt($user, $siteIds),
         );
 
         return response()->json($widgets);
@@ -1793,7 +1821,7 @@ class MedicationsApiController extends Controller
      */
     public function getAllergies(Request $request, Client $client)
     {
-        $this->authorize('viewMedications', $client);
+        app(MedicationRecordAccess::class)->assertReadable($request->user(), $client); // EA-203: 404 when out of scope
         $service = app(ClientAllergyRecordService::class);
         $records = $service->forClient($client);
         $summary = $service->summary($client, $records);

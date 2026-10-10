@@ -8,6 +8,7 @@ use App\Models\ClientDocument;
 use App\Models\ClientIncident;
 use App\Models\TimelineEvent;
 use App\Services\Portal\PortalClientSectionAccess;
+use App\Services\Portal\PortalMedicationList;
 use Illuminate\Http\Request;
 
 class PortalClientController extends Controller
@@ -29,9 +30,6 @@ class PortalClientController extends Controller
             $clientRelations[] = 'medicalProfile';
             $clientRelations[] = 'conditions';
             $clientRelations[] = 'emergencyContacts';
-        }
-        if ($canViewMedications) {
-            $clientRelations[] = 'medications';
         }
         $client->load($clientRelations);
 
@@ -141,7 +139,8 @@ class PortalClientController extends Controller
             $pageProps['emergency_contacts'] = $client->emergencyContacts;
         }
         if ($canViewMedications) {
-            $pageProps['medications'] = $client->medications;
+            // EA-099: current, checked orders as a plain allowlist.
+            $pageProps['medications'] = app(PortalMedicationList::class)->forViewer($client, (bool) $sectionAccess['is_self']);
         }
 
         return inertia('portal/client', $pageProps);

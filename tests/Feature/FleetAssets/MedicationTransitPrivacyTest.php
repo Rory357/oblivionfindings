@@ -178,6 +178,25 @@ class MedicationTransitPrivacyTest extends TestCase
                 ->where('logs.data.0.id', $morning->id));
     }
 
+    /** B9 follow-up: the transport index's date filter and "today" are NZ days too. */
+    public function test_the_transport_index_date_filter_and_today_use_nz_days(): void
+    {
+        $this->freezeNz('2026-10-09 14:00:00');
+        $coordinator = $this->staffAt($this->houseA, role: 'coordinator');
+        [, , $morning] = $this->transitLog($this->houseA, 'Metformin 500mg');
+        $morning->forceFill(['departed_at' => CarbonImmutable::parse('2026-10-09 08:00:00', 'Pacific/Auckland')->utc()])->save();
+        [, , $yesterday] = $this->transitLog($this->houseA, 'Paracetamol 500mg');
+        $yesterday->forceFill(['departed_at' => CarbonImmutable::parse('2026-10-08 15:00:00', 'Pacific/Auckland')->utc()])->save();
+
+        $this->actingAs($coordinator)
+            ->get('/fleet-assets/transports?date_from=2026-10-09&date_to=2026-10-09')
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->has('transports.data', 1)
+                ->where('transports.data.0.id', $morning->id)
+                ->where('hero.today', 1));
+    }
+
     public function test_a_journey_can_carry_more_than_one_dose_of_the_same_medicine(): void
     {
         $coordinator = $this->staffAt($this->houseA, role: 'coordinator');

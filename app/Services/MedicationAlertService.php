@@ -533,11 +533,17 @@ class MedicationAlertService
      * @param  array<int, int>|null  $siteIds  Null is reserved for internal
      *                                         unscoped callers; an explicit empty array must return zero rows.
      */
+    /**
+     * @param  array<int, int>|null  $readableClientIds  The people the reader may
+     *                                                    open (EA-107); null = no person rule (internal use).
+     */
     public function getGlobalDashboardWidgets(
         ?int $clientId = null,
         ?array $siteIds = null,
         bool $canViewControlled = false,
+        ?array $readableClientIds = null,
     ): array {
+        $this->readableClientIds = $readableClientIds;
         $widgets = [
             'overdue_meds' => $this->getOverdueMedsWidget($clientId, $siteIds, $canViewControlled),
             'prn_near_limits' => $this->getPrnNearLimitsWidget($clientId, $siteIds, $canViewControlled),
@@ -549,8 +555,23 @@ class MedicationAlertService
         if ($canViewControlled) {
             $widgets['controlled_discrepancies'] = $this->getControlledDiscrepanciesWidget($clientId, $siteIds);
         }
+        $this->readableClientIds = null;
 
         return $widgets;
+    }
+
+    /** @var array<int, int>|null The person rule for one widget build (EA-107). */
+    private ?array $readableClientIds = null;
+
+    /** One person when asked; otherwise only people the reader may open. */
+    private function narrowToClients($query, ?int $clientId): void
+    {
+        if ($clientId) {
+            $query->where('client_id', $clientId);
+        }
+        if ($this->readableClientIds !== null) {
+            $query->whereIn('client_id', $this->readableClientIds === [] ? [0] : $this->readableClientIds);
+        }
     }
 
     /** @param array<int, int>|null $siteIds */
@@ -569,9 +590,7 @@ class MedicationAlertService
         }
         $query->with('client:id,first_name,last_name');
 
-        if ($clientId) {
-            $query->where('client_id', $clientId);
-        }
+        $this->narrowToClients($query, $clientId);
 
         $alerts = $query->orderByDesc('created_at')->limit(10)->get();
 
@@ -605,9 +624,7 @@ class MedicationAlertService
         }
         $query->with(['client:id,first_name,last_name', 'medication:id,name']);
 
-        if ($clientId) {
-            $query->where('client_id', $clientId);
-        }
+        $this->narrowToClients($query, $clientId);
 
         $alerts = $query->orderByDesc('severity')->orderByDesc('created_at')->limit(10)->get();
 
@@ -636,9 +653,7 @@ class MedicationAlertService
         }
         $query->with(['client:id,first_name,last_name', 'medication:id,name']);
 
-        if ($clientId) {
-            $query->where('client_id', $clientId);
-        }
+        $this->narrowToClients($query, $clientId);
 
         $discrepancies = $query->orderByDesc('reported_at')->limit(10)->get();
 
@@ -675,9 +690,7 @@ class MedicationAlertService
             ->where('end_date', '>=', WorkerClock::today()->toDateString())
             ->with('client:id,first_name,last_name');
 
-        if ($clientId) {
-            $query->where('client_id', $clientId);
-        }
+        $this->narrowToClients($query, $clientId);
 
         $medications = $query->orderBy('end_date')->limit(10)->get();
 
@@ -711,9 +724,7 @@ class MedicationAlertService
             ->where('high_risk', true)
             ->with('client:id,first_name,last_name');
 
-        if ($clientId) {
-            $query->where('client_id', $clientId);
-        }
+        $this->narrowToClients($query, $clientId);
 
         $medications = $query->orderByDesc('created_at')->limit(10)->get();
 
@@ -755,9 +766,7 @@ class MedicationAlertService
                 $q->whereNull('end_date')->orWhere('end_date', '>=', $today);
             });
 
-        if ($clientId) {
-            $scheduledQuery->where('client_id', $clientId);
-        }
+        $this->narrowToClients($scheduledQuery, $clientId);
 
         $scheduledMeds = $scheduledQuery->get();
         $totalScheduled = 0;
@@ -781,9 +790,7 @@ class MedicationAlertService
             $this->governanceScope->scopeWithoutControlledMedicationRows($completedQuery);
         }
 
-        if ($clientId) {
-            $completedQuery->where('client_id', $clientId);
-        }
+        $this->narrowToClients($completedQuery, $clientId);
 
         $completed = $completedQuery->distinct(['client_medication_id', 'scheduled_for'])->count();
 
@@ -817,10 +824,8 @@ class MedicationAlertService
             $this->governanceScope->scopeWithoutControlledMedicationRows($missedQuery);
         }
 
-        if ($clientId) {
-            $refusedQuery->where('client_id', $clientId);
-            $missedQuery->where('client_id', $clientId);
-        }
+        $this->narrowToClients($refusedQuery, $clientId);
+        $this->narrowToClients($missedQuery, $clientId);
 
         $refused = $refusedQuery->count();
         $missed = $missedQuery->count();
