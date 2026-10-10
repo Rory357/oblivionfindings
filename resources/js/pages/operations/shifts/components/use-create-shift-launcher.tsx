@@ -39,6 +39,7 @@ type CoverageContext = {
 
 /** The JSON payload returned by ShiftController@create (Accept: application/json). */
 type CreateData = {
+    workerTimezone: string;
     clients: Client[];
     staff: Staff[];
     serviceContexts: ServiceContext[];
@@ -153,6 +154,7 @@ export function useCreateShiftLauncher() {
         <CreateShiftDialog
             open={open}
             onClose={() => setOpen(false)}
+            workerTimezone={data.workerTimezone}
             clients={data.clients}
             staff={data.staff}
             serviceContexts={data.serviceContexts}

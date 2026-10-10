@@ -359,6 +359,16 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
     );
     if (emarActive !== undefined) return emarActive ? 2000 + item.length : -1;
 
+    // The Conflict Queue has its own Workforce entry; select that destination.
+    const conflictQueuePath = '/operations/rostering/conflicts';
+    if (
+        normalizedItemPath === '/operations/rostering' &&
+        (normalizedCurrentPath === conflictQueuePath ||
+            normalizedCurrentPath.startsWith(`${conflictQueuePath}/`))
+    ) {
+        return -1;
+    }
+
     if (itemQuery.length > 0) {
         return normalizedCurrentPath === normalizedItemPath &&
             currentQuery === itemQuery

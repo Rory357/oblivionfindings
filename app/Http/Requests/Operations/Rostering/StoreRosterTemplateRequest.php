@@ -6,6 +6,14 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreRosterTemplateRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        // FormRequest validation runs before the controller entry boundary.
+        if ($this->hasSession()) {
+            $this->session()->forget('roster_template_result');
+        }
+    }
+
     public function authorize(): bool
     {
         $user = $this->user();

@@ -62,10 +62,21 @@ export default function FlashToaster() {
             'Payroll adjustment marked as processed.',
             'This adjustment has already been marked as processed.',
         ].includes(rawSuccess ?? '');
+    const shiftDialogOwnsResult =
+        [
+            'operations/shifts/index',
+            'operations/rostering/index',
+            'operations/shifts/create',
+            'operations/shifts/show',
+            'operations/clients/show',
+            'operations/rostering/conflicts',
+        ].includes(page.component) &&
+        ['Shift created.', 'Shift updated.'].includes(rawSuccess ?? '');
     const success =
         page.component === 'operations/shift-notes/Index' ||
         timesheetDialogOwnsResult ||
-        adjustmentDialogOwnsResult
+        adjustmentDialogOwnsResult ||
+        shiftDialogOwnsResult
             ? null
             : rawSuccess;
     const error = asToastText(flash?.error);

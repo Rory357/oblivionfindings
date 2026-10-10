@@ -6,6 +6,7 @@ use App\Events\RosterPeriodPublished;
 use App\Models\RosterPeriod;
 use App\Models\Shift;
 use App\Models\User;
+use App\Services\Operations\WorkforceMutationGuard;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -39,6 +40,7 @@ class RosterPublishingService
     public function review(RosterPeriod $period, User $actor): array
     {
         return DB::transaction(function () use ($period) {
+            app(WorkforceMutationGuard::class)->lock();
             $locked = RosterPeriod::query()->lockForUpdate()->findOrFail($period->id);
 
             if ($locked->status === RosterPeriod::STATUS_ARCHIVED) {
@@ -52,7 +54,7 @@ class RosterPublishingService
                 'validating_at' => now(),
             ])->save();
 
-            $summary = $this->validator->validate($locked);
+            $summary = $this->validator->validate($locked, currentHouse: true);
 
             $locked->forceFill([
                 'status' => $summary['can_publish']
@@ -73,6 +75,7 @@ class RosterPublishingService
     public function publish(RosterPeriod $period, User $actor): RosterPeriod
     {
         return DB::transaction(function () use ($period, $actor) {
+            app(WorkforceMutationGuard::class)->lock();
             $locked = RosterPeriod::query()->lockForUpdate()->findOrFail($period->id);
 
             if ($locked->status === RosterPeriod::STATUS_ARCHIVED) {
@@ -85,7 +88,7 @@ class RosterPublishingService
                 return $this->republishLocked($locked, $actor);
             }
 
-            $summary = $this->validator->validate($locked);
+            $summary = $this->validator->validate($locked, currentHouse: true);
 
             if (! $summary['can_publish']) {
                 $locked->forceFill([
@@ -143,6 +146,7 @@ class RosterPublishingService
     public function republish(RosterPeriod $period, User $actor): RosterPeriod
     {
         return DB::transaction(function () use ($period, $actor) {
+            app(WorkforceMutationGuard::class)->lock();
             $locked = RosterPeriod::query()->lockForUpdate()->findOrFail($period->id);
 
             return $this->republishLocked($locked, $actor);
@@ -250,7 +254,7 @@ class RosterPublishingService
             ]);
         }
 
-        $summary = $this->validator->validate($locked);
+        $summary = $this->validator->validate($locked, currentHouse: true);
         if (! $summary['can_publish']) {
             $locked->forceFill([
                 'status' => RosterPeriod::STATUS_CHANGED_AFTER_PUBLISH,

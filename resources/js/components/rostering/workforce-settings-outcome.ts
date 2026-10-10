@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 
 export type SettingsValues = Record<string, string | number>;
 export type SettingsCommand = {
-    action: 'preferences' | 'staffing_rules';
+    action: 'preferences' | 'staffing_rules' | 'eligibility_rules';
     actor_id: number;
     expected_revision: string;
     values: SettingsValues;
@@ -57,7 +57,10 @@ export function settingsReceipt(
         )
     )
         return null;
-    if (expected.action === 'staffing_rules') {
+    if (
+        expected.action === 'staffing_rules' ||
+        expected.action === 'eligibility_rules'
+    ) {
         const refresh = object(receipt.refresh);
         if (!refresh) return null;
         if (receipt.changed) {

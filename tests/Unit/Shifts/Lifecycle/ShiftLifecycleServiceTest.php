@@ -7,6 +7,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Shifts\Lifecycle\Data\CompleteShiftData;
 use App\Domain\Shifts\Lifecycle\ShiftLifecycleService;
 use App\Domain\Shifts\Lifecycle\ShiftLifecycleSource;
+use App\Jobs\RefreshWorkforceEligibility;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\ServiceContext;
@@ -17,11 +18,15 @@ use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Models\WorkforceEligibilityRecheck;
 use App\Services\Eligibility\EligibilityResult;
+use App\Services\Eligibility\PreparedShiftWorkload;
 use App\Services\ShiftStaffEligibilityService;
 use App\Services\ShiftTimelineService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
@@ -205,14 +210,44 @@ class ShiftLifecycleServiceTest extends TestCase
             'user_id' => null,
         ]);
         $this->makeCurrentAtSite($assignee, Site::query()->findOrFail($shift->site_id));
-        // The locked assignment gateway and the committed Workforce observation each evaluate once.
-        $this->mock(ShiftStaffEligibilityService::class, function ($mock): void {
-            $mock->shouldReceive('evaluate')
-                ->twice()
-                ->andReturn(EligibilityResult::fromChecks([]));
+        $priorIntent = WorkforceEligibilityRecheck::query()
+            ->where('source_type', 'shifts')->where('source_id', $shift->id)->sole();
+        $priorVersion = (int) $priorIntent->source_version;
+        $evaluations = [];
+        // Observe durable delivery separately from this command's exact decision.
+        Queue::fake([RefreshWorkforceEligibility::class]);
+        $this->mock(ShiftStaffEligibilityService::class, function ($mock) use (&$evaluations): void {
+            $mock->shouldReceive('evaluate')->once()->andReturnUsing(
+                function (Shift $candidate, User $worker, ?Collection $preloaded = null, ?PreparedShiftWorkload $workload = null) use (&$evaluations): EligibilityResult {
+                    $evaluations[] = [clone $candidate, $worker, $preloaded, $workload];
+
+                    return EligibilityResult::fromChecks([]);
+                },
+            );
         });
 
         $assigned = app(ShiftLifecycleService::class)->assign($shift, $actor, $assignee);
+
+        $this->assertCount(1, $evaluations);
+        [$candidate, $worker, $preloaded, $workload] = $evaluations[0];
+        $this->assertSame((int) $shift->id, (int) $candidate->id);
+        $this->assertNull($candidate->user_id);
+        $this->assertSame((int) $assignee->id, (int) $worker->id);
+        $this->assertNull($preloaded);
+        $this->assertInstanceOf(PreparedShiftWorkload::class, $workload);
+        $this->assertSame((int) $actor->id, $workload->currentEvidence['actor_id']);
+        $this->assertSame([(int) $assignee->id], $workload->currentEvidence['user_ids']);
+        $this->assertSame([(int) $shift->id], $workload->currentEvidence['replaced_ids']);
+        $workload->assertFor($candidate, $worker);
+        $intent = WorkforceEligibilityRecheck::query()
+            ->where('source_type', 'shifts')->where('source_id', $shift->id)->sole();
+        $this->assertSame((int) $priorIntent->id, (int) $intent->id);
+        $this->assertSame($priorVersion + 1, (int) $intent->source_version);
+        $this->assertSame('pending', $intent->status);
+        $this->assertSame([(int) $shift->id], $intent->shift_ids);
+        $this->assertSame([(int) $assignee->id], $intent->user_ids);
+        Queue::assertPushed(RefreshWorkforceEligibility::class, 1);
+        Queue::assertPushed(RefreshWorkforceEligibility::class, fn (RefreshWorkforceEligibility $job): bool => $job->recheckId === (int) $intent->id && $job->sourceVersion === (int) $intent->source_version);
 
         $this->assertSame('scheduled', $assigned->status);
         $this->assertSame($assignee->id, $assigned->user_id);
@@ -248,9 +283,20 @@ class ShiftLifecycleServiceTest extends TestCase
             'overrideable' => true,
             'message' => 'Current turnaround evidence needs acknowledgement.',
         ]]);
-        // The locked assignment gateway and the committed Workforce observation each evaluate once.
-        $this->mock(ShiftStaffEligibilityService::class, function ($mock) use ($currentWarning): void {
-            $mock->shouldReceive('evaluate')->twice()->andReturn($currentWarning);
+        $priorIntent = WorkforceEligibilityRecheck::query()
+            ->where('source_type', 'shifts')->where('source_id', $shift->id)->sole();
+        $priorVersion = (int) $priorIntent->source_version;
+        $evaluations = [];
+        // Keep the observer's queued recheck visible without reusing this decision mock.
+        Queue::fake([RefreshWorkforceEligibility::class]);
+        $this->mock(ShiftStaffEligibilityService::class, function ($mock) use ($currentWarning, &$evaluations): void {
+            $mock->shouldReceive('evaluate')->once()->andReturnUsing(
+                function (Shift $candidate, User $worker, ?Collection $preloaded = null, ?PreparedShiftWorkload $workload = null) use ($currentWarning, &$evaluations): EligibilityResult {
+                    $evaluations[] = [clone $candidate, $worker, $preloaded, $workload];
+
+                    return $currentWarning;
+                },
+            );
         });
 
         app(ShiftLifecycleService::class)->assign($shift, $actor, $assignee, [
@@ -260,6 +306,27 @@ class ShiftLifecycleServiceTest extends TestCase
             'overridden_by' => $assignee->id,
             'rules_overridden' => ['stale_caller_rule'],
         ]);
+
+        $this->assertCount(1, $evaluations);
+        [$candidate, $worker, $preloaded, $workload] = $evaluations[0];
+        $this->assertSame((int) $shift->id, (int) $candidate->id);
+        $this->assertNull($candidate->user_id);
+        $this->assertSame((int) $assignee->id, (int) $worker->id);
+        $this->assertNull($preloaded);
+        $this->assertInstanceOf(PreparedShiftWorkload::class, $workload);
+        $this->assertSame((int) $actor->id, $workload->currentEvidence['actor_id']);
+        $this->assertSame([(int) $assignee->id], $workload->currentEvidence['user_ids']);
+        $this->assertSame([(int) $shift->id], $workload->currentEvidence['replaced_ids']);
+        $workload->assertFor($candidate, $worker);
+        $intent = WorkforceEligibilityRecheck::query()
+            ->where('source_type', 'shifts')->where('source_id', $shift->id)->sole();
+        $this->assertSame((int) $priorIntent->id, (int) $intent->id);
+        $this->assertSame($priorVersion + 1, (int) $intent->source_version);
+        $this->assertSame('pending', $intent->status);
+        $this->assertSame([(int) $shift->id], $intent->shift_ids);
+        $this->assertSame([(int) $assignee->id], $intent->user_ids);
+        Queue::assertPushed(RefreshWorkforceEligibility::class, 1);
+        Queue::assertPushed(RefreshWorkforceEligibility::class, fn (RefreshWorkforceEligibility $job): bool => $job->recheckId === (int) $intent->id && $job->sourceVersion === (int) $intent->source_version);
 
         $override = ShiftEligibilityOverride::query()->where('shift_id', $shift->id)->sole();
         $this->assertSame($assignee->id, (int) $override->user_id);

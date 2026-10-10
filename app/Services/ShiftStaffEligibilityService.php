@@ -7,9 +7,12 @@ use App\Models\Shift;
 use App\Models\StaffTimeOff;
 use App\Models\User;
 use App\Services\Eligibility\EligibilityResult;
+use App\Services\Eligibility\PreparedShiftWorkload;
 use App\Services\Eligibility\Rules\AvailabilityRule;
+use App\Services\Eligibility\Rules\ClientQualificationRule;
 use App\Services\Eligibility\Rules\DriverLicenceExpiryRule;
 use App\Services\Eligibility\Rules\FatigueRule;
+use App\Services\Eligibility\Rules\HouseQualificationRule;
 use App\Services\Eligibility\Rules\HsTrainingRule;
 use App\Services\Eligibility\Rules\MedicationCompetencyRule;
 use App\Services\Eligibility\Rules\RequiredDriverLicenceRule;
@@ -32,6 +35,8 @@ class ShiftStaffEligibilityService
         protected RequiredDriverLicenceRule $requiredDriverLicenceRule,
         protected HsTrainingRule $hsTrainingRule,
         protected MedicationCompetencyRule $medicationCompetencyRule,
+        protected ?ClientQualificationRule $clientQualificationRule = null,
+        protected ?HouseQualificationRule $houseQualificationRule = null,
     ) {}
 
     /**
@@ -47,8 +52,10 @@ class ShiftStaffEligibilityService
      *                                                            querying per pair. When null (the default, single-call path) the
      *                                                            original per-pair queries run unchanged.
      */
-    public function evaluate(Shift $shift, User $user, ?Collection $preloadedUserShifts = null): EligibilityResult
+    public function evaluate(Shift $shift, User $user, ?Collection $preloadedUserShifts = null, ?PreparedShiftWorkload $workload = null, bool $currentQualifications = false): EligibilityResult
     {
+        $workload?->assertFor($shift, $user);
+        $preloadedUserShifts = $workload?->conflictShifts($shift) ?? $preloadedUserShifts;
         $checks = [];
 
         // ── Existing checks (converted to rule-result format) ──────────
@@ -61,18 +68,22 @@ class ShiftStaffEligibilityService
         $checks[] = $complianceCheck;
 
         $checks = array_merge($checks, $this->checkCoverageRoles($shift, $user));
-        $checks[] = $this->checkOverfill($shift, $user);
+        $checks[] = $this->checkOverfill($shift, $user, $workload);
 
         // ── New rule classes ───────────────────────────────────────────
 
         $checks = array_merge($checks, $this->availabilityRule->evaluateAll($shift, $user));
-        $checks = array_merge($checks, $this->fatigueRule->evaluateAll($shift, $user));
+        $checks = array_merge($checks, $this->fatigueRule->evaluateAll($shift, $user, $workload));
         $checks[] = $this->siteAssignmentRule->evaluate($shift, $user);
         $checks[] = $this->driverLicenceRule->evaluate($shift, $user);
         $checks[] = $this->requiredDriverLicenceRule->evaluate($shift, $user);
         $checks = array_merge($checks, $this->hsTrainingRule->evaluateAll($shift, $user));
         $checks[] = $this->medicationCompetencyRule->evaluate($shift, $user);
         $checks[] = $this->checkOnboarding($shift, $user);
+        $checks = array_merge($checks, ($this->clientQualificationRule ??= app(ClientQualificationRule::class))
+            ->evaluateAll($shift, $user, $currentQualifications || $workload?->currentEvidence !== null));
+        $checks = array_merge($checks, ($this->houseQualificationRule ??= app(HouseQualificationRule::class))
+            ->evaluateAll($shift, $user, $currentQualifications || $workload?->currentEvidence !== null));
 
         return EligibilityResult::fromChecks($checks);
     }
@@ -410,9 +421,11 @@ class ShiftStaffEligibilityService
         return [array_merge(self::pass('coverage_roles'), $base)];
     }
 
-    protected function checkOverfill(Shift $shift, User $user): array
+    protected function checkOverfill(Shift $shift, User $user, ?PreparedShiftWorkload $workload = null): array
     {
-        $coverageStatus = $this->coverage->coverageStatusForShift($shift);
+        $coverageStatus = $workload?->currentEvidence !== null
+            ? $this->coverage->coverageStatusForShift($shift, current: true)
+            : $this->coverage->coverageStatusForShift($shift);
 
         $wouldOverfill = $coverageStatus
             && ! ($coverageStatus['allow_overstaffing'] ?? true)
