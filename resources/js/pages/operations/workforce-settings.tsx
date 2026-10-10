@@ -386,7 +386,7 @@ function WorkforceSettingsBody({
                                 </PageHeaderMeterCaption>
                             </PageHeaderMeterBlock>
                             <PageHeaderMeterBlock
-                                label="Your changes"
+                                label="Personal changes"
                                 onClick={() => select('roster')}
                             >
                                 <PageHeaderMeterBig>
@@ -394,8 +394,8 @@ function WorkforceSettingsBody({
                                 </PageHeaderMeterBig>
                                 <PageHeaderMeterCaption>
                                     {dirty
-                                        ? 'ready to review before saving'
-                                        : 'no unsaved preferences'}
+                                        ? 'personal preferences ready to review'
+                                        : 'no unsaved personal preferences'}
                                 </PageHeaderMeterCaption>
                             </PageHeaderMeterBlock>
                         </>
@@ -778,12 +778,12 @@ function WorkforceSettingsBody({
                         <div>
                             <p className="text-sm font-semibold">
                                 {dirty
-                                    ? `${changed.length} ${changed.length === 1 ? 'change' : 'changes'} to review`
-                                    : 'No unsaved changes'}
+                                    ? `${changed.length} personal ${changed.length === 1 ? 'preference' : 'preferences'} to review`
+                                    : 'No unsaved personal preferences'}
                             </p>
                             <p className="text-caption mt-1">
-                                Your choices apply only after you review and
-                                save.
+                                Your personal roster preferences apply only
+                                after you review and save.
                             </p>
                         </div>
                         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
