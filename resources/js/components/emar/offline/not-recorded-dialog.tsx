@@ -14,7 +14,6 @@ import {
     dismissRejectedOfflineSubmission,
     type OfflineSubmission,
     type OfflineSubmissionDisplay,
-    type StrandedSubmission,
 } from '@/lib/offline-queue';
 import { useState } from 'react';
 
@@ -103,11 +102,9 @@ function RefusedRow({ item }: { item: OfflineSubmission }) {
 
 export function NotRecordedDialog({
     refused,
-    stranded,
     onClose,
 }: {
     refused: OfflineSubmission[];
-    stranded: StrandedSubmission[];
     onClose: () => void;
 }) {
     return (
@@ -129,30 +126,6 @@ export function NotRecordedDialog({
                     <ul className="space-y-2">
                         {refused.map((item) => (
                             <RefusedRow key={item.id} item={item} />
-                        ))}
-                    </ul>
-                </section>
-            ) : null}
-            {stranded.length > 0 ? (
-                <section className="space-y-2">
-                    <h3 className="text-section-title">
-                        Saved by another worker ({stranded.length})
-                    </h3>
-                    <p className="text-subtle">
-                        They send when that worker signs in on this device.
-                        Don’t give or record these again. If they can’t sign in
-                        here, tell your lead.
-                    </p>
-                    <ul className="space-y-2">
-                        {stranded.map((item) => (
-                            <li key={item.id} className="rounded-lg border p-3">
-                                <p className="font-medium">
-                                    {doseLine(item.display)}
-                                </p>
-                                <p className="text-caption">
-                                    {whenLine(item.display, item.createdAt)}
-                                </p>
-                            </li>
                         ))}
                     </ul>
                 </section>

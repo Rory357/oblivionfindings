@@ -618,6 +618,12 @@ class WorkerMedsController extends Controller
         }
     }
 
+    /** Review item 3: what a dose without the order it showed is told. */
+    private const ORDER_FINGERPRINT_MESSAGES = [
+        'order_fingerprint.required' => 'This dose doesn’t say which order it was given from, so it wasn’t recorded. Open the dose again and record it from the current order.',
+        'order_fingerprint.required_if' => 'This dose doesn’t say which order it was given from, so it wasn’t recorded. Open the dose again and record it from the current order.',
+    ];
+
     /**
      * Record the outcome of a scheduled dose (given / refused / withheld) from
      * the desktop Record Dose wizard.
@@ -658,7 +664,9 @@ class WorkerMedsController extends Controller
             ...RecordingContract::rules(),
             ...$this->recordingContextRules(),
             ...$this->medicationOfflineSubmissionRules($request),
-        ]);
+            // Review item 3: a "given" always says which order it showed (EA-008).
+            'order_fingerprint' => ['required_if:status,given', 'nullable', 'string', 'max:128'],
+        ], self::ORDER_FINGERPRINT_MESSAGES);
 
         $medication = ClientMedication::with('client')->findOrFail($data['client_medication_id']);
         $round = isset($data['medication_round_id']) ? MedicationRound::findOrFail($data['medication_round_id']) : null;
@@ -907,7 +915,9 @@ class WorkerMedsController extends Controller
             ...RecordingContract::rules(),
             ...$this->recordingContextRules(),
             ...$this->medicationOfflineSubmissionRules($request),
-        ]);
+            // Review item 3: an as-needed dose is always "given".
+            'order_fingerprint' => ['required', 'string', 'max:128'],
+        ], self::ORDER_FINGERPRINT_MESSAGES);
 
         $medication = ClientMedication::with('client')->findOrFail($data['client_medication_id']);
         abort_unless($medication->client, 404);
@@ -1096,17 +1106,9 @@ class WorkerMedsController extends Controller
      */
     private function refuseTooOldQueuedDose(Request $request, MedicationScopeDecision $scope, User $user, array $data): JsonResponse|RedirectResponse|null
     {
-        $review = app(OfflineReplayReview::class);
-        if (! $review->tooOld($data)) {
-            return null;
-        }
-        if (ClientMedicationAdministration::withTrashed()->where('client_request_uuid', (string) ($data['client_request_uuid'] ?? ''))->exists()) {
-            return null;
-        }
-        $message = OfflineReplayReview::tooOldMessage();
-        $review->raise($scope->client, $scope->medication, $user, $data, OfflineReplayReview::TOO_OLD, $message);
+        $message = app(OfflineReplayReview::class)->refuseIfTooOld($request, $scope->client, $scope->medication, $user, $data);
 
-        return $this->queuedRefusal($request, $data, 'queued_offline', $message);
+        return $message === null ? null : $this->queuedRefusal($request, $data, 'queued_offline', $message);
     }
 
     /**
@@ -1125,11 +1127,8 @@ class WorkerMedsController extends Controller
         if ($medication->controlled_drug && ! $user->canDo('medications.controlled.record')) {
             return null;
         }
-        if (! in_array(
-            (int) $medication->client->site_id,
-            $this->siteAccess->accessibleSiteIds($user, MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS),
-            true,
-        )) {
+        // Review item 4: current authority for this person, not just the house.
+        if (! in_array((int) $medication->client_id, $this->medicationScope->clientIdsWithCurrentAuthority($user, [(int) $medication->client_id], now()), true)) {
             return null;
         }
         if (ClientMedicationAdministration::withTrashed()->where('client_request_uuid', (string) $data['client_request_uuid'])->exists()) {

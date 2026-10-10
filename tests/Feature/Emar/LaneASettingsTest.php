@@ -144,8 +144,24 @@ class LaneASettingsTest extends TestCase
         $this->assertSame(3, MedicationSettingChange::query()->where('setting_group', 'forgotten')->count());
     }
 
+    /** Review item 6: the settings mean nothing until Lane C serves the photos. */
+    public function test_the_pack_photo_settings_stay_hidden_until_photos_are_served(): void
+    {
+        if (PackPhotoSettings::served()) {
+            $this->markTestSkipped('Pack photos are served: the settings are covered by the next test.');
+        }
+        $this->assertNull(app(MedicationSettingsRegistry::class)->group('packPhoto'));
+        $this->actingAs($this->organisationManager())
+            ->put('/emar/settings/changes', $this->save('rules', [['packPhoto', 'no_photo', 'tick', 'warn']]))
+            ->assertSessionHasErrors();
+        $this->assertSame(0, MedicationSettingChange::query()->count());
+    }
+
     public function test_the_pack_photo_at_recording_settings_default_to_shown_with_a_warning(): void
     {
+        if (! PackPhotoSettings::served()) {
+            $this->markTestSkipped('Lane C’s pack photo reader has not landed, so these settings are hidden.');
+        }
         $registry = app(MedicationSettingsRegistry::class);
         $show = $registry->definition('packPhoto', 'show');
         $noPhoto = $registry->definition('packPhoto', 'no_photo');

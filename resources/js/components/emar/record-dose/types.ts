@@ -122,6 +122,8 @@ export interface DoseRequirements {
      */
     pack_photo?: PackPhoto | null;
     pack_photo_policy?: PackPhotoPolicy;
+    /** Review P1: hours after which a dose saved on this device is not sent. */
+    offline_max_hours?: number;
     stock_tracking?: { lots_started: boolean; offline_given_allowed: boolean };
     live_recording_context?: string | null;
     /** The order this dialog shows; a save is refused if it changed (EA-008). */

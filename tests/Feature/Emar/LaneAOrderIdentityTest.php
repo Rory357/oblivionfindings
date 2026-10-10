@@ -16,6 +16,7 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\Downtime\PaperEntryService;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
@@ -23,6 +24,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 /**
  * eMAR audit Lane A2 (EA-008, EA-059, EA-060): a save records the order the
@@ -33,6 +35,7 @@ use Tests\TestCase;
 class LaneAOrderIdentityTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     private Site $site;
 
@@ -99,6 +102,59 @@ class LaneAOrderIdentityTest extends TestCase
         $this->record($order, ['order_fingerprint' => $shown, 'status' => 'refused', 'reason_code' => 'refused', 'amount_mode' => null,
             'follow_up_due_at' => '2026-04-30T10:30:00'])->assertOk();
         $this->assertSame('refused', ClientMedicationAdministration::sole()->status);
+    }
+
+    /**
+     * Review item 3: a "given" on Meds today always says which order it was
+     * given from. One without it (an old screen, a dose queued before this
+     * rule) is told why and parked on the device; refusals and withheld
+     * doses don't need it.
+     */
+    public function test_a_given_dose_without_the_order_it_showed_is_refused_with_a_clear_reason(): void
+    {
+        $order = $this->order(['name' => 'Synthetic quetiapine', 'dosage' => '50 mg', 'dose_amount' => 50, 'dose_unit' => 'mg']);
+        $given = [
+            'client_medication_id' => $order->id, 'client_request_uuid' => (string) Str::uuid(),
+            'scheduled_for' => '2026-04-30T09:30:00+12:00', 'status' => 'given', 'administered_at' => '2026-04-30T09:30:00',
+            'amount_mode' => 'as_ordered', 'order_fingerprint' => null,
+        ];
+
+        $this->actingAs($this->worker->fresh())->postJson('/meds/today/record', $given)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['order_fingerprint' => 'doesn’t say which order it was given from']);
+
+        // A dose queued on the device without it is refused the same way (the device parks it).
+        $this->postJson('/meds/today/record', [...$given, 'client_request_uuid' => (string) Str::uuid(), 'queued_offline' => true,
+            'captured_offline_at' => CarbonImmutable::now('Pacific/Auckland')->toIso8601String(),
+            'origin_device_id' => 'synthetic-house-laptop', 'captured_by_user_id' => $this->worker->id])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('order_fingerprint');
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+
+        // A refusal documents what happened without it.
+        $refused = [...$given, 'client_request_uuid' => (string) Str::uuid(), 'status' => 'refused', 'reason_code' => 'refused',
+            'follow_up_due_at' => '2026-04-30T10:30:00'];
+        unset($refused['amount_mode']);
+        $this->postJson('/meds/today/record', $refused)->assertOk();
+        $this->assertSame('refused', ClientMedicationAdministration::sole()->status);
+    }
+
+    /** Review item 3: an as-needed dose is always "given", so it always says which order. */
+    public function test_an_as_needed_dose_without_the_order_it_showed_is_refused(): void
+    {
+        $prn = $this->order(['name' => 'Synthetic paracetamol', 'dosage' => '1 tablet', 'dose_amount' => 1, 'dose_unit' => 'tablet',
+            'frequency' => 'As needed', 'dose_times' => [], 'is_prn' => true, 'prn_reason' => 'Pain', 'min_hours_between_doses' => 4]);
+        $body = ['client_medication_id' => $prn->id, 'client_request_uuid' => (string) Str::uuid(), 'reason' => 'Pain',
+            'administered_at' => '2026-04-30T09:20:00', 'amount_mode' => 'as_ordered'];
+
+        $this->actingAs($this->worker->fresh())->postJson('/meds/today/prn', [...$body, 'order_fingerprint' => null])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('order_fingerprint');
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+
+        // The dialog sends the order it showed, and it saves.
+        $this->postJson('/meds/today/prn', [...$body, 'order_fingerprint' => PaperEntryService::orderFingerprint($prn->fresh())])->assertOk();
+        $this->assertDatabaseCount('client_medication_administrations', 1);
     }
 
     /**

@@ -8,8 +8,10 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { NotRecordedDialog } from '@/components/emar/offline/not-recorded-dialog';
 import { useOfflineQueueState } from '@/hooks/use-offline-queue';
 import {
+    clearMedicationHistory,
     purgeMedicationDeviceData,
     retryOfflineSubmissionsNeedingAttention,
+    strandedSummary,
 } from '@/lib/offline-queue';
 import { router } from '@inertiajs/react';
 
@@ -98,18 +100,7 @@ export default function OfflineStatusBanner() {
             >
                 <div className="mx-auto flex max-w-3xl items-center justify-center gap-2">
                     <Users aria-hidden className="h-4 w-4" />
-                    <span>
-                        {strandedCount === 1
-                            ? '1 medication record on this device was saved by another worker and isn’t on the chart.'
-                            : `${strandedCount} medication records on this device were saved by another worker and aren’t on the chart.`}
-                    </span>
-                    <button
-                        type="button"
-                        className="frontline-hit rounded border border-current px-2 py-0.5 font-semibold"
-                        onClick={() => setReviewing(true)}
-                    >
-                        Review
-                    </button>
+                    <span>{strandedSummary(strandedSubmissions)}</span>
                 </div>
             </div>,
         );
@@ -210,7 +201,6 @@ export default function OfflineStatusBanner() {
             {reviewing ? (
                 <NotRecordedDialog
                     refused={rejectedSubmissions}
-                    stranded={strandedSubmissions}
                     onClose={() => setReviewing(false)}
                 />
             ) : null}
@@ -221,6 +211,7 @@ export default function OfflineStatusBanner() {
                     setSignOutPending(null);
                     void purgeMedicationDeviceData().finally(() => {
                         router.flushAll();
+                        clearMedicationHistory();
                         router.post('/logout');
                     });
                 }}

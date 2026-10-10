@@ -22,6 +22,16 @@ final class PackPhotoSettings
 
     public const NO_PHOTO_DEFAULT = 'warn';
 
+    /**
+     * Review item 6: the settings mean nothing until photos reach the
+     * dialog. Lane C serves the latest staff photo per order
+     * (Stock\PackPhotoReader); until it lands, the settings stay hidden.
+     */
+    public static function served(): bool
+    {
+        return class_exists(\App\Services\Medication\Stock\PackPhotoReader::class);
+    }
+
     public function showAtRecording(): bool
     {
         return $this->value(self::SHOW, ['yes', 'no'], self::SHOW_DEFAULT) === 'yes';

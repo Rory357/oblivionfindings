@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 /**
  * eMAR audit Lane A10 (EA-006, P0; Stephan's decision D1): a worker clocked
@@ -33,6 +34,7 @@ use Tests\TestCase;
 class LaneASharedHouseTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     private Site $house;
 

@@ -53,9 +53,9 @@ export function deviceStateFor(
     row: ScheduleRow,
     queue: Pick<
         OfflineQueueState,
-        'pendingSubmissions' | 'rejectedSubmissions'
+        'pendingSubmissions' | 'rejectedSubmissions' | 'strandedSubmissions'
     > = getOfflineQueueSnapshot(),
-): 'pending' | 'refused' | null {
+): 'pending' | 'other' | 'refused' | null {
     if (row.recorded) return null;
     const due = slotInstant(row.scheduled_for);
     const matches = (item: {
@@ -67,6 +67,17 @@ export function deviceStateFor(
         due !== null &&
         slotInstant(item.payload.scheduled_for) === due;
     if ((queue.pendingSubmissions ?? []).some(matches)) return 'pending';
+    // Review P0: another worker's saved dose for this row blocks a second
+    // recording, matched by order and due time only.
+    if (
+        (queue.strandedSubmissions ?? []).some(
+            (item) =>
+                item.orderId === row.medication_id &&
+                due !== null &&
+                slotInstant(item.dueAt) === due,
+        )
+    )
+        return 'other';
     if ((queue.rejectedSubmissions ?? []).some(matches)) return 'refused';
     return null;
 }
@@ -370,6 +381,22 @@ export function DoseStateCell({
     const ends = nzTime(row.window_ends_at);
     const device = useDeviceState(row);
     const manualRetry = useDeviceNeedsManualRetry(row);
+    if (device === 'other')
+        return (
+            <span className="flex flex-col items-start gap-1 py-0.5">
+                <StatusBadge
+                    variant="info"
+                    className="rounded-[8px] font-semibold"
+                >
+                    <CloudUpload className="size-3" aria-hidden="true" />
+                    Saved on this device by another worker
+                </StatusBadge>
+                <Line tone="warning">
+                    Not on the chart yet — it sends when they sign in here.
+                    Don’t record it again.
+                </Line>
+            </span>
+        );
     if (device === 'pending')
         return (
             <span className="flex flex-col items-start gap-1 py-0.5">
@@ -614,7 +641,8 @@ export function mainAction(
     can: RowPermissions,
     a: RowActions,
 ): (() => void) | null {
-    if (deviceStateFor(row) === 'pending') return null;
+    const device = deviceStateFor(row);
+    if (device === 'pending' || device === 'other') return null;
     if (isOpen(row) && can.canRecord(row)) {
         if (blockOf(row)) return () => a.why(row);
         if (needsHelp(row)) return () => a.notGiven(row);
@@ -643,6 +671,18 @@ export function DoseActionCell({
     const recordable = can.canRecord(row);
     const device = useDeviceState(row);
     // EA-116: recording again would double the dose; it sends on its own.
+    if (device === 'other')
+        return (
+            <Button
+                data-return={row.key}
+                variant="outline"
+                className="frontline-tap"
+                disabled
+            >
+                <CloudUpload className="size-4" aria-hidden="true" /> Saved by
+                another worker
+            </Button>
+        );
     if (device === 'pending')
         return (
             <Button
@@ -734,7 +774,8 @@ export function doseMenu(
 ): MenuItem[] {
     const items: (MenuItem | false)[] = [];
     const recordable = can.canRecord(row);
-    if (deviceStateFor(row) === 'pending') {
+    const device = deviceStateFor(row);
+    if (device === 'pending' || device === 'other') {
         // Saved on this device: nothing to record until it sends.
     } else if (isOpen(row) && recordable) {
         if (blockOf(row)) {

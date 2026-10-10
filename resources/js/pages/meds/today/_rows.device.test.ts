@@ -62,3 +62,25 @@ describe('a dose saved on this device', () => {
         expect(deviceNeedsManualRetry(row, queue)).toBe(false);
     });
 });
+
+describe('a dose another worker saved on this device (review P0)', () => {
+    it('blocks the row by order and due time, knowing nothing else', () => {
+        const queue = {
+            pendingSubmissions: [],
+            rejectedSubmissions: [],
+            strandedSubmissions: [
+                {
+                    id: 'theirs',
+                    createdAt: '2026-10-09T19:05:00.000Z',
+                    actorName: 'Mere Tane',
+                    orderId: 93,
+                    dueAt: '2026-10-10T08:02:00+13:00',
+                },
+            ],
+        };
+        expect(deviceStateFor(row, queue)).toBe('other');
+        expect(
+            deviceStateFor({ ...row, medication_id: 94 } as ScheduleRow, queue),
+        ).toBeNull();
+    });
+});

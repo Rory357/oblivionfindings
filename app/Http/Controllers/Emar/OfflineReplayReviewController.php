@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Medication\Recording\OfflineReplayReview;
 use App\Services\UserSiteAccessService;
 use App\Services\AuditLogger;
@@ -29,6 +30,7 @@ class OfflineReplayReviewController extends Controller
     public function __construct(
         private readonly OfflineReplayReview $review,
         private readonly UserSiteAccessService $sites,
+        private readonly MedicationScopeDecisionService $authority,
     ) {}
 
     public function store(Request $request): JsonResponse
@@ -73,6 +75,10 @@ class OfflineReplayReviewController extends Controller
             ), 404);
             $medication = ClientMedication::withTrashed()->whereKey($snapshot->id)
                 ->where('client_id', $client->id)->lockForUpdate()->firstOrFail();
+            // Review item 4: only someone who may record for this person now
+            // (and record controlled medicines, for one) can raise lead work.
+            abort_unless(in_array((int) $client->id, $this->authority->clientIdsWithCurrentAuthority($user, [(int) $client->id], now()), true)
+                && (! $medication->controlled_drug || $user->canDo('medications.controlled.record')), 404);
 
             $reasonKey = OfflineReplayReview::reasonForStatus(
                 isset($data['http_status']) ? (int) $data['http_status'] : null,
@@ -85,6 +91,7 @@ class OfflineReplayReviewController extends Controller
                 $data,
                 $reasonKey,
                 $data['reason'] ?? 'Saved on a device but not recorded.',
+                reportedByDevice: true,
             );
             if ($followup->wasRecentlyCreated) {
                 AuditLogger::logOrFail('medications.offline_review.reported', $followup, [

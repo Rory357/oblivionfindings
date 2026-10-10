@@ -22,10 +22,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 class PrnQuickRecordTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     protected User $worker;
 

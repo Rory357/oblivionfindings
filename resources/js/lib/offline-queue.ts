@@ -1,3 +1,4 @@
+import { router } from '@inertiajs/react';
 import axios from 'axios';
 import { toast } from 'sonner';
 
@@ -75,18 +76,29 @@ export interface OfflineSubmission {
     rejected?: boolean;
     /** The HTTP status of the refusal (200 for a refused sync envelope). */
     refusedStatus?: number | null;
+    /** The field the refusal named, e.g. queued_offline for "too old". */
+    refusedField?: string | null;
     /** When the refusal reached the server as a lead follow-up. */
     reportedAt?: string | null;
     /** The server answered 401/419: sending waits until the worker signs in again. */
     signInRequired?: boolean;
     display?: OfflineSubmissionDisplay | null;
+    /** Who saved it, so others see "saved on this device by Mere" — and nothing else. */
+    actorName?: string | null;
 }
 
-/** Another worker's saved action on this device: shown, never sent or read (EA-048). */
+/**
+ * Another worker's saved action on this device (EA-048). Shown only as a
+ * count and who saved it (review P0, 10 Oct): never the person, medicine,
+ * outcome or time. The order and due time only match a Meds today row, so
+ * the dose can't be recorded twice.
+ */
 export interface StrandedSubmission {
     id: string;
     createdAt: string;
-    display: OfflineSubmissionDisplay | null;
+    actorName: string | null;
+    orderId: number | null;
+    dueAt: string | null;
 }
 
 export interface OfflineQueueState {
@@ -156,12 +168,33 @@ interface QueueOfflineSubmissionArgs {
     display?: OfflineSubmissionDisplay | null;
 }
 
-/** Dose recordings: bound to their worker on the server and reported to a lead when refused. */
+/** Dose recordings: reported to a lead when refused. */
 const DOSE_ACTIONS: ReadonlySet<OfflineAction> = new Set([
     'prn',
     'administration',
     'round_admin',
 ]);
+/**
+ * Every queued medication action is bound to the worker who saved it
+ * (EA-047; review item 5): doses, controlled register entries, balance
+ * checks, destructions, loss reports, stock updates, corrections and
+ * follow-ups. The server refuses it from anyone else's session.
+ */
+const ACTOR_BOUND_ACTIONS: ReadonlySet<OfflineAction> = new Set([
+    ...DOSE_ACTIONS,
+    'correction',
+    'medication_followup',
+    'support_consent',
+    'cd_loss_report',
+    'cd_entry',
+    'cd_balance_check',
+    'cd_destruction',
+    'stock_update',
+]);
+/** Review P1: every replay says when the device saved it; the server ages it by that. */
+const REPLAY_HEADER = 'X-Medication-Replay';
+const MAX_AGE_STORAGE_KEY = 'oblivion:offline-max-hours:v1';
+const DEFAULT_MAX_AGE_HOURS = 12;
 const OFFLINE_REVIEW_URL = '/meds/today/offline-review';
 /** A request that hangs is treated like no answer, so it is retried (EA-010). */
 export const MEDICATION_REQUEST_TIMEOUT_MS = 30_000;
@@ -533,6 +566,7 @@ export function guardMedicationSignOut(event?: {
     const pending = lastBroadcast.pendingCount;
     if (pending === 0 || currentActorId === null) {
         void purgeMedicationDeviceData(currentActorId);
+        clearMedicationHistory();
         return true;
     }
     event?.preventDefault();
@@ -613,7 +647,16 @@ async function listQueue(): Promise<OfflineSubmission[]> {
                 stranded.push({
                     id: item.id,
                     createdAt: item.createdAt,
-                    display: item.display ?? null,
+                    actorName: item.actorName ?? null,
+                    orderId: Number.isFinite(
+                        Number(item.payload.client_medication_id),
+                    )
+                        ? Number(item.payload.client_medication_id)
+                        : null,
+                    dueAt:
+                        typeof item.payload.scheduled_for === 'string'
+                            ? item.payload.scheduled_for
+                            : null,
                 });
             continue;
         }
@@ -695,6 +738,7 @@ async function persistOfflineSubmission(
         lastError: args.lastError ?? null,
         needsAttention: false,
         display: args.display ?? null,
+        actorName: actorNames.get(currentActorId) ?? null,
     };
 
     await putQueueItem(submission);
@@ -876,6 +920,7 @@ export function __resetOfflineQueueRuntimeForTests(): void {
     notifiedQueueWarnings.clear();
     lastKnownSafeQueue = [];
     lastStranded = [];
+    actorNames.clear();
 }
 
 /* -------------------------------------------------------------------------- */
@@ -907,7 +952,7 @@ function enrichPayload(
     // under the next worker's name.
     if (
         action &&
-        DOSE_ACTIONS.has(action) &&
+        (ACTOR_BOUND_ACTIONS.has(action) || action.startsWith('transport_')) &&
         currentActorId !== null &&
         payload.captured_by_user_id === undefined
     ) {
@@ -1015,10 +1060,126 @@ function isNetworkError(error: unknown): boolean {
     return false;
 }
 
+/* ---------------------------- review fixes ---------------------------- */
+
+/**
+ * Review P0: another worker's saved items, as anyone signed in may see them
+ * — a count and who saved them, never what or for whom.
+ */
+export function strandedSummary(stranded: StrandedSubmission[]): string {
+    const byWorker = new Map<string, number>();
+    for (const item of stranded) {
+        const name = item.actorName?.trim() || '';
+        byWorker.set(name, (byWorker.get(name) ?? 0) + 1);
+    }
+    const total = stranded.length;
+    const records =
+        total === 1 ? '1 medication record' : `${total} medication records`;
+    if (byWorker.size === 1) {
+        const [name] = [...byWorker.keys()];
+        const who = name === '' ? 'another worker' : name;
+        const when = name === '' ? 'that worker' : name;
+        return `${records} saved on this device by ${who} — ${total === 1 ? 'it sends' : 'they send'} when ${when} signs in.`;
+    }
+    const names = [...byWorker.keys()].filter((name) => name !== '');
+    return `${records} saved on this device by other workers${names.length ? ` (${names.join(', ')})` : ''} — each sends when its worker signs in.`;
+}
+
+/** The signed-in workers' names by id, read from the Inertia page (review P0). */
+const actorNames = new Map<string | null, string>();
+
+function readInitialPage(): unknown {
+    if (typeof document === 'undefined') return null;
+    const raw =
+        document.getElementById('app')?.getAttribute('data-page') ?? null;
+    if (!raw) return null;
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return null;
+    }
+}
+
+function rememberActorNameFromPage(page: unknown): void {
+    const user = (
+        page as {
+            props?: {
+                auth?: { user?: { id?: unknown; name?: unknown } | null };
+            };
+        } | null
+    )?.props?.auth?.user;
+    const id = normalizeActorId(user?.id);
+    if (id !== null && typeof user?.name === 'string' && user.name !== '')
+        actorNames.set(id, user.name);
+}
+
+/** Tests and callers that know the worker's name can set it directly. */
+export function setOfflineQueueActorName(actorId: unknown, name: string): void {
+    const id = normalizeActorId(actorId);
+    if (id !== null && name !== '') actorNames.set(id, name);
+}
+
+/** Review P1: the organisation's limit, as the dialog last read it (12 h until then). */
+export function rememberOfflineMaxHours(hours: unknown): void {
+    if (typeof window === 'undefined') return;
+    const value = Number(hours);
+    if (!Number.isInteger(value) || value < 1 || value > 168) return;
+    try {
+        window.localStorage.setItem(MAX_AGE_STORAGE_KEY, String(value));
+    } catch {
+        // Unavailable storage: the default applies.
+    }
+}
+
+/**
+ * The limit the dialog last read, or null before any was read on this device
+ * (every dose is recorded through a dialog that reads it first). The server
+ * checks every replay against the organisation's setting either way.
+ */
+function offlineMaxHours(): number | null {
+    try {
+        const raw =
+            typeof window === 'undefined'
+                ? null
+                : window.localStorage.getItem(MAX_AGE_STORAGE_KEY);
+        const stored = raw === null ? NaN : Number(raw);
+        return Number.isInteger(stored) && stored >= 1 ? stored : null;
+    } catch {
+        return null;
+    }
+}
+
+function savedTooLongAgo(item: OfflineSubmission): boolean {
+    const hours = offlineMaxHours();
+    const saved = Date.parse(item.createdAt);
+    return (
+        hours !== null &&
+        Number.isFinite(saved) &&
+        Date.now() - saved > hours * 3_600_000
+    );
+}
+
+function tooOldOnDeviceMessage(): string {
+    return `Too old to sync — this dose was saved on the device more than ${offlineMaxHours() ?? DEFAULT_MAX_AGE_HOURS} hours ago, so it wasn’t sent to the chart. Use reviewed paper recovery and tell your lead.`;
+}
+
+/**
+ * Review item 7: signing out forgets the medication pages in this tab's
+ * history, so Back can't show them (their history is encrypted).
+ */
+export function clearMedicationHistory(): void {
+    try {
+        router.clearHistory();
+    } catch {
+        // No Inertia router (tests, early boot): nothing to clear.
+    }
+}
+
 async function postMutation(
     method: HttpMethod,
     url: string,
     payload: Record<string, unknown>,
+    replayCapturedAt: string | null = null,
 ): Promise<unknown> {
     const response = await axios({
         method,
@@ -1027,6 +1188,7 @@ async function postMutation(
         headers: {
             Accept: 'application/json',
             'X-Requested-With': 'XMLHttpRequest',
+            ...(replayCapturedAt ? { [REPLAY_HEADER]: replayCapturedAt } : {}),
         },
         // A hung request becomes "no answer", which is retried (EA-010).
         timeout: MEDICATION_REQUEST_TIMEOUT_MS,
@@ -1269,6 +1431,7 @@ async function markRejected(
     item: OfflineSubmission,
     message: string | null,
     status: number | null = null,
+    field: string | null = null,
 ): Promise<'rejected'> {
     const reason = message ?? REJECTED_REPLAY_FALLBACK_MESSAGE;
     const parked: OfflineSubmission = {
@@ -1279,6 +1442,7 @@ async function markRejected(
         needsAttention: true,
         rejected: true,
         refusedStatus: status,
+        refusedField: field,
         signInRequired: false,
     };
     await putQueueItem(parked);
@@ -1317,6 +1481,7 @@ async function reportParkedDose(item: OfflineSubmission): Promise<void> {
             administered_at: payloadString(item, 'administered_at'),
             status: payloadString(item, 'status') ?? 'given',
             http_status: item.refusedStatus ?? null,
+            error_field: item.refusedField ?? null,
             reason: (item.lastError ?? REJECTED_REPLAY_FALLBACK_MESSAGE).slice(
                 0,
                 500,
@@ -1376,8 +1541,24 @@ async function replayOne(
         return 'failed';
     }
 
+    // Review P1: whatever its flag, a dose saved here longer ago than the
+    // limit is not sent as new. It stops here and a lead is told.
+    if (DOSE_ACTIONS.has(item.action) && savedTooLongAgo(item)) {
+        return markRejected(
+            item,
+            tooOldOnDeviceMessage(),
+            422,
+            'queued_offline',
+        );
+    }
+
     try {
-        const data = await postMutation(item.method, item.url, item.payload);
+        const data = await postMutation(
+            item.method,
+            item.url,
+            item.payload,
+            item.createdAt,
+        );
         const outcome = readServerSyncOutcome(data);
         if (outcome.kind === 'confirmed') {
             // EA-004: "already recorded" by someone else is not this dose
@@ -1608,6 +1789,14 @@ function scheduleReplay(): void {
 export function bootOfflineQueue(): void {
     if (booted || typeof window === 'undefined') return;
     booted = true;
+
+    // Review P0: remember the signed-in worker's name for their saved items.
+    rememberActorNameFromPage(readInitialPage());
+    document.addEventListener('inertia:navigate', (event) =>
+        rememberActorNameFromPage(
+            (event as CustomEvent<{ page?: unknown }>).detail?.page,
+        ),
+    );
 
     window.addEventListener('online', () => {
         void broadcastState();

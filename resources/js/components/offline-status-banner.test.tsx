@@ -204,7 +204,7 @@ describe('OfflineStatusBanner', () => {
         );
     });
 
-    it('shows another worker’s saved doses so nobody gives them again (EA-048)', () => {
+    it('says only how many records another worker saved, and who (EA-048, review P0)', () => {
         mockedUseOfflineQueueState.mockReturnValue({
             online: true,
             pendingCount: 0,
@@ -216,21 +216,39 @@ describe('OfflineStatusBanner', () => {
                 {
                     id: 'theirs',
                     createdAt: '2026-04-30T09:00:00.000Z',
-                    display: refusedDose.display,
+                    actorName: 'Mere Tane',
+                    orderId: 41,
+                    dueAt: '2026-04-30T09:00:00+12:00',
+                },
+                {
+                    id: 'theirs-2',
+                    createdAt: '2026-04-30T09:05:00.000Z',
+                    actorName: 'Mere Tane',
+                    orderId: 42,
+                    dueAt: null,
                 },
             ],
             syncing: false,
         });
 
-        render(<OfflineStatusBanner />);
+        // Whoever signs in next — with or without medication access — sees a
+        // count and a name: never the person, medicine, outcome or time.
+        const { container } = render(<OfflineStatusBanner />);
 
         expect(screen.getByRole('status')).toHaveTextContent(
-            /saved by another worker and isn’t on the chart/,
+            '2 medication records saved on this device by Mere Tane — they send when Mere Tane signs in.',
         );
-        fireEvent.click(screen.getByRole('button', { name: 'Review' }));
         expect(
-            screen.getByText('Mary · Paracetamol 500mg'),
-        ).toBeInTheDocument();
+            screen.queryByRole('button', { name: 'Review' }),
+        ).not.toBeInTheDocument();
+        for (const hidden of [
+            'Mary',
+            'Paracetamol',
+            '9:00',
+            'Given',
+            'Refused',
+        ])
+            expect(container).not.toHaveTextContent(hidden);
     });
 
     it('says to sign in again instead of retrying forever (EA-050)', () => {

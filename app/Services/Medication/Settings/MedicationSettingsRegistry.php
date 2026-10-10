@@ -136,7 +136,7 @@ class MedicationSettingsRegistry
     {
         return [
             $this->safetyChecks(),
-            $this->packPhotoAtRecording(),
+            ...(PackPhotoSettings::served() ? [$this->packPhotoAtRecording()] : []),
             $this->doseTiming(),
             $this->offlineReplay(),
             $this->competencyPolicy(),

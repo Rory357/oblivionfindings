@@ -49,11 +49,13 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Tests\Support\CommittedFixtureCleanup;
 use Tests\Support\OwnedTestDatabase;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 /** PIN-2 attestation: named colleague, exact deadline, current authority and safe replay. */
 class ForgottenWitnessPinTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     private User $worker;
 

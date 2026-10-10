@@ -158,6 +158,19 @@ class GuidedRoundController extends Controller
                 $round = $scope->round;
                 $medication = $scope->medication;
 
+                // EA-131 (review P1): a queued or replayed round dose older than
+                // the limit goes to reviewed paper recovery, as on Meds today.
+                if ($tooOld = app(\App\Services\Medication\Recording\OfflineReplayReview::class)->refuseIfTooOld($request, $scope->client ?? $medication->client, $medication, $user, $data)) {
+                    if (! $request->expectsJson()) {
+                        return back()->withErrors(['queued_offline' => $tooOld]);
+                    }
+
+                    return response()->json($this->withMedicationSync(
+                        ['success' => false, 'message' => $tooOld, 'error' => $tooOld, 'error_field' => 'queued_offline', 'errors' => ['queued_offline' => [$tooOld]]],
+                        $data, 'rejected', false, $tooOld,
+                    ), 422);
+                }
+
                 // Offline queues retain their stale-state conflict contract,
                 // but only effective clinical evidence can occupy the round
                 // slot. Online retries always reach EnhancedMarService so the

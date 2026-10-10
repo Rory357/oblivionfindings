@@ -319,7 +319,9 @@ final class DoseRecordingRequirements
             'competency' => $competency,
             // A11: the recording dialog's pack photo settings. The photo itself
             // (pack_photo) comes with Lane C's latest staff photo per order.
-            'pack_photo_policy' => app(PackPhotoSettings::class)->policy(),
+            ...(PackPhotoSettings::served() ? ['pack_photo_policy' => app(PackPhotoSettings::class)->policy()] : []),
+            // Review P1: the device stops replaying doses older than this.
+            'offline_max_hours' => OfflineReplayReview::maxAgeHours(),
             'stock_tracking' => ['lots_started' => $stockStarted, 'offline_given_allowed' => ! $order->controlled_drug && ! $stockStarted],
             'witness_override' => $doseOverride === null ? null : ['id' => (int) $doseOverride->id, 'expires_at' => $doseOverride->expires_at->toIso8601String(), 'followup_due_at' => $doseOverride->followup_due_at->toIso8601String()],
             'second_person' => [

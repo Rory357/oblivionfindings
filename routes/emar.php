@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\BreakGlassController;
+use App\Http\Middleware\MedicationCapturedByGuard;
+use Inertia\Middleware\EncryptHistory;
 use App\Http\Controllers\ClientAllergyRecordController;
 use App\Http\Controllers\Emar\ClientMedicationDayController;
 use App\Http\Controllers\Emar\CompetencyExemptionController;
@@ -47,7 +49,10 @@ use Illuminate\Support\Facades\Route;
 // `/emar` dashboard ever being their default destination. Gated by the
 // administer/update permissions so support workers can load it, with manager
 // permissions also allowed for oversight roles that want the operational view.
-Route::middleware(['auth'])->group(function () {
+// Review item 7: medication pages encrypt their browser history, so Back after
+// signing out shows nothing (the sign-out clears the key). Review item 5: an
+// action saved on a device by another worker is never sent under this session.
+Route::middleware(['auth', EncryptHistory::class, MedicationCapturedByGuard::class])->group(function () {
     Route::post('/medication-followups/administrations/{administration}/prepare', [MedicationFollowupController::class, 'prepare'])
         ->whereNumber('administration')->middleware('permission:medications.administer.record')->name('medication_followups.prepare');
     Route::get('/medication-followups', [MedicationFollowupController::class, 'index'])
@@ -107,7 +112,7 @@ Route::middleware(['auth'])->group(function () {
         ->name('meds.today.prn_requirements');
 });
 
-Route::middleware(['auth'])->prefix('emar')->group(function () {
+Route::middleware(['auth', EncryptHistory::class, MedicationCapturedByGuard::class])->prefix('emar')->group(function () {
     // Dashboard
     Route::get('/', [EmarController::class, 'dashboard'])
         ->middleware('permission:medications.view')

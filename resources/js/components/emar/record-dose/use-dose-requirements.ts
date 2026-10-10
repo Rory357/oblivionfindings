@@ -1,6 +1,7 @@
 /* eMAR P01 — loads what recording one dose needs and allows (the server's
  * DoseRecordingRequirements) when the dialog opens. Read-only; saving
  * checks everything again. */
+import { rememberOfflineMaxHours } from '@/lib/offline-queue';
 import axios from 'axios';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DoseTarget, RequirementsAnswer } from './types';
@@ -48,7 +49,10 @@ export function useDoseRequirements(target: DoseTarget | null): RequirementsStat
         axios
             .get<RequirementsAnswer>(url, { headers: { Accept: 'application/json' } })
             .then((response) => {
-                if (!cancelled) setState({ status: 'ready', data: response.data });
+                if (cancelled) return;
+                // Review P1: the device ages its saved doses by this limit.
+                if ('offline_max_hours' in response.data) rememberOfflineMaxHours(response.data.offline_max_hours);
+                setState({ status: 'ready', data: response.data });
             })
             .catch((error: unknown) => {
                 if (cancelled) return;

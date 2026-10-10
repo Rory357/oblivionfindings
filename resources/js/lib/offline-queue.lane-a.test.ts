@@ -1,6 +1,7 @@
 /* eMAR audit Lane A3 (EA-004, EA-010, EA-046–EA-050, EA-129–EA-131,
  * EA-149): what the device keeps, sends and says about medication records
  * saved on it. */
+import { router } from '@inertiajs/react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import {
@@ -23,6 +24,7 @@ import {
     getOfflineQueueSnapshot,
     guardMedicationSignOut,
     purgeMedicationDeviceData,
+    rememberOfflineMaxHours,
     replayOfflineQueue,
     setOfflineQueueActor,
     submitOffline,
@@ -39,6 +41,10 @@ vi.mock('axios', () => {
 
     return { default: request };
 });
+
+vi.mock('@inertiajs/react', () => ({
+    router: { clearHistory: vi.fn() },
+}));
 
 vi.mock('sonner', () => ({
     toast: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
@@ -218,6 +224,26 @@ describe('offline queue — Lane A3', () => {
         expect(getOfflineQueueActorId()).toBeNull();
     });
 
+    it('binds every queued medication action to its worker, not only doses (EA-047, review item 5)', async () => {
+        const storage = createStorage();
+        __setOfflineQueueStorageForTests(storage);
+        setOnline(false);
+        for (const [action, url] of [
+            ['cd_entry', '/emar/controlled/entries'],
+            ['cd_balance_check', '/emar/controlled/balance-check'],
+            ['stock_update', '/emar/stock/adjust'],
+        ] as const) {
+            await submitOffline({
+                action,
+                url,
+                payload: { client_medication_id: 123 },
+            });
+        }
+
+        expect(
+            storage.items().map((item) => item.payload.captured_by_user_id),
+        ).toEqual([101, 101, 101]);
+    });
     it('treats the server refusing another worker’s item as a stale session, not a refusal (EA-047)', async () => {
         const storage = createStorage([queuedDose()]);
         __setOfflineQueueStorageForTests(storage);
@@ -377,26 +403,72 @@ describe('offline queue — Lane A3', () => {
         ).resolves.toMatchObject({ status: 'requires_connection', sent: true });
     });
 
-    it('lists another worker’s saved doses without sending them (EA-048)', async () => {
-        const theirs = queuedDose({ id: 'theirs', actorId: '202' });
-        const storage = createStorage([theirs]);
-        __setOfflineQueueStorageForTests(storage);
-        const seen: string[][] = [];
+    it('lists another worker’s saved doses by who and which row, never what (EA-048, review P0)', async () => {
+        const theirs = {
+            ...queuedDose({ id: 'theirs', actorId: '202' }),
+            actorName: 'Mere Tane',
+        };
+        __setOfflineQueueStorageForTests(createStorage([theirs]));
+        const seen: unknown[][] = [];
         subscribeOfflineQueue((state) =>
-            seen.push(
-                (state.strandedSubmissions ?? []).map(
-                    (item) =>
-                        `${item.display?.person} · ${item.display?.medicine}`,
-                ),
-            ),
+            seen.push(state.strandedSubmissions ?? []),
         );
 
         await replayOfflineQueue();
 
-        await vi.waitFor(() =>
-            expect(seen.at(-1)).toEqual(['Mary · Epilim 200mg']),
-        );
+        await vi.waitFor(() => expect(seen.at(-1)).toHaveLength(1));
+        const [stranded] = seen.at(-1) as Record<string, unknown>[];
+        expect(stranded).toEqual({
+            id: 'theirs',
+            createdAt: theirs.createdAt,
+            actorName: 'Mere Tane',
+            orderId: Number(theirs.payload.client_medication_id),
+            dueAt: theirs.payload.scheduled_for ?? null,
+        });
+        expect(JSON.stringify(stranded)).not.toContain('Epilim');
+        expect(JSON.stringify(stranded)).not.toContain('Mary');
         expect(mockedAxios).not.toHaveBeenCalled();
+    });
+
+    it('stops and reports a dose saved longer ago than the limit, whatever its flag (review P1)', async () => {
+        rememberOfflineMaxHours(12);
+        const base = queuedDose({ id: 'old-online' });
+        const old = {
+            ...base,
+            createdAt: new Date(Date.now() - 13 * 3_600_000).toISOString(),
+            payload: { ...base.payload, queued_offline: false },
+        };
+        __setOfflineQueueStorageForTests(createStorage([old]));
+        mockedAxios.mockResolvedValue({ data: { status: 'reported' } });
+
+        await replayOfflineQueue();
+
+        const urls = mockedAxios.mock.calls.map(
+            ([config]) => (config as { url: string }).url,
+        );
+        expect(urls).not.toContain(old.url);
+        expect(urls).toContain('/meds/today/offline-review');
+        const report = mockedAxios.mock.calls.find(
+            ([config]) =>
+                (config as { url: string }).url ===
+                '/meds/today/offline-review',
+        )?.[0] as { data: Record<string, unknown> };
+        expect(report.data.error_field).toBe('queued_offline');
+    });
+
+    it('marks every replay with when the device saved it (review P1)', async () => {
+        const fresh = queuedDose({ id: 'fresh' });
+        __setOfflineQueueStorageForTests(createStorage([fresh]));
+        mockedAxios.mockResolvedValue({
+            data: { sync: { status: 'synced', client_request_uuid: 'fresh' } },
+        });
+
+        await replayOfflineQueue();
+
+        const send = mockedAxios.mock.calls.find(
+            ([config]) => (config as { url: string }).url === fresh.url,
+        )?.[0] as { headers: Record<string, string> };
+        expect(send.headers['X-Medication-Replay']).toBe(fresh.createdAt);
     });
 
     it('asks before signing out while doses wait on this device (EA-048)', async () => {
@@ -416,6 +488,13 @@ describe('offline queue — Lane A3', () => {
         window.removeEventListener('emar:sign-out-blocked', blocked);
     });
 
+    it('forgets the medication pages in this tab’s history at sign-out (review item 7)', () => {
+        vi.mocked(router.clearHistory).mockClear();
+        __setOfflineQueueStorageForTests(createStorage());
+
+        expect(guardMedicationSignOut()).toBe(true);
+        expect(router.clearHistory).toHaveBeenCalledTimes(1);
+    });
     it('clears this worker’s drafts and reported refusals at sign-out, keeping unsent doses (EA-129)', async () => {
         const unsent = queuedDose({ id: 'unsent' });
         const reported = queuedDose({

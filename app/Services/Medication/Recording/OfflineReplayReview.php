@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\MarScheduleService;
 use App\Services\Medication\Followups\MedicationFollowupService;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\Request;
 
 /**
  * eMAR audit Lane A3 (EA-004, EA-049, EA-050, EA-131): a dose saved on a
@@ -73,12 +74,18 @@ final class OfflineReplayReview
      *
      * @param  array<string, mixed>  $data
      */
-    public function tooOld(array $data): bool
+    public function tooOld(array $data, ?string $replayCapturedAt = null): bool
     {
-        if (! (bool) ($data['queued_offline'] ?? false)) {
+        // Review P1 (10 Oct): a replay is checked whatever its flag — a save
+        // that timed out online is stored as an ordinary dose and can come
+        // back days later. The device marks every replay with a header.
+        if (! (bool) ($data['queued_offline'] ?? false) && $replayCapturedAt === null) {
             return false;
         }
-        $raw = $data['administered_at'] ?? $data['captured_offline_at'] ?? null;
+        // A replay is aged by when the device saved it (a late-recorded dose
+        // is not "old" just because it was given hours ago); a dose queued
+        // offline by its clinical time, or failing that its capture time.
+        $raw = $replayCapturedAt ?? $data['administered_at'] ?? $data['captured_offline_at'] ?? null;
         if (! filled($raw)) {
             return false;
         }
@@ -89,6 +96,39 @@ final class OfflineReplayReview
         }
 
         return $at->lt(CarbonImmutable::now('UTC')->subHours(self::maxAgeHours()));
+    }
+
+    /** The replay header the device sends with the time it saved the action. Not part of the request fingerprint. */
+    public const REPLAY_HEADER = 'X-Medication-Replay';
+
+    public static function replayCapturedAt(Request $request): ?string
+    {
+        $value = $request->headers->get(self::REPLAY_HEADER);
+
+        return is_string($value) && $value !== '' ? mb_substr($value, 0, 64) : null;
+    }
+
+    /**
+     * EA-131, shared by every dose entry point (Meds today, as-needed, guided
+     * rounds, the mobile API): a queued or replayed dose older than the limit
+     * is not added to the chart. A lead gets the follow-up and the caller
+     * returns the message as a refusal. Call inside the decision transaction,
+     * with the person locked. Returns null to carry on.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function refuseIfTooOld(Request $request, Client $client, ClientMedication $medication, User $capturedBy, array $data): ?string
+    {
+        if (! $this->tooOld($data, self::replayCapturedAt($request))) {
+            return null;
+        }
+        if (ClientMedicationAdministration::withTrashed()->where('client_request_uuid', (string) ($data['client_request_uuid'] ?? ''))->exists()) {
+            return null;
+        }
+        $message = self::tooOldMessage();
+        $this->raise($client, $medication, $capturedBy, $data, self::TOO_OLD, $message);
+
+        return $message;
     }
 
     public static function tooOldMessage(): string
@@ -111,6 +151,7 @@ final class OfflineReplayReview
         string $reasonKey,
         string $reason,
         ?ClientMedicationAdministration $existing = null,
+        bool $reportedByDevice = false,
     ): MedicationFollowup {
         $uuid = (string) $data['client_request_uuid'];
         // Whichever side raised it first — the server refusing the replay,
@@ -133,7 +174,10 @@ final class OfflineReplayReview
             CarbonImmutable::now('UTC'),
             array_filter([
                 'reason_key' => $reasonKey,
-                'reason' => mb_substr($reason, 0, 500),
+                // Review item 4: the device's own words are kept as its report,
+                // never as the server's finding.
+                'reason' => mb_substr(($reportedByDevice ? 'As reported by the device: ' : '').$reason, 0, 500),
+                'reported_by_device' => $reportedByDevice ? true : null,
                 'client_request_uuid' => $uuid,
                 'outcome' => (string) ($data['status'] ?? 'given'),
                 'captured_by' => (int) $capturedBy->id,

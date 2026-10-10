@@ -14,6 +14,7 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\Recording\OfflineReplayReview;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
@@ -21,6 +22,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 /**
  * eMAR audit Lane A3 (EA-004, EA-047, EA-049, EA-050, EA-131): a dose saved
@@ -31,6 +33,7 @@ use Tests\TestCase;
 class LaneAOfflineReplayTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     private Site $site;
 
@@ -205,7 +208,101 @@ class LaneAOfflineReplayTest extends TestCase
         $followup = MedicationFollowup::sole();
         $this->assertSame('offline_review', $followup->type);
         $this->assertSame('access', $followup->context['reason_key']);
+        // Review item 4: the device's words are kept as its report.
+        $this->assertSame('As reported by the device: You do not have a current assignment for this person.', $followup->context['reason']);
+        $this->assertTrue($followup->context['reported_by_device']);
         $this->assertSame(0, ClientMedicationAdministration::count());
+    }
+
+    /** Review item 4: only someone who may record for the person now can raise lead work from a device. */
+    public function test_a_device_report_needs_current_authority_and_controlled_record_for_a_controlled_order(): void
+    {
+        $order = $this->order(['name' => 'Synthetic valproate', 'dosage' => '1 tablet', 'dose_amount' => 1, 'dose_unit' => 'tablet']);
+        $report = fn (ClientMedication $for): array => [
+            'client_request_uuid' => (string) Str::uuid(), 'client_medication_id' => $for->id, 'captured_by_user_id' => $this->worker->id,
+            'captured_offline_at' => '2026-04-30T08:05:00+12:00', 'status' => 'given', 'http_status' => 422, 'reason' => 'Refused.',
+        ];
+
+        // A controlled order needs controlled.record (the worker hasn't got it).
+        $controlled = $this->order(['name' => 'Synthetic morphine', 'dosage' => '5 mg', 'dose_amount' => 5, 'dose_unit' => 'mg',
+            'controlled_drug' => true, 'nz_controlled_class' => 'B', 'controlled_class_source' => 'Synthetic reviewed test class']);
+        $this->actingAs($this->worker)->postJson('/meds/today/offline-review', $report($controlled))->assertNotFound();
+
+        // Clocked out: the house is still in their access, but they can't record for the person now.
+        Shift::query()->where('user_id', $this->worker->id)->update([
+            'actual_ends_at' => now()->subHour()->utc(), 'status' => 'completed',
+        ]);
+        $this->actingAs($this->worker)->postJson('/meds/today/offline-review', $report($order))->assertNotFound();
+        $this->assertSame(0, MedicationFollowup::count());
+    }
+
+    /**
+     * Review P1: a save that timed out online is kept as an ordinary dose and
+     * can come back days later. Every replay says when the device saved it,
+     * and the age limit applies whatever the flag says.
+     */
+    public function test_a_replayed_online_save_older_than_the_limit_is_refused_whatever_its_flag(): void
+    {
+        $order = $this->order(['name' => 'Synthetic valproate', 'dosage' => '1 tablet', 'dose_amount' => 1, 'dose_unit' => 'tablet']);
+        $online = [...$this->dose($order), 'client_request_uuid' => (string) Str::uuid(), 'queued_offline' => false];
+        $saved = CarbonImmutable::now('Pacific/Auckland')->subHours(13)->toIso8601String();
+
+        $this->actingAs($this->worker)
+            ->postJson('/meds/today/record', $online, [OfflineReplayReview::REPLAY_HEADER => $saved])
+            ->assertUnprocessable()
+            ->assertJsonPath('error_field', 'queued_offline');
+        $this->assertSame(0, ClientMedicationAdministration::count());
+        $this->assertSame('too_old', MedicationFollowup::where('type', 'offline_review')->sole()->context['reason_key']);
+
+        // A replay saved an hour ago is recorded as usual.
+        $recent = CarbonImmutable::now('Pacific/Auckland')->subHour()->toIso8601String();
+        $this->postJson('/meds/today/record', [...$online, 'client_request_uuid' => (string) Str::uuid()], [OfflineReplayReview::REPLAY_HEADER => $recent])
+            ->assertOk();
+        $this->assertSame(1, ClientMedicationAdministration::count());
+    }
+
+    /** Review P1: the mobile API refuses an old queued dose the same way. */
+    public function test_the_mobile_api_refuses_a_queued_dose_older_than_the_limit(): void
+    {
+        $order = $this->order(['name' => 'Synthetic valproate', 'dosage' => '1 tablet', 'dose_amount' => 1, 'dose_unit' => 'tablet']);
+        $captured = CarbonImmutable::parse('2026-04-27 09:30', 'Pacific/Auckland');
+        $queued = $this->queued($this->dose($order, [
+            'scheduled_for' => $captured->toIso8601String(), 'administered_at' => $captured->format('Y-m-d\TH:i:s'),
+        ]), $this->worker, $captured);
+
+        $this->actingAs($this->worker)
+            ->postJson("/api/medications/clients/{$this->client->id}/medications/{$order->id}/administrations", $queued)
+            ->assertUnprocessable()
+            ->assertJsonPath('error_field', 'queued_offline');
+        $this->assertSame(0, ClientMedicationAdministration::count());
+        $this->assertSame('too_old', MedicationFollowup::where('type', 'offline_review')->sole()->context['reason_key']);
+    }
+
+    /**
+     * Review item 5 (EA-047): a controlled register entry, balance check,
+     * destruction, loss report or stock update saved on the device by another
+     * worker is refused under this session, before any handler runs.
+     */
+    public function test_a_queued_register_or_stock_action_saved_by_another_worker_is_refused(): void
+    {
+        foreach (['/emar/controlled/entries', '/emar/controlled/balance-check', '/emar/destructions',
+            '/emar/controlled/loss-reports', '/emar/stock/adjust', '/emar/stock/receive'] as $url) {
+            $this->actingAs($this->worker)->postJson($url, [
+                'client_request_uuid' => (string) Str::uuid(), 'queued_offline' => true, 'captured_by_user_id' => $this->colleague->id,
+            ])->assertUnprocessable()
+                ->assertJsonValidationErrors(['captured_by_user_id' => 'saved on this device by another worker']);
+        }
+
+        // The worker's own saved action passes the guard (and meets the handler's own rules).
+        $this->actingAs($this->worker)->postJson('/emar/stock/adjust', ['captured_by_user_id' => $this->worker->id])
+            ->assertJsonMissingValidationErrors('captured_by_user_id');
+    }
+
+    /** Review item 7: medication pages encrypt their history, so Back after sign-out shows nothing. */
+    public function test_medication_pages_encrypt_their_browser_history(): void
+    {
+        $page = $this->actingAs($this->worker)->get('/meds/today')->assertOk()->viewData('page');
+        $this->assertTrue($page['encryptHistory']);
     }
 
     /** A dose that did reach the chart is never reported as a parked dose. */
