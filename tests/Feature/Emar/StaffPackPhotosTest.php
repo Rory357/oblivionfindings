@@ -242,6 +242,8 @@ class StaffPackPhotosTest extends TestCase
 
     public function test_the_catalogue_shows_nothing_until_a_reviewed_source_is_configured_and_bound(): void
     {
+        // D4 (B10): the picture catalogue is a connected service, off until switched on.
+        \Tests\Support\ConnectedCareSwitches::on('picture_catalogue');
         $order = $this->orderRow(['name' => 'Metformin', 'form' => 'tablet']);
         $lead = $this->staff('team_lead', 'Jordan Tipene');
         $reader = app(PackPhotoReader::class);
@@ -267,6 +269,12 @@ class StaffPackPhotosTest extends TestCase
             'medicine_identity_sha256' => app(MedicineCatalogueBindingService::class)->identity($order), 'reference' => 'Label checked',
             'verified_by' => $lead->id, 'verified_at' => now(),
         ]);
+
+        // Switched off in Settings › Connected services: no reference picture.
+        \Tests\Support\ConnectedCareSwitches::off('picture_catalogue');
+        $this->assertFalse(PackPhotoReader::catalogueConfigured());
+        $this->assertNull($reader->forOrder($lead, $order));
+        \Tests\Support\ConnectedCareSwitches::on('picture_catalogue');
 
         $reference = $reader->forOrder($lead, $order);
         $this->assertSame('reference', $reference['kind']);

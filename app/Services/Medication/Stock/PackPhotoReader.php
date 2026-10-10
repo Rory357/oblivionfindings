@@ -265,9 +265,18 @@ final class PackPhotoReader
         return $images;
     }
 
-    /** Whether any reviewed, unexpired catalogue source exists at all. */
+    /**
+     * Whether reference pictures can show at all: the picture catalogue is
+     * switched on in Settings › Connected services (D4, Lane B's B10) and a
+     * reviewed, unexpired catalogue source exists. Staff photos never depend
+     * on this.
+     */
     public static function catalogueConfigured(): bool
     {
+        if (! app(\App\Services\Medication\Connected\ConnectedCareSettings::class)->enabled(\App\Services\Medication\Connected\ConnectedCareSettings::CATALOGUE)) {
+            return false;
+        }
+
         return MedicineCatalogueSource::query()->where('status', 'reviewed')
             ->whereNotNull('reviewed_at')->where('reviewed_at', '<=', now())
             ->where('expires_at', '>', now())->exists();
