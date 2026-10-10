@@ -16,6 +16,7 @@ import type {
 } from '@/components/job-board/types';
 import { Button } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
+import { useIsMobile } from '@/hooks/use-mobile';
 import AppLayout from '@/layouts/app-layout';
 
 type PaginatedJobs = {
@@ -89,6 +90,7 @@ export default function JobBoardIndex({
     week,
     viewer,
 }: Props) {
+    const mobile = useIsMobile();
     const scope = resolveScope(filters.scope);
     const firstName = viewer?.first_name ?? 'there';
     const effectiveStats: JobBoardStats = stats ?? {
@@ -239,6 +241,36 @@ export default function JobBoardIndex({
 
     const visibleJobs = jobs.data;
 
+    const emptyCopy: Record<
+        JobBoardScope,
+        { title: string; description: string }
+    > = {
+        'for-you': {
+            title: 'No shifts to show',
+            description:
+                'Open shifts and their recorded eligibility appear here. The selected filters limit this list.',
+        },
+        all: {
+            title: 'No open positions to show',
+            description:
+                'Open positions from sites you can access appear here.',
+        },
+        mine: {
+            title: 'No claims to show',
+            description:
+                'Your current claims and recently filled positions appear here.',
+        },
+        replacements: {
+            title: 'No replacement requests to show',
+            description: 'Positions requesting replacement cover appear here.',
+        },
+        approvals: {
+            title: 'No claims awaiting approval',
+            description:
+                'Claimed positions from sites you can access appear here.',
+        },
+    };
+
     const recommended = useMemo(
         () => visibleJobs.filter(strongMatchPredicate).slice(0, 3),
         [visibleJobs],
@@ -317,15 +349,16 @@ export default function JobBoardIndex({
                         {visibleJobs.length === 0 ? (
                             <GuardrailCard
                                 unstyled
-                                className="col-span-full rounded-xl border border-dashed border-border bg-card p-14 text-center text-muted-foreground"
+                                className="col-span-full rounded-xl border border-dashed border-border bg-card px-5 py-10 text-center text-muted-foreground md:p-14"
                             >
                                 <Briefcase className="mx-auto mb-3 h-8 w-8 opacity-40" />
-                                <h3 className="m-0 mb-1 text-base font-semibold text-foreground">
-                                    No shifts match those filters
+                                <h3 className="text-section-title m-0 mb-1 text-foreground">
+                                    {emptyCopy[scope].title}
                                 </h3>
                                 <p className="m-0 text-sm">
-                                    Try widening your date range, clearing a
-                                    skill filter, or switching to "All open".
+                                    {emptyCopy[scope].description} Try clearing
+                                    search or other filters if you expected a
+                                    position here.
                                 </p>
                             </GuardrailCard>
                         ) : (
@@ -341,7 +374,10 @@ export default function JobBoardIndex({
                     </div>
 
                     {(jobs.last_page ?? 1) > 1 ? (
-                        <div className="mt-4 flex items-center justify-center gap-1">
+                        <nav
+                            aria-label="Job Board pages"
+                            className="mt-4 flex flex-wrap items-center justify-center gap-2 md:gap-1"
+                        >
                             {(jobs.links ?? []).map((link, idx) => (
                                 <Button
                                     key={idx}
@@ -349,7 +385,14 @@ export default function JobBoardIndex({
                                     variant={
                                         link.active ? 'default' : 'outline'
                                     }
-                                    className="h-7 min-w-[28px] px-2 text-xs"
+                                    className={
+                                        mobile
+                                            ? 'frontline-tap px-2 text-xs'
+                                            : 'h-7 min-w-[28px] px-2 text-xs'
+                                    }
+                                    aria-current={
+                                        link.active ? 'page' : undefined
+                                    }
                                     disabled={!link.url}
                                     onClick={() =>
                                         link.url &&
@@ -364,7 +407,7 @@ export default function JobBoardIndex({
                                     }}
                                 />
                             ))}
-                        </div>
+                        </nav>
                     ) : null}
                 </section>
             </div>
