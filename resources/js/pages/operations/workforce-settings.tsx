@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/select';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { WorkforcePageHeader } from '@/components/workforce/workforce-page-header';
+import { useIsMobile } from '@/hooks/use-mobile';
 import AppLayout from '@/layouts/app-layout';
 import type { SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
@@ -188,6 +189,7 @@ function WorkforceSettingsBody({
     workforceSettings: settings,
     ownerLinks = [],
 }: Props & { actorId: number }) {
+    const mobile = useIsMobile();
     const [eligibilityDirty, setEligibilityDirty] = useState(false);
     const [eligibilityUncertain, setEligibilityUncertain] = useState(false);
     const [staffingDirty, setStaffingDirty] = useState(false);
@@ -499,7 +501,7 @@ function WorkforceSettingsBody({
                                     >
                                         <SelectTrigger
                                             id="workforce-default-tab"
-                                            className="w-48"
+                                            className="w-48 max-md:h-auto max-md:min-h-[44px]"
                                         >
                                             <SelectValue />
                                         </SelectTrigger>
@@ -538,7 +540,7 @@ function WorkforceSettingsBody({
                                     >
                                         <SelectTrigger
                                             id="workforce-roster-view"
-                                            className="w-48"
+                                            className="w-48 max-md:h-auto max-md:min-h-[44px]"
                                         >
                                             <SelectValue />
                                         </SelectTrigger>
@@ -824,6 +826,8 @@ function WorkforceSettingsBody({
             </div>
             {reviewing && (
                 <SettingsModal
+                    frontline={mobile}
+                    scrollHeader={mobile}
                     title="Review your roster preferences"
                     description="These changes affect how your own roster opens. They do not change staff assignments or safety rules."
                     onClose={() => {
@@ -876,6 +880,8 @@ function WorkforceSettingsBody({
             )}
             {leaving && (
                 <SettingsModal
+                    frontline={mobile}
+                    scrollHeader={mobile}
                     title={
                         uncertain || staffingUncertain || eligibilityUncertain
                             ? 'Leave with an unconfirmed save?'
