@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Route;
 
 // Reviewable P06 workspace. Existing /emar/stock stays in place until Main
 // connects every stock writer. No receive-role expansion is made here.
-Route::middleware(['auth', 'permission:medications.view', 'permission:medications.stock.update'])
+Route::middleware(['auth', 'permission:medications.view', 'permission:medications.stock.update', \App\Http\Middleware\ShareConnectedCareSwitches::class])
     ->prefix('emar/stock/packs')->group(function (): void {
         Route::get('/', [MedicationStockController::class, 'index'])->name('emar.stock.packs');
         Route::get('/medicine/{medication}', [MedicationStockController::class, 'detail'])->whereNumber('medication')->name('emar.stock.packs.detail');

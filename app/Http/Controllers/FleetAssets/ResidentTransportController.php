@@ -140,12 +140,13 @@ class ResidentTransportController extends Controller
             $query->where('resident_name', 'like', '%'.$request->input('search').'%');
         }
 
-        if ($request->filled('date_from')) {
-            $query->where('departed_at', '>=', $request->input('date_from'));
+        // NZ days, not UTC days: a 7:30 am departure on the 9th is on the 9th.
+        if ($from = $this->workerDay($request->input('date_from'))) {
+            $query->where('departed_at', '>=', $from->utc());
         }
 
-        if ($request->filled('date_to')) {
-            $query->where('departed_at', '<=', $request->input('date_to').' 23:59:59');
+        if ($to = $this->workerDay($request->input('date_to'))) {
+            $query->where('departed_at', '<', $to->addDay()->utc());
         }
 
         // CSV export
@@ -184,8 +185,8 @@ class ResidentTransportController extends Controller
         $transports = $query->latest('departed_at')->paginate(25)->withQueryString();
 
         // Summary stats
-        $monthStart = now()->startOfMonth();
-        $monthEnd = now()->endOfMonth();
+        $monthStart = WorkerClock::today()->startOfMonth()->utc();
+        $monthEnd = WorkerClock::today()->endOfMonth()->utc();
 
         $monthQuery = FleetResidentTransport::query()
             ->whereBetween('departed_at', [$monthStart, $monthEnd]);
@@ -276,7 +277,8 @@ class ResidentTransportController extends Controller
         }
 
         return [
-            'today' => (clone $base)->whereDate('departed_at', today())->count(),
+            'today' => (clone $base)->where('departed_at', '>=', WorkerClock::today()->utc())
+                ->where('departed_at', '<', WorkerClock::today()->addDay()->utc())->count(),
             'in_progress' => (clone $base)->where('status', 'in_progress')->count(),
             'completed_7d' => (clone $base)
                 ->where('status', 'completed')

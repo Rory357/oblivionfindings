@@ -28,7 +28,10 @@ import {
 type Recipient = {
     user_id: number;
     name: string;
-    email: string;
+    /** Their HR work email: backups never go to a sign-in email. */
+    email: string | null;
+    /** Authenticator two-step sign-in, without which they can't get a password (EA-141). */
+    can_open: boolean;
     status: string;
 };
 type Schedule = {
@@ -40,9 +43,20 @@ type Schedule = {
     version: number;
     retention_days: number;
     recipients: Recipient[];
+    /** Who the daily job runs as, and whether they still can (EA-142). */
+    runs_as?: string | null;
+    runs_as_current?: boolean | null;
+    last_run?: {
+        nz_date: string;
+        state: string;
+        code: string | null;
+        at: string | null;
+    } | null;
 };
 type Delivery = {
     id: number;
+    /** "B12": also in the email subject and file name (EA-140). */
+    reference?: string;
     version: number;
     site_id: number;
     nz_date: string;
@@ -85,6 +99,32 @@ type Props = {
         total: number;
     };
 };
+/** EA-142/EA-143: what the daily job is really doing, not just its switch. */
+function scheduleStatus(s: Schedule, readiness: Props['readiness']): string {
+    if (!s.enabled) return 'Schedule off';
+    if (s.runs_as_current === false)
+        return (
+            'Stopped — ' +
+            (s.runs_as ?? 'whoever set it') +
+            ' can no longer manage backups. Save the schedule again.'
+        );
+    if (!readiness.encryption_ready)
+        return 'Not running — strong PDF encryption isn’t set up';
+    const today = toDateInput(new Date());
+    const run = s.last_run && s.last_run.nz_date === today ? s.last_run : null;
+    if (run?.state === 'sent') return 'Delivered today';
+    if (run?.state === 'failed')
+        return 'Today’s backup failed — see Delivery history';
+    if (run?.state === 'uncertain')
+        return 'Today’s email result is unknown — see Delivery history';
+    if (run?.state === 'prepared_not_emailed')
+        return 'Prepared today, not emailed — email sending is off';
+    if (!readiness.send_enabled)
+        return 'Daily — prepared, not emailed (email sending is off)';
+
+    return 'Daily schedule enabled';
+}
+
 export default function Backups(props: Props) {
     const [view, setView] = useWorkspaceView('schedules', [
         'schedules',
@@ -209,9 +249,7 @@ export default function Backups(props: Props) {
                     )}
                     identity={(s) => ({
                         name: house(s.site_id),
-                        subline: s.enabled
-                            ? 'Daily schedule enabled'
-                            : 'Schedule off',
+                        subline: scheduleStatus(s, props.readiness),
                     })}
                     columns={[
                         {
@@ -227,7 +265,13 @@ export default function Backups(props: Props) {
                             cell: (s) =>
                                 s.recipients
                                     .filter((r) => r.status === 'approved')
-                                    .map((r) => r.name)
+                                    .map(
+                                        (r) =>
+                                            r.name +
+                                            (r.can_open
+                                                ? ''
+                                                : ' (can’t open yet)'),
+                                    )
                                     .join(', ') || 'None approved',
                         },
                         {
@@ -278,7 +322,9 @@ export default function Backups(props: Props) {
                         )}
                         identity={(d) => ({
                             name: house(d.site_id),
-                            subline: formatDateOnly(d.nz_date),
+                            subline:
+                                formatDateOnly(d.nz_date) +
+                                (d.reference ? ' · ' + d.reference : ''),
                         })}
                         columns={[
                             {
@@ -325,6 +371,7 @@ export default function Backups(props: Props) {
                 <ScheduleWizard
                     sites={props.sites}
                     schedule={schedule === 'new' ? null : schedule}
+                    encryptionReady={props.readiness.encryption_ready}
                     onClose={refresh}
                 />
             )}
@@ -350,7 +397,8 @@ export default function Backups(props: Props) {
                     description={
                         house(delivery.site_id) +
                         ' · ' +
-                        formatDateOnly(delivery.nz_date)
+                        formatDateOnly(delivery.nz_date) +
+                        (delivery.reference ? ' · ' + delivery.reference : '')
                     }
                     onClose={refresh}
                     footer={
@@ -443,10 +491,12 @@ export default function Backups(props: Props) {
 function ScheduleWizard({
     sites,
     schedule: s,
+    encryptionReady,
     onClose,
 }: {
     sites: Props['sites'];
     schedule: Schedule | null;
+    encryptionReady: boolean;
     onClose: () => void;
 }) {
     const command = useCommand();
@@ -518,8 +568,15 @@ function ScheduleWizard({
                             <Toggle
                                 label="Enable daily preparation and delivery"
                                 checked={enabled}
+                                disabled={!encryptionReady && !enabled}
                                 onChange={setEnabled}
                             />
+                            {!encryptionReady && (
+                                <SettingsNotice>
+                                    Strong PDF encryption isn’t set up yet, so
+                                    the daily backup can’t be switched on.
+                                </SettingsNotice>
+                            )}
                             <SettingsNotice>
                                 Recipients must be approved separately. Sending
                                 also requires the organisation’s encryption and
@@ -576,7 +633,7 @@ function RecipientWizard({
             .map((r) => ({
                 value: String(r.user_id),
                 label: r.name,
-                description: r.email,
+                description: r.email ?? undefined,
             })),
     ];
     return (
@@ -663,10 +720,12 @@ function RecipientWizard({
                                 }}
                             />
                             <SettingsNotice>
-                                Only current staff with a verified email and
+                                Only current staff with a work email on their HR
+                                profile, authenticator two-step sign-in and
                                 complete chart-export authority can receive this
-                                house’s backup. Switching approval off revokes
-                                this recipient.
+                                house’s backup. It goes to their work email,
+                                never their sign-in email. Switching approval
+                                off revokes this recipient.
                             </SettingsNotice>
                         </div>
                     ),
@@ -681,7 +740,7 @@ function RecipientWizard({
                         options.find((o) => o.value === user)?.label,
                 },
                 {
-                    label: 'Verified email',
+                    label: 'Work email',
                     value:
                         chosen?.email ??
                         options.find((o) => o.value === user)?.description,

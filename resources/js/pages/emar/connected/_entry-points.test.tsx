@@ -41,8 +41,7 @@ describe('connected service shortcuts', () => {
             transfersManage: true,
             pharmacyConnectManage: true,
             catalogueManage: true,
-            reportsView: true,
-            reportsExport: true,
+            backupsManage: true,
         };
         render(<ConnectedServicesMenu clientId={16} />);
         fireEvent.pointerDown(
@@ -64,5 +63,55 @@ describe('connected service shortcuts', () => {
         expect(
             screen.getByRole('menuitem', { name: 'Protected chart backups' }),
         ).toHaveAttribute('href', '/emar/backups');
+    });
+    it('offers backups to report exporters only while backups run (EA-144)', () => {
+        (state.can as Record<string, unknown>) = {
+            reportsView: true,
+            reportsExport: true,
+            connected: { protected_backups: false },
+        };
+        const { unmount } = render(<ConnectedServicesMenu />);
+        expect(
+            screen.queryByRole('button', { name: /Connected services/ }),
+        ).not.toBeInTheDocument();
+        unmount();
+        (state.can as Record<string, unknown>) = {
+            reportsView: true,
+            reportsExport: true,
+            connected: { protected_backups: true },
+        };
+        render(<ConnectedServicesMenu />);
+        fireEvent.pointerDown(
+            screen.getByRole('button', { name: /Connected services/ }),
+            { button: 0, ctrlKey: false },
+        );
+        expect(
+            screen.getByRole('menuitem', { name: 'Protected chart backups' }),
+        ).toHaveAttribute('href', '/emar/backups');
+    });
+    it('hides features that are switched off in Settings › Connected services (D4)', () => {
+        (state.can as Record<string, unknown>) = {
+            ordersManage: true,
+            externalManage: true,
+            catalogueManage: true,
+            connected: {
+                prescriber_portal: false,
+                picture_catalogue: true,
+            },
+        };
+        render(<ConnectedServicesMenu clientId={16} />);
+        fireEvent.pointerDown(
+            screen.getByRole('button', { name: /Connected services/ }),
+            { button: 0, ctrlKey: false },
+        );
+        expect(
+            screen.queryByRole('menuitem', { name: 'Prescriber requests' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('menuitem', { name: 'Prescriber access' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByRole('menuitem', { name: 'Medicine picture library' }),
+        ).toBeInTheDocument();
     });
 });

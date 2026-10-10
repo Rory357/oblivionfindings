@@ -24,6 +24,9 @@ export type Grant = {
     include_controlled: boolean;
     expires_at: string;
     revoked_at: string | null;
+    /** EA-083: chart views by this prescriber under this grant. */
+    views?: number;
+    last_viewed_at?: string | null;
 };
 export type Proposal = {
     id: number;
@@ -39,7 +42,10 @@ export type Proposal = {
     submitted_at: string;
     revision_id: number | null;
     order_url?: string | null;
+    /** The reply the prescriber sees. */
     decision_note: string | null;
+    /** EA-084: staff only, never sent to the portal. */
+    internal_note?: string | null;
     has_source_file: boolean;
 };
 export type Transfer = {

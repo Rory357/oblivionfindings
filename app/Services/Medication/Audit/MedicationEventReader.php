@@ -10,8 +10,16 @@ use Illuminate\Database\Eloquent\Builder;
 
 final class MedicationEventReader
 {
+    /**
+     * Reports › Export history: every copy of medication records that left
+     * the eMAR — exports, and (B10, EA-057/EA-083/EA-087) protected backup
+     * downloads and password reveals, outside-prescriber chart views and
+     * source downloads, and provider handover packets.
+     */
+    public const DISCLOSURE_KINDS = ['export.created', 'backup.downloaded', 'backup.password_revealed', 'external.chart_viewed', 'external.source_downloaded'];
+
     /** One query for the audit screen, event detail and full-period export. */
-    public function query(User $actor, array $siteIds, MedicationReportPeriod $period, ?int $clientId = null, ?string $kind = null, string $search = ''): Builder
+    public function query(User $actor, array $siteIds, MedicationReportPeriod $period, ?int $clientId = null, string|array|null $kind = null, string $search = ''): Builder
     {
         abort_unless($actor->canDo('medications.audit.view'), 403);
         abort_if(app(MedicationReportAccess::class)->financeOnly($actor), 403);
@@ -25,7 +33,8 @@ final class MedicationEventReader
         return MedicationEvent::query()->with(['client:id,first_name,last_name', 'actor:id,name'])->whereIn('site_id', $siteIds)
             ->where(fn ($q) => $q->whereIn('client_id', $ids)->when($clientId === null, fn ($q) => $q->orWhereNull('client_id')))
             ->whereBetween('occurred_at', $period->bounds())
-            ->when($kind !== null, fn ($q) => $q->where('kind', $kind))
+            ->when(is_string($kind), fn ($q) => $q->where('kind', $kind))
+            ->when(is_array($kind), fn ($q) => $q->whereIn('kind', $kind))
             // Searching concealed summaries would leak whether a named
             // controlled medicine occurs. Concealed rows remain unsearched.
             ->when($search !== '', fn ($q) => $q->where(fn ($q) => $q->where('kind', 'like', '%'.$search.'%')->orWhere(fn ($q) => $q->when(! $controlled, fn ($q) => $q->where('controlled', false))->where('summary', 'like', '%'.$search.'%'))))

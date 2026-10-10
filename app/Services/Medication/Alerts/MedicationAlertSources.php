@@ -735,7 +735,9 @@ class MedicationAlertSources
             title: $title,
             message: $message((string) $order->name, $this->person($client), $house),
             shortMessage: $short($house),
-            actionUrl: '/emar/stock',
+            // EA-016: the medicine's own stock page; recipients without stock
+            // access get the person's chart instead (MedicationAlertNotification).
+            actionUrl: $stock->packWorkflowUrl(),
             severity: $severity,
             clientId: (int) $client->id,
             controlled: (bool) $order->controlled_drug,
