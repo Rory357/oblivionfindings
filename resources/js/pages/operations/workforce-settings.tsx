@@ -312,6 +312,24 @@ function WorkforceSettingsBody({
         </span>
     );
     const { view, section } = location;
+    const headerPrimaryAction = (
+        <PageHeaderGlassButton
+            icon={CalendarDays}
+            onClick={() => router.visit('/operations/rostering')}
+        >
+            Open roster
+        </PageHeaderGlassButton>
+    );
+    const headerSecondaryActions = (
+        <>
+            <PageHeaderSearch
+                value={query}
+                onChange={setQuery}
+                placeholder="Find a setting in this section"
+            />
+        </>
+    );
+
     return (
         <AppLayout
             breadcrumbs={[
@@ -328,20 +346,15 @@ function WorkforceSettingsBody({
                     subline="Roster preferences, active safety rules and connected settings"
                     actions={
                         <>
-                            <PageHeaderSearch
-                                value={query}
-                                onChange={setQuery}
-                                placeholder="Find a setting in this section"
-                            />
-                            <PageHeaderGlassButton
-                                icon={CalendarDays}
-                                onClick={() =>
-                                    router.visit('/operations/rostering')
-                                }
-                            >
-                                Open roster
-                            </PageHeaderGlassButton>
+                            {headerSecondaryActions}
+                            {headerPrimaryAction}
                         </>
+                    }
+                    mobilePrimaryAction={headerPrimaryAction}
+                    mobileSecondaryActions={headerSecondaryActions}
+                    mobileSummary={
+                        views.find((item) => item.key === view)?.label ??
+                        'Roster'
                     }
                     meters={
                         <>
@@ -774,7 +787,7 @@ function WorkforceSettingsBody({
                 </div>
                 {(section === 'preferences' ||
                     (dirty && section !== 'fatigue')) && (
-                    <Card className="sticky bottom-3 z-20 flex-row flex-wrap items-center justify-between gap-4 p-4 shadow-md">
+                    <Card className="flex-row flex-wrap items-center justify-between gap-4 p-4 shadow-md md:sticky md:bottom-3 md:z-20">
                         <div>
                             <p className="text-sm font-semibold">
                                 {dirty
@@ -788,6 +801,7 @@ function WorkforceSettingsBody({
                         </div>
                         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                             <Button
+                                className="max-md:h-auto max-md:min-h-[44px] max-md:whitespace-normal"
                                 variant="outline"
                                 disabled={!dirty || locked}
                                 onClick={() => {
@@ -798,6 +812,7 @@ function WorkforceSettingsBody({
                                 Discard changes
                             </Button>
                             <Button
+                                className="max-md:h-auto max-md:min-h-[44px] max-md:whitespace-normal"
                                 disabled={!dirty || locked}
                                 onClick={() => setReviewing(true)}
                             >

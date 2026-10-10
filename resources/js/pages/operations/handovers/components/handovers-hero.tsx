@@ -123,6 +123,42 @@ export function HandoversHero({
             'Recorded acknowledgements',
         ],
     ];
+    const headerPrimaryAction = canCreate ? (
+        <PageHeaderPrimaryButton
+            icon={Plus}
+            onClick={onNewHandover}
+            disabled={loading}
+        >
+            New handover
+        </PageHeaderPrimaryButton>
+    ) : null;
+    const headerSecondaryActions = (
+        <>
+            <form
+                onSubmit={(event) => {
+                    event.preventDefault();
+                    onSearchSubmit();
+                }}
+                className="w-full min-w-0 basis-full sm:w-auto sm:flex-1 sm:basis-auto"
+            >
+                <fieldset
+                    disabled={loading}
+                    className="flex min-w-0 flex-wrap gap-2"
+                >
+                    <PageHeaderSearch
+                        value={search}
+                        onChange={onSearch}
+                        placeholder="Search handovers, people or staff"
+                        className="min-w-0"
+                    />
+                    <PageHeaderGlassButton type="submit" icon={Search}>
+                        Search
+                    </PageHeaderGlassButton>
+                </fieldset>
+            </form>
+        </>
+    );
+
     return (
         <>
             <WorkforcePageHeader
@@ -132,42 +168,13 @@ export function HandoversHero({
                 subline={`${fmt(weekStart)} → ${fmt(range.end)} · ${evidence.timezone} · Review recorded handovers and incoming responsibilities`}
                 actions={
                     <>
-                        <form
-                            onSubmit={(event) => {
-                                event.preventDefault();
-                                onSearchSubmit();
-                            }}
-                            className="w-full min-w-0 basis-full sm:w-auto sm:flex-1 sm:basis-auto"
-                        >
-                            <fieldset
-                                disabled={loading}
-                                className="flex min-w-0 flex-wrap gap-2"
-                            >
-                                <PageHeaderSearch
-                                    value={search}
-                                    onChange={onSearch}
-                                    placeholder="Search handovers, people or staff"
-                                    className="min-w-0"
-                                />
-                                <PageHeaderGlassButton
-                                    type="submit"
-                                    icon={Search}
-                                >
-                                    Search
-                                </PageHeaderGlassButton>
-                            </fieldset>
-                        </form>
-                        {canCreate ? (
-                            <PageHeaderPrimaryButton
-                                icon={Plus}
-                                onClick={onNewHandover}
-                                disabled={loading}
-                            >
-                                New handover
-                            </PageHeaderPrimaryButton>
-                        ) : null}
+                        {headerSecondaryActions}
+                        {headerPrimaryAction}
                     </>
                 }
+                mobilePrimaryAction={headerPrimaryAction}
+                mobileSecondaryActions={headerSecondaryActions}
+                mobileSummary={`${fmt(weekStart)} → ${fmt(range.end)}`}
                 meters={
                     <div className="grid w-full min-w-0 grid-cols-2 gap-2 lg:grid-cols-4">
                         {stats.map(([key, label, value, caption]) => (

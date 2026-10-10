@@ -122,8 +122,10 @@ beforeEach(() => {
     window.history.replaceState({}, '', '/operations/shift-notes');
 });
 it('shows authoritative counts across pages and never claims every shift is documented', () => {
-    render(<ShiftNotesIndex {...props} />);
-    expect(screen.getByText(/5 Oct 2026 → 11 Oct 2026/)).toBeVisible();
+    const { container } = render(<ShiftNotesIndex {...props} />);
+    expect(
+        container.querySelector('[data-slot="page-header-subline"]'),
+    ).toHaveTextContent('5 Oct 2026 → 11 Oct 2026');
     expect(
         within(
             screen.getByRole('button', { name: 'View recorded notes' }),

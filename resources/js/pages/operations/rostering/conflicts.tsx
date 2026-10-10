@@ -446,6 +446,57 @@ export default function RosteringConflicts(props: ConflictsProps) {
     const limited = Object.entries(props.assessment?.categories ?? {}).filter(
         ([, category]) => category.status !== 'assessed' || category.truncated,
     );
+    const headerPrimaryAction = (
+        <PageHeaderPrimaryButton
+            icon={LayoutGrid}
+            onClick={() => {
+                setSearch('');
+                queue.reviewNext();
+                showSelectedFinding();
+            }}
+            disabled={!open.length || pending}
+        >
+            Review next
+        </PageHeaderPrimaryButton>
+    );
+    const headerSecondaryActions = (
+        <>
+            <PageHeaderSearch
+                value={search}
+                onChange={setSearch}
+                placeholder="Search findings…"
+            />
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <PageHeaderGlassButton
+                        icon={MoreHorizontal}
+                        aria-label="More actions"
+                    />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-60">
+                    <DropdownMenuItem
+                        onSelect={refreshQueue}
+                        disabled={refreshing || pending}
+                    >
+                        <RefreshCcw className="mr-2 h-4 w-4" />
+                        {refreshing ? 'Refreshing…' : 'Refresh findings'}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={exportReport}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Export visible findings
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                        onSelect={() => setScanSettingsOpen(true)}
+                    >
+                        <Settings className="mr-2 h-4 w-4" />
+                        Current scan criteria
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+        </>
+    );
+
     const header = (
         <WorkforcePageHeader
             variant="profile"
@@ -471,54 +522,13 @@ export default function RosteringConflicts(props: ConflictsProps) {
             }
             actions={
                 <>
-                    <PageHeaderSearch
-                        value={search}
-                        onChange={setSearch}
-                        placeholder="Search findings…"
-                    />
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <PageHeaderGlassButton
-                                icon={MoreHorizontal}
-                                aria-label="More actions"
-                            />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-60">
-                            <DropdownMenuItem
-                                onSelect={refreshQueue}
-                                disabled={refreshing || pending}
-                            >
-                                <RefreshCcw className="mr-2 h-4 w-4" />
-                                {refreshing
-                                    ? 'Refreshing…'
-                                    : 'Refresh findings'}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onSelect={exportReport}>
-                                <Download className="mr-2 h-4 w-4" />
-                                Export visible findings
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onSelect={() => setScanSettingsOpen(true)}
-                            >
-                                <Settings className="mr-2 h-4 w-4" />
-                                Current scan criteria
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                    <PageHeaderPrimaryButton
-                        icon={LayoutGrid}
-                        onClick={() => {
-                            setSearch('');
-                            queue.reviewNext();
-                            showSelectedFinding();
-                        }}
-                        disabled={!open.length || pending}
-                    >
-                        Review next
-                    </PageHeaderPrimaryButton>
+                    {headerSecondaryActions}
+                    {headerPrimaryAction}
                 </>
             }
+            mobilePrimaryAction={headerPrimaryAction}
+            mobileSecondaryActions={headerSecondaryActions}
+            mobileSummary={`${range.startLabel} → ${range.endLabel}`}
             meters={
                 <>
                     <PageHeaderMeterBlock

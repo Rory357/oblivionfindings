@@ -108,6 +108,34 @@ export function JobBoardHero({
             'Requests for replacement cover',
         ],
     ];
+    const headerPrimaryAction = canPostPosition ? (
+        <PageHeaderPrimaryButton icon={Plus} onClick={onPostPosition}>
+            Post position
+        </PageHeaderPrimaryButton>
+    ) : null;
+    const headerSecondaryActions = (
+        <>
+            <PageHeaderSearch
+                value={filters.q ?? ''}
+                onChange={(value) => onFilterChange('q', value || null)}
+                placeholder="Search title, client, suburb…"
+            />
+            <PageHeaderGlassButton
+                icon={Bell}
+                data-test="job-board-alert-me"
+                active={alertsEnabled}
+                title={
+                    alertsEnabled
+                        ? 'Notifications on — click to mute'
+                        : 'Get notified when matching shifts open'
+                }
+                onClick={onAlertMe}
+            >
+                {alertsEnabled ? 'Alerts on' : 'Alert me'}
+            </PageHeaderGlassButton>
+        </>
+    );
+
     return (
         <>
             <WorkforcePageHeader
@@ -121,36 +149,13 @@ export function JobBoardHero({
                 }
                 actions={
                     <>
-                        <PageHeaderSearch
-                            value={filters.q ?? ''}
-                            onChange={(value) =>
-                                onFilterChange('q', value || null)
-                            }
-                            placeholder="Search title, client, suburb…"
-                        />
-                        <PageHeaderGlassButton
-                            icon={Bell}
-                            data-test="job-board-alert-me"
-                            active={alertsEnabled}
-                            title={
-                                alertsEnabled
-                                    ? 'Notifications on — click to mute'
-                                    : 'Get notified when matching shifts open'
-                            }
-                            onClick={onAlertMe}
-                        >
-                            {alertsEnabled ? 'Alerts on' : 'Alert me'}
-                        </PageHeaderGlassButton>
-                        {canPostPosition ? (
-                            <PageHeaderPrimaryButton
-                                icon={Plus}
-                                onClick={onPostPosition}
-                            >
-                                Post position
-                            </PageHeaderPrimaryButton>
-                        ) : null}
+                        {headerSecondaryActions}
+                        {headerPrimaryAction}
                     </>
                 }
+                mobilePrimaryAction={headerPrimaryAction}
+                mobileSecondaryActions={headerSecondaryActions}
+                mobileSummary={weekRange}
                 meters={
                     <>
                         {meters.map(([scope, label, value, caption]) => (

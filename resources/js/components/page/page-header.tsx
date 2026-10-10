@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import {
     createContext,
+    useCallback,
     useContext,
     useEffect,
     useId,
@@ -72,6 +73,9 @@ type IconType = ComponentType<{ className?: string }>;
 
 /** Opt in once on the band; React context also reaches its portalled menus. */
 const PageHeaderFrontlineContext = createContext(false);
+const PageHeaderRevealContext = createContext<(() => void) | undefined>(
+    undefined,
+);
 const useFrontlineTap = () =>
     useContext(PageHeaderFrontlineContext) ? 'frontline-tap' : undefined;
 
@@ -117,6 +121,8 @@ export interface PageHeaderProps {
     filters?: ReactNode;
     /** Keep the current task visible on phones; all meters and filters remain expandable. */
     mobileSummary?: string;
+    /** Supplementary content inside the existing expandable details region. */
+    expandedContent?: ReactNode;
     /** Bottom edge: the connected-tab rail — <PageHeaderRail>. */
     rail?: ReactNode;
     className?: string;
@@ -138,160 +144,172 @@ export function PageHeader({
     meters,
     filters,
     mobileSummary,
+    expandedContent,
     rail,
     className,
 }: PageHeaderProps) {
     const [mobileExpanded, setMobileExpanded] = useState(false);
+    const revealMobileDetails = useCallback(() => setMobileExpanded(true), []);
     const summaryId = useId();
     return (
         <PageHeaderFrontlineContext.Provider value={frontline}>
-            <header
-                style={
-                    brandColour
-                        ? ({ '--primary': brandColour } as CSSProperties)
+            <PageHeaderRevealContext.Provider
+                value={
+                    frontline && mobileSummary && expandedContent
+                        ? revealMobileDetails
                         : undefined
                 }
-                className={cn(
-                    'eh-header text-band-foreground',
-                    frontline && 'eh-header-frontline',
-                    className,
-                )}
             >
-                <div className="relative z-[1] flex h-full flex-col">
-                    <div className="flex flex-col px-[22px] pt-[18px]">
-                        {/* top row — identity left, search/actions right */}
-                        <div
-                            data-slot="page-header-top"
-                            className={cn(
-                                'flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6',
-                                (wrapTitle || frontline) && 'lg:flex-wrap',
-                            )}
-                        >
+                <header
+                    style={
+                        brandColour
+                            ? ({ '--primary': brandColour } as CSSProperties)
+                            : undefined
+                    }
+                    className={cn(
+                        'eh-header text-band-foreground',
+                        frontline && 'eh-header-frontline',
+                        className,
+                    )}
+                >
+                    <div className="relative z-[1] flex h-full flex-col">
+                        <div className="flex flex-col px-[22px] pt-[18px]">
+                            {/* top row — identity left, search/actions right */}
                             <div
+                                data-slot="page-header-top"
                                 className={cn(
-                                    'flex min-w-0 items-start gap-[13px]',
-                                    wrapTitle && 'lg:flex-[1_0_28rem]',
+                                    'flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6',
+                                    (wrapTitle || frontline) && 'lg:flex-wrap',
                                 )}
                             >
-                                {variant === 'profile' && backHref ? (
-                                    <Link
-                                        href={backHref}
-                                        aria-label="Back"
-                                        className={cn(
-                                            'mt-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-band-foreground/20 bg-band-foreground/10 transition-colors outline-none hover:bg-band-foreground/20 focus-visible:ring-2 focus-visible:ring-band-foreground/70',
-                                            frontline && 'frontline-tap',
-                                        )}
-                                    >
-                                        <ChevronLeft className="size-4" />
-                                    </Link>
-                                ) : null}
-                                {mark ??
-                                    (Icon ? (
-                                        <span className="eh-mark-ring">
-                                            <Icon className="size-5" />
-                                        </span>
-                                    ) : null)}
-                                <div className="flex min-w-0 flex-col">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <h1
-                                            dusk={titleDusk}
-                                            className={cn(
-                                                'text-[22px] leading-tight font-bold tracking-tight',
-                                                wrapTitle
-                                                    ? 'max-w-full min-w-0 break-words whitespace-normal'
-                                                    : 'truncate',
-                                            )}
-                                        >
-                                            {title}
-                                        </h1>
-                                        {titleChip}
-                                    </div>
-                                    {subline ? (
-                                        <p
-                                            data-slot="page-header-subline"
-                                            title={
-                                                typeof subline === 'string'
-                                                    ? subline
-                                                    : undefined
-                                            }
-                                            className="mt-[3px] text-[13px] text-band-foreground/65"
-                                        >
-                                            {subline}
-                                        </p>
-                                    ) : null}
-                                </div>
-                            </div>
-                            {actions ? (
                                 <div
                                     className={cn(
-                                        'flex shrink-0 flex-wrap items-center gap-2 lg:justify-end',
-                                        wrapTitle && 'max-w-full lg:ml-auto',
-                                        frontline &&
-                                            'w-full max-w-full min-w-0 lg:ml-auto lg:w-auto',
+                                        'flex min-w-0 items-start gap-[13px]',
+                                        wrapTitle && 'lg:flex-[1_0_28rem]',
                                     )}
                                 >
-                                    {actions}
+                                    {variant === 'profile' && backHref ? (
+                                        <Link
+                                            href={backHref}
+                                            aria-label="Back"
+                                            className={cn(
+                                                'mt-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-band-foreground/20 bg-band-foreground/10 transition-colors outline-none hover:bg-band-foreground/20 focus-visible:ring-2 focus-visible:ring-band-foreground/70',
+                                                frontline && 'frontline-tap',
+                                            )}
+                                        >
+                                            <ChevronLeft className="size-4" />
+                                        </Link>
+                                    ) : null}
+                                    {mark ??
+                                        (Icon ? (
+                                            <span className="eh-mark-ring">
+                                                <Icon className="size-5" />
+                                            </span>
+                                        ) : null)}
+                                    <div className="flex min-w-0 flex-col">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <h1
+                                                dusk={titleDusk}
+                                                className={cn(
+                                                    'text-[22px] leading-tight font-bold tracking-tight',
+                                                    wrapTitle
+                                                        ? 'max-w-full min-w-0 break-words whitespace-normal'
+                                                        : 'truncate',
+                                                )}
+                                            >
+                                                {title}
+                                            </h1>
+                                            {titleChip}
+                                        </div>
+                                        {subline ? (
+                                            <p
+                                                data-slot="page-header-subline"
+                                                title={
+                                                    typeof subline === 'string'
+                                                        ? subline
+                                                        : undefined
+                                                }
+                                                className="mt-[3px] text-[13px] text-band-foreground/65"
+                                            >
+                                                {subline}
+                                            </p>
+                                        ) : null}
+                                    </div>
                                 </div>
-                            ) : null}
-                        </div>
+                                {actions ? (
+                                    <div
+                                        className={cn(
+                                            'flex shrink-0 flex-wrap items-center gap-2 lg:justify-end',
+                                            wrapTitle &&
+                                                'max-w-full lg:ml-auto',
+                                            frontline &&
+                                                'w-full max-w-full min-w-0 lg:ml-auto lg:w-auto',
+                                        )}
+                                    >
+                                        {actions}
+                                    </div>
+                                ) : null}
+                            </div>
 
-                        {mobileSummary && (
-                            <button
-                                type="button"
-                                className="frontline-tap frontline-focus my-2 flex w-full items-center justify-between gap-2 rounded-lg border border-band-foreground/20 bg-band-foreground/10 px-3 text-left text-[13px] md:hidden"
-                                aria-expanded={mobileExpanded}
-                                aria-controls={summaryId}
-                                onClick={() =>
-                                    setMobileExpanded((value) => !value)
-                                }
-                            >
-                                <span>{mobileSummary}</span>
-                                <span className="shrink-0">
-                                    {mobileExpanded
-                                        ? 'Hide details'
-                                        : 'Details & filters'}
-                                </span>
-                            </button>
-                        )}
-                        <div
-                            id={summaryId}
-                            className={cn(
-                                mobileSummary &&
-                                    !mobileExpanded &&
-                                    'hidden md:block',
-                            )}
-                        >
-                            {/* the meter row — full width, every block a link */}
-                            {meters ? (
-                                <div
-                                    data-slot="page-header-meters"
-                                    className="mt-[13px] flex min-h-[80px] flex-wrap items-stretch gap-2"
+                            {mobileSummary && (
+                                <button
+                                    type="button"
+                                    className="frontline-tap frontline-focus my-2 flex w-full items-center justify-between gap-2 rounded-lg border border-band-foreground/20 bg-band-foreground/10 px-3 text-left text-[13px] md:hidden"
+                                    aria-expanded={mobileExpanded}
+                                    aria-controls={summaryId}
+                                    onClick={() =>
+                                        setMobileExpanded((value) => !value)
+                                    }
                                 >
-                                    {meters}
-                                </div>
-                            ) : null}
-
-                            {/* filter row */}
-                            {filters ? (
-                                <div className="mt-[10px] flex flex-wrap items-center justify-end gap-1.5 pb-3">
-                                    {filters}
-                                </div>
-                            ) : (
-                                <div className="pb-3" />
+                                    <span>{mobileSummary}</span>
+                                    <span className="shrink-0">
+                                        {mobileExpanded
+                                            ? 'Hide details'
+                                            : 'Details & filters'}
+                                    </span>
+                                </button>
                             )}
-                        </div>
-                    </div>
+                            <div
+                                id={summaryId}
+                                className={cn(
+                                    mobileSummary &&
+                                        !mobileExpanded &&
+                                        'hidden md:block',
+                                )}
+                            >
+                                {expandedContent}
+                                {/* the meter row — full width, every block a link */}
+                                {meters ? (
+                                    <div
+                                        data-slot="page-header-meters"
+                                        className="mt-[13px] flex min-h-[80px] flex-wrap items-stretch gap-2"
+                                    >
+                                        {meters}
+                                    </div>
+                                ) : null}
 
-                    {/* the rail — main view tabs, flush with the bottom edge */}
-                    {rail ? (
-                        <div className="flex min-h-[46px] shrink-0 items-end px-[14px]">
-                            {rail}
+                                {/* filter row */}
+                                {filters ? (
+                                    <div className="mt-[10px] flex flex-wrap items-center justify-end gap-1.5 pb-3">
+                                        {filters}
+                                    </div>
+                                ) : (
+                                    <div className="pb-3" />
+                                )}
+                            </div>
                         </div>
-                    ) : (
-                        <div className="h-[18px] shrink-0" />
-                    )}
-                </div>
-            </header>
+
+                        {/* the rail — main view tabs, flush with the bottom edge */}
+                        {rail ? (
+                            <div className="flex min-h-[46px] shrink-0 items-end px-[14px]">
+                                {rail}
+                            </div>
+                        ) : (
+                            <div className="h-[18px] shrink-0" />
+                        )}
+                    </div>
+                </header>
+            </PageHeaderRevealContext.Provider>
         </PageHeaderFrontlineContext.Provider>
     );
 }
@@ -352,6 +370,7 @@ export function PageHeaderSearch({
 }) {
     const inputRef = useRef<HTMLInputElement>(null);
     const tap = useFrontlineTap();
+    const revealMobileDetails = useContext(PageHeaderRevealContext);
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
@@ -367,11 +386,16 @@ export function PageHeaderSearch({
                 return;
             }
             e.preventDefault();
-            inputRef.current?.focus();
+            if (revealMobileDetails) {
+                revealMobileDetails();
+                requestAnimationFrame(() => inputRef.current?.focus());
+            } else {
+                inputRef.current?.focus();
+            }
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, []);
+    }, [revealMobileDetails]);
 
     return (
         <div
@@ -621,7 +645,10 @@ export function PageHeaderMeterBig({ children }: { children: ReactNode }) {
 /** Muted 10.5px context line ("across 3 regions", "0% occupied · 41 available"). */
 export function PageHeaderMeterCaption({ children }: { children: ReactNode }) {
     return (
-        <span className="max-w-full truncate text-[10.5px] leading-tight text-band-foreground/70">
+        <span
+            data-slot="page-header-meter-caption"
+            className="max-w-full truncate text-[10.5px] leading-tight text-band-foreground/70"
+        >
             {children}
         </span>
     );

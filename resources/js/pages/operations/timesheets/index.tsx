@@ -1433,9 +1433,10 @@ export default function TimesheetsIndex({
                             of {pagination.total} timesheets · Page{' '}
                             {pagination.current_page} of {pagination.last_page}
                         </span>
-                        <div className="flex gap-2">
+                        <div className="flex max-w-full min-w-0 flex-wrap gap-2">
                             <Button
                                 variant="outline"
+                                className="max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
                                 disabled={
                                     reads.loading ||
                                     pagination.current_page <= 1
@@ -1448,6 +1449,7 @@ export default function TimesheetsIndex({
                             </Button>
                             <Button
                                 variant="outline"
+                                className="max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
                                 disabled={
                                     reads.loading ||
                                     pagination.current_page >=

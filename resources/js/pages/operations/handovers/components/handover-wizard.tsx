@@ -40,6 +40,7 @@ import {
     StepHead,
 } from '@/components/wizard/primitives';
 import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import {
     sanitiseWitnessPin,
@@ -65,7 +66,7 @@ import {
 import { type ShiftMedSnapshot, ShiftMedSummary } from './shift-med-snapshot';
 
 const SELECT_CLASS =
-    'h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-60';
+    'h-10 w-full max-md:min-h-[44px] rounded-lg border border-input bg-background px-3 text-sm text-foreground transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-60';
 const INPUT_CLASS = SELECT_CLASS;
 const BAD_CLASS = 'border-status-critical focus:ring-status-critical/30';
 
@@ -347,6 +348,7 @@ export function HandoverWizard({
     basePath?: string;
     medicationFocus?: boolean;
 }) {
+    const isMobile = useIsMobile();
     const [stepIndex, setStepIndex] = useState(0);
     const [f, setF] = useState<WizForm>(emptyForm);
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -817,7 +819,11 @@ export function HandoverWizard({
 
     const footerStart =
         !mutationDisabled && stepIndex > 0 ? (
-            <Button variant="ghost" onClick={goBack}>
+            <Button
+                variant="ghost"
+                className="max-md:min-h-[44px] max-md:min-w-[44px]"
+                onClick={goBack}
+            >
                 <ChevronLeft className="mr-1 h-4 w-4" />
                 Back
             </Button>
@@ -825,7 +831,11 @@ export function HandoverWizard({
 
     const footerEnd = (
         <>
-            <Button variant="outline" onClick={closeWizard}>
+            <Button
+                variant="outline"
+                className="max-md:min-h-[44px] max-md:min-w-[44px]"
+                onClick={closeWizard}
+            >
                 {immutable ? 'Close' : 'Cancel'}
             </Button>
             {!mutationDisabled && cur.key === 'review' ? (
@@ -833,6 +843,7 @@ export function HandoverWizard({
                     {!editing || editing.status === 'draft' ? (
                         <Button
                             variant="secondary"
+                            className="max-md:min-h-[44px] max-md:min-w-[44px]"
                             onClick={() => submit(true)}
                             disabled={submitting || mutationDisabled}
                         >
@@ -840,6 +851,7 @@ export function HandoverWizard({
                         </Button>
                     ) : null}
                     <Button
+                        className="max-md:min-h-[44px] max-md:min-w-[44px]"
                         onClick={() => submit(false)}
                         disabled={submitting || mutationDisabled}
                     >
@@ -857,7 +869,10 @@ export function HandoverWizard({
                     </Button>
                 </>
             ) : !mutationDisabled ? (
-                <Button onClick={goNext}>
+                <Button
+                    className="max-md:min-h-[44px] max-md:min-w-[44px]"
+                    onClick={goNext}
+                >
                     Continue
                     <ChevronRight className="ml-1 h-4 w-4" />
                 </Button>
@@ -883,7 +898,11 @@ export function HandoverWizard({
             onStepClick={setStepIndex}
             pct={pct}
             pctLabel="Handover readiness"
-            maxWidth="min(96vw, 1000px)"
+            maxWidth={
+                isMobile
+                    ? 'min(1000px, calc(100% - 2rem))'
+                    : 'min(96vw, 1000px)'
+            }
             maxHeight="min(92vh, 820px)"
             footerStart={footerStart}
             footerEnd={footerEnd}
@@ -1004,7 +1023,7 @@ export function HandoverWizard({
                                     <button
                                         type="button"
                                         onClick={onAddClient}
-                                        className="font-semibold text-primary underline underline-offset-2"
+                                        className="font-semibold text-primary underline underline-offset-2 max-md:inline-flex max-md:min-h-[44px] max-md:min-w-[44px] max-md:items-center"
                                     >
                                         Add a client
                                     </button>{' '}
@@ -1101,7 +1120,7 @@ export function HandoverWizard({
                                               : 'Next shift (auto-suggested)'
                                     }
                                 />
-                                <label className="mt-1 flex cursor-pointer items-center gap-2 text-[12.5px] font-medium">
+                                <label className="mt-1 flex cursor-pointer items-center gap-2 text-[12.5px] font-medium max-md:min-h-[44px]">
                                     <input
                                         type="checkbox"
                                         checked={f.leave_open}

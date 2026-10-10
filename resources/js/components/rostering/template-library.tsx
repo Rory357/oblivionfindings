@@ -128,6 +128,30 @@ function LibraryBody({
         setView(next);
         setQuery('');
     };
+    const headerPrimaryAction = capabilities.can_create ? (
+        <PageHeaderPrimaryButton
+            disabled={blocked}
+            onClick={() =>
+                library &&
+                setEditor({
+                    template: null,
+                    data: library,
+                })
+            }
+        >
+            <Plus className="size-4" /> New template
+        </PageHeaderPrimaryButton>
+    ) : null;
+    const headerSecondaryActions = (
+        <>
+            <PageHeaderSearch
+                value={query}
+                onChange={setQuery}
+                placeholder="Search templates…"
+            />
+        </>
+    );
+
     return (
         <div className="min-w-0 space-y-4">
             {standalone ? (
@@ -142,26 +166,14 @@ function LibraryBody({
                     }
                     actions={
                         <>
-                            <PageHeaderSearch
-                                value={query}
-                                onChange={setQuery}
-                                placeholder="Search templates…"
-                            />
-                            {capabilities.can_create ? (
-                                <PageHeaderPrimaryButton
-                                    disabled={blocked}
-                                    onClick={() =>
-                                        library &&
-                                        setEditor({
-                                            template: null,
-                                            data: library,
-                                        })
-                                    }
-                                >
-                                    <Plus className="size-4" /> New template
-                                </PageHeaderPrimaryButton>
-                            ) : null}
+                            {headerSecondaryActions}
+                            {headerPrimaryAction}
                         </>
+                    }
+                    mobilePrimaryAction={headerPrimaryAction}
+                    mobileSecondaryActions={headerSecondaryActions}
+                    mobileSummary={
+                        view === 'active' ? 'Active templates' : 'All templates'
                     }
                     meters={
                         <>

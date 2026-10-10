@@ -1229,13 +1229,28 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
     min-width: max(44px, 2.75rem);
 }
 
-/* Keep the global phone controls usable at the smaller supported text size.
-   The narrowest layout retains Messages in the existing navigation menu. */
+/* Phone chrome uses fixed icon targets. Text preferences still enlarge labels,
+   while root-font scaling cannot force the navigation off the screen. Browser
+   zoom scales these CSS pixels normally; desktop chrome remains unchanged. */
 @media (max-width: 767px) {
-    .frontline-app-header button,
+    .frontline-app-header {
+        gap: 4px;
+        padding-inline: 12px;
+    }
+    .frontline-app-header [data-slot='app-header-actions'],
+    .frontline-app-header [data-slot='app-header-actions'] > div {
+        gap: 4px;
+    }
+    .frontline-app-header button[aria-label],
     .frontline-app-header a[aria-label^='Messages'] {
-        min-height: max(44px, 2.75rem);
-        min-width: max(44px, 2.75rem);
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        min-height: 44px;
+    }
+    .frontline-app-header [data-slot='avatar'] {
+        width: 32px;
+        height: 32px;
     }
 }
 

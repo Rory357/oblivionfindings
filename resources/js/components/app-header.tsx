@@ -175,7 +175,10 @@ export function AppHeader({
                 </div>
 
                 {/* Right cluster */}
-                <div className="flex items-center justify-end gap-1 md:gap-1.5">
+                <div
+                    data-slot="app-header-actions"
+                    className="flex items-center justify-end gap-1 md:gap-1.5"
+                >
                     {canReportIncident && (
                         <Button
                             asChild

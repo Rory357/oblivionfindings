@@ -136,7 +136,9 @@ it('uses full scoped counts and the shared header with a working status meter an
     const { container } = render(<HandoversIndex {...props} />);
     expect(container.querySelector('.eh-header')).toBeInTheDocument();
     expect(container.querySelector('.page-hero')).not.toBeInTheDocument();
-    expect(screen.getByText(/5 Oct 2026 → 11 Oct 2026/)).toBeVisible();
+    expect(
+        container.querySelector('[data-slot="page-header-subline"]'),
+    ).toHaveTextContent('5 Oct 2026 → 11 Oct 2026');
     expect(
         within(
             screen.getByRole('navigation', { name: 'Breadcrumbs' }),
@@ -192,9 +194,7 @@ it('retains pagination links and keeps failure recovery distinct from an empty r
     expect(get.mock.calls[0][0]).toBe(
         '/operations/handovers?week=2026-10-05&page=2',
     );
-    fireEvent.click(
-        screen.getByRole('button', { name: /^Search$/ }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: /^Search$/ }));
     act(() => get.mock.calls[1][2].onFinish());
     expect(screen.getByRole('alert')).toHaveTextContent(
         'Handovers could not be updated',

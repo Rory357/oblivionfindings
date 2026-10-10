@@ -228,6 +228,51 @@ export default function ShiftNotesIndex({
         id !== null && !items.some((item) => item.id === id)
             ? [...items, { id, name: `Selected ${label} unavailable` }]
             : items;
+    const headerPrimaryAction = can.create && (
+        <PageHeaderPrimaryButton
+            icon={Plus}
+            onClick={openNew}
+            disabled={query.loading}
+        >
+            Add note
+        </PageHeaderPrimaryButton>
+    );
+    const headerSecondaryActions = (
+        <>
+            <form
+                onSubmit={(event) => {
+                    event.preventDefault();
+                    query.change();
+                }}
+                className="w-full min-w-0 basis-full sm:w-auto sm:flex-1 sm:basis-auto"
+            >
+                <fieldset
+                    disabled={query.loading}
+                    className="flex min-w-0 flex-wrap gap-2"
+                >
+                    <PageHeaderSearch
+                        value={filters.q}
+                        onChange={query.editSearch}
+                        placeholder="Search notes, people or staff"
+                        className="min-w-0"
+                    />
+                    <PageHeaderGlassButton type="submit" icon={Search}>
+                        Search
+                    </PageHeaderGlassButton>
+                </fieldset>
+            </form>
+            <PageHeaderGlassButton
+                icon={Download}
+                disabled={query.loading || !!query.error || changed}
+                onClick={() => {
+                    window.location.href = noteExportUrl(loadedFilters);
+                }}
+            >
+                Export matching notes
+            </PageHeaderGlassButton>
+        </>
+    );
+
     return (
         <AppLayout
             breadcrumbs={[
@@ -244,54 +289,13 @@ export default function ShiftNotesIndex({
                     subline={`${formatDateOnly(weekStart)} → ${formatDateOnly(weekEnd)} · ${evidence.timezone} · Read and document support for each shift`}
                     actions={
                         <>
-                            <form
-                                onSubmit={(event) => {
-                                    event.preventDefault();
-                                    query.change();
-                                }}
-                                className="w-full min-w-0 basis-full sm:w-auto sm:flex-1 sm:basis-auto"
-                            >
-                                <fieldset
-                                    disabled={query.loading}
-                                    className="flex min-w-0 flex-wrap gap-2"
-                                >
-                                    <PageHeaderSearch
-                                        value={filters.q}
-                                        onChange={query.editSearch}
-                                        placeholder="Search notes, people or staff"
-                                        className="min-w-0"
-                                    />
-                                    <PageHeaderGlassButton
-                                        type="submit"
-                                        icon={Search}
-                                    >
-                                        Search
-                                    </PageHeaderGlassButton>
-                                </fieldset>
-                            </form>
-                            <PageHeaderGlassButton
-                                icon={Download}
-                                disabled={
-                                    query.loading || !!query.error || changed
-                                }
-                                onClick={() => {
-                                    window.location.href =
-                                        noteExportUrl(loadedFilters);
-                                }}
-                            >
-                                Export matching notes
-                            </PageHeaderGlassButton>
-                            {can.create && (
-                                <PageHeaderPrimaryButton
-                                    icon={Plus}
-                                    onClick={openNew}
-                                    disabled={query.loading}
-                                >
-                                    Add note
-                                </PageHeaderPrimaryButton>
-                            )}
+                            {headerSecondaryActions}
+                            {headerPrimaryAction}
                         </>
                     }
+                    mobilePrimaryAction={headerPrimaryAction}
+                    mobileSecondaryActions={headerSecondaryActions}
+                    mobileSummary={`${formatDateOnly(weekStart)} → ${formatDateOnly(weekEnd)}`}
                     meters={
                         <div className="grid w-full min-w-0 grid-cols-2 gap-2 lg:grid-cols-4">
                             {meters.map(([key, label, value, caption]) => (
