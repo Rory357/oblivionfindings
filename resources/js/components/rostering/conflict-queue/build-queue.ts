@@ -1,15 +1,21 @@
+import { toDateInput, WORKER_LOCALE, WORKER_TIMEZONE } from '@/lib/datetime';
 import { CalendarX, Clock, Layers, RefreshCw } from 'lucide-react';
-
-import { ACTIONS, TYPE_META, type QueueItem, type QueueShift } from './types';
-
-/**
- * The shape of a shift row as the `conflicts` controller serialises it. Kept
- * identical to the controller payload — the adapter is the only place that knows
- * about both this raw shape and the unified `QueueItem` model.
- */
+import {
+    TYPE_META,
+    type ConflictType,
+    type QueueAction,
+    type QueueEntity,
+    type QueueItem,
+    type QueueShift,
+} from './types';
 export type ShiftRow = {
     id: number;
-    client_name: string;
+    finding_id?: string;
+    client_id: number | null;
+    user_id: number | null;
+    site_id: number | null;
+    effective_site_id: number;
+    client_name: string | null;
     staff_name?: string | null;
     service_context?: string | null;
     status: string;
@@ -18,22 +24,75 @@ export type ShiftRow = {
     starts_at?: string | null;
     ends_at?: string | null;
     shift_series_id?: number | null;
+    can: { view_shift: boolean; view_client: boolean; view_roster: boolean };
+    urls: {
+        shift: string | null;
+        client: string | null;
+        roster: string | null;
+    };
 };
-
+export type CategoryAssessment = {
+    status: 'assessed' | 'partially_assessed' | 'not_assessed';
+    displayed_count: number;
+    finding_count: number | null;
+    truncated: boolean;
+    description?: string;
+};
+export type ConflictAssessment = {
+    scope: 'approved_sites';
+    interval_basis: 'worker_local_week';
+    publication_assessed: false;
+    visible_duty_count: number;
+    actionable_duty_count: number;
+    description: string;
+    categories: Record<string, CategoryAssessment>;
+    scan_criteria: {
+        worker_timezone: string;
+        interval_end_exclusive: boolean;
+        turnaround_threshold_minutes: number;
+        automatic_scan: false;
+        publication_assessed: false;
+    };
+    workflow_urls: { workforce_settings: string | null };
+};
 export type CoverageGap = {
+    finding_id: string;
     site_id: number;
     site_name: string;
-    rule_id?: number;
-    coverage_window_key?: string | null;
+    rule_id?: number | null;
     rule_name: string;
     window_label: string;
     starts_at?: string;
     ends_at?: string;
+    source_assessment: 'assessed' | 'not_assessed';
+    assessment_description?: string;
     required_staff: number;
-    assigned_staff: number;
-    planned_staff?: number;
-    missing_staff: number;
+    assigned_staff: number | null;
+    missing_staff: number | null;
+    planned_staff?: number | null;
+    coverage_window_key?: string | null;
     preferred_client_id?: number | null;
+    action_window?: {
+        site_id: number;
+        coverage_requirement_id: number | null;
+        window_starts_at: string;
+        window_ends_at: string;
+    };
+    can?: { acknowledge: boolean; dismiss: boolean; clear: boolean };
+    urls: {
+        roster: string | null;
+        ack?: string | null;
+        dismiss?: string | null;
+        clear?: string | null;
+    };
+    acknowledgement?: {
+        id: number;
+        state: 'acked' | 'dismissed';
+        since: string | null;
+    } | null;
+    acknowledgement_assessment?: 'assessed' | 'unavailable' | 'not_assessed';
+    open_shift_ids?: number[];
+    contributing_shifts?: ShiftRow[];
     role_shortages?: Array<{
         key: string;
         label?: string | null;
@@ -44,77 +103,59 @@ export type CoverageGap = {
         label?: string | null;
         missing?: number;
     }>;
-    unfilled_after_open_shifts?: number;
-    coverage_state: string;
-    planned_coverage_state?: string;
+    unfilled_after_open_shifts?: number | null;
+    coverage_state?: string | null;
+    planned_coverage_state?: string | null;
     gap_kind?: string | null;
     recommended_fill_action?: string | null;
-    contradictions?: string[];
-    partial_window_uncovered_slices?: Array<{
-        starts_at: string;
-        ends_at: string;
-        missing_staff?: number;
-    }>;
-    acknowledgement?: {
-        state: 'acked' | 'dismissed';
-        actor?: { id: number; name?: string | null } | null;
-        reason?: string | null;
-        since?: string | null;
-    } | null;
-    open_shift_ids?: number[];
-    contributing_shifts?: ShiftRow[];
-    matching_series?: Array<{
-        id: number;
-        client_name?: string | null;
-        staff_name?: string | null;
-        service_context_name?: string | null;
-        shift_type?: string | null;
-        weekdays: string[];
-        starts_time?: string | null;
-        ends_time?: string | null;
-        location?: string | null;
-        next_starts_at?: string | null;
-        active_occurrences_count?: number;
-        open_occurrences_count?: number;
-    }>;
 };
-
 export type ConflictsProps = {
     weekStart: string;
     weekEnd: string;
+    workerTimezone: string;
+    assessment?: ConflictAssessment;
     staffOverlaps: Array<{
+        pair_id: string;
         staff_id: number;
         staff_name: string;
         first: ShiftRow;
         second: ShiftRow;
     }>;
     clientOverlaps: Array<{
+        pair_id: string;
         client_id: number;
         client_name: string;
         first: ShiftRow;
         second: ShiftRow;
     }>;
-    timeOffConflicts: Array<{
-        shift: ShiftRow;
-        time_off: {
-            id: number;
-            user_name: string;
-            type: string;
-            label?: string | null;
-            starts_at?: string | null;
-            ends_at?: string | null;
-        };
-    }>;
     tightTurnarounds: Array<{
+        pair_id: string;
         staff_id: number;
         staff_name: string;
         gap_minutes: number;
         first: ShiftRow;
         second: ShiftRow;
     }>;
+    timeOffConflicts: Array<{
+        pair_id: string;
+        shift: ShiftRow;
+        time_off: {
+            id: number;
+            user_id: number;
+            user_name: string;
+            type: string;
+            label: null;
+            description: string;
+            starts_at?: string;
+            ends_at?: string;
+            can: { view_leave: boolean };
+            urls: { leave: string | null };
+        };
+    }>;
     openShifts: ShiftRow[];
     activeReplacements: Array<{
         id: number;
+        finding_id: string;
         shift: ShiftRow;
         status: string;
         reason: string;
@@ -123,48 +164,82 @@ export type ConflictsProps = {
         replacement_staff?: string | null;
         claimed_by?: string | null;
         open_position_id?: number | null;
+        can: { view_job_board: boolean };
+        urls: { job_board: string | null };
     }>;
     coverageGaps: CoverageGap[];
     recurringCoverageAlignment: {
-        rule_drift: Array<Record<string, unknown>>;
-        orphan_series: Array<Record<string, unknown>>;
+        rule_drift: CoverageGap[];
+        orphan_series: Array<{
+            finding_id: string;
+            series_id: number;
+            site_id: number;
+            site_name: string;
+            client_name?: string | null;
+            weekdays: string[];
+            starts_time?: string | null;
+            ends_time?: string | null;
+            urls: { roster: string | null };
+        }>;
     };
 };
-
-/* ----------------------------- shared helpers ----------------------------- */
-
-export function formatWindow(startsAt?: string | null, endsAt?: string | null) {
+export function formatWindow(
+    startsAt?: string | null,
+    endsAt?: string | null,
+    workerTimezone = WORKER_TIMEZONE,
+) {
     if (!startsAt || !endsAt) return 'Time not set';
-    const start = new Date(startsAt);
-    const end = new Date(endsAt);
-    return `${start.toLocaleDateString('en-NZ', {
-        weekday: 'short',
-        day: '2-digit',
-        month: 'short',
-    })} · ${start.toLocaleTimeString('en-NZ', {
-        hour: '2-digit',
-        minute: '2-digit',
-    })}-${end.toLocaleTimeString('en-NZ', {
-        hour: '2-digit',
-        minute: '2-digit',
-    })}`;
+    try {
+        const startDate = toDateInput(startsAt, workerTimezone);
+        const endDate = toDateInput(endsAt, workerTimezone);
+        if (!startDate || !endDate) return 'Time unavailable';
+        const start = `${dayLabel(startsAt, workerTimezone)} · ${timeLabel(startsAt, workerTimezone)}`;
+        const end = `${startDate !== endDate ? `${dayLabel(endsAt, workerTimezone)} · ` : ''}${timeLabel(endsAt, workerTimezone)}`;
+        return `${start} → ${end}`;
+    } catch {
+        return 'Time unavailable';
+    }
 }
 
-export function dayLabel(value?: string | null) {
+export function dayLabel(
+    value?: string | null,
+    workerTimezone = WORKER_TIMEZONE,
+) {
     if (!value) return 'Time not set';
-    return new Date(value).toLocaleDateString('en-NZ', {
-        weekday: 'short',
-        day: '2-digit',
-        month: 'short',
-    });
+    try {
+        if (!toDateInput(value, workerTimezone)) return 'Time unavailable';
+        return new Date(value)
+            .toLocaleDateString(WORKER_LOCALE, {
+                timeZone: workerTimezone,
+                weekday: 'short',
+                day: 'numeric',
+                month: 'short',
+            })
+            .replace(/,\s*/g, ' ');
+    } catch {
+        return 'Time unavailable';
+    }
 }
 
-export function timeLabel(value?: string | null) {
+export function timeLabel(
+    value?: string | null,
+    workerTimezone = WORKER_TIMEZONE,
+) {
     if (!value) return '';
-    return new Date(value).toLocaleTimeString('en-NZ', {
-        hour: '2-digit',
-        minute: '2-digit',
-    });
+    try {
+        if (!toDateInput(value, workerTimezone)) return '';
+        return new Date(value)
+            .toLocaleTimeString(WORKER_LOCALE, {
+                timeZone: workerTimezone,
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true,
+            })
+            .replace(/[\u202f\u00a0]/g, ' ')
+            .toLowerCase();
+    } catch {
+        return '';
+    }
 }
 
 export function shiftTypeLabel(value?: string | null) {
@@ -235,236 +310,323 @@ export function fillActionLabel(action?: string | null) {
 }
 
 export function shouldOfferCreation(action?: string | null) {
-    return !['review_existing_supply', 'rebalance_existing_supply'].includes(
-        action ?? '',
-    );
+    return ![
+        'none',
+        'review_existing_supply',
+        'rebalance_existing_supply',
+    ].includes(action ?? '');
 }
 
-function coverageRecommended(gap: CoverageGap): string {
-    if (gap.recommended_fill_action === 'fill_existing_open_shift') {
-        return 'Demand is already represented by open shifts. Fill one of those rather than creating another.';
-    }
-    if (gap.recommended_fill_action === 'retag_or_replace_open_shift') {
-        return 'An open shift already exists but is not carrying the right role demand. Retag it or create a role-specific cover shift.';
-    }
-    if (gap.unfilled_after_open_shifts && gap.unfilled_after_open_shifts > 0) {
-        return `${gap.unfilled_after_open_shifts} more shift slot(s) still need to be created or reopened after existing open shifts are filled.`;
-    }
-    if (gap.planned_role_shortages && gap.planned_role_shortages.length > 0) {
-        return 'Planned supply exists, but the required role mix is still not covered.';
-    }
-    if (gap.missing_staff > 0) {
-        return `Need ${gap.required_staff} staff and only ${gap.assigned_staff} assigned — create cover or fill an open shift for this window.`;
-    }
-    return 'Current planned supply already represents this demand window.';
-}
-
-function leaveWindowLabel(
-    timeOff: ConflictsProps['timeOffConflicts'][number]['time_off'],
-): string {
-    const typeLabel =
-        timeOff.label ?? String(timeOff.type ?? 'Leave').replace(/_/g, ' ');
-    if (!timeOff.starts_at) return typeLabel;
-    const start = new Date(timeOff.starts_at);
-    const end = timeOff.ends_at ? new Date(timeOff.ends_at) : null;
-    const startDay = start.toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-    });
-    if (!end) return `${typeLabel} · ${startDay}`;
-    const sameMonth = start.getMonth() === end.getMonth();
-    const endDay = end.toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        ...(sameMonth ? {} : { month: 'short' }),
-    });
-    return `${typeLabel} · ${startDay}–${endDay}`;
-}
-
-function toQueueShift(row: ShiftRow, overrideStatus?: string): QueueShift {
+function toQueueShift(row: ShiftRow, zone: string): QueueShift {
     return {
         id: row.id,
+        userId: row.user_id,
+        clientId: row.client_id,
+        siteId: row.effective_site_id,
+        workerTimezone: zone,
+        urls: row.urls,
+        can: row.can,
         client: row.client_name ?? null,
         staff: row.staff_name ?? null,
         location: row.location ?? null,
         serviceContext: row.service_context ?? null,
         shiftType: row.shift_type ?? null,
-        status: overrideStatus ?? row.status,
+        status: row.status,
         startsAt: row.starts_at ?? null,
         endsAt: row.ends_at ?? null,
         seriesId: row.shift_series_id ?? null,
     };
 }
-
-/* ------------------------------- the adapter ------------------------------ */
-
-export function buildQueue(props: ConflictsProps): QueueItem[] {
+function entities(
+    shifts: QueueShift[],
+    kind: 'staff' | 'sites',
+): QueueEntity[] {
+    const found = new Map<number, string>();
+    for (const shift of shifts) {
+        const id = kind === 'staff' ? shift.userId : shift.siteId;
+        const name = kind === 'staff' ? shift.staff : shift.location;
+        if (id != null && name) found.set(id, name);
+    }
+    return [...found].map(([id, name]) => ({ id, name }));
+}
+function link(key: string, label: string, href?: string | null): QueueAction[] {
+    return href ? [{ key, label, href, tone: 'default' }] : [];
+}
+function rosterAction(shifts: QueueShift[]): QueueAction[] {
+    const source = shifts.find(
+        (shift) => shift.can?.view_roster && shift.urls?.roster,
+    );
+    return link('roster', 'Open roster', source?.urls?.roster);
+}
+function entry(
+    type: ConflictType,
+    id: string,
+    who: string,
+    summary: string,
+    shifts: QueueShift[],
+    recommended: string,
+    actions: QueueAction[],
+    payload: Record<string, unknown> = {},
+): QueueItem {
+    return {
+        id,
+        type,
+        who,
+        summary,
+        shifts,
+        recommended,
+        actions,
+        payload,
+        severity: TYPE_META[type].severity,
+        staff: entities(shifts, 'staff'),
+        sites: entities(shifts, 'sites'),
+    };
+}
+export function buildQueue(
+    props: ConflictsProps,
+    canManage = false,
+): QueueItem[] {
     const items: QueueItem[] = [];
-
-    props.staffOverlaps.forEach((conflict, index) => {
-        items.push({
-            id: `staff_overlap-${conflict.staff_id}-${conflict.first.id}-${conflict.second.id}-${index}`,
-            type: 'staff_overlap',
-            severity: TYPE_META.staff_overlap.severity,
-            blocking: TYPE_META.staff_overlap.blocking,
-            who: conflict.staff_name,
-            summary: `Double-booked · ${dayLabel(conflict.first.starts_at)}`,
-            shifts: [
-                toQueueShift(conflict.first),
-                toQueueShift(conflict.second),
-            ],
-            recommended: `Reassign one of ${conflict.staff_name}'s overlapping shifts to an eligible, available colleague — or unassign and make it open.`,
-            actions: ACTIONS.staff_overlap,
-            payload: {
-                first_shift_id: conflict.first.id,
-                second_shift_id: conflict.second.id,
-            },
-        });
-    });
-
-    props.clientOverlaps.forEach((conflict, index) => {
-        items.push({
-            id: `client_overlap-${conflict.client_id}-${conflict.first.id}-${conflict.second.id}-${index}`,
-            type: 'client_overlap',
-            severity: TYPE_META.client_overlap.severity,
-            blocking: TYPE_META.client_overlap.blocking,
-            who: conflict.client_name,
-            summary: `Two staff rostered at once · ${dayLabel(conflict.first.starts_at)}`,
-            shifts: [
-                toQueueShift(conflict.first),
-                toQueueShift(conflict.second),
-            ],
-            recommended: `${conflict.client_name} is usually funded 1:1 — drop one shift, or confirm a 2:1 funding exception.`,
-            actions: ACTIONS.client_overlap,
-            payload: {
-                first_shift_id: conflict.first.id,
-                second_shift_id: conflict.second.id,
-            },
-        });
-    });
-
-    props.timeOffConflicts.forEach((conflict) => {
-        items.push({
-            id: `leave_clash-${conflict.shift.id}-${conflict.time_off.id}`,
-            type: 'leave_clash',
-            severity: TYPE_META.leave_clash.severity,
-            blocking: TYPE_META.leave_clash.blocking,
-            who: conflict.time_off.user_name,
-            summary: `Rostered during approved ${String(conflict.time_off.type ?? 'leave').replace(/_/g, ' ')}`,
-            context: {
-                tone: 'crit',
-                icon: CalendarX,
-                text: leaveWindowLabel(conflict.time_off),
-            },
-            shifts: [toQueueShift(conflict.shift)],
-            recommended: `${conflict.time_off.user_name} is on approved leave — reassign the shift to an available colleague or request a replacement.`,
-            actions: ACTIONS.leave_clash,
-            payload: {
-                shift_id: conflict.shift.id,
-                time_off_id: conflict.time_off.id,
-            },
-        });
-    });
-
-    props.tightTurnarounds.forEach((turnaround, index) => {
-        items.push({
-            id: `tight_turnaround-${turnaround.staff_id}-${turnaround.first.id}-${turnaround.second.id}-${index}`,
-            type: 'tight_turnaround',
-            severity: TYPE_META.tight_turnaround.severity,
-            blocking: TYPE_META.tight_turnaround.blocking,
-            who: turnaround.staff_name,
-            summary: `Only ${turnaround.gap_minutes} min between back-to-back shifts`,
-            context: {
-                tone: 'info',
-                icon: Clock,
-                text: `${turnaround.gap_minutes} min between shifts · below safe turnaround`,
-            },
-            shifts: [
-                toQueueShift(turnaround.first),
-                toQueueShift(turnaround.second),
-            ],
-            recommended: `Travel or rest time is tight — reassign the second shift, or push its start to give a safe gap.`,
-            actions: ACTIONS.tight_turnaround,
-            payload: {
-                first_shift_id: turnaround.first.id,
-                second_shift_id: turnaround.second.id,
-                gap_minutes: turnaround.gap_minutes,
-            },
-        });
-    });
-
-    props.coverageGaps.forEach((gap, index) => {
-        const short = Math.max(0, gap.required_staff - gap.assigned_staff);
-        items.push({
-            id: `coverage_gap-${gap.coverage_window_key ?? `${gap.site_id}-${gap.rule_name}-${gap.window_label}`}-${index}`,
-            type: 'coverage_gap',
-            severity: TYPE_META.coverage_gap.severity,
-            blocking: TYPE_META.coverage_gap.blocking,
-            who: gap.site_name,
-            summary: `${gap.rule_name} · ${gap.window_label}`,
-            context: {
-                tone: 'warn',
-                icon: Layers,
-                text: `${gap.window_label} · ${dayLabel(gap.starts_at)} — need ${gap.required_staff}, ${gap.assigned_staff} assigned (${short} short)`,
-            },
-            shifts: (gap.contributing_shifts ?? []).map((row) =>
-                toQueueShift(row),
+    const zone = props.workerTimezone;
+    for (const row of props.staffOverlaps) {
+        const shifts = [
+            toQueueShift(row.first, zone),
+            toQueueShift(row.second, zone),
+        ];
+        items.push(
+            entry(
+                'staff_overlap',
+                row.pair_id,
+                row.staff_name,
+                'Overlapping duties · ' + dayLabel(row.first.starts_at, zone),
+                shifts,
+                'Choose the duty that needs to change. Open its details to reassign, adjust its times or make it open, then refresh this queue.',
+                rosterAction(shifts),
             ),
-            recommended: coverageRecommended(gap),
-            actions: ACTIONS.coverage_gap,
-            payload: {
-                gap,
-                coverage_window_key: gap.coverage_window_key,
-                starts_at: gap.starts_at,
-                ends_at: gap.ends_at,
-                site_id: gap.site_id,
-                rule_id: gap.rule_id,
-                open_shift_ids: gap.open_shift_ids ?? [],
-            },
-        });
-    });
-
-    props.openShifts.forEach((shift) => {
-        items.push({
-            id: `open_shift-${shift.id}`,
-            type: 'open_shift',
-            severity: TYPE_META.open_shift.severity,
-            blocking: TYPE_META.open_shift.blocking,
-            who: shift.location ?? shift.client_name ?? 'Open shift',
-            summary: `${shift.client_name ?? 'Open shift'} · ${formatWindow(shift.starts_at, shift.ends_at)}`,
-            shifts: [toQueueShift(shift, 'open')],
-            recommended: `Assign an eligible, available staff member — or broadcast to the wider pool if none are free.`,
-            actions: ACTIONS.open_shift,
-            payload: { shift_id: shift.id },
-        });
-    });
-
-    props.activeReplacements.forEach((replacement) => {
-        const claiming =
-            replacement.replacement_staff ?? replacement.claimed_by ?? null;
-        items.push({
-            id: `replacement-${replacement.id}`,
-            type: 'replacement',
-            severity: TYPE_META.replacement.severity,
-            blocking: TYPE_META.replacement.blocking,
-            who: replacement.shift.client_name ?? 'Replacement',
-            summary: replacement.reason,
-            context: {
-                tone: 'info',
-                icon: RefreshCw,
-                text: `${replacement.status}${replacement.requested_by ? ` · requested by ${replacement.requested_by}` : ''}${claiming ? ` · ${claiming} claiming` : ''}`,
-            },
-            shifts: [toQueueShift(replacement.shift)],
-            recommended: claiming
-                ? `${claiming} has claimed this — approve to confirm the cover.`
-                : `No claim yet — keep it on the job board, or assign someone directly.`,
-            actions: ACTIONS.replacement,
-            payload: {
-                shift_id: replacement.shift.id,
-                open_position_id: replacement.open_position_id ?? null,
-                status: replacement.status,
-            },
-        });
-    });
-
+        );
+    }
+    for (const row of props.clientOverlaps) {
+        const shifts = [
+            toQueueShift(row.first, zone),
+            toQueueShift(row.second, zone),
+        ];
+        const client = shifts.find(
+            (shift) => shift.can?.view_client && shift.urls?.client,
+        );
+        items.push(
+            entry(
+                'client_overlap',
+                row.pair_id,
+                row.client_name,
+                'Duties share time · ' + dayLabel(row.first.starts_at, zone),
+                shifts,
+                'Check the person’s support plan and staffing requirements. Concurrent duties may be planned multi-worker support; this finding does not establish a funding ratio or approve an exception.',
+                [
+                    ...link('client', 'View client', client?.urls?.client),
+                    ...rosterAction(shifts),
+                ],
+            ),
+        );
+    }
+    for (const row of props.timeOffConflicts) {
+        const shifts = [toQueueShift(row.shift, zone)];
+        const item = entry(
+            'leave_clash',
+            row.pair_id,
+            row.time_off.user_name,
+            'Duty overlaps recorded ' + row.time_off.type.replace(/_/g, ' '),
+            shifts,
+            'Review the time-off record and the duty. Leave approval and cancellation belong to HR; use the shift details to arrange cover.',
+            [
+                ...link(
+                    'leave',
+                    'Review HR leave',
+                    row.time_off.can.view_leave
+                        ? row.time_off.urls.leave
+                        : null,
+                ),
+                ...rosterAction(shifts),
+            ],
+            { time_off_id: row.time_off.id },
+        );
+        item.context = {
+            tone: 'crit',
+            icon: CalendarX,
+            text:
+                formatWindow(
+                    row.time_off.starts_at,
+                    row.time_off.ends_at,
+                    zone,
+                ) +
+                ' · ' +
+                row.time_off.description,
+        };
+        items.push(item);
+    }
+    for (const row of props.tightTurnarounds) {
+        const shifts = [
+            toQueueShift(row.first, zone),
+            toQueueShift(row.second, zone),
+        ];
+        const item = entry(
+            'tight_turnaround',
+            row.pair_id,
+            row.staff_name,
+            row.gap_minutes + ' min between consecutive duties',
+            shifts,
+            'Check travel and rest needs. Open the appropriate shift to review its times or assignment; this queue cannot accept fatigue risk.',
+            rosterAction(shifts),
+        );
+        item.context = {
+            tone: 'info',
+            icon: Clock,
+            text:
+                'Review prompt · no overlap · ' +
+                row.gap_minutes +
+                ' minute gap',
+        };
+        items.push(item);
+    }
+    function coverage(
+        gap: CoverageGap,
+        type: 'coverage_gap' | 'recurring_alignment',
+    ) {
+        const shifts = (gap.contributing_shifts ?? []).map((row) =>
+            toQueueShift(row, zone),
+        );
+        const assessed = gap.source_assessment === 'assessed';
+        const actions = link(
+            'roster',
+            type === 'recurring_alignment'
+                ? 'Review recurring cover'
+                : 'Review roster',
+            gap.urls.roster,
+        );
+        if (type === 'coverage_gap' && assessed) {
+            if (
+                canManage &&
+                gap.starts_at &&
+                gap.ends_at &&
+                shouldOfferCreation(gap.recommended_fill_action)
+            )
+                actions.push({
+                    key: 'create',
+                    label: 'Create cover shift',
+                    tone: 'primary',
+                });
+            if (gap.can?.acknowledge && gap.urls.ack)
+                actions.push({
+                    key: 'ack',
+                    label: 'Acknowledge',
+                    tone: 'subtle',
+                });
+            if (gap.can?.dismiss && gap.urls.dismiss)
+                actions.push({
+                    key: 'dismiss',
+                    label: 'Dismiss review',
+                    tone: 'subtle',
+                });
+            if (gap.acknowledgement && gap.can?.clear && gap.urls.clear)
+                actions.push({
+                    key: 'clear',
+                    label: 'Clear acknowledgement',
+                    tone: 'subtle',
+                });
+        }
+        const review = gap.acknowledgement
+            ? gap.acknowledgement.state === 'acked'
+                ? ' · Acknowledged'
+                : ' · Review dismissed'
+            : '';
+        const item = entry(
+            type,
+            gap.finding_id,
+            gap.site_name,
+            gap.rule_name +
+                ' · ' +
+                formatWindow(gap.starts_at, gap.ends_at, zone) +
+                review,
+            shifts,
+            assessed
+                ? 'Review the contributing duties and required roles. Fill an existing open duty before creating additional cover. Acknowledging or dismissing a review does not provide staff.'
+                : 'Supply could not be fully assessed within this view. Review the permitted source records; no shortage or safe-cover conclusion is available.',
+            actions,
+            { gap },
+        );
+        item.sites = [{ id: gap.site_id, name: gap.site_name }];
+        item.context = {
+            tone: 'warn',
+            icon: Layers,
+            text:
+                assessed &&
+                gap.assigned_staff != null &&
+                gap.missing_staff != null
+                    ? 'Need ' +
+                      gap.required_staff +
+                      ' · ' +
+                      gap.assigned_staff +
+                      ' assigned · ' +
+                      gap.missing_staff +
+                      ' short'
+                    : 'Supply and shortage not assessed',
+        };
+        items.push(item);
+    }
+    for (const gap of props.coverageGaps) coverage(gap, 'coverage_gap');
+    for (const shift of props.openShifts) {
+        const shifts = [toQueueShift(shift, zone)];
+        items.push(
+            entry(
+                'open_shift',
+                shift.finding_id ?? 'open_shift:' + shift.id,
+                shift.location ?? shift.client_name ?? 'Open shift',
+                formatWindow(shift.starts_at, shift.ends_at, zone),
+                shifts,
+                'Open the shift to assign an eligible, available colleague or review its Job Board options. It remains open until a saved assignment is confirmed.',
+                rosterAction(shifts),
+            ),
+        );
+    }
+    for (const row of props.activeReplacements) {
+        const shifts = [toQueueShift(row.shift, zone)];
+        const item = entry(
+            'replacement',
+            row.finding_id,
+            row.shift.client_name ?? 'Replacement',
+            row.reason,
+            shifts,
+            'Review the current replacement and claim in its owning workflow. A request or claim does not by itself confirm staffing.',
+            [
+                ...link(
+                    'board',
+                    'Review Job Board',
+                    row.can.view_job_board ? row.urls.job_board : null,
+                ),
+                ...rosterAction(shifts),
+            ],
+        );
+        item.context = {
+            tone: 'info',
+            icon: RefreshCw,
+            text: row.status.replace(/_/g, ' '),
+        };
+        items.push(item);
+    }
+    for (const gap of props.recurringCoverageAlignment.rule_drift)
+        coverage(gap, 'recurring_alignment');
+    for (const row of props.recurringCoverageAlignment.orphan_series) {
+        const item = entry(
+            'recurring_alignment',
+            row.finding_id,
+            row.site_name,
+            'Recurring supply has no matching demand window',
+            [],
+            'Review this pattern against the House’s current staffing requirements. Existing duties are not cancelled by this finding.',
+            link('recurring', 'Review recurring pattern', row.urls.roster),
+            { series_id: row.series_id },
+        );
+        item.sites = [{ id: row.site_id, name: row.site_name }];
+        items.push(item);
+    }
     return items;
 }

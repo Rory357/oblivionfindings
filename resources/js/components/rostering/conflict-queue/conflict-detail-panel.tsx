@@ -1,4 +1,5 @@
-import { Check, Inbox, Layers, Zap } from 'lucide-react';
+import { Link } from '@inertiajs/react';
+import { Inbox, Layers, Zap } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -41,25 +42,13 @@ function DetailEmpty() {
             <p className="mt-1 max-w-[280px] text-xs text-muted-foreground">
                 Pick a conflict from the queue, or hit{' '}
                 <span className="font-semibold text-foreground">
-                    Resolve next
+                    Review next
                 </span>{' '}
                 to start with the highest-impact one.
             </p>
         </div>
     );
 }
-
-// Action keys that hit shifts.manageAny-gated endpoints. Disabled for viewers
-// without manage rights so they never trigger a hard 403 on click.
-const MANAGE_GATED = new Set([
-    'reassign',
-    'assign',
-    'open',
-    'broadcast',
-    'fill',
-    'create',
-    'approve',
-]);
 
 function ActionButton({
     action,
@@ -70,26 +59,27 @@ function ActionButton({
     disabled?: boolean;
     onClick: () => void;
 }) {
-    const title = disabled ? 'Requires shift management permission' : undefined;
-    if (action.tone === 'primary') {
+    if (action.href)
         return (
             <Button
-                size="sm"
-                disabled={disabled}
-                title={title}
-                onClick={onClick}
+                asChild
+                variant="outline"
+                className="frontline-tap h-auto whitespace-normal"
             >
-                <Check className="mr-1.5 h-4 w-4" />
-                {action.label}
+                <Link href={action.href}>{action.label}</Link>
             </Button>
         );
-    }
     return (
         <Button
-            size="sm"
-            variant={action.tone === 'subtle' ? 'ghost' : 'outline'}
+            variant={
+                action.tone === 'primary'
+                    ? 'default'
+                    : action.tone === 'subtle'
+                      ? 'ghost'
+                      : 'outline'
+            }
+            className="frontline-tap h-auto whitespace-normal"
             disabled={disabled}
-            title={title}
             onClick={onClick}
         >
             {action.label}
@@ -100,25 +90,20 @@ function ActionButton({
 export interface ConflictDetailPanelProps {
     item: QueueItem | null;
     onAction: (item: QueueItem, action: QueueAction) => void;
-    /** When false, shifts.manageAny-gated actions render disabled. Default true. */
-    canManage?: boolean;
+    pending?: boolean;
 }
 
 export function ConflictDetailPanel({
     item,
     onAction,
-    canManage = true,
+    pending = false,
 }: ConflictDetailPanelProps) {
     return (
         <div className="rounded-2xl border bg-card p-[18px] lg:sticky lg:top-5">
             {!item ? (
                 <DetailEmpty />
             ) : (
-                <DetailBody
-                    item={item}
-                    onAction={onAction}
-                    canManage={canManage}
-                />
+                <DetailBody item={item} onAction={onAction} pending={pending} />
             )}
         </div>
     );
@@ -127,11 +112,11 @@ export function ConflictDetailPanel({
 function DetailBody({
     item,
     onAction,
-    canManage,
+    pending,
 }: {
     item: QueueItem;
     onAction: (item: QueueItem, action: QueueAction) => void;
-    canManage: boolean;
+    pending: boolean;
 }) {
     const meta = TYPE_META[item.type];
     const Icon = meta.icon;
@@ -163,10 +148,10 @@ function DetailBody({
                             {SEVERITY_BADGE_LABEL[meta.severity]}
                         </span>
                     </div>
-                    <h2 className="mt-1 text-[19px] leading-tight font-bold">
+                    <h2 className="mt-1 text-[19px] leading-tight font-bold break-words">
                         {item.who}
                     </h2>
-                    <p className="mt-0.5 text-sm text-muted-foreground">
+                    <p className="mt-0.5 text-sm break-words text-muted-foreground">
                         {item.summary}
                     </p>
                 </div>
@@ -198,7 +183,7 @@ function DetailBody({
             ) : item.type === 'coverage_gap' ? (
                 <div className="mt-3 flex items-center gap-2 rounded-xl border border-dashed p-3 text-[12.5px] text-muted-foreground">
                     <Layers className="h-4 w-4 shrink-0" />
-                    No supply scheduled in this window yet.
+                    No contributing duties returned in this view.
                 </div>
             ) : null}
 
@@ -221,7 +206,7 @@ function DetailBody({
                     <ActionButton
                         key={action.key}
                         action={action}
-                        disabled={!canManage && MANAGE_GATED.has(action.key)}
+                        disabled={pending}
                         onClick={() => onAction(item, action)}
                     />
                 ))}

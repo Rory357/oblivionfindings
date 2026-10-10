@@ -326,6 +326,12 @@ class HandleInertiaRequests extends Middleware
 
                     return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
                 },
+                'coverage_gap_result' => function () use ($request) {
+                    $outcome = $request->session()->get('coverage_gap_result');
+
+                    return is_array($outcome) && ($outcome['version'] ?? null) === 1 && ($outcome['scope'] ?? null) === 'coverage_gap'
+                        && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
                 'house_qualification_result' => function () use ($request) {
                     $outcome = $request->session()->get('house_qualification_result');
 

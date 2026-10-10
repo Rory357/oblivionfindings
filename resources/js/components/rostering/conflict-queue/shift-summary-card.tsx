@@ -3,7 +3,7 @@ import { Clock, MapPin, Users } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
-import { dayLabel, shiftTypeLabel, timeLabel } from './build-queue';
+import { formatWindow, shiftTypeLabel } from './build-queue';
 import type { QueueShift } from './types';
 
 const STATUS_PILL: Record<string, string> = {
@@ -17,9 +17,7 @@ function statusPillClass(status: string) {
 
 function windowLabel(shift: QueueShift) {
     if (!shift.startsAt) return 'Time not set';
-    const start = timeLabel(shift.startsAt);
-    const end = shift.endsAt ? timeLabel(shift.endsAt) : '';
-    return `${dayLabel(shift.startsAt)} · ${start}${end ? `–${end}` : ''}`;
+    return formatWindow(shift.startsAt, shift.endsAt, shift.workerTimezone);
 }
 
 /** Compact shift card used inside the detail panel (one card, or two for overlaps). */
@@ -31,8 +29,8 @@ export function ShiftSummaryCard({ shift }: { shift: QueueShift }) {
     return (
         <div className="rounded-xl border p-3">
             <div className="flex items-start justify-between gap-2">
-                <span className="truncate text-sm font-semibold">
-                    {shift.client ?? 'Unassigned client'}
+                <span className="min-w-0 text-sm font-semibold break-words">
+                    {shift.client ?? 'No client recorded'}
                 </span>
                 <span
                     className={cn(
@@ -46,8 +44,10 @@ export function ShiftSummaryCard({ shift }: { shift: QueueShift }) {
             <div className="mt-2 space-y-1 text-[12.5px] text-muted-foreground">
                 <span className="flex items-center gap-1.5">
                     <Users className="h-3.5 w-3.5 shrink-0" />
-                    {shift.staff ? (
-                        <span className="truncate">{shift.staff}</span>
+                    {shift.staff || shift.userId != null ? (
+                        <span className="min-w-0 break-words">
+                            {shift.staff || 'Staff member'}
+                        </span>
                     ) : (
                         <em className="text-status-warning not-italic">
                             Open — no staff
@@ -57,25 +57,35 @@ export function ShiftSummaryCard({ shift }: { shift: QueueShift }) {
                 {shift.location ? (
                     <span className="flex items-center gap-1.5">
                         <MapPin className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">{shift.location}</span>
+                        <span className="min-w-0 break-words">
+                            {shift.location}
+                        </span>
                     </span>
                 ) : null}
                 <span className="flex items-center gap-1.5">
                     <Clock className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">{windowLabel(shift)}</span>
+                    <span className="min-w-0 break-words">
+                        {windowLabel(shift)}
+                    </span>
                 </span>
                 {contextLine ? (
-                    <span className="block truncate pl-5 capitalize">
+                    <span className="block pl-5 break-words capitalize">
                         {contextLine}
                     </span>
                 ) : null}
             </div>
-            <Link
-                href={`/operations/shifts/${shift.id}`}
-                className="mt-3 inline-flex text-xs font-semibold text-primary underline-offset-4 hover:underline"
-            >
-                View shift
-            </Link>
+            {shift.can?.view_shift && shift.urls?.shift ? (
+                <Link
+                    href={shift.urls.shift}
+                    className="frontline-tap mt-3 inline-flex items-center text-xs font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+                >
+                    View shift
+                </Link>
+            ) : (
+                <p className="text-caption mt-3">
+                    Shift details unavailable for this view.
+                </p>
+            )}
         </div>
     );
 }

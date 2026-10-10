@@ -13,12 +13,7 @@ import {
     PageLayout,
 } from '@/components/page';
 import {
-    BroadcastDialog,
-    type BroadcastShift,
-    ReassignDialog,
-    type ReassignShift,
-    UnassignMakeOpenDialog,
-    type UnassignMakeOpenShift,
+    WeekPicker,
     formatWeekRange,
     startOfWeek,
     weekLabel,
@@ -36,13 +31,18 @@ import {
     type CoverageGap,
     type QueueAction,
     type QueueItem,
-    type QueueShift,
     TYPE_META,
     TYPE_ORDER,
     buildQueue,
     coverageRolesForAction,
     useConflictQueue,
 } from '@/components/rostering/conflict-queue';
+import {
+    confirmedCoverageReview,
+    csvCell,
+} from '@/components/rostering/conflict-queue/coverage-review-result';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -58,7 +58,6 @@ import {
     AlertTriangle,
     Building2,
     CalendarClock,
-    CheckCircle2,
     ChevronLeft,
     ChevronRight,
     Download,
@@ -68,146 +67,101 @@ import {
     Settings,
     Users,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
-type ReassignState = { shift: ReassignShift; item: QueueItem; done: string };
-type UnassignState = { shift: UnassignMakeOpenShift; item: QueueItem };
-type BroadcastState = { shift: BroadcastShift; item: QueueItem };
 type ConfirmState = { kind: ConflictConfirmKind; item: QueueItem };
-
-function pluralise(count: number, word: string, plural?: string) {
-    return `${count} ${count === 1 ? word : (plural ?? `${word}s`)}`;
+function flashError(page: unknown) {
+    return Boolean(
+        (page as { props?: { flash?: { error?: unknown } } } | null)?.props
+            ?.flash?.error,
+    );
 }
-
-/**
- * Laravel business-rule rejections come back as `back()->with('error', …)`, which
- * lands in `flash.error` (a 2xx visit) rather than `props.errors`, so Inertia
- * fires `onSuccess`. Guard server-action success on the absence of a flash error
- * so a rejected action never toasts success or drops a still-live conflict.
- */
-function hasFlashError(page: unknown): boolean {
-    const flash = (page as { props?: { flash?: { error?: unknown } } } | null)
-        ?.props?.flash;
-    return Boolean(flash?.error);
-}
-
 function csrfToken() {
     return (
         document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
             ?.content ?? ''
     );
 }
-
-/** The shift a "reassign"/"unassign" should act on — the second of an overlap pair. */
-function shiftToMove(item: QueueItem): QueueShift | null {
-    if (item.shifts.length === 0) return null;
-    return item.shifts.length > 1 ? item.shifts[1] : item.shifts[0];
-}
-
 export default function RosteringConflicts(props: ConflictsProps) {
     const { auth } = usePage().props as {
         auth?: {
-            user?: { name?: string };
+            user?: { id?: number };
             can?: { shifts?: { manageAny?: boolean } };
         };
     };
-    // Write actions hit endpoints gated on shifts.manageAny; the page itself is
-    // only gated on rostering.viewAny. Disable management actions for viewers
-    // without manage rights (matches the rostering index) so they never 403.
     const canManage = Boolean(auth?.can?.shifts?.manageAny);
-
-    const items = useMemo(() => buildQueue(props), [props]);
+    const items = useMemo(
+        () => buildQueue(props, canManage),
+        [props, canManage],
+    );
     const queue = useConflictQueue(items, props.weekStart);
-    const {
-        counts,
-        blocking,
-        resolvedToday,
-        open,
-        visible,
-        selected,
-        filter,
-        selectedId,
-    } = queue;
-
-    const [reassignState, setReassignState] = useState<ReassignState | null>(
-        null,
-    );
-    const [unassignState, setUnassignState] = useState<UnassignState | null>(
-        null,
-    );
-    const [broadcastState, setBroadcastState] = useState<BroadcastState | null>(
-        null,
-    );
+    const { counts, open, visible, filter, selectedId } = queue;
+    const [search, setSearch] = useState('');
+    const searchedVisible = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return q
+            ? visible.filter((item) =>
+                  (
+                      item.who +
+                      ' ' +
+                      item.summary +
+                      ' ' +
+                      TYPE_META[item.type].label
+                  )
+                      .toLowerCase()
+                      .includes(q),
+              )
+            : visible;
+    }, [visible, search]);
+    const selected =
+        searchedVisible.find((item) => item.id === selectedId) ?? null;
     const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+    const [pending, setPending] = useState(false);
+    const actionLock = useRef(false);
+    const [reviewError, setReviewError] = useState<string | null>(null);
+    const [workflowError, setWorkflowError] = useState<string | null>(null);
+    const [reviewNeedsRefresh, setReviewNeedsRefresh] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const [scanSettingsOpen, setScanSettingsOpen] = useState(false);
-
+    const [pickerOpen, setPickerOpen] = useState(false);
+    const pickerAnchor = useRef<HTMLButtonElement>(null);
+    const listAnchor = useRef<HTMLDivElement>(null);
+    const detailAnchor = useRef<HTMLElement>(null);
+    function showSelectedFinding() {
+        if (!window.matchMedia('(max-width: 1023px)').matches) return;
+        requestAnimationFrame(() => {
+            detailAnchor.current?.focus({ preventScroll: true });
+            detailAnchor.current?.scrollIntoView({ block: 'start' });
+        });
+    }
     const weekStartDate = useMemo(
-        () => startOfWeek(new Date(`${props.weekStart}T00:00:00`)),
+        () => startOfWeek(new Date(props.weekStart + 'T00:00:00')),
         [props.weekStart],
     );
-    const range = useMemo(
-        () => formatWeekRange(weekStartDate),
-        [weekStartDate],
-    );
-    // End label without the year, to match the design ("Mon 25 May → Sun 31 May").
-    // Strip the trailing year off the shared label so it stays consistent with
-    // startLabel's format (no stray comma).
-    const rangeEndLabel = range.endLabel.replace(/[ ,]+\d{4}$/, '');
-    const curLab = weekLabel(weekStartDate);
-    const returnTo = `/operations/rostering/conflicts?week=${encodeURIComponent(props.weekStart)}`;
-
-    const subFor = (item: QueueItem) =>
-        `${TYPE_META[item.type].label} · ${item.who}`;
-
+    const range = formatWeekRange(weekStartDate);
+    const returnTo =
+        '/operations/rostering/conflicts?week=' +
+        encodeURIComponent(props.weekStart);
+    const rosterUrl =
+        '/operations/rostering?week=' + encodeURIComponent(props.weekStart);
     const createShiftLauncher = useCreateShiftLauncher();
 
-    /* ----------------------------- coverage create ----------------------------- */
-
-    // Build the inline-dialog params (was a /operations/shifts/create deep link).
-    // return_to is omitted — the in-place dialog returns to this page on save.
-    const buildCoverageCreateParams = (
-        gap: CoverageGap,
-        options?: { openShift?: boolean; repeatWeekly?: boolean },
-        reservationToken?: string | null,
-    ) => {
-        const actionRoles = coverageRolesForAction(gap);
-        let repeatEndDate: string | undefined;
-        if (options?.repeatWeekly && gap.starts_at) {
-            const repeatEnd = new Date(gap.starts_at);
-            repeatEnd.setDate(repeatEnd.getDate() + 28);
-            repeatEndDate = repeatEnd.toISOString().slice(0, 10);
-        }
-        return {
-            site_id: gap.site_id,
-            coverage_rule_id: gap.rule_id ?? undefined,
-            client_id: gap.preferred_client_id ?? undefined,
-            starts_at: gap.starts_at ?? undefined,
-            ends_at: gap.ends_at ?? undefined,
-            coverage_rule_name: gap.rule_name,
-            coverage_required_staff: gap.required_staff,
-            coverage_missing_staff: gap.missing_staff,
-            coverage_role_shortages:
-                actionRoles.length > 0
-                    ? JSON.stringify(actionRoles)
-                    : undefined,
-            coverage_reservation_token: reservationToken ?? undefined,
-            open_shift: options?.openShift,
-            repeat_weekly: options?.repeatWeekly,
-            repeat_end_date: repeatEndDate,
-        };
-    };
-
-    const openCoverageCreate = async (
-        gap: CoverageGap,
-        options?: { openShift?: boolean; repeatWeekly?: boolean },
-    ) => {
-        if (!gap.starts_at || !gap.ends_at) {
-            createShiftLauncher.openWith(
-                buildCoverageCreateParams(gap, options),
-            );
+    async function openCoverageCreate(gap: CoverageGap) {
+        if (actionLock.current || reviewNeedsRefresh) return;
+        if (
+            !gap.starts_at ||
+            !gap.ends_at ||
+            gap.source_assessment !== 'assessed' ||
+            !canManage
+        ) {
+            setWorkflowError('Refresh this window before creating cover.');
             return;
         }
+        actionLock.current = true;
+        setPending(true);
+        setWorkflowError(null);
         try {
+            const roles = coverageRolesForAction(gap);
             const response = await fetch('/operations/coverage/reservations', {
                 method: 'POST',
                 credentials: 'same-origin',
@@ -222,522 +176,305 @@ export default function RosteringConflicts(props: ConflictsProps) {
                     coverage_rule_id: gap.rule_id ?? null,
                     starts_at: gap.starts_at,
                     ends_at: gap.ends_at,
-                    role_key: coverageRolesForAction(gap)[0]?.key ?? null,
+                    role_key: roles[0]?.key ?? null,
                     return_to: returnTo,
                 }),
             });
-            if (!response.ok) {
-                router.reload({ only: ['coverageGaps'], preserveScroll: true });
-                return;
-            }
+            if (!response.ok) throw new Error('reservation');
             const payload = (await response.json()) as {
                 token?: string | null;
             };
-            createShiftLauncher.openWith(
-                buildCoverageCreateParams(gap, options, payload.token),
-            );
+            if (!payload.token) throw new Error('reservation identity');
+            await createShiftLauncher.openWith({
+                site_id: gap.site_id,
+                coverage_rule_id: gap.rule_id,
+                client_id: gap.preferred_client_id,
+                starts_at: gap.starts_at,
+                ends_at: gap.ends_at,
+                coverage_rule_name: gap.rule_name,
+                coverage_required_staff: gap.required_staff,
+                coverage_missing_staff: gap.missing_staff,
+                coverage_role_shortages: roles.length
+                    ? JSON.stringify(roles)
+                    : undefined,
+                coverage_reservation_token: payload.token,
+            });
         } catch {
-            router.reload({ only: ['coverageGaps'], preserveScroll: true });
+            setWorkflowError(
+                'Could not open cover for this window. Refresh the queue and try again; no staffing change is confirmed.',
+            );
+        } finally {
+            actionLock.current = false;
+            setPending(false);
         }
-    };
-
-    const coverageLifecyclePayload = (gap: CoverageGap) => ({
-        site_id: gap.site_id,
-        coverage_requirement_id: gap.rule_id ?? null,
-        window_starts_at: gap.starts_at,
-        window_ends_at: gap.ends_at,
-        return_to: returnTo,
-    });
-
-    const ackCoverage = (item: QueueItem) => {
-        const gap = item.payload.gap as CoverageGap | undefined;
-        if (!gap?.coverage_window_key || !gap.starts_at || !gap.ends_at) {
-            queue.resolveLocally(item.id, 'Acknowledged', subFor(item));
+    }
+    function dispatchAction(item: QueueItem, action: QueueAction) {
+        if (actionLock.current) return;
+        if (action.href) {
+            router.visit(action.href);
             return;
         }
-        router.post(
-            `/operations/rostering/coverage/${encodeURIComponent(gap.coverage_window_key)}/ack`,
-            coverageLifecyclePayload(gap),
-            {
-                preserveScroll: true,
-                preserveState: true,
-                onSuccess: (page) => {
-                    if (!hasFlashError(page)) {
-                        queue.resolveLocally(
-                            item.id,
-                            'Acknowledged',
-                            subFor(item),
-                        );
-                    }
-                },
-            },
-        );
-    };
-
-    const dismissCoverage = (item: QueueItem, reason: string) => {
-        const gap = item.payload.gap as CoverageGap | undefined;
-        if (!gap?.coverage_window_key || !gap.starts_at || !gap.ends_at) {
-            queue.resolveLocally(item.id, 'Gap dismissed', subFor(item));
+        if (reviewNeedsRefresh) return;
+        if (action.key === 'create') {
+            const gap = item.payload.gap as CoverageGap | undefined;
+            if (gap) void openCoverageCreate(gap);
             return;
         }
-        router.post(
-            `/operations/rostering/coverage/${encodeURIComponent(gap.coverage_window_key)}/dismiss`,
-            { ...coverageLifecyclePayload(gap), reason },
-            {
-                preserveScroll: true,
-                preserveState: true,
-                onSuccess: (page) => {
-                    if (!hasFlashError(page)) {
-                        queue.resolveLocally(
-                            item.id,
-                            'Gap dismissed',
-                            subFor(item),
-                        );
-                    }
-                },
-            },
-        );
-    };
-
-    /* ------------------------------- dispatch ------------------------------- */
-
-    const dispatchAction = (item: QueueItem, action: QueueAction) => {
-        const sub = subFor(item);
-        switch (action.key) {
-            case 'reassign': {
-                const shift = shiftToMove(item);
-                if (!shift) return;
-                setReassignState({
-                    item,
-                    done: action.done,
-                    shift: {
-                        id: shift.id,
-                        starts_at: shift.startsAt,
-                        ends_at: shift.endsAt,
-                        client: shift.client,
-                        staff: shift.staff,
-                        isOpen: false,
-                    },
-                });
-                return;
-            }
-            case 'assign': {
-                const shift = item.shifts[0];
-                if (!shift) return;
-                setReassignState({
-                    item,
-                    done: action.done,
-                    shift: {
-                        id: shift.id,
-                        starts_at: shift.startsAt,
-                        ends_at: shift.endsAt,
-                        client: shift.client,
-                        staff: shift.staff,
-                        isOpen: true,
-                    },
-                });
-                return;
-            }
-            case 'open': {
-                const shift = shiftToMove(item);
-                if (!shift) return;
-                setUnassignState({
-                    item,
-                    shift: {
-                        id: shift.id,
-                        starts_at: shift.startsAt,
-                        client: shift.client,
-                        staff: shift.staff,
-                    },
-                });
-                return;
-            }
-            case 'broadcast': {
-                const shift = item.shifts[0];
-                if (!shift) return;
-                setBroadcastState({
-                    item,
-                    shift: {
-                        id: shift.id,
-                        starts_at: shift.startsAt,
-                        client: shift.client,
-                        site: shift.location,
-                    },
-                });
-                return;
-            }
-            case 'keep':
-            case 'accept':
-                setConfirmState({ kind: 'acknowledge', item });
-                return;
-            case 'cancel':
-                setConfirmState({ kind: 'cancel', item });
-                return;
-            case 'ratio':
-                setConfirmState({ kind: 'ratio', item });
-                return;
-            case 'dismiss':
-                setConfirmState({ kind: 'dismiss', item });
-                return;
-            case 'ack':
-                ackCoverage(item);
-                return;
-            case 'fill': {
-                const openShiftIds =
-                    (item.payload.open_shift_ids as number[]) ?? [];
-                if (openShiftIds.length > 0) {
-                    setReassignState({
-                        item,
-                        done: 'Open shift filled',
-                        shift: { id: openShiftIds[0], isOpen: true },
-                    });
-                    return;
-                }
-                const gap = item.payload.gap as CoverageGap | undefined;
-                if (gap) void openCoverageCreate(gap);
-                return;
-            }
-            case 'create': {
-                const gap = item.payload.gap as CoverageGap | undefined;
-                if (gap) void openCoverageCreate(gap);
-                return;
-            }
-            case 'approve': {
-                const openPositionId = item.payload.open_position_id as
-                    | number
-                    | null;
-                if (!openPositionId) {
-                    queue.resolveLocally(item.id, action.done, sub);
-                    return;
-                }
-                router.post(
-                    `/operations/job-board/${openPositionId}/approve`,
-                    {},
-                    {
-                        preserveScroll: true,
-                        preserveState: true,
-                        // The approved replacement leaves activeReplacements on
-                        // the prop reload — just tally + toast on real success.
-                        onSuccess: (page) => {
-                            if (!hasFlashError(page)) {
-                                queue.pushToast(action.done, sub);
-                                queue.recordResolved();
-                            }
-                        },
-                    },
-                );
-                return;
-            }
-            case 'board':
-                router.visit('/operations/job-board');
-                return;
-            case 'edit':
-            case 'retime': {
-                // No conflict-page editor (Props are intentionally minimal); hand off
-                // to the shift detail page where the full editor lives. For a tight
-                // turnaround the recommendation targets the SECOND shift, so open
-                // that one; otherwise the first shift.
-                const target =
-                    item.type === 'tight_turnaround'
-                        ? shiftToMove(item)
-                        : item.shifts[0];
-                const id = target?.id ?? null;
-                if (id) router.visit(`/operations/shifts/${id}`);
-                return;
-            }
-            case 'leave':
-                // Client-only acknowledgement — the shift stays open by choice.
-                queue.resolveLocally(item.id, action.done, sub);
-                return;
-            case 'reject':
-                // TODO: wire to a reject-claim endpoint when one exists.
-                queue.resolveLocally(item.id, action.done, sub);
-                return;
-            default:
-                queue.resolveLocally(item.id, action.done, sub);
+        if (
+            action.key === 'ack' ||
+            action.key === 'dismiss' ||
+            action.key === 'clear'
+        ) {
+            setReviewError(null);
+            setConfirmState({ kind: action.key, item });
         }
-    };
-
-    const handleConfirm = (result: ConflictConfirmResult) => {
-        if (!confirmState) return;
+    }
+    async function handleConfirm(result: ConflictConfirmResult) {
+        if (!confirmState || actionLock.current) return;
         const { kind, item } = confirmState;
-        const sub = subFor(item);
-        if (kind === 'acknowledge') {
-            queue.resolveLocally(
-                item.id,
-                'Acknowledged — both shifts kept',
-                sub,
-            );
-        } else if (kind === 'cancel') {
-            const timeOffId = item.payload.time_off_id as number | undefined;
-            if (timeOffId) {
-                router.delete(`/operations/rostering/time-off/${timeOffId}`, {
-                    data: { return_to: returnTo, reason: result.reason ?? '' },
-                    preserveScroll: true,
-                    preserveState: true,
-                    // The deleted leave block clears the clash on reload.
-                    onSuccess: (page) => {
-                        if (!hasFlashError(page)) {
-                            queue.pushToast(
-                                'Leave cancelled · shift retained',
-                                sub,
-                            );
-                            queue.recordResolved();
-                        }
-                    },
-                });
-            } else {
-                queue.resolveLocally(
-                    item.id,
-                    'Leave cancelled · shift retained',
-                    sub,
-                );
-            }
-        } else if (kind === 'ratio') {
-            queue.resolveLocally(
-                item.id,
-                result.ratio === '2:1'
-                    ? '2:1 exception approved'
-                    : 'Set to 1:1 — overlap dropped',
-                sub,
-            );
-        } else if (kind === 'dismiss') {
-            dismissCoverage(item, result.reason ?? '');
-        }
-        setConfirmState(null);
-    };
-
-    /* --------------------------- existing dialogs --------------------------- */
-
-    const handleReassignAssign = (
-        shiftId: number,
-        userId: number,
-        override?: { reason: string },
-    ) => {
-        if (!reassignState) return;
-        const { item, done } = reassignState;
-        router.post(
-            `/operations/shifts/${shiftId}/assign`,
-            {
-                user_id: userId,
-                return_to: returnTo,
-                ...(override
-                    ? {
-                          override_acknowledged: true,
-                          override_reason: override.reason,
-                      }
-                    : {}),
-            },
-            {
-                preserveScroll: true,
-                preserveState: true,
-                // Don't optimistically hide the conflict: a rejected assign comes
-                // back as flash.error (still onSuccess), and a coverage "fill"
-                // may only partially close the gap. Toast + tally on real success
-                // and let the prop reload decide whether the item leaves.
-                onSuccess: (page) => {
-                    if (!hasFlashError(page)) {
-                        queue.pushToast(done, subFor(item));
-                        queue.recordResolved();
-                    }
-                },
-                onFinish: () => setReassignState(null),
-            },
-        );
-    };
-
-    const handleUnassign = (
-        shift: UnassignMakeOpenShift,
-        reason: string | null,
-    ) => {
-        if (!unassignState) return;
-        const { item } = unassignState;
-        router.post(
-            `/operations/shifts/${shift.id}/unassign`,
-            { return_to: returnTo, ...(reason ? { reason } : {}) },
-            {
-                preserveScroll: true,
-                preserveState: true,
-                onSuccess: (page) => {
-                    if (!hasFlashError(page)) {
-                        queue.pushToast(
-                            'Shift unassigned & opened',
-                            subFor(item),
-                        );
-                        queue.recordResolved();
-                    }
-                },
-                onFinish: () => setUnassignState(null),
-            },
-        );
-    };
-
-    const handleBroadcast = (shift: BroadcastShift, message: string | null) => {
-        if (!broadcastState) return;
-        const { item } = broadcastState;
-        router.post(
-            `/operations/shifts/${shift.id}/broadcast`,
-            message ? { message } : {},
-            {
-                preserveScroll: true,
-                preserveState: true,
-                // The shift is still open after broadcasting — don't clear it,
-                // just confirm the broadcast went out (and only on real success;
-                // server guards reject via flash.error, which still hits onSuccess).
-                onSuccess: (page) => {
-                    if (!hasFlashError(page)) {
-                        queue.pushToast('Broadcast sent', subFor(item));
-                    }
-                },
-                onFinish: () => setBroadcastState(null),
-            },
-        );
-    };
-
-    /* ---------------------------- hero ⋯ actions ---------------------------- */
-
-    const acknowledgeAllTurnarounds = () => {
-        const ids = open
-            .filter((item) => item.type === 'tight_turnaround')
-            .map((item) => item.id);
-        if (ids.length === 0) {
-            queue.pushToast(
-                'Nothing to acknowledge',
-                'No open tight turnarounds',
+        const gap = item.payload.gap as CoverageGap | undefined;
+        const actorId = auth?.user?.id;
+        const url = gap?.urls[kind];
+        if (
+            !gap?.action_window ||
+            !gap.coverage_window_key ||
+            !url ||
+            !actorId
+        ) {
+            setReviewError(
+                'This review no longer has a valid source window. Refresh the queue before saving.',
             );
             return;
         }
-        queue.resolveManyLocally(ids);
-        queue.pushToast(
-            `Acknowledged ${pluralise(ids.length, 'tight turnaround')}`,
-            'Marked as reviewed',
-        );
-    };
-
-    const exportReport = () => {
+        const requestId = crypto.randomUUID();
+        actionLock.current = true;
+        setPending(true);
+        setReviewError(null);
+        const unknownResult =
+            'The saved review could not be confirmed. Your reason is retained. Refresh and check the window before trying again.';
+        let failureMessage = unknownResult;
+        try {
+            const response = await fetch(url, {
+                method: kind === 'clear' ? 'DELETE' : 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrfToken(),
+                },
+                body: JSON.stringify({
+                    ...gap.action_window,
+                    request_id: requestId,
+                    return_to: returnTo,
+                    ...(result.reason ? { reason: result.reason } : {}),
+                }),
+            });
+            const payload = (await response.json()) as {
+                result?: unknown;
+                errors?: Record<string, unknown>;
+            };
+            if (!response.ok) {
+                const values =
+                    response.status === 422
+                        ? Object.values(payload.errors ?? {}).flat()
+                        : [];
+                const message = values.find(
+                    (value) => typeof value === 'string',
+                );
+                failureMessage =
+                    typeof message === 'string'
+                        ? message
+                        : response.status === 403
+                          ? 'Your access to this window could not be confirmed. Your reason is retained; refresh before proceeding.'
+                          : unknownResult;
+                throw new Error('Review request failed');
+            }
+            const receipt = confirmedCoverageReview(payload.result, {
+                gap,
+                action: kind,
+                actorId,
+                requestId,
+                reason: result.reason,
+            });
+            if (!receipt) throw new Error(unknownResult);
+            setConfirmState(null);
+            setReviewNeedsRefresh(true);
+            queue.pushToast(
+                receipt.outcome === 'unchanged'
+                    ? 'No active acknowledgement to clear'
+                    : kind === 'clear'
+                      ? 'Acknowledgement cleared'
+                      : 'Coverage review recorded',
+                'Staffing remains unchanged. Refreshing the source findings.',
+            );
+            router.reload({
+                preserveScroll: true,
+                onSuccess: (page) => {
+                    if (flashError(page)) {
+                        setWorkflowError(
+                            'The review was recorded, but current findings could not be refreshed. Refresh the queue before another decision.',
+                        );
+                    } else {
+                        setReviewNeedsRefresh(false);
+                    }
+                },
+                onError: () =>
+                    setWorkflowError(
+                        'The review was recorded, but current findings could not be refreshed. Refresh the queue before another decision.',
+                    ),
+            });
+        } catch {
+            setReviewError(failureMessage);
+        } finally {
+            actionLock.current = false;
+            setPending(false);
+        }
+    }
+    function refreshQueue() {
+        if (refreshing || actionLock.current) return;
+        setRefreshing(true);
+        setWorkflowError(null);
+        router.reload({
+            preserveScroll: true,
+            onSuccess: (page) => {
+                if (flashError(page)) {
+                    setWorkflowError(
+                        'The queue could not be refreshed. Review the current records before proceeding.',
+                    );
+                    return;
+                }
+                queue.pushToast(
+                    'Queue refreshed',
+                    'Current findings loaded. Publication checks run separately.',
+                );
+                setReviewNeedsRefresh(false);
+            },
+            onError: () =>
+                setWorkflowError(
+                    'The queue could not be refreshed. Try again.',
+                ),
+            onFinish: () => setRefreshing(false),
+        });
+    }
+    function exportReport() {
+        const categoryKeys = {
+            staff_overlap: 'staff_overlaps',
+            client_overlap: 'client_overlaps',
+            leave_clash: 'time_off_conflicts',
+            tight_turnaround: 'tight_turnarounds',
+            coverage_gap: 'coverage_gaps',
+            open_shift: 'open_shifts',
+            replacement: 'active_replacements',
+            recurring_alignment: 'recurring_alignment',
+        };
         const rows = [
-            ['Type', 'Severity', 'Who', 'Summary'],
-            ...open.map((item) => [
-                TYPE_META[item.type].label,
-                item.severity,
-                item.who,
-                item.summary,
-            ]),
+            [
+                'Type',
+                'Review priority',
+                'Who',
+                'Summary',
+                'Week',
+                'Time zone',
+                'Assessment',
+                'Limited results',
+                'Scope',
+                'Publication assessed',
+            ],
+            ...searchedVisible.map((item) => {
+                const meta =
+                    props.assessment?.categories[categoryKeys[item.type]];
+                return [
+                    TYPE_META[item.type].label,
+                    item.severity,
+                    item.who,
+                    item.summary,
+                    props.weekStart,
+                    props.workerTimezone,
+                    meta?.status ?? 'not returned',
+                    meta?.truncated ? 'Yes' : 'No',
+                    'Returned records within your access',
+                    'No',
+                ];
+            }),
         ];
-        const csv = rows
-            .map((row) =>
-                row
-                    .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
-                    .join(','),
-            )
-            .join('\n');
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `conflict-report-${props.weekStart}.csv`;
-        link.click();
+        const csv = rows.map((row) => row.map(csvCell).join(',')).join('\r\n');
+        const url = URL.createObjectURL(
+            new Blob([csv], { type: 'text/csv;charset=utf-8;' }),
+        );
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'visible-scheduling-findings-' + props.weekStart + '.csv';
+        a.click();
         URL.revokeObjectURL(url);
         queue.pushToast(
-            'Conflict report exported',
-            `${open.length} open · ${curLab}`,
+            'Visible findings exported',
+            searchedVisible.length +
+                ' rows · current filters · partial assessments remain labelled on screen',
         );
-    };
-
-    const rerunScan = () => {
-        router.reload({ preserveScroll: true });
-        queue.pushToast('Scan complete', 'Conflict scan refreshed · just now');
-    };
-
-    /* -------------------------------- render -------------------------------- */
-
-    const [search, setSearch] = useState('');
-    const searchedVisible = useMemo(() => {
-        const q = search.trim().toLowerCase();
-        if (!q) return visible;
-        return visible.filter((item) =>
-            `${item.who} ${item.summary} ${TYPE_META[item.type].label}`
-                .toLowerCase()
-                .includes(q),
-        );
-    }, [visible, search]);
-
-    const goToWeek = (date: Date) => {
+    }
+    function goToWeek(date: Date) {
+        if (pending) return;
+        setPickerOpen(false);
         router.get(
             '/operations/rostering/conflicts',
             { week: weekPickerYmd(date) },
             { preserveScroll: true },
         );
-    };
-    const shiftWeek = (days: number) => {
-        const d = new Date(weekStartDate);
-        d.setDate(d.getDate() + days);
-        goToWeek(d);
-    };
-
+    }
+    function shiftWeek(days: number) {
+        const date = new Date(weekStartDate);
+        date.setDate(date.getDate() + days);
+        goToWeek(date);
+    }
     const railItems: PageHeaderRailItem<typeof filter>[] = [
         {
             key: 'all',
-            label: 'All conflicts',
+            label: 'All findings',
             icon: LayoutGrid,
             count: open.length,
         },
         ...TYPE_ORDER.map((type) => ({
-            key: type as typeof filter,
+            key: type,
             label: TYPE_META[type].short,
             icon: TYPE_META[type].icon,
             count: counts[type],
-            alert: TYPE_META[type].severity === 'critical',
+            alert: TYPE_META[type].severity === 'critical' && counts[type] > 0,
         })),
     ];
-
-    const titleChip =
-        blocking > 0 ? (
-            <PageHeaderStatusChip variant="critical">
-                {blocking} blocking
-            </PageHeaderStatusChip>
-        ) : open.length > 0 ? (
-            <PageHeaderStatusChip variant="warning">
-                {open.length} open
-            </PageHeaderStatusChip>
-        ) : (
-            <PageHeaderStatusChip variant="success">
-                All clear
-            </PageHeaderStatusChip>
-        );
-
-    const siteFilterOptions = [
-        { value: 'all', label: 'All sites' },
-        ...queue.siteOptions.map((option) => ({
-            value: String(option.id),
-            label: option.name,
-        })),
-    ];
-    const staffFilterOptions = [
-        { value: 'all', label: 'All staff' },
-        ...queue.staffOptions.map((option) => ({
-            value: String(option.id),
-            label: option.name,
-        })),
-    ];
-
+    const coverageMeta = props.assessment?.categories.coverage_gaps;
+    const limited = Object.entries(props.assessment?.categories ?? {}).filter(
+        ([, category]) => category.status !== 'assessed' || category.truncated,
+    );
     const header = (
         <WorkforcePageHeader
             variant="profile"
-            backHref="/operations/rostering"
+            backHref={rosterUrl}
             icon={AlertTriangle}
             title="Conflict queue"
-            titleChip={titleChip}
-            subline={`${range.startLabel} → ${rangeEndLabel} · ${pluralise(
-                queue.siteOptions.length,
-                'site',
-            )} · ${resolvedToday} actions in this session`}
+            titleChip={
+                <PageHeaderStatusChip
+                    variant={open.length ? 'warning' : 'info'}
+                >
+                    {open.length
+                        ? open.length + ' findings shown'
+                        : 'No findings returned'}
+                </PageHeaderStatusChip>
+            }
+            subline={
+                range.startLabel +
+                ' → ' +
+                range.endLabel.replace(/[ ,]+\d{4}$/, '') +
+                ' · ' +
+                props.workerTimezone +
+                ' · approved sites'
+            }
             actions={
                 <>
                     <PageHeaderSearch
                         value={search}
                         onChange={setSearch}
-                        placeholder="Search conflicts…"
+                        placeholder="Search findings…"
                     />
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -747,67 +484,73 @@ export default function RosteringConflicts(props: ConflictsProps) {
                             />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-60">
-                            <DropdownMenuItem onSelect={rerunScan}>
-                                <RefreshCcw className="mr-2 h-4 w-4" />
-                                Re-run conflict scan
-                            </DropdownMenuItem>
                             <DropdownMenuItem
-                                onSelect={acknowledgeAllTurnarounds}
-                                disabled={counts.tight_turnaround === 0}
+                                onSelect={refreshQueue}
+                                disabled={refreshing || pending}
                             >
-                                <CheckCircle2 className="mr-2 h-4 w-4" />
-                                Acknowledge all turnarounds
-                                <span className="ml-auto text-xs text-muted-foreground tabular-nums">
-                                    {counts.tight_turnaround}
-                                </span>
+                                <RefreshCcw className="mr-2 h-4 w-4" />
+                                {refreshing
+                                    ? 'Refreshing…'
+                                    : 'Refresh findings'}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onSelect={exportReport}>
                                 <Download className="mr-2 h-4 w-4" />
-                                Export conflict report
+                                Export visible findings
                             </DropdownMenuItem>
                             <DropdownMenuItem
                                 onSelect={() => setScanSettingsOpen(true)}
                             >
                                 <Settings className="mr-2 h-4 w-4" />
-                                Scan settings
+                                Current scan criteria
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                     <PageHeaderPrimaryButton
-                        icon={CheckCircle2}
-                        onClick={queue.resolveNext}
-                        disabled={open.length === 0}
-                        className="disabled:pointer-events-none disabled:opacity-50"
+                        icon={LayoutGrid}
+                        onClick={() => {
+                            setSearch('');
+                            queue.reviewNext();
+                            showSelectedFinding();
+                        }}
+                        disabled={!open.length || pending}
                     >
-                        Resolve next
+                        Review next
                     </PageHeaderPrimaryButton>
                 </>
             }
             meters={
                 <>
                     <PageHeaderMeterBlock
-                        label="Blocking"
-                        tone={blocking > 0 ? 'critical' : 'success'}
-                        ariaLabel="View all conflicts"
+                        label="Visible findings"
+                        ariaLabel="View all findings"
                         onClick={() => queue.setFilter('all')}
                     >
-                        <PageHeaderMeterBig>{blocking}</PageHeaderMeterBig>
+                        <PageHeaderMeterBig>{open.length}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            conflicts blocking the roster
+                            returned in your access
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="Coverage gaps"
-                        tone={counts.coverage_gap > 0 ? 'warning' : 'success'}
+                        tone={counts.coverage_gap ? 'warning' : undefined}
                         ariaLabel="View coverage gaps"
                         onClick={() => queue.setFilter('coverage_gap')}
                     >
                         <PageHeaderMeterBig>
-                            {counts.coverage_gap}
+                            {!coverageMeta ||
+                            coverageMeta.status === 'not_assessed'
+                                ? '—'
+                                : counts.coverage_gap}
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            windows below required staffing
+                            {!coverageMeta ||
+                            coverageMeta.status === 'not_assessed'
+                                ? 'not assessed for this view'
+                                : coverageMeta.truncated ||
+                                    coverageMeta.status === 'partially_assessed'
+                                  ? 'shown · assessment incomplete'
+                                  : 'reported staffing windows'}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
@@ -819,29 +562,31 @@ export default function RosteringConflicts(props: ConflictsProps) {
                             {counts.open_shift}
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            still need cover
+                            unassigned duties shown
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="Replacing"
-                        ariaLabel="View replacements in flight"
+                        label="Replacements"
+                        ariaLabel="View replacements"
                         onClick={() => queue.setFilter('replacement')}
                     >
                         <PageHeaderMeterBig>
                             {counts.replacement}
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            replacements in flight
+                            active requests shown
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
-                        label="This session"
-                        ariaLabel="View all conflicts"
-                        onClick={() => queue.setFilter('all')}
+                        label="Duties checked"
+                        href={rosterUrl}
+                        ariaLabel="View the duty roster"
                     >
-                        <PageHeaderMeterBig>{resolvedToday}</PageHeaderMeterBig>
+                        <PageHeaderMeterBig>
+                            {props.assessment?.actionable_duty_count ?? '—'}
+                        </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            {resolvedToday} actions in this session
+                            completed/cancelled excluded
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                 </>
@@ -851,27 +596,37 @@ export default function RosteringConflicts(props: ConflictsProps) {
                     <PageHeaderFilterButton
                         icon={ChevronLeft}
                         aria-label="Previous week"
+                        disabled={pending}
                         onClick={() => shiftWeek(-7)}
                     />
                     <PageHeaderFilterButton
+                        ref={pickerAnchor}
                         icon={CalendarClock}
-                        onClick={() => goToWeek(startOfWeek(new Date()))}
+                        disabled={pending}
+                        onClick={() => setPickerOpen(!pickerOpen)}
                     >
-                        {curLab}
+                        {weekLabel(weekStartDate)} · Choose week
                     </PageHeaderFilterButton>
                     <PageHeaderFilterButton
                         icon={ChevronRight}
                         aria-label="Next week"
+                        disabled={pending}
                         onClick={() => shiftWeek(7)}
                     />
                     <PageHeaderFilterSelect
                         icon={Building2}
                         label="All sites"
                         value={String(queue.siteFilterValue ?? 'all')}
-                        options={siteFilterOptions}
-                        onChange={(v) =>
+                        options={[
+                            { value: 'all', label: 'All sites' },
+                            ...queue.siteOptions.map((option) => ({
+                                value: String(option.id),
+                                label: option.name,
+                            })),
+                        ]}
+                        onChange={(value) =>
                             queue.setSiteFilterById(
-                                v === 'all' ? null : Number(v),
+                                value === 'all' ? null : Number(value),
                             )
                         }
                     />
@@ -879,10 +634,16 @@ export default function RosteringConflicts(props: ConflictsProps) {
                         icon={Users}
                         label="All staff"
                         value={String(queue.staffFilterValue ?? 'all')}
-                        options={staffFilterOptions}
-                        onChange={(v) =>
+                        options={[
+                            { value: 'all', label: 'All staff' },
+                            ...queue.staffOptions.map((option) => ({
+                                value: String(option.id),
+                                label: option.name,
+                            })),
+                        ]}
+                        onChange={(value) =>
                             queue.setStaffFilterById(
-                                v === 'all' ? null : Number(v),
+                                value === 'all' ? null : Number(value),
                             )
                         }
                     />
@@ -893,94 +654,139 @@ export default function RosteringConflicts(props: ConflictsProps) {
                     items={railItems}
                     value={filter}
                     onSelect={queue.setFilter}
-                    ariaLabel="Conflict views"
+                    ariaLabel="Scheduling finding views"
                 />
             }
         />
     );
-
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                {
-                    title: 'Workforce',
-                    href: `/operations/rostering?week=${encodeURIComponent(props.weekStart)}`,
-                },
-                {
-                    title: 'Rostering',
-                    href: `/operations/rostering?week=${encodeURIComponent(props.weekStart)}`,
-                },
-                {
-                    title: 'Conflict queue',
-                    href: '/operations/rostering/conflicts',
-                },
+                { title: 'Workforce', href: rosterUrl },
+                { title: 'Rostering', href: rosterUrl },
+                { title: 'Conflict queue', href: returnTo },
             ]}
         >
             <Head title="Rostering conflict queue" />
-
             <PageLayout hero={header}>
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,540px)]">
-                    <ConflictQueueList
-                        filter={filter}
-                        visible={searchedVisible}
-                        selectedId={selectedId}
-                        onSelect={queue.setSelectedId}
-                        allResolved={open.length === 0}
-                    />
-                    <ConflictDetailPanel
-                        item={selected}
-                        onAction={dispatchAction}
-                        canManage={canManage}
-                    />
+                <Card className="mb-4">
+                    <CardContent className="p-4 text-sm">
+                        <p className="font-semibold">
+                            Review recorded scheduling findings
+                        </p>
+                        <p className="mt-1 text-muted-foreground">
+                            Figures cover the returned records within your
+                            access. Overlapping client duties may be planned
+                            support. Acknowledgements do not provide staff, and
+                            publication runs separate checks.
+                        </p>
+                        {limited.length ? (
+                            <ul className="mt-2 space-y-1 text-muted-foreground">
+                                {limited.map(([key, category]) => (
+                                    <li key={key}>
+                                        {key.replace(/_/g, ' ')}:{' '}
+                                        {category.status === 'not_assessed'
+                                            ? 'not assessed'
+                                            : 'partially assessed'}
+                                        {category.truncated
+                                            ? ' · limited results shown'
+                                            : ''}
+                                        . {category.description}
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : null}
+                        {!props.assessment ? (
+                            <p className="mt-2 text-muted-foreground">
+                                Assessment details were not returned. Refresh
+                                before making a decision.
+                            </p>
+                        ) : null}
+                    </CardContent>
+                </Card>
+                {workflowError || createShiftLauncher.error ? (
+                    <p
+                        role="alert"
+                        className="mb-4 rounded-lg border bg-card p-3 text-sm text-status-critical"
+                    >
+                        {workflowError ?? createShiftLauncher.error}
+                    </p>
+                ) : null}
+                <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,540px)]">
+                    <div ref={listAnchor} className="min-w-0">
+                        <ConflictQueueList
+                            filter={filter}
+                            visible={searchedVisible}
+                            selectedId={selectedId}
+                            onSelect={(id) => {
+                                queue.setSelectedId(id);
+                                showSelectedFinding();
+                            }}
+                            allResolved={!open.length}
+                        />
+                    </div>
+                    <section
+                        ref={detailAnchor}
+                        tabIndex={-1}
+                        aria-label="Selected finding"
+                        className="min-w-0 scroll-mt-5"
+                    >
+                        {selected ? (
+                            <Button
+                                variant="outline"
+                                className="frontline-tap mb-3 lg:hidden"
+                                onClick={() => {
+                                    listAnchor.current?.scrollIntoView({
+                                        block: 'start',
+                                    });
+                                    listAnchor.current
+                                        ?.querySelector<HTMLButtonElement>(
+                                            'button[aria-pressed="true"]',
+                                        )
+                                        ?.focus({ preventScroll: true });
+                                }}
+                            >
+                                <ChevronLeft className="mr-2 h-4 w-4" />
+                                Back to findings
+                            </Button>
+                        ) : null}
+                        <ConflictDetailPanel
+                            item={selected}
+                            onAction={dispatchAction}
+                            pending={
+                                pending ||
+                                reviewNeedsRefresh ||
+                                createShiftLauncher.loading
+                            }
+                        />
+                    </section>
                 </div>
+                {pickerOpen ? (
+                    <WeekPicker
+                        selectedWeekStart={weekStartDate}
+                        anchorRef={pickerAnchor}
+                        onSelect={goToWeek}
+                        onClose={() => setPickerOpen(false)}
+                    />
+                ) : null}
             </PageLayout>
-
             <ConflictToasts toasts={queue.toasts} />
-
-            <ReassignDialog
-                open={Boolean(reassignState)}
-                shift={reassignState?.shift ?? null}
-                onOpenChange={(next) => {
-                    if (!next) setReassignState(null);
-                }}
-                onAssign={handleReassignAssign}
-            />
-            <UnassignMakeOpenDialog
-                open={Boolean(unassignState)}
-                shift={unassignState?.shift ?? null}
-                onOpenChange={(next) => {
-                    if (!next) setUnassignState(null);
-                }}
-                onConfirm={handleUnassign}
-            />
-            <BroadcastDialog
-                open={Boolean(broadcastState)}
-                shift={broadcastState?.shift ?? null}
-                onOpenChange={(next) => {
-                    if (!next) setBroadcastState(null);
-                }}
-                onConfirm={handleBroadcast}
-            />
             <ConflictConfirmDialog
                 open={Boolean(confirmState)}
-                kind={confirmState?.kind ?? 'acknowledge'}
+                kind={confirmState?.kind ?? 'ack'}
                 item={confirmState?.item ?? null}
+                pending={pending}
+                error={reviewError}
                 onOpenChange={(next) => {
-                    if (!next) setConfirmState(null);
+                    if (!next && !pending) setConfirmState(null);
                 }}
                 onConfirm={handleConfirm}
             />
             <ConflictScanSettingsDialog
                 open={scanSettingsOpen}
                 onOpenChange={setScanSettingsOpen}
-                onSave={() => {
-                    setScanSettingsOpen(false);
-                    queue.pushToast(
-                        'Scan settings saved',
-                        'Conflict scan updated',
-                    );
-                }}
+                assessment={props.assessment}
             />
             {createShiftLauncher.dialog}
         </AppLayout>
