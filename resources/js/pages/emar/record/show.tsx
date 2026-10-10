@@ -1,9 +1,18 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { AlertTriangle, Clock, Home, Pill, Printer } from 'lucide-react';
+import {
+    AlertTriangle,
+    CalendarDays,
+    CalendarRange,
+    Clock,
+    Home,
+    Pill,
+    Printer,
+} from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 import { MarReportDialog } from '@/components/clients/profile/mar-day/report-dialog';
-import { ChartSection, ChartViewSwitch } from '@/components/emar/record/chart';
+import { ChartSection } from '@/components/emar/record/chart';
 import { ClinicalSection } from '@/components/emar/record/clinical';
 import { DoseMeters } from '@/components/emar/record/dose-meters';
 import { HistorySection } from '@/components/emar/record/history';
@@ -29,6 +38,8 @@ import {
 import {
     PageHeader,
     PageHeaderFilterButton,
+    PageHeaderFilterCheck,
+    PageHeaderFilterSelect,
     PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
@@ -37,6 +48,7 @@ import {
     PageHeaderSearch,
     PageHeaderSearchTrigger,
     PageHeaderStatusChip,
+    PageHeaderViewToggle,
 } from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -125,6 +137,42 @@ function AvailableRecord({
         hubUrl.pathname + hubUrl.search;
     const week = query.get('mode') === 'week';
     const historyPage = Math.max(1, Number(query.get('page')) || 1);
+    // EA-109 (Lane C9): each section's approved filters, kept in the URL.
+    const pick = <T extends string>(
+        key: string,
+        allowed: readonly T[],
+        fallback: T,
+    ): T =>
+        (allowed as readonly string[]).includes(query.get(key) ?? '')
+            ? (query.get(key) as T)
+            : fallback;
+    const medType = pick('type', ['all', 'scheduled', 'prn'] as const, 'all');
+    const attention = query.get('attn') === '1';
+    const showResolved = query.get('resolved') === '1';
+    const range = pick('range', ['7d', '30d', 'all'] as const, '7d');
+    const outcome = pick(
+        'out',
+        ['all', 'given', 'notgiven', 'corrected'] as const,
+        'all',
+    );
+    const sectionFilters: Record<string, string | null> = {
+        type: medType === 'all' ? null : medType,
+        attn: attention ? '1' : null,
+        resolved: showResolved ? '1' : null,
+        range: range === '7d' ? null : range,
+        out: outcome === 'all' ? null : outcome,
+    };
+    // "As at" refreshes the header and reloads the open section.
+    const [refreshKey, setRefreshKey] = useState(0);
+    const refresh = () =>
+        router.reload({
+            onSuccess: () => {
+                setRefreshKey((key) => key + 1);
+                toast.success(
+                    `Up to date · as at ${formatTime(new Date().toISOString())} · Pacific/Auckland`,
+                );
+            },
+        });
     const sections = RECORD_SECTIONS.map((item) => ({
         ...item,
         views: item.views.filter(
@@ -180,7 +228,7 @@ function AvailableRecord({
         : section.views[0].key;
     const navigateQuery = (extra: Record<string, string | null>) =>
         router.push({
-            url: `/emar/mar${locationSearch(person.id, location, extra, page.url.split('?')[1])}`,
+            url: `/emar/mar${locationSearch(person.id, location, { ...sectionFilters, ...extra }, page.url.split('?')[1])}`,
             preserveState: true,
             preserveScroll: true,
         });
@@ -367,7 +415,150 @@ function AvailableRecord({
                     }
                     filters={
                         <>
-                            <PageHeaderFilterButton icon={Clock} disabled>
+                            {location.tab === 'chart' &&
+                            activeView !== 'asneeded' ? (
+                                <PageHeaderViewToggle
+                                    ariaLabel="Chart layout"
+                                    value={week ? 'week' : 'day'}
+                                    onChange={(next) =>
+                                        navigateQuery({
+                                            mode:
+                                                next === 'week' ? 'week' : null,
+                                        })
+                                    }
+                                    options={[
+                                        {
+                                            value: 'day',
+                                            label: 'Day',
+                                            icon: CalendarDays,
+                                        },
+                                        {
+                                            value: 'week',
+                                            label: 'Week',
+                                            icon: CalendarRange,
+                                        },
+                                    ]}
+                                />
+                            ) : null}
+                            {location.tab === 'medicines' &&
+                            location.view !== 'photos' ? (
+                                <>
+                                    <PageHeaderFilterSelect
+                                        label="Type"
+                                        value={medType}
+                                        allValue="all"
+                                        options={[
+                                            {
+                                                value: 'all',
+                                                label: 'All types',
+                                            },
+                                            {
+                                                value: 'scheduled',
+                                                label: 'Scheduled',
+                                            },
+                                            {
+                                                value: 'prn',
+                                                label: 'As needed',
+                                            },
+                                        ]}
+                                        onChange={(next) =>
+                                            navigateQuery({
+                                                type:
+                                                    next === 'all'
+                                                        ? null
+                                                        : next,
+                                            })
+                                        }
+                                    />
+                                    <PageHeaderFilterCheck
+                                        label="Needs attention"
+                                        checked={attention}
+                                        onChange={(next) =>
+                                            navigateQuery({
+                                                attn: next ? '1' : null,
+                                            })
+                                        }
+                                    />
+                                </>
+                            ) : null}
+                            {location.tab === 'allergies' &&
+                            activeView === 'alerts' ? (
+                                <PageHeaderFilterCheck
+                                    label="Show resolved alerts"
+                                    checked={showResolved}
+                                    onChange={(next) =>
+                                        navigateQuery({
+                                            resolved: next ? '1' : null,
+                                        })
+                                    }
+                                />
+                            ) : null}
+                            {location.tab === 'history' &&
+                            activeView !== 'changes' ? (
+                                <>
+                                    <PageHeaderFilterSelect
+                                        label="Range"
+                                        value={range}
+                                        options={[
+                                            {
+                                                value: '7d',
+                                                label: 'Last 7 days',
+                                            },
+                                            {
+                                                value: '30d',
+                                                label: 'Last 30 days',
+                                            },
+                                            {
+                                                value: 'all',
+                                                label: 'All dates',
+                                            },
+                                        ]}
+                                        onChange={(next) =>
+                                            navigateQuery({
+                                                range:
+                                                    next === '7d' ? null : next,
+                                                page: null,
+                                            })
+                                        }
+                                    />
+                                    <PageHeaderFilterSelect
+                                        label="Outcome"
+                                        value={outcome}
+                                        allValue="all"
+                                        options={[
+                                            {
+                                                value: 'all',
+                                                label: 'All outcomes',
+                                            },
+                                            {
+                                                value: 'given',
+                                                label: 'Given or taken',
+                                            },
+                                            {
+                                                value: 'notgiven',
+                                                label: 'Not given',
+                                            },
+                                            {
+                                                value: 'corrected',
+                                                label: 'Has a correction',
+                                            },
+                                        ]}
+                                        onChange={(next) =>
+                                            navigateQuery({
+                                                out:
+                                                    next === 'all'
+                                                        ? null
+                                                        : next,
+                                                page: null,
+                                            })
+                                        }
+                                    />
+                                </>
+                            ) : null}
+                            <PageHeaderFilterButton
+                                icon={Clock}
+                                onClick={refresh}
+                            >
                                 As at {formatTime(as_at)} · Pacific/Auckland
                             </PageHeaderFilterButton>
                             {location.tab === 'medicines' ? (
@@ -409,18 +600,9 @@ function AvailableRecord({
                             </Button>
                         )}
                     />
-                    {location.tab === 'chart' && activeView !== 'asneeded' && (
-                        <ChartViewSwitch
-                            week={week}
-                            onChange={(nextWeek) =>
-                                navigateQuery({
-                                    mode: nextWeek ? 'week' : null,
-                                })
-                            }
-                        />
-                    )}
                 </div>
                 <div
+                    key={refreshKey}
                     id="medication-record-panel"
                     role="tabpanel"
                     aria-labelledby={`medication-record-tab-${activeView}`}
@@ -439,6 +621,8 @@ function AvailableRecord({
                             clientId={person.id}
                             stopped={location.view === 'stopped'}
                             search={search}
+                            type={medType}
+                            attention={attention}
                             onMedicine={setMedicine}
                             onPhotos={openPhotos}
                         />
@@ -463,7 +647,11 @@ function AvailableRecord({
                             }
                         />
                     ) : location.tab === 'allergies' ? (
-                        <SafetySection clientId={person.id} view={activeView} />
+                        <SafetySection
+                            clientId={person.id}
+                            view={activeView}
+                            showResolved={showResolved}
+                        />
                     ) : location.tab === 'clinical' ? (
                         <ClinicalSection
                             clientId={person.id}
@@ -483,6 +671,8 @@ function AvailableRecord({
                                 navigateQuery({ dose_id: null })
                             }
                             page={historyPage}
+                            range={range}
+                            outcome={outcome}
                             onPage={(next) =>
                                 navigateQuery({
                                     page: next > 1 ? String(next) : null,

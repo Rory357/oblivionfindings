@@ -75,16 +75,22 @@ export function HistorySection({
     onPage,
     initialDoseId,
     onDetailClose,
+    range = '7d',
+    outcome = 'all',
 }: {
     clientId: number;
     view: string;
     page: number;
+    /** EA-109 (Lane C9): the approved History filters, applied by the server. */
+    range?: '7d' | '30d' | 'all';
+    outcome?: 'all' | 'given' | 'notgiven' | 'corrected';
     onPage: (page: number) => void;
     initialDoseId?: number | null;
     onDetailClose?: () => void;
 }) {
     const { data, load, reload, stale, loadedAt } = useRecordJson<HistoryData>(
-        `/emar/clients/${clientId}/record/history?view=${view}&page=${page}`,
+        `/emar/clients/${clientId}/record/history?view=${view}&page=${page}` +
+            (view === 'changes' ? '' : `&range=${range}&outcome=${outcome}`),
     );
     const [detail, setDetail] = useState<number | null>(initialDoseId ?? null);
     const [command, setCommand] = useState<{

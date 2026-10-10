@@ -142,10 +142,16 @@ export function MedicinesSection({
     search,
     onMedicine,
     onPhotos,
+    type = 'all',
+    attention = false,
 }: {
     clientId: number;
     stopped: boolean;
     search: string;
+    /** EA-109 (Lane C9): the approved Medicines filters. */
+    type?: 'all' | 'scheduled' | 'prn';
+    /** Waiting to be checked or on hold. */
+    attention?: boolean;
     onMedicine: (id: number) => void;
     /** C11: open Medicines › Photos for one medicine. */
     onPhotos?: (id: number) => void;
@@ -159,13 +165,19 @@ export function MedicinesSection({
     if (load !== 'ready' || !data)
         return <ReadingState load={load} reload={reload} />;
     const query = search.trim().toLocaleLowerCase('en-NZ');
+    const filtering = Boolean(query) || type !== 'all' || attention;
     const rows = data.rows.filter(
         (row) =>
-            !query ||
+            !filtering ||
             (!isConcealed(row) &&
-                `${row.name} ${row.strength ?? ''}`
-                    .toLocaleLowerCase('en-NZ')
-                    .includes(query)),
+                (!query ||
+                    `${row.name} ${row.strength ?? ''}`
+                        .toLocaleLowerCase('en-NZ')
+                        .includes(query)) &&
+                (type === 'all' || row.kind === type) &&
+                (!attention ||
+                    row.status === 'awaiting' ||
+                    row.status === 'paused')),
     );
     return (
         <div className="flex min-w-0 flex-col gap-5">

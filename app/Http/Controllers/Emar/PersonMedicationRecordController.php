@@ -318,7 +318,9 @@ class PersonMedicationRecordController extends Controller
     {
         $actor = $this->actor($request);
         $client = $this->access->client($actor, $clientId);
-        $data = $request->validate(['page' => ['nullable', 'integer', 'min:1'], 'view' => ['nullable', 'in:doses,corrections,changes']]);
+        $data = $request->validate(['page' => ['nullable', 'integer', 'min:1'], 'view' => ['nullable', 'in:doses,corrections,changes'],
+            // EA-109 (Lane C9): the approved History filters (doses and corrections).
+            'range' => ['nullable', 'in:7d,30d,all'], 'outcome' => ['nullable', 'in:all,given,notgiven,corrected']]);
         if (($data['view'] ?? '') === 'changes') {
             abort_unless($actor->canDo('medications.audit.view'), 403);
             $privacy = app(MedicationProfileAuditPrivacy::class);
@@ -367,6 +369,17 @@ class PersonMedicationRecordController extends Controller
         } else {
             $query->effectiveClinicalEvidence();
         }
+        // NZ days: "Last 7 days" is today and the six days before.
+        $days = ['7d' => 7, '30d' => 30][$data['range'] ?? 'all'] ?? null;
+        if ($days !== null) {
+            $query->where('administered_at', '>=', Carbon::now($this->schedule->workerTimezone())->startOfDay()->subDays($days - 1)->utc());
+        }
+        match ($data['outcome'] ?? 'all') {
+            'given' => $query->where('status', 'given'),
+            'notgiven' => $query->whereIn('status', ['refused', 'withheld', 'missed']),
+            'corrected' => $query->where('is_correction', true),
+            default => null,
+        };
         $records = $query->latest('administered_at')->latest('id')->paginate(25);
         $concealment = MedicationConcealment::for($actor);
         $records->setCollection($records->getCollection()->map(fn ($dose) => $concealment->hides((bool) $dose->medication?->controlled_drug) ? ['concealed' => true, 'key' => 'dose'.$dose->id] : ['key' => (string) $dose->id, 'id' => $dose->id, 'medicine' => $dose->medication?->name, 'status' => $dose->status, 'at' => $dose->administered_at?->toIso8601String(), 'scheduled_for' => $dose->scheduled_for?->toIso8601String(), 'by' => $dose->administeredBy?->name, 'dose' => $dose->dose_given, 'reason' => $dose->reason, 'notes' => $dose->notes, 'is_correction' => (bool) $dose->is_correction, 'correction_status' => $dose->correction_status, 'correction_reason' => $dose->correction_reason, 'requested_by' => $dose->correction_requested_by ?? $dose->administered_by]));

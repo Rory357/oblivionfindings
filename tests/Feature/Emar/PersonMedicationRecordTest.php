@@ -285,6 +285,29 @@ class PersonMedicationRecordTest extends TestCase
         $this->assertSame($source, $query['return_to']);
     }
 
+    /** EA-109 (Lane C9): History's Range and Outcome filters are applied by the server, in NZ days. */
+    public function test_history_range_and_outcome_filters(): void
+    {
+        $order = $this->medicine('As needed medicine', ['is_prn' => true]);
+        foreach ([['given', '2026-09-28 08:00'], ['refused', '2026-09-20 08:00'], ['given', '2026-08-01 08:00']] as [$status, $at]) {
+            ClientMedicationAdministration::query()->create([
+                'client_id' => $this->person->id, 'client_medication_id' => $order->id, 'administered_by' => $this->reader->id,
+                'status' => $status, 'administered_at' => Carbon::parse($at, 'Pacific/Auckland')->utc(), 'dose_given' => '1 tablet',
+                'reason' => $status === 'refused' ? 'Declined' : null,
+            ]);
+        }
+        $count = fn (string $query) => $this->actingAs($this->reader)->getJson($this->url('/history?view=doses&'.$query))->assertOk()->json('page.total');
+
+        $this->assertSame(1, $count('range=7d'));
+        $this->assertSame(2, $count('range=30d'));
+        $this->assertSame(3, $count('range=all'));
+        $this->assertSame(3, $count(''), 'Without a range the history stays complete.');
+        $this->assertSame(1, $count('range=30d&outcome=notgiven'));
+        $this->assertSame(2, $count('range=all&outcome=given'));
+        $this->assertSame(0, $count('range=all&outcome=corrected'));
+        $this->getJson($this->url('/history?range=1y'))->assertUnprocessable()->assertJsonValidationErrors('range');
+    }
+
     public function test_changes_page_combines_retained_audits_with_new_events_and_conceals_controlled_facts(): void
     {
         $this->reader->permissionOverrides()->syncWithoutDetaching(Permission::where('key', 'medications.audit.view')->pluck('id')->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])->all());
