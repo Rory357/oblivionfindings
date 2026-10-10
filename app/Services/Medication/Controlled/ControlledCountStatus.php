@@ -47,9 +47,16 @@ final class ControlledCountStatus
 
         // EA-012: an archived person's controlled stock keeps its count
         // schedule at an open house until it is cleared (stock below).
+        // EA-012 follow-up: a house closed before the guard keeps the count
+        // schedule for stock still on hand there, until it is cleared.
+        $closedSite = fn ($site) => $site->where(fn ($closed) => $closed->where('is_active', false)
+            ->orWhere('archived', true)->orWhereNotNull('archived_at'));
+
         return ClientMedication::withTrashed()->controlled()
             ->where(fn ($owner) => $owner->whereHas('client.site', $openSite)
-                ->orWhereHas('client', fn ($client) => $client->onlyTrashed()->whereHas('site', $openSite)))
+                ->orWhereHas('client', fn ($client) => $client->onlyTrashed()->whereHas('site', $openSite))
+                ->orWhere(fn ($closedHouse) => $closedHouse->whereHas('client', fn ($client) => $client->withTrashed()->whereHas('site', $closedSite))
+                    ->whereHas('stock', fn ($stock) => $stock->where('on_hand', '>', 0))))
             ->when($siteId !== null, fn ($q) => $q->whereHas('client', fn ($client) => $client->withTrashed()->where('site_id', $siteId)))
             ->where(fn ($q) => $q->where(fn ($active) => $active->active()->whereHas('client'))
                 // The outer medicine lock does not make this subquery a current

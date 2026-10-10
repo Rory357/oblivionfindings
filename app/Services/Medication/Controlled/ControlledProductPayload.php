@@ -41,17 +41,29 @@ final class ControlledProductPayload
 
     public function forActor(User $actor, ?int $siteId = null, ?int $medicationId = null, ?int $clientId = null, ?string $date = null, ?int $entryId = null, ?int $destructionId = null): array
     {
-        $siteIds = $this->scope->readerSiteIds($actor, 'medications.controlled.view', $siteId);
+        $holding = app(ControlledStockHolding::class);
+        // EA-012 follow-up: houses closed before the guard that still hold
+        // controlled stock stay listed, "(archived house)", for close-out.
+        $closedSiteIds = $holding->closedHeldSiteIdsFor($actor);
+        $closedRequested = $siteId !== null && in_array($siteId, $closedSiteIds, true);
+        $siteIds = $this->scope->readerSiteIds($actor, 'medications.controlled.view', $closedRequested ? null : $siteId);
         if ($siteId !== null) {
             $siteIds = [$siteId];
+        } else {
+            $siteIds = array_values(array_unique([...$siteIds, ...$closedSiteIds]));
         }
-        $clientIds = $this->access->readableClientIds($actor, Client::query()->whereIn('site_id', $siteIds)->pluck('id'));
+        $openSiteIds = array_values(array_diff($siteIds, $closedSiteIds));
+        $clientIds = $this->access->readableClientIds($actor, Client::query()->whereIn('site_id', $openSiteIds)->pluck('id'));
+        // At a closed house, house-level access stands in for the person rule:
+        // everyone there who still holds controlled stock.
+        $closedHolders = Client::withTrashed()->whereIn('site_id', array_values(array_intersect($siteIds, $closedSiteIds)))->pluck('id')
+            ->map(fn ($id) => (int) $id)->filter(fn (int $id) => $holding->heldByClients([$id])->isNotEmpty())->values()->all();
+        $clientIds = array_values(array_unique([...$clientIds, ...$closedHolders]));
         // EA-012: an archived person stays in the register, under the same
         // person rule, until their controlled stock is cleared.
-        $archivedIds = Client::onlyTrashed()->whereIn('site_id', $siteIds)->get()
+        $archivedIds = Client::onlyTrashed()->whereIn('site_id', $openSiteIds)->get()
             ->filter(fn (Client $person) => Gate::forUser($actor)->allows('viewMedications', $person))
             ->pluck('id')->map(fn ($id) => (int) $id)->all();
-        $holding = app(ControlledStockHolding::class);
         $archivedIds = array_values(array_filter($archivedIds, fn (int $id) => $holding->heldByClients([$id])->isNotEmpty()));
         $clientIds = array_values(array_unique([...$clientIds, ...$archivedIds]));
         // Narrow within the existing person boundary; conceal unreadable IDs.
@@ -118,7 +130,8 @@ final class ControlledProductPayload
         $names = $names->union(User::query()->whereIn('id', $allUserIds)->pluck('name', 'id'));
         $manage = $actor->canDo(ControlledRegisterService::MANAGE);
         $record = $actor->canDo('medications.controlled.record');
-        $siteRows = Site::query()->whereIn('id', $siteIds)->orderBy('name')->get(['id', 'name', 'brand_colour']);
+        $siteRows = Site::query()->whereIn('id', $siteIds)->orderBy('name')->get(['id', 'name', 'brand_colour'])
+            ->each(fn (Site $site) => $site->setAttribute('name', $site->name.(in_array((int) $site->id, $closedSiteIds, true) ? ' (archived house)' : '')));
         $activeSite = $siteId !== null ? $siteRows->firstWhere('id', $siteId) : null;
         $presentSites = HrAttendanceSession::query()->where('user_id', $actor->id)->whereIn('site_id', $siteIds)->where('status', 'open')->whereNull('clock_out_at')->where('clock_in_at', '<=', now()->utc())->pluck('site_id')->all();
         // Canonical active Shift evidence remains supported alongside attendance.
@@ -154,7 +167,7 @@ final class ControlledProductPayload
             'history_limit' => self::HISTORY_LIMIT,
             'history_has_more' => ['entries' => (clone $historyQuery)->count() > self::HISTORY_LIMIT, 'discrepancies' => (clone $discrepancyQuery)->count() > self::HISTORY_LIMIT, 'losses' => (clone $lossQuery)->count() > self::HISTORY_LIMIT, 'destructions' => (clone $destructionQuery)->count() > self::HISTORY_LIMIT, 'overrides' => (clone $overrideQuery)->count() > self::HISTORY_LIMIT],
             'totals' => ['open_discrepancies' => (clone $discrepancyQuery)->whereIn('status', ['open', 'under_review'])->count(), 'open_losses' => (clone $lossQuery)->whereIn('investigation_status', ['reported', 'investigating'])->count(), 'awaiting_receipt' => (clone $destructionQuery)->whereNull('voided_at')->where('disposal_method', 'pharmacy_return')->whereNull('pharmacy_received_at')->count()],
-            'medicines' => $medicineRows = $meds->map(function (ClientMedication $m) use ($record, $presentSites, $counts, $latest): array {
+            'medicines' => $medicineRows = $meds->map(function (ClientMedication $m) use ($record, $presentSites, $counts, $latest, $closedSiteIds): array {
                 $count = $counts->get($m->id);
                 $state = $this->policy->countStatus($m, now(), $count?->recorded_at);
                 $status = match ($state['status']) {
@@ -162,7 +175,7 @@ final class ControlledProductPayload
                 };
                 $canRecord = $record && in_array((int) $m->client->site_id, $presentSites, true) && (($m->deleted_at === null && $m->superseded_by === null));
 
-                return ['id' => $m->id, 'client_id' => $m->client_id, 'client_name' => $m->client->full_name.($m->client->trashed() ? ' (archived)' : ''), 'client_archived' => $m->client->trashed(), 'site_id' => $m->client->site_id, 'site_name' => $m->client->site?->name ?? '',
+                return ['id' => $m->id, 'client_id' => $m->client_id, 'client_name' => $m->client->full_name.($m->client->trashed() ? ' (archived)' : ''), 'client_archived' => $m->client->trashed(), 'site_id' => $m->client->site_id, 'site_name' => ($m->client->site?->name ?? '').(in_array((int) $m->client->site_id, $closedSiteIds, true) ? ' (archived house)' : ''), 'site_archived' => in_array((int) $m->client->site_id, $closedSiteIds, true),
                     'pack_stock' => app(MedicationStockService::class)->packOptions($m),
                     'name' => $m->name, 'unit' => $m->stock?->unit ?? '', 'balance' => $m->stock?->on_hand === null ? null : Quantity::toFloat($m->stock->on_hand),
                     'entry_version' => $latest[$m->id] ?? null, 'nz_class' => $m->nz_controlled_class, 'class_review_required' => $m->controlled_class_reviewed_at === null,

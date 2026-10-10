@@ -18,6 +18,7 @@ use App\Models\MedicationScheduledStockCount;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\Site;
+use App\Services\Medication\Controlled\ControlledStockHolding;
 use App\Models\User;
 use App\Services\AuthorizationEvidenceLockService;
 use App\Services\UserSiteAccessService;
@@ -95,6 +96,15 @@ final class MedicationGovernanceScopeService
         'clinical.accessAllSites',
         'sites.viewAll',
     ];
+
+    /**
+     * EA-012 follow-up: a closed (archived or inactive) house whose
+     * controlled stock is being cleared. Set only while a register close-out
+     * command runs for a permitted reader; every other check still applies.
+     *
+     * @var list<int>
+     */
+    private array $closeOutSiteIds = [];
 
     public function __construct(
         private UserSiteAccessService $siteAccess,
@@ -501,20 +511,41 @@ final class MedicationGovernanceScopeService
                 ->lockForUpdate()
                 ->first();
             $this->notFoundUnless($medication !== null);
+            // EA-012 follow-up: a house closed before the guard that still
+            // holds controlled stock — register close-out only, for readers
+            // whose current profile names that house or who hold the bypass.
+            $site = Site::query()->whereKey($client->site_id)->first();
+            $closedHouse = $allowArchivedClient && $site !== null && ! ControlledStockHolding::siteIsOpen($site);
             [$lockedActor, $lockedUsers] = $this->lockMutationActor(
                 $actor,
                 (int) $client->site_id,
                 $capability,
                 $authorizationUserIds,
                 $authorizationEffectiveAt,
+                lockSite: ! $closedHouse,
             );
+            if ($closedHouse) {
+                Site::query()->whereKey($site->id)->lockForUpdate()->first(['id']);
+                $this->notFoundUnless(in_array((int) $site->id, app(ControlledStockHolding::class)->closedHeldSiteIdsFor($lockedActor), true));
+                $this->closeOutSiteIds = [(int) $site->id];
+            }
 
-            return $this->invokeWithLockedActorEvidence(
-                $actor,
-                $lockedActor,
-                fn () => $callback($client, $medication, $lockedActor, $lockedUsers),
-            );
+            try {
+                return $this->invokeWithLockedActorEvidence(
+                    $actor,
+                    $lockedActor,
+                    fn () => $callback($client, $medication, $lockedActor, $lockedUsers),
+                );
+            } finally {
+                $this->closeOutSiteIds = [];
+            }
         }, 3);
+    }
+
+    /** Whether the running command is a close-out at this closed house. */
+    public function closingOutSite(int $siteId): bool
+    {
+        return in_array($siteId, $this->closeOutSiteIds, true);
     }
 
     public function forStock(
@@ -1705,6 +1736,9 @@ final class MedicationGovernanceScopeService
 
     private function assertSiteAccess(User $actor, int $siteId): void
     {
+        if ($this->closingOutSite($siteId)) {
+            return;
+        }
         $this->notFoundUnless(
             in_array(
                 $siteId,

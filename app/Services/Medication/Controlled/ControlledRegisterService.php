@@ -86,8 +86,18 @@ final class ControlledRegisterService
                         abort_unless(in_array($action, self::ARCHIVED_CLOSE_OUT_ACTIONS, true)
                             && app(ControlledStockHolding::class)->heldByClients([(int) $client->id])->isNotEmpty(), 404);
                     }
+                    // EA-012 follow-up: at a house closed before the guard, only
+                    // close-out work while it still holds stock. House-level access
+                    // was checked by the scope; the person rule needs an open house.
+                    $closedHouse = $this->scope->closingOutSite((int) $client->site_id);
+                    if ($closedHouse) {
+                        abort_unless(in_array($action, self::ARCHIVED_CLOSE_OUT_ACTIONS, true)
+                            && app(ControlledStockHolding::class)->heldAtSite((int) $client->site_id), 404);
+                    }
                     $medication->setRelation('client', $client);
-                    $this->access->assertReadable($lockedActor, $client);
+                    if (! $closedHouse) {
+                        $this->access->assertReadable($lockedActor, $client);
+                    }
                     $auditEvents = [];
                     abort_if(isset($input['client_id']) && (int) $input['client_id'] !== (int) $client->id, 404);
                     abort_if(isset($input['site_id']) && (int) $input['site_id'] !== (int) $client->site_id, 404);

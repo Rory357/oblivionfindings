@@ -138,6 +138,48 @@ class ControlledRegisterCloseOutTest extends TestCase
         $this->denied(404, fn () => $this->perform('class_review', ['nz_class' => 'B', 'source' => 'Synthetic'], $this->lead));
     }
 
+    /**
+     * EA-012 follow-up (Main's decision, 10 Oct): a house archived before the
+     * guard that still holds controlled stock stays in the register, "(archived
+     * house)", for close-out only — for readers of that house.
+     */
+    public function test_a_house_archived_before_the_guard_keeps_its_held_stock_listed_for_close_out_only(): void
+    {
+        // Archived before this guard existed: bypass the model event.
+        DB::table('sites')->where('id', $this->site->id)->update(['archived' => true, 'archived_at' => now()->subDay(), 'is_active' => false]);
+        $outsider = $this->staff('team_lead', 'Synthetic other-house lead');
+        HrEmployeeProfile::query()->where('user_id', $outsider->id)->update(['primary_site_id' => Site::factory()->create(['is_active' => true])->id]);
+
+        $payload = $this->actingAs($this->lead->fresh())->getJson('/emar/controlled/product')->assertOk()->json();
+        $row = collect($payload['medicines'])->firstWhere('id', $this->medication->id);
+        $this->assertNotNull($row, 'The closed house\'s held stock must stay in the register.');
+        $this->assertSame('Rimu House (archived house)', $row['site_name']);
+        $this->assertTrue($row['site_archived']);
+        $this->assertContains('Rimu House (archived house)', collect($payload['sites'])->pluck('name')->all());
+        $this->assertTrue(app(ControlledCountStatus::class)->relevantMedicines()->contains('id', $this->medication->id));
+        // Not for someone who never had that house.
+        $other = $this->actingAs($outsider->fresh())->getJson('/emar/controlled/product')->assertOk()->json();
+        $this->assertNull(collect($other['medicines'])->firstWhere('id', $this->medication->id));
+
+        // Close-out work still runs (the lead and witness are on shift there).
+        $result = $this->perform('count', ['actual_balance' => 14], $this->lead);
+        $this->assertSame('Count saved — matches the register.', $result['message']);
+        // Nothing else: no class review, and no new delivery.
+        $this->denied(404, fn () => $this->perform('class_review', ['nz_class' => 'B', 'source' => 'Synthetic'], $this->lead));
+        $entries = ClientControlledDrugEntry::query()->count();
+        config(['medications.stock_lots_enabled' => true]);
+        $status = $this->actingAs($this->lead->fresh())->postJson('/emar/stock/packs/commands', [
+            'action' => 'receive', 'client_medication_id' => $this->medication->id, 'request_uuid' => (string) Str::uuid(),
+            'quantity' => '5', 'source' => 'pharmacy', 'source_reference' => 'Late delivery', 'unit' => 'mL', 'label_checked' => true,
+            'batch_number' => 'LATE-1', 'batch_not_printed' => false, 'expiry_month' => now('Pacific/Auckland')->addMonths(6)->format('m/Y'), 'expiry_not_printed' => false,
+        ])->status();
+        $this->assertContains($status, [403, 404]);
+        $this->assertSame($entries, ClientControlledDrugEntry::query()->count());
+        $this->assertSame('14.00', (string) $this->stock->fresh()->on_hand);
+        // An outsider can't close it out either.
+        $this->denied(404, fn () => $this->perform('count', ['actual_balance' => 14], $outsider));
+    }
+
     public function test_an_archived_person_with_nothing_left_is_not_reopened(): void
     {
         $this->stock->forceFill(['on_hand' => '0.00'])->saveQuietly();
