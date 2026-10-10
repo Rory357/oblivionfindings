@@ -397,6 +397,8 @@ type Props = {
         client_care: string | null;
     };
     can: {
+        edit_shift?: boolean;
+        view_client_profile?: boolean;
         add_note: boolean;
         create_incident: boolean;
         mark_tasks?: boolean;
@@ -1012,7 +1014,7 @@ export default function ShiftShow({
                                     </Link>
                                 </Button>
                             ) : null}
-                            {auth?.can?.shifts?.update ? (
+                            {can.edit_shift === true ? (
                                 <Button
                                     type="button"
                                     size="sm"
@@ -1023,7 +1025,8 @@ export default function ShiftShow({
                                     Edit shift
                                 </Button>
                             ) : null}
-                            {links.client_care ? (
+                            {can.view_client_profile === true &&
+                            links.client_care ? (
                                 <Button asChild size="sm" variant="secondary">
                                     <Link
                                         href={links.client_care}
@@ -3216,17 +3219,19 @@ export default function ShiftShow({
                 </div>
 
                 {/* ── Modals (outside tab structure) ── */}
-                <CreateShiftDialog
-                    key={`show-edit-${shift.id}`}
-                    open={editOpen}
-                    onClose={() => setEditOpen(false)}
-                    clients={clients}
-                    staff={staff}
-                    sites={sites}
-                    serviceContexts={serviceContexts}
-                    defaultServiceContextId={defaultServiceContextId}
-                    initialShift={editableShift}
-                />
+                {can.edit_shift === true ? (
+                    <CreateShiftDialog
+                        key={`show-edit-${shift.id}`}
+                        open={editOpen}
+                        onClose={() => setEditOpen(false)}
+                        clients={clients}
+                        staff={staff}
+                        sites={sites}
+                        serviceContexts={serviceContexts}
+                        defaultServiceContextId={defaultServiceContextId}
+                        initialShift={editableShift}
+                    />
+                ) : null}
                 {createShiftLauncher.dialog}
 
                 <Dialog open={completeOpen} onOpenChange={setCompleteOpen}>

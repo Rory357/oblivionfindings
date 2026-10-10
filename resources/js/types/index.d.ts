@@ -40,6 +40,7 @@ export interface AuthPermissions {
         create?: boolean;
         update?: boolean;
         manageAny?: boolean;
+        overrideEligibility?: boolean;
     };
     calendar?: {
         viewAny?: boolean;

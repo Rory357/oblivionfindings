@@ -1,9 +1,8 @@
 import { cn } from '@/lib/utils';
 
-import { Card as GuardrailCard } from '@/components/ui/card';
 import { MicroStats, type MicroStat } from './micro-stats';
 
-export type AnalyticsTrendPoint = { week: string; coverage: number };
+export type AnalyticsTrendPoint = { week: string; completion: number | null };
 export type DailyCoveragePoint = {
     day: string;
     date: string;
@@ -21,7 +20,7 @@ export type FillBySite = { site: string; rate: number };
 
 export type AnalyticsPaneProps = {
     stats: MicroStat[];
-    coverageTrend: AnalyticsTrendPoint[];
+    completionTrend: AnalyticsTrendPoint[];
     dailyCoverage?: DailyCoveragePoint[];
     shiftTypes: ShiftTypeSlice[];
     fillBySite: FillBySite[];
@@ -30,13 +29,13 @@ export type AnalyticsPaneProps = {
 
 export function AnalyticsPane({
     stats,
-    coverageTrend,
+    completionTrend,
     dailyCoverage = [],
     shiftTypes,
     fillBySite,
     overtimeTrend = [],
 }: AnalyticsPaneProps) {
-    const totalShifts = shiftTypes.reduce((s, x) => s + x.value, 0) || 1;
+    const totalShifts = shiftTypes.reduce((s, x) => s + x.value, 0);
     const maxDailyScheduled = Math.max(
         1,
         ...dailyCoverage.map((d) => d.scheduled),
@@ -45,8 +44,7 @@ export function AnalyticsPane({
     const W = 520;
     const H = 170;
     const PAD = 28;
-    const points =
-        coverageTrend.length > 0 ? coverageTrend : [{ week: '—', coverage: 0 }];
+    const points = completionTrend;
     const xs = points.map(
         (_, i) =>
             PAD +
@@ -54,18 +52,17 @@ export function AnalyticsPane({
                 ? (W - 2 * PAD) / 2
                 : (i / (points.length - 1)) * (W - 2 * PAD)),
     );
-    const ymin = 80;
+    const ymin = 0;
     const ymax = 100;
     const yFor = (v: number) =>
         H - PAD - ((v - ymin) / (ymax - ymin)) * (H - 2 * PAD - 12);
     const linePath = points
-        .map(
-            (p, i) =>
-                `${i === 0 ? 'M' : 'L'}${xs[i]},${yFor(Math.max(ymin, Math.min(ymax, p.coverage)))}`,
+        .map((p, i) =>
+            p.completion === null
+                ? ''
+                : `${i === 0 || points[i - 1].completion === null ? 'M' : 'L'}${xs[i]},${yFor(p.completion)}`,
         )
         .join(' ');
-    const areaPath =
-        linePath + ` L${xs[xs.length - 1]},${H - PAD} L${xs[0]},${H - PAD} Z`;
 
     const maxOt = Math.max(1, ...overtimeTrend);
     const otDelta =
@@ -78,144 +75,110 @@ export function AnalyticsPane({
             <MicroStats stats={stats} />
 
             <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr]">
-                <section className="rounded-[14px] border border-border bg-card p-4 shadow-sm">
-                    <div className="mb-3 flex items-center justify-between">
-                        <div>
-                            <h3 className="text-sm font-bold tracking-tight">
-                                Coverage trend · last {points.length} weeks
-                            </h3>
-                            <div className="text-[11px] text-muted-foreground">
-                                Filled vs. target (95%)
-                            </div>
-                        </div>
-                        <GuardrailCard
-                            unstyled
-                            className="inline-flex rounded-md border border-border bg-background p-0.5 text-[11px]"
-                        >
-                            <button
-                                type="button"
-                                className="rounded-sm px-2 py-1 font-semibold text-muted-foreground hover:bg-accent"
-                            >
-                                4w
-                            </button>
-                            <button
-                                type="button"
-                                className="rounded-sm bg-primary-fill px-2 py-1 font-semibold text-primary-fill-foreground"
-                            >
-                                8w
-                            </button>
-                            <button
-                                type="button"
-                                className="rounded-sm px-2 py-1 font-semibold text-muted-foreground hover:bg-accent"
-                            >
-                                12w
-                            </button>
-                        </GuardrailCard>
-                    </div>
-                    <div className="w-full overflow-hidden">
+                <section className="min-w-0 rounded-[14px] border border-border bg-card p-4 shadow-sm">
+                    <h3 className="text-section-title">
+                        Shift completion · {points.length} weeks
+                    </h3>
+                    <p className="text-caption mt-1">
+                        Completed records as a share of all recorded shifts,
+                        including cancellations.
+                    </p>
+                    {points.some((point) => point.completion !== null) ? (
                         <svg
                             viewBox={`0 0 ${W} ${H}`}
                             width="100%"
-                            preserveAspectRatio="none"
+                            role="img"
+                            aria-label="Weekly shift completion percentages"
                         >
-                            <defs>
-                                <linearGradient
-                                    id="rost-trendFill"
-                                    x1="0"
-                                    x2="0"
-                                    y1="0"
-                                    y2="1"
-                                >
-                                    <stop
-                                        offset="0%"
-                                        stopColor="var(--primary)"
-                                        stopOpacity="0.30"
-                                    />
-                                    <stop
-                                        offset="100%"
-                                        stopColor="var(--primary)"
-                                        stopOpacity="0"
-                                    />
-                                </linearGradient>
-                            </defs>
-                            {[80, 85, 90, 95, 100].map((v) => (
-                                <g key={v}>
+                            {[0, 25, 50, 75, 100].map((value) => (
+                                <g key={value}>
                                     <line
                                         x1={PAD}
                                         x2={W - PAD}
-                                        y1={yFor(v)}
-                                        y2={yFor(v)}
+                                        y1={yFor(value)}
+                                        y2={yFor(value)}
                                         stroke="var(--border)"
-                                        strokeWidth="1"
-                                        strokeDasharray={v === 95 ? '4 4' : '0'}
                                     />
                                     <text
                                         x={PAD - 6}
-                                        y={yFor(v) + 3}
+                                        y={yFor(value) + 3}
                                         textAnchor="end"
                                         fontSize="10"
                                         fill="var(--muted-foreground)"
                                     >
-                                        {v}%
+                                        {value}%
                                     </text>
                                 </g>
                             ))}
-                            <path d={areaPath} fill="url(#rost-trendFill)" />
                             <path
                                 d={linePath}
                                 stroke="var(--primary)"
                                 strokeWidth="2.5"
                                 fill="none"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
                             />
-                            {points.map((p, i) => (
-                                <g key={i}>
-                                    <circle
-                                        cx={xs[i]}
-                                        cy={yFor(
-                                            Math.max(
-                                                ymin,
-                                                Math.min(ymax, p.coverage),
-                                            ),
-                                        )}
-                                        r={i === points.length - 1 ? 5 : 3.5}
-                                        fill="var(--background)"
-                                        stroke="var(--primary)"
-                                        strokeWidth="2"
-                                    />
+                            {points.map((point, index) => (
+                                <g key={point.week}>
+                                    {point.completion !== null && (
+                                        <circle
+                                            cx={xs[index]}
+                                            cy={yFor(point.completion)}
+                                            r="4"
+                                            fill="var(--background)"
+                                            stroke="var(--primary)"
+                                            strokeWidth="2"
+                                        >
+                                            <title>
+                                                {point.week}: {point.completion}
+                                                % completed
+                                            </title>
+                                        </circle>
+                                    )}
                                     <text
-                                        x={xs[i]}
+                                        x={xs[index]}
                                         y={H - 8}
                                         textAnchor="middle"
                                         fontSize="10"
                                         fill="var(--muted-foreground)"
                                     >
-                                        {p.week}
+                                        {point.week}
                                     </text>
                                 </g>
                             ))}
                         </svg>
-                    </div>
+                    ) : (
+                        <p className="py-8 text-sm text-muted-foreground">
+                            No recorded shifts in this period.
+                        </p>
+                    )}
+                    <ul className="text-caption mt-3 flex flex-wrap gap-x-4 gap-y-2">
+                        {points.map((point) => (
+                            <li key={point.week}>
+                                {point.week}:{' '}
+                                {point.completion === null
+                                    ? 'No shifts'
+                                    : `${point.completion}% completed`}
+                            </li>
+                        ))}
+                    </ul>
                 </section>
 
                 <section className="rounded-[14px] border border-border bg-card p-4 shadow-sm">
                     <div className="mb-3">
                         <h3 className="text-sm font-bold tracking-tight">
-                            Daily coverage
+                            Recorded shift starts
                         </h3>
                         <div className="text-[11px] text-muted-foreground">
-                            Filled vs. open shifts this week
+                            Assigned and unassigned starts · all statuses
                         </div>
                     </div>
                     <div className="space-y-2">
                         {dailyCoverage.length === 0 ? (
                             <div className="text-xs text-muted-foreground">
-                                No daily coverage data this week.
+                                No recorded shift starts this week.
                             </div>
                         ) : null}
                         {dailyCoverage.map((day) => {
-                            const filledWidth =
+                            const assignedWidth =
                                 (day.filled / maxDailyScheduled) * 100;
                             const openWidth =
                                 (day.open / maxDailyScheduled) * 100;
@@ -240,12 +203,12 @@ export function AnalyticsPane({
                                     </div>
                                     <div
                                         className="flex h-2.5 overflow-hidden rounded-full bg-muted"
-                                        title={`${day.filled}/${day.scheduled} filled · ${day.open} open`}
+                                        title={`${day.filled}/${day.scheduled} assigned · ${day.open} open`}
                                     >
                                         <span
                                             className="block h-full bg-status-success"
                                             style={{
-                                                width: `${Math.max(0, filledWidth)}%`,
+                                                width: `${Math.max(0, assignedWidth)}%`,
                                             }}
                                         />
                                         <span
@@ -257,7 +220,8 @@ export function AnalyticsPane({
                                     </div>
                                     <div className="text-right">
                                         <div className="font-semibold tabular-nums">
-                                            {day.filled}/{day.scheduled} filled
+                                            {day.filled}/{day.scheduled}{' '}
+                                            assigned
                                         </div>
                                         <div
                                             className={cn(
@@ -291,7 +255,7 @@ export function AnalyticsPane({
                                 <div
                                     key={t.key}
                                     style={{
-                                        width: `${(t.value / totalShifts) * 100}%`,
+                                        width: `${(t.value / Math.max(1, totalShifts)) * 100}%`,
                                         background: t.color,
                                     }}
                                     title={`${t.label} · ${t.value}`}
@@ -316,7 +280,9 @@ export function AnalyticsPane({
                                         <span className="ml-1 text-[10px] text-muted-foreground">
                                             ·{' '}
                                             {Math.round(
-                                                (t.value / totalShifts) * 100,
+                                                (t.value /
+                                                    Math.max(1, totalShifts)) *
+                                                    100,
                                             )}
                                             %
                                         </span>
@@ -330,30 +296,22 @@ export function AnalyticsPane({
                 <section className="rounded-[14px] border border-border bg-card p-4 shadow-sm">
                     <div className="mb-3">
                         <h3 className="text-sm font-bold tracking-tight">
-                            Fill rate by site
+                            Staff numbers by site
                         </h3>
                         <div className="text-[11px] text-muted-foreground">
-                            This week
+                            Windows at or above configured staff numbers
                         </div>
                     </div>
                     <ul className="space-y-2">
                         {fillBySite.length === 0 ? (
                             <li className="text-xs text-muted-foreground">
-                                No site data this week.
+                                No configured coverage windows were assessed.
                             </li>
                         ) : null}
                         {fillBySite
                             .slice()
                             .sort((a, b) => b.rate - a.rate)
                             .map((s) => {
-                                const cls =
-                                    s.rate >= 95
-                                        ? 'bg-status-success'
-                                        : s.rate >= 90
-                                          ? 'bg-status-info'
-                                          : s.rate >= 85
-                                            ? 'bg-status-warning'
-                                            : 'bg-status-critical';
                                 return (
                                     <li
                                         key={s.site}
@@ -364,10 +322,7 @@ export function AnalyticsPane({
                                         </span>
                                         <span className="relative h-2 overflow-hidden rounded-full bg-muted">
                                             <span
-                                                className={cn(
-                                                    'block h-full',
-                                                    cls,
-                                                )}
+                                                className="block h-full bg-primary"
                                                 style={{
                                                     width: `${Math.min(100, Math.max(0, s.rate))}%`,
                                                 }}
@@ -389,7 +344,9 @@ export function AnalyticsPane({
                                 Overtime hours · trend
                             </h3>
                             <div className="text-[11px] text-muted-foreground">
-                                Weekly · last {overtimeTrend.length} weeks
+                                {overtimeTrend.length > 0
+                                    ? 'Recorded hours by week'
+                                    : 'Recorded overtime hours are not available'}
                             </div>
                         </div>
                         {overtimeTrend.length >= 2 ? (

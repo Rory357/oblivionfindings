@@ -43,7 +43,7 @@ beforeEach(() => {
 });
 function reviewCalendar() {
     fireEvent.click(screen.getByLabelText('Starting view'));
-    fireEvent.click(screen.getByRole('option', { name: 'Month calendar' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Calendar' }));
     fireEvent.click(screen.getByRole('button', { name: 'Review changes' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save preferences' }));
 }
@@ -80,7 +80,7 @@ it('uses its matching preference receipt instead of a newer unrelated projection
     });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Starting view')).toHaveTextContent(
-        'Month calendar',
+        'Calendar',
     );
     expect(screen.getByLabelText('Roster layout')).toHaveTextContent(
         'Week grid',
@@ -124,7 +124,7 @@ it('keeps choices after an unknown save and failed then successful current-state
         reload.mock.calls[1][0].onFinish();
     });
     expect(screen.getByLabelText('Starting view')).toHaveTextContent(
-        'Month calendar',
+        'Calendar',
     );
     expect(screen.getByText(/does not confirm the earlier save/)).toBeVisible();
     expect(patch).toHaveBeenCalledOnce();
@@ -133,12 +133,12 @@ it('keeps choices after an unknown save and failed then successful current-state
 it('reviews and submits both personal choices together', () => {
     render(<WorkforceSettings {...props} />);
     fireEvent.click(screen.getByLabelText('Starting view'));
-    fireEvent.click(screen.getByRole('option', { name: 'Month calendar' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Calendar' }));
     fireEvent.click(screen.getByLabelText('Roster layout'));
     fireEvent.click(screen.getByRole('option', { name: 'List' }));
     fireEvent.click(screen.getByRole('button', { name: 'Review changes' }));
     const review = screen.getByRole('dialog');
-    expect(within(review).getByText('Roster → Month calendar')).toBeVisible();
+    expect(within(review).getByText('Shifts → Calendar')).toBeVisible();
     expect(within(review).getByText('Week grid → List')).toBeVisible();
     fireEvent.click(
         within(review).getByRole('button', { name: 'Save preferences' }),
@@ -152,4 +152,52 @@ it('reviews and submits both personal choices together', () => {
         },
         expect.any(Object),
     );
+});
+
+it('retains a House qualification choice across sections and guards leaving the settings page', () => {
+    window.history.replaceState(
+        {},
+        '',
+        '/operations/workforce-settings#safety/checks',
+    );
+    render(
+        <WorkforceSettings
+            {...props}
+            eligibilityRules={{
+                values: {
+                    unmapped_mandatory_qualification: 'warn',
+                    house_qualification_approach: 'per_requirement',
+                },
+                defaults: {
+                    unmapped_mandatory_qualification: 'warn',
+                    house_qualification_approach: 'per_requirement',
+                },
+                revision: 'd'.repeat(64),
+                source: 'deployment_defaults',
+                scope: 'organisation',
+                can_edit: true,
+                can_view_history: false,
+                urls: {
+                    update: '/operations/workforce-settings/eligibility-rules',
+                    history: null,
+                },
+            }}
+        />,
+    );
+    fireEvent.click(screen.getByLabelText('House qualification approach'));
+    fireEvent.click(screen.getByRole('option', { name: 'Every worker' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Roster' }));
+    expect(
+        screen.getByText('You have an unsaved qualification rule.'),
+    ).toBeVisible();
+    const leaving = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(leaving);
+    expect(leaving.defaultPrevented).toBe(true);
+    fireEvent.click(
+        screen.getByRole('button', { name: 'Review qualification rule' }),
+    );
+    expect(
+        screen.getByLabelText('House qualification approach'),
+    ).toHaveTextContent('Every worker');
+    expect(patch).not.toHaveBeenCalled();
 });

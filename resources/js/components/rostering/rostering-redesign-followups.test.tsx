@@ -731,11 +731,41 @@ describe('rostering redesign follow-up wiring', () => {
         expect(screen.getByText('Expiring soon')).toBeVisible();
     });
 
-    it('renders daily coverage returned by the controller in analytics', () => {
+    it('keeps low completion rates and empty periods distinct from targets', () => {
         render(
             <AnalyticsPane
                 stats={[]}
-                coverageTrend={[]}
+                completionTrend={[
+                    { week: '14 Sep', completion: 20 },
+                    { week: '21 Sep', completion: 0 },
+                    { week: '28 Sep', completion: null },
+                ]}
+                shiftTypes={[]}
+                fillBySite={[]}
+            />,
+        );
+        expect(
+            screen.getByText('14 Sep: 20% completed', { selector: 'li' }),
+        ).toBeVisible();
+        expect(
+            screen.getByText('21 Sep: 0% completed', { selector: 'li' }),
+        ).toBeVisible();
+        expect(screen.getByText('28 Sep: No shifts')).toBeVisible();
+        expect(screen.getByText('0 shifts · this week')).toBeVisible();
+        expect(screen.queryByText(/target \(95%\)/)).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: '8w' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByText('Recorded overtime hours are not available'),
+        ).toBeVisible();
+    });
+
+    it('renders recorded shift starts returned by the controller in analytics', () => {
+        render(
+            <AnalyticsPane
+                stats={[]}
+                completionTrend={[]}
                 shiftTypes={[]}
                 fillBySite={[]}
                 overtimeTrend={[]}
@@ -758,8 +788,8 @@ describe('rostering redesign follow-up wiring', () => {
             />,
         );
 
-        expect(screen.getByText('Daily coverage')).toBeVisible();
-        expect(screen.getByText('4/5 filled')).toBeVisible();
+        expect(screen.getByText('Recorded shift starts')).toBeVisible();
+        expect(screen.getByText('4/5 assigned')).toBeVisible();
         expect(screen.getByText('1 open')).toBeVisible();
     });
 
@@ -767,8 +797,7 @@ describe('rostering redesign follow-up wiring', () => {
         render(
             <CoveragePane
                 stats={[]}
-                windowLabels={['AM 07-15']}
-                rows={[]}
+                sites={[]}
                 alerts={[
                     {
                         site_name: 'Matai House',
@@ -783,11 +812,13 @@ describe('rostering redesign follow-up wiring', () => {
             />,
         );
 
-        expect(screen.getByText('Coverage gaps this week')).toBeVisible();
+        expect(
+            screen.getByText('Coverage windows needing review'),
+        ).toBeVisible();
         expect(screen.getByText('Matai House')).toBeVisible();
         expect(screen.getByText('Night cover')).toBeVisible();
         expect(screen.getByText('1 short')).toBeVisible();
-        expect(screen.getByText('1/2 assigned')).toBeVisible();
+        expect(screen.getByText('1/2 in roster')).toBeVisible();
     });
 
     it('uses caught-up copy when no leave requests are waiting', () => {

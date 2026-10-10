@@ -8,6 +8,7 @@ use App\Domain\Shifts\Lifecycle\Data\CompleteShiftData;
 use App\Domain\Shifts\Timesheets\Drafts\DraftTimesheetService;
 use App\Models\Client;
 use App\Models\ClientNote;
+use App\Models\CoverageReservation;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftEligibilityOverride;
@@ -20,6 +21,8 @@ use App\Services\AuthorizationEvidenceLockService;
 use App\Services\CoverageReservationService;
 use App\Services\Eligibility\AssignmentEligibilityDecision;
 use App\Services\Eligibility\AssignmentEligibilityGateway;
+use App\Services\Eligibility\PreparedShiftWorkload;
+use App\Services\Eligibility\ProposedShiftWorkloadService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\MyDay\ShiftTaskHelpService;
 use App\Services\ShiftCancellationService;
@@ -568,6 +571,58 @@ class ShiftLifecycleService
     }
 
     /**
+     * Hold the complete canonical prefix before a batch waits for any worker/Site.
+     *
+     * @param  Collection<int, Shift>  $shifts  Identity hints only.
+     * @param  Collection<int, User>  $assignees  Keyed by target Shift ID.
+     * @return array{shifts: Collection<int, Shift>, users: Collection<int, User>, actor: User}
+     */
+    public function lockAssignmentBatch(Collection $shifts, User $actor, Collection $assignees): array
+    {
+        if (DB::transactionLevel() < 1) {
+            throw new \LogicException('Assignment batches require their governing transaction.');
+        }
+        $this->lockApplicationShiftMutex();
+        $snapshots = Shift::query()->whereKey($shifts->pluck('id')->unique()->all())->orderBy('id')->get()->keyBy('id');
+        abort_unless($snapshots->count() === $shifts->unique('id')->count(), 404);
+        // Ordinary rows identify which locks to acquire; they never grant access.
+        $contexts = ServiceContext::query()->whereKey($snapshots->pluck('service_context_id')->filter()->unique()->sort()->values()->all())
+            ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+        $clients = Client::query()->whereKey($snapshots->pluck('client_id')->filter()->unique()->sort()->values()->all())
+            ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+        $lockedShifts = Shift::query()->whereKey($snapshots->keys()->all())->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+        abort_unless($lockedShifts->count() === $snapshots->count(), 404);
+        foreach ($lockedShifts as $locked) {
+            $hint = $snapshots->get($locked->id);
+            foreach (['client_id', 'site_id', 'service_context_id'] as $key) {
+                abort_unless($locked->getRawOriginal($key) === $hint->getRawOriginal($key), 409,
+                    'The assignment source changed. Reload before applying suggestions.');
+            }
+            $client = $clients->get($locked->client_id);
+            abort_unless($client && (int) $client->site_id === (int) $locked->site_id, 404);
+            $locked->setRelation('client', $client)->setRelation('serviceContext', $contexts->get($locked->service_context_id));
+        }
+        $ids = collect([$actor->id, ...$assignees->pluck('id')->all()])->map(fn ($id) => (int) $id)->unique()->sort()->values()->all();
+        $users = $this->authorizationEvidence->lockForUsers($ids, self::MUTATION_AUTHORIZATION_EVIDENCE);
+        $profiles = $this->medicationGovernance->lockCurrentStaffProfiles($users, $ids);
+        foreach ($users as $user) {
+            $user->setRelation('hrEmployeeProfile', $profiles->get($user->id));
+        }
+        $sites = Site::query()->whereKey($lockedShifts->pluck('site_id')->unique()->sort()->values()->all())
+            ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+        foreach ($lockedShifts as $locked) {
+            $locked->setRelation('site', $sites->get($locked->site_id));
+            $assignee = $assignees->get($locked->id);
+            abort_unless($assignee instanceof User, 404);
+            // Preserve the existing Bulk permission OR, profile and Site bypass.
+            [$actor] = $this->lockCurrentShiftAuthority($locked, $actor, self::BULK_ASSIGN_PERMISSIONS,
+                [(int) $assignee->id], [(int) $assignee->id], ['reports.viewAny', 'shifts.manageAny']);
+        }
+
+        return ['shifts' => $lockedShifts, 'users' => $users, 'actor' => $actor];
+    }
+
+    /**
      * @param  array<string, mixed>|null  $overrideData
      */
     public function assign(
@@ -579,6 +634,7 @@ class ShiftLifecycleService
         ?AssignmentEligibilityDecision $eligibilityDecision = null,
         ShiftLifecycleSource|string|null $source = null,
         ?string $reservationReason = null,
+        ?PreparedShiftWorkload $workload = null,
     ): Shift {
         $source = $this->normalizeSource($source);
         $originalUserId = null;
@@ -592,6 +648,7 @@ class ShiftLifecycleService
             &$eligibilityDecision,
             $source,
             $reservationReason,
+            $workload,
             &$originalUserId,
         ) {
             $this->lockApplicationShiftMutex();
@@ -621,7 +678,28 @@ class ShiftLifecycleService
             // Any controller/suggestion decision was a pre-wait hint. Re-run
             // the complete gateway only after the canonical Shift and the
             // assignee's current User/RBAC/Profile/Site evidence are locked.
-            $eligibilityDecision = $this->assignmentEligibility->decide($locked, $assignee);
+            $eligibilityDecision = null;
+            try {
+                if ($workload === null) {
+                    $proposed = clone $locked;
+                    $proposed->user_id = $assignee->id;
+                    $workload = app(ProposedShiftWorkloadService::class)->prepareCurrent(collect([$proposed]), [$locked->id], $actor)->get($assignee->id);
+                    if (! $workload) {
+                        throw new \LogicException('The assignment workload was not prepared.');
+                    }
+                } else {
+                    app(ProposedShiftWorkloadService::class)->assertCurrentFor($workload, $locked, $assignee, $actor);
+                }
+            } catch (\Throwable $exception) {
+                try {
+                    Log::error('Assignment workload unavailable', ['shift_id' => $locked->id,
+                        'user_id' => $assignee->id, 'exception_class' => $exception::class]);
+                } catch (\Throwable) {
+                    // Diagnostics cannot replace the safe unavailable outcome.
+                }
+                $eligibilityDecision = AssignmentEligibilityDecision::unavailable($locked, $assignee);
+            }
+            $eligibilityDecision ??= $this->assignmentEligibility->decide($locked, $assignee, $workload);
             $eligibilityDecision->assertMayAssign(
                 'user_id',
                 'This staff member cannot be assigned to the shift.',
@@ -641,20 +719,44 @@ class ShiftLifecycleService
                 );
             }
 
-            $locked->update([
-                'user_id' => $assignee->id,
-                'status' => $locked->status === 'draft' ? 'scheduled' : $locked->status,
-            ]);
+            $beforeAssignment = $locked->getRawOriginal();
+            $assignedStatus = $locked->status === 'draft' ? 'scheduled' : $locked->status;
+            if ($locked->update(['user_id' => $assignee->id, 'status' => $assignedStatus]) !== true) {
+                throw ValidationException::withMessages(['user_id' => 'The assignment could not be saved. No assignment changes were applied.']);
+            }
+            $stored = Shift::query()->whereKey($locked->id)->lockForUpdate()->firstOrFail();
+            if ((int) $stored->user_id !== (int) $assignee->id || $stored->status !== $assignedStatus) {
+                throw ValidationException::withMessages(['user_id' => 'The saved assignment did not match this command. No assignment changes were applied.']);
+            }
+            foreach (array_diff($locked->getFillable(), ['user_id', 'status']) as $field) {
+                if ($stored->getRawOriginal($field) !== ($beforeAssignment[$field] ?? null)) {
+                    throw ValidationException::withMessages(['user_id' => 'The assignment source changed while saving. No assignment changes were applied.']);
+                }
+            }
+            $locked = $stored->setRelation('client', $locked->client)->setRelation('staff', $assignee);
 
             if ($currentOverrideData) {
-                ShiftEligibilityOverride::create([
+                $override = ShiftEligibilityOverride::create([
                     'shift_id' => $locked->id,
                     ...$currentOverrideData,
                 ]);
+                $storedOverride = $override->id ? ShiftEligibilityOverride::query()->whereKey($override->id)->lockForUpdate()->first() : null;
+                if (! $storedOverride || (int) $storedOverride->shift_id !== (int) $locked->id
+                    || (int) $storedOverride->user_id !== (int) $assignee->id || (int) $storedOverride->overridden_by !== (int) $actor->id
+                    || $storedOverride->override_reason !== $currentOverrideData['override_reason']
+                    || $storedOverride->rules_overridden !== $currentOverrideData['rules_overridden']
+                    || $storedOverride->acknowledged_warnings !== $currentOverrideData['acknowledged_warnings']) {
+                    throw ValidationException::withMessages(['user_id' => 'The assignment warning acknowledgement could not be saved. No assignment changes were applied.']);
+                }
             }
 
             if ($reservation) {
                 $this->coverageReservationService->fulfill($reservation, $locked);
+                $storedReservation = CoverageReservation::query()->whereKey($reservation->id)->lockForUpdate()->first();
+                if (! $storedReservation || $storedReservation->status !== CoverageReservationService::STATUS_FULFILLED
+                    || (int) $storedReservation->shift_id !== (int) $locked->id) {
+                    throw ValidationException::withMessages(['coverage_reservation_token' => 'The coverage hold could not be fulfilled. No assignment changes were applied.']);
+                }
             }
 
             return $locked->fresh() ?? $locked;

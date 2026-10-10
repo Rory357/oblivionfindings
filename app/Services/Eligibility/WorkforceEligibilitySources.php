@@ -23,9 +23,11 @@ use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\Site;
+use App\Models\SiteStaffRequirement;
 use App\Models\StaffAvailability;
 use App\Models\StaffBackgroundCheck;
 use App\Models\StaffCredential;
+use App\Models\StaffQualificationRequirement;
 use App\Models\StaffTimeOff;
 use App\Models\StaffTrainingRecord;
 use App\Models\User;
@@ -42,6 +44,8 @@ final class WorkforceEligibilitySources
             User::class => ['scope' => 'account', 'fields' => ['approved_at', 'role']],
             Role::class => ['scope' => 'role', 'fields' => ['name']],
             HrEmployeeProfile::class => ['scope' => 'user', 'fields' => ['user_id', 'is_active', 'start_date', 'end_date', 'primary_site_id', 'secondary_site_ids', 'position_role', 'can_drive_clients', 'deleted_at']],
+            StaffQualificationRequirement::class => ['scope' => 'qualification', 'fields' => ['client_id', 'service_context_id', 'hr_compliance_requirement_id', 'is_mandatory']],
+            SiteStaffRequirement::class => ['scope' => 'house_qualification', 'fields' => ['site_id', 'category', 'is_active', 'hr_compliance_requirement_id', 'applicability_mode', 'minimum_qualified_staff']],
             StaffCredential::class => ['scope' => 'user', 'fields' => ['user_id', 'type', 'issued_at', 'expires_at']],
             StaffTrainingRecord::class => ['scope' => 'user', 'fields' => ['user_id', 'training_course_id', 'hr_course_id', 'status', 'completed_at', 'expires_at', 'assessment_passed', 'exempted_at', 'deleted_at']],
             StaffBackgroundCheck::class => ['scope' => 'user', 'fields' => ['user_id', 'check_type', 'status', 'issue_date', 'check_date', 'expires_at', 'risk_assessed', 'risk_decision', 'deleted_at']],
@@ -77,6 +81,16 @@ final class WorkforceEligibilitySources
             return null;
         }
         $attributes = array_intersect_key($model->getAttributes(), array_flip($definition['fields']));
+        if ($model instanceof StaffQualificationRequirement) {
+            // Insert-time omitted nullable/default columns and a reloaded row
+            // represent the same qualification source, including SQL BOOLEAN.
+            $attributes = [...array_fill_keys($definition['fields'], null), ...$attributes];
+            $attributes['is_mandatory'] = (bool) ($model->getAttribute('is_mandatory') ?? true);
+        }
+        if ($model instanceof SiteStaffRequirement) {
+            $attributes = [...array_fill_keys($definition['fields'], null), ...$attributes];
+            $attributes['is_active'] = (bool) ($model->getAttribute('is_active') ?? true);
+        }
         $casts = $model->getCasts();
         foreach ($attributes as $field => $value) {
             $cast = explode(':', (string) ($casts[$field] ?? ''), 2)[0];
@@ -118,6 +132,10 @@ final class WorkforceEligibilitySources
                 $scope['user_ids'] = HrEmployeeProfile::withTrashed()->where(function ($query) use ($model): void {
                     $query->where('primary_site_id', $model->id)->orWhereJsonContains('secondary_site_ids', (int) $model->id);
                 })->pluck('user_id')->all();
+                break;
+            case 'house_qualification': $scope['site_ids'] = $values('site_id');
+                break;
+            case 'qualification': $scope['client_ids'] = $values('client_id');
                 break;
             case 'client': $scope['client_ids'] = [(int) $model->id];
                 break;

@@ -4,6 +4,8 @@ namespace App\Domain\Rostering;
 
 use App\Models\RosterPeriod;
 use App\Models\Shift;
+use App\Services\CurrentAuthorizationReads;
+use App\Services\Eligibility\HouseQualificationCoverageService;
 use App\Services\ShiftConflictService;
 use App\Services\ShiftCoverageService;
 use App\Services\ShiftStaffEligibilityService;
@@ -22,13 +24,18 @@ class RosterPublishValidator
     /**
      * @return array{can_publish: bool, blocks: array<int, array<string, mixed>>, warnings: array<int, array<string, mixed>>, shift_count: int}
      */
-    public function validate(RosterPeriod $period): array
+    public function validate(RosterPeriod $period, bool $currentHouse = false): array
     {
-        $shifts = $this->periods
-            ->shiftsQuery($period)
-            ->with(['staff:id,name,email', 'client:id,first_name,last_name', 'site:id,name'])
-            ->orderBy('starts_at')
-            ->get();
+        $shifts = $currentHouse
+            ? CurrentAuthorizationReads::within(fn (CurrentAuthorizationReads $reads) => $reads->query($this->periods->shiftsQuery($period))
+                ->with([
+                    'staff' => fn ($relation) => $reads->query($relation->getQuery())->select(['id', 'name', 'email']),
+                    'client' => fn ($relation) => $reads->query($relation->getQuery())->select(['id', 'first_name', 'last_name']),
+                    'site' => fn ($relation) => $reads->query($relation->getQuery())->select(['id', 'name']),
+                ])->orderBy('starts_at')->get())
+            : $this->periods->shiftsQuery($period)
+                ->with(['staff:id,name,email', 'client:id,first_name,last_name', 'site:id,name'])
+                ->orderBy('starts_at')->get();
 
         $blocks = [];
         $warnings = [];
@@ -40,15 +47,19 @@ class RosterPublishValidator
 
             if (! $shift->user_id) {
                 $warnings[] = $this->entry($shift, 'unassigned', 'This shift is still open.');
+
                 continue;
             }
 
             if (! $shift->staff) {
                 $blocks[] = $this->entry($shift, 'missing_staff_record', 'Assigned staff member could not be loaded.');
+
                 continue;
             }
 
-            $result = $this->eligibility->evaluate($shift, $shift->staff)->toArray();
+            $result = ($currentHouse
+                ? $this->eligibility->evaluate($shift, $shift->staff, currentQualifications: true)
+                : $this->eligibility->evaluate($shift, $shift->staff))->toArray();
 
             foreach ($result['blocked_reasons'] ?? [] as $reason) {
                 $blocks[] = $this->entry($shift, 'eligibility_block', $reason);
@@ -62,6 +73,10 @@ class RosterPublishValidator
         foreach ($this->coverageWarnings($period) as $warning) {
             $warnings[] = $warning;
         }
+
+        $house = app(HouseQualificationCoverageService::class)->validatePeriod($period, current: $currentHouse);
+        $blocks = [...$blocks, ...$house['blocks']];
+        $warnings = [...$warnings, ...$house['warnings']];
 
         return [
             'can_publish' => $blocks === [],

@@ -2,6 +2,7 @@
 
 namespace App\Services\Sites\Profile;
 
+use App\Domain\Hr\Services\HrEligibilityRuleSettings;
 use App\Models\Client;
 use App\Models\ServiceContext;
 use App\Models\Site;
@@ -10,6 +11,7 @@ use App\Models\SiteStaffRequirement;
 use App\Models\User;
 use App\Services\Clients\ClientFormOptions;
 use App\Services\Clients\ClientWorkerEligibility;
+use App\Services\Eligibility\WorkforceRequirementMapping;
 use App\Services\ShiftCoverageService;
 
 class SiteProfilePeoplePresenter
@@ -133,6 +135,7 @@ class SiteProfilePeoplePresenter
     /** @return array<string, mixed> */
     public function staffRequirements(User $user, Site $site): array
     {
+        $houseApproach = app(HrEligibilityRuleSettings::class)->values()['house_qualification_approach'];
         $this->primePermissions($user);
         $canView = $user->canDo('staff.viewAny');
 
@@ -142,6 +145,7 @@ class SiteProfilePeoplePresenter
                 ? SiteStaffRequirement::query()
                     ->where('site_id', $site->id)
                     ->active()
+                    ->with('hrComplianceRequirement')
                     ->orderBy('category')
                     ->orderBy('requirement_name')
                     ->limit(100)
@@ -153,9 +157,20 @@ class SiteProfilePeoplePresenter
                         'description' => $requirement->description,
                         'certification_required' => (bool) $requirement->certification_required,
                         'expiry_period_months' => $requirement->expiry_period_months,
+                        'hr_compliance_requirement_id' => $requirement->hr_compliance_requirement_id,
+                        'mapping' => app(WorkforceRequirementMapping::class)->present($requirement),
+                        'applicability_mode' => $requirement->applicability_mode,
+                        'minimum_qualified_staff' => $requirement->minimum_qualified_staff,
+                        'applicability_status' => $requirement->hasConfiguredApplicability() ? 'configured' : 'unresolved',
                     ])->values()
                 : collect(),
             'can_manage' => ! $site->archived && $canView && $user->can('update', $site),
+            'mapping_options' => ! $site->archived && $canView && $user->can('update', $site)
+                ? app(WorkforceRequirementMapping::class)->catalog() : [],
+            'house_qualification_approach' => $houseApproach,
+            'new_requirement_defaults' => SiteStaffRequirement::newRequirementDefaults(
+                $houseApproach,
+            ),
         ];
     }
 

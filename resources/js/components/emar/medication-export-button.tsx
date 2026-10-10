@@ -5,7 +5,7 @@ import { Download } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 
 /** P02 and other record surfaces use the same P09 purpose/review/download flow. */
-export function MedicationExportButton({ type = 'mar', clientId, siteId, dateFrom, dateTo, includePrn = true, disabled = false, children, className }: { type?: 'mar' | 'cd_register' | 'round_sheet' | 'doses' | 'errors' | 'stock' | 'audit'; clientId?: number; siteId?: number; dateFrom: string; dateTo: string; includePrn?: boolean; disabled?: boolean; children?: ReactNode; className?: string }) {
+export function MedicationExportButton({ type = 'mar', clientId, siteId, dateFrom, dateTo, includePrn = true, disabled = false, children, className }: { type?: 'mar' | 'cd_register' | 'round_sheet' | 'doses' | 'errors' | 'stock' | 'audit' | 'transit'; clientId?: number; siteId?: number; dateFrom: string; dateTo: string; includePrn?: boolean; disabled?: boolean; children?: ReactNode; className?: string }) {
     const [context, setContext] = useState<ExportContext | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState(''), [online, setOnline] = useState(typeof navigator === 'undefined' || navigator.onLine);
     useEffect(() => { const update = () => setOnline(navigator.onLine); window.addEventListener('online', update); window.addEventListener('offline', update); return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update); }; }, []);
     async function open() {

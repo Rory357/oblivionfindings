@@ -406,17 +406,24 @@ it('carries is_lone_worker from a template shift onto the generated shift', func
 
 it('serializes is_lone_worker for the template edit wizard', function () {
     $site = Site::factory()->create();
+    $actor = rosteringTemplateActor($site);
+    $view = Permission::firstOrCreate(
+        ['key' => 'roster_templates.viewAny'],
+        ['description' => 'Read roster templates', 'group' => 'Rostering', 'module' => 'operations'],
+    );
+    $actor->permissionOverrides()->attach($view, ['allowed' => true]);
     $client = Client::factory()->create(['site_id' => $site->id]);
-    $template = RosterTemplate::factory()->create();
+    $template = RosterTemplate::factory()->create(['created_by' => $actor->id]);
     RosterTemplateShift::factory()->create([
         'roster_template_id' => $template->id,
         'client_id' => $client->id,
         'service_context_id' => null,
+        'user_id' => null,
         'is_lone_worker' => true,
     ]);
     $method = new ReflectionMethod(RosteringController::class, 'buildRosterTemplates');
     $method->setAccessible(true);
-    $payload = collect($method->invoke(app(RosteringController::class)))
+    $payload = collect($method->invoke(app(RosteringController::class), $actor))
         ->firstWhere('id', $template->id);
 
     expect($payload)->not->toBeNull()

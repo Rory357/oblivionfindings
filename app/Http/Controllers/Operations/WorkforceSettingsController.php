@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Operations;
 
+use App\Domain\Hr\Services\HrEligibilityRuleSettings;
 use App\Domain\Hr\Services\HrFatiguePolicySettings;
 use App\Domain\Rostering\RosteringFeatureFlags;
 use App\Http\Controllers\Controller;
@@ -18,13 +19,14 @@ use Throwable;
 
 class WorkforceSettingsController extends Controller
 {
-    public function __construct(private RosteringFeatureFlags $features, private WorkforcePreferences $preferences, private HrFatiguePolicySettings $policies) {}
+    public function __construct(private RosteringFeatureFlags $features, private WorkforcePreferences $preferences, private HrFatiguePolicySettings $policies, private HrEligibilityRuleSettings $eligibilityRules) {}
 
     public function index(Request $request)
     {
         $actor = $request->user();
         abort_unless($actor?->canDo('rostering.viewAny'), 403);
         $rules = $this->policies->snapshot();
+        $eligibilityRules = $this->eligibilityRules->snapshot();
         $canEditRules = $actor->isApproved() && $actor->canDo('hr.settings.manage');
 
         return inertia('operations/workforce-settings', [
@@ -34,6 +36,10 @@ class WorkforceSettingsController extends Controller
                 'can_view_history' => $canEditRules, 'scope' => 'organisation',
                 'urls' => ['update' => $canEditRules ? route('operations.workforce.settings.staffing-rules.update') : null,
                     'history' => $canEditRules ? route('operations.workforce.settings.history') : null]],
+            'eligibilityRules' => [...Arr::except($eligibilityRules, ['version']), 'can_edit' => $canEditRules,
+                'can_view_history' => $canEditRules, 'scope' => 'organisation',
+                'urls' => ['update' => $canEditRules ? route('operations.workforce.settings.eligibility-rules.update') : null,
+                    'history' => $canEditRules ? route('operations.workforce.settings.history', ['action' => 'eligibility_rules']) : null]],
             'workforceSettings' => [
                 'worker_timezone' => (string) config('app.worker_timezone', 'Pacific/Auckland'),
                 'week_starts_on' => 'Monday',
@@ -82,6 +88,21 @@ class WorkforceSettingsController extends Controller
             : 'Staffing rules already match the saved values.'), $rootEntry, 'staffing_rules', $outcome);
     }
 
+    public function updateEligibilityRules(Request $request)
+    {
+        $request->session()->forget('workforce_settings_result');
+        $actor = $request->user();
+        abort_unless($actor?->isApproved() && $actor->canDo('rostering.viewAny') && $actor->canDo('hr.settings.manage'), 403);
+        $data = $request->validate(['expected_revision' => ['required', 'string', 'size:64'],
+            'reason' => ['required', 'string', 'max:2000'], ...$this->eligibilityRules->validationRules()]);
+        $rootEntry = $this->isPhysicalRoot();
+        $outcome = $this->eligibilityRules->save($actor, $data['values'], $data['expected_revision'], $data['reason'], $request);
+
+        return $this->committedResult(redirect()->route('operations.workforce.settings')->with('success', $outcome['changed']
+            ? 'Eligibility rules were saved. Existing assignments are being checked again.'
+            : 'Eligibility rules already match the saved values.'), $rootEntry, 'eligibility_rules', $outcome);
+    }
+
     private function isPhysicalRoot(): bool
     {
         return DB::connection()->transactionLevel() === 0 && ! DB::connection()->getPdo()->inTransaction();
@@ -100,9 +121,9 @@ class WorkforceSettingsController extends Controller
                 'action' => $action, 'actor_id' => (int) $outcome['actor_id'],
                 'expected_revision' => $outcome['expected_revision'], 'prior_revision' => $outcome['prior_revision'],
                 'revision' => $outcome['revision'], 'values' => Arr::only($outcome['values'], $action === 'preferences'
-                    ? ['default_tab', 'roster_view'] : HrFatiguePolicySettings::KEYS), 'changed' => $outcome['changed'],
+                    ? ['default_tab', 'roster_view'] : ($action === 'eligibility_rules' ? HrEligibilityRuleSettings::KEYS : HrFatiguePolicySettings::KEYS)), 'changed' => $outcome['changed'],
             ];
-            if ($action === 'staffing_rules') {
+            if (in_array($action, ['staffing_rules', 'eligibility_rules'], true)) {
                 $receipt['refresh'] = Arr::only($outcome['refresh'], ['status', 'recheck_id', 'source_version']);
             }
 
@@ -124,14 +145,16 @@ class WorkforceSettingsController extends Controller
     {
         $actor = $request->user();
         abort_unless($actor?->isApproved() && $actor->canDo('rostering.viewAny') && $actor->canDo('hr.settings.manage'), 403);
-        $request->validate(['page' => ['nullable', 'integer', 'min:1']]);
-        $history = AuditLog::query()->where('action', HrFatiguePolicySettings::AUDIT_ACTION)
-            ->where('auditable_type', (new AppSetting)->getMorphClass())->where('meta->source_key', HrFatiguePolicySettings::KEY)
+        $filters = $request->validate(['page' => ['nullable', 'integer', 'min:1'],
+            'action' => ['nullable', 'in:staffing_rules,eligibility_rules']]);
+        $policyClass = ($filters['action'] ?? 'staffing_rules') === 'eligibility_rules' ? HrEligibilityRuleSettings::class : HrFatiguePolicySettings::class;
+        $history = AuditLog::query()->where('action', $policyClass::AUDIT_ACTION)
+            ->where('auditable_type', (new AppSetting)->getMorphClass())->where('meta->source_key', $policyClass::KEY)
             ->with('user:id,name')->orderByDesc('id')->paginate(20)->withQueryString()
-            ->through(function (AuditLog $row): array {
-                $before = Arr::only($row->meta['before'] ?? [], HrFatiguePolicySettings::KEYS);
-                $after = Arr::only($row->meta['after'] ?? [], HrFatiguePolicySettings::KEYS);
-                $changes = collect(HrFatiguePolicySettings::KEYS)
+            ->through(function (AuditLog $row) use ($policyClass): array {
+                $before = Arr::only($row->meta['before'] ?? [], $policyClass::KEYS);
+                $after = Arr::only($row->meta['after'] ?? [], $policyClass::KEYS);
+                $changes = collect($policyClass::KEYS)
                     ->filter(fn ($key) => ($before[$key] ?? null) !== ($after[$key] ?? null))
                     ->map(fn ($key) => ['key' => $key, 'before' => $before[$key] ?? null, 'after' => $after[$key] ?? null])->values()->all();
 

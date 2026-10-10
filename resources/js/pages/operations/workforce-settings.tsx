@@ -8,6 +8,10 @@ import {
     PageHeaderSearch,
 } from '@/components/page/page-header';
 import {
+    WorkforceEligibilityRules,
+    type EligibilityRules,
+} from '@/components/rostering/workforce-eligibility-rules';
+import {
     isRevision,
     object,
     useSettingsCommand,
@@ -53,6 +57,7 @@ type Preferences = {
 type Props = {
     preferences: Preferences;
     staffingRules?: StaffingRules;
+    eligibilityRules?: EligibilityRules;
     workforceSettings: {
         worker_timezone: string;
         week_starts_on: string;
@@ -164,8 +169,8 @@ function Row({
 const choiceLabel = (key: keyof Preferences, value: string) =>
     key === 'default_tab'
         ? value === 'calendar'
-            ? 'Month calendar'
-            : 'Roster'
+            ? 'Calendar'
+            : 'Shifts'
         : value === 'list'
           ? 'List'
           : 'Week grid';
@@ -179,9 +184,12 @@ function WorkforceSettingsBody({
     actorId,
     preferences,
     staffingRules,
+    eligibilityRules,
     workforceSettings: settings,
     ownerLinks = [],
 }: Props & { actorId: number }) {
+    const [eligibilityDirty, setEligibilityDirty] = useState(false);
+    const [eligibilityUncertain, setEligibilityUncertain] = useState(false);
     const [staffingDirty, setStaffingDirty] = useState(false);
     const [staffingUncertain, setStaffingUncertain] = useState(false);
     const [saved, setSaved] = useState(preferences);
@@ -199,7 +207,8 @@ function WorkforceSettingsBody({
         (key) => draft[key] !== saved[key],
     );
     const dirty = changed.length > 0;
-    const anyDirty = dirty || staffingDirty || uncertain || processing;
+    const anyDirty =
+        dirty || staffingDirty || eligibilityDirty || uncertain || processing;
     const select = (view: string, section = sections[view][0].key) => {
         setLocation({ view, section });
         setQuery('');
@@ -483,10 +492,10 @@ function WorkforceSettingsBody({
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="shifts">
-                                                Roster
+                                                Shifts
                                             </SelectItem>
                                             <SelectItem value="calendar">
-                                                Month calendar
+                                                Calendar
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>
@@ -496,7 +505,7 @@ function WorkforceSettingsBody({
                                 query={query}
                                 id="workforce-roster-view"
                                 label="Roster layout"
-                                hint="Choose the initial layout inside the Roster view. You can still switch between week, day and list while working."
+                                hint="Choose the initial layout inside the Shifts view in Rostering. You can still switch between week, day and list while working."
                                 changed={
                                     draft.roster_view !== saved.roster_view
                                 }
@@ -653,6 +662,18 @@ function WorkforceSettingsBody({
                             </Group>
                         </>
                     )}
+                    {eligibilityRules ? (
+                        <WorkforceEligibilityRules
+                            actorId={actorId}
+                            rules={eligibilityRules}
+                            visible={section === 'checks'}
+                            query={query}
+                            timezone={settings.worker_timezone}
+                            onDirtyChange={setEligibilityDirty}
+                            onUncertainChange={setEligibilityUncertain}
+                            onShow={() => select('safety', 'checks')}
+                        />
+                    ) : null}
                     {section === 'checks' && (
                         <Group
                             title="Eligibility follows the duty"
@@ -841,12 +862,15 @@ function WorkforceSettingsBody({
             {leaving && (
                 <SettingsModal
                     title={
-                        uncertain || staffingUncertain
+                        uncertain || staffingUncertain || eligibilityUncertain
                             ? 'Leave with an unconfirmed save?'
                             : 'Leave without saving?'
                     }
                     description={
-                        uncertain || staffingUncertain || processing
+                        uncertain ||
+                        staffingUncertain ||
+                        eligibilityUncertain ||
+                        processing
                             ? 'A save is unconfirmed. Leaving loses these entries; check current settings before making the same change again.'
                             : 'Your Workforce settings have unsaved changes.'
                     }
@@ -865,7 +889,10 @@ function WorkforceSettingsBody({
                                     router.visit(leaving);
                                 }}
                             >
-                                {uncertain || staffingUncertain || processing
+                                {uncertain ||
+                                staffingUncertain ||
+                                eligibilityUncertain ||
+                                processing
                                     ? 'Leave anyway'
                                     : 'Discard and leave'}
                             </Button>
@@ -873,7 +900,10 @@ function WorkforceSettingsBody({
                     }
                 >
                     <p className="text-body">
-                        {uncertain || staffingUncertain || processing
+                        {uncertain ||
+                        staffingUncertain ||
+                        eligibilityUncertain ||
+                        processing
                             ? 'Keep editing to check the current settings and retain your entries.'
                             : 'Review and save first if you want to keep these changes.'}
                     </p>
