@@ -392,6 +392,7 @@ const WORKFORCE_ROUTE_PREFIXES = [
     '/operations/job-board',
     '/operations/rostering',
     '/operations/workforce-settings',
+    '/operations/qualifications',
     '/operations/availability',
     '/operations/handovers',
     '/operations/shift-notes',
@@ -655,7 +656,6 @@ function buildIconNavItems({
         !!can?.evv?.viewAny ||
         !!can?.family_portal?.viewAny ||
         !!can?.family_portal?.manage ||
-        !!can?.qualifications?.viewAny ||
         !!can?.operations?.reports?.view ||
         !!can?.reports?.viewAny ||
         !!can?.timeline?.viewAny ||
@@ -1241,12 +1241,6 @@ function buildOperationsSubPanelGroups({
             href: '/settings/calendar-sync',
             icon: CalendarDays,
         });
-    if (can?.qualifications?.viewAny)
-        tools.push({
-            title: 'Qualifications',
-            href: '/operations/qualifications',
-            icon: ShieldCheck,
-        });
     if (tools.length > 0) groups.push({ label: 'Tools', items: tools });
 
     // Reports
@@ -1346,6 +1340,12 @@ function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             title: 'Conflict Queue',
             href: '/operations/rostering/conflicts',
             icon: AlertTriangle,
+        });
+    if (can?.rostering?.viewAny)
+        workforce.push({
+            title: 'Qualifications',
+            href: '/operations/qualifications',
+            icon: ShieldCheck,
         });
     if (can?.rostering?.viewAny)
         workforce.push({
