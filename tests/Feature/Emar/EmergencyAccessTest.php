@@ -268,9 +268,10 @@ class EmergencyAccessTest extends TestCase
             $this->assertNotContains($hiddenClient->id, collect($props['results'])->pluck('id')->all());
         });
 
+        // EA-203: a house outside your access is "not found", not "forbidden".
         $this->actingAs($worker)
             ->get('/emar/emergency-access?site_id='.$hiddenSite->id)
-            ->assertForbidden();
+            ->assertNotFound();
 
         $this->actingAs($worker)
             ->post("/clients/{$hiddenClient->id}/break-glass", ['reason' => 'Out of Site scope'])

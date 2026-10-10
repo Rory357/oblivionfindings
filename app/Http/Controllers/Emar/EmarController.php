@@ -163,7 +163,8 @@ class EmarController extends Controller
             'manage_interactions' => (bool) $user && $user->canDo('medications.administer.correct'),
             'manage_stock' => (bool) $user && $user->canDo('medications.stock.update'),
             'view_controlled' => (bool) $user && $user->canDo('medications.controlled.view'),
-            'revoke_break_glass' => (bool) $user && ($user->canDo('medications.breakglass') || $user->canDo('medications.audit.view')),
+            // EA-196: ending access needs breakglass (own) or breakglass.end, not audit.view.
+            'revoke_break_glass' => (bool) $user && ($user->canDo('medications.breakglass') || $user->canDo('medications.breakglass.end')),
             'view_reports' => (bool) $user && $user->canDo('medications.reports.view'),
             'view_audit' => (bool) $user && $user->canDo('medications.reports.view') && $user->canDo('medications.audit.view'),
             'export_reports' => (bool) $user && (

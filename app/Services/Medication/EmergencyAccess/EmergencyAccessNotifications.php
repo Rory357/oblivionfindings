@@ -5,6 +5,7 @@ namespace App\Services\Medication\EmergencyAccess;
 use App\Models\ClientBreakGlassAccess;
 use App\Models\User;
 use App\Notifications\AppEventNotification;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\NotificationService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Support\Collection;
@@ -18,7 +19,7 @@ class EmergencyAccessNotifications
     {
         return User::query()->whereNotNull('approved_at')->with(['roles.permissions', 'permissionOverrides', 'hrEmployeeProfile'])
             ->get()->filter(fn (User $user): bool => $user->canDo('medications.audit.view')
-                && in_array($siteId, $this->sites->accessibleSiteIds($user, ['medications.audit.view']), true));
+                && in_array($siteId, $this->sites->accessibleSiteIds($user, MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS), true));
     }
 
     public function opened(ClientBreakGlassAccess $grant): void

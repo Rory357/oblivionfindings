@@ -248,7 +248,7 @@ class MedicationAlertRecipients
         }
         if ($reason === MedicationAlertCatalogue::EA_REVIEWERS || ($subject->context['emergency_access_review_report'] ?? false)) {
             return $this->can($user, 'medications.audit.view') && $subject->siteId !== null
-                && in_array($subject->siteId, $this->siteAccess->accessibleSiteIds($user, ['medications.audit.view']), true) ? 'yes' : 'no';
+                && in_array($subject->siteId, $this->siteAccess->accessibleSiteIds($user, MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS), true) ? 'yes' : 'no';
         }
         if ($reason === MedicationAlertCatalogue::STAFF_MEMBER) {
             return 'yes';

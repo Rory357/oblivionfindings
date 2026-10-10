@@ -10,6 +10,7 @@ use App\Models\MedicationEvent;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\Alerts\OnCallResolver;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\WitnessPinService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
@@ -24,9 +25,9 @@ class EmergencyAccessController extends Controller
         abort_unless($user && ($user->canDo('medications.breakglass') || $user->canDo('medications.audit.view')), 403);
         $reviewer = $user->canDo('medications.audit.view');
         $canStart = $user->canDo('medications.breakglass');
-        $visible = $this->siteAccess->accessibleSiteIds($user, $reviewer ? ['medications.audit.view'] : []);
+        $visible = $this->siteAccess->accessibleSiteIds($user, $reviewer ? MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS : []);
         $siteId = $request->integer('site_id') ?: null;
-        abort_if($siteId !== null && ! in_array($siteId, $visible, true), 403);
+        abort_if($siteId !== null && ! in_array($siteId, $visible, true), 404);
         $scoped = $siteId ? [$siteId] : $visible;
         $base = ClientBreakGlassAccess::withTrashed()
             ->whereHas('client', fn ($q) => $q->whereIn('site_id', $scoped));
