@@ -1,3 +1,4 @@
+import { MedicationExportButton } from '@/components/emar/medication-export-button';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import PageShell from '@/components/page-shell';
 import {
@@ -16,6 +17,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { toDateInput } from '@/lib/datetime';
 import { formatDateTime } from '@/lib/fleet-utils';
 import { fmt } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
@@ -25,7 +27,6 @@ import {
     ArrowLeft,
     ArrowLeftRight,
     Check,
-    Download,
     Pill,
     Search,
 } from 'lucide-react';
@@ -55,6 +56,7 @@ type Props = {
     can_manage: boolean;
     can_administer: boolean;
     can_record_controlled: boolean;
+    can_export?: boolean;
     transport_scope?: {
         id: number;
         resident_name: string;
@@ -98,9 +100,11 @@ export default function MedicationTransitIndex({
     can_manage,
     can_administer,
     can_record_controlled,
+    can_export,
     transport_scope,
     stats,
 }: Props) {
+    const exportToday = toDateInput(new Date());
     const safeData = logs?.data ?? [];
     const safeMeta = logs?.meta ?? { current_page: 1, last_page: 1, total: 0 };
     const safeStats = stats ?? {
@@ -420,21 +424,30 @@ export default function MedicationTransitIndex({
                             >
                                 Clear
                             </Button>
-                            <div className="ml-auto">
-                                <Button size="sm" variant="outline" asChild>
-                                    <a
-                                        href={`/fleet-assets/transports/medications?export=csv&${new URLSearchParams(
-                                            localFilters as Record<
-                                                string,
-                                                string
-                                            >,
-                                        ).toString()}`}
+                            {can_export ? (
+                                <div className="ml-auto">
+                                    {/* EA-002: the custody CSV is a medication export — purpose step, person rule and export register. */}
+                                    <MedicationExportButton
+                                        type="transit"
+                                        clientId={
+                                            filters?.client_id
+                                                ? Number(filters.client_id)
+                                                : undefined
+                                        }
+                                        dateFrom={
+                                            filters?.date_from || exportToday
+                                        }
+                                        dateTo={
+                                            filters?.date_to &&
+                                            filters.date_to < exportToday
+                                                ? filters.date_to
+                                                : exportToday
+                                        }
                                     >
-                                        <Download className="mr-1.5 h-4 w-4" />
                                         Export CSV
-                                    </a>
-                                </Button>
-                            </div>
+                                    </MedicationExportButton>
+                                </div>
+                            ) : null}
                         </div>
                     </CardContent>
                 </Card>

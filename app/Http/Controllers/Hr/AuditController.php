@@ -29,7 +29,7 @@ class AuditController extends Controller
             'date_to' => $request->string('date_to')->trim()->value() ?: null,
         ];
         $modelType = $request->string('model_type')->trim()->value() ?: null;
-        $logs = $this->auditLogs->query($filters)
+        $logs = $this->auditLogs->query($filters, $user)
             ->when($modelType, fn ($query) => $query->where('auditable_type', $modelType))
             ->paginate(30)
             ->withQueryString()
@@ -37,7 +37,7 @@ class AuditController extends Controller
                 $this->auditLogs->present($log),
             ));
 
-        $hrLogs = $this->auditLogs->query(['module' => 'hr'])->reorder();
+        $hrLogs = $this->auditLogs->query(['module' => 'hr'], $user)->reorder();
         $modelTypes = (clone $hrLogs)
             ->select('auditable_type')
             ->whereNotNull('auditable_type')
@@ -83,7 +83,7 @@ class AuditController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('audit.viewAny'), 403);
 
-        $logs = $this->auditLogs->query(['module' => 'hr'])
+        $logs = $this->auditLogs->query(['module' => 'hr'], $user)
             ->where('auditable_type', $type)
             ->where('auditable_id', $id)
             ->get()
