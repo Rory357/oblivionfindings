@@ -1,10 +1,11 @@
-import { ConnectedServicesMenu } from '@/pages/emar/connected/_entry-points';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { AlertTriangle, Clock, Home, Pill } from 'lucide-react';
+import { AlertTriangle, Clock, Home, Pill, Printer } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
+import { MarReportDialog } from '@/components/clients/profile/mar-day/report-dialog';
 import { ChartSection, ChartViewSwitch } from '@/components/emar/record/chart';
 import { ClinicalSection } from '@/components/emar/record/clinical';
+import { DoseMeters } from '@/components/emar/record/dose-meters';
 import { HistorySection } from '@/components/emar/record/history';
 import { PhotosSection } from '@/components/emar/record/photos';
 import {
@@ -28,6 +29,7 @@ import {
 import {
     PageHeader,
     PageHeaderFilterButton,
+    PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
@@ -102,6 +104,7 @@ function AvailableRecord({
     meters,
     as_at,
     can,
+    today,
 }: Extract<RecordPageProps, { person: unknown }>) {
     const page = usePage<{ auth?: { can?: EmarNavigationPermissions } }>();
     const query = new URLSearchParams(page.url.split('?')[1]);
@@ -136,6 +139,7 @@ function AvailableRecord({
     );
     const [search, setSearch] = useState('');
     const [find, setFind] = useState(false);
+    const [printing, setPrinting] = useState(false);
     const [medicine, setMedicine] = useState<number | null>(
         () =>
             Number(
@@ -248,7 +252,14 @@ function AvailableRecord({
                                 placeholder="Find in this record…"
                                 onOpen={() => setFind(true)}
                             />
-                            <ConnectedServicesMenu clientId={person.id} />
+                            {can.print && today ? (
+                                <PageHeaderGlassButton
+                                    icon={Printer}
+                                    onClick={() => setPrinting(true)}
+                                >
+                                    Print MAR
+                                </PageHeaderGlassButton>
+                            ) : null}
                             <RecordDoseLaunch
                                 clientId={person.id}
                                 personName={person.preferred}
@@ -261,6 +272,11 @@ function AvailableRecord({
                     }
                     meters={
                         <>
+                            <DoseMeters
+                                doses={meters.doses ?? null}
+                                onChart={() => jump('chart')}
+                                onHistory={() => jump('history', 'doses')}
+                            />
                             <PageHeaderMeterBlock
                                 label="Medicines"
                                 onClick={() => jump('medicines')}
@@ -305,43 +321,48 @@ function AvailableRecord({
                                     · health profile
                                 </PageHeaderMeterCaption>
                             </PageHeaderMeterBlock>
-                            <PageHeaderMeterBlock
-                                label="INR"
-                                onClick={() => jump('clinical', 'inr')}
-                                ariaLabel="View INR results"
-                            >
-                                <PageHeaderMeterBig>
-                                    {meters.inr?.value ?? 'None recorded'}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    {meters.inr
-                                        ? `${formatDateOnly(meters.inr.tested)} · ${meters.inr.target ? `target ${meters.inr.target.join('–')}` : 'target not recorded'}`
-                                        : 'Open clinical results'}
-                                    {meters.inr?.next
-                                        ? ` · next ${formatDateOnly(meters.inr.next)}`
-                                        : ''}
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                            <PageHeaderMeterBlock
-                                label="Syringe driver"
-                                onClick={() => jump('clinical', 'driver')}
-                                ariaLabel="View syringe driver"
-                            >
-                                <PageHeaderMeterBig>
-                                    {meters.driver?.concealed
-                                        ? 'Controlled access needed'
-                                        : meters.driver
-                                          ? 'Running'
-                                          : 'None running'}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    {meters.driver && !meters.driver.concealed
-                                        ? meters.driver.last_check
-                                            ? `Last checked ${formatDateTime(meters.driver.last_check)}`
-                                            : 'No check recorded'
-                                        : 'Open clinical record'}
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
+                            {meters.inr ? (
+                                <PageHeaderMeterBlock
+                                    label="INR"
+                                    onClick={() => jump('clinical', 'inr')}
+                                    ariaLabel="View INR results"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {meters.inr?.value ?? 'None recorded'}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {meters.inr
+                                            ? `${formatDateOnly(meters.inr.tested)} · ${meters.inr.target ? `target ${meters.inr.target.join('–')}` : 'target not recorded'}`
+                                            : 'Open clinical results'}
+                                        {meters.inr?.next
+                                            ? ` · next ${formatDateOnly(meters.inr.next)}`
+                                            : ''}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            ) : null}
+                            {meters.driver ? (
+                                <PageHeaderMeterBlock
+                                    label="Syringe driver"
+                                    onClick={() => jump('clinical', 'driver')}
+                                    ariaLabel="View syringe driver"
+                                >
+                                    <PageHeaderMeterBig>
+                                        {meters.driver?.concealed
+                                            ? 'Controlled access needed'
+                                            : meters.driver
+                                              ? 'Running'
+                                              : 'None running'}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {meters.driver &&
+                                        !meters.driver.concealed
+                                            ? meters.driver.last_check
+                                                ? `Last checked ${formatDateTime(meters.driver.last_check)}`
+                                                : 'No check recorded'
+                                            : 'Open clinical record'}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            ) : null}
                         </>
                     }
                     filters={
@@ -508,6 +529,16 @@ function AvailableRecord({
                 testIdPrefix="medication-record"
                 searchLabel="Find a section of this record"
             />
+            {can.print && today ? (
+                <MarReportDialog
+                    open={printing}
+                    onClose={() => setPrinting(false)}
+                    clientId={person.id}
+                    personName={person.preferred}
+                    today={today}
+                    controlledLeftOut={!can.view_controlled}
+                />
+            ) : null}
         </AppLayout>
     );
 }

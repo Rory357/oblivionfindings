@@ -1,9 +1,10 @@
+import { MarReportDialog } from '@/components/clients/profile/mar-day/report-dialog';
 import { AdministrationFollowupDialog } from '@/components/emar/followups/administration-followup-dialog';
-import { MedicationExportButton } from '@/components/emar/medication-export-button';
 import { MedicationJourneyReturn } from '@/components/emar/medication-journey-return';
-import { RecordDoseLaunch } from '@/components/emar/record/record-dose-launch';
+import { DosePicker } from '@/components/emar/record/record-dose-launch';
 import { RecordTable } from '@/components/emar/record/record-table';
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
+import { EmptyValue, ProgressValue } from '@/components/lists/entity-cells';
 import {
     PageHeader,
     PageHeaderFilterButton,
@@ -11,10 +12,10 @@ import {
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
     PageHeaderRail,
     PageHeaderSearch,
 } from '@/components/page/page-header';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
@@ -28,16 +29,20 @@ import {
     type SecondPersonEvidence,
 } from '@/lib/medication-second-person';
 import { ConnectedServicesMenu } from '@/pages/emar/connected/_entry-points';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     CalendarDays,
+    CircleHelp,
     ClipboardList,
     History,
     Pill,
+    Printer,
+    UserRound,
     Users,
     X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 type View = 'charts' | 'medicines' | 'asneeded';
 type Row = SecondPersonEvidence & {
@@ -58,6 +63,9 @@ type Row = SecondPersonEvidence & {
     recorded?: number;
     so_far?: number;
     waiting?: number;
+    /** EA-111: doses that can't be recorded yet, and why. */
+    help?: number;
+    help_reason?: string | null;
     next?: string | null;
     at?: string | null;
     by?: string | null;
@@ -76,7 +84,7 @@ type Props = {
         date: string;
         status: string;
         range: number;
-        work?: 'all' | 'due' | 'overdue';
+        work?: 'all' | 'due' | 'overdue' | 'help';
     };
     today: string;
     as_at: string;
@@ -90,7 +98,22 @@ type Props = {
         total: number;
         links?: { url: string | null; label: string; active: boolean }[];
     };
-    meters: { people: number; medicines: number; due: number; overdue: number };
+    meters: {
+        people: number;
+        medicines: number;
+        due: number;
+        overdue: number;
+        to_check?: number;
+        controlled_hidden?: number;
+        due_people?: number;
+        due_until?: string | null;
+        oldest_late?: string | null;
+        help?: number;
+        recorded?: number;
+        so_far?: number;
+        as_needed?: number;
+        effect_overdue?: number;
+    };
     controlled_left_out: boolean;
     can_report: boolean;
     coverage: { complete: boolean; notice: string | null };
@@ -114,6 +137,15 @@ export default function MedicationRecordHub(props: Props) {
     const [search, setSearch] = useState(props.filters.q);
     useEffect(() => setSearch(props.filters.q), [props.filters.q]);
     const [effectDose, setEffectDose] = useState<number | null>(null);
+    const [dosePerson, setDosePerson] = useState<{
+        id: number;
+        name: string;
+    } | null>(null);
+    const [printPerson, setPrintPerson] = useState<{
+        id: number;
+        name: string;
+    } | null>(null);
+    const m = props.meters;
     const visit = (
         extra: Record<string, string | number | null>,
         view = props.view,
@@ -134,7 +166,62 @@ export default function MedicationRecordHub(props: Props) {
             },
             { preserveScroll: true },
         );
+    // Today's charts, filtered by the Show choice.
+    const charts = (work: 'all' | 'due' | 'overdue' | 'help') =>
+        visit({ date: props.today, work, q: '', page: null }, 'charts');
     const title = RAIL.find((item) => item.key === props.view)!.label;
+    const chartActions = (row: Row) => [
+        {
+            label: `Open ${row.person}’s medication record`,
+            icon: ClipboardList,
+            onClick: () => router.visit(row.href),
+        },
+        ...(row.can_record && ((row.due ?? 0) > 0 || (row.overdue ?? 0) > 0)
+            ? [
+                  {
+                      label: 'Record a dose',
+                      icon: Pill,
+                      onClick: () =>
+                          setDosePerson({
+                              id: row.client_id,
+                              name: row.person,
+                          }),
+                  },
+              ]
+            : []),
+        ...(row.help
+            ? [
+                  {
+                      label: 'Why can’t these be recorded?',
+                      icon: CircleHelp,
+                      onClick: () =>
+                          toast.info(
+                              `${row.help_reason ?? 'These doses can’t be recorded yet'}. Open the record to see who can unblock it.`,
+                          ),
+                  },
+              ]
+            : []),
+        { separator: true },
+        {
+            label: 'Open the client profile',
+            icon: UserRound,
+            onClick: () =>
+                router.visit(`/operations/clients/${row.client_id}?tab=mar`),
+        },
+        ...(props.can_report
+            ? [
+                  {
+                      label: 'Print MAR',
+                      icon: Printer,
+                      onClick: () =>
+                          setPrintPerson({
+                              id: row.client_id,
+                              name: row.person,
+                          }),
+                  },
+              ]
+            : []),
+    ];
     const rows = props.page.data;
     // EA-108: a person filter is always shown, and removable.
     const personFilterName =
@@ -175,77 +262,107 @@ export default function MedicationRecordHub(props: Props) {
                     }
                     meters={
                         <>
+                            {/* EA-111 (Lane C9): the approved P02 meters, for today. */}
                             <PageHeaderMeterBlock
-                                label="People with medicines"
-                                onClick={() => visit({ work: 'all' }, 'charts')}
-                                ariaLabel="View medication charts"
+                                label="Due now"
+                                onClick={() => charts('due')}
+                                ariaLabel="View people with doses due now"
                             >
-                                <PageHeaderMeterBig>
-                                    {props.meters.people}
-                                </PageHeaderMeterBig>
+                                <PageHeaderMeterBig>{m.due}</PageHeaderMeterBig>
                                 <PageHeaderMeterCaption>
-                                    Permitted people · visible medicines
+                                    {m.due
+                                        ? `${m.due_people ?? 0} ${m.due_people === 1 ? 'person' : 'people'}${m.due_until ? ` · until ${formatTime(m.due_until)}` : ''}`
+                                        : 'Nothing due right now'}
                                 </PageHeaderMeterCaption>
                             </PageHeaderMeterBlock>
                             <PageHeaderMeterBlock
-                                label="Current medicines"
+                                label="Late"
+                                tone={m.overdue ? 'warning' : 'brand'}
+                                onClick={() => charts('overdue')}
+                                ariaLabel="View people with late doses"
+                            >
+                                <PageHeaderMeterBig>
+                                    {m.overdue}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    {m.overdue && m.oldest_late
+                                        ? `Oldest due ${formatTime(m.oldest_late)}`
+                                        : 'None late'}
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Needs help"
+                                tone={m.help ? 'critical' : 'brand'}
+                                onClick={() => charts('help')}
+                                ariaLabel="View doses that can’t be recorded yet"
+                            >
+                                <PageHeaderMeterBig>
+                                    {m.help ?? 0}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    {m.help
+                                        ? 'Blocked — see why'
+                                        : 'Nothing blocked'}
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Recorded today"
+                                value={
+                                    m.so_far
+                                        ? `${m.recorded ?? 0}/${m.so_far}`
+                                        : undefined
+                                }
+                                onClick={() => charts('all')}
+                                ariaLabel="View today’s charts"
+                            >
+                                {m.so_far ? (
+                                    <PageHeaderMeterDonut
+                                        percent={
+                                            (100 * (m.recorded ?? 0)) / m.so_far
+                                        }
+                                        caption="of doses due so far"
+                                    />
+                                ) : (
+                                    <>
+                                        <PageHeaderMeterBig>
+                                            n/a
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            No doses due yet
+                                        </PageHeaderMeterCaption>
+                                    </>
+                                )}
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Medicines"
                                 onClick={() =>
                                     visit({ status: 'current' }, 'medicines')
                                 }
-                                ariaLabel="View current medicines"
+                                ariaLabel="View medicines"
                             >
                                 <PageHeaderMeterBig>
-                                    {props.meters.medicines}
+                                    {m.medicines}
                                 </PageHeaderMeterBig>
                                 <PageHeaderMeterCaption>
-                                    Scheduled and as needed
+                                    {m.controlled_hidden
+                                        ? `+${m.controlled_hidden} controlled hidden`
+                                        : m.to_check
+                                          ? `${m.to_check} ${m.to_check === 1 ? 'order' : 'orders'} to check`
+                                          : 'All checked'}
                                 </PageHeaderMeterCaption>
                             </PageHeaderMeterBlock>
                             <PageHeaderMeterBlock
-                                label="Due now"
-                                onClick={() =>
-                                    visit(
-                                        {
-                                            date: props.today,
-                                            work: 'due',
-                                            q: '',
-                                            page: null,
-                                        },
-                                        'charts',
-                                    )
-                                }
-                                ariaLabel="View doses due now"
+                                label="As needed · 24 h"
+                                onClick={() => visit({}, 'asneeded')}
+                                ariaLabel="View as-needed history"
                             >
                                 <PageHeaderMeterBig>
-                                    {props.meters.due}
+                                    {m.as_needed ?? 0}
                                 </PageHeaderMeterBig>
                                 <PageHeaderMeterCaption>
-                                    Today · inside their time windows
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                            <PageHeaderMeterBlock
-                                label="Overdue"
-                                tone={
-                                    props.meters.overdue ? 'critical' : 'brand'
-                                }
-                                onClick={() =>
-                                    visit(
-                                        {
-                                            date: props.today,
-                                            work: 'overdue',
-                                            q: '',
-                                            page: null,
-                                        },
-                                        'charts',
-                                    )
-                                }
-                                ariaLabel="View overdue doses"
-                            >
-                                <PageHeaderMeterBig>
-                                    {props.meters.overdue}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    Today · visible staff doses
+                                    {m.effect_overdue
+                                        ? `${m.effect_overdue} effect ${m.effect_overdue === 1 ? 'check' : 'checks'} overdue`
+                                        : 'No effect checks overdue'}
                                 </PageHeaderMeterCaption>
                             </PageHeaderMeterBlock>
                         </>
@@ -273,13 +390,17 @@ export default function MedicationRecordHub(props: Props) {
                             />
                             {props.view === 'charts' && (
                                 <PageHeaderFilterSelect
-                                    label="Work"
+                                    label="Show"
                                     value={props.filters.work ?? 'all'}
                                     allValue="all"
                                     options={[
-                                        { value: 'all', label: 'All charts' },
+                                        {
+                                            value: 'all',
+                                            label: 'Everyone with doses',
+                                        },
                                         { value: 'due', label: 'Due now' },
-                                        { value: 'overdue', label: 'Overdue' },
+                                        { value: 'overdue', label: 'Late' },
+                                        { value: 'help', label: 'Needs help' },
                                     ]}
                                     onChange={(work) =>
                                         visit({ work, page: null })
@@ -429,90 +550,86 @@ export default function MedicationRecordHub(props: Props) {
                                           {
                                               key: 'due',
                                               label: 'Due now',
-                                              width: '1fr',
-                                              cell: (row) => row.due ?? 0,
+                                              width: '0.7fr',
+                                              cell: (row) =>
+                                                  row.due ? (
+                                                      <StatusBadge variant="neutral">
+                                                          {row.due}
+                                                      </StatusBadge>
+                                                  ) : (
+                                                      <EmptyValue />
+                                                  ),
                                           },
                                           {
-                                              key: 'overdue',
-                                              label: 'Overdue / not recorded',
-                                              width: '1fr',
-                                              cell: (row) => row.overdue ?? 0,
+                                              key: 'late',
+                                              label: 'Late',
+                                              width: '0.6fr',
+                                              cell: (row) =>
+                                                  row.overdue ? (
+                                                      <StatusBadge variant="warning">
+                                                          {row.overdue}
+                                                      </StatusBadge>
+                                                  ) : (
+                                                      <EmptyValue />
+                                                  ),
+                                          },
+                                          {
+                                              key: 'help',
+                                              label: 'Needs help',
+                                              width: '1.7fr',
+                                              cell: (row) =>
+                                                  row.help ? (
+                                                      <span className="flex items-center gap-2">
+                                                          <StatusBadge variant="critical">
+                                                              {row.help}
+                                                          </StatusBadge>
+                                                          <span className="text-caption whitespace-normal">
+                                                              {row.help_reason}
+                                                          </span>
+                                                      </span>
+                                                  ) : (
+                                                      <EmptyValue />
+                                                  ),
                                           },
                                           {
                                               key: 'recorded',
-                                              label: 'Staff doses so far',
-                                              width: '1.5fr',
-                                              cell: (row) => (
-                                                  <span>
-                                                      {row.recorded ?? 0} of{' '}
-                                                      {row.so_far ?? 0} recorded
-                                                      {row.waiting
-                                                          ? ` · ${row.waiting} waiting for an order check`
-                                                          : ''}
-                                                  </span>
-                                              ),
-                                          },
-                                          {
-                                              key: 'next',
-                                              label: 'Next dose',
-                                              width: '1fr',
+                                              label:
+                                                  props.filters.date ===
+                                                  props.today
+                                                      ? 'Recorded today'
+                                                      : 'Recorded',
+                                              width: '1.1fr',
                                               cell: (row) =>
-                                                  row.next ?? 'None listed',
-                                          },
-                                          {
-                                              key: 'report',
-                                              label: 'Report',
-                                              width: '180px',
-                                              cell: (row) =>
-                                                  props.can_report ? (
-                                                      <MedicationExportButton
-                                                          clientId={
-                                                              row.client_id
+                                                  row.so_far ? (
+                                                      <ProgressValue
+                                                          percent={
+                                                              (100 *
+                                                                  (row.recorded ??
+                                                                      0)) /
+                                                              row.so_far
                                                           }
-                                                          dateFrom={
-                                                              props.filters.date
+                                                          tone={
+                                                              row.recorded ===
+                                                              row.so_far
+                                                                  ? 'success'
+                                                                  : 'brand'
                                                           }
-                                                          dateTo={
-                                                              props.filters.date
-                                                          }
-                                                      />
+                                                      >
+                                                          {row.recorded ?? 0} of{' '}
+                                                          {row.so_far}
+                                                      </ProgressValue>
                                                   ) : (
                                                       <span className="text-caption text-muted-foreground">
-                                                          Report access needed
+                                                          n/a — none due yet
                                                       </span>
                                                   ),
                                           },
                                           {
-                                              key: 'record',
-                                              label: 'Chart / record',
-                                              width: '180px',
-                                              cell: (row) => (
-                                                  <div className="flex flex-col items-start gap-2">
-                                                      <Button
-                                                          asChild
-                                                          variant="outline"
-                                                          size="sm"
-                                                      >
-                                                          <Link
-                                                              href={row.href}
-                                                              aria-label={`Open MAR chart for ${row.person}`}
-                                                          >
-                                                              <ClipboardList className="size-4" />
-                                                              Open chart
-                                                          </Link>
-                                                      </Button>
-                                                      {row.can_record && (
-                                                          <RecordDoseLaunch
-                                                              clientId={
-                                                                  row.client_id
-                                                              }
-                                                              personName={
-                                                                  row.person
-                                                              }
-                                                          />
-                                                      )}
-                                                  </div>
-                                              ),
+                                              key: 'next',
+                                              label: 'Next due',
+                                              width: '1.1fr',
+                                              cell: (row) =>
+                                                  row.next ?? <EmptyValue />,
                                           },
                                       ]
                                     : props.view === 'medicines'
@@ -638,23 +755,31 @@ export default function MedicationRecordHub(props: Props) {
                                             },
                                         ]
                             }
-                            actionsFor={(row) => [
-                                {
-                                    label: 'Open medication record',
-                                    icon: ClipboardList,
-                                    onClick: () => router.visit(row.href),
-                                },
-                                ...(props.view === 'asneeded' && row.can_record
-                                    ? [
+                            actionsFor={(row) =>
+                                props.view === 'charts'
+                                    ? chartActions(row)
+                                    : [
                                           {
-                                              label: 'Record effect check',
-                                              icon: History,
+                                              label: 'Open medication record',
+                                              icon: ClipboardList,
                                               onClick: () =>
-                                                  setEffectDose(row.id),
+                                                  router.visit(row.href),
                                           },
+                                          ...(props.view === 'asneeded' &&
+                                          row.can_record
+                                              ? [
+                                                    {
+                                                        label: 'Record effect check',
+                                                        icon: History,
+                                                        onClick: () =>
+                                                            setEffectDose(
+                                                                row.id,
+                                                            ),
+                                                    },
+                                                ]
+                                              : []),
                                       ]
-                                    : []),
-                            ]}
+                            }
                         />
                     ) : (
                         <EmptyState
@@ -672,6 +797,26 @@ export default function MedicationRecordHub(props: Props) {
                     />
                 </Card>
             </div>
+            {dosePerson && (
+                <DosePicker
+                    key={dosePerson.id}
+                    clientId={dosePerson.id}
+                    personName={dosePerson.name}
+                    asNeeded={false}
+                    onClose={() => setDosePerson(null)}
+                    returnFocus={() => null}
+                />
+            )}
+            {printPerson && (
+                <MarReportDialog
+                    open
+                    onClose={() => setPrintPerson(null)}
+                    clientId={printPerson.id}
+                    personName={printPerson.name}
+                    today={props.today}
+                    controlledLeftOut={props.controlled_left_out}
+                />
+            )}
             {effectDose !== null && (
                 <AdministrationFollowupDialog
                     key={effectDose}
