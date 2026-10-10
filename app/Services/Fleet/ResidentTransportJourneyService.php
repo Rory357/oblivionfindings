@@ -738,11 +738,11 @@ class ResidentTransportJourneyService
                 ];
             }
 
-            $duplicate = FleetMedicationTransitLog::query()
-                ->where('transport_id', $transport->id)
-                ->where('medication_id', $prepared['medication']->id)
-                ->exists();
-            abort_if($duplicate, 409, 'This medication is already packed for the journey.');
+            // EA-100: a long outing can need the same medicine more than once
+            // (12:00 and 17:00, or a PRN given twice). Each dose is its own
+            // custody record: packed, witnessed, given or returned, and
+            // settled against its own pack lines. Replays stay idempotent
+            // through the request UUID above, not through this medicine.
 
             $log = $this->createMedicationCustody(
                 $transport,
