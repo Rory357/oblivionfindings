@@ -383,3 +383,7 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
   - **Accepted:** fleet.medication.manage without medications.view sees no medication register rows; packing is unchanged.
   - **Main now also carries 13 workforce commits pushed on 10 Oct:** roster, shifts, scoped shift access (`6317cdce1`) and qualification rules. All lanes have been told to merge main.
 - **Lane A A10 (shared houses, D1) committed:** `50c8ef5a5`. The baseline failure was confirmed, and 214/215 tests pass after the fix (F3 reworked).
+- **Housekeeping for Stephan.**
+  - The main repo's `node_modules` is a junction into `C:/Users/steph/.codex/worktrees/workforce-improvements/oblivionfindings/node_modules`. It was created on 8 Oct, during the Codex work. Every worktree's tsc and vitest runs therefore read through, and cache into, that Codex folder. If that folder is ever deleted, every build breaks.
+  - Once the lanes finish, replace the junction with a physical `npm ci` in the main repo.
+- **Workforce delivery is active on main.** `codex/workforce-delivery-20261010` was merged into main as `94e31596c` on 10 Oct. eMAR lanes merge main before each report.
