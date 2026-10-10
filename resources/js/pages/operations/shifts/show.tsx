@@ -115,6 +115,12 @@ type HandoverObservationSummary = {
 };
 
 type Props = {
+    returnContext?: {
+        scope: 'conflict_queue';
+        week: string;
+        href: string;
+        label: 'Conflict queue';
+    } | null;
     shift: {
         id: number;
         client_id: number;
@@ -397,6 +403,8 @@ type Props = {
         client_care: string | null;
     };
     can: {
+        edit_shift?: boolean;
+        view_client_profile?: boolean;
         add_note: boolean;
         create_incident: boolean;
         mark_tasks?: boolean;
@@ -513,6 +521,7 @@ export default function ShiftShow({
     replacementRequest,
     assignmentCandidates = [],
     coverage = null,
+    returnContext = null,
     client_safety,
     links,
     can,
@@ -920,7 +929,13 @@ export default function ShiftShow({
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Shifts', href: '/operations/shifts' },
+                { title: 'Home', href: '/dashboard' },
+                ...(returnContext
+                    ? [
+                          { title: 'Workforce', href: '/operations/rostering' },
+                          { title: returnContext.label, href: returnContext.href },
+                      ]
+                    : [{ title: 'Shifts', href: '/operations/shifts' }]),
                 {
                     title: `${name} (${formatDate(shift.starts_at)})`,
                     href: `/operations/shifts/${shift.id}`,
@@ -935,8 +950,8 @@ export default function ShiftShow({
                     title={name}
                     description={formatDate(shift.starts_at)}
                     avatar={{ fallback: buildShiftHeroInitials(name) }}
-                    backHref="/operations/shifts"
-                    backLabel="All shifts"
+                    backHref={returnContext?.href ?? '/operations/shifts'}
+                    backLabel={returnContext?.label ?? 'All shifts'}
                     meta={[
                         {
                             icon: Clock,
@@ -1012,7 +1027,7 @@ export default function ShiftShow({
                                     </Link>
                                 </Button>
                             ) : null}
-                            {auth?.can?.shifts?.update ? (
+                            {can.edit_shift === true ? (
                                 <Button
                                     type="button"
                                     size="sm"
@@ -1023,7 +1038,8 @@ export default function ShiftShow({
                                     Edit shift
                                 </Button>
                             ) : null}
-                            {links.client_care ? (
+                            {can.view_client_profile === true &&
+                            links.client_care ? (
                                 <Button asChild size="sm" variant="secondary">
                                     <Link
                                         href={links.client_care}
@@ -3216,17 +3232,19 @@ export default function ShiftShow({
                 </div>
 
                 {/* ── Modals (outside tab structure) ── */}
-                <CreateShiftDialog
-                    key={`show-edit-${shift.id}`}
-                    open={editOpen}
-                    onClose={() => setEditOpen(false)}
-                    clients={clients}
-                    staff={staff}
-                    sites={sites}
-                    serviceContexts={serviceContexts}
-                    defaultServiceContextId={defaultServiceContextId}
-                    initialShift={editableShift}
-                />
+                {can.edit_shift === true ? (
+                    <CreateShiftDialog
+                        key={`show-edit-${shift.id}`}
+                        open={editOpen}
+                        onClose={() => setEditOpen(false)}
+                        clients={clients}
+                        staff={staff}
+                        sites={sites}
+                        serviceContexts={serviceContexts}
+                        defaultServiceContextId={defaultServiceContextId}
+                        initialShift={editableShift}
+                    />
+                ) : null}
                 {createShiftLauncher.dialog}
 
                 <Dialog open={completeOpen} onOpenChange={setCompleteOpen}>

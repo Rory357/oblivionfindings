@@ -39,6 +39,8 @@ export interface EmarNavigationPermissions {
         transfersManage?: boolean;
         catalogueManage?: boolean;
         backupsManage?: boolean;
+        /** Connected-care features that run now (eMAR pages only, D4). */
+        connected?: Record<string, boolean>;
         reportsView?: boolean;
         reportsExport?: boolean;
         settingsManage?: boolean;
@@ -158,6 +160,18 @@ const flag =
     ): Visibility =>
     (can) =>
         Boolean(meds(can)[key]);
+
+/**
+ * Whether a connected-care feature runs now (Settings › Connected services,
+ * D4). eMAR pages receive the switches; elsewhere they are unknown and the
+ * entry follows the permission alone. The server always re-checks.
+ */
+const runs =
+    (feature: string): Visibility =>
+    (can) => {
+        const connected = meds(can).connected;
+        return connected === undefined ? true : Boolean(connected[feature]);
+    };
 
 const administer = flag('administerRecord');
 const stockUpdate = flag('stockUpdate');
@@ -371,12 +385,15 @@ export const EMAR_HUBS: EmarHub[] = [
                 label: 'Connected care',
                 href: '/emar/connected-care',
                 icon: Stethoscope,
+                // EA-086: shown only while the portal or handovers run, and
+                // order checkers only for the portal's requests.
                 visible: (can) =>
                     view(can) &&
                     Boolean(
-                        meds(can).externalManage ||
-                        meds(can).transfersManage ||
-                        meds(can).ordersManage,
+                        ((meds(can).externalManage || meds(can).ordersManage) &&
+                            runs('prescriber_portal')(can)) ||
+                        (meds(can).transfersManage &&
+                            runs('provider_transfers')(can)),
                     ),
             },
         ],
@@ -546,7 +563,16 @@ export const EMAR_HUBS: EmarHub[] = [
                 label: 'Protected backups',
                 href: '/emar/backups',
                 icon: Lock,
-                visible: all(view, reportsView, flag('reportsExport')),
+                // EA-144: only while backups run; recipients (report exporters)
+                // still reach their passwords. Finance-only users are refused.
+                visible: all(
+                    view,
+                    any(
+                        flag('backupsManage'),
+                        all(reportsView, flag('reportsExport')),
+                    ),
+                    runs('protected_backups'),
+                ),
             },
         ],
     },

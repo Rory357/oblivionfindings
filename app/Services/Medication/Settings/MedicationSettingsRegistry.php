@@ -31,6 +31,9 @@ class MedicationSettingsRegistry
 
     public const VIEW_ALERTS = 'alerts';
 
+    /** Settings › Connected services: the optional third-party features (D4). */
+    public const VIEW_CONNECTIONS = 'connections';
+
     /** Who gets each alert, organisation-wide: `medications.alerts.{alert}`. */
     public const ALERT_STORAGE_PREFIX = 'medications.alerts.';
 
@@ -148,6 +151,7 @@ class MedicationSettingsRegistry
             // Lane C11: Medication rules › Medicine photos (P11 Q18, P06 Q6).
             \App\Services\Medication\Stock\PackPhotoReceiptSettings::group(),
             $this->emergencyPolicy(),
+            \App\Services\Medication\Connected\ConnectedCareSettings::group(),
         ];
     }
 

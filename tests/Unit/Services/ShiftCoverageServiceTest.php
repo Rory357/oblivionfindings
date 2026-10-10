@@ -30,6 +30,7 @@ class ShiftCoverageServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        config(['app.worker_timezone' => 'UTC']);
 
         $this->service = app(ShiftCoverageService::class);
         $this->site = Site::factory()->create();

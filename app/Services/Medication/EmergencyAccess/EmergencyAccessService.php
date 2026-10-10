@@ -174,7 +174,7 @@ class EmergencyAccessService
             if (! $expired) {
                 $this->governance->lockCurrentMedicationSite((int) $grant->client->site_id);
                 abort_unless($actor && in_array((int) $grant->client->site_id,
-                    $this->sites->accessibleSiteIds($actor, $owner ? [] : ['medications.breakglass.end']), true), 404);
+                    $this->sites->accessibleSiteIds($actor, $owner ? [] : MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS), true), 404);
                 if (! $owner && mb_strlen(trim((string) $reason)) < 10) {
                     throw ValidationException::withMessages(['reason' => 'Say why their emergency access is being ended.']);
                 }
@@ -206,7 +206,7 @@ class EmergencyAccessService
             $this->governance->lockCurrentMedicationSite((int) $grant->client->site_id);
             abort_unless($actor->approved_at !== null && $actor->canDo('medications.audit.view')
                 && ! in_array((int) $actor->id, [(int) $grant->user_id, (int) $grant->co_signed_by], true), 403);
-            abort_unless(in_array((int) $grant->client->site_id, $this->sites->accessibleSiteIds($actor, ['medications.audit.view']), true), 404);
+            abort_unless(in_array((int) $grant->client->site_id, $this->sites->accessibleSiteIds($actor, MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS), true), 404);
             $data = Validator::make($data, [
                 'review_outcome' => ['required', Rule::in(['justified', 'not_justified'])],
                 'review_notes' => ['required_if:review_outcome,not_justified', 'nullable', 'string', 'min:10', 'max:2000'],
@@ -253,7 +253,7 @@ class EmergencyAccessService
     {
         abort_unless($actor->approved_at !== null && $actor->canDo('medications.audit.view'), 403);
         abort_if($staffId === (int) $actor->id, 403);
-        abort_unless(in_array($houseId, $this->sites->accessibleSiteIds($actor, ['medications.audit.view']), true), 404);
+        abort_unless(in_array($houseId, $this->sites->accessibleSiteIds($actor, MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS), true), 404);
         Validator::make(['reason' => $reason], ['reason' => ['required', 'string', 'min:10', 'max:1000']])->validate();
         DB::transaction(function () use ($actor, $houseId, $staffId, $reason): void {
             $policy = BreakGlassPolicy::current();
@@ -272,7 +272,7 @@ class EmergencyAccessService
             $this->governance->lockCurrentMedicationSite($houseId);
             abort_unless($actor->approved_at !== null && $actor->canDo('medications.audit.view'), 403);
             abort_if($staffId === (int) $actor->id, 403);
-            abort_unless(in_array($houseId, $this->sites->accessibleSiteIds($actor, ['medications.audit.view']), true), 404);
+            abort_unless(in_array($houseId, $this->sites->accessibleSiteIds($actor, MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS), true), 404);
             abort_unless($grants->count() >= $policy->repeat_threshold_count, 404);
             BreakGlassFlagDismissal::updateOrCreate(
                 ['signal_type' => 'repeat', 'signal_key' => $houseId.':'.$staffId],

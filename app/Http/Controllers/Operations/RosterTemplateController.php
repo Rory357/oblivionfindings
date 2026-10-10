@@ -14,6 +14,9 @@ use App\Models\RosterTemplate;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\User;
+use App\Services\Operations\RosterTemplateAccessService;
+use App\Services\Operations\RosterTemplateCommand;
+use App\Services\Operations\RosterTemplateReceipt;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -21,122 +24,104 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
 use Throwable;
 
 class RosterTemplateController extends Controller
 {
     public function __construct(private readonly UserSiteAccessService $siteAccess) {}
 
+    public function index(Request $request)
+    {
+        $actor = $request->user();
+        abort_unless($actor, 403);
+        $access = app(RosterTemplateAccessService::class);
+        $capabilities = $access->capabilities($actor);
+        abort_unless($capabilities['can_view'], 403);
+        $request->validate(['week' => ['nullable', 'date']]);
+        $timezone = $this->templateTimezone();
+        $week = Carbon::parse($request->input('week') ?: now($timezone), $timezone)->startOfWeek(Carbon::MONDAY)->toDateString();
+        if ($actor->canDo('rostering.viewAny')) {
+            return redirect()->route('operations.rostering.index', ['tab' => 'templates', 'week' => $week]);
+        }
+        $options = $access->options($actor);
+
+        return Inertia::render('operations/rostering/template-workspace', [
+            'rosterTemplates' => $access->templates($actor), 'templateCapabilities' => $capabilities,
+            'templateOptions' => $options, ...$options, 'workerTimezone' => $timezone, 'week' => $week,
+            'urls' => ['index' => route('operations.rostering.templates.index'),
+                'store' => $capabilities['can_create'] ? route('operations.rostering.templates.store') : null, 'roster' => null],
+        ]);
+    }
+
     public function store(StoreRosterTemplateRequest $request)
     {
-        $auth = $request->user();
-        abort_unless($this->canCreateTemplates($auth), 403);
-
-        $data = $request->validated();
-        $this->assertTemplateRowsAccessible($auth, $data['template_shifts']);
-
-        $template = RosterTemplate::create([
-            'name' => $data['name'],
-            'description' => $data['description'] ?? null,
-            'template_type' => $data['template_type'] ?? 'weekly',
-            'is_active' => $data['is_active'] ?? true,
-            'created_by' => $auth->id,
-        ]);
-
-        $template->templateShifts()->createMany(
-            collect($data['template_shifts'])
-                ->map(fn (array $row) => $this->normalizeTemplateShift($row))
-                ->all()
-        );
-
-        return redirect()
-            ->route('operations.rostering.index', ['tab' => 'templates'])
-            ->with('status', 'Roster template created.');
+        return $this->libraryCommand($request, 'create', $request->validated());
     }
 
     public function update(UpdateRosterTemplateRequest $request, $template)
     {
-        $auth = $request->user();
-        abort_unless($this->canUpdateTemplates($auth), 403);
-
-        $template = RosterTemplate::query()->findOrFail($template);
-        $data = $request->validated();
-        $this->assertTemplateRowsAccessible($auth, $data['template_shifts']);
-
-        $template->update([
-            'name' => $data['name'],
-            'description' => $data['description'] ?? null,
-            'template_type' => $data['template_type'] ?? $template->template_type,
-            'is_active' => $data['is_active'] ?? $template->is_active,
-        ]);
-
-        $template->templateShifts()->delete();
-        $template->templateShifts()->createMany(
-            collect($data['template_shifts'])
-                ->map(fn (array $row) => $this->normalizeTemplateShift($row))
-                ->all()
-        );
-
-        return redirect()
-            ->route('operations.rostering.index', ['tab' => 'templates'])
-            ->with('status', 'Roster template updated.');
+        return $this->libraryCommand($request, 'update', $request->validated(), (int) $template);
     }
 
     public function destroy(Request $request, $template)
     {
-        $auth = $request->user();
-        abort_unless($this->canDeleteTemplates($auth), 403);
-
-        $template = RosterTemplate::query()->findOrFail($template);
-        $template->delete();
-
-        return redirect()
-            ->route('operations.rostering.index', ['tab' => 'templates'])
-            ->with('status', 'Roster template deleted.');
+        return $this->libraryCommand($request, 'delete', [], (int) $template);
     }
 
     public function duplicate(Request $request, $template)
     {
-        $auth = $request->user();
-        abort_unless($this->canCreateTemplates($auth), 403);
+        return $this->libraryCommand($request, 'duplicate', [], (int) $template);
+    }
 
-        $template = RosterTemplate::query()
-            ->with('templateShifts')
-            ->findOrFail($template);
-        $this->assertTemplateRowsAccessible($auth, $template->templateShifts->all());
+    private function libraryCommand(Request $request, string $action, array $values, ?int $templateId = null)
+    {
+        $receipts = app(RosterTemplateReceipt::class);
+        $root = $receipts->begin($request);
+        $actor = $request->user();
+        abort_unless($actor, 403);
+        $modern = $request->header('X-Roster-Template-Result') === 'committed-v1';
+        $rules = ['week' => ['nullable', 'date']];
+        if ($modern) {
+            $rules['request_id'] = ['required', 'uuid'];
+        }
+        if ($action === 'create') {
+            $rules['expected_source'] = ['prohibited'];
+        } elseif ($modern || $request->exists('expected_source')) {
+            $rules += ['expected_source' => ['required', 'array:template_id,source_revision'],
+                'expected_source.template_id' => ['required', 'integer', 'min:1'],
+                'expected_source.source_revision' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/']];
+        }
+        $data = $request->validate($rules);
+        $expected = isset($data['expected_source']) ? ['template_id' => (int) $data['expected_source']['template_id'],
+            'source_revision' => $data['expected_source']['source_revision']] : null;
+        // Resolve the redirect date before a write, with no post-commit read.
+        $timezone = $this->templateTimezone();
+        $week = Carbon::parse($data['week'] ?? now($timezone), $timezone)->startOfWeek(Carbon::MONDAY)->toDateString();
+        $result = app(RosterTemplateCommand::class)->execute($actor, $action, $values, $templateId, $expected, $modern ? $data['request_id'] : null);
+        $receipt = $receipts->committed($root, $result);
+        $weekParameters = $modern || $request->filled('week') ? ['week' => $week] : [];
+        $url = $result->canViewRoster
+            ? route('operations.rostering.index', ['tab' => 'templates', ...$weekParameters])
+            : route('operations.rostering.templates.index', $weekParameters);
+        $response = redirect()->to($url);
+        if ($modern) {
+            $response->setStatusCode(303);
+        }
+        if ($receipt === null) {
+            return $response->with('warning', 'The roster template result could not be confirmed. Reload the library before trying again.');
+        }
+        $status = match ($action) {
+            'create' => 'Roster template created.', 'update' => 'Roster template updated.',
+            'delete' => 'Roster template deleted.', 'duplicate' => 'Roster template duplicated.',
+        };
 
-        $copy = RosterTemplate::create([
-            'name' => $this->duplicateName($template->name),
-            'description' => $template->description,
-            'template_type' => $template->template_type,
-            'is_active' => $template->is_active,
-            'created_by' => $auth->id,
-        ]);
+        return $response->with('status', $status)->with('roster_template_result', $receipt);
+    }
 
-        $copy->templateShifts()->createMany(
-            $template->templateShifts
-                ->map(fn ($shift) => [
-                    'client_id' => $shift->client_id,
-                    'user_id' => $shift->user_id,
-                    'service_context_id' => $shift->service_context_id,
-                    'day_of_week' => $shift->day_of_week,
-                    'start_time' => $shift->start_time,
-                    'end_time' => $shift->end_time,
-                    'shift_type' => $shift->shift_type,
-                    'is_sleepover' => $shift->is_sleepover,
-                    'is_on_call' => $shift->is_on_call,
-                    'is_lone_worker' => $shift->is_lone_worker,
-                    'expected_break_minutes' => $shift->expected_break_minutes,
-                    'required_skills' => $shift->required_skills,
-                    'location' => $shift->location,
-                    'notes' => $shift->notes,
-                ])
-                ->all()
-        );
-
-        return redirect()
-            ->route('operations.rostering.index', ['tab' => 'templates'])
-            ->with('status', 'Roster template duplicated.');
+    private function templateTimezone(): string
+    {
+        return (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC');
     }
 
     private function duplicateName(string $name): string

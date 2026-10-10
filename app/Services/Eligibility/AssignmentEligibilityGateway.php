@@ -16,13 +16,15 @@ final class AssignmentEligibilityGateway
         private readonly ShiftStaffEligibilityService $eligibility,
     ) {}
 
-    public function decide(Shift $shift, User $user): AssignmentEligibilityDecision
+    public function decide(Shift $shift, User $user, ?PreparedShiftWorkload $workload = null): AssignmentEligibilityDecision
     {
         try {
+            $workload?->assertFor($shift, $user);
+
             return AssignmentEligibilityDecision::fromResult(
                 $shift,
                 $user,
-                $this->eligibility->evaluate($shift, $user),
+                $workload ? $this->eligibility->evaluate($shift, $user, workload: $workload) : $this->eligibility->evaluate($shift, $user),
             );
         } catch (\Throwable $exception) {
             Log::error('Assignment eligibility decision unavailable', [

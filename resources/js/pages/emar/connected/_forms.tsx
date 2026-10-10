@@ -23,10 +23,12 @@ export function Toggle({
     label,
     checked,
     onChange,
+    disabled,
 }: {
     label: string;
     checked: boolean;
     onChange: (v: boolean) => void;
+    disabled?: boolean;
 }) {
     return (
         <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
@@ -35,6 +37,7 @@ export function Toggle({
                 <Switch
                     aria-label={label}
                     checked={checked}
+                    disabled={disabled}
                     onCheckedChange={onChange}
                 />
                 <span className="text-caption w-6">
@@ -398,6 +401,8 @@ export function ProposalDecision({
     );
     const [decision, setDecision] = useState('');
     const [note, setNote] = useState('');
+    // EA-084: kept inside the organisation; never shown in the portal.
+    const [internalNote, setInternalNote] = useState('');
     const [confirmed, setConfirmed] = useState(false);
     const [file, setFile] = useState<File | null>(null);
     const [source, setSource] = useState({
@@ -449,6 +454,7 @@ export function ProposalDecision({
                     multipart({
                         decision,
                         decision_note: note,
+                        internal_note: internalNote,
                         source_confirmed: confirmed,
                         source,
                         source_file: file,
@@ -654,10 +660,26 @@ export function ProposalDecision({
                                 ]}
                                 onChange={setDecision}
                             />
-                            <Field label="Decision note" required>
+                            <Field
+                                label="Reply to the prescriber (they will see this)"
+                                required
+                            >
                                 <Textarea
                                     value={note}
                                     onChange={(e) => setNote(e.target.value)}
+                                />
+                            </Field>
+                            <p className="text-caption">
+                                The prescriber reads this word for word in their
+                                portal. Keep family, staff and incident details
+                                out of it.
+                            </p>
+                            <Field label="Internal note (staff only)">
+                                <Textarea
+                                    value={internalNote}
+                                    onChange={(e) =>
+                                        setInternalNote(e.target.value)
+                                    }
                                 />
                             </Field>
                             {decision === 'link_stop' && (
@@ -819,7 +841,8 @@ export function ProposalDecision({
                         'Existing medication #' + p.medication_id,
                 },
                 { label: 'Decision', value: decision.replace('_', ' ') },
-                { label: 'Note', value: note },
+                { label: 'Reply to the prescriber', value: note },
+                { label: 'Internal note', value: internalNote || 'None' },
                 { label: 'Source confirmed', value: confirmed ? 'Yes' : 'No' },
             ]}
         />

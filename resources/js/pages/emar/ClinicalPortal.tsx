@@ -61,6 +61,13 @@ type Props = {
         date_of_birth: string;
         medications: Medicine[];
         allergies: { allergen: string; reaction: string; severity: string }[];
+        /** EA-085: controlled medicines this grant leaves out. */
+        hidden_controlled_count?: number;
+        /** EA-085: recorded, reviewed as none known, or not assessed. */
+        allergy_status?: {
+            status: 'recorded' | 'no_known' | 'none';
+            reviewed_at: string | null;
+        };
     } | null;
     proposals: Proposal[];
     pagination?: {
@@ -182,7 +189,14 @@ export default function ClinicalPortal(props: Props) {
                                     <SettingsNotice>
                                         {grant?.include_controlled
                                             ? 'Your grant includes controlled medicines.'
-                                            : 'Controlled medicines may be withheld from this view; this is not a complete controlled-medicine chart.'}{' '}
+                                            : person.hidden_controlled_count
+                                              ? person.hidden_controlled_count +
+                                                (person.hidden_controlled_count ===
+                                                1
+                                                    ? ' controlled medicine is'
+                                                    : ' controlled medicines are') +
+                                                ' not shown — contact the organisation before prescribing.'
+                                              : 'No controlled medicines are left out of this view.'}{' '}
                                         Review current source evidence with the
                                         care organisation before making a
                                         medication decision.
@@ -208,10 +222,20 @@ export default function ClinicalPortal(props: Props) {
                                                 ))
                                             ) : (
                                                 <p className="text-caption mt-2">
-                                                    No allergy entries are
-                                                    recorded here. Confirm
-                                                    allergy status with the care
-                                                    organisation.
+                                                    {person.allergy_status
+                                                        ?.status === 'no_known'
+                                                        ? 'No known allergies' +
+                                                          (person.allergy_status
+                                                              .reviewed_at
+                                                              ? ', reviewed ' +
+                                                                formatDateOnly(
+                                                                    person
+                                                                        .allergy_status
+                                                                        .reviewed_at,
+                                                                )
+                                                              : '') +
+                                                          '.'
+                                                        : 'Not assessed — no allergy review is recorded. Confirm allergy status with the care organisation.'}
                                                 </p>
                                             )}
                                         </CardContent>

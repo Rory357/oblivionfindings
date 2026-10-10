@@ -112,7 +112,7 @@ it('duplicates a roster template with its shift rows', function () {
 
     $this->actingAs($actor)
         ->post(route('operations.rostering.templates.duplicate', $template))
-        ->assertRedirect(route('operations.rostering.index', ['tab' => 'templates']));
+        ->assertRedirect(route('operations.rostering.templates.index'));
 
     $copy = RosterTemplate::query()->where('name', 'North House weekdays (copy)')->first();
 

@@ -25,6 +25,7 @@ use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\CommittedFixtureCleanup;
+use Tests\Support\ConnectedCareSwitches;
 use Tests\Support\ExternalClinicalFixtures;
 use Tests\TestCase;
 
@@ -35,6 +36,10 @@ final class ProviderMedicationTransferTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // D4: handovers run only while switched on; the two-person review rule
+        // is switched back on in the test_b10_ tests below.
+        ConnectedCareSwitches::on('provider_transfers', 'prescriber_portal');
+        ConnectedCareSwitches::off('two_person_handover', 'two_person_identity');
         $this->connectedFixtures();
         Mail::fake();
     }
@@ -271,6 +276,34 @@ final class ProviderMedicationTransferTest extends TestCase
         $this->postJson('/emar/connected-care/transfers', $this->timedTransferInput())->assertOk()->assertJsonPath('success', true);
         $this->assertDatabaseCount('medication_provider_transfers', 1);
         Mail::assertNothingSent();
+    }
+
+    /** EA-104: with the two-person rule on (its default), the person who made a handover doesn't also review it. */
+    public function test_b10_handover_review_needs_a_second_person(): void
+    {
+        ConnectedCareSwitches::on('two_person_handover');
+        $this->chart();
+        $record = app(ProviderMedicationTransfers::class)->create($this->manager, $this->transferInput());
+        $this->actingAs($this->manager)->postJson('/emar/connected-care/transfers/'.$record->id.'/transition', $this->action('review', 1, 'review-self'))
+            ->assertUnprocessable()->assertJsonValidationErrors('action');
+        $this->assertSame('draft', $record->fresh()->status);
+        $this->actingAs($this->connectedStaff())->postJson('/emar/connected-care/transfers/'.$record->id.'/transition', $this->action('review', 1, 'review-other'))->assertOk();
+        $this->assertSame('reviewed', $record->fresh()->status);
+    }
+
+    /** EA-087 + EA-085: the packet is a P09 export; the duplicate JSON route is gone; allergy status travels with it. */
+    public function test_b10_handover_packet_is_recorded_in_export_history_and_says_the_allergy_status(): void
+    {
+        $this->chart();
+        $record = app(ProviderMedicationTransfers::class)->create($this->manager, $this->transferInput());
+        $this->actingAs($this->manager)->postJson('/emar/connected-care/transfers/'.$record->id.'/transition', $this->action('review', 1, 'review-1'))->assertOk();
+        $this->getJson('/emar/connected-care/transfers/'.$record->id.'/handover')->assertNotFound();
+        $this->getJson('/emar/connected-care/transfers/'.$record->id.'/packet')->assertOk()
+            ->assertJsonPath('snapshot.allergy_status.status', 'not_assessed');
+        $export = \App\Models\MedicationEvent::query()->where('kind', 'export.created')->where('subject_id', 'provider_handover')->sole();
+        $this->assertSame((int) $this->manager->id, (int) $export->actor_id);
+        $this->assertSame((int) $this->person->id, (int) $export->client_id);
+        $this->assertStringContainsString('Approved care transfer', (string) json_encode($export->facts));
     }
 
     private function timedTransferInput(): array

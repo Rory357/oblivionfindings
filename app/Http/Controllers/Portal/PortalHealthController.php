@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Portal;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Services\Portal\PortalClientSectionAccess;
+use App\Services\Portal\PortalMedicationList;
 use Illuminate\Http\Request;
 
 class PortalHealthController extends Controller
@@ -31,9 +32,6 @@ class PortalHealthController extends Controller
             $clientRelations[] = 'medicalProfile';
             $clientRelations[] = 'conditions';
         }
-        if ($permissions['can_view_medications']) {
-            $clientRelations['medications'] = fn ($query) => $query->where('active', true);
-        }
         $client->load($clientRelations);
 
         return inertia('portal/health', [
@@ -51,8 +49,9 @@ class PortalHealthController extends Controller
                     : null,
             ],
             'medicalProfile' => $permissions['can_view_medical'] ? $client->medicalProfile : null,
+            // EA-099: current, checked orders as a plain allowlist.
             'medications' => $permissions['can_view_medications']
-                ? $client->medications->values()
+                ? app(PortalMedicationList::class)->forViewer($client, (bool) $sectionAccess['is_self'])
                 : [],
             'conditions' => $permissions['can_view_medical']
                 ? $client->conditions->values()

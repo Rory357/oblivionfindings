@@ -40,6 +40,7 @@ export interface AuthPermissions {
         create?: boolean;
         update?: boolean;
         manageAny?: boolean;
+        overrideEligibility?: boolean;
     };
     calendar?: {
         viewAny?: boolean;
@@ -57,6 +58,8 @@ export interface AuthPermissions {
         transfersManage?: boolean;
         catalogueManage?: boolean;
         backupsManage?: boolean;
+        /** Which connected-care features run now (eMAR pages only; D4). */
+        connected?: Record<string, boolean>;
         reportsView?: boolean;
         reportsExport?: boolean;
         settingsManage?: boolean;

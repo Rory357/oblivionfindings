@@ -3378,27 +3378,9 @@ class ClientController extends Controller
                 ->values()
             : collect();
 
-        // Medication transit logs
+        // Medication transit logs: Medical section + controlled view (EA-022).
         $medicationLogs = $hasMedLogs
-            ? FleetMedicationTransitLog::query()
-                ->where('client_id', $client->id)
-                ->with(['packedBy:id,name', 'administeredBy:id,name', 'witnessedBy:id,name'])
-                ->latest('packed_at')
-                ->limit(20)
-                ->get()
-                ->map(fn ($m) => [
-                    'id' => $m->id,
-                    'medication_name' => $m->medication_name,
-                    'is_controlled_drug' => $m->is_controlled_drug,
-                    'packed_at' => optional($m->packed_at)->toISOString(),
-                    'packed_by' => $m->packedBy ? $m->packedBy->name : null,
-                    'administered_at' => optional($m->administered_at)->toISOString(),
-                    'administered_by' => $m->administeredBy ? $m->administeredBy->name : null,
-                    'witnessed_by' => $m->witnessedBy ? $m->witnessedBy->name : null,
-                    'returned_to_house_at' => optional($m->returned_to_house_at)->toISOString(),
-                    'status' => $m->status,
-                ])
-                ->values()
+            ? app(\App\Services\Medication\Transit\ClientTransportMedicationLogs::class)->forViewer($client, auth()->user())
             : collect();
 
         // Client-scoped transport bookings (Book transport workflow)

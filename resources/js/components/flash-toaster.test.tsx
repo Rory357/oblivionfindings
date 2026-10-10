@@ -80,3 +80,26 @@ it.each([
         expect(success).not.toHaveBeenCalled();
     },
 );
+
+it.each([
+    'operations/shifts/index',
+    'operations/rostering/index',
+    'operations/shifts/create',
+    'operations/shifts/show',
+    'operations/clients/show',
+    'operations/rostering/conflicts',
+])(
+    'leaves single Shift confirmation to the owning wizard on %s',
+    (component) => {
+        page.component = component;
+        page.props.flash = { success: 'Shift updated.' };
+        render(<FlashToaster />);
+        expect(success).not.toHaveBeenCalled();
+    },
+);
+it('retains separate publish and series feedback on the Shift index', () => {
+    page.component = 'operations/shifts/index';
+    page.props.flash = { success: 'Shift published.' };
+    render(<FlashToaster />);
+    expect(success).toHaveBeenCalledWith('Shift published.');
+});

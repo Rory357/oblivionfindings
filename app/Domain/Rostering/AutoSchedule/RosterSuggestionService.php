@@ -153,7 +153,11 @@ class RosterSuggestionService
             $shifts = $this->openShiftsQuery((int) $run->site_id, $weekStart, $weekEnd)
                 ->with(['client:id,first_name,last_name,site_id', 'site:id,name'])
                 ->orderBy('starts_at')
-                ->get();
+                ->get()
+                ->filter(fn (Shift $shift) => $shift->site && (int) $shift->site->id === (int) $run->site_id
+                    && ($shift->client_id === null || ($shift->client
+                        && (int) $shift->client->id === (int) $shift->client_id
+                        && (int) $shift->client->site_id === (int) $run->site_id)));
 
             $currentCandidates = $this->currentSiteCandidates((int) $run->site_id);
             $context = new RosterSuggestionContext($run, $actor, $shifts);
@@ -208,12 +212,13 @@ class RosterSuggestionService
 
     private function openShiftsQuery(int $siteId, CarbonInterface $weekStart, CarbonInterface $weekEnd): Builder
     {
-        return Shift::query()
+        return $this->siteAccess->applyShiftIntegrityScope(Shift::query()
+            ->employeeDuties()
             ->where('site_id', $siteId)
             ->whereNull('user_id')
             ->where('status', '!=', 'cancelled')
             ->where('starts_at', '<', $weekEnd->copy()->utc())
-            ->where('ends_at', '>', $weekStart->copy()->utc());
+            ->where('ends_at', '>', $weekStart->copy()->utc()));
     }
 
     /** @return Collection<int, User> */
@@ -269,28 +274,18 @@ class RosterSuggestionService
 
     public function accept(RosterSuggestion $suggestion, User $actor): RosterSuggestion
     {
-        $this->assertFresh($suggestion);
+        $result = app(RosterSuggestionCommand::class)->decide('accept', $suggestion, $actor);
+        if ($result->outcome === 'expired_marked_stale') {
+            // The legacy stale marker is already persisted before the rejection.
+            abort(422, 'This roster suggestion has expired. Generate a fresh run before applying it.');
+        }
 
-        $suggestion->forceFill([
-            'status' => RosterSuggestion::STATUS_ACCEPTED,
-            'accepted_by' => $actor->id,
-            'accepted_at' => now(),
-            'dismissed_by' => null,
-            'dismissed_at' => null,
-        ])->save();
-
-        return $suggestion->fresh() ?? $suggestion;
+        return $result->model;
     }
 
     public function dismiss(RosterSuggestion $suggestion, User $actor): RosterSuggestion
     {
-        $suggestion->forceFill([
-            'status' => RosterSuggestion::STATUS_DISMISSED,
-            'dismissed_by' => $actor->id,
-            'dismissed_at' => now(),
-        ])->save();
-
-        return $suggestion->fresh() ?? $suggestion;
+        return app(RosterSuggestionCommand::class)->decide('dismiss', $suggestion, $actor)->model;
     }
 
     public function expireStaleRuns(): int

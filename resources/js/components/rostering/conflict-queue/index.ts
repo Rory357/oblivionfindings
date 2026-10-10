@@ -8,6 +8,7 @@ export {
     shiftTypeLabel,
     shouldOfferCreation,
     timeLabel,
+    type ConflictAssessment,
     type ConflictsProps,
     type CoverageGap,
     type ShiftRow,
@@ -19,14 +20,10 @@ export {
 } from './conflict-confirm-dialog';
 export { ConflictDetailPanel } from './conflict-detail-panel';
 export { ConflictQueueList } from './conflict-queue-list';
-export {
-    ConflictScanSettingsDialog,
-    type ScanSettings,
-} from './conflict-scan-settings-dialog';
+export { ConflictScanSettingsDialog } from './conflict-scan-settings-dialog';
 export { ConflictToasts } from './conflict-toasts';
 export { ShiftSummaryCard } from './shift-summary-card';
 export {
-    ACTIONS,
     SEVERITY_BADGE_LABEL,
     SEVERITY_RANK,
     TYPE_META,

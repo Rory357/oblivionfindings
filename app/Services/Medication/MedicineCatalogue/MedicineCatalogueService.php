@@ -6,6 +6,7 @@ use App\Models\MedicineCatalogueProduct;
 use App\Models\MedicineCatalogueSource;
 use App\Models\User;
 use App\Services\AuthorizationEvidenceLockService;
+use App\Services\Medication\Connected\ConnectedCareSettings;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +27,9 @@ class MedicineCatalogueService
     public function page(User $actor, int $page = 1): array
     {
         $this->reader($actor);
+        // EA-186: draft, expired and revoked sources and licence references
+        // are for catalogue managers; readers only match reviewed pictures.
+        abort_unless($actor->canDo('medications.catalogue.manage'), 403);
         $sources = MedicineCatalogueSource::query()->with('products')->orderByDesc('id')->paginate(10, ['*'], 'source_page', max(1, $page));
 
         return ['source_meta' => ['current_page' => $sources->currentPage(), 'last_page' => $sources->lastPage(), 'total' => $sources->total()], 'sources' => $sources->getCollection()->map(fn ($source) => $this->sourceDto($source))->all(), 'can_manage' => $actor->canDo('medications.catalogue.manage'), 'notice' => 'No supplier feed is installed. Only owner-licensed, reviewed datasets are available. Photos help identify a product; always check the current chart and packaging.'];
@@ -103,6 +107,12 @@ class MedicineCatalogueService
             $current = $this->manager($actor);
             $source = $this->locked($id, $version);
             $this->draft($source);
+            // EA-104: a second person reviews what someone else added (a
+            // Settings › Connected services switch, on by default).
+            if (app(ConnectedCareSettings::class)->twoPerson(ConnectedCareSettings::TWO_PERSON_CATALOGUE)
+                && (int) $source->created_by === (int) $current->id) {
+                throw ValidationException::withMessages(['source' => 'Another catalogue manager reviews this source. You added it, so you can’t also review it.']);
+            }
             if (! preg_match('/^\\d{4}-\\d{2}-\\d{2}T.*(?:Z|[+-]\\d{2}:\\d{2})$/D', $expiry)) {
                 throw ValidationException::withMessages(['expires_at' => 'Provide the expiry with an explicit UTC offset.']);
             }

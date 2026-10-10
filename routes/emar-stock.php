@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Route;
 // (everything); coordinators and finance hold stock.update (Stephan, 10 Oct).
 // MedicationStockController::command checks each action's key, and every
 // command is scoped to the houses and people the actor can open.
-Route::middleware(['auth', 'permission:medications.view', 'permission:medications.stock.receive|medications.stock.update'])
+Route::middleware(['auth', 'permission:medications.view', 'permission:medications.stock.receive|medications.stock.update', \App\Http\Middleware\ShareConnectedCareSwitches::class])
     ->prefix('emar/stock/packs')->group(function (): void {
         Route::get('/', [MedicationStockController::class, 'index'])->name('emar.stock.packs');
         Route::get('/medicine/{medication}', [MedicationStockController::class, 'detail'])->whereNumber('medication')->name('emar.stock.packs.detail');

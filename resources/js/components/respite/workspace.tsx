@@ -69,6 +69,7 @@ type ReasonKind = 'decline' | 'reject' | 'fundingOverride';
 type ProfileCompletionTarget = {
     clientId: number;
     initialValues: Partial<ClientWizardForm>;
+    canEditMedical: boolean;
 };
 
 const REASON_CONFIG: Record<
@@ -194,13 +195,14 @@ export function RespiteWorkspace({
     const openProfileCompletion = (
         row: Pick<
             RespiteReferralRow | RespiteRequestRow,
-            'clientId' | 'clientProfilePrefill'
+            'clientId' | 'clientProfilePrefill' | 'clientProfileCanEditMedical'
         >,
     ) => {
         if (!row.clientId) return;
         setProfileFor({
             clientId: row.clientId,
             initialValues: row.clientProfilePrefill ?? {},
+            canEditMedical: row.clientProfileCanEditMedical,
         });
     };
 
@@ -440,6 +442,7 @@ export function RespiteWorkspace({
                 onClose={() => setProfileFor(null)}
                 clientId={profileFor?.clientId}
                 initialValues={profileFor?.initialValues}
+                canEditMedical={profileFor?.canEditMedical ?? false}
                 onSaved={() => {
                     setProfileFor(null);
                     router.reload({

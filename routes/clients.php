@@ -207,8 +207,10 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/clients/{client}/break-glass', [BreakGlassController::class, 'store'])
         ->middleware('permission:medications.breakglass')
         ->name('clients.break_glass.store');
+    // Same keys as the canonical /emar copy (EA-196): ending needs breakglass
+    // (your own) or breakglass.end (someone else's), never audit.view alone.
     Route::delete('/clients/{client}/break-glass/{access}', [BreakGlassController::class, 'destroy'])
-        ->middleware('permission:medications.breakglass|medications.audit.view')
+        ->middleware('permission:medications.breakglass|medications.breakglass.end')
         ->name('clients.break_glass.destroy');
 
     // Emergency-access entry point is the canonical emar.emergency_access route

@@ -15,25 +15,30 @@ use App\Http\Requests\Operations\Rostering\AutoScheduleRosterRequest;
 use App\Http\Requests\Operations\Rostering\RosteringConflictsRequest;
 use App\Http\Requests\Operations\Rostering\RosteringIndexRequest;
 use App\Models\Client;
+use App\Models\CoverageGapAcknowledgement;
 use App\Models\RosterPeriod;
 use App\Models\RosterSuggestionRun;
-use App\Models\RosterTemplate;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftEligibilityOverride;
 use App\Models\ShiftSeries;
 use App\Models\Site;
+use App\Models\SiteCoverageRequirement;
 use App\Models\StaffTimeOff;
 use App\Models\User;
+use App\Policies\ClientPolicy;
 use App\Services\Eligibility\WorkforceEligibilityRefresh;
 use App\Services\Eligibility\WorkforceEligibilityRefreshAccess;
 use App\Services\Eligibility\WorkforceEligibilityRefreshPresenter;
+use App\Services\Operations\RosterTemplateAccessService;
 use App\Services\Operations\ShiftSeriesPresenter;
 use App\Services\Operations\WorkforcePreferences;
 use App\Services\ShiftCoverageService;
+use App\Services\ShiftSignalService;
 use App\Services\ShiftStaffEligibilityService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -58,6 +63,7 @@ class RosteringController extends Controller
         abort_unless($auth && $auth->canDo('rostering.viewAny'), 403);
 
         $canManageAny = $auth->canDo('shifts.manageAny');
+        $canReadAnyShifts = $canManageAny || $auth->canDo('shifts.viewAny');
         $fatiguePolicy = app(HrFatiguePolicySettings::class)->values();
         $availabilityCapabilities = [
             'view_any' => $canManageAny || $auth->canDo('staff.viewAny') || $auth->canDo('staff.availability.updateAny'),
@@ -74,6 +80,7 @@ class RosteringController extends Controller
         // on the rostering.viewAny gate this method already enforces; create/update
         // and delete keep their own permissions (with a rostering.* fallback so a
         // scheduler who manages shifts can also manage the patterns).
+        $templateCapabilities = app(RosterTemplateAccessService::class)->capabilities($auth);
         $canManageTemplates = $auth->canDo('roster_templates.create')
             || $auth->canDo('roster_templates.update')
             || $auth->canDo('rostering.create')
@@ -94,13 +101,12 @@ class RosteringController extends Controller
         $availabilityWeekStart = $this->rosterPeriods->weekStart($data['week'] ?? null);
         $availabilityWeekEnd = $availabilityWeekStart->copy()->addDays(7);
 
-        $week = ! empty($data['week'])
-            ? Carbon::parse($data['week'])
-            : now();
-
-        // NZ: week starts on Monday.
-        $weekStart = (clone $week)->startOfWeek(Carbon::MONDAY)->startOfDay();
-        $weekEnd = (clone $weekStart)->addDays(7);
+        // One worker-local civil week governs records, day buckets and labels.
+        // UTC copies are used only for persisted instant comparisons.
+        $weekStart = $availabilityWeekStart->copy();
+        $weekEnd = $availabilityWeekEnd->copy();
+        $queryWeekStart = $weekStart->copy()->utc();
+        $queryWeekEnd = $weekEnd->copy()->utc();
 
         $staff = [];
         $clients = [];
@@ -111,8 +117,12 @@ class RosteringController extends Controller
         // pickers too, and it is gated on the broader $canManageTemplates. Load the
         // datasets for either gate so a roster_templates.create user who is not a
         // shifts.manageAny manager doesn't open the wizard to empty dropdowns.
-        if ($canManageAny || $canManageTemplates) {
-            $siteBypassPermissions = ['rostering.viewAny', 'shifts.manageAny'];
+        if ($canReadAnyShifts || $canManageTemplates) {
+            // Preserve the existing template/manager picker contract; the new
+            // scoped Shift reader does not gain the legacy roster Site bypass.
+            $siteBypassPermissions = $canManageAny || $canManageTemplates
+                ? ['rostering.viewAny', 'shifts.manageAny']
+                : ['shifts.manageAny'];
             $accessibleSiteIds = $this->siteAccess->accessibleSiteIds($auth, $siteBypassPermissions);
 
             $staff = $this->siteAccess->applyStaffScope(User::query(), $auth, $siteBypassPermissions)
@@ -167,16 +177,44 @@ class RosteringController extends Controller
                 'tasks as tasks_completed' => fn ($q) => $q->where('is_completed', true),
             ])
             // overlap window
-            ->where('starts_at', '<', $weekEnd)
-            ->where('ends_at', '>', $weekStart)
+            ->where('starts_at', '<', $queryWeekEnd)
+            ->where('ends_at', '>', $queryWeekStart)
             ->orderBy('starts_at');
 
         // Normalise the site_id filter once — may be null, a single int, or an int[].
         $siteFilter = $request->siteFilter();
 
-        if (! $canManageAny) {
+        if (! $canReadAnyShifts) {
             $query->where('user_id', $auth->id);
         } else {
+            if (! $canManageAny) {
+                $this->siteAccess->applyShiftScope($query, $auth, ['shifts.manageAny']);
+                $readSiteIds = $this->siteAccess->accessibleSiteIds($auth, ['shifts.manageAny']);
+                // A visible occurrence cannot disclose a foreign recurring source.
+                // Keep legacy Client fallback and manual explicit-Site provenance.
+                $query->where(function ($linkedSeries) use ($auth, $readSiteIds): void {
+                    $linkedSeries->whereNull('shift_series_id')->orWhereHas('series', function ($series) use ($auth, $readSiteIds): void {
+                        $series->where(function ($provenance) use ($auth, $readSiteIds): void {
+                            $provenance->where(fn ($manual) => $manual->whereNull('client_id')->whereIn('site_id', $readSiteIds))
+                                ->orWhereHas('client', function ($client) use ($auth): void {
+                                    $this->siteAccess->applyClientScope($client, $auth, ['shifts.manageAny'])
+                                        ->where(fn ($agreement) => $agreement->whereNull('shift_series.site_id')
+                                            ->orWhereColumn('clients.site_id', 'shift_series.site_id'));
+                                });
+                        });
+                    });
+                });
+                // Existing integrity keeps historical participant existence;
+                // no new participant employment or Site policy is introduced.
+                $query->with(['replacementRequests' => fn ($replacement) => $this->siteAccess
+                    ->applyShiftReplacementIntegrityScope($replacement->getQuery())->active()->with([
+                        'requester:id,name', 'currentStaff:id,name', 'replacementStaff:id,name',
+                        'openPosition' => fn ($position) => $this->siteAccess
+                            ->applyShiftOpenPositionIntegrityScope($position->getQuery())
+                            ->select(['id', 'replacement_request_id', 'status', 'claimed_by', 'approved_by', 'expires_at']),
+                        'openPosition.claimer:id,name',
+                    ])]);
+            }
             if (! empty($data['staff_id'])) {
                 $query->where('user_id', $data['staff_id']);
             }
@@ -197,8 +235,8 @@ class RosteringController extends Controller
         // Time-off / one-off unavailability blocks
         $timeOffQuery = StaffTimeOff::query()
             ->with(['user:id,name'])
-            ->where('starts_at', '<', $weekEnd)
-            ->where('ends_at', '>', $weekStart)
+            ->where('starts_at', '<', $queryWeekEnd)
+            ->where('ends_at', '>', $queryWeekStart)
             ->orderBy('starts_at');
 
         if (! $canManageAny) {
@@ -319,7 +357,7 @@ class RosteringController extends Controller
 
         // --- Analytics Data ---
 
-        // Daily shift coverage (scheduled vs filled per day)
+        // Recorded starts by worker-local day; retain all statuses and assignment counts.
         $dailyCoverage = [];
         for ($d = 0; $d < 7; $d++) {
             $day = (clone $weekStart)->addDays($d);
@@ -348,8 +386,8 @@ class RosteringController extends Controller
         // Staff on leave this week
         $onLeaveCount = $canManageAny ? $this->leaveAccess->visibleRequests($auth, true)
             ->where('status', 'approved')
-            ->where('starts_at', '<', $weekEnd)
-            ->where('ends_at', '>', $weekStart)
+            ->where('starts_at', '<', $queryWeekEnd)
+            ->where('ends_at', '>', $queryWeekStart)
             ->distinct('user_id')
             ->count('user_id') : 0;
 
@@ -366,41 +404,55 @@ class RosteringController extends Controller
                 ->count();
         }
 
-        // 4-week historical trend (shifts completed vs cancelled per week).
-        // Collapsed into a single GROUP BY week-bucket query and organization
-        // scoped to match the sibling analytics above (Shift carries an
-        // organization_id column). The bucket index is the number of whole
-        // 7-day windows from the trend start (weekStart - 3 weeks); because all
-        // window boundaries land on startOfDay, DATEDIFF (date-only) reproduces
-        // the original half-open [wStart, wEnd) buckets exactly.
-        // Skipped on the availability-tab landing: only the analytics pane reads
-        // analytics.historicalTrend, and that tab body is not rendered there.
+        // Four worker-local reporting weeks ending in the selected week.
+        // These are visible recorded Shift starts/completions/cancellations,
+        // not staffing coverage or overtime. Preserve the availability fast path.
         $historicalTrend = [];
-        if ($canManageAny && ! $isAvailabilityTab) {
-            $trendStart = (clone $weekStart)->subWeeks(3);
-            $trendEnd = (clone $weekStart)->addDays(7);
+        if ($canReadAnyShifts && ! $isAvailabilityTab) {
+            $trendWeekStart = $this->rosterPeriods->weekStart($data['week'] ?? null);
+            $trendStart = $trendWeekStart->copy()->subWeeks(3);
+            $trendEnd = $trendWeekStart->copy()->addDays(7);
+            $trendQuery = $this->siteAccess->applyShiftScope(Shift::query(), $auth, ['shifts.manageAny'])
+                ->where('starts_at', '>=', $trendStart->copy()->utc())
+                ->where('starts_at', '<', $trendEnd->copy()->utc());
 
-            $bucketRows = Shift::query()
-                ->when($organizationId, fn ($q) => $q->where('organization_id', $organizationId))
-                ->where('starts_at', '>=', $trendStart)
-                ->where('starts_at', '<', $trendEnd)
-                ->selectRaw('FLOOR(DATEDIFF(starts_at, ?) / 7) as week_bucket', [$trendStart->toDateString()])
-                ->selectRaw("SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed")
-                ->selectRaw("SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled")
-                ->selectRaw('COUNT(*) as total')
-                ->groupBy('week_bucket')
-                ->get()
-                ->keyBy(fn ($row) => (int) $row->week_bucket);
+            if (! $canManageAny) {
+                // Match the scoped roster's whole linked-series visibility.
+                $trendQuery->where(function ($linkedSeries) use ($auth, $readSiteIds): void {
+                    $linkedSeries->whereNull('shift_series_id')->orWhereHas('series', function ($series) use ($auth, $readSiteIds): void {
+                        $series->where(function ($provenance) use ($auth, $readSiteIds): void {
+                            $provenance->where(fn ($manual) => $manual->whereNull('client_id')->whereIn('site_id', $readSiteIds))
+                                ->orWhereHas('client', function ($client) use ($auth): void {
+                                    $this->siteAccess->applyClientScope($client, $auth, ['shifts.manageAny'])
+                                        ->where(fn ($agreement) => $agreement->whereNull('shift_series.site_id')
+                                            ->orWhereColumn('clients.site_id', 'shift_series.site_id'));
+                                });
+                        });
+                    });
+                });
+            }
+            if (! empty($data['staff_id'])) {
+                $trendQuery->where('user_id', $data['staff_id']);
+            }
+            if (! empty($data['client_id'])) {
+                $trendQuery->where('client_id', $data['client_id']);
+            }
+            if ($siteFilter !== null) {
+                is_array($siteFilter)
+                    ? $trendQuery->whereIn('site_id', $siteFilter)
+                    : $trendQuery->where('site_id', $siteFilter);
+            }
+            $trendShifts = $trendQuery->get(['id', 'starts_at', 'status']);
 
             for ($w = 3; $w >= 0; $w--) {
-                $wStart = (clone $weekStart)->subWeeks($w);
-                $bucketIndex = 3 - $w;
-                $row = $bucketRows->get($bucketIndex);
+                $wStart = $trendWeekStart->copy()->subWeeks($w);
+                $wEnd = $wStart->copy()->addDays(7);
+                $rows = $trendShifts->filter(fn (Shift $shift) => $shift->starts_at->gte($wStart) && $shift->starts_at->lt($wEnd));
                 $historicalTrend[] = [
                     'week' => $wStart->format('d M'),
-                    'completed' => (int) ($row?->completed ?? 0),
-                    'cancelled' => (int) ($row?->cancelled ?? 0),
-                    'total' => (int) ($row?->total ?? 0),
+                    'completed' => $rows->where('status', 'completed')->count(),
+                    'cancelled' => $rows->where('status', 'cancelled')->count(),
+                    'total' => $rows->count(),
                 ];
             }
         }
@@ -537,16 +589,23 @@ class RosteringController extends Controller
         $selectedRosterPeriod = null;
         $selectedRosterPeriodDiffSummary = null;
 
-        if ($publishEnabled && $canManageAny && $selectedSiteId) {
-            $selectedRosterPeriod = $this->rosterPeriods->activeFor((int) $selectedSiteId, $weekStart)
-                ?? $this->rosterPeriods->findOrCreate((int) $selectedSiteId, $weekStart);
+        if ($publishEnabled && $selectedSiteId && ($canManageAny || $auth->canDo('rostering.publish'))) {
+            if (! $canManageAny) {
+                $this->siteAccess->assertCanAccessSiteId($auth, (int) $selectedSiteId, ['shifts.manageAny']);
+            }
+            $selectedRosterPeriod = $this->rosterPeriods->activeFor((int) $selectedSiteId, $weekStart);
+            // Scoped publication entry only reads an existing period. Keep the
+            // legacy manager GET creation path unchanged.
+            if (! $selectedRosterPeriod && $canManageAny) {
+                $selectedRosterPeriod = $this->rosterPeriods->findOrCreate((int) $selectedSiteId, $weekStart);
+            }
 
-            if ($selectedRosterPeriod->snapshot) {
+            if ($selectedRosterPeriod?->snapshot) {
                 $selectedRosterPeriodDiffSummary = $this->publishing->diff($selectedRosterPeriod)['summary'];
             }
         }
 
-        $leaveLookaheadEnd = $weekStart->copy()->addDays(14);
+        $leaveLookaheadEnd = $weekStart->copy()->addDays(14)->utc();
         $approvedLeave = collect();
         $pendingLeave = collect();
 
@@ -554,7 +613,7 @@ class RosteringController extends Controller
             $approvedLeave = $this->leaveAccess->visibleRequests($auth, true)
                 ->where('status', 'approved')
                 ->where('starts_at', '<', $leaveLookaheadEnd)
-                ->where('ends_at', '>', $weekStart)
+                ->where('ends_at', '>', $queryWeekStart)
                 ->when(! empty($data['staff_id']), fn ($query) => $query->where('user_id', $data['staff_id']))
                 ->with('user:id,name')
                 ->orderBy('starts_at')
@@ -565,7 +624,7 @@ class RosteringController extends Controller
             $pendingLeave = $this->leaveAccess->visibleRequests($auth, true)
                 ->where('status', 'pending')
                 ->where('starts_at', '<', $leaveLookaheadEnd)
-                ->where('ends_at', '>', $weekStart)
+                ->where('ends_at', '>', $queryWeekStart)
                 ->when(! empty($data['staff_id']), fn ($query) => $query->where('user_id', $data['staff_id']))
                 ->with('user:id,name')
                 ->orderBy('starts_at')
@@ -578,7 +637,7 @@ class RosteringController extends Controller
             'capacityPlanningReferenceHours' => $fatiguePolicy['warning_threshold_weekly'],
             'workforcePreferences' => app(WorkforcePreferences::class)->for($auth),
             'eligibilityFreshness' => $this->eligibilityFreshness($shifts, $auth),
-            'workerTimezone' => (string) config('app.worker_timezone', 'Pacific/Auckland'),
+            'workerTimezone' => (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC'),
             'canApproveLeave' => $canApproveLeave,
             'canPublishRoster' => $auth->canDo('rostering.publish'),
             'canAutoScheduleRoster' => $auth->canDo('rostering.autoSchedule'),
@@ -613,12 +672,16 @@ class RosteringController extends Controller
             'defaultServiceContextId' => ServiceContext::defaultId(),
             'canManageTemplates' => $canManageTemplates,
             'canDeleteTemplates' => $canDeleteTemplates,
+            'templateCapabilities' => $templateCapabilities,
+            'templateOptions' => $request->query('tab') === 'templates'
+                ? app(RosterTemplateAccessService::class)->options($auth)
+                : Inertia::optional(fn () => app(RosterTemplateAccessService::class)->options($auth)),
             // Roster templates (tab). Loaded lazily like staffAvailabilitySummary:
             // eager only on the ?tab=templates landing, otherwise resolved on a
             // partial reload when the user opens the tab.
             'rosterTemplates' => $request->query('tab') === 'templates'
-                ? $this->buildRosterTemplates()
-                : Inertia::optional(fn () => $this->buildRosterTemplates()),
+                ? $this->buildRosterTemplates($auth)
+                : Inertia::optional(fn () => $this->buildRosterTemplates($auth)),
             'canManageSeries' => $auth->canDo('shifts.manageAny') || $auth->canDo('rostering.viewAny'),
             // Recurring series (tab). Same lazy pattern as rosterTemplates: eager on
             // the ?tab=recurring landing, otherwise resolved on a partial reload.
@@ -764,67 +827,9 @@ class RosteringController extends Controller
      *
      * @return array<int, array<string, mixed>>
      */
-    protected function buildRosterTemplates(): array
+    protected function buildRosterTemplates(User $auth): array
     {
-        return RosterTemplate::query()
-            ->with([
-                'creator:id,name',
-                'templateShifts.client:id,first_name,last_name',
-                'templateShifts.user:id,name',
-                'templateShifts.serviceContext:id,name,type',
-            ])
-            ->withCount('templateShifts')
-            ->orderByDesc('is_active')
-            ->orderBy('name')
-            ->get()
-            ->map(fn (RosterTemplate $template) => [
-                'id' => $template->id,
-                'name' => $template->name,
-                'description' => $template->description,
-                'template_type' => $template->template_type,
-                'is_active' => (bool) $template->is_active,
-                'template_shifts_count' => (int) $template->template_shifts_count,
-                'creator' => $template->creator ? [
-                    'id' => $template->creator->id,
-                    'name' => $template->creator->name,
-                ] : null,
-                'updated_at' => optional($template->updated_at)->toIso8601String(),
-                'template_shifts' => $template->templateShifts
-                    ->sortBy([['day_of_week', 'asc'], ['start_time', 'asc']])
-                    ->values()
-                    ->map(fn ($shift) => [
-                        'id' => $shift->id,
-                        'client_id' => $shift->client_id,
-                        'user_id' => $shift->user_id,
-                        'service_context_id' => $shift->service_context_id,
-                        'day_of_week' => (int) $shift->day_of_week,
-                        'start_time' => substr((string) $shift->start_time, 0, 5),
-                        'end_time' => substr((string) $shift->end_time, 0, 5),
-                        'shift_type' => $shift->shift_type ?? 'standard',
-                        'is_sleepover' => (bool) $shift->is_sleepover,
-                        'is_on_call' => (bool) $shift->is_on_call,
-                        'is_lone_worker' => (bool) $shift->is_lone_worker,
-                        'expected_break_minutes' => $shift->expected_break_minutes,
-                        'required_skills' => $shift->required_skills ?? [],
-                        'location' => $shift->location,
-                        'notes' => $shift->notes,
-                        'client' => $shift->client ? [
-                            'id' => $shift->client->id,
-                            'first_name' => $shift->client->first_name,
-                            'last_name' => $shift->client->last_name,
-                        ] : null,
-                        'user' => $shift->user ? [
-                            'id' => $shift->user->id,
-                            'name' => $shift->user->name,
-                        ] : null,
-                        'service_context' => $shift->serviceContext ? [
-                            'id' => $shift->serviceContext->id,
-                            'name' => $shift->serviceContext->name,
-                        ] : null,
-                    ])
-                    ->all(),
-            ])
-            ->all();
+        return app(RosterTemplateAccessService::class)->templates($auth);
     }
 
     /**
@@ -948,184 +953,126 @@ class RosteringController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('rostering.viewAny'), 403);
-
         $data = $request->validated();
-
-        $week = ! empty($data['week']) ? Carbon::parse($data['week']) : now();
-        $weekStart = (clone $week)->startOfWeek(Carbon::MONDAY)->startOfDay();
-        $weekEnd = (clone $weekStart)->addDays(7);
-
-        $shifts = Shift::query()
+        $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC');
+        $weekStart = Carbon::parse($data['week'] ?? now($timezone), $timezone)->timezone($timezone)->startOfWeek(Carbon::MONDAY)->startOfDay();
+        $weekEnd = $weekStart->copy()->addDays(7);
+        $siteIds = $this->siteAccess->accessibleSiteIds($auth, ['shifts.manageAny']);
+        $shifts = $this->conflictShiftQuery($auth, $siteIds)
             ->with([
-                'client:id,first_name,last_name',
-                'site:id,name,type',
-                'staff:id,name,email',
+                'client:id,first_name,last_name,site_id', 'site:id,name,type', 'staff:id,name',
                 'serviceContext:id,name,type,is_active',
-                'replacementRequests' => fn ($query) => $query->active()->with([
-                    'requester:id,name',
-                    'currentStaff:id,name',
-                    'replacementStaff:id,name',
-                    'openPosition:id,replacement_request_id,status,claimed_by',
-                    'openPosition.claimer:id,name',
-                ]),
+                'replacementRequests' => function ($relation) {
+                    $this->siteAccess->applyShiftReplacementIntegrityScope($relation->getQuery())
+                        ->active()->with(['requester:id,name', 'currentStaff:id,name', 'replacementStaff:id,name',
+                            'openPosition' => function ($position) {
+                                $this->siteAccess->applyShiftOpenPositionIntegrityScope($position->getQuery())
+                                    ->with('claimer:id,name');
+                            }]);
+                },
             ])
-            ->where('starts_at', '<', $weekEnd)
-            ->where('ends_at', '>', $weekStart)
-            ->orderBy('starts_at')
-            ->get();
-
-        $actionableShifts = $shifts
-            ->filter(fn (Shift $shift) => ! in_array($shift->status, ['completed', 'cancelled'], true))
-            ->values();
+            ->where('starts_at', '<', $weekEnd->copy()->utc())
+            ->where('ends_at', '>', $weekStart->copy()->utc())
+            ->orderBy('starts_at')->orderBy('id')->get();
+        $actionableShifts = $shifts->filter(fn (Shift $shift) => ! in_array($shift->status, ['completed', 'cancelled'], true))->values();
+        $serialize = fn (Shift $shift) => $this->serializeConflictShift($shift, $auth, $weekStart->toDateString());
 
         $staffOverlaps = [];
-        foreach ($actionableShifts->filter(fn (Shift $shift) => ! empty($shift->user_id))->groupBy('user_id') as $userId => $group) {
-            $sorted = $group->sortBy('starts_at')->values();
-            for ($i = 1; $i < $sorted->count(); $i++) {
-                $previous = $sorted[$i - 1];
-                $current = $sorted[$i];
-                if ($previous && $current && $previous->ends_at && $current->starts_at && $previous->ends_at->gt($current->starts_at)) {
-                    $staffOverlaps[] = [
-                        'staff_id' => (int) $userId,
-                        'staff_name' => $current->staff?->name ?? $previous->staff?->name ?? 'Staff member',
-                        'first' => $this->serializeConflictShift($previous),
-                        'second' => $this->serializeConflictShift($current),
-                    ];
-                }
+        foreach ($actionableShifts->whereNotNull('user_id')->groupBy('user_id') as $userId => $group) {
+            foreach ($this->conflictOverlappingPairs($group) as [$first, $second]) {
+                $staffOverlaps[] = ['pair_id' => $this->conflictPairId('staff_overlap', $first, $second),
+                    'staff_id' => (int) $userId, 'staff_name' => $first->staff?->name ?? 'Staff member',
+                    'first' => $serialize($first), 'second' => $serialize($second)];
             }
         }
-
         $clientOverlaps = [];
-        foreach ($actionableShifts->groupBy('client_id') as $clientId => $group) {
-            $sorted = $group->sortBy('starts_at')->values();
-            for ($i = 1; $i < $sorted->count(); $i++) {
-                $previous = $sorted[$i - 1];
-                $current = $sorted[$i];
-                if ($previous && $current && $previous->ends_at && $current->starts_at && $previous->ends_at->gt($current->starts_at)) {
-                    $clientOverlaps[] = [
-                        'client_id' => (int) $clientId,
-                        'client_name' => $current->client ? trim($current->client->first_name.' '.$current->client->last_name) : 'Client',
-                        'first' => $this->serializeConflictShift($previous),
-                        'second' => $this->serializeConflictShift($current),
-                    ];
-                }
+        foreach ($actionableShifts->whereNotNull('client_id')->groupBy('client_id') as $clientId => $group) {
+            foreach ($this->conflictOverlappingPairs($group) as [$first, $second]) {
+                $clientOverlaps[] = ['pair_id' => $this->conflictPairId('client_overlap', $first, $second),
+                    'client_id' => (int) $clientId, 'client_name' => trim($first->client->first_name.' '.$first->client->last_name),
+                    'first' => $serialize($first), 'second' => $serialize($second)];
             }
         }
 
-        $timeOffs = StaffTimeOff::query()
-            ->with('user:id,name')
-            ->where('starts_at', '<', $weekEnd)
-            ->where('ends_at', '>', $weekStart)
-            ->orderBy('starts_at')
-            ->get();
-
+        // Read only time-off belonging to already visible duties. Free-text reasons
+        // and HR approval status are not scheduler conflict evidence.
+        $timeOffs = StaffTimeOff::query()->whereIn('user_id', $actionableShifts->pluck('user_id')->filter()->unique())
+            ->where('starts_at', '<', $weekEnd->copy()->utc())->where('ends_at', '>', $weekStart->copy()->utc())
+            ->orderBy('starts_at')->orderBy('id')->get();
+        $canViewLeaveQueue = $auth->canDo('hr.leave.approve') || $auth->canDo('hr.leave.manage');
+        $visibleLeaveIds = $auth->canDo('hr.leave.viewAny')
+            ? $this->leaveAccess->visibleRequests($auth, $canViewLeaveQueue)
+                ->whereIn('id', $timeOffs->pluck('hr_leave_request_id')->filter())->pluck('id')->all() : [];
         $timeOffConflicts = [];
-        foreach ($actionableShifts->filter(fn (Shift $shift) => ! empty($shift->user_id)) as $shift) {
+        foreach ($actionableShifts->whereNotNull('user_id') as $shift) {
             foreach ($timeOffs->where('user_id', $shift->user_id) as $timeOff) {
-                if ($timeOff->starts_at < $shift->ends_at && $timeOff->ends_at > $shift->starts_at) {
-                    $timeOffConflicts[] = [
-                        'shift' => $this->serializeConflictShift($shift),
-                        'time_off' => [
-                            'id' => $timeOff->id,
-                            'user_name' => $timeOff->user?->name ?? 'Staff member',
-                            'type' => $timeOff->type,
-                            'label' => $timeOff->label,
-                            'starts_at' => optional($timeOff->starts_at)->toIso8601String(),
-                            'ends_at' => optional($timeOff->ends_at)->toIso8601String(),
-                        ],
-                    ];
-                    break;
+                if (! $timeOff->starts_at || ! $timeOff->ends_at || $timeOff->ends_at->lte($timeOff->starts_at)
+                    || ! $timeOff->starts_at->lt($shift->ends_at) || ! $timeOff->ends_at->gt($shift->starts_at)) {
+                    continue;
                 }
+                $canViewLeave = $timeOff->hr_leave_request_id !== null && in_array($timeOff->hr_leave_request_id, $visibleLeaveIds, true);
+                $timeOffConflicts[] = ['pair_id' => 'time_off:'.$shift->id.':'.$timeOff->id, 'shift' => $serialize($shift),
+                    'time_off' => ['id' => $timeOff->id, 'user_id' => $shift->user_id, 'user_name' => $shift->staff?->name ?? 'Staff member',
+                        'type' => $timeOff->type, 'label' => null, 'description' => 'Recorded staff time off overlaps this duty; leave approval is not assessed here.',
+                        'hr_leave_request_id' => $canViewLeave ? $timeOff->hr_leave_request_id : null,
+                        'starts_at' => $timeOff->starts_at->toIso8601String(), 'ends_at' => $timeOff->ends_at->toIso8601String(),
+                        'can' => ['view_leave' => $canViewLeave],
+                        'urls' => ['leave' => $canViewLeave ? route('hr.leave.index') : null]]];
             }
         }
 
         $tightTurnarounds = [];
-        foreach ($actionableShifts->filter(fn (Shift $shift) => ! empty($shift->user_id))->groupBy('user_id') as $userId => $group) {
-            $sorted = $group->sortBy('starts_at')->values();
+        foreach ($actionableShifts->whereNotNull('user_id')->groupBy('user_id') as $userId => $group) {
+            $sorted = $group->sort(fn (Shift $a, Shift $b) => $a->starts_at->getTimestamp() <=> $b->starts_at->getTimestamp() ?: $a->id <=> $b->id)->values();
             for ($i = 1; $i < $sorted->count(); $i++) {
-                $previous = $sorted[$i - 1];
-                $current = $sorted[$i];
-
-                if (! $previous?->ends_at || ! $current?->starts_at) {
+                $first = $sorted[$i - 1];
+                $second = $sorted[$i];
+                if ($first->ends_at->gt($second->starts_at)) {
                     continue;
                 }
-
-                if ($previous->ends_at->gt($current->starts_at)) {
-                    continue;
+                $gap = $first->ends_at->diffInMinutes($second->starts_at);
+                if ($gap <= 30) {
+                    $tightTurnarounds[] = ['pair_id' => $this->conflictPairId('tight_turnaround', $first, $second),
+                        'staff_id' => (int) $userId, 'staff_name' => $first->staff?->name ?? 'Staff member', 'gap_minutes' => $gap,
+                        'first' => $serialize($first), 'second' => $serialize($second)];
                 }
-
-                $gapMinutes = $previous->ends_at->diffInMinutes($current->starts_at);
-                if ($gapMinutes > 30) {
-                    continue;
-                }
-
-                $tightTurnarounds[] = [
-                    'staff_id' => (int) $userId,
-                    'staff_name' => $current->staff?->name ?? $previous->staff?->name ?? 'Staff member',
-                    'gap_minutes' => $gapMinutes,
-                    'first' => $this->serializeConflictShift($previous),
-                    'second' => $this->serializeConflictShift($current),
-                ];
             }
         }
+        $openShifts = $actionableShifts->whereNull('user_id')->map(fn (Shift $shift) => ['finding_id' => 'open_shift:'.$shift->id, ...$serialize($shift)])->values()->all();
+        $canViewJobBoard = $auth->canDo('job_board.viewAny') || $auth->canDo('job_board.claim') || $auth->canDo('shifts.viewAny') || $auth->canDo('shifts.viewAssigned');
+        $activeReplacements = $actionableShifts->map(function (Shift $shift) use ($serialize, $canViewJobBoard) {
+            $replacement = $shift->replacementRequests->sortByDesc('id')->sortByDesc('requested_at')->first();
+            if (! $replacement) {
+                return null;
+            }
 
-        $openShifts = $actionableShifts
-            ->whereNull('user_id')
-            ->map(fn (Shift $shift) => $this->serializeConflictShift($shift))
-            ->values();
+            return ['id' => $replacement->id, 'finding_id' => 'replacement:'.$replacement->id, 'shift' => $serialize($shift),
+                'status' => $replacement->status, 'reason' => $replacement->reason, 'requested_by' => $replacement->requester?->name,
+                'current_staff' => $replacement->currentStaff?->name, 'replacement_staff' => $replacement->replacementStaff?->name,
+                'claimed_by' => $replacement->openPosition?->claimer?->name, 'open_position_id' => $replacement->openPosition?->id,
+                'can' => ['view_job_board' => $canViewJobBoard], 'urls' => ['job_board' => $canViewJobBoard ? route('operations.job_board.index') : null]];
+        })->filter()->values()->all();
+        [$coverageGaps, $alignment, $coverageAssessment, $alignmentAssessment] = $this->conflictCoverageProjection($auth, $siteIds, $weekStart, $weekEnd, $shifts);
+        $categories = [];
+        foreach (['staff_overlaps' => $staffOverlaps, 'client_overlaps' => $clientOverlaps, 'time_off_conflicts' => $timeOffConflicts,
+            'tight_turnarounds' => $tightTurnarounds, 'open_shifts' => $openShifts, 'active_replacements' => $activeReplacements] as $key => $rows) {
+            $categories[$key] = ['status' => 'assessed', 'displayed_count' => count($rows), 'finding_count' => count($rows), 'truncated' => false];
+        }
+        $categories['coverage_gaps'] = $coverageAssessment;
+        $categories['recurring_alignment'] = $alignmentAssessment;
 
-        $activeReplacements = $actionableShifts
-            ->map(function (Shift $shift) {
-                $replacement = $shift->replacementRequests->sortByDesc('requested_at')->first();
-                if (! $replacement) {
-                    return null;
-                }
-
-                return [
-                    'id' => $replacement->id,
-                    'shift' => $this->serializeConflictShift($shift),
-                    'status' => $replacement->status,
-                    'reason' => $replacement->reason,
-                    'requested_by' => $replacement->requester?->name,
-                    'current_staff' => $replacement->currentStaff?->name,
-                    'replacement_staff' => $replacement->replacementStaff?->name,
-                    'claimed_by' => $replacement->openPosition?->claimer?->name,
-                    'open_position_id' => $replacement->openPosition?->id,
-                ];
-            })
-            ->filter()
-            ->values();
-
-        $coverageGaps = collect($this->shiftCoverageService->buildSiteSummaries($weekStart, $weekEnd))
-            ->flatMap(fn (array $site) => collect($site['alerts'] ?? [])->map(function (array $alert) use ($site) {
-                return [
-                    ...$alert,
-                    'site_id' => $site['site_id'],
-                    'site_name' => $site['site_name'],
-                ];
-            }))
-            ->sortByDesc(fn (array $alert) => (
-                (($alert['unfilled_after_open_shifts'] ?? 0) * 100)
-                + ((count($alert['planned_role_shortages'] ?? []) > 0 ? 1 : 0) * 75)
-                + ((count($alert['role_shortages'] ?? []) > 0 ? 1 : 0) * 50)
-                + ($alert['missing_staff'] ?? 0)
-            ))
-            ->values()
-            ->all();
-        $recurringCoverageAlignment = $this->shiftCoverageService->buildRecurringAlignment($weekStart, $weekEnd);
-
-        return inertia('operations/rostering/conflicts', [
-            'weekStart' => $weekStart->toDateString(),
-            'weekEnd' => $weekEnd->toDateString(),
-            'staffOverlaps' => array_values($staffOverlaps),
-            'clientOverlaps' => array_values($clientOverlaps),
-            'timeOffConflicts' => array_values($timeOffConflicts),
-            'tightTurnarounds' => array_values($tightTurnarounds),
-            'openShifts' => $openShifts,
-            'activeReplacements' => $activeReplacements,
-            'coverageGaps' => $coverageGaps,
-            'recurringCoverageAlignment' => $recurringCoverageAlignment,
-        ]);
+        return inertia('operations/rostering/conflicts', ['weekStart' => $weekStart->toDateString(), 'weekEnd' => $weekEnd->toDateString(),
+            'workerTimezone' => $timezone, 'staffOverlaps' => $staffOverlaps, 'clientOverlaps' => $clientOverlaps,
+            'timeOffConflicts' => $timeOffConflicts, 'tightTurnarounds' => $tightTurnarounds, 'openShifts' => $openShifts,
+            'activeReplacements' => $activeReplacements, 'coverageGaps' => $coverageGaps, 'recurringCoverageAlignment' => $alignment,
+            'assessment' => ['scope' => 'approved_sites', 'interval_basis' => 'worker_local_week', 'publication_assessed' => false,
+                'visible_duty_count' => $shifts->count(), 'actionable_duty_count' => $actionableShifts->count(),
+                'scan_criteria' => ['overlap' => 'start < other_end and end > other_start', 'interval_end_exclusive' => true,
+                    'turnaround_threshold_minutes' => 30, 'turnaround_comparison' => 'consecutive non-overlapping duties; 0 <= gap_minutes <= 30',
+                    'worker_timezone' => $timezone, 'automatic_scan' => false, 'publication_assessed' => false],
+                'workflow_urls' => ['workforce_settings' => route('operations.workforce.settings')],
+                'description' => 'Recorded scheduling findings for visible duties. Client overlaps are not a ratio-policy decision; no conflict is resolved by this read.',
+                'categories' => $categories]]);
     }
 
     public function autoSchedule(AutoScheduleRosterRequest $request)
@@ -1373,20 +1320,276 @@ class RosteringController extends Controller
         );
     }
 
-    protected function serializeConflictShift(Shift $shift): array
+    protected function serializeConflictShift(Shift $shift, User $actor, string $week): array
     {
-        return [
-            'id' => $shift->id,
-            'client_name' => $shift->client ? trim($shift->client->first_name.' '.$shift->client->last_name) : 'Client',
-            'staff_name' => $shift->staff?->name,
-            'service_context' => $shift->serviceContext?->name,
-            'status' => $shift->status,
-            'shift_type' => $shift->shift_type ?? 'standard',
-            'location' => $shift->location,
-            'starts_at' => optional($shift->starts_at)->toIso8601String(),
-            'ends_at' => optional($shift->ends_at)->toIso8601String(),
-            'shift_series_id' => $shift->shift_series_id,
-        ];
+        $siteId = $shift->site_id ?? $shift->client?->site_id;
+        $canViewShift = ($actor->canDo('shifts.viewAny') || $actor->canDo('shifts.viewAssigned'))
+            && ($actor->canDo('shifts.viewAny') || $actor->canDo('shifts.manageAny') || (int) $shift->user_id === (int) $actor->id);
+        $canViewClient = $shift->client !== null && ($actor->canDo('clients.viewAny') || $actor->canDo('clients.viewAssigned'))
+            && app(ClientPolicy::class)->view($actor, $shift->client);
+
+        return ['id' => $shift->id, 'client_id' => $shift->client_id, 'user_id' => $shift->user_id, 'site_id' => $shift->site_id, 'effective_site_id' => $siteId,
+            'service_context_id' => $shift->service_context_id, 'client_name' => $shift->client ? trim($shift->client->first_name.' '.$shift->client->last_name) : null,
+            'staff_name' => $shift->staff?->name, 'service_context' => $shift->serviceContext?->name, 'status' => $shift->status,
+            'shift_type' => $shift->shift_type ?? 'standard', 'location' => $shift->location,
+            'starts_at' => $shift->starts_at->toIso8601String(), 'ends_at' => $shift->ends_at->toIso8601String(), 'shift_series_id' => $shift->shift_series_id,
+            'can' => ['view_shift' => $canViewShift, 'view_client' => $canViewClient, 'view_roster' => true],
+            'urls' => ['shift' => $canViewShift ? route('operations.shifts.show', ['shift' => $shift,
+                'return_to' => route('operations.rostering.conflicts', ['week' => $week], false)]) : null,
+                'client' => $canViewClient ? route('operations.clients.show', $shift->client) : null,
+                'roster' => route('operations.rostering.index', ['tab' => 'shifts', 'week' => $week, 'site_id' => [(int) $siteId]])]];
+    }
+
+    private function conflictShiftQuery(User $actor, array $siteIds): Builder
+    {
+        $query = Shift::query()->employeeDuties();
+        $this->siteAccess->applyShiftScope($query, $actor, ['shifts.manageAny']);
+        $query->whereNotNull('starts_at')->whereNotNull('ends_at')->whereColumn('ends_at', '>', 'starts_at')
+            ->where(function ($source) use ($actor, $siteIds) {
+                $source->whereNull('shift_series_id')->orWhereHas('series', fn ($series) => $this->conflictSeriesScope($series, $actor, $siteIds));
+            });
+        if (! $actor->canDo('shifts.manageAny') && ! $actor->canDo('shifts.viewAny')) {
+            $query->where('user_id', $actor->id)->visibleToFrontline();
+        }
+
+        return $query;
+    }
+
+    private function conflictSeriesScope(Builder $query, User $actor, array $siteIds): void
+    {
+        $query->where(function ($source) use ($actor, $siteIds) {
+            $source->where(fn ($manual) => $manual->whereNull('client_id')->whereIn('site_id', $siteIds))
+                ->orWhereHas('client', function ($client) use ($actor) {
+                    $this->siteAccess->applyClientScope($client, $actor, ['shifts.manageAny']);
+                    $client->where(fn ($agreement) => $agreement->whereNull('shift_series.site_id')->orWhereColumn('clients.site_id', 'shift_series.site_id'));
+                });
+        });
+    }
+
+    private function conflictOverlappingPairs(Collection $shifts): array
+    {
+        $ordered = $shifts->unique('id')->sort(fn (Shift $a, Shift $b) => $a->starts_at->getTimestamp() <=> $b->starts_at->getTimestamp() ?: $a->id <=> $b->id);
+        $active = [];
+        $pairs = [];
+        foreach ($ordered as $shift) {
+            $active = array_filter($active, fn (Shift $prior) => $prior->ends_at->gt($shift->starts_at));
+            foreach ($active as $prior) {
+                $pairs[] = [$prior, $shift];
+            }
+            $active[] = $shift;
+        }
+
+        return $pairs;
+    }
+
+    private function conflictPairId(string $kind, Shift $first, Shift $second): string
+    {
+        return $kind.':'.min($first->id, $second->id).':'.max($first->id, $second->id);
+    }
+
+    private function conflictCoverageProjection(User $actor, array $siteIds, Carbon $start, Carbon $end, Collection $shifts): array
+    {
+        $empty = ['status' => 'not_assessed', 'displayed_count' => 0, 'finding_count' => null, 'truncated' => false,
+            'description' => 'Detailed coverage assessment requires the existing shifts.manageAny permission.'];
+        if (! $actor->canDo('shifts.manageAny') || $siteIds === []) {
+            return [[], ['rule_drift' => [], 'orphan_series' => []], $empty, $empty];
+        }
+        $canonicalShifts = $shifts->keyBy('id');
+        $seriesQuery = ShiftSeries::query()->with('client:id,first_name,last_name,site_id');
+        $this->conflictSeriesScope($seriesQuery, $actor, $siteIds);
+        $canonicalSeries = $seriesQuery->get()->keyBy('id');
+        $rules = SiteCoverageRequirement::query()->active()->whereIn('site_id', $siteIds)
+            ->where(fn ($source) => $source->whereNull('preferred_client_id')->orWhereHas('preferredClient', fn ($client) => $client->whereColumn('clients.site_id', 'site_coverage_requirements.site_id')))
+            ->get()->keyBy('id');
+        $siteNames = Site::query()->whereIn('id', $siteIds)->pluck('name', 'id');
+        $writerSiteIds = $actor->isApproved() && $actor->canDo('rostering.viewAny') ? $this->siteAccess->accessibleSiteIds($actor, ['reports.viewAny']) : [];
+        $gaps = [];
+        $alignment = ['rule_drift' => [], 'orphan_series' => []];
+        $capped = false;
+        $incomplete = false;
+        foreach ($siteIds as $siteId) {
+            // Validate all windows before the service hides exact supply from finding lists.
+            foreach ($this->shiftCoverageService->buildRangeCoverage($start, $end, $siteId) as $window) {
+                $checked = $this->conflictCoverageWindow($window, $siteId, $siteNames, $rules, $canonicalShifts, $canonicalSeries, $actor, $start->toDateString(), $writerSiteIds, false);
+                $incomplete = $incomplete || $checked === null || $checked['source_assessment'] === 'not_assessed';
+            }
+            $summaries = $this->shiftCoverageService->buildSiteSummaries($start, $end, $siteId);
+            foreach ($summaries as $summary) {
+                $capped = $capped || (int) ($summary['under_covered_windows'] ?? 0) > count($summary['alerts'] ?? []);
+                foreach ($summary['alerts'] ?? [] as $row) {
+                    $projected = $this->conflictCoverageWindow($row, $siteId, $siteNames, $rules, $canonicalShifts, $canonicalSeries, $actor, $start->toDateString(), $writerSiteIds);
+                    if ($projected === null) {
+                        $incomplete = true;
+
+                        continue;
+                    }
+                    $incomplete = $incomplete || $projected['source_assessment'] === 'not_assessed';
+                    $gaps[] = $projected;
+                }
+            }
+            $rawAlignment = $this->shiftCoverageService->buildRecurringAlignment($start, $end, $siteId);
+            foreach ($rawAlignment['rule_drift'] ?? [] as $row) {
+                $projected = $this->conflictCoverageWindow($row, $siteId, $siteNames, $rules, $canonicalShifts, $canonicalSeries, $actor, $start->toDateString(), $writerSiteIds);
+                if ($projected !== null) {
+                    $projected['finding_id'] = str_replace('coverage:', 'recurring_alignment:', $projected['finding_id']);
+                    $projected['issue_type'] = $row['issue_type'];
+                    $alignment['rule_drift'][] = $projected;
+                } else {
+                    $incomplete = true;
+                }
+                $incomplete = $incomplete || ($projected['source_assessment'] ?? null) === 'not_assessed';
+            }
+            foreach ($rawAlignment['orphan_series'] ?? [] as $row) {
+                $series = $canonicalSeries->get((int) ($row['series_id'] ?? 0));
+                if (! $series || (int) ($series->site_id ?? $series->client?->site_id) !== (int) $siteId) {
+                    $incomplete = true;
+
+                    continue;
+                }
+                $alignment['orphan_series'][] = ['finding_id' => 'orphan_series:'.$series->id, 'issue_type' => 'recurring_supply_without_demand',
+                    'series_id' => $series->id, 'site_id' => $siteId, 'site_name' => $siteNames->get($siteId),
+                    ...$this->conflictCoverageSeries($series), 'urls' => ['roster' => route('operations.rostering.index', ['tab' => 'recurring', 'week' => $start->toDateString(), 'site_id' => [$siteId]])]];
+            }
+        }
+        $meta = ['status' => $incomplete ? 'partially_assessed' : 'assessed', 'displayed_count' => count($gaps),
+            'finding_count' => ($capped || $incomplete) ? null : count($gaps), 'truncated' => $capped,
+            'description' => 'Existing advisory coverage windows; at most eight alerts per Site. Unsafe linked detail is withheld; this is not publication validation.'];
+        $alignmentMeta = ['status' => $incomplete ? 'partially_assessed' : 'assessed',
+            'displayed_count' => count($alignment['rule_drift']) + count($alignment['orphan_series']),
+            'finding_count' => $incomplete ? null : count($alignment['rule_drift']) + count($alignment['orphan_series']), 'truncated' => false,
+            'description' => 'Existing recurring alignment diagnostics for permitted Sites, with unsafe linked details withheld.'];
+
+        return [$gaps, $alignment, $meta, $alignmentMeta];
+    }
+
+    private function conflictCoverageSeries(ShiftSeries $series): array
+    {
+        // Names of workers, contexts and future occurrence metadata are deliberately
+        // absent: the service's unrestricted nested source is not read authority.
+        return ['id' => $series->id, 'client_id' => $series->client_id, 'client_name' => $series->client ? trim($series->client->first_name.' '.$series->client->last_name) : null,
+            'site_id' => $series->site_id ?? $series->client?->site_id, 'shift_type' => $series->shift_type ?? 'standard',
+            'weekdays' => $series->by_weekday ?? [], 'starts_time' => $series->starts_time, 'ends_time' => $series->ends_time];
+    }
+
+    private function conflictCoverageWindow(array $row, int $siteId, $siteNames, Collection $rules, Collection $shifts, Collection $series, User $actor, string $week, array $writerSiteIds, bool $withLifecycle = true): ?array
+    {
+        $rule = $rules->get((int) ($row['rule_id'] ?? 0));
+        if (! $rule || (int) $rule->site_id !== $siteId || (int) ($row['site_id'] ?? 0) !== $siteId) {
+            return null;
+        }
+        $safe = true;
+        $duties = [];
+        foreach ($row['contributing_shifts'] ?? [] as $source) {
+            $shift = $shifts->get((int) ($source['id'] ?? 0));
+            if (! $shift || (int) ($shift->site_id ?? $shift->client?->site_id) !== $siteId) {
+                $safe = false;
+
+                continue;
+            }
+            $detail = $this->serializeConflictShift($shift, $actor, $week);
+            unset($detail['service_context'], $detail['service_context_id']);
+            $duties[] = $detail;
+        }
+        $patterns = [];
+        foreach ($row['matching_series'] ?? [] as $source) {
+            $pattern = $series->get((int) ($source['id'] ?? 0));
+            if (! $pattern || (int) ($pattern->site_id ?? $pattern->client?->site_id) !== $siteId) {
+                $safe = false;
+
+                continue;
+            }
+            if ($pattern->user_id !== null) {
+                $worker = User::query()->whereKey($pattern->user_id);
+                $this->siteAccess->applyFleetRecipientEligibility($worker, $siteId);
+                $safe = $safe && $worker->exists();
+            }
+            $patterns[] = $this->conflictCoverageSeries($pattern);
+        }
+        $openShiftIds = [];
+        foreach ($row['open_shift_ids'] ?? [] as $sourceId) {
+            $open = $shifts->get((int) $sourceId);
+            if (! $open || $open->user_id !== null || in_array($open->status, ['completed', 'cancelled'], true)
+                || (int) ($open->site_id ?? $open->client?->site_id) !== $siteId) {
+                $safe = false;
+
+                continue;
+            }
+            $openShiftIds[] = (int) $open->id;
+        }
+        $preferredClientId = null;
+        if ($rule->preferred_client_id !== null) {
+            $preferred = Client::query()->whereKey($rule->preferred_client_id)->where('site_id', $siteId);
+            $this->siteAccess->applyClientScope($preferred, $actor, ['shifts.manageAny']);
+            $preferredClientId = $preferred->value('id');
+        }
+        $recommendations = ['fill_existing_open_shift', 'retag_or_replace_open_shift', 'create_role_specific_shift',
+            'create_recurring_cover', 'create_cover_shift', 'review_existing_supply', 'rebalance_existing_supply', 'none'];
+        $recommendation = $safe && in_array($row['recommended_fill_action'] ?? null, $recommendations, true)
+            ? $row['recommended_fill_action'] : null;
+        $result = ['finding_id' => 'coverage:'.$rule->id.':'.Carbon::parse($row['starts_at'])->utc()->format('YmdHis').':'.Carbon::parse($row['ends_at'])->utc()->format('YmdHis'),
+            'site_id' => $siteId, 'site_name' => $siteNames->get($siteId), 'rule_id' => $rule->id, 'rule_name' => $rule->name,
+            'coverage_type' => $rule->coverage_type, 'shift_type' => $rule->shift_type, 'required_staff' => $rule->minimum_staff,
+            'starts_at' => $row['starts_at'], 'ends_at' => $row['ends_at'], 'window_label' => $row['window_label'],
+            'source_assessment' => $safe ? 'assessed' : 'not_assessed',
+            'assessment_description' => $safe ? 'Existing advisory demand-window calculation; no publication decision.' : 'Some contributing records are outside the canonical read boundary; supply and shortage are not assessed.',
+            'contributing_shifts' => $duties, 'matching_series' => $patterns,
+            'open_shift_ids' => array_values(array_unique($openShiftIds)), 'preferred_client_id' => $preferredClientId === null ? null : (int) $preferredClientId,
+            'recommended_fill_action' => $recommendation, 'staffing_resolved' => false,
+            'urls' => ['roster' => route('operations.rostering.index', ['tab' => 'shifts', 'week' => $week, 'site_id' => [$siteId]])]];
+        foreach (['assigned_staff', 'open_shifts', 'missing_staff', 'unfilled_after_open_shifts', 'coverage_state', 'planned_coverage_state', 'gap_kind', 'imbalance_kind'] as $key) {
+            $result[$key] = $safe ? ($row[$key] ?? null) : null;
+        }
+        foreach (['role_shortages', 'planned_role_shortages'] as $key) {
+            $result[$key] = $safe ? array_map(fn (array $role) => ['key' => $role['key'], 'label' => $role['label'], 'required' => $role['required'], 'missing' => $role['missing']], $row[$key] ?? []) : [];
+        }
+
+        if (! $withLifecycle) {
+            return $result;
+        }
+        $lifecycle = $this->conflictCoverageLifecycle($row, $rule, in_array($siteId, $writerSiteIds, true));
+        $result['urls'] = array_merge($result['urls'], $lifecycle['urls']);
+        unset($lifecycle['urls']);
+
+        return array_merge($result, $lifecycle);
+    }
+
+    private function conflictCoverageLifecycle(array $row, SiteCoverageRequirement $rule, bool $canWrite): array
+    {
+        $empty = ['coverage_window_key' => null, 'action_window' => null, 'acknowledgement' => null,
+            'acknowledgement_assessment' => 'not_assessed', 'can' => ['acknowledge' => false, 'dismiss' => false, 'clear' => false],
+            'urls' => ['ack' => null, 'dismiss' => null, 'clear' => null]];
+        $key = $row['coverage_window_key'] ?? null;
+        if (! is_string($key) || $key === '') {
+            return $empty;
+        }
+        $start = Carbon::parse($row['starts_at']);
+        $end = Carbon::parse($row['ends_at']);
+        $expectedKey = app(ShiftSignalService::class)->buildCoverageWindowKey([
+            'site_id' => (int) $rule->site_id, 'rule_id' => (int) $rule->id,
+            'starts_at' => $start->toIso8601String(), 'ends_at' => $end->toIso8601String(),
+        ]);
+        if ($key !== $expectedKey || ! $start->lt($end)) {
+            $empty['acknowledgement_assessment'] = 'unavailable';
+
+            return $empty;
+        }
+        $source = CoverageGapAcknowledgement::query()->where('site_id', $rule->site_id)->where('coverage_window_key', $key)->whereNull('cleared_at');
+        $exact = (clone $source)->where('coverage_requirement_id', $rule->id)
+            ->where('window_starts_at', $start)->where('window_ends_at', $end)->orderBy('id')->get();
+        $valid = $source->count() === $exact->count() && $exact->count() <= 1
+            && $exact->every(fn (CoverageGapAcknowledgement $record) => in_array($record->state, [CoverageGapAcknowledgement::STATE_ACKED, CoverageGapAcknowledgement::STATE_DISMISSED], true));
+        $ack = $valid ? $exact->first() : null;
+        $allowed = $canWrite && $valid;
+
+        return ['coverage_window_key' => $key,
+            'action_window' => ['site_id' => (int) $rule->site_id, 'coverage_requirement_id' => (int) $rule->id,
+                'window_starts_at' => $row['starts_at'], 'window_ends_at' => $row['ends_at']],
+            'acknowledgement' => $ack ? ['id' => (int) $ack->id, 'state' => $ack->state, 'since' => $ack->created_at?->toISOString()] : null,
+            'acknowledgement_assessment' => $valid ? 'assessed' : 'unavailable',
+            'can' => ['acknowledge' => $allowed, 'dismiss' => $allowed, 'clear' => $allowed && $ack !== null],
+            'urls' => ['ack' => $allowed ? route('operations.rostering.coverage.ack', ['key' => $key]) : null,
+                'dismiss' => $allowed ? route('operations.rostering.coverage.dismiss', ['key' => $key]) : null,
+                'clear' => $allowed && $ack !== null ? route('operations.rostering.coverage.clear', ['key' => $key]) : null]];
     }
 
     /**

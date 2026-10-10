@@ -101,7 +101,7 @@ final class MedicationNotificationVisibility
         $siteIds = $actor->canDo('medications.view')
             ? $this->governance->readerSiteIds($actor, 'medications.view') : [];
         $auditSites = $actor->canDo('medications.audit.view')
-            ? $this->sites->accessibleSiteIds($actor, ['medications.audit.view']) : [];
+            ? $this->sites->accessibleSiteIds($actor, MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS) : [];
         $query->where(function (Builder $scope) use ($actor, $siteIds, $readable, $auditSites): void {
             // Own competency renewal is nonclinical, unlike a person's record.
             $scope->where(function (Builder $own) use ($actor): void {
@@ -135,7 +135,7 @@ final class MedicationNotificationVisibility
         }
         // Match the existing emergency history reader; an ended grant may be
         // reviewed but never becomes current administration authority here.
-        $siteIds = $this->sites->accessibleSiteIds($actor, $reviewer ? ['medications.audit.view'] : []);
+        $siteIds = $this->sites->accessibleSiteIds($actor, $reviewer ? MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS : []);
 
         return $query->whereHas('client', fn (Builder $client) => $client->whereIn('site_id', $siteIds))
             ->where(function (Builder $identity): void {

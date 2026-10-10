@@ -592,6 +592,7 @@ export function WeekGridPane({
     const visibleDays =
         view === 'day' && days.length > 0 ? [days[cursorIdx]] : days;
     const gridCols = `220px repeat(${visibleDays.length}, minmax(0, 1fr))`;
+    const gridMinWidth = 220 + visibleDays.length * 110;
     const goDay = (delta: number) => {
         if (days.length === 0) return;
         const next = Math.min(days.length - 1, Math.max(0, cursorIdx + delta));
@@ -845,10 +846,18 @@ export function WeekGridPane({
                     )}
                 </div>
             ) : (
-                <div className="overflow-hidden rounded-[14px] border border-border bg-card">
+                <div
+                    role="region"
+                    aria-label="Roster grid, scroll across for all days"
+                    tabIndex={0}
+                    className="overflow-x-auto rounded-[14px] border border-border bg-card focus-visible:ring-2 focus-visible:ring-ring"
+                >
                     <div
                         className="sticky top-0 z-10 grid border-b border-border bg-muted/50"
-                        style={{ gridTemplateColumns: gridCols }}
+                        style={{
+                            gridTemplateColumns: gridCols,
+                            minWidth: gridMinWidth,
+                        }}
                     >
                         <div className="px-3 py-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                             {groupedBySite
@@ -883,7 +892,14 @@ export function WeekGridPane({
                             );
                         })}
                     </div>
-                    <div className="divide-y divide-border">
+                    <div
+                        className="divide-y divide-border"
+                        style={{
+                            minWidth: activeRows.length
+                                ? gridMinWidth
+                                : undefined,
+                        }}
+                    >
                         {activeRows.length === 0 ? <EmptyRoster /> : null}
                         {activeRows.map((row) => (
                             <div

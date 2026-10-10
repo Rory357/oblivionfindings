@@ -997,6 +997,8 @@ app(Schedule::class)->command('emar:expire-second-person-confirmations')->everyM
 app(Schedule::class)->call(fn () => app(PharmacyDispatchService::class)->recover())
     ->name('emar-pharmacy-dispatch-recovery')->everyMinute()->withoutOverlapping()->onOneServer();
 app(Schedule::class)->command('medications:chart-backups')->everyMinute()->withoutOverlapping()->onOneServer();
+// EA-188: 14-day reminders before prescriber access, identities and catalogue reviews end.
+app(Schedule::class)->command('medications:connected-expiry-reminders')->dailyAt('07:00')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
 
 // Durable workforce eligibility recovery uses the existing minute scheduler.
 Artisan::command('workforce:recover-eligibility-refresh', function () {
