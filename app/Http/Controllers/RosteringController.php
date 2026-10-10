@@ -96,13 +96,12 @@ class RosteringController extends Controller
         $availabilityWeekStart = $this->rosterPeriods->weekStart($data['week'] ?? null);
         $availabilityWeekEnd = $availabilityWeekStart->copy()->addDays(7);
 
-        $week = ! empty($data['week'])
-            ? Carbon::parse($data['week'])
-            : now();
-
-        // NZ: week starts on Monday.
-        $weekStart = (clone $week)->startOfWeek(Carbon::MONDAY)->startOfDay();
-        $weekEnd = (clone $weekStart)->addDays(7);
+        // One worker-local civil week governs records, day buckets and labels.
+        // UTC copies are used only for persisted instant comparisons.
+        $weekStart = $availabilityWeekStart->copy();
+        $weekEnd = $availabilityWeekEnd->copy();
+        $queryWeekStart = $weekStart->copy()->utc();
+        $queryWeekEnd = $weekEnd->copy()->utc();
 
         $staff = [];
         $clients = [];
@@ -173,8 +172,8 @@ class RosteringController extends Controller
                 'tasks as tasks_completed' => fn ($q) => $q->where('is_completed', true),
             ])
             // overlap window
-            ->where('starts_at', '<', $weekEnd)
-            ->where('ends_at', '>', $weekStart)
+            ->where('starts_at', '<', $queryWeekEnd)
+            ->where('ends_at', '>', $queryWeekStart)
             ->orderBy('starts_at');
 
         // Normalise the site_id filter once — may be null, a single int, or an int[].
@@ -231,8 +230,8 @@ class RosteringController extends Controller
         // Time-off / one-off unavailability blocks
         $timeOffQuery = StaffTimeOff::query()
             ->with(['user:id,name'])
-            ->where('starts_at', '<', $weekEnd)
-            ->where('ends_at', '>', $weekStart)
+            ->where('starts_at', '<', $queryWeekEnd)
+            ->where('ends_at', '>', $queryWeekStart)
             ->orderBy('starts_at');
 
         if (! $canManageAny) {
@@ -353,7 +352,7 @@ class RosteringController extends Controller
 
         // --- Analytics Data ---
 
-        // Daily shift coverage (scheduled vs filled per day)
+        // Recorded starts by worker-local day; retain all statuses and assignment counts.
         $dailyCoverage = [];
         for ($d = 0; $d < 7; $d++) {
             $day = (clone $weekStart)->addDays($d);
@@ -382,8 +381,8 @@ class RosteringController extends Controller
         // Staff on leave this week
         $onLeaveCount = $canManageAny ? $this->leaveAccess->visibleRequests($auth, true)
             ->where('status', 'approved')
-            ->where('starts_at', '<', $weekEnd)
-            ->where('ends_at', '>', $weekStart)
+            ->where('starts_at', '<', $queryWeekEnd)
+            ->where('ends_at', '>', $queryWeekStart)
             ->distinct('user_id')
             ->count('user_id') : 0;
 
@@ -601,7 +600,7 @@ class RosteringController extends Controller
             }
         }
 
-        $leaveLookaheadEnd = $weekStart->copy()->addDays(14);
+        $leaveLookaheadEnd = $weekStart->copy()->addDays(14)->utc();
         $approvedLeave = collect();
         $pendingLeave = collect();
 
@@ -609,7 +608,7 @@ class RosteringController extends Controller
             $approvedLeave = $this->leaveAccess->visibleRequests($auth, true)
                 ->where('status', 'approved')
                 ->where('starts_at', '<', $leaveLookaheadEnd)
-                ->where('ends_at', '>', $weekStart)
+                ->where('ends_at', '>', $queryWeekStart)
                 ->when(! empty($data['staff_id']), fn ($query) => $query->where('user_id', $data['staff_id']))
                 ->with('user:id,name')
                 ->orderBy('starts_at')
@@ -620,7 +619,7 @@ class RosteringController extends Controller
             $pendingLeave = $this->leaveAccess->visibleRequests($auth, true)
                 ->where('status', 'pending')
                 ->where('starts_at', '<', $leaveLookaheadEnd)
-                ->where('ends_at', '>', $weekStart)
+                ->where('ends_at', '>', $queryWeekStart)
                 ->when(! empty($data['staff_id']), fn ($query) => $query->where('user_id', $data['staff_id']))
                 ->with('user:id,name')
                 ->orderBy('starts_at')

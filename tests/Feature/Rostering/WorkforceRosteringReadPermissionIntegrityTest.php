@@ -3,6 +3,7 @@
 namespace Tests\Feature\Rostering;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Rostering\RosteringFeatureFlags;
 use App\Domain\Rostering\RosterPeriodService;
 use App\Models\AppSetting;
@@ -15,6 +16,8 @@ use App\Models\ShiftOpenPosition;
 use App\Models\ShiftReplacementRequest;
 use App\Models\ShiftSeries;
 use App\Models\Site;
+use App\Models\SiteCoverageRequirement;
+use App\Models\StaffTimeOff;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -323,6 +326,182 @@ class WorkforceRosteringReadPermissionIntegrityTest extends TestCase
         $this->get($this->url(['tab' => 'analytics', 'week' => '2027-01-25']))->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('analytics.historicalTrend', $expected));
         $this->assertSame($state, $this->state());
+        $this->assertSame($queue, $this->queueState());
+    }
+
+    #[DataProvider('dailyCoverageReaders')]
+    public function test_daily_coverage_and_selected_records_share_the_configured_worker_day(string $timezone, bool $ownerOnly): void
+    {
+        config(['app.worker_timezone' => $timezone]);
+        $reader = $ownerOnly
+            ? $this->person($this->site, ['rostering.viewAny', 'shifts.viewAssigned'], 'coordinator')
+            : $this->reader(false);
+        $worker = $ownerOnly ? $reader : $this->person($this->site, ['shifts.viewAssigned']);
+        $rows = [];
+        foreach ([['00:15', 'draft', false], ['09:00', 'scheduled', true], ['12:00', 'in_progress', true],
+            ['18:00', 'completed', true], ['23:45', 'cancelled', false]] as [$clock, $status, $assigned]) {
+            $start = Carbon::parse('2026-10-27 '.$clock, $timezone)->utc();
+            $rows[] = $this->shift($assigned ? $worker : null, [
+                'created_by' => $reader->id, 'starts_at' => $start, 'ends_at' => $start->copy()->addMinutes(10),
+                'status' => $status,
+            ]);
+        }
+        // The owner-only reader keeps the existing own-record restriction.
+        $expectedIds = collect($rows)->filter(fn (Shift $row) => ! $ownerOnly || $row->user_id === $reader->id)->pluck('id')->all();
+        $expected = [];
+        foreach (['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as $i => $day) {
+            $expected[] = ['day' => $day, 'date' => Carbon::parse('2026-10-26', $timezone)->addDays($i)->toDateString(),
+                'scheduled' => $i === 1 ? ($ownerOnly ? 3 : 5) : 0,
+                'filled' => $i === 1 ? 3 : 0, 'open' => $i === 1 && ! $ownerOnly ? 2 : 0];
+        }
+        $state = $this->state();
+        $queue = $this->queueState();
+        $this->actingAs($reader)->get($this->url(['tab' => 'analytics']))->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('workerTimezone', $timezone)->where('weekStart', '2026-10-26')->where('weekEnd', '2026-11-02')
+                ->where('filters.week', '2026-10-26')->where('shifts', fn ($actual) => collect($actual)->pluck('id')->all() === $expectedIds)
+                ->where('stats.total', count($expectedIds))->where('analytics.dailyCoverage', $expected));
+        $this->assertSame($state, $this->state());
+        $this->assertSame($queue, $this->queueState());
+    }
+
+    public static function dailyCoverageReaders(): array
+    {
+        return ['NZ scoped reader' => ['Pacific/Auckland', false], 'NZ owner reader' => ['Pacific/Auckland', true],
+            'Los Angeles scoped reader' => ['America/Los_Angeles', false], 'Los Angeles owner reader' => ['America/Los_Angeles', true]];
+    }
+
+    #[DataProvider('dailyCoverageDstWeeks')]
+    public function test_worker_local_week_includes_boundary_overlap_but_daily_counts_follow_only_the_start_day(string $week, int $sundayHours): void
+    {
+        $reader = $this->reader(false);
+        $worker = $this->person($this->site, ['shifts.viewAssigned']);
+        $monday = Carbon::parse($week, 'Pacific/Auckland');
+        $sunday = $monday->copy()->addDays(6);
+        $nextMonday = $monday->copy()->addWeek();
+        $this->assertEquals($sundayHours, $sunday->diffInHours($nextMonday));
+        $carryIn = $this->shift($worker, ['starts_at' => $monday->copy()->subMinutes(30)->utc(), 'ends_at' => $monday->copy()->addMinutes(30)->utc()]);
+        $first = $this->shift($worker, ['starts_at' => $monday->copy()->utc(), 'ends_at' => $monday->copy()->addMinutes(30)->utc()]);
+        $dstRows = [];
+        foreach (['01:30', '03:30', '23:59:59'] as $clock) {
+            $start = Carbon::parse($sunday->toDateString().' '.$clock, 'Pacific/Auckland')->utc();
+            $dstRows[] = $this->shift(null, ['created_by' => $reader->id, 'starts_at' => $start, 'ends_at' => $start->copy()->addMinutes(30)]);
+        }
+        $this->shift($worker, ['starts_at' => $monday->copy()->subHour()->utc(), 'ends_at' => $monday->copy()->utc()]);
+        $this->shift($worker, ['starts_at' => $nextMonday->copy()->utc(), 'ends_at' => $nextMonday->copy()->addMinutes(30)->utc()]);
+        $expected = [];
+        foreach (['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as $i => $day) {
+            $expected[] = ['day' => $day, 'date' => $monday->copy()->addDays($i)->toDateString(),
+                'scheduled' => $i === 0 ? 1 : ($i === 6 ? 3 : 0), 'filled' => $i === 0 ? 1 : 0, 'open' => $i === 6 ? 3 : 0];
+        }
+        $expectedIds = [$carryIn->id, $first->id, ...collect($dstRows)->pluck('id')->all()];
+        $state = $this->state();
+        $queue = $this->queueState();
+        $this->actingAs($reader)->get($this->url(['tab' => 'analytics', 'week' => $week]))->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('weekStart', $week)->where('weekEnd', $nextMonday->toDateString())->where('filters.week', $week)
+                ->where('shifts', fn ($actual) => collect($actual)->pluck('id')->all() === $expectedIds)
+                ->where('stats.total', 5)->where('analytics.dailyCoverage', $expected));
+        $this->assertSame($state, $this->state());
+        $this->assertSame($queue, $this->queueState());
+    }
+
+    public static function dailyCoverageDstWeeks(): array
+    {
+        return ['NZ daylight starts' => ['2026-09-21', 23], 'NZ daylight ends' => ['2026-03-30', 25]];
+    }
+
+    public function test_worker_local_daily_counts_retain_selected_site_worker_client_and_canonical_scope(): void
+    {
+        $reader = $this->reader(false);
+        $secondSite = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
+        $secondClient = Client::factory()->create(['site_id' => $secondSite->id, 'service_context_id' => $this->context->id]);
+        $otherClient = Client::factory()->create(['site_id' => $this->site->id, 'service_context_id' => $this->context->id]);
+        $reader->hrEmployeeProfile->update(['secondary_site_ids' => [$secondSite->id]]);
+        $reader = $reader->fresh();
+        $worker = $this->person($this->site, ['shifts.viewAssigned']);
+        $worker->hrEmployeeProfile->update(['secondary_site_ids' => [$secondSite->id]]);
+        $otherWorker = $this->person($this->site, ['shifts.viewAssigned']);
+        $foreignWorker = $this->person($this->foreignSite, ['shifts.viewAssigned']);
+        $this->shift($worker);
+        $this->shift($otherWorker, ['status' => 'cancelled']);
+        $this->shift($worker, ['client_id' => $otherClient->id]);
+        $wednesday = Carbon::parse('2026-10-28 09:00', 'Pacific/Auckland')->utc();
+        $this->shift($worker, ['site_id' => $secondSite->id, 'client_id' => $secondClient->id, 'starts_at' => $wednesday, 'ends_at' => $wednesday->copy()->addHour()]);
+        $thursday = Carbon::parse('2026-10-29 09:00', 'Pacific/Auckland')->utc();
+        $this->shift(null, ['created_by' => $reader->id, 'starts_at' => $thursday, 'ends_at' => $thursday->copy()->addHour()]);
+        $this->shift($foreignWorker, ['site_id' => $this->foreignSite->id, 'client_id' => $this->foreignClient->id]);
+        $this->shift($worker, ['client_id' => $this->foreignClient->id]);
+        $state = $this->state();
+        $queue = $this->queueState();
+        foreach ([[[], [3, 1, 1]], [['site_id' => [$this->site->id]], [3, 0, 1]],
+            [['staff_id' => $worker->id], [2, 1, 0]], [['client_id' => $this->client->id], [2, 0, 1]],
+            [['site_id' => [$secondSite->id], 'staff_id' => $worker->id, 'client_id' => $secondClient->id], [0, 1, 0]],
+            [['site_id' => [$this->foreignSite->id]], [0, 0, 0]]] as [$filters, $counts]) {
+            $expected = [];
+            foreach (['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as $i => $day) {
+                $count = $i >= 1 && $i <= 3 ? $counts[$i - 1] : 0;
+                $expected[] = ['day' => $day, 'date' => Carbon::parse('2026-10-26', 'Pacific/Auckland')->addDays($i)->toDateString(),
+                    'scheduled' => $count, 'filled' => $i === 3 ? 0 : $count, 'open' => $i === 3 ? $count : 0];
+            }
+            $this->actingAs($reader)->get($this->url(['tab' => 'analytics', ...$filters]))->assertOk()
+                ->assertInertia(fn (Assert $page) => $page->where('stats.total', array_sum($counts))->where('analytics.dailyCoverage', $expected));
+        }
+        $this->assertSame($state, $this->state());
+        $this->assertSame($queue, $this->queueState());
+    }
+
+    public function test_worker_local_week_aligns_existing_period_capacity_coverage_and_leave_windows_without_writes(): void
+    {
+        $manager = $this->person($this->site, ['rostering.viewAny', 'shifts.manageAny', 'rostering.publish', 'hr.leave.manage'], 'coordinator');
+        $worker = $this->person($this->site, ['shifts.viewAssigned']);
+        $otherWorker = $this->person($this->site, ['shifts.viewAssigned']);
+        $monday = Carbon::parse('2026-10-26', 'Pacific/Auckland');
+        $nextMonday = $monday->copy()->addWeek();
+        $period = $this->period($this->site, $manager);
+        $first = $this->shift($worker, ['starts_at' => $monday->copy()->utc(), 'ends_at' => $monday->copy()->addHour()->utc()]);
+        $last = $this->shift($worker, ['starts_at' => $nextMonday->copy()->subHour()->utc(), 'ends_at' => $nextMonday->copy()->addHour()->utc()]);
+        $carryIn = $this->shift($otherWorker, ['starts_at' => $monday->copy()->subHour()->utc(), 'ends_at' => $monday->copy()->addMinutes(30)->utc()]);
+        $this->shift($worker, ['starts_at' => $nextMonday->copy()->utc(), 'ends_at' => $nextMonday->copy()->addHour()->utc()]);
+        $rule = SiteCoverageRequirement::create(['site_id' => $this->site->id, 'name' => 'Local Monday coverage', 'coverage_type' => 'custom',
+            'day_of_week' => 'mon', 'starts_time' => '00:00', 'ends_time' => '01:00', 'minimum_staff' => 1,
+            'role_requirements' => [], 'allow_overstaffing' => true, 'is_active' => true]);
+        $timeOff = StaffTimeOff::create(['user_id' => $worker->id, 'created_by' => $manager->id, 'type' => 'unavailable',
+            'starts_at' => $monday->copy()->utc(), 'ends_at' => $monday->copy()->addMinutes(30)->utc()]);
+        foreach ([[$monday->copy()->subHour(), $monday], [$nextMonday, $nextMonday->copy()->addHour()]] as [$start, $end]) {
+            StaffTimeOff::create(['user_id' => $worker->id, 'created_by' => $manager->id, 'type' => 'unavailable',
+                'starts_at' => $start->copy()->utc(), 'ends_at' => $end->copy()->utc()]);
+        }
+        $approved = HrLeaveRequest::factory()->create(['user_id' => $otherWorker->id, 'created_by' => $manager->id, 'status' => 'approved',
+            'starts_at' => $monday->copy()->utc(), 'ends_at' => $monday->copy()->addMinutes(30)->utc()]);
+        HrLeaveRequest::factory()->create(['user_id' => $otherWorker->id, 'status' => 'approved',
+            'starts_at' => $monday->copy()->subHour()->utc(), 'ends_at' => $monday->copy()->utc()]);
+        HrLeaveRequest::factory()->create(['user_id' => $worker->id, 'status' => 'approved',
+            'starts_at' => $monday->copy()->addDays(14)->utc(), 'ends_at' => $monday->copy()->addDays(14)->addHour()->utc()]);
+        $pending = HrLeaveRequest::factory()->create(['user_id' => $otherWorker->id, 'status' => 'pending',
+            'starts_at' => $nextMonday->copy()->subMinutes(30)->utc(), 'ends_at' => $nextMonday->copy()->addMinutes(30)->utc()]);
+        $periodIds = app(RosterPeriodService::class)->shiftsQuery($period)->orderBy('starts_at')->pluck('id')->all();
+        $this->assertSame([$carryIn->id, $first->id, $last->id], $periodIds);
+        $relatedState = static fn () => collect(['staff_time_offs', 'hr_leave_requests', 'site_coverage_requirements'])
+            ->mapWithKeys(fn ($table) => [$table => DB::table($table)->orderBy('id')->get()->map(fn ($row) => (array) $row)->all()])->all();
+        $state = $this->state();
+        $related = $relatedState();
+        $queue = $this->queueState();
+        $this->actingAs($manager)->get($this->url(['tab' => 'analytics', 'site_id' => [$this->site->id]]))->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('weekStart', '2026-10-26')->where('weekEnd', '2026-11-02')->where('filters.week', '2026-10-26')
+                ->where('rosterPeriod.id', $period->id)->where('rosterPeriod.week_start', '2026-10-26')->where('rosterPeriod.week_end', '2026-11-02')
+                ->where('shifts', fn ($actual) => collect($actual)->pluck('id')->all() === $periodIds)
+                ->where('capacity', fn ($actual) => (float) collect($actual)->keyBy('user_id')->get($worker->id)['hours'] === 2.0
+                    && (float) collect($actual)->keyBy('user_id')->get($otherWorker->id)['hours'] === 0.5)
+                ->where('coverageSites.0.site_id', $this->site->id)->where('coverageSites.0.total_windows', 1)
+                ->where('recurringCoverageAlignment.rule_drift.0.rule_id', $rule->id)
+                ->where('recurringCoverageAlignment.rule_drift.0.starts_at', $monday->toIso8601String())
+                ->where('recurringCoverageAlignment.rule_drift.0.ends_at', $monday->copy()->addHour()->toIso8601String())
+                ->has('timeOffs', 1)->where('timeOffs.0.id', $timeOff->id)->where('analytics.onLeaveCount', 1)
+                ->has('approvedLeave', 1)->where('approvedLeave.0.id', $approved->id)->has('pendingLeave', 1)->where('pendingLeave.0.id', $pending->id));
+        $this->assertSame($state, $this->state());
+        $this->assertSame($related, $relatedState());
         $this->assertSame($queue, $this->queueState());
     }
 
