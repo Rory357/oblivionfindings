@@ -1495,7 +1495,27 @@ export function PageHeaderRail<K extends string>({
                             {morePill(overflowAlertCount)}
                         </button>
                     </PopoverTrigger>
-                    <PopoverContent align="end" className="w-60 p-1.5">
+                    <PopoverContent
+                        align="end"
+                        className="w-60 p-1.5"
+                        onCloseAutoFocus={(event) => {
+                            const content = event.currentTarget;
+                            const active = document.activeElement;
+                            // A closing menu must not steal focus from a control
+                            // or dialog the worker has already moved on to.
+                            if (
+                                frontline &&
+                                content instanceof HTMLElement &&
+                                active instanceof HTMLElement &&
+                                active !== document.body &&
+                                active.isConnected &&
+                                active.getClientRects().length &&
+                                !content.contains(active)
+                            ) {
+                                event.preventDefault();
+                            }
+                        }}
+                    >
                         {overflowItems.map((it) => {
                             const Icon = it.icon;
                             return (

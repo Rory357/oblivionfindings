@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { formatDateTimeInZone } from '@/lib/datetime';
 import { router } from '@inertiajs/react';
 import { History, Loader2 } from 'lucide-react';
@@ -171,6 +172,23 @@ export function WorkforceStaffingRules({
     onUncertainChange?: (uncertain: boolean) => void;
     onShow: () => void;
 }) {
+    const mobile = useIsMobile();
+    const reviewTrigger = useRef<HTMLButtonElement>(null);
+    const historyTrigger = useRef<HTMLButtonElement>(null);
+    const sectionHeading = useRef<HTMLHeadingElement>(null);
+    const returnFocus = (event: Event, trigger: HTMLButtonElement | null) => {
+        const target =
+            trigger &&
+            !trigger.disabled &&
+            trigger.isConnected &&
+            trigger.getClientRects().length
+                ? trigger
+                : sectionHeading.current;
+        if (target?.isConnected && target.getClientRects().length) {
+            event.preventDefault();
+            target.focus();
+        }
+    };
     const [saved, setSaved] = useState(rules);
     const [draft, setDraft] = useState(() => toDraft(rules.values));
     const [reason, setReason] = useState('');
@@ -335,7 +353,11 @@ export function WorkforceStaffingRules({
             {!visible && hasDraft ? (
                 <SettingsNotice>
                     You have unsaved staffing rules.{' '}
-                    <Button variant="link" onClick={onShow}>
+                    <Button
+                        className="max-md:h-auto max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
+                        variant="link"
+                        onClick={onShow}
+                    >
                         Review staffing rules
                     </Button>
                 </SettingsNotice>
@@ -362,6 +384,7 @@ export function WorkforceStaffingRules({
                     <SettingsNotice role="alert">
                         {error}{' '}
                         <Button
+                            className="max-md:h-auto max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
                             variant="link"
                             onClick={reloadSaved}
                             disabled={processing}
@@ -373,7 +396,13 @@ export function WorkforceStaffingRules({
                 <Card className="gap-0 overflow-hidden p-0">
                     <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
                         <div>
-                            <h2 className="text-section-title">Hours & rest</h2>
+                            <h2
+                                ref={sectionHeading}
+                                tabIndex={-1}
+                                className="text-section-title frontline-focus"
+                            >
+                                Hours & rest
+                            </h2>
                             <p className="text-caption mt-1">
                                 {saved.source === 'saved_override'
                                     ? 'Saved organisation rules'
@@ -386,8 +415,10 @@ export function WorkforceStaffingRules({
                         </div>
                         {rules.can_view_history && rules.urls.history ? (
                             <Button
+                                className="max-md:h-auto max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
                                 variant="outline"
                                 onClick={() => setHistoryPage(1)}
+                                ref={historyTrigger}
                             >
                                 <History className="mr-2 size-4" />
                                 Change history
@@ -443,7 +474,7 @@ export function WorkforceStaffingRules({
                                                         ? 1
                                                         : 'any'
                                                 }
-                                                className="w-28"
+                                                className="w-28 max-md:h-auto max-md:min-h-[44px]"
                                                 value={draft[key]}
                                                 disabled={locked}
                                                 aria-invalid={invalid.some(
@@ -486,7 +517,7 @@ export function WorkforceStaffingRules({
                     </SettingsNotice>
                 ) : null}
                 {canEdit ? (
-                    <Card className="sticky bottom-3 z-20 flex-row flex-wrap items-center justify-between gap-4 p-4 shadow-md">
+                    <Card className="flex-row flex-wrap items-center justify-between gap-4 p-4 shadow-md md:sticky md:bottom-3 md:z-20">
                         <div>
                             <p className="text-body font-semibold">
                                 {changed.length} unsaved staffing{' '}
@@ -498,6 +529,7 @@ export function WorkforceStaffingRules({
                         </div>
                         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                             <Button
+                                className="max-md:h-auto max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
                                 variant="outline"
                                 disabled={!hasDraft || locked}
                                 onClick={discard}
@@ -505,8 +537,10 @@ export function WorkforceStaffingRules({
                                 Discard rule changes
                             </Button>
                             <Button
+                                className="max-md:h-auto max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
                                 disabled={!dirty || locked || !!invalid.length}
                                 onClick={() => setReview(true)}
+                                ref={reviewTrigger}
                             >
                                 Review staffing rules
                             </Button>
@@ -516,7 +550,12 @@ export function WorkforceStaffingRules({
             </div>
             {review ? (
                 <SettingsModal
+                    frontline={mobile}
+                    scrollHeader={mobile}
                     title="Review staffing rules"
+                    onCloseAutoFocus={(event) =>
+                        returnFocus(event, reviewTrigger.current)
+                    }
                     description="These values change shared workload checks. Existing permission, warning and override rules still apply."
                     onClose={() => {
                         if (!command.pending.current) setReview(false);
@@ -524,6 +563,7 @@ export function WorkforceStaffingRules({
                     footer={
                         <>
                             <Button
+                                className="max-md:h-auto max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
                                 variant="outline"
                                 disabled={processing}
                                 onClick={() => setReview(false)}
@@ -531,6 +571,7 @@ export function WorkforceStaffingRules({
                                 Keep editing
                             </Button>
                             <Button
+                                className="max-md:h-auto max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
                                 onClick={save}
                                 disabled={
                                     locked ||
@@ -577,6 +618,7 @@ export function WorkforceStaffingRules({
                         <SettingsNotice role="alert">
                             {error}{' '}
                             <Button
+                                className="max-md:h-auto max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
                                 variant="link"
                                 disabled={processing}
                                 onClick={reloadSaved}
@@ -591,7 +633,12 @@ export function WorkforceStaffingRules({
             rules.can_view_history &&
             rules.urls.history ? (
                 <SettingsModal
+                    frontline={mobile}
+                    scrollHeader={mobile}
                     title="Staffing rule change history"
+                    onCloseAutoFocus={(event) =>
+                        returnFocus(event, historyTrigger.current)
+                    }
                     description="Saved changes to organisation-wide hours and rest thresholds."
                     onClose={() => setHistoryPage(null)}
                 >
@@ -602,6 +649,7 @@ export function WorkforceStaffingRules({
                         <SettingsNotice role="alert">
                             {historyError}{' '}
                             <Button
+                                className="max-md:h-auto max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
                                 variant="link"
                                 onClick={() => {
                                     setHistoryPage(null);
@@ -646,9 +694,10 @@ export function WorkforceStaffingRules({
                     {history && history.last_page > 1 ? (
                         <nav
                             aria-label="Staffing history pages"
-                            className="flex items-center justify-between gap-3"
+                            className="flex items-center justify-between gap-3 max-md:flex-wrap"
                         >
                             <Button
+                                className="max-md:h-auto max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
                                 variant="outline"
                                 disabled={history.current_page <= 1}
                                 onClick={() =>
@@ -657,11 +706,12 @@ export function WorkforceStaffingRules({
                             >
                                 Previous
                             </Button>
-                            <span className="text-caption">
+                            <span className="text-caption max-md:order-first max-md:w-full max-md:text-center">
                                 Page {history.current_page} of{' '}
                                 {history.last_page}
                             </span>
                             <Button
+                                className="max-md:h-auto max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
                                 variant="outline"
                                 disabled={
                                     history.current_page >= history.last_page
