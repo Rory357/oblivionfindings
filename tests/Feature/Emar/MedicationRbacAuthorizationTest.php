@@ -464,6 +464,8 @@ class MedicationRbacAuthorizationTest extends TestCase
         ]);
 
         $reader = $this->userWithPermissions(['medications.view'], $site);
+        // P02 person rule (EA-066/EA-107): the reader supports this resident.
+        $client->supportWorkers()->attach($reader->id);
         $this->actingAs($reader)
             ->get(route('emar.index'))
             ->assertOk()
@@ -491,6 +493,7 @@ class MedicationRbacAuthorizationTest extends TestCase
             'medications.view',
             'medications.controlled.view',
         ], $site);
+        $client->supportWorkers()->attach($controlledReader->id); // P02 person rule
         $this->actingAs($controlledReader)
             ->get(route('emar.index'))
             ->assertOk()

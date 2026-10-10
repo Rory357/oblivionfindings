@@ -150,6 +150,12 @@ it('keeps controlled, cross-client and other-Site INR readings concealed from a 
         'end_date' => null,
         'is_active' => true,
     ]);
+    // EA-066: the overview follows the person rule, so the reader supports
+    // each same-house resident; what stays hidden is hidden for the
+    // controlled, cross-link and other-house reasons this test is about.
+    foreach ([$visible, $controlledOwner, $crossLinked] as $supported) {
+        $supported->supportWorkers()->attach($reader->id);
+    }
 
     $payload = app(MedicationOverviewService::class)->payload(today(), $reader);
 
