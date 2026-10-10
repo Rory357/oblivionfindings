@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { Briefcase } from 'lucide-react';
 import { useMemo } from 'react';
 import { toast } from 'sonner';
@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
 import { useIsMobile } from '@/hooks/use-mobile';
 import AppLayout from '@/layouts/app-layout';
+import { useBoardFilters, type BoardFilters } from './use-board-filters';
 
 type PaginatedJobs = {
     data: JobPost[];
@@ -29,15 +30,7 @@ type PaginatedJobs = {
 
 interface Props {
     jobs?: PaginatedJobs;
-    filters?: {
-        q?: string;
-        status?: string;
-        scope?: string;
-        date_range?: string;
-        skill?: string;
-        fit?: string;
-        week?: string;
-    };
+    filters?: BoardFilters;
     available_skills?: string[];
     stats?: JobBoardStats;
     week?: JobBoardWeek;
@@ -91,6 +84,13 @@ export default function JobBoardIndex({
     viewer,
 }: Props) {
     const mobile = useIsMobile();
+    const page = usePage().props as unknown as {
+        auth?: { user?: { id?: number } | null };
+    };
+    const query = useBoardFilters(
+        filters,
+        String(page.auth?.user?.id ?? 'signed-out'),
+    );
     const scope = resolveScope(filters.scope);
     const firstName = viewer?.first_name ?? 'there';
     const effectiveStats: JobBoardStats = stats ?? {
@@ -133,39 +133,17 @@ export default function JobBoardIndex({
         };
     }, [week]);
 
-    const navigate = (next: Record<string, string | null | undefined>) => {
-        const baseFilters: Record<string, string> = {};
-        const merged: Record<string, string | null | undefined> = {
-            ...filters,
-            ...next,
-        };
-
-        for (const [key, value] of Object.entries(merged)) {
-            if (value !== null && value !== undefined && value !== '') {
-                baseFilters[key] = String(value);
-            }
-        }
-
-        if (next.scope === 'mine') {
-            delete baseFilters.status;
-        }
-
-        router.get('/operations/job-board', baseFilters, {
-            preserveState: true,
-            replace: true,
-        });
-    };
-
     const handleScopeChange = (nextScope: JobBoardScope) => {
-        navigate({ scope: nextScope });
+        query.change({ scope: nextScope });
     };
 
     const handleWeekChange = (anchor: string) => {
-        navigate({ week: anchor });
+        query.change({ week: anchor });
     };
 
     const handleFilterChange = (key: string, value: string | null) => {
-        navigate({ [key]: value });
+        if (key === 'q') query.editSearch(value ?? '');
+        else query.change({ [key]: value ?? undefined });
     };
 
     const handleClaim = (job: JobPost) => {
@@ -313,11 +291,22 @@ export default function JobBoardIndex({
                     stats={effectiveStats}
                     availableSkills={available_skills}
                     filters={{
-                        q: filters.q,
-                        date_range: filters.date_range,
-                        skill: filters.skill,
-                        fit: filters.fit,
+                        q: query.draft.q,
+                        date_range: query.draft.date_range,
+                        skill: query.draft.skill,
+                        fit: query.draft.fit,
                     }}
+                    onSearchSubmit={() => query.change()}
+                    loading={query.loading}
+                    readNotice={
+                        query.loading
+                            ? 'Updating results. The previous results remain visible.'
+                            : (query.error ??
+                              ((query.draft.q ?? '') !== (filters.q ?? '') &&
+                              !query.loading
+                                  ? 'Search changed. Select Search to refresh the positions.'
+                                  : null))
+                    }
                     onFilterChange={handleFilterChange}
                     onWeekChange={handleWeekChange}
                     onAlertMe={handleAlertMe}
@@ -335,7 +324,7 @@ export default function JobBoardIndex({
                     />
                 ) : null}
 
-                <section>
+                <section aria-busy={query.loading}>
                     <header className="mb-3 flex items-center justify-between">
                         <h2 className="inline-flex items-center gap-2 text-[15px] font-bold tracking-tight">
                             {sectionTitle}
@@ -393,14 +382,9 @@ export default function JobBoardIndex({
                                     aria-current={
                                         link.active ? 'page' : undefined
                                     }
-                                    disabled={!link.url}
+                                    disabled={!link.url || query.loading}
                                     onClick={() =>
-                                        link.url &&
-                                        router.get(
-                                            link.url,
-                                            {},
-                                            { preserveState: true },
-                                        )
+                                        link.url && query.goPage(link.url)
                                     }
                                     dangerouslySetInnerHTML={{
                                         __html: link.label,
