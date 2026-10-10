@@ -176,6 +176,8 @@ export function blockLine(
             return { text: 'You’re not clocked in', critical: false };
         case 'notOnShift':
             return { text: `${person} isn’t on your shift`, critical: false };
+        case 'notAssigned':
+            return { text: 'Not assigned to you', critical: false };
         case 'siteNotApproved':
             return { text: 'This house isn’t in your access', critical: false };
         case 'controlledNotAllowed':
@@ -211,6 +213,7 @@ export function blockLine(
 export const BLOCK_CAPTION: Record<string, string> = {
     notClockedIn: 'not clocked in',
     notOnShift: 'not on your shift',
+    notAssigned: 'not assigned to you',
     siteNotApproved: 'house not in your access',
     controlledNotAllowed: 'controlled medicine',
     awaitingVerification: 'order to check',

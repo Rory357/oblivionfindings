@@ -109,6 +109,15 @@ export function blockAllCopy(block: Block<BlockAllKey>, label: DoseLabel | null)
                 stillText: `You can’t record for ${p} until ${p} is on your shift.`,
                 tone: 'warning',
             };
+        case 'notAssigned':
+            return {
+                title: 'Not assigned to you',
+                text: `You’re clocked in at ${house}, but you aren’t assigned to support ${p}.`,
+                next: ['Ask a lead to assign you to support this person.', 'Or contact the coordinator on call for your house.'],
+                still: 'none',
+                stillText: `You can’t record for ${p} until you’re assigned to support them.`,
+                tone: 'warning',
+            };
         case 'siteNotApproved':
             return {
                 title: `Your access doesn’t include ${house}`,

@@ -1787,6 +1787,15 @@ describe('P01 copy', () => {
                 label,
             ).title,
         ).toBe('Aroha isn’t on your shift');
+        // EA-006 (D1): at the house, but not assigned to support the person.
+        const notAssigned = blockAllCopy(
+            { key: 'notAssigned', facts: { house: 'Kōwhai House' } },
+            label,
+        );
+        expect(notAssigned.title).toBe('Not assigned to you');
+        expect(notAssigned.next[0]).toBe(
+            'Ask a lead to assign you to support this person.',
+        );
         expect(
             blockAllCopy({ key: 'controlledNotAllowed', facts: {} }, label)
                 .still,

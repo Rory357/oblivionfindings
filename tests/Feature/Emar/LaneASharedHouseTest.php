@@ -136,6 +136,21 @@ class LaneASharedHouseTest extends TestCase
         $this->assertSame(0, ClientMedicationAdministration::query()->where('client_id', $this->people['D']->id)->count());
     }
 
+    /** Main, 10 Oct: the reason reads "Not assigned to you", not "isn't on your shift". */
+    public function test_a_resident_they_can_read_but_dont_support_says_not_assigned(): void
+    {
+        $this->person('D', $this->house);
+        $this->artisan('emar:generate-dose-slots')->assertSuccessful();
+        $viewAny = Permission::where('key', 'clients.viewAny')->sole()->id;
+        $this->worker->permissionOverrides()->syncWithoutDetaching([$viewAny => ['allowed' => true]]);
+        $this->worker = $this->worker->fresh();
+        Cache::flush();
+
+        $this->requirements('D')->assertOk()->assertJsonPath('block_all.key', 'notAssigned');
+        $this->assertContains($this->record('D')->status(), [403, 404]);
+        $this->assertSame(0, ClientMedicationAdministration::query()->where('client_id', $this->people['D']->id)->count());
+    }
+
     public function test_an_assigned_resident_at_another_house_stays_blocked(): void
     {
         $this->requirements('E')->assertOk()->assertJsonPath('block_all.key', 'notClockedIn');

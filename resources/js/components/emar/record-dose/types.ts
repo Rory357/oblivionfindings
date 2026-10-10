@@ -7,6 +7,8 @@
 export type BlockAllKey =
     | 'notClockedIn'
     | 'notOnShift'
+    /** EA-006 (D1): clocked in at the house, not assigned to support this person. */
+    | 'notAssigned'
     | 'siteNotApproved'
     | 'controlledNotAllowed'
     | 'awaitingVerification'

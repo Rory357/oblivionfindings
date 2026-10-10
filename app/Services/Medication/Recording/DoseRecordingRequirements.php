@@ -38,6 +38,7 @@ use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 /**
@@ -71,6 +72,9 @@ final class DoseRecordingRequirements
     public const BLOCK_NOT_CLOCKED_IN = 'notClockedIn';
 
     public const BLOCK_NOT_ON_SHIFT = 'notOnShift';
+
+    /** EA-006 (D1): clocked in at the house, but not assigned to support this person. */
+    public const BLOCK_NOT_ASSIGNED = 'notAssigned';
 
     public const BLOCK_SITE_NOT_APPROVED = 'siteNotApproved';
 
@@ -430,7 +434,11 @@ final class DoseRecordingRequirements
         }
 
         if ($this->clockedInShiftAtSite($viewer, (int) $client->site_id, $now) !== null) {
-            return ['key' => self::BLOCK_NOT_ON_SHIFT, 'facts' => []];
+            // D1: a shift at the house covers everyone there the worker
+            // supports, so the reason is the missing assignment.
+            $assigned = DB::table('client_user')->where('client_id', $clientId)->where('user_id', $viewer->id)->exists();
+
+            return ['key' => $assigned ? self::BLOCK_NOT_ON_SHIFT : self::BLOCK_NOT_ASSIGNED, 'facts' => []];
         }
 
         return ['key' => self::BLOCK_NOT_CLOCKED_IN, 'facts' => []];
