@@ -407,3 +407,17 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
     - EA-025: a "request waiting" marker on the MAR.
     - EA-138: dispatch state on order rows.
     - EA-136: the duplicate-supply alert does not close on its own.
+- **Stephan's decisions on 10 Oct**
+  - **EA-141:** each backup recipient gets a personal passphrase, so backups can be opened during an outage.
+  - **EA-104:** the prescriber registration check becomes a setting. "Structured" (council, number, scope, date checked, yearly re-check) is the default; "Note only" counts as loosening. Assigned to Lane B.
+- **Independent review of Lane A (`eb9d302c2`)**
+  - No weakening of the controlled-medicine witness or stock checks.
+  - Findings sent back to Lane A before the push:
+    - P0: on a shared device, another worker's stranded doses show names and medicines.
+    - P1: the replay maximum-age check can be bypassed through a timed-out online save.
+    - P2:
+      - the order fingerprint is opt-in;
+      - the offline-review endpoint doesn't check authority;
+      - `captured_by` isn't set on every queued action;
+      - the A11 settings are inert;
+      - pressing Back after sign-out still shows medication pages.
