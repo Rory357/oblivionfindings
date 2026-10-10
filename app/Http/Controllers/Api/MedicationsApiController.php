@@ -28,6 +28,7 @@ use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Medication\Recording\RecordingContract;
+use App\Services\Medication\ShiftMedicationCardAccess;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\MedicationReportingService;
@@ -1772,6 +1773,9 @@ class MedicationsApiController extends Controller
         if (! $user->canDo('shifts.viewAny') && (int) $shift->user_id !== (int) $user->id) {
             abort(404);
         }
+        // EA-166: the shift's person, under the same per-person rule as the
+        // shift page's medication card; anything else is "not found".
+        abort_unless(app(ShiftMedicationCardAccess::class)->canRead($user, $shift->client), 404);
 
         $summary = $this->marService->getShiftSummary(
             $shiftId,

@@ -1898,6 +1898,8 @@ class MedicationRbacAuthorizationTest extends TestCase
             'client_id' => $client->id,
             'user_id' => $actor->id,
         ]);
+        // B5 (EA-069): the shift card follows the person rule; this worker supports the resident.
+        $client->supportWorkers()->attach($actor->id);
         $foreignShift = Shift::factory()->forSite($foreignSite)->create([
             'client_id' => $foreignClient->id,
             'user_id' => $foreignWorker->id,

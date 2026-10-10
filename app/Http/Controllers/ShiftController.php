@@ -301,8 +301,6 @@ class ShiftController extends Controller
 
         $shift->load([
             'client:id,first_name,last_name,site_id,risk_level,safeguarding_flag',
-            'client.medicalProfile',
-            'client.risks',
             'staff:id,name,email',
             'site:id,name,type',
             'tasks',
@@ -400,7 +398,7 @@ class ShiftController extends Controller
         $medicationSummary = null;
         $medicationWitnesses = collect();
 
-        if ($canViewMedications && $shift->client) {
+        if ($canViewMedications && app(\App\Services\Medication\ShiftMedicationCardAccess::class)->canRead($auth, $shift->client)) {
             $scheduleService = app(MarScheduleService::class);
             $shiftDate = $scheduleService->dateFromInput(
                 ($shift->starts_at ?? now())->copy()->timezone($scheduleService->workerTimezone())->toDateString(),
