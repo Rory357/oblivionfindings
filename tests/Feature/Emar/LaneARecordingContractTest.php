@@ -18,6 +18,7 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\Controlled\ControlledRegisterService;
+use App\Services\Medication\Stock\MedicationStockService;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
@@ -110,6 +111,54 @@ class LaneARecordingContractTest extends TestCase
         $this->assertSame('9.00', $lot->fresh()->quantity_remaining);
         $this->assertSame([$lot->id], MedicationStockMovement::where('administration_id', $admin->id)->pluck('medication_stock_lot_id')->unique()->values()->all());
         $this->assertSame(['administered'], ClientControlledDrugEntry::where('client_medication_administration_id', $admin->id)->pluck('entry_type')->all());
+    }
+
+    /**
+     * Walk finding F3 (Main, 10 Oct): the dialog records whole minutes, so a
+     * pack started at 09:30:13 can be used by a dose given at 09:30. A dose
+     * in an earlier minute than the pack started is still refused.
+     */
+    public function test_a_pack_started_earlier_in_the_same_minute_can_be_used(): void
+    {
+        $this->order([
+            'name' => 'Synthetic oxycodone 5mg', 'dosage' => '1 tablet', 'dose_amount' => 1, 'dose_unit' => 'tablet',
+            'frequency' => 'As needed', 'dose_times' => [], 'is_prn' => true, 'prn_reason' => 'Breakthrough pain',
+            'controlled_drug' => true, 'nz_controlled_class' => 'B', 'controlled_class_source' => 'Synthetic reviewed test class',
+        ], 'tablet', '10.00');
+        $started = CarbonImmutable::parse('2026-04-30 09:30:13', 'Pacific/Auckland')->utc();
+        Carbon::setTestNow($started);
+        CarbonImmutable::setTestNow($started);
+        $lot = $this->open(true);
+        $review = $this->asNeededRequirements()->json('live_recording_context');
+        $dose = fn (string $at): array => [
+            'client_medication_id' => $this->medication->id,
+            'client_request_uuid' => (string) Str::uuid(),
+            'live_recording_context' => $review,
+            'administered_at' => $at,
+            'reason' => 'Breakthrough pain',
+            'effect_check_due_at' => '2026-04-30T10:30:00',
+            'amount_mode' => 'as_ordered',
+            'witnessed_by' => $this->witness->id,
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
+            'cd_balance' => 9,
+            'pack_lines' => [['lot_id' => $lot->id, 'revision' => $lot->revision, 'quantity' => '1', 'quantity_wasted' => '0']],
+            'quantity_wasted' => 0,
+        ];
+
+        // Before the fix: "Enter the actual selected pack…" (the walk's 422).
+        $this->actingAs($this->recorder)->postJson('/meds/today/prn', $dose('2026-04-30T09:30:00'))
+            ->assertOk()->assertJsonPath('sync.status', 'processed');
+        $this->assertSame('9.00', $lot->fresh()->quantity_remaining);
+        $this->assertSame(1, MedicationStockMovement::where('medication_stock_lot_id', $lot->id)->where('kind', 'controlled_given')->count());
+
+        // The boundary itself: the pack's minute counts, an earlier minute
+        // never does. (Through the dialog, an earlier dose time is refused
+        // first by its connected review.)
+        $at = fn (string $nz) => CarbonImmutable::parse($nz, 'Pacific/Auckland');
+        $this->assertTrue(MedicationStockService::packStartedBy($at('2026-04-30 09:30:13'), $at('2026-04-30 09:30:00')));
+        $this->assertTrue(MedicationStockService::packStartedBy($at('2026-04-30 09:30:13'), $at('2026-04-30 09:31:00')));
+        $this->assertFalse(MedicationStockService::packStartedBy($at('2026-04-30 09:30:13'), $at('2026-04-30 09:29:59')));
+        $this->assertFalse(MedicationStockService::packStartedBy($at('2026-04-30 09:30:00'), $at('2026-04-30 09:29:00')));
     }
 
     /** EA-003 case 2: a back-dated pack-tracked as-needed dose keeps its connected review. */
