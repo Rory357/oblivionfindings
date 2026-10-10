@@ -115,6 +115,12 @@ type HandoverObservationSummary = {
 };
 
 type Props = {
+    returnContext?: {
+        scope: 'conflict_queue';
+        week: string;
+        href: string;
+        label: 'Conflict queue';
+    } | null;
     shift: {
         id: number;
         client_id: number;
@@ -515,6 +521,7 @@ export default function ShiftShow({
     replacementRequest,
     assignmentCandidates = [],
     coverage = null,
+    returnContext = null,
     client_safety,
     links,
     can,
@@ -922,7 +929,13 @@ export default function ShiftShow({
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Shifts', href: '/operations/shifts' },
+                { title: 'Home', href: '/dashboard' },
+                ...(returnContext
+                    ? [
+                          { title: 'Workforce', href: '/operations/rostering' },
+                          { title: returnContext.label, href: returnContext.href },
+                      ]
+                    : [{ title: 'Shifts', href: '/operations/shifts' }]),
                 {
                     title: `${name} (${formatDate(shift.starts_at)})`,
                     href: `/operations/shifts/${shift.id}`,
@@ -937,8 +950,8 @@ export default function ShiftShow({
                     title={name}
                     description={formatDate(shift.starts_at)}
                     avatar={{ fallback: buildShiftHeroInitials(name) }}
-                    backHref="/operations/shifts"
-                    backLabel="All shifts"
+                    backHref={returnContext?.href ?? '/operations/shifts'}
+                    backLabel={returnContext?.label ?? 'All shifts'}
                     meta={[
                         {
                             icon: Clock,

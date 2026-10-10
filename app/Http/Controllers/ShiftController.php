@@ -555,6 +555,7 @@ class ShiftController extends Controller
             : collect();
 
         return inertia('operations/shifts/show', [
+            'returnContext' => $this->conflictQueueReturnContext($auth, $request->query('return_to')),
             'shift' => $shift,
             'clients' => $clients,
             'staff' => $staff,
@@ -729,6 +730,37 @@ class ShiftController extends Controller
                 'record_event' => $auth->canDo('clinical.events.record'),
             ],
         ]);
+    }
+
+    /** A known queue location is a navigation hint, never authority to read a Shift. */
+    private function conflictQueueReturnContext(User $actor, mixed $value): ?array
+    {
+        if (! $actor->isApproved() || ! $actor->canDo('rostering.viewAny')
+            || $actor->hasRole('client', 'next_of_kin') || in_array($actor->role, ['client', 'next_of_kin'], true)
+            || ! is_string($value) || strlen($value) > 2048 || ! str_starts_with($value, '/') || str_starts_with($value, '//')
+            || preg_match('/[\\\\\x00-\x1f\x7f]/', rawurldecode($value))) {
+            return null;
+        }
+        $parts = parse_url($value);
+        if ($parts === false || array_intersect(array_keys($parts), ['scheme', 'host', 'port', 'user', 'pass', 'fragment']) !== []
+            || ($parts['path'] ?? '') !== route('operations.rostering.conflicts', [], false)) {
+            return null;
+        }
+        $queryString = $parts['query'] ?? '';
+        parse_str($queryString, $query);
+        $week = $query['week'] ?? null;
+        if (count(explode('&', $queryString)) !== 1 || array_keys($query) !== ['week'] || ! is_string($week)
+            || preg_match('/\A(\d{4})-(\d{2})-(\d{2})\z/', $week, $date) !== 1
+            || ! checkdate((int) $date[2], (int) $date[3], (int) $date[1])) {
+            return null;
+        }
+        // This is an already canonical civil date; do not shift or roll it into another week.
+        if (! Carbon::createFromFormat('!Y-m-d', $week, 'UTC')->isMonday()) {
+            return null;
+        }
+
+        return ['scope' => 'conflict_queue', 'week' => $week,
+            'href' => route('operations.rostering.conflicts', ['week' => $week], false), 'label' => 'Conflict queue'];
     }
 
     /** Record-specific access to existing actions; no assignment or save is performed. */

@@ -1334,7 +1334,8 @@ class RosteringController extends Controller
             'shift_type' => $shift->shift_type ?? 'standard', 'location' => $shift->location,
             'starts_at' => $shift->starts_at->toIso8601String(), 'ends_at' => $shift->ends_at->toIso8601String(), 'shift_series_id' => $shift->shift_series_id,
             'can' => ['view_shift' => $canViewShift, 'view_client' => $canViewClient, 'view_roster' => true],
-            'urls' => ['shift' => $canViewShift ? route('operations.shifts.show', $shift) : null,
+            'urls' => ['shift' => $canViewShift ? route('operations.shifts.show', ['shift' => $shift,
+                'return_to' => route('operations.rostering.conflicts', ['week' => $week], false)]) : null,
                 'client' => $canViewClient ? route('operations.clients.show', $shift->client) : null,
                 'roster' => route('operations.rostering.index', ['tab' => 'shifts', 'week' => $week, 'site_id' => [(int) $siteId]])]];
     }

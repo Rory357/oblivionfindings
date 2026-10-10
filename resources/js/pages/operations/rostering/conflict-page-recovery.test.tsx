@@ -174,6 +174,46 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 describe('Conflict Queue real action recovery', () => {
+    it('explains unavailable House staffing access without printing permission keys or claiming assessment', () => {
+        render(
+            <RosteringConflicts
+                {...props}
+                coverageGaps={[]}
+                assessment={{
+                    scope: 'approved_sites',
+                    interval_basis: 'worker_local_week',
+                    publication_assessed: false,
+                    visible_duty_count: 0,
+                    actionable_duty_count: 0,
+                    description: 'Recorded scheduling findings',
+                    categories: {
+                        coverage_gaps: {
+                            status: 'not_assessed',
+                            displayed_count: 0,
+                            finding_count: null,
+                            truncated: false,
+                            description: 'Detailed coverage assessment requires the existing shifts.manageAny permission.',
+                        },
+                    },
+                    scan_criteria: {
+                        worker_timezone: 'Pacific/Auckland',
+                        interval_end_exclusive: true,
+                        turnaround_threshold_minutes: 30,
+                        automatic_scan: false,
+                        publication_assessed: false,
+                    },
+                    workflow_urls: { workforce_settings: null },
+                }}
+            />,
+        );
+        expect(screen.getByText(/coverage gaps: not assessed/)).toHaveTextContent(
+            'House staffing details are not available with your current access',
+        );
+        expect(screen.queryByText(/shifts\.manageAny/)).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Acknowledge' })).toBeNull();
+        expect(mock.fetch).not.toHaveBeenCalled();
+    });
+
     it('retains the selected finding and reason on a real 422 validation response', async () => {
         mock.fetch.mockResolvedValue(
             response(422, {

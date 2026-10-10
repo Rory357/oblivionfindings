@@ -692,7 +692,13 @@ export default function RosteringConflicts(props: ConflictsProps) {
                                         {category.truncated
                                             ? ' · limited results shown'
                                             : ''}
-                                        . {category.description}
+                                        .{' '}
+                                        {!canManage &&
+                                        category.status === 'not_assessed' &&
+                                        (key === 'coverage_gaps' ||
+                                            key === 'recurring_alignment')
+                                            ? 'House staffing details are not available with your current access. Ask your workforce administrator to check your access.'
+                                            : category.description}
                                     </li>
                                 ))}
                             </ul>
