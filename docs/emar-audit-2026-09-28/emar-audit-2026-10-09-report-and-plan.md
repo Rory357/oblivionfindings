@@ -371,3 +371,15 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
   - Walk fixes F1 (follow-up idempotency) and F2 (copy) are being committed.
   - F3 is decided by Main: the pack-start check uses minute precision.
   - Independent review of A1–A4 comes next, before the push.
+- **10 Oct: Lane B B2 + B4 are LIVE as `356e62017`** (a plumbing merge onto `b4deda29e`).
+  - **B2, fleet transit register:**
+    - follows the person rule, with controlled concealment;
+    - fleet.manage is no longer an all-house bypass;
+    - the CSV goes through the P09 export guard;
+    - uses NZ days;
+    - allows several doses per medicine per journey.
+  - **B4:** the general, Settings and HR audit views and the audit-export zip show medication rows only to readers allowed to see them.
+  - **Tests:** MedicationTransitPrivacyTest 7/7, MedicationAuditLogPrivacyTest, green-b2 38/38.
+  - **Accepted:** fleet.medication.manage without medications.view sees no medication register rows; packing is unchanged.
+  - **Main now also carries 13 workforce commits pushed on 10 Oct:** roster, shifts, scoped shift access (`6317cdce1`) and qualification rules. All lanes have been told to merge main.
+- **Lane A A10 (shared houses, D1) committed:** `50c8ef5a5`. The baseline failure was confirmed, and 214/215 tests pass after the fix (F3 reworked).
