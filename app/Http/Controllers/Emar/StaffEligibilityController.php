@@ -74,6 +74,8 @@ class StaffEligibilityController extends Controller
         $resetAuthority = app(WitnessPinResetAuthority::class);
 
         $people = $this->register->rows($readerSiteIds);
+        // EA-156 (Lane C9h): Witnesses & PINs — who is on shift now and can witness.
+        $onShift = $this->register->onShiftNow($readerSiteIds, $people);
         $users = User::query()->whereKey($people->pluck('id')->all())->get()->keyBy('id');
         $people = $people->map(function (array $row) use ($actor, $assessSiteIds, $exemptSiteIds, $canResetPins, $resetAuthority, $users): array {
             $self = (int) $row['id'] === (int) $actor->id;
@@ -101,6 +103,7 @@ class StaffEligibilityController extends Controller
                 ->map(fn (array $e): array => $e + ['can_end' => $canExempt && $e['status'] === 'active' && in_array($e['house_id'], $exemptSiteIds, true)])
                 ->values(),
             'houses' => $houses,
+            'on_shift' => $onShift,
             'policy' => $this->register->policy(),
             'areas' => $this->register->areas(),
             'can' => [

@@ -4,9 +4,10 @@
  * add theirs) — and Register · Renewals · Exemptions are header filter chips
  * (Rory: nothing below the header band).
  *
- * Every number comes from the server's competency decision. There is no
- * witness view or "Can witness" meter: that rule is enforced with P07b; the
- * register keeps the real witness PIN status. */
+ * Every number comes from the server's competency decision. EA-156 (Lane
+ * C9h): the "Can witness" meter, the register's Witness column and the
+ * Witnesses & PINs view read the server's witness rule (the one P07b
+ * enforces) and who P07b accepts on shift now. */
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import { EntityChip, PersonDisc } from '@/components/lists/entity-cells';
@@ -16,6 +17,7 @@ import {
     type MenuItem,
 } from '@/components/lists/entity-menu';
 import { EntityTable } from '@/components/lists/entity-table';
+import { ListCaption } from '@/components/lists/list-caption';
 import {
     PageHeader,
     PageHeaderFilterButton,
@@ -30,6 +32,7 @@ import {
     PageHeaderStatusChip,
 } from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
@@ -44,6 +47,7 @@ import {
     Download,
     Eye,
     Home,
+    KeyRound,
     Pencil,
     Plus,
     RefreshCw,
@@ -86,8 +90,27 @@ import {
 import { StatusChip } from './eligibility/_parts';
 import { Note, RowMenu, Section } from './settings/_ui';
 
+/** EA-156 (Lane C9h): who from the register is on shift now at a house. */
+type OnShiftHouse = {
+    id: number;
+    name: string;
+    /** People P07b accepts as a controlled-drug witness here now. */
+    can_now: number;
+    people: {
+        id: number;
+        name: string;
+        role: string | null;
+        since: string | null;
+        until: string | null;
+        clocked_in: boolean;
+        can_now: boolean;
+        reasons: string[];
+    }[];
+};
+
 type Props = {
     people: EligPerson[];
+    on_shift?: OnShiftHouse[];
     exemptions: EligExemption[];
     houses: { id: number; name: string }[];
     policy: EligPolicy;
@@ -98,11 +121,12 @@ type Props = {
     loaded_at: string;
 };
 
-type View = 'register' | 'renewals' | 'exemptions';
+type View = 'register' | 'renewals' | 'exemptions' | 'witness';
 const VIEWS: [View, string][] = [
     ['register', 'Register'],
     ['renewals', 'Renewals'],
     ['exemptions', 'Exemptions'],
+    ['witness', 'Witnesses & PINs'],
 ];
 const STATUS_FILTERS = [
     { value: 'all', label: 'Any status' },
@@ -136,7 +160,9 @@ export default function StaffEligibility(props: Props) {
     const { people, exemptions, houses, policy, areas, can } = props;
     const [view, setView] = useState<View>(() => {
         const v = readQuery().get('view');
-        return v === 'renewals' || v === 'exemptions' ? v : 'register';
+        return v === 'renewals' || v === 'exemptions' || v === 'witness'
+            ? v
+            : 'register';
     });
     const [house, setHouse] = useState(() => readQuery().get('house') ?? 'all');
     const [status, setStatus] = useState(
@@ -183,6 +209,11 @@ export default function StaffEligibility(props: Props) {
     const activeExemptions = exemptions.filter(
         (e) => e.status === 'active' && inHouse(e.house_id),
     );
+    // EA-156: can witness (all but being on shift), and houses where nobody
+    // on shift now can.
+    const witnesses = scoped.filter((x) => x.witness?.can);
+    const onShift = (props.on_shift ?? []).filter((h) => inHouse(h.id));
+    const noWitnessNow = onShift.filter((h) => h.can_now === 0);
     const roles = useMemo(
         () =>
             [...new Set(people.map((x) => x.role).filter(Boolean) as string[])]
@@ -262,6 +293,8 @@ export default function StaffEligibility(props: Props) {
             'Given doses',
             'Areas not passed',
             'Witness PIN',
+            'Can witness',
+            'Why not',
             'Assessed',
             'Assessor',
             'Type',
@@ -280,6 +313,8 @@ export default function StaffEligibility(props: Props) {
                     .map((a) => a.label)
                     .join('; '),
                 PIN_LABEL[x.pin],
+                x.witness?.can ? 'Yes' : 'No',
+                x.witness?.reasons.join('; '),
                 x.assessment?.assessed,
                 x.assessment?.assessor,
                 x.assessment?.type_label,
@@ -422,6 +457,27 @@ export default function StaffEligibility(props: Props) {
                                 : ' · not reviewed'}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Can witness"
+                        tone={noWitnessNow.length ? 'warning' : 'brand'}
+                        ariaLabel={`View witnesses and PINs, ${witnesses.length} of ${scoped.length} can witness`}
+                        pressed={view === 'witness'}
+                        onClick={() => go('witness')}
+                    >
+                        <PageHeaderMeterBig>
+                            {witnesses.length} of {scoped.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {noWitnessNow.length
+                                ? `${noWitnessNow
+                                      .slice(0, 2)
+                                      .map((h) => h.name)
+                                      .join(
+                                          ', ',
+                                      )}${noWitnessNow.length > 2 ? ` and ${noWitnessNow.length - 2} more` : ''}: nobody on shift now`
+                                : 'Someone on shift can witness at each house'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
                 </>
             }
             filters={
@@ -441,7 +497,9 @@ export default function StaffEligibility(props: Props) {
                                         ? ClipboardList
                                         : key === 'renewals'
                                           ? Clock
-                                          : ShieldCheck
+                                          : key === 'witness'
+                                            ? KeyRound
+                                            : ShieldCheck
                                 }
                                 active={view === key}
                                 aria-pressed={view === key}
@@ -489,7 +547,12 @@ export default function StaffEligibility(props: Props) {
                         icon={RefreshCw}
                         onClick={() =>
                             router.reload({
-                                only: ['people', 'exemptions', 'loaded_at'],
+                                only: [
+                                    'people',
+                                    'on_shift',
+                                    'exemptions',
+                                    'loaded_at',
+                                ],
                             })
                         }
                     >
@@ -552,6 +615,18 @@ export default function StaffEligibility(props: Props) {
                             ? { kind: 'assess', id: x.id, mode: assessMode(x) }
                             : { kind: 'view', id: x.id },
                     )
+                }
+            />
+        );
+    } else if (view === 'witness') {
+        body = (
+            <Witnesses
+                houses={onShift}
+                people={scoped.filter(matches)}
+                checkedAt={props.loaded_at}
+                actions={actions}
+                onOpen={(x) =>
+                    x.assessment ? setDialog({ kind: 'view', id: x.id }) : null
                 }
             />
         );
@@ -863,16 +938,29 @@ function Register({
                             },
                         },
                         {
-                            key: 'pin',
-                            label: 'Witness PIN',
-                            width: '1fr',
+                            key: 'witness',
+                            label: 'Witness',
+                            width: '1.3fr',
                             cell: (x) => (
-                                <StatusBadge
-                                    variant={PIN_VARIANT[x.pin]}
-                                    size="sm"
-                                >
-                                    {PIN_LABEL[x.pin]}
-                                </StatusBadge>
+                                <div className="space-y-1 py-2">
+                                    <StatusBadge
+                                        variant={
+                                            x.witness?.can
+                                                ? 'success'
+                                                : 'neutral'
+                                        }
+                                        size="sm"
+                                    >
+                                        {x.witness?.can
+                                            ? 'Can witness'
+                                            : 'Not a witness'}
+                                    </StatusBadge>
+                                    {x.witness && !x.witness.can ? (
+                                        <p className="text-caption">
+                                            {x.witness.reasons.join(' · ')}
+                                        </p>
+                                    ) : null}
+                                </div>
                             ),
                         },
                     ]}
@@ -905,6 +993,227 @@ function Register({
                 assessment requirement. The usual recording checks still apply.
             </Note>
         </Section>
+    );
+}
+
+/** "Clocked in 7:02 am · until 3:00 pm" (approved P11 v5 witness view). */
+const onShiftLine = (p: OnShiftHouse['people'][number]) =>
+    [
+        p.since
+            ? `${p.clocked_in ? 'Clocked in' : 'On shift from'} ${formatTime(p.since)}`
+            : 'On shift',
+        p.until ? `until ${formatTime(p.until)}` : null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+
+/**
+ * EA-156 (Lane C9h): Witnesses & PINs (approved P11 v5). Each house's people
+ * on shift now and whether P07b accepts them as a witness now, then everyone's
+ * witness competency, PIN and shift.
+ */
+function Witnesses({
+    houses,
+    people,
+    checkedAt,
+    actions,
+    onOpen,
+}: {
+    houses: OnShiftHouse[];
+    people: EligPerson[];
+    checkedAt: string;
+    actions: (x: EligPerson) => MenuItem[];
+    onOpen: (x: EligPerson) => void;
+}) {
+    const menu = useEntityContextMenu<EligPerson>();
+    const shiftOf = new Map(
+        houses.flatMap((h) =>
+            h.people.map((p) => [p.id, { ...p, house: h.name }] as const),
+        ),
+    );
+    return (
+        <div className="space-y-5">
+            <div className="grid gap-4 lg:grid-cols-2">
+                {houses.map((h) => (
+                    <Card
+                        key={h.id}
+                        aria-label={`${h.name} · on shift now`}
+                        className="gap-3 p-4"
+                    >
+                        <ListCaption
+                            title={`${h.name} · on shift now`}
+                            right={
+                                <StatusBadge
+                                    variant={h.can_now ? 'success' : 'warning'}
+                                    size="sm"
+                                >
+                                    {h.can_now
+                                        ? `${h.can_now} can witness`
+                                        : 'Nobody can witness'}
+                                </StatusBadge>
+                            }
+                        />
+                        {h.people.length ? (
+                            <ul className="divide-y divide-border rounded-lg border border-border">
+                                {h.people.map((p) => (
+                                    <li
+                                        key={p.id}
+                                        className="flex flex-wrap items-start justify-between gap-3 px-3 py-2.5"
+                                    >
+                                        <div className="min-w-0">
+                                            <p className="font-medium">
+                                                {p.name}
+                                            </p>
+                                            <p className="text-caption">
+                                                {onShiftLine(p)}
+                                            </p>
+                                        </div>
+                                        <p className="text-caption max-w-[60%] text-right">
+                                            {p.can_now
+                                                ? 'Can witness'
+                                                : p.reasons.join(' · ')}
+                                        </p>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <EmptyState
+                                variant="inline"
+                                icon={Clock}
+                                title="Nobody who records doses is on shift here now."
+                            />
+                        )}
+                        <p className="text-caption">
+                            Checked against clock-ins and shifts in progress at{' '}
+                            {formatTime(checkedAt)}.
+                            {h.can_now
+                                ? ''
+                                : ' Controlled doses need a witness: without one, a manager can approve a witness override.'}
+                        </p>
+                        {h.can_now ? null : (
+                            <div>
+                                <Button variant="link" asChild>
+                                    <Link href="/emar/safety/witness-overrides">
+                                        Open witness overrides
+                                        <ArrowUpRight className="size-4" />
+                                    </Link>
+                                </Button>
+                            </div>
+                        )}
+                    </Card>
+                ))}
+            </div>
+            <Section
+                id="witness"
+                title="Witness competency and PIN"
+                caption={`${people.length} ${people.length === 1 ? 'person' : 'people'}`}
+            >
+                <p className="text-subtle">
+                    A witness needs all four: a current assessment (not an
+                    exemption, not restricted) with the controlled drugs area
+                    passed and “can witness controlled drugs” on, a witness PIN,
+                    and being on shift at the house.
+                </p>
+                {people.length ? (
+                    <EntityTable<EligPerson>
+                        rows={people}
+                        rowKey={(x) => x.id}
+                        identityLabel="Person"
+                        identityWidth="1.3fr"
+                        minWidth={1000}
+                        rowHeight="content"
+                        identity={identity}
+                        columns={[
+                            {
+                                key: 'competency',
+                                label: 'Witness competency',
+                                width: '1.6fr',
+                                cell: (x) => {
+                                    const reasons =
+                                        x.pin === 'set'
+                                            ? (x.witness?.reasons ?? [])
+                                            : (x.witness?.reasons ?? []).slice(
+                                                  0,
+                                                  -1,
+                                              );
+                                    return (
+                                        <span className="py-2 text-[12.5px]">
+                                            {x.witness?.competency
+                                                ? 'Yes — on for this assessment'
+                                                : `No — ${reasons.join(' · ') || 'not assessed'}`}
+                                        </span>
+                                    );
+                                },
+                            },
+                            {
+                                key: 'pin',
+                                label: 'Witness PIN',
+                                width: '1fr',
+                                cell: (x) => (
+                                    <StatusBadge
+                                        variant={PIN_VARIANT[x.pin]}
+                                        size="sm"
+                                    >
+                                        {PIN_LABEL[x.pin]}
+                                        {x.pin === 'set' && x.pin_set_at
+                                            ? ` · ${day(x.pin_set_at)}`
+                                            : ''}
+                                    </StatusBadge>
+                                ),
+                            },
+                            {
+                                key: 'shift',
+                                label: 'On shift now',
+                                width: '1.2fr',
+                                cell: (x) => {
+                                    const at = shiftOf.get(x.id);
+                                    return (
+                                        <span className="text-[12.5px]">
+                                            {at
+                                                ? `${onShiftLine(at)}${houses.length > 1 ? ` · ${at.house}` : ''}`
+                                                : 'Not on shift now'}
+                                        </span>
+                                    );
+                                },
+                            },
+                            {
+                                key: 'can',
+                                label: 'Can witness',
+                                width: '0.7fr',
+                                cell: (x) => (
+                                    <StatusBadge
+                                        variant={
+                                            x.witness?.can
+                                                ? 'success'
+                                                : 'neutral'
+                                        }
+                                        size="sm"
+                                    >
+                                        {x.witness?.can ? 'Yes' : 'No'}
+                                    </StatusBadge>
+                                ),
+                            },
+                        ]}
+                        actionsFor={actions}
+                        onOpen={onOpen}
+                        onRowContextMenu={menu.open}
+                    />
+                ) : (
+                    <EmptyState
+                        icon={Users}
+                        title="Nobody matches"
+                        description="Clear the search or choose another house."
+                    />
+                )}
+                <RowMenu
+                    ctx={menu.ctx}
+                    close={menu.close}
+                    icon={UserCheck}
+                    title={(x) => x.name}
+                    items={actions}
+                />
+            </Section>
+        </div>
     );
 }
 
