@@ -1813,6 +1813,7 @@ class MedicationsApiController extends Controller
             (int) $shift->client_id,
             (int) $shift->site_id,
             is_numeric($shift->user_id) ? (int) $shift->user_id : null,
+            $user,
         );
 
         return response()->json($summary);

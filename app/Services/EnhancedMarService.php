@@ -29,6 +29,7 @@ use App\Services\Medication\ForgottenWitnessPinService;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationCompetencyRestrictionRules;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationSecondPersonService;
 use App\Services\Medication\Recording\LiveRecordingContext;
@@ -2765,6 +2766,7 @@ class EnhancedMarService
         int $expectedClientId,
         int $expectedSiteId,
         ?int $expectedAssigneeId,
+        ?User $viewer = null,
     ): array {
         abort_unless($expectedClientId > 0 && $expectedSiteId > 0, 404);
 
@@ -2794,11 +2796,19 @@ class EnhancedMarService
 
         $administrationQuery = ClientMedicationAdministration::query()
             ->effectiveClinicalEvidence()
-            ->where('shift_id', $shiftId)
-            ->where('client_id', $client->id);
+            ->where('shift_id', $shiftId);
+        $clientIds = [(int) $client->id];
+        if ($viewer !== null) {
+            // EA-006 follow-up (shared houses, D1): a worker on this shift can
+            // record for other residents too. Their doses appear for each
+            // person this viewer may read (the person rule, per person).
+            $recorded = (clone $administrationQuery)->distinct()->pluck('client_id')->map(fn ($id): int => (int) $id)->all();
+            $clientIds = array_values(array_unique([...$clientIds, ...app(MedicationRecordAccess::class)->readableClientIds($viewer, $recorded)]));
+        }
+        $administrationQuery->whereIn('client_id', $clientIds);
         $this->medicationGovernanceScope->scopeCanonicalClientMedicationRows(
             $administrationQuery,
-            $client->site_id ? [(int) $client->site_id] : [],
+            Client::query()->whereIn('id', $clientIds)->whereNotNull('site_id')->pluck('site_id')->map(fn ($id): int => (int) $id)->unique()->values()->all(),
             false,
         );
         if (! $includeControlled) {
@@ -2806,9 +2816,18 @@ class EnhancedMarService
         }
 
         $administrations = $administrationQuery
-            ->with('medication:id,name,controlled_drug,is_prn')
+            ->with(['medication:id,name,controlled_drug,is_prn', 'client:id,first_name,last_name'])
             ->orderByDesc('administered_at')
             ->get();
+        // Another resident's dose is named, so it is never read as this person's.
+        $personLabel = function (ClientMedicationAdministration $a) use ($client): ?string {
+            if ((int) $a->client_id === (int) $client->id || $a->client === null) {
+                return null;
+            }
+            $last = trim((string) $a->client->last_name);
+
+            return trim(trim((string) $a->client->first_name).($last !== '' ? ' '.mb_substr($last, 0, 1).'.' : '')) ?: 'Another person';
+        };
 
         $scheduledCount = $administrations->where('medication.is_prn', false)->count();
         $prnCount = $administrations->where('medication.is_prn', true)->count();
@@ -2829,7 +2848,7 @@ class EnhancedMarService
             'by_status' => $byStatus,
             'administrations' => $administrations->map(fn ($a) => [
                 'id' => $a->id,
-                'medication_name' => $a->medication?->name ?? 'Unknown',
+                'medication_name' => ($a->medication?->name ?? 'Unknown').(($person = $personLabel($a)) !== null ? ' — '.$person : ''),
                 'status' => $a->status,
                 'administered_at' => $a->administered_at?->toIso8601String(),
                 'is_controlled' => $a->medication?->controlled_drug ?? false,

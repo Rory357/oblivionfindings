@@ -50,6 +50,8 @@ final class ExternalClinicalAccessTest extends TestCase
         // person flows predate the two-person rule, switched back on in the test_b10_ tests below.
         ConnectedCareSwitches::on('prescriber_portal', 'provider_transfers');
         ConnectedCareSwitches::off('two_person_identity', 'two_person_handover');
+        // These flows record free-text evidence; Structured checks are tested in test_b10_ tests.
+        ConnectedCareSwitches::value('prescriber_registration_check', 'note');
         $this->connectedFixtures();
     }
 
@@ -373,6 +375,71 @@ final class ExternalClinicalAccessTest extends TestCase
         $portal = $this->actingAs($this->clinician)->get('/clinical-portal')->assertOk();
         $portal->assertInertia(fn (Assert $p) => $p->where('proposals.0.decision_note', 'Please phone the house first.'));
         $this->assertStringNotContainsString('Synthetic family concern note', (string) $portal->getContent());
+    }
+
+    /** EA-104 (setting, Structured by default): council, number, scope and the date checked; free text alone is refused. */
+    public function test_b10_structured_registration_check_is_the_default_and_records_structured_evidence(): void
+    {
+        ConnectedCareSwitches::value('prescriber_registration_check', 'structured');
+        $base = ['client_id' => $this->person->id, 'name' => 'Dr Structured', 'email' => 'structured-fictional@example.test',
+            'provider_name' => 'Fictional practice', 'identity_confirmed' => true, 'expires_at' => now()->addDays(90)->toIso8601String()];
+        $this->actingAs($this->manager)->postJson('/emar/connected-care/clinicians', [...$base, 'registration_authority' => 'Clinical register',
+            'registration_number' => 'FREE-1', 'identity_evidence' => 'Checked somehow'])->assertUnprocessable()
+            ->assertJsonValidationErrors(['registration_authority', 'registration_scope', 'register_checked_at']);
+        $this->actingAs($this->manager)->postJson('/emar/connected-care/clinicians', [...$base, 'registration_authority' => 'MCNZ',
+            'registration_number' => '12345', 'registration_scope' => 'Vocational — general practice',
+            'register_checked_at' => now('Pacific/Auckland')->subDays(120)->toDateString()])->assertUnprocessable()->assertJsonValidationErrors('register_checked_at');
+
+        $id = $this->actingAs($this->manager)->postJson('/emar/connected-care/clinicians', [...$base, 'registration_authority' => 'MCNZ',
+            'registration_number' => '12345', 'registration_scope' => 'Vocational — general practice',
+            'register_checked_at' => now('Pacific/Auckland')->subDays(2)->toDateString()])->assertSuccessful()->json('id');
+
+        $profile = MedicationExternalClinician::query()->findOrFail($id);
+        $this->assertTrue($profile->hasStructuredCheck());
+        $this->assertSame('Vocational — general practice', $profile->registration_scope);
+        $this->assertSame((int) $this->manager->id, (int) $profile->register_checked_by);
+        // The fixture's free-text record is flagged, not blocked: its grant still works.
+        $this->actingAs($this->manager)->get('/emar/connected-care?client_id='.$this->person->id)->assertOk()
+            ->assertInertia(fn (Assert $p) => $p->where('registration.mode', 'structured')
+                ->where('clinicians', fn ($rows) => collect($rows)->firstWhere('id', $this->identity->id)['needs_structured_check'] === true
+                    && collect($rows)->firstWhere('id', $id)['needs_structured_check'] === false));
+        $this->actingAs($this->clinician)->get('/clinical-portal?client_id='.$this->person->id)->assertOk();
+    }
+
+    /** EA-104: recording the structured check makes the recorder the verifier, so the two-person rule applies to them. */
+    public function test_b10_recording_a_registration_check_keeps_the_two_person_rule(): void
+    {
+        ConnectedCareSwitches::value('prescriber_registration_check', 'structured');
+        ConnectedCareSwitches::on('two_person_identity');
+        $checker = $this->connectedStaff();
+        $this->actingAs($checker)->postJson('/emar/connected-care/clinicians/'.$this->identity->id.'/registration-check', [
+            'client_id' => $this->person->id, 'registration_authority' => 'NCNZ', 'registration_number' => '67890',
+            'registration_scope' => 'Nurse practitioner', 'register_checked_at' => now('Pacific/Auckland')->toDateString(), 'identity_confirmed' => true,
+        ])->assertSuccessful();
+        $this->assertSame((int) $checker->id, (int) $this->identity->fresh()->verified_by);
+        $this->assertTrue($this->identity->fresh()->hasStructuredCheck());
+
+        app(ExternalClinicalAccess::class)->revokeGrant($this->manager, $this->grant->id, ['reason' => 'Synthetic regrant']);
+        $grant = ['clinician_id' => $this->identity->id, 'client_id' => $this->person->id, 'purpose' => 'Review',
+            'expires_at' => now()->addDays(20)->toIso8601String(), 'can_propose' => false, 'include_controlled' => false];
+        $this->actingAs($checker)->postJson('/emar/connected-care/grants', $grant)->assertUnprocessable()->assertJsonValidationErrors('clinician_id');
+        $this->actingAs($this->manager)->postJson('/emar/connected-care/grants', $grant)->assertSuccessful();
+    }
+
+    /** EA-104: Note only is the loosening; with it, free-text evidence is accepted. */
+    public function test_b10_note_only_is_the_loosening_and_accepts_free_text_evidence(): void
+    {
+        $definition = app(\App\Services\Medication\Settings\MedicationSettingsRegistry::class)->definition('connected', 'prescriber_registration_check');
+        $this->assertSame('structured', $definition->default);
+        $this->assertTrue($definition->loosens('structured', 'note'));
+        $this->assertFalse($definition->loosens('note', 'structured'));
+
+        ConnectedCareSwitches::value('prescriber_registration_check', 'note');
+        $id = $this->actingAs($this->manager)->postJson('/emar/connected-care/clinicians', ['client_id' => $this->person->id,
+            'name' => 'Dr Note', 'email' => 'note-fictional@example.test', 'provider_name' => 'Fictional practice',
+            'registration_authority' => 'Clinical register', 'registration_number' => 'NOTE-1', 'identity_evidence' => 'Checked by phone with the practice',
+            'identity_confirmed' => true, 'expires_at' => now()->addDays(90)->toIso8601String()])->assertSuccessful()->json('id');
+        $this->assertSame('note', MedicationExternalClinician::query()->findOrFail($id)->registration_check);
     }
 
     private function allowGlobalIdentityWithdrawal(User $actor, string $permission): User

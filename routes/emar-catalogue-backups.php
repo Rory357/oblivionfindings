@@ -38,5 +38,7 @@ Route::middleware(['auth', ShareConnectedCareSwitches::class])->prefix('emar/bac
         Route::post('/sites/{site}/prepare', [MedicationBackupDeliveryController::class, 'prepare'])->whereNumber('site')->name('prepare');
         Route::post('/deliveries/{delivery}/send', [MedicationBackupDeliveryController::class, 'send'])->whereNumber('delivery')->name('send');
         Route::post('/deliveries/{delivery}/retry', [MedicationBackupDeliveryController::class, 'retry'])->whereNumber('delivery')->name('retry');
+        // EA-141: your own backup passphrase (step-up; applies to new backups).
+        Route::post('/passphrase', [MedicationBackupDeliveryController::class, 'passphrase'])->middleware('throttle:6,1')->name('passphrase');
     });
 });

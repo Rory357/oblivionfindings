@@ -17,6 +17,7 @@ import { useState } from 'react';
 import {
     AccessWizard,
     ProposalDecision,
+    RegistrationCheckWizard,
     RevokeAccess,
     TransferAction,
     TransferWizard,
@@ -55,6 +56,9 @@ export default function ConnectedCare(props: ConnectedProps) {
         ConnectedProps['proposals'][number] | null
     >(null);
     const [transfer, setTransfer] = useState<Transfer | null>(null);
+    const [registrationCheck, setRegistrationCheck] = useState<
+        ConnectedProps['clinicians'][number] | null
+    >(null);
     const [transition, setTransition] = useState<string | null>(null);
     const [revoke, setRevoke] = useState<{
         kind: 'clinicians' | 'grants';
@@ -353,12 +357,67 @@ export default function ConnectedCare(props: ConnectedProps) {
                                     {
                                         key: 'registration',
                                         label: 'Registration',
-                                        width: '1fr',
-                                        cell: (c) =>
-                                            c.registration_authority +
-                                            ' ' +
-                                            c.registration_number,
+                                        width: '1.5fr',
+                                        // EA-104: structured evidence, a due re-check, or a free-text record.
+                                        cell: (c) => (
+                                            <div className="space-y-1">
+                                                <div>
+                                                    {(props.registration
+                                                        ?.councils?.[
+                                                        c.registration_authority
+                                                    ] ??
+                                                        c.registration_authority) +
+                                                        ' ' +
+                                                        c.registration_number}
+                                                </div>
+                                                {c.needs_structured_check ? (
+                                                    <StatusBadge variant="warning">
+                                                        Needs structured check
+                                                    </StatusBadge>
+                                                ) : c.register_recheck_due ? (
+                                                    <StatusBadge variant="warning">
+                                                        Re-check due
+                                                    </StatusBadge>
+                                                ) : c.register_checked_at ? (
+                                                    <span className="text-caption">
+                                                        {c.registration_scope} ·
+                                                        checked{' '}
+                                                        {formatDateOnly(
+                                                            c.register_checked_at,
+                                                        )}
+                                                    </span>
+                                                ) : null}
+                                            </div>
+                                        ),
                                     },
+                                    ...(props.can.manage_access
+                                        ? [
+                                              {
+                                                  key: 'check',
+                                                  label: '',
+                                                  width: '160px',
+                                                  cell: (
+                                                      c: ConnectedProps['clinicians'][number],
+                                                  ) =>
+                                                      !c.revoked_at &&
+                                                      (c.needs_structured_check ||
+                                                          c.register_recheck_due) ? (
+                                                          <Button
+                                                              size="sm"
+                                                              variant="outline"
+                                                              onClick={(e) => {
+                                                                  e.stopPropagation();
+                                                                  setRegistrationCheck(
+                                                                      c,
+                                                                  );
+                                                              }}
+                                                          >
+                                                              Record check
+                                                          </Button>
+                                                      ) : null,
+                                              },
+                                          ]
+                                        : []),
                                     {
                                         key: 'expiry',
                                         label: 'Identity review ends',
@@ -477,6 +536,14 @@ export default function ConnectedCare(props: ConnectedProps) {
                         onSaved={saved}
                     />
                 ))}
+            {registrationCheck && (
+                <RegistrationCheckWizard
+                    clinician={registrationCheck}
+                    props={props}
+                    onClose={() => setRegistrationCheck(null)}
+                    onSaved={saved}
+                />
+            )}
             {decision && (
                 <ProposalDecision
                     proposal={decision}

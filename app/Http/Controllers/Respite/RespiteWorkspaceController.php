@@ -22,6 +22,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Respite\RespiteMedicalDisclosure;
 use App\Services\Respite\RespiteStayScope;
+use App\Services\UserSiteAccessService;
 use App\Support\Respite\RespiteFundingSource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -60,6 +61,8 @@ class RespiteWorkspaceController extends Controller
     public function index(Request $request): Response
     {
         $this->viewer = $request->user();
+        // The route can reuse this controller; alerts are per viewer.
+        $this->criticalAlertCache = [];
         $viewer = $this->viewer;
         $clientScope = fn ($clients) => $this->scope->applyAccessibleClientScope($clients, $viewer);
 
@@ -187,10 +190,17 @@ class RespiteWorkspaceController extends Controller
      */
     private function restraintPickers(): array
     {
+        // Deferred from B1 (EA-011): the viewer's houses, staff and residents only.
+        $viewer = $this->viewer;
+        $inScope = fn ($clients) => $this->scope->applyAccessibleClientScope($clients, $viewer);
+        // The same house bypass as RespiteStayScope.
+        $siteIds = app(UserSiteAccessService::class)->accessibleSiteIds($viewer, ['clinical.accessAllSites', 'sites.viewAll']);
+
         return [
-            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
-            'staff' => User::query()->orderBy('name')->get(['id', 'name']),
+            'sites' => Site::query()->whereIn('id', $siteIds)->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'staff' => $this->scope->applyAccessibleStaffScope(User::query(), $viewer)->orderBy('name')->get(['users.id', 'users.name']),
             'incidents' => ClientIncident::query()
+                ->whereHas('client', $inScope)
                 ->select('id', 'reference_number', 'client_id', 'type', 'occurred_at')
                 ->orderByDesc('occurred_at')
                 ->limit(100)
@@ -207,6 +217,7 @@ class RespiteWorkspaceController extends Controller
                 })
                 ->all(),
             'plans' => BehaviourSupportPlan::query()
+                ->whereHas('client', $inScope)
                 ->where('status', '!=', 'archived')
                 ->orderByDesc('created_at')
                 ->get(['id', 'reference_number', 'client_id', 'title', 'status', 'restrictive_practice_type'])
@@ -545,8 +556,10 @@ class RespiteWorkspaceController extends Controller
             ->whereIn('status', ['active', 'extended'])
             ->count();
         $bedsOccupied = RespiteStay::whereIn('status', ['active', 'extended'])->count();
+        // Deferred from B1 (EA-011): compliance counts cover the viewer's stays only.
+        $scopedStayIds = $this->scope->applyAccessibleStayScope(RespiteStay::query(), $request)->pluck('respite_stays.id');
         $respiteIncidentIds = ClientIncident::query()
-            ->whereNotNull('respite_stay_id')
+            ->whereIn('respite_stay_id', $scopedStayIds)
             ->pluck('id');
         $pendingNotifiableCount = $respiteIncidentIds->isEmpty()
             ? 0
@@ -565,8 +578,8 @@ class RespiteWorkspaceController extends Controller
                 ->where('status', 'pending')
                 ->whereBetween('notification_deadline', [now(), now()->addDay()])
                 ->count();
-        $restraintsAwaitingReview = RestraintEvent::whereNull('reviewed_at')->whereNotNull('stay_id')->count();
-        $bspAwaitingLink = RestraintEvent::whereNotNull('stay_id')
+        $restraintsAwaitingReview = RestraintEvent::whereNull('reviewed_at')->whereIn('stay_id', $scopedStayIds)->count();
+        $bspAwaitingLink = RestraintEvent::whereIn('stay_id', $scopedStayIds)
             ->where('within_support_plan', true)
             ->whereNull('behaviour_support_plan_id')
             ->count();
@@ -584,7 +597,10 @@ class RespiteWorkspaceController extends Controller
                     ->orWhereNull('rights_recorded_at');
             })
             ->count();
-        $openComplaints = RespiteComplaint::whereNotIn('status', ['resolved'])->count();
+        $openComplaints = RespiteComplaint::whereNotIn('status', ['resolved'])
+            ->where(fn ($q) => $q->whereIn('stay_id', $scopedStayIds)
+                ->orWhere(fn ($q) => $q->whereNull('stay_id')->whereHas('client', fn ($clients) => $this->scope->applyAccessibleClientScope($clients, $viewer))))
+            ->count();
         $fundingAttention = $bookingRows()
             ->whereIn('status', ['pending', 'confirmed'])
             ->where(function ($query) {
@@ -614,7 +630,7 @@ class RespiteWorkspaceController extends Controller
             'fullHomes' => $fullHomes,
             'fundingAttention' => $fundingAttention,
             'complianceAttention' => $restraintsAwaitingReview
-                + ClientIncident::whereNotNull('respite_stay_id')->whereNotIn('status', ['reviewed', 'closed'])->count()
+                + ClientIncident::whereIn('respite_stay_id', $scopedStayIds)->whereNotIn('status', ['reviewed', 'closed'])->count()
                 + $pendingNotifiableCount
                 + $bspAwaitingLink
                 + $missingConsentRights
@@ -920,6 +936,7 @@ class RespiteWorkspaceController extends Controller
         // concealment applied), only for readers of the Medical section.
         $medical = collect($this->medical->criticalMedicalAlerts($this->viewer, $client));
 
+        $canReadSafeguarding = (bool) $this->viewer?->canDo('safeguarding.viewAny') || (bool) $this->viewer?->canDo('safeguarding.viewSensitive');
         $safeguardingAlerts = SafeguardingAlert::query()
             ->where('alertable_type', Client::class)
             ->where('alertable_id', $client->id)
@@ -928,7 +945,8 @@ class RespiteWorkspaceController extends Controller
             ->map(fn (SafeguardingAlert $alert) => [
                 'type' => 'safeguarding',
                 'label' => $alert->alert_summary,
-                'detail' => $alert->alert_details,
+                // Deferred from B1: the detail can hold allegations; it needs safeguarding access.
+                'detail' => $canReadSafeguarding ? $alert->alert_details : null,
                 'severity' => $alert->severity,
                 'requiresAcknowledgement' => in_array($alert->severity, ['high', 'critical'], true),
             ]);

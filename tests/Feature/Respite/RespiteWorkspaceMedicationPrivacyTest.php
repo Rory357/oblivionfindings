@@ -210,3 +210,62 @@ test('a canonical-only life-threatening allergy still requires the anaphylaxis a
 
     expect($stay->fresh()->status)->toBe('admitted');
 });
+
+/*
+ * Deferred from B1: the restraint wizard pickers, the compliance counts and
+ * the safeguarding alert text in the same payload follow the same houses and
+ * people, and safeguarding detail needs safeguarding access.
+ */
+test('restraint pickers list only the viewer’s houses, staff, incidents and plans', function () {
+    $a1 = ($this->resident)($this->houseA, 'Aroha');
+    $b1 = ($this->resident)($this->houseB, 'Bella');
+    $staffB = ($this->staffAt)($this->houseB, ['respite.viewAny']);
+    $incidentA = \App\Models\ClientIncident::factory()->create(['client_id' => $a1->id]);
+    $incidentB = \App\Models\ClientIncident::factory()->create(['client_id' => $b1->id]);
+    $planA = \App\Models\BehaviourSupportPlan::factory()->create(['client_id' => $a1->id]);
+    $planB = \App\Models\BehaviourSupportPlan::factory()->create(['client_id' => $b1->id]);
+    $reader = ($this->staffAt)($this->houseA, ['respite.viewAny', 'clients.viewAny']);
+
+    $this->actingAs($reader)->get('/respite')->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('restraintPickers.sites', fn ($sites) => collect($sites)->pluck('id')->all() === [$this->houseA->id])
+            ->where('restraintPickers.staff', fn ($staff) => collect($staff)->pluck('id')->doesntContain($staffB->id)
+                && collect($staff)->pluck('id')->contains($reader->id))
+            ->where('restraintPickers.incidents', fn ($rows) => collect($rows)->pluck('id')->contains($incidentA->id)
+                && collect($rows)->pluck('id')->doesntContain($incidentB->id))
+            ->where('restraintPickers.plans', fn ($rows) => collect($rows)->pluck('id')->contains($planA->id)
+                && collect($rows)->pluck('id')->doesntContain($planB->id)));
+});
+
+test('compliance counts include only the viewer’s houses', function () {
+    ($this->resident)($this->houseA, 'Aroha');
+    $b1 = ($this->resident)($this->houseB, 'Bella');
+    $stayB = RespiteStay::query()->where('client_id', $b1->id)->sole();
+    \App\Models\RestraintEvent::factory()->create(['site_id' => $this->houseB->id, 'client_id' => $b1->id, 'stay_id' => $stayB->id, 'reviewed_at' => null]);
+    \App\Models\ClientIncident::factory()->create(['client_id' => $b1->id, 'respite_stay_id' => $stayB->id, 'status' => 'draft']);
+    $reader = ($this->staffAt)($this->houseA, ['respite.viewAny', 'clients.viewAny']);
+
+    $this->actingAs($reader)->get('/respite')->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('stats.compliance.restraintsAwaitingReview', 0)
+            ->where('stats.complianceAttention', fn ($count) => (int) $count === (int) $page->toArray()['props']['stats']['compliance']['missingConsentRights']
+                + (int) $page->toArray()['props']['stats']['compliance']['openComplaints']
+                + (int) $page->toArray()['props']['stats']['compliance']['bspAwaitingLink']));
+});
+
+test('safeguarding alert detail needs safeguarding access', function () {
+    $a1 = ($this->resident)($this->houseA, 'Aroha');
+    \App\Models\SafeguardingAlert::query()->create([
+        'alertable_type' => Client::class, 'alertable_id' => $a1->id, 'alert_type' => 'requires_monitoring',
+        'alert_summary' => 'Requires monitoring on outings', 'alert_details' => 'Synthetic sensitive allegation detail',
+        'severity' => 'high', 'active' => true,
+    ]);
+    $reader = ($this->staffAt)($this->houseA, ['respite.viewAny', 'clients.viewAny']);
+    $lead = ($this->staffAt)($this->houseA, ['respite.viewAny', 'clients.viewAny', 'safeguarding.viewAny']);
+
+    $alertFor = fn (User $viewer) => collect($this->actingAs($viewer)->get('/respite')->assertOk()
+        ->inertiaProps('stays.0.criticalAlerts'))->firstWhere('type', 'safeguarding');
+
+    expect($alertFor($reader))->toMatchArray(['label' => 'Requires monitoring on outings', 'detail' => null, 'requiresAcknowledgement' => true])
+        ->and($alertFor($lead)['detail'])->toBe('Synthetic sensitive allegation detail');
+});

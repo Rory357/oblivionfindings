@@ -16,6 +16,7 @@ use App\Services\CurrentAuthorizationReads;
 use App\Services\Medication\Audit\MedicationEventData;
 use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\ClientAllergyRecordService;
+use App\Services\Medication\Connected\ConnectedCareSettings;
 use App\Services\Medication\ExternalClinical\ExternalClinicalAccess;
 use App\Services\Medication\ExternalClinical\ExternalClinicalPrescription;
 use App\Services\Medication\ExternalClinical\ExternalClinicalProposals;
@@ -60,6 +61,7 @@ final class MedicationExternalClinicalController extends Controller
         $selected = $clientId !== null ? $this->records->client($actor, $clientId) : null;
         $selectedIds = $selected ? [$selected->id] : $ids;
         $canAccess = $actor->canDo('medications.external.manage');
+        $registrationMode = app(ConnectedCareSettings::class)->registrationCheck();
         $canRevokeIdentity = $this->external->canRevokeIdentity($actor);
         $canOrders = $actor->canDo('medications.orders.manage');
         $canTransfer = $actor->canDo('medications.transfers.manage');
@@ -86,7 +88,13 @@ final class MedicationExternalClinicalController extends Controller
             'filters' => ['site_id' => $siteId, 'client_id' => $clientId, 'return_to' => MedicationJourney::returnTo($request->query('return_to'))],
             'clinicians' => $profiles->map(fn ($p) => ['id' => $p->id, 'user_id' => $p->user_id, 'name' => $p->user->name, 'email' => $p->user->email,
                 'provider_name' => $p->provider_name, 'registration_authority' => $p->registration_authority, 'registration_number' => $p->registration_number,
-                'identity_verified_at' => $p->identity_verified_at?->toIso8601String(), 'expires_at' => $p->expires_at?->toIso8601String(), 'revoked_at' => $p->revoked_at?->toIso8601String()])->all(),
+                'identity_verified_at' => $p->identity_verified_at?->toIso8601String(), 'expires_at' => $p->expires_at?->toIso8601String(), 'revoked_at' => $p->revoked_at?->toIso8601String(),
+                // EA-104: structured registration evidence and its yearly re-check.
+                'registration_check' => $p->hasStructuredCheck() ? 'structured' : 'note', 'registration_scope' => $p->registration_scope,
+                'register_checked_at' => $p->register_checked_at?->toDateString(), 'register_recheck_due' => $p->registerRecheckDue(),
+                'needs_structured_check' => $registrationMode === 'structured' && ! $p->hasStructuredCheck()])->all(),
+            // EA-104: Settings › Connected services › Prescriber registration check.
+            'registration' => ['mode' => $registrationMode, 'councils' => ConnectedCareSettings::COUNCILS],
             'grants' => $grants->map(fn ($g) => ['id' => $g->id, 'clinician_id' => $g->clinician_id, 'clinician_name' => $g->clinician->user->name,
                 'client_id' => $g->client_id, 'site_id' => $g->site_id, 'purpose' => $g->purpose, 'can_propose' => $g->can_propose,
                 'include_controlled' => $g->include_controlled, 'expires_at' => $g->expires_at?->toIso8601String(), 'revoked_at' => $g->revoked_at?->toIso8601String(),
@@ -175,6 +183,14 @@ final class MedicationExternalClinicalController extends Controller
         $this->external->revokeIdentity($r->user(), $clinician, $r->all());
 
         return $this->mutation($r, ['id' => $clinician], 'Clinical identity access revoked.');
+    }
+
+    /** EA-104: record or re-check a prescriber's structured registration check. */
+    public function registrationCheck(Request $r, int $clinician)
+    {
+        $this->external->recordRegistrationCheck($r->user(), $clinician, $r->all());
+
+        return $this->mutation($r, ['id' => $clinician], 'Registration check recorded.');
     }
 
     public function revokeGrant(Request $r, int $grant)
