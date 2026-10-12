@@ -9,6 +9,7 @@ import InputError from '@/components/input-error';
 import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { RecordPicker } from '@/components/people-locations/record-picker';
 import { SettingsNotice } from '@/components/settings/settings-notice';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
@@ -22,6 +23,7 @@ import {
     WizardStepPane,
     WizardSuccessPane,
 } from '@/components/wizard/shell';
+import { formatDateTime } from '@/lib/datetime';
 import {
     Camera,
     Check,
@@ -31,9 +33,14 @@ import {
     Truck,
     Users,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
-import { csrfHeaders, useStockCommand } from './_requests';
-import type { StockItem, SupplyOrder } from './_types';
+import { useState } from 'react';
+import { useStockCommand } from './_requests';
+import type {
+    LatestPackPhoto,
+    PhotoPolicy,
+    StockItem,
+    SupplyOrder,
+} from './_types';
 
 type ReceiptPack = {
     key: string;
@@ -88,6 +95,8 @@ export function ReceiveWizard({
     item: StockItem & {
         witnesses?: ControlledWitness[];
         current_user_id?: number;
+        photo_policy?: PhotoPolicy;
+        latest_photo?: LatestPackPhoto | null;
     };
     order?: SupplyOrder;
     onClose: () => void;
@@ -100,20 +109,49 @@ export function ReceiveWizard({
     const witnessValid =
         !item.controlled ||
         Object.keys(witnessErrors(witness, candidates)).length === 0;
-    const steps = item.controlled
-        ? [
-              ...baseSteps.slice(0, 3),
-              {
-                  key: 'witness',
-                  label: 'Witness',
-                  blurb: 'Check the delivery together',
-                  icon: Users,
-              },
-              baseSteps[3],
-          ]
-        : baseSteps;
+    // C11 (P06 Q6 + Settings › Medicine photos): the photo step shows when
+    // this person may take photos and receipts prompt (or a controlled
+    // delivery needs one). It asks for a photo when the medicine has none,
+    // at every delivery, or when the pack looks different from last time.
+    const policy = item.photo_policy;
+    const [looksDifferent, setLooksDifferent] = useState(false);
+    const photoRequired = policy?.required ?? false;
+    const showPhotoStep =
+        !policy ||
+        (policy.can_photograph && (policy.mode !== 'off' || photoRequired));
+    const hasPhoto = policy?.has_photo ?? false;
+    const prompting = !policy || policy.prompt || looksDifferent;
+    const steps = [
+        baseSteps[0],
+        baseSteps[1],
+        ...(showPhotoStep
+            ? [
+                  {
+                      ...baseSteps[2],
+                      blurb: photoRequired
+                          ? 'Needed for a controlled delivery'
+                          : prompting
+                            ? 'Take one'
+                            : 'Optional',
+                  },
+              ]
+            : []),
+        ...(item.controlled
+            ? [
+                  {
+                      key: 'witness',
+                      label: 'Witness',
+                      blurb: 'Check the delivery together',
+                      icon: Users,
+                  },
+              ]
+            : []),
+        baseSteps[3],
+    ];
     const reviewIndex = steps.length - 1;
     const [step, setStep] = useState(0);
+    const stepKey = steps[step]?.key;
+    const photoIndex = steps.findIndex((entry) => entry.key === 'photo');
     const [source, setSource] = useState(order ? 'pharmacy' : '');
     const [reference, setReference] = useState(
         order ? `Pharmacy order #${order.id}` : '',
@@ -136,16 +174,13 @@ export function ReceiveWizard({
     const [notes, setNotes] = useState('');
     const [photo, setPhoto] = useState<File | null>(null);
     const [photoPack, setPhotoPack] = useState('first');
-    const [looksDifferent, setLooksDifferent] = useState(false);
     const [photoError, setPhotoError] = useState('');
-    const [uploading, setUploading] = useState(false);
     const [savedLots, setSavedLots] = useState<number[]>([]);
     const [photoSaved, setPhotoSaved] = useState(false);
     const [discard, setDiscard] = useState(false);
-    const camera = useRef<HTMLInputElement>(null);
-    const photoUuid = useRef(crypto.randomUUID());
     const command = useStockCommand();
-    const saving = command.saving || uploading;
+    const saving = command.saving;
+    const photoMissing = photoRequired && !photo;
     const snapshot = JSON.stringify({
         source,
         reference,
@@ -158,8 +193,8 @@ export function ReceiveWizard({
         looksDifferent,
         witnessId: witness.id,
     });
-    const initial = useRef(snapshot);
-    const dirty = snapshot !== initial.current || photo !== null;
+    const [initial] = useState(snapshot);
+    const dirty = snapshot !== initial || photo !== null;
     const allCounted = packs.every(
         (pack) =>
             /^\d+(?:\.\d{1,2})?$/.test(pack.quantity) &&
@@ -204,6 +239,7 @@ export function ReceiveWizard({
             saving ||
             (index > 0 && !sourceValid) ||
             (index > 1 && !packsValid) ||
+            (photoIndex >= 0 && index > photoIndex && photoMissing) ||
             (index === reviewIndex && !witnessValid)
         )
             return;
@@ -237,43 +273,11 @@ export function ReceiveWizard({
             return;
         }
         setPhoto(file);
-        photoUuid.current = crypto.randomUUID();
         setPhotoError('');
-    };
-    const upload = async (lotId: number) => {
-        if (!photo) return;
-        setUploading(true);
-        setPhotoError('');
-        const body = new FormData();
-        body.set('photo', photo);
-        body.set('request_uuid', photoUuid.current);
-        try {
-            const response = await fetch(`/emar/stock/packs/${lotId}/photos`, {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: csrfHeaders(),
-                body,
-            });
-            const result = await response.json();
-            if (!response.ok || result.success !== true) {
-                setPhotoError(
-                    result.errors?.photo?.[0] ??
-                        result.message ??
-                        'Stock is received. The photo was not saved; keep it here and try again.',
-                );
-                return;
-            }
-            setPhotoSaved(true);
-        } catch {
-            setPhotoError(
-                'Stock is received. The photo save could not be confirmed; keep it here and try again.',
-            );
-        } finally {
-            setUploading(false);
-        }
     };
     const receive = async () => {
-        if (!sourceValid || !packsValid || !witnessValid) return;
+        if (!sourceValid || !packsValid || !witnessValid || photoMissing)
+            return;
         const result = await command.run({
             action: 'receive',
             client_medication_id: item.id,
@@ -302,29 +306,26 @@ export function ReceiveWizard({
                       witness_credential: witness.pin,
                   }
                 : {}),
+            // C11: the photo is saved with the delivery, in one request.
+            ...(photo && showPhotoStep
+                ? {
+                      photo,
+                      photo_pack: Math.max(
+                          0,
+                          packs.findIndex((pack) => pack.key === photoPack),
+                      ),
+                      pack_changed: looksDifferent,
+                  }
+                : {}),
         });
         const lotIds =
             result?.lot_ids ?? (result?.lot_id ? [result.lot_id] : []);
         if (!lotIds.length) return;
         setWitness(emptyWitness());
         setSavedLots(lotIds);
+        setPhotoSaved(Boolean(result?.photo_id));
         onSaved();
-        await upload(
-            lotIds[
-                Math.max(
-                    0,
-                    packs.findIndex((pack) => pack.key === photoPack),
-                )
-            ],
-        );
     };
-    const photoLotId =
-        savedLots[
-            Math.max(
-                0,
-                packs.findIndex((pack) => pack.key === photoPack),
-            )
-        ];
     return (
         <>
             <WizardShell
@@ -342,6 +343,9 @@ export function ReceiveWizard({
                         saving ||
                         (index > 0 && !sourceValid) ||
                         (index > 1 && !packsValid) ||
+                        (photoIndex >= 0 &&
+                            index > photoIndex &&
+                            photoMissing) ||
                         (index === reviewIndex && !witnessValid),
                 }))}
                 stepIndex={step}
@@ -372,7 +376,10 @@ export function ReceiveWizard({
                                 saving ||
                                 !sourceValid ||
                                 (step > 0 && !packsValid) ||
-                                (step >= 3 && !witnessValid)
+                                (stepKey === 'photo' && photoMissing) ||
+                                ((stepKey === 'witness' ||
+                                    stepKey === 'review') &&
+                                    !witnessValid)
                             }
                             onClick={() =>
                                 step < reviewIndex
@@ -384,7 +391,9 @@ export function ReceiveWizard({
                                 ? 'Saving…'
                                 : step === reviewIndex
                                   ? 'Receive stock'
-                                  : step === 2 && !photo
+                                  : stepKey === 'photo' &&
+                                      !photo &&
+                                      !photoRequired
                                     ? 'Continue without a photo'
                                     : 'Continue'}
                         </Button>
@@ -408,39 +417,11 @@ export function ReceiveWizard({
                                           ? 'The order is closed short. '
                                           : ''}
                                     {photoSaved
-                                        ? 'The selected pack photo is saved.'
-                                        : photo
-                                          ? 'The photo still needs to be saved.'
-                                          : 'Received without a photo.'}
-                                    {photoError && (
-                                        <SettingsNotice>
-                                            {photoError}
-                                        </SettingsNotice>
-                                    )}
+                                        ? 'The pack photo is saved with this delivery.'
+                                        : 'Received without a photo.'}
                                 </>
                             }
-                            actions={
-                                <>
-                                    {photo && !photoSaved && (
-                                        <Button
-                                            disabled={uploading}
-                                            onClick={() =>
-                                                void upload(photoLotId)
-                                            }
-                                        >
-                                            {uploading
-                                                ? 'Saving photo…'
-                                                : 'Try photo again'}
-                                        </Button>
-                                    )}
-                                    <Button
-                                        disabled={uploading}
-                                        onClick={onClose}
-                                    >
-                                        Done
-                                    </Button>
-                                </>
-                            }
+                            actions={<Button onClick={onClose}>Done</Button>}
                         />
                     ) : undefined
                 }
@@ -460,7 +441,7 @@ export function ReceiveWizard({
                             </SettingsNotice>
                         )}
                         <div className="space-y-4">
-                            {step === 0 && (
+                            {stepKey === 'source' && (
                                 <>
                                     <p className="text-section-title">
                                         {item.name}
@@ -524,7 +505,7 @@ export function ReceiveWizard({
                                     </label>
                                 </>
                             )}
-                            {step === 1 && (
+                            {stepKey === 'packs' && (
                                 <>
                                     {!item.stock_id && (
                                         <>
@@ -754,30 +735,52 @@ export function ReceiveWizard({
                                     />
                                 </>
                             )}
-                            {step === 2 && (
+                            {stepKey === 'photo' && (
                                 <>
-                                    <SettingsNotice role="note">
-                                        A photo helps identify this supplied
-                                        pack. Check the label and current order.
-                                        Taking a photo is optional; earlier
-                                        photos are kept.
-                                    </SettingsNotice>
-                                    <label className="frontline-tap flex items-center gap-2">
-                                        <Checkbox
-                                            checked={looksDifferent}
-                                            onCheckedChange={(value) =>
-                                                setLooksDifferent(
-                                                    value === true,
-                                                )
-                                            }
-                                        />
-                                        This pack or brand looks different.
-                                    </label>
-                                    {looksDifferent && (
-                                        <SettingsNotice role="note">
-                                            Add a new photo to help staff
-                                            identify the changed pack.
-                                        </SettingsNotice>
+                                    {prompting || photoRequired ? (
+                                        <Alert role="note">
+                                            <Camera className="size-4" />
+                                            <AlertTitle>
+                                                {photoRequired
+                                                    ? `A photo of ${item.name} is needed for this controlled delivery`
+                                                    : hasPhoto && looksDifferent
+                                                      ? 'The pack looks different — take a photo'
+                                                      : hasPhoto
+                                                        ? `Take a photo of this ${item.name} delivery`
+                                                        : `No pack photo of ${item.name} yet — take one`}
+                                            </AlertTitle>
+                                            <AlertDescription>
+                                                Photograph the pack with its
+                                                pharmacy label showing. Staff
+                                                see it in the dose dialog, so
+                                                they know what the medicine
+                                                should look like.{' '}
+                                                {photoRequired
+                                                    ? 'Your organisation needs one before a controlled delivery is received.'
+                                                    : 'It’s optional — you can skip it.'}
+                                            </AlertDescription>
+                                        </Alert>
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground">
+                                            There’s already a photo of this
+                                            pack. Take a new one only if it
+                                            looks different.
+                                        </p>
+                                    )}
+                                    {hasPhoto && (
+                                        <label className="frontline-tap flex items-start gap-2 rounded-lg border px-3 py-2 text-sm">
+                                            <Checkbox
+                                                checked={looksDifferent}
+                                                onCheckedChange={(value) =>
+                                                    setLooksDifferent(
+                                                        value === true,
+                                                    )
+                                                }
+                                            />
+                                            The pack or the tablets look
+                                            different from last time (a new
+                                            brand, shape or colour)
+                                        </label>
                                     )}
                                     {packs.length > 1 && (
                                         <RecordPicker
@@ -792,50 +795,68 @@ export function ReceiveWizard({
                                             onChange={setPhotoPack}
                                         />
                                     )}
-                                    <FileDropzone
-                                        accept="image/jpeg,image/png,image/webp"
-                                        multiple={false}
-                                        onFiles={choosePhoto}
-                                        title="Add a pack photo"
-                                        hint="JPEG, PNG or WebP · up to 8 MB"
-                                    />
-                                    <input
-                                        ref={camera}
-                                        className="hidden"
-                                        type="file"
-                                        accept="image/*"
-                                        capture="environment"
-                                        onChange={(event) =>
-                                            choosePhoto(
-                                                Array.from(
-                                                    event.target.files ?? [],
-                                                ),
-                                            )
+                                    <div className="space-y-1.5">
+                                        <Label id="rc-photo-l">
+                                            {photoRequired
+                                                ? 'Pack photo'
+                                                : 'Pack photo (optional)'}
+                                        </Label>
+                                        {photo ? (
+                                            <StagedFileCard
+                                                file={photo}
+                                                onRemove={() => setPhoto(null)}
+                                            >
+                                                <p className="text-caption">
+                                                    Saved with this delivery
+                                                    when you receive it.
+                                                </p>
+                                            </StagedFileCard>
+                                        ) : (
+                                            <FileDropzone
+                                                aria-labelledby="rc-photo-l"
+                                                accept="image/jpeg,image/png,image/webp"
+                                                multiple={false}
+                                                onFiles={choosePhoto}
+                                                title="Add a pack photo"
+                                                hint="A photo of the pack and its label · JPEG, PNG or WebP up to 8 MB"
+                                            />
+                                        )}
+                                    </div>
+                                    {hasPhoto &&
+                                        item.latest_photo?.kind === 'staff' && (
+                                            <figure className="w-44 space-y-1.5">
+                                                <img
+                                                    src={item.latest_photo.url}
+                                                    alt={`Last pack photo of ${item.name}`}
+                                                    className="aspect-[4/3] w-full rounded-lg border object-cover"
+                                                />
+                                                <figcaption className="text-caption">
+                                                    Last photo ·{' '}
+                                                    {item.latest_photo.taken_at
+                                                        ? formatDateTime(
+                                                              item.latest_photo
+                                                                  .taken_at,
+                                                          )
+                                                        : 'date unknown'}
+                                                </figcaption>
+                                            </figure>
+                                        )}
+                                    <InputError
+                                        message={
+                                            command.errors.photo ?? photoError
                                         }
                                     />
-                                    <Button
-                                        variant="outline"
-                                        className="frontline-tap"
-                                        onClick={() => camera.current?.click()}
-                                    >
-                                        <Camera className="size-4" />
-                                        Take a photo
-                                    </Button>
-                                    {photo && (
-                                        <StagedFileCard
-                                            file={photo}
-                                            onRemove={() => setPhoto(null)}
-                                        >
-                                            <p className="text-caption">
-                                                Saved for the selected pack
-                                                after stock is received.
-                                            </p>
-                                        </StagedFileCard>
-                                    )}
-                                    <InputError message={photoError} />
+                                    <p className="text-caption">
+                                        Stored privately
+                                        {item.controlled
+                                            ? ' and shown only to people with controlled-medicine access'
+                                            : ''}
+                                        . Earlier photos are kept. Check the
+                                        label — the picture is a guide only.
+                                    </p>
                                 </>
                             )}
-                            {item.controlled && step === 3 && (
+                            {stepKey === 'witness' && (
                                 <WitnessField
                                     value={witness}
                                     onChange={setWitness}
@@ -843,7 +864,7 @@ export function ReceiveWizard({
                                     errors={command.errors}
                                 />
                             )}
-                            {step === reviewIndex && (
+                            {stepKey === 'review' && (
                                 <>
                                     {packs.map((pack, index) => (
                                         <ReviewCard
@@ -921,14 +942,16 @@ export function ReceiveWizard({
                                                       : 'No pharmacy order'
                                             }
                                         />
-                                        <ReviewRow
-                                            label="Photo"
-                                            value={
-                                                photo
-                                                    ? `Staged for pack ${packs.findIndex((pack) => pack.key === photoPack) + 1}`
-                                                    : 'Continue without a photo'
-                                            }
-                                        />
+                                        {showPhotoStep && (
+                                            <ReviewRow
+                                                label="Pack photo"
+                                                value={
+                                                    photo
+                                                        ? `Saved with pack ${packs.findIndex((pack) => pack.key === photoPack) + 1}${looksDifferent ? ' · the pack looks different from last time' : ''}`
+                                                        : 'No photo'
+                                                }
+                                            />
+                                        )}
                                     </ReviewCard>
                                     <SettingsNotice role="note">
                                         Saving creates a separate record for

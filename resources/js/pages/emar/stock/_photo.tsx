@@ -3,10 +3,10 @@ import { RecordPicker } from '@/components/people-locations/record-picker';
 import { SettingsModal } from '@/components/settings/settings-modal';
 import { SettingsNotice } from '@/components/settings/settings-notice';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Camera } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { csrfHeaders } from './_requests';
 import type { ItemDetail } from './_types';
@@ -28,7 +28,7 @@ export function PackPhotoDialog({
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
     const [discard, setDiscard] = useState(false);
-    const camera = useRef<HTMLInputElement>(null);
+    const [looksDifferent, setLooksDifferent] = useState(false);
     const requestUuid = useRef(crypto.randomUUID());
     const busy = useRef(false);
     const close = () => {
@@ -62,6 +62,7 @@ export function PackPhotoDialog({
         body.set('request_uuid', requestUuid.current);
         body.set('photo', photo);
         body.set('description', description);
+        body.set('pack_changed', looksDifferent ? '1' : '0');
         try {
             const response = await fetch(`/emar/stock/packs/${packId}/photos`, {
                 method: 'POST',
@@ -117,9 +118,9 @@ export function PackPhotoDialog({
                 }
             >
                 <SettingsNotice role="note">
-                    Photos help identify a pack. Check the current medicine
-                    order and its label. A new photo becomes the latest for this
-                    pack; earlier photos remain in its history.
+                    Photos help identify a pack. A new photo becomes the latest
+                    for this medicine; earlier photos are kept. Check the label
+                    — the picture is a guide only.
                 </SettingsNotice>
                 <RecordPicker
                     label="Pack"
@@ -142,26 +143,18 @@ export function PackPhotoDialog({
                     title="Choose a pack photo"
                     hint="JPEG, PNG or WebP · up to 8 MB"
                 />
-                <input
-                    ref={camera}
-                    type="file"
-                    className="sr-only"
-                    accept="image/*"
-                    capture="environment"
-                    disabled={saving}
-                    onChange={(event) => {
-                        choosePhoto(Array.from(event.target.files ?? []));
-                        event.target.value = '';
-                    }}
-                />
-                <Button
-                    variant="outline"
-                    disabled={saving}
-                    onClick={() => camera.current?.click()}
-                >
-                    <Camera className="size-4" />
-                    Use camera
-                </Button>
+                <label className="frontline-tap flex items-start gap-2 rounded-lg border px-3 py-2 text-sm">
+                    <Checkbox
+                        checked={looksDifferent}
+                        disabled={saving}
+                        onCheckedChange={(value) => {
+                            setLooksDifferent(value === true);
+                            requestUuid.current = crypto.randomUUID();
+                        }}
+                    />
+                    The pack or the tablets look different from last time (a new
+                    brand, shape or colour)
+                </label>
                 {photo && (
                     <StagedFileCard
                         file={photo}

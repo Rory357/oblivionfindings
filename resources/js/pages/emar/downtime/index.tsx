@@ -20,6 +20,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
@@ -37,6 +38,7 @@ type Props = {
     sites: Site[];
     can_manage: boolean;
     can_make_pack: boolean;
+    meters?: { to_enter: number; to_confirm: number; this_month: number };
     today: string;
     tomorrow: string;
 };
@@ -46,9 +48,12 @@ export default function DowntimeIndex({
     sites,
     can_manage,
     can_make_pack,
+    meters = { to_enter: 0, to_confirm: 0, this_month: 0 },
     today,
     tomorrow,
 }: Props) {
+    // EA-045: Home › Medication › Safety & oversight › Downtime & paper records.
+    const breadcrumbs = useEmarBreadcrumbs();
     const [declare, setDeclare] = useState(false);
     const [pack, setPack] = useState(false);
     const [view, setView] = useState<'all' | 'open' | 'collected'>('all');
@@ -66,7 +71,6 @@ export default function DowntimeIndex({
             view === 'all' ||
             (view === 'open' ? !row.finished_at : !!row.finished_at),
     );
-    const openHere = downtimes.data.filter((row) => !row.finished_at).length;
     const header = (
         <PageHeader
             icon={FileText}
@@ -94,49 +98,50 @@ export default function DowntimeIndex({
             }
             meters={
                 <>
-                    <PageHeaderMeterBlock
-                        label="Downtimes in your scope"
-                        onClick={() => setView('all')}
-                    >
-                        <PageHeaderMeterBig>
-                            {downtimes.total}
-                        </PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            All permitted houses
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
-                    <PageHeaderMeterBlock
-                        label="Open on this page"
-                        tone="warning"
-                        onClick={() => setView('open')}
-                    >
-                        <PageHeaderMeterBig>{openHere}</PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            Paper still being collected
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
-                    <PageHeaderMeterBlock
-                        label="Collected on this page"
-                        onClick={() => setView('collected')}
-                    >
-                        <PageHeaderMeterBig>
-                            {downtimes.data.length - openHere}
-                        </PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            Paper collection finished
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
-                    {can_make_pack && (
+                    {/* EA-095 (approved P10): counted across the viewer's
+                        whole scope, not the page shown. */}
+                    {can_manage && (
                         <PageHeaderMeterBlock
-                            label="Today's downtime pack"
-                            onClick={() => setPack(true)}
+                            label="To enter"
+                            tone={meters.to_enter ? 'warning' : 'brand'}
+                            ariaLabel={`${meters.to_enter} paper records to enter`}
+                            onClick={() => setView('open')}
                         >
-                            <PageHeaderMeterBig>PDF</PageHeaderMeterBig>
+                            <PageHeaderMeterBig>
+                                {meters.to_enter}
+                            </PageHeaderMeterBig>
                             <PageHeaderMeterCaption>
-                                Prepare the current paper pack
+                                {meters.to_enter
+                                    ? 'From the paper sheets'
+                                    : 'Nothing waiting'}
                             </PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                     )}
+                    <PageHeaderMeterBlock
+                        label="To confirm"
+                        tone={meters.to_confirm ? 'warning' : 'brand'}
+                        ariaLabel={`${meters.to_confirm} waiting to confirm`}
+                        onClick={() => setView('open')}
+                    >
+                        <PageHeaderMeterBig>
+                            {meters.to_confirm}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            By the giver or witness
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Downtimes"
+                        ariaLabel={`${meters.this_month} downtimes recorded this month`}
+                        onClick={() => setView('all')}
+                    >
+                        <PageHeaderMeterBig>
+                            {meters.this_month}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            This month
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
                 </>
             }
             rail={
@@ -153,13 +158,7 @@ export default function DowntimeIndex({
         />
     );
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Home', href: '/dashboard' },
-                { title: 'Medication', href: '/emar' },
-                { title: 'Downtime & paper records', href: '/emar/downtime' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Downtime & paper records" />
             <PageLayout hero={header}>
                 <div className="space-y-5">

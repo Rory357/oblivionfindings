@@ -124,6 +124,7 @@ describe('server-authorised medication discovery', () => {
             'Handovers',
             'Staff eligibility',
             'Witness overrides',
+            'Downtime & paper records',
         ]);
         expect(emarSearchEntries(lead)).toContainEqual(
             expect.objectContaining({

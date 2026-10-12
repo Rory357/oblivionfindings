@@ -512,6 +512,17 @@ export const EMAR_HUBS: EmarHub[] = [
                 visible: all(view, controlledView, hasManagerCapability),
             },
             {
+                // EA-045 (approved P10): record a downtime and enter its paper
+                // doses. Mirrors DowntimeAccess::siteIds — medication access
+                // plus a lead capability or dose recording; frontline staff
+                // reach their own paper records from Meds today.
+                key: 'downtime',
+                label: 'Downtime & paper records',
+                href: '/emar/downtime',
+                icon: FileText,
+                visible: all(view, any(hasLeadCapability, administer)),
+            },
+            {
                 // Request and active grants. Review for audit.view holders
                 // (NF-12) joins when P10 builds it; the route is break-glass.
                 key: 'emergency',

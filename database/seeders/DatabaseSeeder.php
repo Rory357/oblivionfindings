@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
         $this->call(OperationsPermissionsSeeder::class);
         $this->call(FinancePermissionsSeeder::class);
         $this->call(SeedCalendarPermissionsSeeder::class);
+        $this->call(MedicationDowntimePermissionsSeeder::class);
         $this->call(SystemCatalogSeeder::class);
         $this->call(SystemUsersSeeder::class);
         $this->call(SystemClientsSeeder::class);
