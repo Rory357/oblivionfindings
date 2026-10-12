@@ -451,8 +451,9 @@ class MedicationScopeAuthorizationTest extends TestCase
         ]);
         $foreignMedication = $this->scheduledMedication($otherClient, ['name' => 'Foreign resident medicine']);
 
+        // EA-053 (Lane C3): the old prescriber-order register is read only.
         $this->actingAs($this->worker)
-            ->post('/emar/prescriptions', [
+            ->postJson('/emar/prescriptions', [
                 'client_id' => $this->client->id,
                 'client_medication_id' => $foreignMedication->id,
                 'order_type' => 'cease',
@@ -463,7 +464,7 @@ class MedicationScopeAuthorizationTest extends TestCase
                 'frequency' => 'Once daily',
                 'order_date' => today()->toDateString(),
             ])
-            ->assertNotFound();
+            ->assertStatus(409);
 
         $this->assertDatabaseCount('medication_prescriber_orders', 0);
         $this->assertTrue((bool) $foreignMedication->fresh()->active);
@@ -534,11 +535,10 @@ class MedicationScopeAuthorizationTest extends TestCase
         $replacement = $this->scheduledMedication($this->client, ['name' => 'Replacement medicine']);
 
         $this->actingAs($this->worker)
-            ->put("/emar/prescriptions/{$order->id}", [
+            ->putJson("/emar/prescriptions/{$order->id}", [
                 'client_medication_id' => $replacement->id,
             ])
-            ->assertRedirect()
-            ->assertSessionHasErrors('client_medication_id');
+            ->assertStatus(409);
 
         $this->assertSame($this->medication->id, (int) $order->fresh()->client_medication_id);
     }

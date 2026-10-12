@@ -775,72 +775,30 @@ class MedicationControllerTest extends TestCase
             ->assertRedirect('/login');
     }
 
-    public function test_store_medication_with_valid_data(): void
+    public function test_profile_create_and_edit_send_the_order_to_p04_without_writing(): void
     {
-        $this->mockNotificationService();
-
+        // EA-023 (Lane C3): the person profile answers through P04 like the
+        // eMAR flat form — no order, version or state change is written here.
         $this->actingAs($this->admin)
-            ->post("/clients/{$this->client->id}/medical/medications", [
-                'name' => 'Metformin',
-                'dosage' => '500mg',
-                'frequency' => 'Twice daily',
-                'dose_times' => ['08:00', '20:00'],
-                'is_prn' => false,
-                'controlled_drug' => false,
-                'route' => 'oral',
-                'form' => 'tablet',
-                'prescriber' => 'Dr Smith',
-                'pharmacy' => 'Local Pharmacy',
-                'start_date' => '2025-01-01',
-                'instructions' => 'Take with food',
-                'active' => true,
+            ->postJson("/clients/{$this->client->id}/medical/medications", [
+                'name' => 'Metformin', 'dosage' => '500mg', 'frequency' => 'Twice daily',
+                'dose_times' => ['08:00', '20:00'], 'route' => 'oral', 'active' => true,
             ])
-            ->assertRedirect()
-            ->assertSessionHas('success');
+            ->assertStatus(409)
+            ->assertJsonPath('orders_url', '/emar/prescriptions?client_id='.$this->client->id.'&action=entry');
+        $this->assertDatabaseMissing('client_medications', ['client_id' => $this->client->id, 'name' => 'Metformin']);
 
-        $this->assertDatabaseHas('client_medications', [
-            'client_id' => $this->client->id,
-            'name' => 'Metformin',
-            'dosage' => '500mg',
-            'route' => 'oral',
-            'form' => 'tablet',
-            'prescriber' => 'Dr Smith',
-            'active' => true,
-        ]);
-    }
-
-    public function test_store_prn_medication_persists_canonical_prn_fields(): void
-    {
-        $this->mockNotificationService();
-
+        $med = $this->createMedication();
         $this->actingAs($this->admin)
-            ->post("/clients/{$this->client->id}/medical/medications", [
-                'name' => 'Ibuprofen PRN',
-                'dosage' => '200mg',
-                'is_prn' => true,
-                'prn_reason' => 'Breakthrough pain',
-                'max_per_day' => 4,
-                'min_hours_between_doses' => 6,
-                'controlled_drug' => true,
-                'high_risk' => true,
-                'prescriber' => 'Dr Canonical',
-                'route' => 'oral',
-                'form' => 'tablet',
+            ->putJson("/clients/{$this->client->id}/medical/medications/{$med->id}", [
+                'name' => 'Paracetamol Updated', 'dosage' => '1000mg', 'state' => 'paused',
             ])
-            ->assertRedirect()
-            ->assertSessionHas('success');
-
-        $medication = ClientMedication::where('client_id', $this->client->id)
-            ->where('name', 'Ibuprofen PRN')
-            ->firstOrFail();
-
-        $this->assertTrue($medication->is_prn);
-        $this->assertSame('Breakthrough pain', $medication->prn_reason);
-        $this->assertSame(4, $medication->max_per_day);
-        $this->assertSame(6.0, $medication->min_hours_between_doses);
-        $this->assertTrue($medication->controlled_drug);
-        $this->assertTrue($medication->high_risk);
-        $this->assertSame('Dr Canonical', $medication->prescriber);
+            ->assertStatus(409)
+            ->assertJsonPath('orders_url', '/emar/prescriptions?client_id='.$this->client->id.'&order_id='.$med->id.'&action=entry');
+        $med->refresh();
+        $this->assertSame('Paracetamol', $med->name);
+        $this->assertSame('500mg', $med->dosage);
+        $this->assertSame('active', $med->state);
     }
 
     public function test_store_medication_forbidden_for_support_worker(): void
@@ -852,86 +810,6 @@ class MedicationControllerTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_store_medication_validates_name_required(): void
-    {
-        $this->actingAs($this->admin)
-            ->post("/clients/{$this->client->id}/medical/medications", [
-                'dosage' => '10mg',
-            ])
-            ->assertSessionHasErrors(['name']);
-    }
-
-    public function test_store_medication_validates_name_max_length(): void
-    {
-        $this->actingAs($this->admin)
-            ->post("/clients/{$this->client->id}/medical/medications", [
-                'name' => str_repeat('a', 256),
-            ])
-            ->assertSessionHasErrors(['name']);
-    }
-
-    public function test_store_medication_validates_dose_times_format(): void
-    {
-        $this->actingAs($this->admin)
-            ->post("/clients/{$this->client->id}/medical/medications", [
-                'name' => 'Test',
-                'dose_times' => ['8am', 'noon'],
-            ])
-            ->assertSessionHasErrors(['dose_times.0']);
-    }
-
-    public function test_store_medication_accepts_valid_dose_times(): void
-    {
-        $this->mockNotificationService();
-
-        $this->actingAs($this->admin)
-            ->post("/clients/{$this->client->id}/medical/medications", [
-                'name' => 'Test Med',
-                'dose_times' => ['08:00', '12:30', '18:00'],
-            ])
-            ->assertRedirect()
-            ->assertSessionHas('success');
-
-        $med = ClientMedication::where('name', 'Test Med')->first();
-        $this->assertEquals(['08:00', '12:30', '18:00'], $med->dose_times);
-    }
-
-    public function test_store_medication_validates_state_enum(): void
-    {
-        $this->actingAs($this->admin)
-            ->post("/clients/{$this->client->id}/medical/medications", [
-                'name' => 'Test',
-                'state' => 'invalid_state',
-            ])
-            ->assertSessionHasErrors(['state']);
-    }
-
-    public function test_store_medication_rejects_crafted_inactive_or_ceased_orders_without_persistence(): void
-    {
-        $attempts = [
-            ['name' => 'Crafted ceased state', 'state' => 'ceased', 'error' => 'state'],
-            ['name' => 'Crafted paused state', 'state' => 'paused', 'error' => 'state'],
-            ['name' => 'Crafted inactive flag', 'active' => false, 'error' => 'active'],
-            ['name' => 'Crafted expired order', 'end_date' => today()->subDay()->toDateString(), 'error' => 'end_date'],
-            ['name' => 'Crafted cessation time', 'ceased_at' => '2026-08-21 10:30:00', 'error' => 'ceased_at'],
-            ['name' => 'Crafted cessation reason', 'ceased_reason' => 'Historical import bypass', 'error' => 'ceased_reason'],
-        ];
-
-        foreach ($attempts as $attempt) {
-            $error = $attempt['error'];
-            unset($attempt['error']);
-
-            $this->actingAs($this->admin)
-                ->post("/clients/{$this->client->id}/medical/medications", $attempt)
-                ->assertSessionHasErrors($error);
-
-            $this->assertDatabaseMissing('client_medications', [
-                'client_id' => $this->client->id,
-                'name' => $attempt['name'],
-            ]);
-        }
-    }
-
     // ══════════════════════════════════════════════════════════════
     //  9. MEDICATION CRUD - Update
     // ══════════════════════════════════════════════════════════════
@@ -941,69 +819,6 @@ class MedicationControllerTest extends TestCase
         $med = $this->createMedication();
         $this->put("/clients/{$this->client->id}/medical/medications/{$med->id}", [])
             ->assertRedirect('/login');
-    }
-
-    public function test_update_medication_with_valid_data(): void
-    {
-        $this->mockNotificationService();
-        $med = $this->createMedication();
-
-        $this->actingAs($this->admin)
-            ->put("/clients/{$this->client->id}/medical/medications/{$med->id}", [
-                'name' => 'Paracetamol Updated',
-                'dosage' => '1000mg',
-                'frequency' => 'Three times daily',
-                'dose_times' => ['08:00', '14:00', '20:00'],
-            ])
-            ->assertRedirect()
-            ->assertSessionHas('success');
-
-        $this->assertDatabaseHas('client_medications', [
-            'id' => $med->id,
-            'name' => 'Paracetamol Updated',
-            'dosage' => '1000mg',
-            'frequency' => 'Three times daily',
-        ]);
-    }
-
-    public function test_update_medication_persists_canonical_prn_fields(): void
-    {
-        $this->mockNotificationService();
-        $med = $this->createPrnMedication([
-            'max_per_day' => 2,
-            'min_hours_between_doses' => 4,
-            'controlled_drug' => false,
-            'high_risk' => false,
-            'prescriber' => 'Dr Initial',
-        ]);
-
-        $this->actingAs($this->admin)
-            ->put("/clients/{$this->client->id}/medical/medications/{$med->id}", [
-                'name' => 'Ibuprofen PRN Updated',
-                'is_prn' => true,
-                'prn_reason' => 'Updated PRN reason',
-                'max_per_day' => 6,
-                'min_hours_between_doses' => 3,
-                'controlled_drug' => false,
-                'high_risk' => true,
-                'prescriber' => 'Dr Updated',
-                'route' => 'oral',
-                'form' => 'capsule',
-            ])
-            ->assertRedirect()
-            ->assertSessionHas('success');
-
-        $med->refresh();
-
-        $this->assertSame('Ibuprofen PRN Updated', $med->name);
-        $this->assertTrue($med->is_prn);
-        $this->assertSame('Updated PRN reason', $med->prn_reason);
-        $this->assertSame(6, $med->max_per_day);
-        $this->assertSame(3.0, $med->min_hours_between_doses);
-        $this->assertFalse($med->controlled_drug);
-        $this->assertTrue($med->high_risk);
-        $this->assertSame('Dr Updated', $med->prescriber);
-        $this->assertSame('capsule', $med->form);
     }
 
     public function test_update_medication_returns_404_for_mismatched_client(): void
@@ -3054,57 +2869,10 @@ class MedicationControllerTest extends TestCase
     }
 
     // ══════════════════════════════════════════════════════════════
-    //  31. MULTIPLE MEDICATIONS PER CLIENT
-    // ══════════════════════════════════════════════════════════════
-
-    public function test_client_can_have_multiple_medications(): void
-    {
-        $this->mockNotificationService();
-
-        $this->actingAs($this->admin)
-            ->post("/clients/{$this->client->id}/medical/medications", [
-                'name' => 'Medication A',
-            ])
-            ->assertRedirect();
-
-        $this->actingAs($this->admin)
-            ->post("/clients/{$this->client->id}/medical/medications", [
-                'name' => 'Medication B',
-            ])
-            ->assertRedirect();
-
-        $this->actingAs($this->admin)
-            ->post("/clients/{$this->client->id}/medical/medications", [
-                'name' => 'Medication C',
-            ])
-            ->assertRedirect();
-
-        $this->assertDatabaseCount('client_medications', 3);
-    }
-
-    // ══════════════════════════════════════════════════════════════
     //  32. MEDICATION STATE TRANSITIONS
+    //  (Lane C3, EA-023: profile create/edit/pause go through P04 — see
+    //  test_profile_create_and_edit_send_the_order_to_p04_without_writing.)
     // ══════════════════════════════════════════════════════════════
-
-    public function test_medication_can_be_paused(): void
-    {
-        $this->mockNotificationService();
-        $med = $this->createMedication();
-
-        $this->actingAs($this->admin)
-            ->put("/clients/{$this->client->id}/medical/medications/{$med->id}", [
-                'name' => $med->name,
-                'state' => 'paused',
-                'paused_at' => now()->format('Y-m-d'),
-            ])
-            ->assertRedirect();
-
-        $this->assertDatabaseHas('client_medications', [
-            'id' => $med->id,
-            'state' => 'paused',
-            'active' => false,
-        ]);
-    }
 
     public function test_medication_can_be_ceased(): void
     {
@@ -3187,66 +2955,6 @@ class MedicationControllerTest extends TestCase
 
         // No controlled drug entry should be created
         $this->assertDatabaseCount('client_controlled_drug_entries', 0);
-    }
-
-    // ══════════════════════════════════════════════════════════════
-    //  35. DOSE TIMES REGEX VALIDATION
-    // ══════════════════════════════════════════════════════════════
-
-    public function test_dose_times_rejects_single_digit_hours(): void
-    {
-        $this->actingAs($this->admin)
-            ->post("/clients/{$this->client->id}/medical/medications", [
-                'name' => 'Test',
-                'dose_times' => ['8:00'],
-            ])
-            ->assertSessionHasErrors(['dose_times.0']);
-    }
-
-    public function test_dose_times_rejects_invalid_format(): void
-    {
-        $this->actingAs($this->admin)
-            ->post("/clients/{$this->client->id}/medical/medications", [
-                'name' => 'Test',
-                'dose_times' => ['12:00:00'],
-            ])
-            ->assertSessionHasErrors(['dose_times.0']);
-    }
-
-    public function test_dose_times_rejects_non_numeric(): void
-    {
-        $this->actingAs($this->admin)
-            ->post("/clients/{$this->client->id}/medical/medications", [
-                'name' => 'Test',
-                'dose_times' => ['ab:cd'],
-            ])
-            ->assertSessionHasErrors(['dose_times.0']);
-    }
-
-    public function test_dose_times_accepts_midnight(): void
-    {
-        $this->mockNotificationService();
-
-        $this->actingAs($this->admin)
-            ->post("/clients/{$this->client->id}/medical/medications", [
-                'name' => 'Midnight Med',
-                'dose_times' => ['00:00'],
-            ])
-            ->assertRedirect()
-            ->assertSessionHas('success');
-    }
-
-    public function test_dose_times_accepts_2359(): void
-    {
-        $this->mockNotificationService();
-
-        $this->actingAs($this->admin)
-            ->post("/clients/{$this->client->id}/medical/medications", [
-                'name' => 'Late Night Med',
-                'dose_times' => ['23:59'],
-            ])
-            ->assertRedirect()
-            ->assertSessionHas('success');
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -3378,30 +3086,11 @@ class MedicationControllerTest extends TestCase
         // owed before an order exists (P01 recording guard).
         $doseAt = $administrationAt->copy()->addMinutes(2);
 
-        // 1. Create medication
-        $this->actingAs($this->admin)
-            ->post("/clients/{$this->client->id}/medical/medications", [
-                'name' => 'Lifecycle Med',
-                'dosage' => '10mg',
-                'frequency' => 'Once daily',
-                'dose_times' => [$doseAt->format('H:i')],
-                'state' => 'active',
-                'controlled_drug' => false,
-                'high_risk' => false,
-                'witness_required' => false,
-            ])
-            ->assertRedirect()
-            ->assertSessionHas('success');
-
-        $med = ClientMedication::where('name', 'Lifecycle Med')->first();
-        $this->assertNotNull($med);
-
-        // 2. Retain the signed source and independently check its revision.
+        // 1–2. Enter the order from its signed source (P04 is the only order
+        // writer, Lane C3 EA-023) and independently check its revision.
         $sourceRequest = 'lifecycle-source-'.bin2hex(random_bytes(8));
         $this->actingAs($this->admin)->post('/emar/orders', [
             'client_id' => $this->client->id,
-            'medication_id' => $med->id,
-            'expected_version' => $med->version,
             'request_key' => $sourceRequest,
             'change_reason' => 'Enter the signed prescription.',
             'source' => [
@@ -3416,6 +3105,7 @@ class MedicationControllerTest extends TestCase
                 'controlled_drug' => false, 'high_risk' => false, 'witness_required' => false,
             ],
         ])->assertRedirect()->assertSessionHasNoErrors();
+        $med = ClientMedication::where('client_id', $this->client->id)->where('name', 'Lifecycle Med')->sole();
         $revision = MedicationOrderRevision::where('client_medication_id', $med->id)
             ->where('status', 'pending')->whereHas('version', fn ($query) => $query->where('entry_request_key', $sourceRequest))->sole();
         $versionEvidence = $revision->version->fresh()->getAttributes();
@@ -3452,14 +3142,12 @@ class MedicationControllerTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        // 5. Pause medication
+        // 5. Hold the order on the prescriber's instruction (P04).
         $this->actingAs($this->admin)
-            ->put("/clients/{$this->client->id}/medical/medications/{$med->id}", [
-                'name' => 'Lifecycle Med',
-                'state' => 'paused',
-                'paused_at' => now()->format('Y-m-d'),
-            ])
-            ->assertRedirect();
+            ->post("/emar/orders/{$med->id}/hold", ['reason' => 'Prescriber asked to hold it.'])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+        $this->assertSame('paused', $med->fresh()->state);
 
         // 6. Discontinue medication through the governed lifecycle action.
         $this->actingAs($this->admin)
