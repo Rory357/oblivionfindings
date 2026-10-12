@@ -8,6 +8,7 @@ use App\Models\Client;
 use App\Models\ClientInrRecord;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationAllergy;
 use App\Models\MedicationSyringeDriver;
 use App\Models\Permission;
 use App\Models\Site;
@@ -218,6 +219,31 @@ class PersonMedicationRecordTest extends TestCase
                 ->where('meters.due', 1)->where('meters.due_people', 1)->where('meters.overdue', 1)->where('meters.help', 1)
                 // Staff doses due so far: the due and the late one; the blocked dose isn't owed yet.
                 ->where('meters.so_far', 2)->where('meters.recorded', 0)->where('meters.as_needed', 0));
+    }
+
+    /** EA-111 (Lane C9g): the charts list is grouped by house, then name, and shows each person's allergy record. */
+    public function test_hub_charts_group_by_house_and_show_allergy_status(): void
+    {
+        $this->site->update(['name' => 'Zzz House']);
+        $second = Site::factory()->create(['is_active' => true, 'name' => 'Aaa House']);
+        // The person rule: an assigned worker reads people at the houses on their HR profile.
+        HrEmployeeProfile::query()->where('user_id', $this->reader->id)->firstOrFail()->update(['secondary_site_ids' => [$second->id]]);
+        $zoe = Client::factory()->create(['site_id' => $second->id, 'first_name' => 'Zoe', 'last_name' => 'Allergic']);
+        $amy = Client::factory()->create(['site_id' => $this->site->id, 'first_name' => 'Amy', 'last_name' => 'Plain']);
+        foreach ([$zoe, $amy, $this->person] as $person) {
+            $person->supportWorkers()->syncWithoutDetaching([$this->reader->id]);
+            $this->medicine($person->first_name.' medicine', ['client_id' => $person->id]);
+        }
+        MedicationAllergy::query()->create(['client_id' => $zoe->id, 'allergen' => 'Penicillin', 'severity' => 'severe', 'reaction' => 'Rash', 'recorded_by' => $this->reader->id]);
+
+        $this->actingAs($this->reader)->get('/emar/mar')->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+            ->has('page.data', 3)
+            ->where('page.data.0.person', 'Zoe Allergic')->where('page.data.0.house_id', $second->id)
+            ->where('page.data.0.allergy.status', 'recorded')->where('page.data.0.allergy.count', 1)->where('page.data.0.allergy.reviewed', false)
+            ->where('page.data.1.person', 'Amy Plain')->where('page.data.1.house_id', $this->site->id)
+            ->where('page.data.1.allergy.status', 'none')->where('page.data.1.allergy.count', 0)
+            ->where('page.data.2.client_id', $this->person->id)
+            ->where('house_counts.'.$second->id, 1)->where('house_counts.'.$this->site->id, 2));
     }
 
     /** EA-110 (Lane C9): the record header's Due now, Late and Recorded today for one person. */
