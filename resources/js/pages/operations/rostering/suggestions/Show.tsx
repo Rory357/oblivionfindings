@@ -361,7 +361,7 @@ function SuggestionRunPage({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Operations', href: '/operations' },
+                { title: 'Workforce', href: '/operations/rostering' },
                 {
                     title: t('rostering.title', 'Rostering'),
                     href: '/operations/rostering',
