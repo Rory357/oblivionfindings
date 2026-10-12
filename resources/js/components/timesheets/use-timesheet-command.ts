@@ -1,5 +1,6 @@
 import { router } from '@inertiajs/react';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useInsertionEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { TimesheetWriteLease, TimesheetWriteScope } from './timesheet-write-scope';
 
 export type TimesheetAction =
     | 'create'
@@ -262,32 +263,59 @@ const fields = new Set([
     'returned_notes',
 ]);
 /** A missing or interrupted confirmation never automatically replays a write. */
-export function useTimesheetCommand(context: string) {
+/** Omit only for existing independent legacy callers. Coordinated owning pages
+ * must pass the one stable page scope explicitly; {scope:null} denies dispatch.
+ * Scope lifetime and all other writers/reads remain owning-page obligations. */
+export function useTimesheetCommand(context: string, coordination?: {
+    scope: TimesheetWriteScope | null;
+}) {
     const [pending, setPending] = useState(false);
     const [outcome, setOutcome] = useState<TimesheetOutcome | null>(null);
     const busy = useRef(false),
         held = useRef(false),
         mounted = useRef(true),
         attempted = useRef(false);
-    const identity = useRef(context),
-        generation = useRef(0);
+    const identity = useRef(context), generation = useRef(0);
+    const currentCoordination = useRef(coordination), contextChanged = useRef(false);
+    type LocalLease = { scope: TimesheetWriteScope; token: TimesheetWriteLease;
+        invoked: boolean; retiredNoSend: boolean };
+    const activeLease = useRef<LocalLease | null>(null);
+    // Publish only a committed source/coordination frame before child layouts.
+    // No subscriber or React state updates occur during insertion.
+    useInsertionEffect(() => {
+        const previous = currentCoordination.current;
+        if (identity.current !== context || previous?.scope !== coordination?.scope ||
+            (previous === undefined) !== (coordination === undefined)) {
+            identity.current = context;
+            generation.current += 1;
+            contextChanged.current = true;
+        }
+        currentCoordination.current = coordination;
+    }, [context, coordination]);
     useLayoutEffect(() => {
-        if (identity.current === context) return;
-        identity.current = context;
-        generation.current += 1;
+        if (!contextChanged.current) return;
+        contextChanged.current = false;
         if (attempted.current) {
             held.current = true;
-            setOutcome({
-                status: 'unknown',
-                message:
-                    'The record or signed-in user has changed. Check the original record before another action.',
-            });
+            const owner = activeLease.current;
+            if (owner) owner.scope.holdUnknown(owner.token);
+            setOutcome({ status: 'unknown', message:
+                'The record or signed-in user has changed. Check the original record before another action.' });
         }
-    }, [context]);
-    useEffect(() => {
+    }, [context, coordination]);
+    useLayoutEffect(() => {
         mounted.current = true;
         return () => {
             mounted.current = false;
+            const owner = activeLease.current;
+            if (!owner) return;
+            // Commit removal prevents this hook's pending preparation dispatch.
+            // An already invoked request is never described as not sent.
+            if (!owner.invoked) {
+                owner.retiredNoSend = owner.scope.completeNoSend(owner.token, 'preparation_exit');
+                if (owner.retiredNoSend) activeLease.current = null;
+                else owner.scope.holdUnknown(owner.token);
+            } else owner.scope.holdUnknown(owner.token);
         };
     }, []);
     const submit = async (
@@ -297,21 +325,25 @@ export function useTimesheetCommand(context: string) {
         expected: TimesheetExpectation,
     ) => {
         if (!mounted.current || busy.current || held.current) return;
+        // Capture before tryPrepare's synchronous subscriber notifications.
+        const sentContext = context, sentGeneration = generation.current;
+        const requestedCoordination = currentCoordination.current;
+        let lease: LocalLease | null = null;
+        // A reentrant acquisition listener cannot submit through this same hook.
         busy.current = true;
-        attempted.current = true;
-        setPending(true);
-        setOutcome(null);
-        const sentContext = context,
-            sentGeneration = generation.current;
         let result: TimesheetOutcome | null = null,
             finished = false;
-        const finish = () => {
+        const finish = (knownNotSent = false) => {
             if (finished) return;
             finished = true;
-            busy.current = false;
-            const next =
-                sentContext !== identity.current ||
-                sentGeneration !== generation.current
+            // Keep this hook busy through externally observable scope release.
+            // Only a proven preparation exit or exact synchronous before veto proves no send.
+            // A context change cannot make a request exist after that proof.
+            let noSendProven = knownNotSent;
+            let next: TimesheetOutcome =
+                !knownNotSent &&
+                (sentContext !== identity.current ||
+                    sentGeneration !== generation.current)
                     ? {
                           status: 'unknown' as const,
                           message:
@@ -321,12 +353,76 @@ export function useTimesheetCommand(context: string) {
                           status: 'unknown' as const,
                           message: UNKNOWN_TIMESHEET_RESULT,
                       });
+            if (lease) {
+                const originalContext = mounted.current && sentContext === identity.current &&
+                    sentGeneration === generation.current &&
+                    currentCoordination.current?.scope === lease.scope;
+                const released = knownNotSent
+                    ? lease.retiredNoSend || lease.scope.completeNoSend(lease.token,
+                        lease.invoked ? 'exact_before_veto' : 'preparation_exit')
+                    : originalContext && next.status === 'confirmed' &&
+                        lease.scope.completeMatched(lease.token);
+                if (released) {
+                    if (knownNotSent) lease.retiredNoSend = true;
+                    if (activeLease.current === lease) activeLease.current = null;
+                } else {
+                    noSendProven = false;
+                    // Ordinary field errors do not certify that no write committed.
+                    // Preserve them for review, but hold the original uncertain attempt.
+                    lease.scope.holdUnknown(lease.token);
+                    next = { status: 'unknown', message: UNKNOWN_TIMESHEET_RESULT,
+                        ...(next.status === 'rejected' || next.status === 'unknown'
+                            ? { errors: next.errors } : {}) };
+                }
+            }
+            // A release/hold notification can itself commit a different context.
+            // Never overwrite that new frame with a cached confirmed outcome.
+            const sameContextAfterNotification = mounted.current &&
+                sentContext === identity.current && sentGeneration === generation.current &&
+                (lease === null || currentCoordination.current?.scope === lease.scope);
+            if (!sameContextAfterNotification) {
+                next = noSendProven
+                    ? { status: 'rejected', message: result?.status === 'rejected'
+                        ? result.message
+                        : 'No request was sent. This view changed; return to the original form before another action.' }
+                    : { status: 'unknown', message:
+                        'The record or signed-in user has changed. Check the original record before another action.',
+                        ...(next.status !== 'confirmed' ? { errors: next.errors } : {}) };
+            }
+            if (noSendProven) attempted.current = false;
             held.current = next.status !== 'rejected';
+            busy.current = false;
             if (mounted.current) {
                 setOutcome(next);
                 setPending(false);
             }
         };
+        if (requestedCoordination !== undefined) {
+            const scope = requestedCoordination.scope;
+            const token = scope?.tryPrepare(expected.actorId) ?? null;
+            if (!scope || !token) {
+                busy.current = false;
+                if (mounted.current && sentContext === identity.current &&
+                    sentGeneration === generation.current)
+                    setOutcome({ status: 'rejected', message:
+                        'Saving is unavailable in this view. Keep your entries and check any earlier timesheet action.' });
+                return;
+            }
+            lease = { scope, token, invoked: false, retiredNoSend: false };
+            activeLease.current = lease;
+        }
+        if (!mounted.current || sentContext !== identity.current ||
+            sentGeneration !== generation.current ||
+            (lease !== null && (currentCoordination.current?.scope !== lease.scope ||
+                !lease.scope.canDispatch(lease.token)))) {
+            result = { status: 'rejected', message:
+                'No request was sent because this view changed while preparing the action. Your entries are kept.' };
+            finish(true);
+            return;
+        }
+        attempted.current = true;
+        setPending(true);
+        setOutcome(null);
         let hash: string, unchangedHash: string | undefined;
         try {
             hash = await timesheetHash(expected.values);
@@ -341,22 +437,55 @@ export function useTimesheetCommand(context: string) {
                 message:
                     'Save confirmation is unavailable in this browser. No request was sent. Keep your draft and use a secure browser connection.',
             };
-            finish();
+            // Hashing failed before any router dispatch could occur.
+            finish(true);
             return;
         }
         if (
             !mounted.current ||
             sentContext !== identity.current ||
-            sentGeneration !== generation.current
+            sentGeneration !== generation.current ||
+            (lease !== null && (currentCoordination.current?.scope !== lease.scope ||
+                lease.retiredNoSend || !lease.scope.canDispatch(lease.token)))
         ) {
-            finish();
+            // This preparation never reached router dispatch, even when the
+            // actor/source context changed and was restored while hashing.
+            result = { status: 'rejected', message:
+                'No request was sent because the record or your access changed while preparing this action. Your entries are kept.' };
+            finish(true);
             return;
         }
+        const observed: { visit: unknown; event: Event | null } = {
+            visit: null,
+            event: null,
+        };
+        let removeBefore: (() => void) | undefined;
+        let started = false, callbackObserved = false,
+            dispatching = false, deferredFinish = false;
         try {
+            removeBefore = router.on('before', (event) => {
+                if (observed.visit !== null && event.detail.visit === observed.visit)
+                    observed.event = event;
+            });
+            if (lease && !lease.scope.markInvoked(lease.token)) {
+                result = { status: 'rejected', message:
+                    'No request was sent because this view changed while preparing the action. Your entries are kept.' };
+                finish(true);
+                return;
+            }
+            if (lease) lease.invoked = true;
+            dispatching = true;
             router[method](url, payload, {
                 preserveScroll: true,
                 preserveState: true,
+                onBefore: (visit) => { observed.visit = visit; },
+                onStart: () => {
+                    started = true;
+                    if (!finished && lease) lease.scope.markStarted(lease.token);
+                },
                 onSuccess: (page) => {
+                    callbackObserved = true;
+                    if (!finished && lease) lease.scope.markCallback(lease.token);
                     if (!finished && !result)
                         result = timesheetReceipt(
                             page.props.flash,
@@ -366,6 +495,8 @@ export function useTimesheetCommand(context: string) {
                         );
                 },
                 onError: (errors) => {
+                    callbackObserved = true;
+                    if (!finished && lease) lease.scope.markCallback(lease.token);
                     if (finished || result) return;
                     const entries = Object.entries(errors);
                     const validation =
@@ -389,16 +520,44 @@ export function useTimesheetCommand(context: string) {
                           };
                 },
                 onCancel: () => {
+                    callbackObserved = true;
+                    if (!finished && lease) lease.scope.markCallback(lease.token);
                     if (!finished && !result)
                         result = {
                             status: 'unknown',
                             message: UNKNOWN_TIMESHEET_RESULT,
                         };
                 },
-                onFinish: finish,
+                // Inertia passes a visit to onFinish: never pass it as knownNotSent.
+                onFinish: () => {
+                    callbackObserved = true;
+                    if (!finished && lease) lease.scope.markCallback(lease.token);
+                    if (dispatching) deferredFinish = true;
+                    else finish();
+                },
             });
+            dispatching = false;
+            // This is the same cancelable event, inspected after every synchronous
+            // listener has run. Missing/foreign events and late cancellation are
+            // not evidence that the request was never sent.
+            if (observed.event?.defaultPrevented) {
+                const knownNotSent = !started && !callbackObserved && !deferredFinish;
+                result = knownNotSent
+                    ? { status: 'rejected', message:
+                        'This action was cancelled before sending. Your entries are kept. Review your entries, then choose this action again when you are ready.' }
+                    : { status: 'unknown', message: UNKNOWN_TIMESHEET_RESULT };
+                finish(knownNotSent);
+            } else if (deferredFinish) finish();
         } catch {
-            finish();
+            dispatching = false;
+            const preparationOnly = lease !== null && !lease.invoked;
+            result = preparationOnly
+                ? { status: 'rejected', message:
+                    'No request was sent because preparation could not finish. Your entries are kept.' }
+                : { status: 'unknown', message: UNKNOWN_TIMESHEET_RESULT };
+            finish(preparationOnly);
+        } finally {
+            removeBefore?.();
         }
     };
     return { submit, pending, outcome, busy, held };

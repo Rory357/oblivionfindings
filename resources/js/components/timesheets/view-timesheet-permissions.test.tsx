@@ -5,7 +5,7 @@ import ViewTimesheetDialog, {
 } from './view-timesheet-dialog';
 const { post } = vi.hoisted(() => ({ post: vi.fn() }));
 vi.mock('@inertiajs/react', () => ({
-    router: { post },
+    router: { post, on: () => () => {} },
     usePage: () => ({ props: { auth: { user: { id: 7 }, can: {} } } }),
 }));
 const row: ViewTimesheetRow = {
@@ -118,4 +118,15 @@ it('describes the synthetic no-client fallback without inventing an individual a
     expect(screen.getByText('Aroha')).toBeTruthy();
     expect(screen.getByText(/100%/)).toBeTruthy();
     expect(screen.getByText('single')).toBeTruthy();
+});
+
+it('forwards explicit missing coordination from actual View to its nested review Action', async () => {
+    render(<ViewTimesheetDialog open timesheet={row} canApprove onOpenChange={() => {}}
+        writeCoordination={{ scope: null }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Return for changes' }));
+    fireEvent.change(screen.getByLabelText('What needs changing?'), { target: { value: 'Review kept without scope' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Return to staff' }));
+    await waitFor(() => expect(screen.getByText(/Saving is unavailable in this view/)).toBeTruthy());
+    expect(post).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('What needs changing?')).toHaveValue('Review kept without scope');
 });

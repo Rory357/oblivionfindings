@@ -55,7 +55,7 @@ import {
     Users,
     X,
 } from 'lucide-react';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type SetStateAction } from 'react';
 import { timesheetTimeRange } from './timesheet-time';
 import {
     timesheetEditProjection,
@@ -107,9 +107,13 @@ export type TimesheetWizardProps = {
     sites?: SiteOption[];
     initialShiftId?: number | null;
     record?: EditTimesheetRow;
+    /** Keeps a closed edit owner distinct from the create form. */
+    draftKind?: 'create' | 'edit';
     canSave: boolean;
     canSubmit?: boolean;
     workerTimezone?: string;
+    /** Explicit shared page coordination; omit only for independent legacy hosts. */
+    writeCoordination?: Parameters<typeof useTimesheetCommand>[1];
 };
 /** Record identity stays separate from editable person choices in the draft. */
 export function timesheetEditContext(record?: EditTimesheetRow | null) {
@@ -321,15 +325,50 @@ function seed(props: TimesheetWizardProps, zone: string) {
 }
 /** One shared form for add and edit; a mounted draft is never reseeded by fresh list props. */
 export function TimesheetWizard(props: TimesheetWizardProps) {
-    if (!props.open) return null;
+    const requestedKey = props.record
+        ? `edit-${props.record.id}`
+        : props.draftKind === 'edit' ? null : 'create';
+    const serial = useRef(0);
+    // Fail closed until the mounted body registers its actual state probe.
+    const protectedForm = useRef<() => boolean>(() => true);
+    const wasOpen = useRef(props.open);
+    const [session, setSession] = useState<{
+        key: string;
+        serial: number;
+        record?: EditTimesheetRow;
+    } | null>(() => props.open && requestedKey
+        ? { key: requestedKey, serial: 0, record: props.record } : null);
+    useLayoutEffect(() => {
+        const reopening = props.open && !wasOpen.current;
+        wasOpen.current = props.open;
+        if (!props.open || !requestedKey) return;
+        if (!session || (!protectedForm.current() &&
+            (requestedKey !== session.key || reopening))) {
+            protectedForm.current = () => true;
+            serial.current += 1;
+            setSession({ key: requestedKey, serial: serial.current, record: props.record });
+        }
+    }, [props.open, requestedKey, props.record, session]);
+    if (!session) return null;
+    const targetAvailable = requestedKey === session.key;
     return (
         <TimesheetWizardBody
-            key={props.record ? `edit-${props.record.id}` : 'create'}
             {...props}
+            key={`${session.key}:${session.serial}`}
+            record={targetAvailable ? props.record : session.record}
+            canSave={targetAvailable && props.canSave}
+            canSubmit={targetAvailable && props.canSubmit}
+            targetAvailable={targetAvailable}
+            protectedForm={protectedForm}
+            releaseDraft={() => setSession(null)}
         />
     );
 }
-function TimesheetWizardBody(props: TimesheetWizardProps) {
+function TimesheetWizardBody(props: TimesheetWizardProps & {
+    targetAvailable: boolean;
+    protectedForm: { current: () => boolean };
+    releaseDraft: () => void;
+}) {
     const {
         record,
         onOpenChange,
@@ -346,20 +385,36 @@ function TimesheetWizardBody(props: TimesheetWizardProps) {
     const [initialContext] = useState(() => timesheetEditContext(record));
     const [zone] = useState(props.workerTimezone ?? WORKER_TIMEZONE);
     const [initial] = useState(() => seed(props, zone));
-    const [draft, setDraft] = useState(initial);
+    const mutationPending = useRef(false);
+    const [draft, setDraftState] = useState(initial);
     const [step, setStep] = useState(0),
         [search, setSearch] = useState(''),
-        [newItem, setNewItem] = useState('');
+        [newItem, setNewItemState] = useState('');
+    const setDraft = (value: SetStateAction<typeof draft>) => {
+        mutationPending.current = true;
+        setDraftState(value);
+    };
+    const setNewItem = (value: SetStateAction<string>) => {
+        mutationPending.current = true;
+        setNewItemState(value);
+    };
     const [discard, setDiscard] = useState(false),
         [submitConfirm, setSubmitConfirm] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    useEffect(() => {
+        if (!props.open) {
+            setDiscard(false);
+            setSubmitConfirm(false);
+        }
+    }, [props.open]);
     const feedback = useRef<HTMLDivElement>(null);
     const body = useRef<HTMLDivElement>(null);
     useLayoutEffect(() => {
         if (body.current) body.current.scrollTop = 0;
     }, [step]);
     const command = useTimesheetCommand(
-        `${currentActorId}:${record?.id ?? 'create'}`,
+        `${currentActorId}:${record?.id ?? 'create'}:${canSave}:${canSubmit}:${timesheetEditContext(record)}`,
+        props.writeCoordination,
     );
     const linked = record ? !!record.shift : draft.mode === 'shift';
     const shiftId = record?.shift?.id ?? draft.shift?.id ?? null;
@@ -371,6 +426,18 @@ function TimesheetWizardBody(props: TimesheetWizardProps) {
     const locked = !allowed || command.pending || command.held.current;
     const dirty =
         JSON.stringify(initial) !== JSON.stringify(draft) || newItem !== '';
+    useLayoutEffect(() => {
+        mutationPending.current = dirty;
+        // Read busy/held refs at admission, not just the previous render's
+        // pending flag: hashing begins synchronously before React commits.
+        props.protectedForm.current = () =>
+            mutationPending.current || dirty || command.pending ||
+            command.busy.current || command.held.current ||
+            command.outcome !== null || discard || submitConfirm ||
+            actorId !== currentActorId;
+        return () => { props.protectedForm.current = () => true; };
+    }, [dirty, command.pending, command.outcome, discard, submitConfirm,
+        actorId, currentActorId, props.protectedForm]);
     const confirmed =
         command.outcome?.status === 'confirmed'
             ? command.outcome.receipt
@@ -399,11 +466,15 @@ function TimesheetWizardBody(props: TimesheetWizardProps) {
         if (command.outcome && command.outcome.status !== 'confirmed')
             feedback.current?.focus();
     }, [command.outcome]);
+    const leave = () => {
+        props.releaseDraft();
+        onOpenChange(false);
+    };
     const close = () => {
         if (command.busy.current) return;
         if (!confirmed && (dirty || command.outcome?.status === 'unknown'))
             setDiscard(true);
-        else onOpenChange(false);
+        else leave();
     };
     function chooseShift(shift: ShiftOption) {
         if (locked) return;
@@ -596,14 +667,42 @@ function TimesheetWizardBody(props: TimesheetWizardProps) {
         : activityLabel || 'Manual work';
     const fieldErrors = {
         ...errors,
-        ...(command.outcome?.status === 'rejected'
+        ...(command.outcome && command.outcome.status !== 'confirmed'
             ? command.outcome.errors
             : {}),
     };
+    // Keep the private state mounted, but do not expose a different actor's
+    // entries or a retained target when its owner has selected another record.
+    if (actorId !== currentActorId || !props.targetAvailable) return (
+        <WizardShell
+            open={props.open}
+            onClose={() => onOpenChange(false)}
+            title="Timesheet form unavailable"
+            description="An unfinished form is kept in this page."
+            railIcon={FileText}
+            railTitle="Timesheet"
+            railSub="Kept in this page"
+            steps={[{ key: 'kept', label: 'Kept form',
+                blurb: 'Return to the original form', icon: FileText, disabled: true }]}
+            stepIndex={0}
+            onStepClick={() => {}}
+            headerLabel="Kept form"
+            sequential={false}
+            pct={null}
+            pctLabel="Form unavailable"
+            frontline
+            footerStart={<Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>}
+        >
+            <InfoCard icon={AlertTriangle} tone="warn">
+                Return to the original signed-in session and timesheet to
+                review the kept form. This view cannot send another request.
+            </InfoCard>
+        </WizardShell>
+    );
     return (
         <>
             <WizardShell
-                open
+                open={props.open}
                 onClose={close}
                 title={
                     record ? `Edit timesheet #${record.id}` : 'Create timesheet'
@@ -690,7 +789,7 @@ function TimesheetWizardBody(props: TimesheetWizardProps) {
                             blurb={`Timesheet #${confirmed.timesheet_id} is confirmed ${confirmed.status === 'submitted' ? 'saved and submitted for approval' : 'saved'}. ${linked && !record ? 'Shift task progress has not been changed by this form.' : ''}`}
                             actions={
                                 <>
-                                    <Button onClick={() => onOpenChange(false)}>
+                                    <Button onClick={leave}>
                                         Done
                                     </Button>
                                     <Button variant="outline" asChild>
@@ -711,9 +810,18 @@ function TimesheetWizardBody(props: TimesheetWizardProps) {
             >
                 {!allowed && (
                     <InfoCard icon={AlertTriangle} tone="warn">
-                        Saving is unavailable in the current view. Your entries
-                        are retained. Close and refresh to check this record and
-                        your access.
+                        <p>Saving is unavailable in the current view.</p>
+                        <p className="mt-2">
+                            Your entries are kept in this form. Before
+                            leaving or refreshing this page, check the record
+                            and your access in a new tab.
+                        </p>
+                        <Button asChild variant="outline" className="mt-3 frontline-tap">
+                            <a href={recoveryUrl} target="_blank" rel="noopener noreferrer">
+                                Check record and access in a new tab
+                                <ExternalLink className="size-4" />
+                            </a>
+                        </Button>
                     </InfoCard>
                 )}
                 {record?.returned_notes && (
@@ -1561,9 +1669,12 @@ function TimesheetWizardBody(props: TimesheetWizardProps) {
                 </WizardStepPane>
             </WizardShell>
             <ConfirmDialog
-                open={discard}
+                open={props.open && discard}
                 onClose={() => setDiscard(false)}
-                onConfirm={() => onOpenChange(false)}
+                onConfirm={() => {
+                    if (command.outcome?.status === 'unknown') onOpenChange(false);
+                    else leave();
+                }}
                 title={
                     command.outcome?.status === 'unknown'
                         ? 'Close this unconfirmed attempt?'
@@ -1571,7 +1682,7 @@ function TimesheetWizardBody(props: TimesheetWizardProps) {
                 }
                 description={
                     command.outcome?.status === 'unknown'
-                        ? 'Closing does not undo anything already saved. Check current records first; the entries held in this form will be lost.'
+                        ? 'Closing does not undo anything already saved. Your entries and this unconfirmed attempt stay in this page. Reopen this same form to review them and check current records before another attempt. Leaving or refreshing this page can still lose the kept form.'
                         : 'Your unsaved hours and details will be lost.'
                 }
                 confirmText={
@@ -1582,7 +1693,7 @@ function TimesheetWizardBody(props: TimesheetWizardProps) {
                 cancelText="Keep editing"
             />
             <ConfirmDialog
-                open={submitConfirm}
+                open={props.open && submitConfirm}
                 onClose={() => !command.pending && setSubmitConfirm(false)}
                 onConfirm={() => save(true)}
                 title="Save and submit this timesheet?"

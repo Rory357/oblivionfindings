@@ -5,7 +5,7 @@ const { put, post } = vi.hoisted(() => ({ put: vi.fn(), post: vi.fn() }));
 vi.mock('@inertiajs/react', async () => {
     const React = await import('react');
     return {
-        router: { post, put },
+        router: { post, put, on: () => () => {} },
         usePage: () => ({ props: { auth: { user: { id: 7 }, can: {} } } }),
         useForm: (initial: Record<string, unknown>) => {
             const [data, setData] = React.useState(initial);
