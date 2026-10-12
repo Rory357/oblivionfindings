@@ -287,9 +287,16 @@ class PersonMedicationRecordController extends Controller
         $client = $this->access->client($actor, $clientId);
         $scope = app(MedicationGovernanceScopeService::class);
         $concealment = MedicationConcealment::for($actor);
-        $inr = $scope->scopeCanonicalClientMedicationRows(ClientInrRecord::query()->where('client_id', $client->id), [(int) $client->site_id])->with(['medication:id,client_id,name,controlled_drug', 'recordedBy:id,name'])->latest('tested_on')->latest('id')->get();
+        // EA-109 (Lane C9f): the approved Clinical "Range" (last 3 or 12 months
+        // in NZ days). Without a range the clinical record stays complete.
+        $range = $request->validate(['range' => ['nullable', 'in:3m,12m,all']])['range'] ?? 'all';
+        $months = ['3m' => 3, '12m' => 12][$range] ?? null;
+        $fromDay = $months === null ? null : Carbon::now($this->schedule->workerTimezone())->startOfDay()->subMonthsNoOverflow($months);
+        $from = $fromDay?->copy()->utc();
+        $inr = $scope->scopeCanonicalClientMedicationRows(ClientInrRecord::query()->where('client_id', $client->id), [(int) $client->site_id])->when($fromDay, fn ($query) => $query->whereDate('tested_on', '>=', $fromDay->toDateString()))->with(['medication:id,client_id,name,controlled_drug', 'recordedBy:id,name'])->latest('tested_on')->latest('id')->get();
         $inrRows = $concealment->redact($inr, fn ($result) => (bool) $result->medication?->controlled_drug, fn ($result) => ['concealed' => true, 'key' => 'inr'.$result->id]);
-        $drivers = MedicationSyringeDriver::query()->where('client_id', $client->id)->where('site_id', $client->site_id)->with(['commencedBy:id,name', 'checks.checkedBy:id,name'])->latest('commenced_at')->get()->map(function ($driver) use ($scope, $client, $concealment) {
+        // A running driver always shows, however long ago it started.
+        $drivers = MedicationSyringeDriver::query()->where('client_id', $client->id)->where('site_id', $client->site_id)->when($from, fn ($query) => $query->where(fn ($inRange) => $inRange->where('status', 'running')->orWhere('commenced_at', '>=', $from)->orWhere('completed_at', '>=', $from)))->with(['commencedBy:id,name', 'checks.checkedBy:id,name'])->latest('commenced_at')->get()->map(function ($driver) use ($scope, $client, $concealment) {
             $contents = $scope->visibleSyringeDriverContents($client, $driver->contents ?? [], $concealment->canViewControlled());
             if ($contents === null) {
                 return ['concealed' => true, 'key' => 'driver'.$driver->id];
@@ -299,7 +306,7 @@ class PersonMedicationRecordController extends Controller
         });
         $observations = $scope->scopeCanonicalClientMedicationRows(ClientMedicationAdministration::query()->effectiveClinicalEvidence()->where('client_id', $client->id), [(int) $client->site_id], false)->where(function ($query) {
             $query->whereNotNull('blood_glucose_level')->orWhereNotNull('pulse_bpm')->orWhereNotNull('blood_pressure_systolic')->orWhereNotNull('blood_pressure_diastolic');
-        })->with(['medication:id,client_id,name,controlled_drug', 'administeredBy:id,name'])->latest('administered_at')->limit(100)->get();
+        })->when($from, fn ($query) => $query->where('administered_at', '>=', $from))->with(['medication:id,client_id,name,controlled_drug', 'administeredBy:id,name'])->latest('administered_at')->limit(100)->get();
         $obsRows = $concealment->redact($observations, fn ($dose) => (bool) $dose->medication?->controlled_drug, fn ($dose) => ['concealed' => true, 'key' => 'obs'.$dose->id]);
         $orders = $this->orders($client)->filter(fn ($order) => $this->status($order) !== 'stopped' && ! $concealment->hides((bool) $order->controlled_drug));
 

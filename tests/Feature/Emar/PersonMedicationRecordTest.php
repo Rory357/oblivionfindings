@@ -308,6 +308,38 @@ class PersonMedicationRecordTest extends TestCase
         $this->getJson($this->url('/history?range=1y'))->assertUnprocessable()->assertJsonValidationErrors('range');
     }
 
+    /** EA-109 (Lane C9f): Clinical's Range filter is applied by the server in NZ days; a running driver always shows. */
+    public function test_clinical_range_filter(): void
+    {
+        $order = $this->medicine('Warfarin');
+        foreach (['2026-09-20', '2026-05-01', '2025-06-01'] as $tested) {
+            ClientInrRecord::query()->create(['client_id' => $this->person->id, 'client_medication_id' => $order->id, 'inr_value' => 2.5, 'tested_on' => $tested, 'recorded_by' => $this->reader->id]);
+        }
+        $nz = fn (string $at) => Carbon::parse($at, 'Pacific/Auckland')->utc();
+        $driver = ['client_id' => $this->person->id, 'site_id' => $this->site->id, 'commenced_by' => $this->reader->id, 'contents' => [['client_medication_id' => $order->id, 'name' => $order->name, 'dose' => '1', 'unit' => 'mg']]];
+        MedicationSyringeDriver::query()->create($driver + ['status' => 'running', 'commenced_at' => $nz('2025-08-01 10:00')]);
+        MedicationSyringeDriver::query()->create($driver + ['status' => 'completed', 'commenced_at' => $nz('2026-02-01 10:00'), 'completed_at' => $nz('2026-02-03 10:00')]);
+        MedicationSyringeDriver::query()->create($driver + ['status' => 'completed', 'commenced_at' => $nz('2025-03-01 10:00'), 'completed_at' => $nz('2025-03-04 10:00')]);
+        foreach (['2026-09-01 08:00', '2026-03-01 08:00', '2025-01-10 08:00'] as $at) {
+            ClientMedicationAdministration::query()->create([
+                'client_id' => $this->person->id, 'client_medication_id' => $order->id, 'administered_by' => $this->reader->id,
+                'status' => 'given', 'administered_at' => $nz($at), 'dose_given' => '1 tablet', 'blood_glucose_level' => 6.1,
+            ]);
+        }
+        $counts = function (string $query) {
+            $json = $this->actingAs($this->reader)->getJson($this->url('/clinical'.($query === '' ? '' : '?'.$query)))->assertOk()->json();
+
+            return [count($json['inr']['rows']), count($json['drivers']), count($json['observations']['rows'])];
+        };
+
+        // 3 months back from Sat 3 Oct (NZ) is 3 Jul; the long-running driver still shows.
+        $this->assertSame([1, 1, 1], $counts('range=3m'));
+        $this->assertSame([2, 2, 2], $counts('range=12m'));
+        $this->assertSame([3, 3, 3], $counts('range=all'));
+        $this->assertSame([3, 3, 3], $counts(''), 'Without a range the clinical record stays complete.');
+        $this->getJson($this->url('/clinical?range=7d'))->assertUnprocessable()->assertJsonValidationErrors('range');
+    }
+
     public function test_changes_page_combines_retained_audits_with_new_events_and_conceals_controlled_facts(): void
     {
         $this->reader->permissionOverrides()->syncWithoutDetaching(Permission::where('key', 'medications.audit.view')->pluck('id')->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])->all());

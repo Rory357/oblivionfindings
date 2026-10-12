@@ -1,4 +1,5 @@
 import { medicationReturnTo } from '@/lib/medication-navigation';
+import { SUPPORT, type SupportMode } from '@/pages/emar/support/types';
 import {
     Activity,
     BellRing,
@@ -114,6 +115,16 @@ export function readLocation(search: string): RecordLocation {
         section.views[0].key;
     return { tab: section.key, view };
 }
+
+/** P02 Support filter (Lane C9f), worded as the support badges are. */
+export const SUPPORT_FILTERS = [
+    { value: 'all', label: 'All support' },
+    { value: 'staff_given', label: SUPPORT.staff_given.label },
+    { value: 'assisted', label: SUPPORT.assisted.label },
+    { value: 'prompted', label: SUPPORT.prompted.label },
+    { value: 'self_managed', label: SUPPORT.self_managed.label },
+] as const satisfies readonly { value: 'all' | SupportMode; label: string }[];
+export type SupportFilter = (typeof SUPPORT_FILTERS)[number]['value'];
 
 /** The URL for a location, keeping the person and dropping first-view defaults. */
 export function locationSearch(

@@ -1,6 +1,7 @@
-import { Plus } from 'lucide-react';
+import { Pill, Plus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/ui/status-badge';
 import {
     Tooltip,
@@ -39,6 +40,7 @@ export function PrnStrip({
     hidden,
     recordBlocked,
     canRecordControlled,
+    limitReachedOnly = false,
     onRecord,
 }: {
     rows: DayPrnMedication[];
@@ -46,9 +48,15 @@ export function PrnStrip({
     /** Why this reader can't record here now, or null when they can. */
     recordBlocked: string | null;
     canRecordControlled: boolean;
+    /** P02 "Show limit reached only" (Lane C9f): today's medicines at their 24-hour limit. */
+    limitReachedOnly?: boolean;
     onRecord: (medicationId: number) => void;
 }) {
     if (rows.length === 0 && hidden === 0) return null;
+    const shown = limitReachedOnly
+        ? rows.filter((med) => med.is_today && med.over_limit)
+        : rows;
+    const onToday = rows.some((med) => med.is_today);
 
     return (
         <TooltipProvider delayDuration={150}>
@@ -62,8 +70,20 @@ export function PrnStrip({
                         </span>
                     ) : null}
                 </div>
+                {limitReachedOnly && rows.length > 0 && shown.length === 0 ? (
+                    <EmptyState
+                        icon={Pill}
+                        variant="compact"
+                        title="No as-needed medicine is at its limit"
+                        description={
+                            onToday
+                                ? 'Turn off “Show limit reached only” to see every as-needed medicine.'
+                                : 'Limits count the last 24 hours, so they show on today’s chart. Turn off “Show limit reached only” to see this day.'
+                        }
+                    />
+                ) : null}
                 <ul className="grid gap-2 md:grid-cols-2 2xl:grid-cols-3">
-                    {rows.map((med) => {
+                    {shown.map((med) => {
                         const blocked =
                             recordBlocked ??
                             (med.is_controlled && !canRecordControlled

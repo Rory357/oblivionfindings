@@ -8,12 +8,14 @@ import { CHECKS, SCORES, SUPPORT, type SupportMode, type SupportPlan } from '@/p
 import { Link } from '@inertiajs/react';
 import { ClipboardList, History, Users } from 'lucide-react';
 import { ReadingState } from './reading';
+import type { SupportFilter } from './sections';
 import { isConcealed, type MaybeConcealed } from './types';
 import { concealedIdentity, recordDate, SectionCard } from './ui';
 import { useRecordJson } from './use-record-json';
 
+
 type Change = { key: string; medicine: string; mode: SupportMode; previous: SupportMode | null; at: string; by: string | null; reason: string; notes: string | null };
-export function CanonicalSupportSection({ clientId, view }: { clientId: number; view: string }) {
+export function CanonicalSupportSection({ clientId, view, support = 'all' }: { clientId: number; view: string; support?: SupportFilter }) {
     const { data, load, reload } = useRecordJson<{ plan: SupportPlan; changes: MaybeConcealed<Change>[] }>(`/emar/clients/${clientId}/record/support`);
     if (!data || load !== 'ready') return <ReadingState load={load} reload={reload} />;
     const { plan } = data;
@@ -21,7 +23,7 @@ export function CanonicalSupportSection({ clientId, view }: { clientId: number; 
     const link = <Button variant="outline" asChild><Link href={plan.url}>Open Support & self-administration</Link></Button>;
     return <div className="space-y-5">
         <div className="flex justify-end">{link}</div>
-        {view === 'bymedicine' ? <MedicationSupportPanel plan={plan} /> : view === 'assessment' ? <SectionCard title="Current support assessment" icon={ClipboardList}>
+        {view === 'bymedicine' ? <MedicationSupportPanel plan={plan} mode={support === 'all' ? null : support} /> : view === 'assessment' ? <SectionCard title="Current support assessment" icon={ClipboardList}>
             {!assessment ? <p className="text-sm">No assessment is recorded. Open Support & self-administration to record an assessment and any agreed changes.</p> : <div className="space-y-4">
                 <ReviewRow label="Assessed" value={recordDate(assessment.assessment_date)} /><ReviewRow label="Reassess by" value={recordDate(assessment.reassessment_date)} />
                 <ReviewRow label="Person’s wish" value={assessment.wishes_to_self_administer ? 'Wishes to manage medicines' : 'Staff support requested'} />

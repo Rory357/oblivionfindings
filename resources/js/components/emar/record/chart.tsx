@@ -70,6 +70,7 @@ export function ChartSection({
     view,
     date,
     week,
+    limitReachedOnly = false,
     onChange,
 }: {
     clientId: number;
@@ -78,6 +79,7 @@ export function ChartSection({
     view: string;
     date: string | null;
     week: boolean;
+    limitReachedOnly?: boolean;
     onChange: (date: string | null, week: boolean) => void;
 }) {
     return (
@@ -97,6 +99,7 @@ export function ChartSection({
                     canViewControlled={canViewControlled}
                     embedded
                     view={view === 'asneeded' ? 'asneeded' : 'scheduled'}
+                    limitReachedOnly={view === 'asneeded' && limitReachedOnly}
                     initialDate={date}
                     onDateChange={(next) => onChange(next, false)}
                 />
