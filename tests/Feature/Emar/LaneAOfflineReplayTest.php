@@ -223,16 +223,26 @@ class LaneAOfflineReplayTest extends TestCase
             'captured_offline_at' => '2026-04-30T08:05:00+12:00', 'status' => 'given', 'http_status' => 422, 'reason' => 'Refused.',
         ];
 
-        // A controlled order needs controlled.record (the worker hasn't got it).
+        // A controlled order needs controlled.record (the support worker role
+        // has it; this worker's is withdrawn).
         $controlled = $this->order(['name' => 'Synthetic morphine', 'dosage' => '5 mg', 'dose_amount' => 5, 'dose_unit' => 'mg',
             'controlled_drug' => true, 'nz_controlled_class' => 'B', 'controlled_class_source' => 'Synthetic reviewed test class']);
-        $this->actingAs($this->worker)->postJson('/meds/today/offline-review', $report($controlled))->assertNotFound();
+        $this->worker->permissionOverrides()->syncWithoutDetaching([
+            Permission::where('key', 'medications.controlled.record')->sole()->id => ['allowed' => false],
+        ]);
+        Cache::flush();
+        $this->assertFalse($this->worker->fresh()->canDo('medications.controlled.record'));
+        $this->actingAs($this->worker->fresh())->postJson('/meds/today/offline-review', $report($controlled))->assertNotFound();
+        // The same report for an ordinary order is taken (authority is current).
+        $this->postJson('/meds/today/offline-review', $report($order))->assertOk()->assertJsonPath('status', 'reported');
+        MedicationFollowup::query()->delete();
 
         // Clocked out: the house is still in their access, but they can't record for the person now.
         Shift::query()->where('user_id', $this->worker->id)->update([
             'actual_ends_at' => now()->subHour()->utc(), 'status' => 'completed',
         ]);
-        $this->actingAs($this->worker)->postJson('/meds/today/offline-review', $report($order))->assertNotFound();
+        Cache::flush();
+        $this->actingAs($this->worker->fresh())->postJson('/meds/today/offline-review', $report($order))->assertNotFound();
         $this->assertSame(0, MedicationFollowup::count());
     }
 

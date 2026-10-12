@@ -9,7 +9,11 @@ import OfflineStatusBanner from './offline-status-banner';
 vi.mock('@/hooks/use-offline-queue', () => ({
     useOfflineQueueState: vi.fn(),
 }));
-vi.mock('@/lib/offline-queue', () => ({
+vi.mock('@/lib/offline-queue', async (importOriginal) => ({
+    // The real wording for another worker's saved items (review P0).
+    strandedSummary: (await importOriginal<typeof import('@/lib/offline-queue')>())
+        .strandedSummary,
+    clearMedicationHistory: vi.fn(),
     dismissRejectedOfflineSubmission: vi.fn(),
     purgeMedicationDeviceData: vi.fn(async () => undefined),
     retryOfflineSubmissionsNeedingAttention: vi.fn(),
