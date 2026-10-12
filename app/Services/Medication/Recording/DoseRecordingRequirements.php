@@ -313,13 +313,19 @@ final class DoseRecordingRequirements
         $result = [
             'kind' => $order->is_prn ? 'prn' : 'scheduled',
             'order' => $orderFacts,
+            // C11: the latest staff photo of the supplied pack (else a bound
+            // catalogue reference image, else null), concealed for a
+            // controlled medicine the viewer can't see. A11: only when the
+            // organisation shows it at recording; left out when that's off.
+            ...(app(PackPhotoSettings::class)->showAtRecording()
+                ? ['pack_photo' => app(\App\Services\Medication\Stock\PackPhotoReader::class)->forOrder($viewer, $order)]
+                : []),
+            // A11 {show, no_photo} and C11's receipt prompt, in one place.
+            'pack_photo_policy' => [...app(PackPhotoSettings::class)->policy(), 'receipt_prompt' => app(\App\Services\Medication\Stock\PackPhotoReceiptSettings::class)->receiptPromptOn()],
             'due' => $due,
             'block_all' => null,
             'block_given' => $blockGiven,
             'competency' => $competency,
-            // A11: the recording dialog's pack photo settings. The photo itself
-            // (pack_photo) comes with Lane C's latest staff photo per order.
-            ...(PackPhotoSettings::served() ? ['pack_photo_policy' => app(PackPhotoSettings::class)->policy()] : []),
             // Review P1: the device stops replaying doses older than this.
             'offline_max_hours' => OfflineReplayReview::maxAgeHours(),
             'stock_tracking' => ['lots_started' => $stockStarted, 'offline_given_allowed' => ! $order->controlled_drug && ! $stockStarted],

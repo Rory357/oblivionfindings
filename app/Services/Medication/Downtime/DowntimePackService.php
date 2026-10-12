@@ -194,8 +194,7 @@ final class DowntimePackService
     /** P09's non-stock report/export boundary, including explicit finance overrides. */
     private function assertPackAuthority(User $actor): void
     {
-        abort_unless($actor->approved_at !== null
-            && $actor->canDo('medications.reports.view') && $actor->canDo('medications.reports.export'), 403);
+        abort_unless($actor->approved_at !== null && $this->access->canMakePack($actor), 403);
         abort_if($actor->hasRole('finance') && ! $actor->hasRole('admin', 'provider_manager', 'coordinator', 'clinical_lead', 'team_lead', 'auditor'), 403);
     }
 

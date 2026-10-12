@@ -14,6 +14,7 @@ import {
     ClipboardCheck,
     ClipboardList,
     Clock3,
+    FileText,
     Flag,
     LogIn,
     Package,
@@ -882,6 +883,18 @@ export default function MedsToday(props: MedsTodayProps) {
                             <Link href="/emar/handovers" />
                         </PageHeaderGlassButton>
                     ) : null}
+                    {/* EA-045 (approved P10): staff who give medicines reach
+                        their paper records after a downtime. */}
+                    {board_can.view_emar && board_can.record_administration ? (
+                        <PageHeaderGlassButton
+                            asChild
+                            icon={FileText}
+                            aria-label="Downtime & paper records"
+                            title="Downtime & paper records"
+                        >
+                            <Link href="/emar/downtime" />
+                        </PageHeaderGlassButton>
+                    ) : null}
                     {extraCan.report_error ? (
                         <PageHeaderGlassButton
                             icon={Flag}
@@ -1115,6 +1128,7 @@ export default function MedsToday(props: MedsTodayProps) {
                         <StockTab
                             alerts={stock_alerts}
                             canManage={board_can.manage_stock}
+                            canReceive={board_can.receive_stock ?? false}
                         />
                     ) : null}
                     {view === 'activity' ? (

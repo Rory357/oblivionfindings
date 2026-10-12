@@ -27,7 +27,7 @@ abstract class MedicationPaperConfirmationProvider implements SiteScopedTaskProv
     {
         return $user->approved_at !== null && $user->canDo('medications.view')
             && ($user->canDo('medications.administer.record')
-                || $user->hasRole('admin', 'provider_manager', 'coordinator', 'clinical_lead', 'team_lead'));
+                || $user->canDo(\App\Services\Medication\Downtime\DowntimeAccess::MANAGE));
     }
 
     public function authorizedTasks(User $user, array $filters = []): array

@@ -139,7 +139,7 @@ class MedicationSettingsRegistry
     {
         return [
             $this->safetyChecks(),
-            ...(PackPhotoSettings::served() ? [$this->packPhotoAtRecording()] : []),
+            $this->packPhotoAtRecording(),
             $this->doseTiming(),
             $this->offlineReplay(),
             $this->competencyPolicy(),
@@ -153,6 +153,10 @@ class MedicationSettingsRegistry
             MedicationReviewCadence::settingsGroup(),
             ...ControlledSettingsFragment::groups(),
             \App\Services\Medication\Reporting\RecordsReportingSettings::group(),
+            // Lane C11: Medication rules › Medicine photos (P11 Q18, P06 Q6).
+            \App\Services\Medication\Stock\PackPhotoReceiptSettings::group(),
+            // Lane C1 (D2): Records & reporting › Paper records.
+            \App\Services\Medication\Downtime\DowntimeSettings::group(),
             $this->emergencyPolicy(),
             \App\Services\Medication\Connected\ConnectedCareSettings::group(),
         ];

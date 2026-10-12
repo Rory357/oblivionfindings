@@ -15,18 +15,26 @@ use Illuminate\Validation\ValidationException;
 /** Actual signed facts are separate from the later physical settlement decision. */
 final class PaperDoseFacts
 {
-    public static function missing(array $clinical, array $physical): array
+    /**
+     * D2 (Lane C1): with $untracked (no pack tracking at the paper time) only
+     * the clinical facts are needed; the stock is flagged for a recount instead.
+     */
+    public static function missing(array $clinical, array $physical, bool $untracked = false): array
     {
         $labels = [
             'clinical_facts.quantity_given' => 'Actual clinical amount given', 'clinical_facts.amount_mode' => 'How the actual amount compares with the order',
+        ] + ($untracked ? [] : [
             'stock_evidence.stock_id' => 'The medicine stock record', 'stock_evidence.unit' => 'The counted stock unit',
             'stock_evidence.quantity_removed' => 'Actual amount removed from stock', 'stock_evidence.quantity_wasted' => 'Actual amount wasted, including zero',
-        ];
+        ]);
         $missing = [];
         foreach ($labels as $path => $label) {
             if (! filled(data_get(['clinical_facts' => $clinical, 'stock_evidence' => $physical], $path))) {
                 $missing[$path] = $label;
             }
+        }
+        if ($untracked) {
+            return $missing;
         }
         $lines = $physical['lines'] ?? [];
         if ($lines === []) {
@@ -43,9 +51,9 @@ final class PaperDoseFacts
         return $missing;
     }
 
-    public static function complete(array $clinical, array $physical): bool
+    public static function complete(array $clinical, array $physical, bool $untracked = false): bool
     {
-        return self::missing($clinical, $physical) === [];
+        return self::missing($clinical, $physical, $untracked) === [];
     }
 
     /** Collect unknown facts as unknown; an incomplete signed entry is not a dose posting. */
@@ -80,8 +88,11 @@ final class PaperDoseFacts
         return ['clinical' => $clinical, 'physical' => $physical];
     }
 
-    public static function normalize(ClientMedication $order, array $clinical, array $physical, CarbonInterface $at): array
+    public static function normalize(ClientMedication $order, array $clinical, array $physical, CarbonInterface $at, bool $untracked = false): array
     {
+        if ($untracked) {
+            return self::normalizeClinical($order, $clinical);
+        }
         if (! self::complete($clinical, $physical)) {
             throw ValidationException::withMessages(['stock_evidence' => 'Complete actual facts are required for normalization. Unknown waste is never assumed to be zero.']);
         }
@@ -144,5 +155,34 @@ final class PaperDoseFacts
 
         return ['clinical' => $clinical, 'physical' => ['stock_id' => (int) $stock->id, 'unit' => $stock->unit,
             'quantity_removed' => $removed, 'quantity_wasted' => $wasted, 'waste_reason' => $physical['waste_reason'] ?? null, 'lines' => $lines]];
+    }
+
+    /**
+     * D2: the clinical facts alone, for stock that wasn't pack-tracked at the
+     * paper time. No pack, waste or stock amount is assumed or recorded.
+     */
+    private static function normalizeClinical(ClientMedication $order, array $clinical): array
+    {
+        if (! self::complete($clinical, [], true)) {
+            throw ValidationException::withMessages(['clinical_facts' => 'Retain the actual amount given and how it compares with the order.']);
+        }
+        $clinical = self::retain($order, $clinical, [])['clinical'];
+        if (blank($order->dose_unit)) {
+            throw ValidationException::withMessages(['clinical_facts.quantity_given' => 'The order has no structured clinical unit. Keep the signed paper for clinical review; do not assume its unit from stock.']);
+        }
+        try {
+            $clinical['quantity_given'] = Qty::normalizeMovement($clinical['quantity_given'] ?? 0);
+            if (! Qty::greaterThan($clinical['quantity_given'], 0) || ! in_array($clinical['amount_mode'] ?? null, RecordingContract::AMOUNT_MODES, true)) {
+                throw new \InvalidArgumentException;
+            }
+        } catch (\InvalidArgumentException) {
+            throw ValidationException::withMessages(['clinical_facts.quantity_given' => 'Retain a positive actual amount given and how it compares with the order.']);
+        }
+        if (($clinical['amount_mode'] ?? null) === RecordingContract::AMOUNT_AS_ORDERED
+            && ($order->dose_amount === null || ! app(RecordingContractEnforcer::class)->matchesOrderedAmount($clinical['quantity_given'], $order))) {
+            throw ValidationException::withMessages(['clinical_facts.quantity_given' => 'The actual amount must match the structured order for As ordered. Choose Less or More for a different amount; an unstructured order needs clinical review.']);
+        }
+
+        return ['clinical' => $clinical, 'physical' => []];
     }
 }

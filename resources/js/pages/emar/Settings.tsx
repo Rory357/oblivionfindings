@@ -323,7 +323,9 @@ export default function EmarSettings(props: Props) {
                       'medicines',
                       'safety',
                       ...(s.groups.review_cadence ? ['reviews'] : []),
-                      ...(s.groups.packPhoto ? ['photos'] : []),
+                      ...(s.groups.packPhoto || s.groups.packPhotoReceipt
+                          ? ['photos']
+                          : []),
                       'records',
                       ...(props.controlledSettingsAccess.view
                           ? ['controlled']
@@ -370,6 +372,7 @@ export default function EmarSettings(props: Props) {
             alertAccess.view,
             s.groups.review_cadence,
             s.groups.packPhoto,
+            s.groups.packPhotoReceipt,
         ],
     );
     const [route, setRoute] = useState(() =>

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ChartSection, ChartViewSwitch } from '@/components/emar/record/chart';
 import { ClinicalSection } from '@/components/emar/record/clinical';
 import { HistorySection } from '@/components/emar/record/history';
+import { PhotosSection } from '@/components/emar/record/photos';
 import {
     MedicinesSection,
     RecordMedicineDialog,
@@ -166,6 +167,17 @@ function AvailableRecord({
             preserveState: true,
             preserveScroll: true,
         });
+    // C11: Medicines › Photos for one medicine (approved P02 "View pack photos").
+    const openPhotos = (medicationId: number) => {
+        const next: RecordLocation = { tab: 'medicines', view: 'photos' };
+        setLocation(next);
+        setMedicine(null);
+        router.push({
+            url: `/emar/mar${locationSearch(person.id, next, { med: String(medicationId) }, page.url.split('?')[1])}`,
+            preserveState: true,
+            preserveScroll: true,
+        });
+    };
     const jump = (tab: RecordLocation['tab'], view?: string) => {
         const target = RECORD_SECTIONS.find((item) => item.key === tab);
         if (target) go({ tab, view: view ?? target.views[0].key });
@@ -366,12 +378,21 @@ function AvailableRecord({
                     aria-labelledby={`medication-record-tab-${activeView}`}
                     className="max-w-full min-w-0"
                 >
-                    {location.tab === 'medicines' ? (
+                    {location.tab === 'medicines' &&
+                    location.view === 'photos' ? (
+                        <PhotosSection
+                            clientId={person.id}
+                            medicationId={Number(query.get('med')) || null}
+                            onMedicine={setMedicine}
+                            onShowAll={() => navigateQuery({ med: null })}
+                        />
+                    ) : location.tab === 'medicines' ? (
                         <MedicinesSection
                             clientId={person.id}
                             stopped={location.view === 'stopped'}
                             search={search}
                             onMedicine={setMedicine}
+                            onPhotos={openPhotos}
                         />
                     ) : location.tab === 'support' ? (
                         <CanonicalSupportSection
@@ -428,6 +449,7 @@ function AvailableRecord({
                     key={medicine}
                     clientId={person.id}
                     medicationId={medicine}
+                    onPhotos={openPhotos}
                     onClose={() => {
                         setMedicine(null);
                         if (query.has('medication_id')) {

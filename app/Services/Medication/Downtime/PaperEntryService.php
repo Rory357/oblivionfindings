@@ -117,13 +117,16 @@ final class PaperEntryService
         }
         $clinical = $data['clinical_facts'] ?? [];
         $physical = $data['stock_evidence'] ?? [];
+        // D2 (Lane C1): stock not yet pack-tracked at the paper time needs only
+        // the clinical facts; the posting flags it for a counted recount.
+        $untracked = $data['outcome'] === 'given' && PaperStockTracking::untrackedAt($order, $at);
         if ($data['outcome'] === 'given' && ($clinical !== [] || $physical !== [])) {
-            $actual = PaperDoseFacts::complete($clinical, $physical)
-                ? PaperDoseFacts::normalize($order, $clinical, $physical, $at)
+            $actual = PaperDoseFacts::complete($clinical, $physical, $untracked)
+                ? PaperDoseFacts::normalize($order, $clinical, $physical, $at, $untracked)
                 : PaperDoseFacts::retain($order, $clinical, $physical);
             $clinical = $actual['clinical'];
             $physical = $actual['physical'];
-            if ($order->is_prn && PaperDoseFacts::complete($clinical, $physical) && blank($clinical['prn_reason'] ?? null)) {
+            if ($order->is_prn && PaperDoseFacts::complete($clinical, $physical, $untracked) && blank($clinical['prn_reason'] ?? null)) {
                 $errors[] = 'Retain the reason the as-needed dose was given.';
             }
             $snapshot['second_person_required'] = $snapshot['second_person_required']
@@ -169,7 +172,10 @@ final class PaperEntryService
             'can_submit' => $conflicts === [] && $errors === [] && $downtime->finished_at === null,
             'giver_confirmation_needed' => (int) $giver->id !== (int) $actor->id,
             'second_person_required' => $snapshot['second_person_required'],
-            'notice' => 'This collects paper facts. It does not post a dose or change stock. Confirmations and an explicit reconciliation are required.',
+            'untracked_stock' => $untracked,
+            'notice' => $untracked
+                ? 'Pack tracking hadn’t started for this medicine at the paper time. Only the clinical facts are needed: the dose posts without pack evidence and the stock is flagged for a counted recount.'
+                : 'This collects paper facts. It does not post a dose or change stock. Confirmations and an explicit reconciliation are required.',
         ];
     }
 
@@ -316,6 +322,11 @@ final class PaperEntryService
                 MedicationPaperPosting::query()->create([
                     'paper_entry_id' => $entry->id, 'administration_id' => $result['administration']->id, 'posted_by' => $decision->performer->id,
                 ]);
+                // D2: posted without pack evidence, so the stock gets a counted recount.
+                if (PaperStockTracking::untrackedEntry($entry, $decision->medication)) {
+                    app(PaperStockTracking::class)->flagRecount($entry, $decision->medication);
+                    $this->events->record($downtime, 'stock_recount_flagged', $decision->performer, $entry, ['administration_id' => (int) $result['administration']->id]);
+                }
                 $this->writer->recordBreakGlassUse($decision, $entry);
                 $this->events->record($downtime, 'paper_reconciled', $decision->performer, $entry, ['administration_id' => (int) $result['administration']->id]);
 
@@ -333,17 +344,20 @@ final class PaperEntryService
         $unavailable = $this->writer->availability($entry, $order, $actor);
         $settlement = MedicationPaperStockEvidence::where('paper_entry_id', $entry->id)->latest('id')->first();
         $authorization = MedicationPaperRecoveryAuthorization::where('paper_entry_id', $entry->id)->first();
+        $untracked = PaperStockTracking::untrackedEntry($entry, $order);
         $facts = [$entry->request_fingerprint, $state, $conflicts, $unavailable, self::orderFingerprint($order), $this->requirementsFingerprint($order, $lockRequirements), $settlement?->id, $settlement?->reviewed_by, $settlement?->fingerprint, $authorization?->fingerprint];
 
         return [
             'state' => $state, 'conflicts' => $conflicts, 'unavailable' => $unavailable,
+            // D2: posts without pack evidence; the stock is flagged for a counted recount.
+            'untracked_stock' => $untracked,
             'missing_evidence' => array_values(array_filter([
-                $entry->outcome === 'given' && array_filter(array_keys(PaperDoseFacts::missing($entry->clinical_facts ?? [], $entry->stock_evidence ?? [])), fn ($key) => str_starts_with($key, 'clinical_facts.')) ? 'clinical_facts' : null,
-                $entry->outcome === 'given' && array_filter(array_keys(PaperDoseFacts::missing($entry->clinical_facts ?? [], $entry->stock_evidence ?? [])), fn ($key) => str_starts_with($key, 'stock_evidence.')) ? 'physical_facts' : null,
-                $entry->outcome === 'given' && ! $settlement ? 'stock_settlement' : null,
+                $entry->outcome === 'given' && array_filter(array_keys(PaperDoseFacts::missing($entry->clinical_facts ?? [], $entry->stock_evidence ?? [], $untracked)), fn ($key) => str_starts_with($key, 'clinical_facts.')) ? 'clinical_facts' : null,
+                $entry->outcome === 'given' && array_filter(array_keys(PaperDoseFacts::missing($entry->clinical_facts ?? [], $entry->stock_evidence ?? [], $untracked)), fn ($key) => str_starts_with($key, 'stock_evidence.')) ? 'physical_facts' : null,
+                $entry->outcome === 'given' && ! $settlement && ! $untracked ? 'stock_settlement' : null,
                 ($entry->snapshot['second_person_required'] ?? false) && ! $confirmations->has('witness') ? 'own_witness_confirmation' : null,
             ])),
-            'missing_actual_fields' => $entry->outcome === 'given' ? collect(PaperDoseFacts::missing($entry->clinical_facts ?? [], $entry->stock_evidence ?? []))->map(fn ($label, $key) => ['key' => $key, 'label' => $label])->values()->all() : [],
+            'missing_actual_fields' => $entry->outcome === 'given' ? collect(PaperDoseFacts::missing($entry->clinical_facts ?? [], $entry->stock_evidence ?? [], $untracked))->map(fn ($label, $key) => ['key' => $key, 'label' => $label])->values()->all() : [],
             'stock_evidence' => $this->recoveryStock($actor, $downtime, (int) $order->id, $entry),
             'stock_settlement' => $settlement ? ['id' => (int) $settlement->id, 'request_uuid' => $settlement->request_uuid, 'evidence' => $settlement->evidence, 'reviewed_by' => ['id' => (int) $settlement->reviewed_by, 'name' => User::find($settlement->reviewed_by)?->name],
                 'reviewed_at' => $settlement->created_at->toIso8601String(), 'fingerprint' => $settlement->fingerprint] : null,
@@ -372,6 +386,8 @@ final class PaperEntryService
         $options = app(MedicationStockService::class)->recoveryOptions($order, $entry);
 
         return [...$options, 'dose_amount' => $order->dose_amount, 'dose_unit' => $order->dose_unit,
+            // D2 (Lane C1): paper from before this time needs no pack facts.
+            'lots_started_at' => $order->stock()->first()?->lots_started_at?->toIso8601String(),
             'clinical_unavailable' => blank($order->dose_unit) ? 'The order has no structured clinical unit. Keep the signed paper for clinical review.' : null,
             'can_record_settlement' => $this->access->manages($actor) && $actor->canDo('medications.stock.update')
                 && (! $order->controlled_drug || $actor->canDo('medications.controlled.record'))
@@ -390,6 +406,9 @@ final class PaperEntryService
                 && (! $order->controlled_drug || $actor->canDo('medications.controlled.record')), 403);
             $entry = MedicationPaperEntry::whereKey($submitted->id)->lockForUpdate()->firstOrFail();
             $this->access->entry($actor, $downtime, (int) $entry->id);
+            if (PaperStockTracking::untrackedEntry($entry, $order)) {
+                throw ValidationException::withMessages(['settlement' => 'Pack tracking hadn’t started for this medicine at the paper time, so there are no packs to settle. The dose posts without pack evidence and the stock is flagged for a counted recount.']);
+            }
             abort_unless($entry->outcome === 'given' && PaperDoseFacts::complete($entry->clinical_facts ?? [], $entry->stock_evidence ?? []), 422, 'Retain complete actual clinical and physical facts before settlement; unknown waste is not zero.');
             $actual = $entry->stock_evidence;
             $reviews = collect($data['lines'])->keyBy('lot_id');
@@ -421,7 +440,11 @@ final class PaperEntryService
 
     public function authorizeRecovery(User $actor, MedicationDowntime $downtime, MedicationPaperEntry $submitted, array $data): MedicationPaperRecoveryAuthorization
     {
-        abort_unless(filter_var($data['accountable_confirmation'] ?? false, FILTER_VALIDATE_BOOL) && filled($data['reason'] ?? null), 422);
+        // EA-194 (Lane C1): reasons a review can't go ahead are form errors,
+        // shown in the wizard with the lead's entries kept.
+        if (! filter_var($data['accountable_confirmation'] ?? false, FILTER_VALIDATE_BOOL) || blank($data['reason'] ?? null)) {
+            throw ValidationException::withMessages(['reason' => 'Say why the historical authority is accepted, and confirm you are accountable for this review.']);
+        }
 
         return DB::transaction(function () use ($actor, $downtime, $submitted, $data) {
             [$order, $actor] = $this->lockOrder($actor, $downtime, (int) $submitted->client_medication_id);
@@ -429,9 +452,15 @@ final class PaperEntryService
             $this->access->entry($actor, $downtime, (int) $entry->id);
             abort_unless($actor->isApproved() && $this->access->manages($actor) && $actor->canDo('medications.administer.record')
                 && (int) $actor->id !== (int) $entry->given_by && (! $order->controlled_drug || $actor->canDo('medications.controlled.record')), 403);
-            abort_unless(! $entry->posting()->exists() && $entry->confirmations()->where('kind', 'giver')->where('confirmed_by', $entry->given_by)->whereNotNull('confirmed_at')->exists(), 422);
+            if ($entry->posting()->exists() || ! $entry->confirmations()->where('kind', 'giver')->where('confirmed_by', $entry->given_by)->whereNotNull('confirmed_at')->exists()) {
+                throw ValidationException::withMessages(['reason' => $entry->posting()->exists()
+                    ? 'This paper dose is already posted.'
+                    : 'The giver must confirm their paper record with their own PIN before historical authority is reviewed.']);
+            }
             $grant = ReviewedPaperAuthority::historicalGrant($entry, lock: true);
-            abort_unless($grant, 422, 'No retained server grant proves authority at the actual paper time. Keep the signed evidence for clinical review.');
+            if (! $grant) {
+                throw ValidationException::withMessages(['reason' => 'No retained server grant proves authority at the actual paper time. Keep the signed evidence for clinical review.']);
+            }
             $evidence = ['entry_hash' => ReviewedPaperAuthority::entryHash($entry), 'grant_id' => (int) $grant->id,
                 'grant_created_at' => $grant->created_at->toIso8601String(), 'grant_expires_at' => $grant->expires_at->toIso8601String(),
                 'giver_confirmation_id' => (int) $entry->confirmations()->where('kind', 'giver')->value('id')];
@@ -464,8 +493,19 @@ final class PaperEntryService
             ->filter(fn ($record) => $actor->canDo('medications.controlled.view') || ! ($record->snapshot['controlled'] ?? false))
             ->map(fn ($record) => ['kind' => 'paper', 'id' => (int) $record->id, 'label' => 'Existing paper entry #'.$record->id.' in DT-'.$record->downtime_id,
                 'href' => '/emar/downtime/'.$record->downtime_id, 'actual_at' => $record->given_at->toIso8601String()])->all();
+        // EA-028 (Lane C1): when the order changed after the downtime was
+        // listed, paper for it can't be entered against the new order. A lead
+        // reviews the signed paper and records what was done instead, so the
+        // downtime can still be finished. Nothing is posted or assumed.
+        $changed = ($dose->snapshot['order_fingerprint'] ?? null) !== self::orderFingerprint($order);
+        $orderChanged = $changed && $this->access->manages($actor) ? [[
+            'kind' => 'order_changed', 'id' => 0,
+            'label' => 'The order changed after this downtime was listed — record your review of the signed paper',
+            'href' => '/emar/orders/'.(int) $order->id,
+            'actual_at' => null,
+        ]] : [];
 
-        return [...$clinical, ...$paper];
+        return [...$clinical, ...$paper, ...$orderChanged];
     }
 
     public function resolveDuplicate(User $actor, MedicationDowntime $downtime, MedicationDowntimeDose $dose, string $kind, int $recordId, string $reason): void
@@ -482,16 +522,22 @@ final class PaperEntryService
             $choices = $this->resolutionChoices($actor, $downtime, $dose);
             abort_unless(collect($choices)->contains(fn ($choice) => $choice['kind'] === $kind && $choice['id'] === $recordId), 404);
             if ($existing = MedicationDowntimeResolution::query()->where('downtime_dose_id', $dose->id)->first()) {
-                abort_unless((int) ($kind === 'clinical' ? $existing->administration_id : $existing->paper_entry_id) === $recordId, 409);
+                abort_unless($kind === 'order_changed'
+                    ? $existing->administration_id === null && $existing->paper_entry_id === null && $existing->reason === $reason
+                    : (int) ($kind === 'clinical' ? $existing->administration_id : $existing->paper_entry_id) === $recordId, 409);
 
                 return;
             }
-            abort_if($downtime->finished_at || $downtime->entries()->where('downtime_dose_id', $dose->id)->exists(), 409, 'This paper collection item is already complete.');
+            if ($downtime->finished_at || $downtime->entries()->where('downtime_dose_id', $dose->id)->exists()) {
+                throw ValidationException::withMessages(['reason' => 'This paper collection item is already complete.']);
+            }
             MedicationDowntimeResolution::query()->create([
                 'downtime_dose_id' => $dose->id, 'administration_id' => $kind === 'clinical' ? $recordId : null,
                 'paper_entry_id' => $kind === 'paper' ? $recordId : null, 'resolved_by' => $actor->id, 'reason' => $reason,
             ]);
-            $this->events->record($downtime, 'duplicate_reviewed', $actor, facts: ['listed_dose_id' => (int) $dose->id, 'evidence_kind' => $kind, 'evidence_id' => $recordId], clientId: (int) $dose->client_id,
+            $this->events->record($downtime, $kind === 'order_changed' ? 'order_change_reviewed' : 'duplicate_reviewed', $actor,
+                facts: ['listed_dose_id' => (int) $dose->id, 'evidence_kind' => $kind, 'evidence_id' => $kind === 'order_changed' ? null : $recordId,
+                    'reason' => $kind === 'order_changed' ? $reason : null], clientId: (int) $dose->client_id,
                 controlled: (bool) ($dose->snapshot['controlled'] ?? false) || (bool) $order->controlled_drug);
         }, 5);
     }

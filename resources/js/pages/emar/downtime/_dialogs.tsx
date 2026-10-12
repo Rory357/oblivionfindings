@@ -240,7 +240,10 @@ export function DuplicateResolutionDialog({
                                                     target="_blank"
                                                     rel="noreferrer"
                                                 >
-                                                    Open existing evidence
+                                                    {choice.kind ===
+                                                    'order_changed'
+                                                        ? 'Open the current order'
+                                                        : 'Open existing evidence'}
                                                 </a>
                                             </Button>
                                         )}
@@ -275,7 +278,11 @@ export function DuplicateResolutionDialog({
                                             value,
                                         )
                                     }
-                                    label="I checked the signed paper and this existing evidence. This listed dose is accounted for by that record."
+                                    label={
+                                        choice?.kind === 'order_changed'
+                                            ? 'I checked the signed paper against the changed order. Nothing is posted for this listed dose; my review is kept with the downtime.'
+                                            : 'I checked the signed paper and this existing evidence. This listed dose is accounted for by that record.'
+                                    }
                                 />
                             </>
                         )}
@@ -302,7 +309,10 @@ export function DuplicateResolutionDialog({
                                     if (!choice) return;
                                     form.transform((data) => ({
                                         kind: choice.kind,
-                                        record_id: choice.id,
+                                        record_id:
+                                            choice.kind === 'order_changed'
+                                                ? null
+                                                : choice.id,
                                         reason: data.reason,
                                         accountable_confirmation:
                                             data.accountable_confirmation,
@@ -319,7 +329,9 @@ export function DuplicateResolutionDialog({
                                 {form.processing && (
                                     <Loader2 className="size-4 animate-spin" />
                                 )}
-                                Link reviewed evidence
+                                {choice?.kind === 'order_changed'
+                                    ? 'Record my review'
+                                    : 'Link reviewed evidence'}
                             </Button>
                         )}
                     </DialogFooter>
@@ -641,6 +653,16 @@ export function PaperEntryDialog({
         accountable_confirmation: false,
     });
     const isGiven = form.data.outcome === 'given';
+    // D2 (Lane C1): paper from before pack tracking started needs no pack
+    // facts; the server decides finally and flags the stock for a recount.
+    const orderStock = recoveryStock[form.data.client_medication_id];
+    const untracked =
+        isGiven &&
+        !!form.data.client_medication_id &&
+        (!orderStock?.lots_started_at ||
+            (!!form.data.given_at &&
+                new Date(orderStock.lots_started_at) >
+                    new Date(form.data.given_at + clockOffset)));
     const steps = [
         {
             key: 'facts',
@@ -656,12 +678,16 @@ export function PaperEntryDialog({
                       blurb: 'Amount and checks on paper',
                       icon: ClipboardCheck,
                   },
-                  {
-                      key: 'stock',
-                      label: 'Packs used',
-                      blurb: 'Physical stock evidence',
-                      icon: FileText,
-                  },
+                  ...(untracked
+                      ? []
+                      : [
+                            {
+                                key: 'stock',
+                                label: 'Packs used',
+                                blurb: 'Physical stock evidence',
+                                icon: FileText,
+                            },
+                        ]),
               ]
             : []),
         {
@@ -672,7 +698,7 @@ export function PaperEntryDialog({
         },
     ];
     const reviewIndex = steps.length - 1;
-    const activeStep = steps[step].key;
+    const activeStep = steps[Math.min(step, steps.length - 1)].key;
     const close = () => {
         if (form.processing || checking) return;
         if (form.isDirty) setDiscard(true);

@@ -35,6 +35,7 @@ import { router } from '@inertiajs/react';
 import {
     AlertTriangle,
     Building2,
+    Camera,
     Check,
     ChevronLeft,
     ChevronRight,
@@ -1262,6 +1263,16 @@ export function RulesOverview({ data, q }: { data: RuleData; q: string }) {
         return (def ? format(def, value) : value).split(' — ')[0];
     };
     const open = SAFETY_KEYS.filter((k) => !s.reviewed.safety?.[k]).length;
+    const photoWord = (key: string) => {
+        const def = s.definitions.packPhotoReceipt?.[key];
+        const value = s.values.packPhotoReceipt?.[key] ?? def?.default ?? '';
+        return (def ? format(def, value) : value).split(' — ')[0];
+    };
+    const photosOpen = ['who', 'prompt', 'controlled_required'].filter(
+        (k) =>
+            s.definitions.packPhotoReceipt?.[k] &&
+            !s.reviewed.packPhotoReceipt?.[k],
+    ).length;
     return (
         <Overview
             q={q}
@@ -1299,6 +1310,29 @@ export function RulesOverview({ data, q }: { data: RuleData; q: string }) {
                     cta: 'Review safety checks',
                     onClick: () => go('rules', 'safety'),
                 },
+                ...(s.groups.packPhotoReceipt
+                    ? [
+                          {
+                              icon: Camera,
+                              title: 'Medicine photos',
+                              lines: [
+                                  `Prompt at receipt: ${photoWord('prompt')}.`,
+                                  `Who takes them: ${photoWord('who')}.`,
+                              ],
+                              badge: photosOpen ? (
+                                  <StatusBadge variant="warning" size="sm">
+                                      {photosOpen} not yet reviewed
+                                  </StatusBadge>
+                              ) : (
+                                  <StatusBadge variant="success" size="sm">
+                                      All reviewed
+                                  </StatusBadge>
+                              ),
+                              cta: 'Review medicine photos',
+                              onClick: () => go('rules', 'photos'),
+                          },
+                      ]
+                    : []),
             ]}
         />
     );

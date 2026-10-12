@@ -25,7 +25,7 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { genericStockMedications } from '../medication-stock-governance';
-import type { MedicationOption } from './cd-register-modal';
+import type { MedicationOption } from './option-types';
 import type { ClientOption } from './report-error-modal';
 
 const STEPS = [

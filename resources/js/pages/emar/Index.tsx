@@ -80,13 +80,12 @@ import type {
     ScheduleRow,
 } from '@/pages/meds/today/types';
 import { AddMedicationModal } from './components/add-medication-modal';
-import {
-    CdRegisterModal,
-    type MedicationOption,
-    type WitnessOption,
-} from './components/cd-register-modal';
 import { GenerateRoundsModal } from './components/generate-rounds-modal';
 import { MedicationReviewModal } from './components/medication-review-modal';
+import type {
+    MedicationOption,
+    WitnessOption,
+} from './components/option-types';
 import {
     ReportErrorModal,
     type ClientOption,
@@ -382,7 +381,6 @@ export default function EmarHome(props: Props) {
         recentActivity,
         clientOptions,
         medicationOptions,
-        witnesses,
         orderCheckUrl,
         signedAs,
         can,
@@ -395,7 +393,6 @@ export default function EmarHome(props: Props) {
         | undefined;
     const canReadReports = canOpenEmarReports(navigationCan);
     const canReadAudit = canOpenEmarAudit(navigationCan);
-    const currentUserId = page.props.auth?.user?.id ?? 0;
 
     const [acFilter, setAcFilter] = useState<'all' | AcCategory>('all');
     const [search, setSearch] = useState('');
@@ -410,7 +407,6 @@ export default function EmarHome(props: Props) {
         | 'report-error'
         | 'add-medication'
         | 'medication-review'
-        | 'cd-register'
         | 'stock-movement'
     >(null);
     const [modalClientId, setModalClientId] = useState<number | null>(null);
@@ -947,26 +943,9 @@ export default function EmarHome(props: Props) {
                                             </p>
                                         </div>
                                         {it.action_type === 'cd_balance' ? (
-                                            can.view_controlled &&
-                                            can.record_controlled ? (
-                                                <Button
-                                                    size="sm"
-                                                    className={cn(
-                                                        'shrink-0',
-                                                        SEVERITY_BTN[
-                                                            it.severity
-                                                        ],
-                                                    )}
-                                                    onClick={() =>
-                                                        openModal(
-                                                            'cd-register',
-                                                            it.client_id,
-                                                        )
-                                                    }
-                                                >
-                                                    {it.action}
-                                                </Button>
-                                            ) : can.view_controlled ? (
+                                            // EA-029/067: the count is recorded in the
+                                            // controlled register's own witnessed count.
+                                            can.view_controlled ? (
                                                 <Button
                                                     asChild
                                                     size="sm"
@@ -977,7 +956,13 @@ export default function EmarHome(props: Props) {
                                                         ],
                                                     )}
                                                 >
-                                                    <Link href="/emar/controlled">
+                                                    <Link
+                                                        href={
+                                                            it.client_id
+                                                                ? `/emar/controlled?client_id=${it.client_id}`
+                                                                : '/emar/controlled'
+                                                        }
+                                                    >
                                                         {it.action}
                                                     </Link>
                                                 </Button>
@@ -1859,17 +1844,6 @@ export default function EmarHome(props: Props) {
                 onClose={() => setModal(null)}
                 clients={clientOptions}
             />
-            {can.view_controlled && can.record_controlled ? (
-                <CdRegisterModal
-                    open={modal === 'cd-register'}
-                    onClose={() => setModal(null)}
-                    clients={clientOptions}
-                    medications={medicationOptions}
-                    witnesses={witnesses}
-                    currentUserId={currentUserId}
-                    initialClientId={modalClientId}
-                />
-            ) : null}
             {can.manage_stock ? (
                 <StockMovementModal
                     open={modal === 'stock-movement'}

@@ -1,9 +1,10 @@
 /* Medication › Settings › Medication rules › Medicine photos (P11 v5
- * `MedicinePhotos`). Lane A11 builds the "At recording" group: whether the
- * recording dialog shows the latest photo of the supplied pack, and what
- * happens when there's no photo. Taking photos at receipt is Lane C's group
- * and joins this section when it's built — nothing unbuilt is shown. */
+ * `MedicinePhotos`). Lane A11's "At recording" group (whether the recording
+ * dialog shows the latest photo of the supplied pack, and what happens when
+ * there's no photo) sits beside Lane C11's "Taking photos" group (when stock
+ * is received, `_photos-receipt.tsx`). */
 import { Camera } from 'lucide-react';
+import { ReceiptPhotoGroup } from './_photos-receipt';
 import { NoMatches, useRow } from './_sections';
 import {
     Choice,
@@ -109,11 +110,15 @@ export function MedicinePhotos({
                         ) : null}
                     </SettingGroup>
                 ) : null}
+                <ReceiptPhotoGroup q={q} show={show} />
             </GroupGrid>
             <Note>
-                A photo is a guide only. The dialog always says “Check the label
-                — the picture is a guide only”, and neither choice switches
-                label checking off.
+                Photos are stored privately, with controlled-medicine
+                concealment. A photo is a guide only: every screen that shows
+                one says “Check the label — the picture is a guide only”, and no
+                choice here switches label checking off. A catalogue picture
+                appears only when a reviewed catalogue is connected to that
+                medicine, and it is labelled a reference image.
             </Note>
         </Section>
     );

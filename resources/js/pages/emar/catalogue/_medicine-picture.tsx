@@ -13,6 +13,8 @@ import type { Product } from './index';
 type Binding = {
     medicine_version: number;
     can_manage: boolean;
+    /** C11: a reviewed catalogue source exists. Without one, no catalogue UI. */
+    catalogue_configured?: boolean;
     status: string;
     message?: string;
     product?: Product;
@@ -45,80 +47,67 @@ export function MedicinePicture({ medicationId }: { medicationId: number }) {
             });
         return () => controller.abort();
     }, [medicationId, refresh]);
+    // C11: staff pack photos are the primary picture. The catalogue is an
+    // optional extra: with no reviewed source configured there is no
+    // catalogue UI at all, and a picture shows only once it is bound to this
+    // medicine, labelled a reference image. Staff without catalogue rights
+    // see nothing until then (hide unbuilt).
+    const matched =
+        record?.status === 'matched' && record.product?.photo_url
+            ? record.product
+            : null;
+    if (
+        error ||
+        !record ||
+        !record.catalogue_configured ||
+        (!matched && !record.can_manage)
+    ) {
+        return null;
+    }
     return (
         <>
-            <ReviewCard icon={Image} title="Verified product picture">
-                {error ? (
-                    <SettingsNotice>{error}</SettingsNotice>
-                ) : !record ? (
-                    <p className="text-caption">Checking the image source…</p>
-                ) : (
-                    <div className="space-y-3">
-                        {record.status === 'matched' &&
-                        record.product?.photo_url ? (
-                            <>
-                                <img
-                                    src={record.product.photo_url}
-                                    alt={
-                                        record.product.name +
-                                        ' ' +
-                                        record.product.strength +
-                                        ' ' +
-                                        record.product.form
-                                    }
-                                    className="max-h-48 max-w-full object-contain"
-                                />
-                                <ReviewRow
-                                    label="Exact product"
-                                    value={
-                                        record.product.name +
-                                        ' · ' +
-                                        record.product.strength +
-                                        ' · ' +
-                                        record.product.form
-                                    }
-                                />
-                                <ReviewRow
-                                    label="Source"
-                                    value={
-                                        record.source?.source_name +
-                                        ' · ' +
-                                        record.source?.source_version
-                                    }
-                                />
-                                <p className="text-caption">
-                                    {record.source?.attribution} · review
-                                    expires{' '}
-                                    {record.source?.expires_at
-                                        ? formatDateTime(
-                                              record.source.expires_at,
-                                          )
-                                        : 'Unknown'}
-                                </p>
-                            </>
-                        ) : (
-                            <SettingsNotice>
-                                {record.message ??
-                                    'No current verified product image is linked. Check the chart and actual packaging.'}
-                            </SettingsNotice>
-                        )}
-                        {record.can_manage && (
-                            <Button
-                                variant="outline"
-                                onClick={() => setEdit(true)}
-                            >
-                                Review product link
-                            </Button>
-                        )}
-                        <p className="text-caption">
-                            Use the current chart and labelled packaging to
-                            identify medicine. A picture alone does not confirm
-                            a dose.
-                        </p>
-                    </div>
-                )}
+            <ReviewCard icon={Image} title="Reference image">
+                <div className="space-y-3">
+                    {matched ? (
+                        <>
+                            <img
+                                src={matched.photo_url ?? undefined}
+                                alt={`Reference image: ${matched.name} ${matched.strength} ${matched.form}`}
+                                className="max-h-48 max-w-full object-contain"
+                            />
+                            <ReviewRow
+                                label="Exact product"
+                                value={`${matched.name} · ${matched.strength} · ${matched.form}`}
+                            />
+                            <ReviewRow
+                                label="Catalogue"
+                                value={`${record.source?.source_name ?? ''} · ${record.source?.source_version ?? ''}`}
+                            />
+                            <p className="text-caption">
+                                {record.source?.attribution} · review expires{' '}
+                                {record.source?.expires_at
+                                    ? formatDateTime(record.source.expires_at)
+                                    : 'Unknown'}
+                            </p>
+                        </>
+                    ) : (
+                        <SettingsNotice role="note">
+                            {record.message ??
+                                'No reference image is linked to this medicine.'}
+                        </SettingsNotice>
+                    )}
+                    {record.can_manage && (
+                        <Button variant="outline" onClick={() => setEdit(true)}>
+                            Review product link
+                        </Button>
+                    )}
+                    <p className="text-caption">
+                        A catalogue picture, not a photo of this person’s pack.
+                        Check the label — the picture is a guide only.
+                    </p>
+                </div>
             </ReviewCard>
-            {record && edit && (
+            {edit && (
                 <BindingWizard
                     medicationId={medicationId}
                     record={record}
