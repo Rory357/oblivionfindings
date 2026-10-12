@@ -11,6 +11,15 @@ export function useSettingsLeaveConfirmation(
 ) {
     const [pending, setPending] = useState<{ run: () => void } | null>(null);
     const approved = useRef(false);
+    const discardAndRun = (run: () => void) => {
+        approved.current = true;
+        try {
+            onDiscard?.();
+            run();
+        } finally {
+            approved.current = false;
+        }
+    };
     const request = useCallback(
         (run: () => void) => {
             if (dirty) setPending({ run });
@@ -43,19 +52,14 @@ export function useSettingsLeaveConfirmation(
 
     return {
         request,
+        discardAndRun,
         confirmation: (
             <ConfirmDialog
                 open={dirty && pending !== null}
                 onClose={() => setPending(null)}
                 onConfirm={() => {
                     if (!dirty || !pending) return;
-                    approved.current = true;
-                    try {
-                        onDiscard?.();
-                        pending.run();
-                    } finally {
-                        approved.current = false;
-                    }
+                    discardAndRun(pending.run);
                 }}
                 title={title}
                 description={description}

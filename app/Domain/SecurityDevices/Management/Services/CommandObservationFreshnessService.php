@@ -12,12 +12,25 @@ final class CommandObservationFreshnessService
 {
     public function inspect(Device $device, ?CarbonImmutable $now = null): CommandObservationFreshness
     {
+        return $this->inspectMany(collect([$device]), $now)->get($device->id);
+    }
+
+    /** @param Collection<int, Device> $devices @return Collection<int, CommandObservationFreshness> */
+    public function inspectMany(Collection $devices, ?CarbonImmutable $now = null): Collection
+    {
         $now ??= CarbonImmutable::now('UTC');
-        $monitors = Monitor::query()
-            ->where('device_id', $device->id)
+        $monitors = $devices->isEmpty() ? collect() : Monitor::query()
+            ->whereIn('device_id', $devices->pluck('id'))
             ->where('is_enabled', true)
             ->with('profile:id,stale_after_seconds')
-            ->get();
+            ->get()->groupBy('device_id');
+
+        return $devices->mapWithKeys(fn (Device $device) => [$device->id => $this->fromMonitors($device, $monitors->get($device->id, collect()), $now)]);
+    }
+
+    /** @param Collection<int, Monitor> $monitors */
+    private function fromMonitors(Device $device, Collection $monitors, CarbonImmutable $now): CommandObservationFreshness
+    {
         $latestMonitor = $monitors
             ->filter(fn (Monitor $monitor): bool => $monitor->last_observation_at !== null)
             ->sortByDesc(fn (Monitor $monitor): int => $monitor->last_observation_at->getTimestamp())
