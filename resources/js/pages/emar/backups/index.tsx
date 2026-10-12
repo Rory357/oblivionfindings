@@ -32,6 +32,8 @@ type Recipient = {
     email: string | null;
     /** Authenticator two-step sign-in, without which they can't get a password (EA-141). */
     can_open: boolean;
+    /** EA-141: their own backup passphrase is set (opens in an outage). */
+    has_passphrase?: boolean;
     status: string;
 };
 type Schedule = {
@@ -91,6 +93,13 @@ type Props = {
         email_source?: 'saved' | 'server';
     };
     can_view_email_settings?: boolean;
+    /** EA-141: this person's own backup passphrase. */
+    my_passphrase?: {
+        set: boolean;
+        set_at: string | null;
+        can_set: boolean;
+        reason: string | null;
+    };
     can_manage: boolean;
     notice: string;
     deliveries_meta?: {
@@ -138,6 +147,7 @@ export default function Backups(props: Props) {
     const [action, setAction] = useState<'send' | 'retry' | 'password' | null>(
         null,
     );
+    const [passphrase, setPassphrase] = useState(false);
     const house = (id: number) =>
         props.sites.find((s) => s.id === id)?.name ?? 'House unavailable';
     const refresh = () => {
@@ -236,6 +246,24 @@ export default function Backups(props: Props) {
                     </Button>
                 )}
             </SettingsNotice>
+            {props.my_passphrase &&
+                (props.my_passphrase.set ||
+                    props.my_passphrase.can_set ||
+                    props.my_passphrase.reason) && (
+                    <MyPassphrase
+                        status={props.my_passphrase}
+                        onSet={() => setPassphrase(true)}
+                    />
+                )}
+            {passphrase && (
+                <PassphraseDialog
+                    replacing={!!props.my_passphrase?.set}
+                    onClose={() => {
+                        setPassphrase(false);
+                        router.reload();
+                    }}
+                />
+            )}
             <SettingsNotice>
                 {props.notice ||
                     'Passwords are never included in the email. Each recipient must still have current access to the complete chart when it is prepared and sent.'}
@@ -262,17 +290,53 @@ export default function Backups(props: Props) {
                             key: 'recipients',
                             label: 'Recipients',
                             width: '2fr',
-                            cell: (s) =>
-                                s.recipients
-                                    .filter((r) => r.status === 'approved')
-                                    .map(
-                                        (r) =>
-                                            r.name +
-                                            (r.can_open
-                                                ? ''
-                                                : ' (can’t open yet)'),
-                                    )
-                                    .join(', ') || 'None approved',
+                            cell: (s) => {
+                                // A recipient whose work email changed (or who was
+                                // approved against a sign-in email) gets nothing
+                                // until approved again — say so, don't hide them.
+                                const review = s.recipients.filter(
+                                    (r) => r.status === 'review_required',
+                                );
+                                return (
+                                    <div className="space-y-1">
+                                        <div>
+                                            {s.recipients
+                                                .filter(
+                                                    (r) =>
+                                                        r.status === 'approved',
+                                                )
+                                                .map(
+                                                    (r) =>
+                                                        r.name +
+                                                        (!r.can_open
+                                                            ? ' (can’t open yet)'
+                                                            : r.has_passphrase
+                                                              ? ''
+                                                              : ' (can’t open during an outage — set a backup passphrase)'),
+                                                )
+                                                .join(', ') || 'None approved'}
+                                        </div>
+                                        {review.length > 0 && (
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <StatusBadge variant="warning">
+                                                    {review.length === 1
+                                                        ? '1 to approve again'
+                                                        : review.length +
+                                                          ' to approve again'}
+                                                </StatusBadge>
+                                                <span className="text-caption">
+                                                    {review
+                                                        .map((r) => r.name)
+                                                        .join(', ')}{' '}
+                                                    — not sent backups until
+                                                    approved with their work
+                                                    email
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            },
                         },
                         {
                             key: 'retention',
@@ -985,6 +1049,168 @@ function PasswordDialog({
                         />
                     </Field>
                     <Field label="Your authenticator code" required>
+                        <Input
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            maxLength={6}
+                            value={code}
+                            onChange={(e) =>
+                                setCode(e.target.value.replace(/\D/g, ''))
+                            }
+                        />
+                    </Field>
+                </>
+            )}
+        </SettingsModal>
+    );
+}
+
+/** EA-141: your own backup passphrase — so your copy opens during an outage. */
+function MyPassphrase({
+    status,
+    onSet,
+}: {
+    status: NonNullable<Props['my_passphrase']>;
+    onSet: () => void;
+}) {
+    return (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border p-4">
+            <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium">
+                        Your backup passphrase
+                    </span>
+                    {status.set ? (
+                        <StatusBadge variant="success">Set</StatusBadge>
+                    ) : (
+                        <StatusBadge variant="warning">Not set</StatusBadge>
+                    )}
+                </div>
+                <p className="text-caption">
+                    {status.set
+                        ? 'Set ' +
+                          formatDateTime(status.set_at) +
+                          '. Your copy of each backup opens with it — no app needed during an outage.'
+                        : 'Can’t open during an outage — set a backup passphrase. Until you do, a backup needs its password from this page while the app is working.'}
+                </p>
+                {status.reason && (
+                    <p className="text-caption">{status.reason}</p>
+                )}
+            </div>
+            {status.can_set && (
+                <Button variant="outline" onClick={onSet}>
+                    {status.set ? 'Change passphrase' : 'Set backup passphrase'}
+                </Button>
+            )}
+        </div>
+    );
+}
+
+function PassphraseDialog({
+    replacing,
+    onClose,
+}: {
+    replacing: boolean;
+    onClose: () => void;
+}) {
+    const command = useCommand();
+    const [passphrase, setPassphrase] = useState('');
+    const [confirmation, setConfirmation] = useState('');
+    const [password, setPassword] = useState('');
+    const [code, setCode] = useState('');
+    const [saved, setSaved] = useState(false);
+    const save = async () => {
+        const result = await command.run('/emar/backups/passphrase', {
+            passphrase,
+            passphrase_confirmation: confirmation,
+            password,
+            verification_code: code,
+        });
+        setPassword('');
+        setCode('');
+        if (result) {
+            setPassphrase('');
+            setConfirmation('');
+            setSaved(true);
+        }
+    };
+    return (
+        <SettingsModal
+            width={480}
+            title={
+                replacing
+                    ? 'Change your backup passphrase'
+                    : 'Set your backup passphrase'
+            }
+            description="Confirm your own account and authenticator"
+            onClose={onClose}
+            footer={
+                <>
+                    <Button variant="outline" onClick={onClose}>
+                        Close
+                    </Button>
+                    {!saved && (
+                        <Button
+                            disabled={
+                                passphrase.length < 12 ||
+                                passphrase !== confirmation ||
+                                !password ||
+                                code.length !== 6 ||
+                                command.busy ||
+                                command.uncertain
+                            }
+                            onClick={() => void save()}
+                        >
+                            Save passphrase
+                        </Button>
+                    )}
+                </>
+            }
+        >
+            {command.error && (
+                <SettingsNotice role="alert">{command.error}</SettingsNotice>
+            )}
+            {saved ? (
+                <SettingsNotice>
+                    Saved. Backups made from now on open with this passphrase.
+                    Keep it somewhere you can reach without the app.
+                </SettingsNotice>
+            ) : (
+                <>
+                    <SettingsNotice>
+                        {replacing
+                            ? 'A new passphrase applies to backups made from now on. Backups you already received still open with the passphrase they were made with.'
+                            : 'Your copy of each backup will open with this passphrase, without the app. It is never stored — if you forget it, set a new one; it applies to new backups.'}
+                    </SettingsNotice>
+                    <Field label="Backup passphrase" required>
+                        <Input
+                            type="password"
+                            autoComplete="new-password"
+                            value={passphrase}
+                            onChange={(e) => setPassphrase(e.target.value)}
+                        />
+                    </Field>
+                    <p className="text-caption">
+                        12 to 128 ordinary keyboard characters, with no space at
+                        the start or end. Not your account password.
+                    </p>
+                    <Field label="Type it again" required>
+                        <Input
+                            type="password"
+                            autoComplete="new-password"
+                            value={confirmation}
+                            onChange={(e) => setConfirmation(e.target.value)}
+                        />
+                    </Field>
+                    <Field label="Your account password" required>
+                        <Input
+                            type="password"
+                            autoComplete="current-password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                        />
+                    </Field>
+                    <Field label="Authenticator code" required>
                         <Input
                             inputMode="numeric"
                             autoComplete="one-time-code"

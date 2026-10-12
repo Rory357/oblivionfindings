@@ -11,6 +11,7 @@ Route::middleware(['auth', 'verified', 'permission:medications.view', ShareConne
     Route::middleware(['permission:medications.external.manage', Feature::class.':prescriber_portal'])->group(function () {
         Route::post('/clinicians', [Clinical::class, 'provision'])->name('clinicians.store');
         Route::post('/clinicians/{clinician}/revoke', [Clinical::class, 'revokeIdentity'])->whereNumber('clinician')->name('clinicians.revoke');
+        Route::post('/clinicians/{clinician}/registration-check', [Clinical::class, 'registrationCheck'])->whereNumber('clinician')->name('clinicians.registration-check');
         Route::post('/grants', [Clinical::class, 'grant'])->name('grants.store');
         Route::post('/grants/{grant}/revoke', [Clinical::class, 'revokeGrant'])->whereNumber('grant')->name('grants.revoke');
     });

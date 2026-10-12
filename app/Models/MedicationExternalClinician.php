@@ -10,7 +10,19 @@ final class MedicationExternalClinician extends Model
 
     protected $guarded = ['id'];
 
-    protected $casts = ['identity_evidence' => 'encrypted', 'identity_verified_at' => 'datetime', 'expires_at' => 'datetime', 'revoked_at' => 'datetime'];
+    protected $casts = ['identity_evidence' => 'encrypted', 'identity_verified_at' => 'datetime', 'expires_at' => 'datetime', 'revoked_at' => 'datetime', 'register_checked_at' => 'date'];
+
+    /** EA-104: the registration check was recorded as structured evidence. */
+    public function hasStructuredCheck(): bool
+    {
+        return $this->registration_check === 'structured' && $this->register_checked_at !== null;
+    }
+
+    /** The yearly re-check of the public register is due (structured records only). */
+    public function registerRecheckDue(): bool
+    {
+        return $this->hasStructuredCheck() && $this->register_checked_at->copy()->addYear()->isPast();
+    }
 
     public function user()
     {

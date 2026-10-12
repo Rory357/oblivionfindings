@@ -10,6 +10,12 @@ export type Clinician = {
     expires_at: string;
     revoked_at: string | null;
     identity_verified_at: string;
+    /** EA-104: structured registration evidence and its yearly re-check. */
+    registration_check?: 'structured' | 'note';
+    registration_scope?: string | null;
+    register_checked_at?: string | null;
+    register_recheck_due?: boolean;
+    needs_structured_check?: boolean;
 };
 export type Grant = {
     active: boolean;
@@ -109,4 +115,9 @@ export type ConnectedProps = {
         export: boolean;
     };
     witnesses: { id: number; name: string }[];
+    /** EA-104: Settings › Connected services › Prescriber registration check. */
+    registration?: {
+        mode: 'structured' | 'note';
+        councils: Record<string, string>;
+    };
 };

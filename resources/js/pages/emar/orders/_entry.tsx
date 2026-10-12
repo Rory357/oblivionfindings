@@ -30,7 +30,13 @@ import {
     User,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { Errors, Field, Note, useDraftClose } from './_parts';
+import {
+    classMatchingText,
+    Errors,
+    Field,
+    Note,
+    useDraftClose,
+} from './_parts';
 import type {
     AllergyInspection,
     ClientChoice,
@@ -659,15 +665,11 @@ export function OrderEntry(props: Props) {
                                                 </p>
                                             </>
                                         )}
-                                        {allergy.class_matching ===
-                                            'not_configured' && (
-                                            <p>
-                                                Drug-class matching: Not
-                                                configured. Check the
-                                                prescription against all
-                                                recorded allergies.
-                                            </p>
-                                        )}
+                                        <p>
+                                            {classMatchingText(
+                                                allergy.class_matching,
+                                            )}
+                                        </p>
                                     </Note>
                                 ) : p.name && form.data.client_id ? (
                                     <Note>Loading the recorded allergies…</Note>

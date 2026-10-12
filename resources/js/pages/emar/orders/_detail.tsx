@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import {
+    classMatchingText,
     Errors,
     Field,
     Note,
@@ -660,14 +661,11 @@ export function OrderDetail({
                                     .map((entry) => entry.allergen)
                                     .join(', ') ||
                                     'Nothing recorded — not a confirmed allergy review.'}
-                                {detail.allergies.class_matching ===
-                                    'not_configured' && (
-                                    <p>
-                                        Drug-class matching: Not configured.
-                                        Check against the source and all
-                                        recorded allergies.
-                                    </p>
-                                )}
+                                <p>
+                                    {classMatchingText(
+                                        detail.allergies.class_matching,
+                                    )}
+                                </p>
                             </Note>
                             {allergyBlocked && (
                                 <Note>

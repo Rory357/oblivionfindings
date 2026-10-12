@@ -11,18 +11,15 @@ use App\Services\AuthorizationEvidenceLockService;
 use App\Services\Medication\BackupDelivery\BackupDeliveryAccess;
 use App\Services\Medication\BackupDelivery\BackupDeliveryService;
 use App\Services\Medication\BackupDelivery\BackupEmailSender;
+use App\Services\Medication\BackupDelivery\BackupPassphrases;
 use App\Services\Medication\BackupDelivery\BackupPdfEncryption;
+use App\Services\Medication\BackupDelivery\BackupStepUp;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\UserSiteAccessService;
-use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
-use Laravel\Fortify\Fortify;
-use PragmaRX\Google2FA\Google2FA;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class MedicationBackupDeliveryController extends Controller
@@ -42,6 +39,9 @@ class MedicationBackupDeliveryController extends Controller
         $allowedIds = $manager ? $siteIds : $schedules->pluck('site_id')->all();
         $deliveries = MedicationBackupDelivery::query()->whereIn('site_id', $allowedIds)->orderByDesc('id')->paginate(25, ['*'], 'deliveries_page', $request->integer('deliveries_page', 1));
         $ready = app(BackupPdfEncryption::class)->ready();
+        // EA-141: who can open a backup during an outage (their own passphrase).
+        $passphrases = app(BackupPassphrases::class);
+        $withPassphrase = $passphrases->withPassphrase($schedules->flatMap(fn ($s) => $s->recipients->pluck('user_id'))->map(fn ($id): int => (int) $id)->unique()->values()->all());
 
         return Inertia::render('emar/backups/index', [
             'sites' => Site::query()->whereIn('id', $allowedIds)->where('is_active', true)->where('archived', false)->get(['id', 'name'])->toArray(),
@@ -50,9 +50,11 @@ class MedicationBackupDeliveryController extends Controller
                 'runs_as' => $manager ? $s->approver?->name : null, 'runs_as_current' => $manager ? $this->runsAsCurrent($s) : null,
                 'last_run' => $s->last_run_state === null ? null : ['nz_date' => $s->last_run_nz_date, 'state' => $s->last_run_state, 'code' => $s->last_run_code, 'at' => $s->last_run_at?->toIso8601String()],
                 // Fixed rule: backups go to the HR work email only. EA-141: can they open one (authenticator two-step)?
-                'recipients' => $s->recipients->map(fn ($r) => ['user_id' => (int) $r->user_id, 'name' => $r->user?->name, 'email' => $manager && $r->user ? $this->access->workEmail($r->user) : null, 'can_open' => $r->user ? $this->access->canOpen($r->user) : false, 'status' => $r->revoked_at ? 'revoked' : ($r->user?->email_verified_at && $this->access->emailHashMatches($r->user, $r->email_sha256) ? 'approved' : 'review_required')])->all()])->all(),
+                'recipients' => $s->recipients->map(fn ($r) => ['user_id' => (int) $r->user_id, 'name' => $r->user?->name, 'email' => $manager && $r->user ? $this->access->workEmail($r->user) : null, 'can_open' => $r->user ? $this->access->canOpen($r->user) : false, 'has_passphrase' => in_array((int) $r->user_id, $withPassphrase, true), 'status' => $r->revoked_at ? 'revoked' : ($r->user?->email_verified_at && $this->access->emailHashMatches($r->user, $r->email_sha256) ? 'approved' : 'review_required')])->all()])->all(),
             'recipient_candidates' => [], 'deliveries_meta' => ['current_page' => $deliveries->currentPage(), 'last_page' => $deliveries->lastPage(), 'total' => $deliveries->total()], 'deliveries' => $deliveries->getCollection()->map(fn ($d) => $this->backups->dto($d, $actor))->all(),
             'readiness' => array_merge(app(BackupEmailSender::class)->readiness(), ['encryption_ready' => $ready, 'send_enabled' => (bool) config('emar-catalogue-backups.send_enabled', false), 'reason' => ! $ready ? 'Configure a reviewed qpdf executable for AES-256 backups.' : (! config('emar-catalogue-backups.send_enabled', false) ? 'Email delivery is disabled until the owner approves the transport.' : null)]),
+            // EA-141: this person's own backup passphrase.
+            'my_passphrase' => [...$passphrases->status($actor), ...$passphrases->eligibility($actor)],
             'can_view_email_settings' => $actor->canDo('settings.access.manage'), 'can_manage' => $manager, 'notice' => 'Whole-house charts are encrypted with AES-256. Passwords are available separately after your own password and personal authenticator check. A submission with an unknown result is never resent automatically.',
         ]);
     }
@@ -70,6 +72,14 @@ class MedicationBackupDeliveryController extends Controller
         } catch (HttpExceptionInterface) {
             return false;
         }
+    }
+
+    /** EA-141: set or change your own backup passphrase (step-up; applies to new backups). */
+    public function passphrase(Request $request)
+    {
+        app(BackupPassphrases::class)->set($request->user(), $request->all());
+
+        return response()->json(['success' => true, 'message' => 'Backup passphrase saved. Backups made from now on open with it.'])->header('Cache-Control', 'private, no-store');
     }
 
     public function recipientSearch(Request $request, int $site)
@@ -161,19 +171,7 @@ class MedicationBackupDeliveryController extends Controller
         $password = DB::transaction(function () use ($request, $delivery, $data): string {
             $actor = app(AuthorizationEvidenceLockService::class)->lockForUserWithoutWaiting($request->user(), ['*']);
             $row = $this->backups->readable($actor, $delivery);
-            $valid = $actor->two_factor_confirmed_at && $actor->two_factor_secret && is_string($actor->password) && Hash::check($data['password'], $actor->password);
-            $window = false;
-            if ($valid) {
-                try {
-                    $secret = Fortify::currentEncrypter()->decrypt($actor->two_factor_secret);
-                    $window = (new Google2FA)->verifyKeyNewer($secret, $data['verification_code'], 0, 1);
-                } catch (DecryptException) {
-                    $window = false;
-                }
-            }
-            if (! is_int($window) || $window < 1 || DB::table('medication_backup_step_up_uses')->insertOrIgnore(['user_id' => $actor->id, 'authenticator_window' => $window, 'created_at' => now()]) !== 1) {
-                throw ValidationException::withMessages(['verification_code' => 'Use your own current account password and a new personal authenticator code.']);
-            }
+            app(BackupStepUp::class)->verify($actor, $data['password'], $data['verification_code']);
             // EA-057: the password reveal is a disclosure too.
             $this->backups->recordDisclosure($row, $actor, 'password_revealed');
 

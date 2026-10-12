@@ -192,19 +192,16 @@ class MedicationControlledOrderMutationAuthorizationTest extends TestCase
         ] as $routeIndex => $routeName) {
             $profileCreatedName = 'Authorised profile controlled creation '.$routeIndex;
 
+            // EA-023 (Lane C3): the profile answers through P04 and writes nothing.
             $this->actingAs($actor)
-                ->post(route($routeName, $this->client), [
+                ->postJson(route($routeName, $this->client), [
                     'name' => $profileCreatedName,
                     'dosage' => '5 mg',
                     'frequency' => 'Once daily',
                     'controlled_drug' => true,
                 ])
-                ->assertRedirect();
-            $this->assertDatabaseHas('client_medications', [
-                'client_id' => $this->client->id,
-                'name' => $profileCreatedName,
-                'controlled_drug' => true,
-            ]);
+                ->assertStatus(409);
+            $this->assertDatabaseMissing('client_medications', ['name' => $profileCreatedName]);
         }
 
         foreach ([
@@ -218,11 +215,11 @@ class MedicationControlledOrderMutationAuthorizationTest extends TestCase
             $updatedName = 'Authorised profile controlled update '.$routeIndex;
 
             $this->actingAs($actor)
-                ->put(route($routeName, [$this->client, $profileUpdateTarget]), [
+                ->putJson(route($routeName, [$this->client, $profileUpdateTarget]), [
                     'name' => $updatedName,
                 ])
-                ->assertRedirect();
-            $this->assertSame($updatedName, $profileUpdateTarget->fresh()->name);
+                ->assertStatus(409);
+            $this->assertSame('Controlled profile update target '.$routeIndex, $profileUpdateTarget->fresh()->name);
         }
 
         $updateTarget = $this->controlledMedication(['created_by' => $creator->id]);
@@ -281,7 +278,7 @@ class MedicationControlledOrderMutationAuthorizationTest extends TestCase
         }
     }
 
-    public function test_profile_routes_preserve_ordinary_mutations_without_controlled_capabilities(): void
+    public function test_profile_routes_send_ordinary_orders_to_p04_without_controlled_capabilities(): void
     {
         $actor = $this->makeSiteActor([
             'clients.update',
@@ -327,19 +324,16 @@ class MedicationControlledOrderMutationAuthorizationTest extends TestCase
         ] as $routeIndex => $routeName) {
             $createdName = 'Ordinary profile medication '.$routeIndex;
 
+            // EA-023 (Lane C3): the profile answers through P04 and writes nothing.
             $this->actingAs($actor)
-                ->post(route($routeName, $this->client), [
+                ->postJson(route($routeName, $this->client), [
                     'name' => $createdName,
                     'dosage' => '10 mg',
                     'frequency' => 'Once daily',
                     'controlled_drug' => false,
                 ])
-                ->assertRedirect();
-            $this->assertDatabaseHas('client_medications', [
-                'client_id' => $this->client->id,
-                'name' => $createdName,
-                'controlled_drug' => false,
-            ]);
+                ->assertStatus(409);
+            $this->assertDatabaseMissing('client_medications', ['name' => $createdName]);
         }
 
         foreach ([
@@ -355,11 +349,11 @@ class MedicationControlledOrderMutationAuthorizationTest extends TestCase
             $updatedName = 'Ordinary profile medication updated '.$routeIndex;
 
             $this->actingAs($actor)
-                ->put(route($routeName, [$this->client, $ordinaryMedication]), [
+                ->putJson(route($routeName, [$this->client, $ordinaryMedication]), [
                     'name' => $updatedName,
                 ])
-                ->assertRedirect();
-            $this->assertSame($updatedName, $ordinaryMedication->fresh()->name);
+                ->assertStatus(409);
+            $this->assertSame('Ordinary profile update target '.$routeIndex, $ordinaryMedication->fresh()->name);
         }
     }
 

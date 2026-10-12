@@ -757,7 +757,7 @@ export default function Orders(props: Props) {
                                 href="/emar/prescriptions/legacy"
                                 className="inline-flex min-h-[44px] items-center underline"
                             >
-                                Open supply and dispensing records
+                                Old prescriber-order records (read only)
                             </Link>
                         </p>
                     </>

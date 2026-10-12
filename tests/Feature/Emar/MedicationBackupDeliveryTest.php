@@ -176,7 +176,7 @@ class MedicationBackupDeliveryTest extends TestCase
         $this->app->instance(DowntimePackPdf::class, $pdf);
         config(['emar-catalogue-backups.send_enabled' => true]);
         $transport = Mockery::mock(BackupMailTransport::class);
-        $transport->shouldReceive('send')->once()->with($mailboxes, '%PDF-PROTECTED-FICTIONAL', '2026-10-07', $this->site->name, Mockery::pattern('/^B\d+$/'));
+        $transport->shouldReceive('send')->once()->with($mailboxes, '%PDF-PROTECTED-FICTIONAL', '2026-10-07', $this->site->name, Mockery::pattern('/^B\d+$/'), []);
         $this->app->instance(BackupMailTransport::class, $transport);
         $service = app(BackupDeliveryService::class);
         if ($scheduled) {
@@ -357,7 +357,7 @@ class MedicationBackupDeliveryTest extends TestCase
 
             config(['emar-catalogue-backups.send_enabled' => true]);
             $transport = Mockery::mock(BackupMailTransport::class);
-            $transport->shouldReceive('send')->once()->with([$this->recipient->email], $bytes, '2026-10-07', $this->site->name, 'B'.$row->id);
+            $transport->shouldReceive('send')->once()->with([$this->recipient->email], $bytes, '2026-10-07', $this->site->name, 'B'.$row->id, []);
             $this->app->instance(BackupMailTransport::class, $transport);
             $sent = app(BackupDeliveryService::class)->send($this->lead, $row->id, $row->version);
             $this->assertSame('sent', $sent->state);
@@ -570,7 +570,7 @@ class MedicationBackupDeliveryTest extends TestCase
         $this->openDurableBoundary();
         config(['emar-catalogue-backups.send_enabled' => true]);
         $transport = Mockery::mock(BackupMailTransport::class);
-        $transport->shouldReceive('send')->once()->with([$this->recipient->email], '%PDF-PROTECTED-FICTIONAL', '2026-10-07', Mockery::type('string'), Mockery::pattern('/^B\d+$/'));
+        $transport->shouldReceive('send')->once()->with([$this->recipient->email], '%PDF-PROTECTED-FICTIONAL', '2026-10-07', Mockery::type('string'), Mockery::pattern('/^B\d+$/'), []);
         $this->app->instance(BackupMailTransport::class, $transport);
         $this->actingAs($this->lead)->postJson('/emar/backups/deliveries/'.$row->id.'/send', ['version' => $row->version])->assertOk()->assertJsonPath('state', 'sent');
         $this->actingAs($this->lead)->postJson('/emar/backups/deliveries/'.$row->id.'/send', ['version' => $row->version])->assertConflict();
@@ -1018,7 +1018,7 @@ class MedicationBackupDeliveryTest extends TestCase
         $other->hrEmployeeProfile->forceFill(['is_active' => false])->saveQuietly();
         Carbon::setTestNow(Carbon::parse('2026-10-07 12:00', 'Pacific/Auckland')->utc());
         $transport = Mockery::mock(BackupMailTransport::class);
-        $transport->shouldReceive('send')->once()->with([$this->recipient->email], '%PDF-PROTECTED-FICTIONAL', '2026-10-07', Mockery::type('string'), Mockery::pattern('/^B\d+$/'));
+        $transport->shouldReceive('send')->once()->with([$this->recipient->email], '%PDF-PROTECTED-FICTIONAL', '2026-10-07', Mockery::type('string'), Mockery::pattern('/^B\d+$/'), []);
         $this->app->instance(BackupMailTransport::class, $transport);
         $service = app(BackupDeliveryService::class);
         $this->assertSame(['prepared' => 1, 'sent' => 1, 'failed' => 0, 'disabled' => 0], $service->dispatchDue());
@@ -1169,7 +1169,7 @@ class MedicationBackupDeliveryTest extends TestCase
         $row = $this->prepare($schedule->fresh());
         config(['emar-catalogue-backups.send_enabled' => true]);
         $transport = Mockery::mock(BackupMailTransport::class);
-        $transport->shouldReceive('send')->once()->with(['house.work@example.test'], Mockery::any(), '2026-10-07', Mockery::any(), Mockery::any());
+        $transport->shouldReceive('send')->once()->with(['house.work@example.test'], Mockery::any(), '2026-10-07', Mockery::any(), Mockery::any(), []);
         $this->app->instance(BackupMailTransport::class, $transport);
         $this->assertSame('sent', app(BackupDeliveryService::class)->send($this->lead, $row->id, $row->version)->state);
     }
@@ -1232,6 +1232,64 @@ class MedicationBackupDeliveryTest extends TestCase
         $finance = $this->staff($this->site, false);
         $finance->roles()->sync([\App\Models\Role::firstOrCreate(['name' => 'finance'], ['label' => 'Synthetic finance', 'level' => 10, 'type' => 'system'])->id]);
         $this->actingAs($finance->fresh())->get('/emar/backups')->assertForbidden();
+    }
+
+    /** EA-141: a recipient sets their own passphrase with step-up; only the encryption template is kept. */
+    public function test_b10_recipient_sets_a_backup_passphrase_with_step_up_and_it_is_never_stored(): void
+    {
+        $this->schedule();
+        $passphrase = 'Correct horse battery 42';
+        app(BackupPdfEncryption::class)->shouldReceive('passphraseTemplate')->with($passphrase)
+            ->andReturn(['template' => '%PDF-TEMPLATE-FICTIONAL', 'owner' => str_repeat('o', 64)]);
+        $authenticator = new Google2FA;
+        $secret = $authenticator->generateSecretKey();
+        $this->recipient->forceFill(['two_factor_secret' => Fortify::currentEncrypter()->encrypt($secret), 'two_factor_confirmed_at' => now()])->saveQuietly();
+        $input = ['passphrase' => $passphrase, 'passphrase_confirmation' => $passphrase, 'password' => 'fictional-secret'];
+
+        $this->actingAs($this->recipient)->postJson('/emar/backups/passphrase', [...$input, 'verification_code' => '000000'])->assertUnprocessable();
+        $this->actingAs($this->recipient)->postJson('/emar/backups/passphrase', [...$input, 'passphrase' => 'fictional-secret', 'passphrase_confirmation' => 'fictional-secret',
+            'verification_code' => $authenticator->getCurrentOtp($secret)])->assertUnprocessable()->assertJsonValidationErrors('passphrase');
+        $this->assertDatabaseCount('medication_backup_passphrases', 0);
+        $this->actingAs($this->recipient)->postJson('/emar/backups/passphrase', [...$input, 'verification_code' => $authenticator->getCurrentOtp($secret)])->assertOk();
+
+        $row = \App\Models\MedicationBackupPassphrase::query()->where('user_id', $this->recipient->id)->sole();
+        $this->assertSame('%PDF-TEMPLATE-FICTIONAL', base64_decode($row->template));
+        $raw = json_encode(DB::table('medication_backup_passphrases')->get());
+        $decrypted = $row->template.$row->owner_secret.base64_decode($row->template);
+        $this->assertStringNotContainsString($passphrase, $raw.$decrypted);
+        $this->actingAs($this->recipient)->get('/emar/backups')->assertOk()
+            ->assertInertia(fn (Assert $p) => $p->where('my_passphrase.set', true)->where('my_passphrase.can_set', true));
+    }
+
+    /** EA-141: a recipient with a passphrase gets their own copy, which opens without the app. */
+    public function test_b10_send_attaches_a_personal_copy_for_recipients_with_a_passphrase(): void
+    {
+        $schedule = $this->schedule();
+        $second = $this->staff($this->site, false);
+        $schedule = app(BackupDeliveryService::class)->approveRecipient($this->lead, $schedule->id, $schedule->version, $second->id, true);
+        \App\Models\MedicationBackupPassphrase::query()->create(['user_id' => $this->recipient->id, 'template' => base64_encode('%PDF-TEMPLATE-FICTIONAL'),
+            'owner_secret' => str_repeat('o', 64), 'set_at' => now()]);
+        $this->actingAs($this->lead)->get('/emar/backups')->assertOk()->assertInertia(fn (Assert $p) => $p
+            ->where('schedules.0.recipients', fn ($rows) => collect($rows)->firstWhere('user_id', $this->recipient->id)['has_passphrase'] === true
+                && collect($rows)->firstWhere('user_id', $second->id)['has_passphrase'] === false));
+        $row = $this->prepare($schedule->fresh());
+        app(BackupPdfEncryption::class)->shouldReceive('encryptForRecipient')->once()
+            ->with('%PDF-PROTECTED-FICTIONAL', $row->password, '%PDF-TEMPLATE-FICTIONAL', str_repeat('o', 64))->andReturn('%PDF-PERSONAL-COPY');
+        config(['emar-catalogue-backups.send_enabled' => true]);
+        $transport = Mockery::mock(BackupMailTransport::class);
+        $transport->shouldReceive('send')->once()->with(Mockery::on(fn ($to) => count($to) === 2), '%PDF-PROTECTED-FICTIONAL', '2026-10-07', Mockery::any(), Mockery::any(),
+            [mb_strtolower($this->recipient->email) => '%PDF-PERSONAL-COPY']);
+        $this->app->instance(BackupMailTransport::class, $transport);
+
+        $this->assertSame('sent', app(BackupDeliveryService::class)->send($this->lead, $row->id, $row->version)->state);
+    }
+
+    /** EA-141: someone approved without a passphrase is reminded to set one. */
+    public function test_b10_approving_a_recipient_without_a_passphrase_reminds_them(): void
+    {
+        \Illuminate\Support\Facades\Notification::fake();
+        $this->schedule();
+        \Illuminate\Support\Facades\Notification::assertSentTo($this->recipient, \App\Notifications\BackupPassphraseReminderNotification::class);
     }
 
     private function failedDelivery(): MedicationBackupDelivery

@@ -56,10 +56,15 @@ final class DoseScheduleHistory
             // A new version of the order. The model sends every such change
             // back for verification, so it waits unless already verified.
             $verified = $status === null || $status === 'verified';
+            // A stopped order keeps its earlier check (EA-132), but its
+            // end-date version takes effect from now, not that check time.
+            $verifiedAt = array_key_exists('verified_at', $changes)
+                ? DoseOrderTimelineFactory::rawInstant($order->getAttributes()['verified_at'] ?? null)
+                : null;
             $this->insertVersion(
                 $order,
                 $now,
-                $verified ? (DoseOrderTimelineFactory::rawInstant($order->getAttributes()['verified_at'] ?? null) ?? $now) : null,
+                $verified ? ($verifiedAt ?? $now) : null,
                 $status === 'rejected' ? $now : null,
             );
         } elseif (array_key_exists('approval_status', $changes)) {
@@ -68,6 +73,16 @@ final class DoseScheduleHistory
                 $pending->update([
                     'verified_at' => DoseOrderTimelineFactory::rawInstant($order->getAttributes()['verified_at'] ?? null) ?? $now,
                 ]);
+            } elseif ($status === 'verified' && $this->needsVerifiedVersion($order)) {
+                // EA-051 (Lane C3): a sent-back order re-entered unchanged is
+                // checked with no field change, so nothing is awaiting. Record
+                // the checked schedule now, or the order never owes a dose.
+                $this->insertVersion(
+                    $order,
+                    $now,
+                    DoseOrderTimelineFactory::rawInstant($order->getAttributes()['verified_at'] ?? null) ?? $now,
+                    null,
+                );
             } elseif ($status === 'rejected' && $pending !== null) {
                 $pending->update(['rejected_at' => $now]);
             } elseif ($status === 'pending_verification' && $pending === null) {
@@ -111,6 +126,19 @@ final class DoseScheduleHistory
 
         $baseline = DoseOrderTimelineFactory::currentRowVersion($order, original: true);
         $this->insertVersion($order, $baseline->changedAt, $baseline->verifiedAt, $baseline->rejectedAt, original: true);
+    }
+
+    /** The latest version was sent back (rejected), or none was ever verified. */
+    private function needsVerifiedVersion(ClientMedication $order): bool
+    {
+        $latest = MedicationDoseScheduleVersion::query()
+            ->where('client_medication_id', $order->id)
+            ->orderByDesc('changed_at')
+            ->orderByDesc('id')
+            ->first();
+
+        return $latest === null || $latest->rejected_at !== null
+            || ! MedicationDoseScheduleVersion::query()->where('client_medication_id', $order->id)->whereNotNull('verified_at')->exists();
     }
 
     private function latestAwaitingVersion(ClientMedication $order): ?MedicationDoseScheduleVersion
