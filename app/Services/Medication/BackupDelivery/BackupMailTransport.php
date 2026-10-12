@@ -34,22 +34,30 @@ class BackupMailTransport
         return 'Protected chart backup — '.trim($house).' — '.$day.($reference !== null && $reference !== '' ? ' ('.$reference.')' : '');
     }
 
-    public function send(array $addresses, string $bytes, string $day, ?string $house = null, ?string $reference = null): void
+    /**
+     * @param  array<string, string>  $personal  EA-141: address => that recipient's own copy,
+     *                                         which opens with their backup passphrase.
+     */
+    public function send(array $addresses, string $bytes, string $day, ?string $house = null, ?string $reference = null, array $personal = []): void
     {
         if (! config('emar-catalogue-backups.send_enabled', false) || $addresses === []) {
             throw new MailNotSubmitted('backup_delivery_disabled');
         }
         $subject = self::subject($house, $day, $reference);
         $filename = self::filename($house, $day, $reference);
-        $body = 'A protected chart backup'.($house !== null && trim($house) !== '' ? ' for '.trim($house) : '').' ('.$day.($reference ? ', '.$reference : '').') is attached. '
-            .'Its password is shown separately in the app after your own password and authenticator check — get it at the start of each day, while the app is working. Do not forward this message.';
-        DB::transaction(function () use ($addresses, $bytes, $subject, $filename, $body): void {
+        $intro = 'A protected chart backup'.($house !== null && trim($house) !== '' ? ' for '.trim($house) : '').' ('.$day.($reference ? ', '.$reference : '').') is attached. ';
+        // EA-141: a personal copy opens with the recipient's own passphrase; the app isn't needed.
+        $personalBody = $intro.'It opens with your own backup passphrase — you don’t need the app. Do not forward this message.';
+        $body = $intro.'Its password is shown separately in the app after your own password and authenticator check. '
+            .'Set a backup passphrase in the app so future backups open without it, even when the app is down. Do not forward this message.';
+        DB::transaction(function () use ($addresses, $bytes, $subject, $filename, $body, $personal, $personalBody): void {
             $mailer = $this->sender->make($addresses);
             $accepted = 0;
             foreach ($addresses as $address) {
                 try {
-                    $sent = $mailer->raw($body, function (Message $message) use ($address, $bytes, $subject, $filename): void {
-                        $message->to($address)->subject($subject)->attachData($bytes, $filename, ['mime' => 'application/pdf']);
+                    $copy = $personal[$address] ?? null;
+                    $sent = $mailer->raw($copy !== null ? $personalBody : $body, function (Message $message) use ($address, $bytes, $copy, $subject, $filename): void {
+                        $message->to($address)->subject($subject)->attachData($copy ?? $bytes, $filename, ['mime' => 'application/pdf']);
                     });
                 } catch (MailNotSubmitted|MailSubmissionRejected) {
                     if ($accepted === 0) {

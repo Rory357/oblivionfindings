@@ -2,6 +2,7 @@ import { withMedicationReturn } from '@/lib/medication-navigation';
 import { Link } from '@inertiajs/react';
 import {
     ArrowUpRight,
+    Camera,
     ClipboardList,
     History,
     Pill,
@@ -29,6 +30,7 @@ import {
 } from '@/components/wizard/shell';
 import { formatDateTime } from '@/lib/datetime';
 
+import { MedicinePackPhoto, PackPhotoCell } from './photo-bits';
 import {
     isConcealed,
     type MaybeConcealed,
@@ -97,11 +99,14 @@ export function MedicinesSection({
     stopped,
     search,
     onMedicine,
+    onPhotos,
 }: {
     clientId: number;
     stopped: boolean;
     search: string;
     onMedicine: (id: number) => void;
+    /** C11: open Medicines › Photos for one medicine. */
+    onPhotos?: (id: number) => void;
 }) {
     const { data, load, reload } = useRecordJson<{
         rows: MaybeConcealed<RecordMedicine>[];
@@ -131,7 +136,12 @@ export function MedicinesSection({
                     </>
                 }
             />
-            <MedicineTable rows={rows} onMedicine={onMedicine} />
+            <MedicineTable
+                rows={rows}
+                onMedicine={onMedicine}
+                onPhotos={onPhotos}
+                photoColumn={!stopped}
+            />
         </div>
     );
 }
@@ -140,10 +150,14 @@ function MedicineTable({
     rows,
     onMedicine,
     supportPlan,
+    onPhotos,
+    photoColumn = false,
 }: {
     rows: MaybeConcealed<RecordMedicine>[];
     onMedicine: (id: number) => void;
     supportPlan?: RecordSupportPlan;
+    onPhotos?: (id: number) => void;
+    photoColumn?: boolean;
 }) {
     const context = useEntityContextMenu<MaybeConcealed<RecordMedicine>>();
     const open = (row: MaybeConcealed<RecordMedicine>) => {
@@ -165,6 +179,15 @@ function MedicineTable({
                       icon: Pill,
                       onClick: () => open(row),
                   },
+                  ...(onPhotos && row.pack_photo?.kind === 'staff'
+                      ? [
+                            {
+                                label: 'View pack photos',
+                                icon: Camera,
+                                onClick: () => onPhotos(row.id),
+                            },
+                        ]
+                      : []),
               ];
     if (!rows.length)
         return (
@@ -295,6 +318,25 @@ function MedicineTable({
                                           </StatusBadge>
                                       ),
                               },
+                              ...(photoColumn
+                                  ? [
+                                        {
+                                            key: 'photo',
+                                            label: 'Pack photo',
+                                            width: '1.1fr',
+                                            cell: (
+                                                row: MaybeConcealed<RecordMedicine>,
+                                            ) =>
+                                                isConcealed(row) ? (
+                                                    '—'
+                                                ) : (
+                                                    <PackPhotoCell
+                                                        photo={row.pack_photo}
+                                                    />
+                                                ),
+                                        },
+                                    ]
+                                  : []),
                           ]
                 }
                 actionsFor={menu}
@@ -419,6 +461,13 @@ const DETAIL_SECTIONS = [
         blurb: 'Instructions and support',
         icon: Users,
     },
+    // C11 (approved P02): the photo staff see when recording, and its history.
+    {
+        key: 'photo',
+        label: 'Pack photo & supply',
+        blurb: 'Check the label',
+        icon: Camera,
+    },
     {
         key: 'doses',
         label: 'Recent doses',
@@ -431,10 +480,13 @@ export function RecordMedicineDialog({
     clientId,
     medicationId,
     onClose,
+    onPhotos,
 }: {
     clientId: number;
     medicationId: number;
     onClose: () => void;
+    /** C11: open Medicines › Photos for this medicine. */
+    onPhotos?: (medicationId: number) => void;
 }) {
     const { data, load, reload } = useRecordJson<RecordMedicineDetail>(
         `/emar/clients/${clientId}/record/medicines/${medicationId}`,
@@ -545,6 +597,15 @@ export function RecordMedicineDialog({
                         </>
                     ) : null}
                     {section === 2 ? (
+                        <MedicinePackPhoto
+                            name={`${order.name} ${order.strength ?? ''}`.trim()}
+                            photo={data.pack_photo ?? null}
+                            onHistory={
+                                onPhotos ? () => onPhotos(order.id) : undefined
+                            }
+                        />
+                    ) : null}
+                    {section === 3 ? (
                         data.recent_doses.length ? (
                             data.recent_doses.map((dose) => (
                                 <ReviewRow

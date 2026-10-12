@@ -238,6 +238,9 @@ class WorkerMedsController extends Controller
                     && $user->canDo('medications.controlled.view'),
                 'manage_stock' => $user->canDo('medications.view')
                     && $user->canDo('medications.stock.update'),
+                // P06 (Stephan, 10 Oct): stock.receive holders — house leads — receive deliveries.
+                'receive_stock' => $user->canDo('medications.view')
+                    && ($user->canDo('medications.stock.receive') || $user->canDo('medications.stock.update')),
             ],
             'has_shift_context' => $hasShift || ! empty($assignedClientIds),
             // People on their shift whose medicines show once they're clocked

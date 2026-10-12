@@ -7,6 +7,7 @@ use App\Models\Asset;
 use App\Models\Client;
 use App\Models\ClientMedicalProfile;
 use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
 use App\Models\FleetMedicationTransitLog;
 use App\Models\FleetResidentTransport;
 use App\Models\Permission;
@@ -108,6 +109,40 @@ class ShiftAndTransportMedicationPrivacyTest extends TestCase
         $this->actingAs($worker)
             ->getJson('/api/medications/shifts/'.$shift->id.'/medication-summary')
             ->assertOk();
+    }
+
+    /**
+     * EA-006 follow-up (shared houses, D1): doses recorded on A's shift for
+     * other residents appear in the shift summary for each person the viewer
+     * may read, named, with controlled doses only for controlled readers.
+     */
+    public function test_the_shift_summary_lists_this_shifts_doses_for_each_person_the_viewer_may_read(): void
+    {
+        $bella = Client::factory()->create(['site_id' => $this->site->id, 'status' => 'active', 'first_name' => 'Bella', 'last_name' => 'Ngata']);
+        $carl = Client::factory()->create(['site_id' => $this->site->id, 'status' => 'active', 'first_name' => 'Carl', 'last_name' => 'Rewi']);
+        $worker = $this->staff(['shifts.viewAssigned' => true, 'medications.view' => true, 'medications.administer.record' => true]);
+        $shift = $this->shiftFor($worker, 'in_progress');
+        foreach ([[$this->client, 'Aroha morning tablet', false], [$bella, 'Bella morning tablet', false],
+            [$bella, 'Bella controlled tablet', true], [$carl, 'Carl morning tablet', false]] as [$person, $name, $controlled]) {
+            $medication = ClientMedication::query()->create(['client_id' => $person->id, 'name' => $name, 'controlled_drug' => $controlled,
+                'active' => true, 'state' => 'active', 'approval_status' => 'verified', 'version' => 1]);
+            ClientMedicationAdministration::query()->create(['client_id' => $person->id, 'client_medication_id' => $medication->id,
+                'shift_id' => $shift->id, 'administered_by' => $worker->id, 'status' => 'given',
+                'scheduled_for' => now()->subMinutes(30), 'administered_at' => now()->subMinutes(20)]);
+        }
+        // Reads the shift's person and Bella, but not Carl, and not controlled medicines.
+        $viewer = $this->staff(['shifts.viewAny' => true, 'medications.view' => true, 'medications.controlled.view' => false]);
+        $viewer->assignedClients()->attach([$this->client->id, $bella->id]);
+
+        $names = collect($this->actingAs($viewer)
+            ->getJson('/api/medications/shifts/'.$shift->id.'/medication-summary')
+            ->assertOk()
+            ->json('administrations'))->pluck('medication_name');
+
+        $this->assertContains('Aroha morning tablet', $names);
+        $this->assertContains('Bella morning tablet — Bella N.', $names);
+        $this->assertFalse($names->contains(fn ($name) => str_contains($name, 'Carl')));
+        $this->assertFalse($names->contains(fn ($name) => str_contains($name, 'controlled')));
     }
 
     /** @return array<string, mixed> */

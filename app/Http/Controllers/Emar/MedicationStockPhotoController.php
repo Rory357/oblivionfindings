@@ -8,17 +8,14 @@ use App\Models\ClientMedication;
 use App\Models\MedicationStockLot;
 use App\Models\MedicationStockPhoto;
 use App\Models\User;
-use App\Services\AuditLogger;
-use App\Services\Medication\Audit\MedicationEventData;
-use App\Services\Medication\Audit\MedicationEventRecorder;
-use Carbon\CarbonImmutable;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
+use App\Services\Medication\Stock\PackPhotoReceiptSettings;
+use App\Services\Medication\Stock\PackPhotoWriter;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
-use RuntimeException;
 use Throwable;
 
 final class MedicationStockPhotoController extends Controller
@@ -27,19 +24,25 @@ final class MedicationStockPhotoController extends Controller
 
     public function store(Request $request, int $lot)
     {
-        // Existing stock-update authority only until the exact receive-role
-        // grant has been approved and integrated. Do not broaden role access.
-        abort_unless($request->user()->canDo('medications.stock.update'), 403);
+        // Approved P06 Q5: staff who receive stock photograph the pack; the
+        // Medicine photos "who" setting can narrow or widen that (P11 Q18).
+        abort_unless(app(PackPhotoReceiptSettings::class)->canPhotograph($request->user()), 403);
+        $capability = collect([
+            MedicationGovernanceScopeService::STOCK_CAPABILITY,
+            MedicationGovernanceScopeService::STOCK_RECEIVE_CAPABILITY,
+            'medications.administer.record',
+        ])->first(fn (string $key): bool => $request->user()->canDo($key)) ?? abort(403);
         $data = $request->validate([
             'request_uuid' => 'required|uuid',
-            'photo' => 'required|file|image|mimes:jpg,jpeg,png,webp|max:8192|dimensions:max_width=12000,max_height=12000',
+            'photo' => 'required|'.PackPhotoWriter::RULES,
             'description' => 'nullable|string|max:1000',
+            'pack_changed' => 'nullable|boolean',
         ]);
         $submitted = MedicationStockLot::with('stock')->findOrFail($lot);
         $writtenPath = null;
         try {
-            $response = DB::transaction(function () use ($request, $submitted, $lot, $data, &$writtenPath) {
-                return $this->scope->forMedication($request->user(), $submitted->stock->client_medication_id, 'medications.stock.update',
+            $response = DB::transaction(function () use ($request, $submitted, $lot, $data, $capability, &$writtenPath) {
+                return $this->scope->forMedication($request->user(), $submitted->stock->client_medication_id, $capability,
                 function (Client $client, ClientMedication $med, User $actor) use ($lot, $data, $request, &$writtenPath) {
                     $this->access->assertReadable($actor, $client);
                     abort_if($med->controlled_drug && ! $actor->canDo('medications.controlled.view'), 404);
@@ -48,31 +51,18 @@ final class MedicationStockPhotoController extends Controller
                     $file = $request->file('photo');
                     $hash = hash_file('sha256', $file->getRealPath());
                     $existing = MedicationStockPhoto::where('request_uuid', $data['request_uuid'])->lockForUpdate()->first();
+                    $packChanged = (bool) ($data['pack_changed'] ?? false);
                     if ($existing) {
                         if ((int) $existing->medication_stock_lot_id !== (int) $pack->id || ! hash_equals($existing->sha256, $hash)
-                            || (int) $existing->taken_by !== (int) $actor->id || $existing->description !== ($data['description'] ?? null)) {
+                            || (int) $existing->taken_by !== (int) $actor->id || $existing->description !== ($data['description'] ?? null)
+                            || (bool) $existing->pack_changed !== $packChanged) {
                             throw ValidationException::withMessages(['photo' => 'This request was used for a different photo. Choose the intended photo and retry with a new request.']);
                         }
                         return response()->json(['success' => true, 'photo_id' => $existing->id, 'duplicate' => true]);
                     }
-                    // A transaction retry reuses this call's file. It must not
-                    // leave an orphan for each failed attempt.
-                    $writtenPath ??= $file->store('medication-stock/'.$pack->id, 'private');
-                    if (! is_string($writtenPath) || $writtenPath === '') {
-                        throw new RuntimeException('The photo could not be stored. Keep it on this form and try again.');
-                    }
-                    $photo = MedicationStockPhoto::create([
-                        'medication_stock_lot_id' => $pack->id, 'request_uuid' => $data['request_uuid'],
-                        'path' => $writtenPath, 'original_name' => mb_substr(basename($file->getClientOriginalName()), 0, 255),
-                        'mime' => $file->getMimeType(), 'bytes' => $file->getSize(), 'sha256' => $hash,
-                        'description' => $data['description'] ?? null, 'taken_by' => $actor->id, 'taken_at' => now(),
-                    ]);
-                    AuditLogger::logOrFail('medications.stock.photo_added', $photo, ['actor_id' => $actor->id, 'lot_id' => $pack->id, 'client_medication_id' => $med->id]);
-                    app(MedicationEventRecorder::class)->append(new MedicationEventData(
-                        siteId: (int) $client->site_id, kind: 'stock.photo_added', subjectType: 'stock_photo', subjectId: (string) $photo->id,
-                        actorId: $actor->id, occurredAt: CarbonImmutable::now('UTC'), summary: 'Medicine pack photo added',
-                        facts: ['lot_id' => $pack->id, 'request_uuid' => $data['request_uuid']], clientId: $client->id, controlled: (bool) $med->controlled_drug,
-                    ));
+                    $photo = app(PackPhotoWriter::class)->create(
+                        $actor, $client, $med, $pack, $file, $data['request_uuid'], $data['description'] ?? null, $packChanged, $writtenPath,
+                    );
                     return response()->json(['success' => true, 'photo_id' => $photo->id]);
                 });
             }, 5);

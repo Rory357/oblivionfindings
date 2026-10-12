@@ -129,7 +129,8 @@ class DestructionsTest extends TestCase
     public function test_void_marks_record_voided_not_deleted(): void
     {
         ['user' => $user, 'client' => $client] = $this->setupRegister();
-        $rec = $this->record(['client_id' => $client->id]);
+        // Lane C2: the old route voids ordinary records; controlled ones void in the register.
+        $rec = $this->record(['client_id' => $client->id, 'is_controlled_drug' => false]);
 
         $this->actingAs($user)
             ->from('/emar/destructions')
@@ -171,24 +172,23 @@ class DestructionsTest extends TestCase
             'quantity' => 0.5,
         ]);
 
+        // EA-173 (Lane C2): the old route no longer voids a controlled record
+        // around the register; nothing changes and nothing is audited as voided.
         $this->actingAs($user)
             ->post(route('emar.destructions.void', $record), ['void_reason' => 'Duplicate administrative record'])
-            ->assertSessionHasNoErrors()
-            ->assertSessionHas('success', 'Destruction record voided. Stock and register balances were not changed; record any correction through witnessed reconciliation.');
+            ->assertStatus(422);
 
         $this->assertSame(8.5, (float) $stock->refresh()->on_hand);
         $this->assertDatabaseHas('client_controlled_drug_entries', ['id' => $entry->id]);
         $this->assertDatabaseCount('client_controlled_drug_entries', 1);
-        $audit = AuditLog::query()->where('action', 'medications.destruction.void')->latest('id')->firstOrFail();
-        $this->assertSame(MedicationDestruction::VOID_STOCK_SEMANTICS, $audit->meta['void_stock_semantics'] ?? null);
-        $this->assertFalse((bool) ($audit->meta['stock_effect_reversed'] ?? true));
-        $this->assertTrue((bool) ($audit->meta['requires_governed_stock_reconciliation'] ?? false));
+        $this->assertNull($record->refresh()->voided_at);
+        $this->assertDatabaseMissing('audit_logs', ['action' => 'medications.destruction.void']);
     }
 
     public function test_void_requires_a_reason(): void
     {
         ['user' => $user, 'client' => $client] = $this->setupRegister();
-        $rec = $this->record(['client_id' => $client->id]);
+        $rec = $this->record(['client_id' => $client->id, 'is_controlled_drug' => false]);
 
         $this->actingAs($user)
             ->from('/emar/destructions')
@@ -724,66 +724,31 @@ class DestructionsTest extends TestCase
         $this->assertSame(10.0, (float) $ordinary->stock()->firstOrFail()->on_hand);
     }
 
-    public function test_page_serves_brand_colour_and_payload(): void
+    /** EA-074/075/089/173 (Lane C2): a controlled reader lands on the register's view. */
+    public function test_the_old_destructions_page_lands_controlled_readers_on_the_register(): void
     {
-        ['user' => $user, 'site' => $site] = $this->setupRegister();
+        ['user' => $user, 'site' => $site, 'client' => $client] = $this->setupRegister();
 
-        $this->actingAs($user)
-            ->get('/emar/destructions?site_id='.$site->id)
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('emar/Destructions')
-                ->where('site_brand_colour', '#5E35B1')
-                ->has('medications', 1)
-                ->has('destructions')
-                ->has('sites')
-                ->has('staff')
-                // The hero footer Client EntityFilter (Gap A) is driven by `clients`.
-                ->has('clients')
-            );
+        $this->actingAs($user)->get('/emar/destructions?site_id='.$site->id.'&client_id='.$client->id)
+            ->assertRedirect('/emar/controlled?'.http_build_query(['view' => 'destructions', 'site_id' => $site->id, 'client_id' => $client->id]));
+
+        // A stock-only reader keeps the ordinary disposal history page.
+        $this->setPermission($user, 'medications.controlled.view', false);
+        $this->setPermission($user, 'medications.stock.update', true);
+        $this->actingAs($user->fresh())->get('/emar/destructions?site_id='.$site->id)->assertOk();
     }
 
-    /**
-     * The read-only detail modal (Gap B) and the immutable-register UI render
-     * entirely from the page payload: it must carry the witnesses, authoriser,
-     * controlled-drug flags, human labels and the full void trail so a record can
-     * be inspected without an extra round-trip. (Backend gap BK1.)
-     */
-    public function test_payload_carries_detail_fields_for_voided_cd_record(): void
+    /** EA-173 (Lane C2): a controlled destruction is voided only through the register command. */
+    public function test_a_controlled_destruction_cannot_be_voided_through_the_old_route(): void
     {
-        ['user' => $user, 'w1' => $w1, 'w2' => $w2, 'client' => $client] = $this->setupRegister();
-        $rec = $this->record([
-            'client_id' => $client->id,
-            'witness_1_id' => $w1->id,
-            'witness_2_id' => $w2->id,
-            'authorised_by_name' => 'Pharmacist Pat',
-            'reason' => 'expired',
-            'disposal_method' => 'denaturing',
-        ]);
+        ['user' => $user, 'client' => $client] = $this->setupRegister();
+        $record = $this->record(['client_id' => $client->id, 'is_controlled_drug' => true]);
 
-        // Void it so the payload also exercises the void trail (immutable: retained).
-        $this->actingAs($user)
-            ->from('/emar/destructions')
-            ->post("/emar/destructions/{$rec->id}/void", ['void_reason' => 'Wrong quantity recorded'])
-            ->assertSessionHasNoErrors();
+        $this->actingAs($user)->post("/emar/destructions/{$record->id}/void", ['void_reason' => 'Duplicate entry'])
+            ->assertStatus(422);
 
-        $this->actingAs($user)
-            ->get('/emar/destructions')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('emar/Destructions')
-                ->where('destructions.0.witness_1_name', $w1->name)
-                ->where('destructions.0.witness_2_name', $w2->name)
-                ->where('destructions.0.authorised_by_name', 'Pharmacist Pat')
-                ->where('destructions.0.is_controlled_drug', true)
-                ->where('destructions.0.reason_label', 'Expired')
-                ->where('destructions.0.disposal_method_label', 'Denaturing')
-                ->where('destructions.0.is_voided', true)
-                ->where('destructions.0.void_stock_semantics', MedicationDestruction::VOID_STOCK_SEMANTICS)
-                ->where('destructions.0.requires_governed_stock_reconciliation', true)
-                ->where('destructions.0.void_reason', 'Wrong quantity recorded')
-                ->where('destructions.0.voided_by_name', $user->name)
-            );
+        $this->assertNull($record->refresh()->voided_at);
+        $this->assertDatabaseMissing('audit_logs', ['action' => 'medications.destruction.void']);
     }
 
     protected function makeRoleUser(string $roleName): User

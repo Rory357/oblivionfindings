@@ -126,8 +126,8 @@ final class StockReadPayload
                 'orders' => (clone $orders)->whereNotIn('status', PharmacySupplyRules::CLOSED)->count(),
                 'counts' => (clone $counts)->where('state', 'needs_review')->count(),
             ],
-            // Permission scope stays unchanged pending the exact receive-role grant.
-            'can' => ['receive' => config('medications.stock_lots_enabled', false) && $actor->canDo('medications.stock.update'), 'manage' => config('medications.stock_lots_enabled', false) && $actor->canDo('medications.stock.update'), 'receive_controlled' => config('medications.stock_lots_enabled', false) && $actor->canDo('medications.stock.update') && $actor->canDo('medications.controlled.view') && $actor->canDo('medications.controlled.record') && $siteIds !== [], 'controlled' => $actor->canDo('medications.controlled.view')],
+            // Approved P06 Q5: receive-level actions with either key; the rest stay stock.update.
+            'can' => ['photograph' => app(PackPhotoReceiptSettings::class)->canPhotograph($actor), 'receive' => config('medications.stock_lots_enabled', false) && ($actor->canDo('medications.stock.update') || $actor->canDo('medications.stock.receive')), 'manage' => config('medications.stock_lots_enabled', false) && $actor->canDo('medications.stock.update'), 'receive_controlled' => config('medications.stock_lots_enabled', false) && $actor->canDo('medications.stock.update') && $actor->canDo('medications.controlled.view') && $actor->canDo('medications.controlled.record') && $siteIds !== [], 'controlled' => $actor->canDo('medications.controlled.view')],
             'lots_enabled' => (bool) config('medications.stock_lots_enabled', false),
         ];
     }
@@ -136,7 +136,7 @@ final class StockReadPayload
     {
         $med = $this->access->medication($actor, $medicationId);
         abort_if($med->controlled_drug && ! $actor->canDo('medications.controlled.view'), 404);
-        $med->load(['client.site', 'stock.lots.photos.takenBy']);
+        $med->load(['client.site', 'stock.lots.photos.takenBy', 'stock.lots.pharmacyOrder']);
         $item = $this->item($med);
         $item['current_user_id'] = (int) $actor->id;
         $item['witnesses'] = [];
@@ -153,11 +153,26 @@ final class StockReadPayload
         }
         $item['packs'] = $med->stock?->lots->map(fn ($lot) => [
             ...$lot->only(['id', 'batch_number', 'batch_not_printed', 'expiry_date', 'expiry_not_printed', 'quantity_received', 'quantity_remaining', 'controlled_entry_id', 'state', 'source', 'source_reference', 'received_at', 'short_expiry_reason', 'revision', 'notes']),
+            'label' => PackPhotoReader::packLabel($lot),
+            'supplier' => PackPhotoReader::supplierLabel($lot),
             'photos' => $lot->photos->map(fn ($photo) => [
-                ...$photo->only(['id', 'original_name', 'mime', 'bytes', 'taken_at', 'description']),
+                ...$photo->only(['id', 'original_name', 'mime', 'bytes', 'taken_at', 'description', 'pack_changed']),
                 'taken_by_name' => $photo->takenBy?->name, 'preview_url' => route('emar.stock.photos.view', $photo->id), 'download_url' => route('emar.stock.photos.download', $photo->id),
             ])->all(),
         ])->all() ?? [];
+        // C11 (approved P06 Q6 + P11 Medicine photos): whether the receive
+        // dialog asks for a photo, whether a controlled receipt needs one,
+        // and the photo staff saw last.
+        $settings = app(PackPhotoReceiptSettings::class);
+        $hasPhoto = $med->stock?->lots->contains(fn ($lot) => $lot->photos->isNotEmpty()) ?? false;
+        $item['photo_policy'] = [
+            'can_photograph' => $settings->canPhotograph($actor),
+            'mode' => $settings->prompt(),
+            'prompt' => $settings->promptFor($hasPhoto, (bool) $med->controlled_drug),
+            'required' => (bool) $med->controlled_drug && $settings->controlledPhotoRequired(),
+            'has_photo' => $hasPhoto,
+        ];
+        $item['latest_photo'] = app(PackPhotoReader::class)->forOrder($actor, $med);
         $item['outward'] = $med->stock ? MedicationStockMovement::where('kind', 'going_out')
             ->whereHas('lot', fn ($q) => $q->where('client_medication_stock_id', $med->stock->id))->whereDoesntHave('returns')
             ->get(['id', 'quantity', 'medication_stock_lot_id', 'recorded_at', 'reason'])->toArray() : [];
@@ -202,6 +217,8 @@ final class StockReadPayload
             'id' => $med->id, 'name' => $med->name, 'client_id' => (int) $med->client_id, 'site_id' => (int) $med->client->site_id,
             'client_name' => $med->client->full_name, 'site_name' => $med->client->site?->name,
             'controlled' => (bool) $med->controlled_drug, 'active' => (bool) $med->active && $med->state === 'active',
+            // EA-073: a held medicine can still be received and reordered.
+            'receivable' => MedicationStockService::receivable($med), 'held' => $med->state === 'paused',
             'stock_id' => $stock?->id, 'physical_on_hand' => $stock?->on_hand, 'usable_on_hand' => $stock ? app(StockAvailability::class)->usableQuantity($stock) : null, 'on_hand' => $onHand === null ? null : Qty::toFloat($onHand), 'unit' => $stock?->unit,
             'reorder_level' => $stock?->reorder_level, 'last_counted_at' => $stock?->last_counted_at, 'lots_started' => $started,
             'pack_count' => $lots->where('quantity_remaining', '>', 0)->count(), 'next_batch' => $stock?->currentBatchNumber(),

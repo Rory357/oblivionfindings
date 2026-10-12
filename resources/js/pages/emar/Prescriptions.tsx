@@ -658,7 +658,7 @@ export default function Prescriptions(props: Props) {
                             {activeSite?.name ?? 'All permitted houses'}
                         </PageHeaderStatusChip>
                     }
-                    subline="Prescriber orders, countersignatures, dispensing and covert authorisations"
+                    subline="Old prescriber-order records (read only) and covert authorisations. Enter new orders, changes and stops in Orders."
                     meters={
                         <EmarMeters
                             items={[

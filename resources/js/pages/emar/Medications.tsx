@@ -40,7 +40,6 @@ import {
     AddMedicationDialog,
     DiscontinueDialog,
     EditMedicationDialog,
-    ImportCsvDialog,
     InteractionsDialog,
     MedicationDetailDialog,
     RejectOrderDialog,
@@ -54,7 +53,6 @@ import {
     Clock,
     Eye,
     FileText,
-    FileUp,
     Flame,
     Layers,
     Package,
@@ -69,7 +67,6 @@ import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 
 type Modal =
     | { type: 'add' }
-    | { type: 'import' }
     | { type: 'interactions' }
     | { type: 'detail' | 'edit' | 'discontinue' | 'reject'; med: MedRow }
     | null;
@@ -451,12 +448,6 @@ export default function Medications(props: Props) {
                             >
                                 Add medication
                             </PageHeaderPrimaryButton>
-                            <PageHeaderGlassButton
-                                icon={FileUp}
-                                onClick={() => setModal({ type: 'import' })}
-                            >
-                                Import
-                            </PageHeaderGlassButton>
                         </>
                     }
                     filters={
@@ -783,9 +774,6 @@ export default function Medications(props: Props) {
                     clients={clients}
                     onClose={() => setModal(null)}
                 />
-            )}
-            {modal?.type === 'import' && (
-                <ImportCsvDialog onClose={() => setModal(null)} />
             )}
             {modal?.type === 'interactions' && (
                 <InteractionsDialog

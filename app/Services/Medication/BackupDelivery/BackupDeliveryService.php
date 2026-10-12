@@ -9,6 +9,7 @@ use App\Models\MedicationBackupRecipient;
 use App\Models\MedicationBackupSchedule;
 use App\Models\Site;
 use App\Models\User;
+use App\Notifications\BackupPassphraseReminderNotification;
 use App\Services\AuthorizationEvidenceLockService;
 use App\Services\Medication\Audit\MedicationEventData;
 use App\Services\Medication\Audit\MedicationEventRecorder;
@@ -69,6 +70,10 @@ class BackupDeliveryService
                 $recipient = $this->access->recipient(User::query()->findOrFail($userId), $schedule->site_id);
                 $row ??= new MedicationBackupRecipient(['schedule_id' => $schedule->id, 'user_id' => $recipient->id]);
                 $row->forceFill(['email_sha256' => $this->access->emailHash($recipient), 'approved_by' => $current->id, 'approved_at' => now(), 'revoked_at' => null])->saveOrFail();
+                // EA-141: without their own passphrase they can't open a backup in an outage.
+                if (app(BackupPassphrases::class)->withPassphrase([(int) $recipient->id]) === []) {
+                    DB::afterCommit(fn () => $recipient->notify(new BackupPassphraseReminderNotification('backup-passphrase:'.$recipient->id.':approved:'.now()->toDateString())));
+                }
             } else {
                 abort_unless($row !== null, 404);
                 $row->forceFill(['revoked_at' => now()])->saveOrFail();
@@ -205,9 +210,15 @@ class BackupDeliveryService
         }, 1);
         $submissionStarted = false;
         try {
+            // EA-141: recipients with their own backup passphrase get a copy that
+            // opens with it (no app needed in an outage). Made before any lock;
+            // a copy that can't be made stops the send before anything is submitted.
+            $claimed = MedicationBackupDelivery::query()->findOrFail($id);
+            $copies = app(BackupPassphrases::class)->copiesFor($claimed, array_map('intval', $claimed->recipient_ids ?? []),
+                (string) Storage::disk('private')->get((string) $claimed->artifact_path));
             app(BackupEmailSender::class)->prepare();
             // ONE attempt. Nested release cannot retry a submitted transport side effect.
-            DB::transaction(function () use ($actor, $id, $token, &$submissionStarted): void {
+            DB::transaction(function () use ($actor, $id, $token, $copies, &$submissionStarted): void {
                 $row = MedicationBackupDelivery::query()->lockForUpdate()->findOrFail($id);
                 abort_unless($row->state === 'sending' && $row->claim_token === $token && $row->expires_at?->isFuture(), 409);
                 $schedule = MedicationBackupSchedule::query()->lockForUpdate()->findOrFail($row->schedule_id);
@@ -219,10 +230,16 @@ class BackupDeliveryService
                 abort_unless(is_array($pack) && $row->artifact_path && Storage::disk('private')->exists($row->artifact_path), 409);
                 $bytes = Storage::disk('private')->get($row->artifact_path);
                 abort_unless(hash_equals($row->artifact_sha256, hash('sha256', $bytes)), 409);
-                $this->packs->release($current, $pack, function () use ($row, $current, $token, $recipients, $bytes, &$submissionStarted): void {
+                $personal = [];
+                foreach ($copies as $userId => $copy) {
+                    if (isset($recipients[$userId])) {
+                        $personal[$recipients[$userId]] = $copy;
+                    }
+                }
+                $this->packs->release($current, $pack, function () use ($row, $current, $token, $recipients, $bytes, $personal, &$submissionStarted): void {
                     $submissionStarted = true;
                     // EA-140: the email and file say which house and which backup.
-                    $this->transport->send(array_values($recipients), $bytes, $row->nz_date, $this->houseName($row), self::reference($row));
+                    $this->transport->send(array_values($recipients), $bytes, $row->nz_date, $this->houseName($row), self::reference($row), $personal);
                     $row->forceFill(['state' => 'sent', 'sent_at' => now(), 'failure_code' => null, 'claim_token' => null, 'claimed_at' => null, 'version' => $row->version + 1])->saveOrFail();
                     MedicationBackupAttempt::query()->where('token', $token)->update(['state' => 'sent', 'result_code' => 'accepted', 'finished_at' => now()]);
                     $this->event($row, $current, 'sent');

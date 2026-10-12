@@ -122,9 +122,15 @@ class PersonMedicationRecordController extends Controller
             fn (ClientMedication $order) => ['concealed' => true, 'key' => 'c'.$order->id],
         );
 
+        // C11: the approved P02 "Pack photo" column — the latest staff photo
+        // per medicine (concealed medicines are already redacted above).
+        $photos = app(\App\Services\Medication\Stock\PackPhotoReader::class)->forOrders($actor, $orders);
+
         return $this->privateJson([
             'rows' => array_map(
-                fn ($row) => $row instanceof ClientMedication ? $this->medicineRow($row, $support) : $row,
+                fn ($row) => $row instanceof ClientMedication
+                    ? $this->medicineRow($row, $support) + ['pack_photo' => $photos[(int) $row->id] ?? null]
+                    : $row,
                 $rows['rows'],
             ),
             'hidden' => $rows['hidden'],
@@ -168,6 +174,8 @@ class PersonMedicationRecordController extends Controller
                 'review' => $order->review_date?->toDateString(),
             ],
             'recent_doses' => $doses,
+            // C11: the photo staff see at recording (approved P02 medicine details).
+            'pack_photo' => app(\App\Services\Medication\Stock\PackPhotoReader::class)->forOrder($actor, $order),
         ]);
     }
 

@@ -1136,4 +1136,34 @@ class StockManagementTest extends TestCase
 
         $this->assertDatabaseMissing('audit_logs', ['action' => $action]);
     }
+
+    /** EA-092 (Lane C2): one controlled receipt writer, with the register's own audit and the event chain. */
+    public function test_controlled_pharmacy_delivery_writes_through_the_canonical_register_receipt(): void
+    {
+        $context = $this->controlledDeliveryContext();
+
+        $this->actingAs($context['user'])->from('/emar/stock')
+            ->post(route('emar.pharmacy_orders.controlled_delivery', $context['order']), $context['payload'])
+            ->assertSessionHasNoErrors();
+
+        $entry = ClientControlledDrugEntry::query()->sole();
+        $this->assertDatabaseHas('audit_logs', ['action' => 'medications.controlled.entry.record', 'auditable_id' => $entry->id]);
+        $event = \App\Models\MedicationEvent::query()->where('kind', 'stock.receive')->where('controlled', true)->sole();
+        $this->assertSame($context['payload']['client_request_uuid'], $event->facts['request_uuid'] ?? null);
+        $this->assertSame($entry->id, $event->facts['entry_id'] ?? null);
+    }
+
+    /** EA-073 (Lane C2): a held medicine's controlled delivery is still entered in the register. */
+    public function test_a_held_controlled_medicines_pharmacy_delivery_is_still_received(): void
+    {
+        $context = $this->controlledDeliveryContext();
+        $context['med']->forceFill(['state' => 'paused', 'paused_at' => now(), 'active' => false])->saveQuietly();
+
+        $this->actingAs($context['user'])->from('/emar/stock')
+            ->post(route('emar.pharmacy_orders.controlled_delivery', $context['order']), $context['payload'])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('12.50', (string) $context['stock']->refresh()->on_hand);
+        $this->assertSame(1, ClientControlledDrugEntry::query()->where('entry_type', 'receipt')->count());
+    }
 }

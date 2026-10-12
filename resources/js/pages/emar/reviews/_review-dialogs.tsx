@@ -1058,9 +1058,36 @@ export function RecordReviewDialog({
                                     ) : (
                                         <>
                                             <div>
-                                                <h3 className="text-sm font-semibold">
-                                                    {order.name}
-                                                </h3>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <h3 className="text-sm font-semibold">
+                                                        {order.name}
+                                                    </h3>
+                                                    {order.order_state &&
+                                                        order.order_state !==
+                                                            'active' && (
+                                                            <StatusBadge
+                                                                variant={
+                                                                    order.order_state ===
+                                                                    'held'
+                                                                        ? 'neutral'
+                                                                        : 'warning'
+                                                                }
+                                                            >
+                                                                {
+                                                                    {
+                                                                        held: 'Held',
+                                                                        waiting_check:
+                                                                            'Waiting for its check',
+                                                                        sent_back:
+                                                                            'Sent back — to enter again',
+                                                                    }[
+                                                                        order
+                                                                            .order_state
+                                                                    ]
+                                                                }
+                                                            </StatusBadge>
+                                                        )}
+                                                </div>
                                                 <p className="text-caption">
                                                     {[
                                                         order.dosage,

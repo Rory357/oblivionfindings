@@ -181,12 +181,8 @@ class EmarListPersonScopeTest extends TestCase
             ])->id;
         }
 
-        $disposalPage = $this->actingAs($this->worker)->get(route('emar.destructions'))->assertOk();
-        $this->assertSame($this->visibleIds(), $this->sortedIds($disposalPage->inertiaProps('medications'), 'client_id'));
-        $this->assertSame(
-            collect($destructionIds)->only($this->visibleIds())->sort()->values()->all(),
-            $this->sortedIds($disposalPage->inertiaProps('destructions'), 'id'),
-        );
+        // Lane C2: the old Destructions page lands on the register's view.
+        $this->actingAs($this->worker)->get(route('emar.destructions'))->assertRedirect('/emar/controlled?view=destructions');
         $page = $this->actingAs($this->worker)->get(route('emar.controlled', ['view' => 'destructions']))->assertOk();
         $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('product.medicines'), 'client_id'));
         $this->assertSame(

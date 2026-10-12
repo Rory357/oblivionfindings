@@ -15,7 +15,7 @@ use Illuminate\Container\Attributes\Scoped;
  *
  * Each optional third-party feature has its own switch, off until an
  * organisation turns it on (switching one on shares medication data
- * outside the eMAR, so it counts as loosening and asks for a reason). A
+ * outside the eMAR, so it counts as loosening and is flagged in review). A
  * switched-on feature only runs when it is also configured: the pharmacy
  * bridge needs the installation's partner and its platform switch, and
  * protected backups need the reviewed PDF encryption — never without it.
@@ -52,6 +52,18 @@ final class ConnectedCareSettings
     public const TWO_PERSON_CATALOGUE = 'two_person_catalogue';
 
     public const TWO_PERSON_HANDOVER = 'two_person_handover';
+
+    /** EA-104 (Stephan, 10 Oct): how an outside prescriber's registration is checked. */
+    public const REGISTRATION_CHECK = 'prescriber_registration_check';
+
+    /** The registration authorities for NZ prescribers. */
+    public const COUNCILS = [
+        'MCNZ' => 'Medical Council (MCNZ)',
+        'NCNZ' => 'Nursing Council (NCNZ)',
+        'Pharmacy Council' => 'Pharmacy Council',
+        'Midwifery Council' => 'Midwifery Council',
+        'Dental Council' => 'Dental Council',
+    ];
 
     public const STORAGE_PREFIX = 'medications.connected.';
 
@@ -93,6 +105,18 @@ final class ConnectedCareSettings
             $check(self::TWO_PERSON_IDENTITY, 'A second person grants access to a prescriber someone verified'),
             $check(self::TWO_PERSON_CATALOGUE, 'A second person reviews a catalogue source'),
             $check(self::TWO_PERSON_HANDOVER, 'A second person reviews a provider handover'),
+            // Structured is the default; Note only is the loosening (flagged in review).
+            new Definition(
+                group: self::GROUP,
+                key: self::REGISTRATION_CHECK,
+                storageKey: self::STORAGE_PREFIX.self::REGISTRATION_CHECK,
+                scope: Definition::SCOPE_ORGANISATION,
+                section: 'services',
+                label: 'Prescriber registration check',
+                options: ['structured' => 'Structured — council, number, scope and date checked on the public register', 'note' => 'Note only — a free-text note of the check'],
+                default: 'structured',
+                rank: ['note', 'structured'],
+            ),
         ]);
     }
 
@@ -121,6 +145,12 @@ final class ConnectedCareSettings
         return in_array($feature, self::FEATURES, true)
             && $this->switchedOn($feature)
             && $this->readiness($feature)['ready'];
+    }
+
+    /** 'structured' (the default) or 'note'. */
+    public function registrationCheck(): string
+    {
+        return $this->value(self::REGISTRATION_CHECK, 'structured') === 'note' ? 'note' : 'structured';
     }
 
     public function twoPerson(string $check): bool

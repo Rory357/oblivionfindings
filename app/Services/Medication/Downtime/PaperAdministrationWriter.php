@@ -50,12 +50,18 @@ class PaperAdministrationWriter
                 return 'A refused or withheld historical outcome needs the exact scheduled dose and its signed explanation, without a given-dose witness claim.';
             }
         } else {
-            if (! PaperDoseFacts::complete($entry->clinical_facts ?? [], $entry->stock_evidence ?? [])) {
-                return 'Historical physical stock disposition and count coverage need complete signed actual facts: '.implode('; ', PaperDoseFacts::missing($entry->clinical_facts ?? [], $entry->stock_evidence ?? [])).'. Unknown waste is never zero. The incomplete evidence is retained for clinical review.';
+            // D2 (Lane C1): no pack tracking at the paper time — clinical facts
+            // only, no settlement; posting flags the stock for a counted recount.
+            $untracked = PaperStockTracking::untrackedEntry($entry, $order);
+            if (! PaperDoseFacts::complete($entry->clinical_facts ?? [], $entry->stock_evidence ?? [], $untracked)) {
+                return 'Historical physical stock disposition and count coverage need complete signed actual facts: '.implode('; ', PaperDoseFacts::missing($entry->clinical_facts ?? [], $entry->stock_evidence ?? [], $untracked)).'. Unknown waste is never zero. The incomplete evidence is retained for clinical review.';
             }
             $currentCompetency = app(MedicationAdministratorCompetencyPolicy::class)->evaluate($actor, (int) $order->client->site_id, now());
             if (! $currentCompetency['allowed']) {
                 return 'Current medication competency does not permit this paper posting. '.$currentCompetency['message'];
+            }
+            if ($untracked) {
+                return null;
             }
             $settlement = MedicationPaperStockEvidence::query()->where('paper_entry_id', $entry->id)->latest('id')->first();
             if (! $settlement) {

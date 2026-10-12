@@ -69,6 +69,9 @@ class MedicationDowntimeTest extends TestCase
         parent::setUp();
         Carbon::setTestNow(Carbon::parse('2026-10-03 00:00', 'Pacific/Auckland')->utc());
         $this->seed(RbacSeeder::class);
+        // Lane C1 (EA-090): downtime authority is a permission; RbacSeeder
+        // resets role grants, so add it the way DatabaseSeeder does.
+        $this->seed(\Database\Seeders\MedicationDowntimePermissionsSeeder::class);
         // P09 owns the production grant foundation; this older P10 base
         // supplies the key only in isolated synthetic test fixtures.
         Permission::query()->firstOrCreate(['key' => 'medications.reports.view'], ['description' => 'View medication reports', 'group' => 'medications', 'module' => 'Clinical']);
@@ -785,8 +788,11 @@ class MedicationDowntimeTest extends TestCase
 
     public function test_revoked_export_authority_during_render_releases_no_bytes_or_export_event(): void
     {
+        // Approved P10 (Lane C1, EA-027): a house lead makes the pack through
+        // downtime authority as well as export, so both are revoked.
         $this->fakePackRender(function (): void {
-            $this->lead->permissionOverrides()->syncWithoutDetaching([Permission::query()->where('key', 'medications.reports.export')->firstOrFail()->id => ['allowed' => false]]);
+            $this->lead->permissionOverrides()->syncWithoutDetaching(Permission::query()->whereIn('key', ['medications.reports.export', 'medications.downtime.manage'])
+                ->pluck('id')->mapWithKeys(fn ($id): array => [$id => ['allowed' => false]])->all());
         });
         $response = $this->actingAs($this->lead)->postJson('/emar/downtime/pack', ['site_id' => $this->site->id, 'nz_date' => '2026-10-03']);
         $response->assertForbidden();

@@ -117,7 +117,8 @@ class MedicationOrderLifecycleService
                 $medication->forceFill([
                     'state' => 'ceased',
                     'active' => false,
-                    'end_date' => $effectiveCeasedAt->toDateString(),
+                    // EA-132 (Lane C3): the NZ date it stopped, not the UTC one.
+                    'end_date' => $effectiveCeasedAt->copy()->timezone(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString(),
                     'ceased_reason' => $reason,
                     'ceased_at' => $effectiveCeasedAt,
                     'ceased_by' => $decision->performer->id,

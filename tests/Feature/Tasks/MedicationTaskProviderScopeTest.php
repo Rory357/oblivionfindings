@@ -25,6 +25,9 @@ use Illuminate\Support\Str;
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
+    // Lane C1 (EA-090): downtime authority is a permission; RbacSeeder
+    // resets role grants, so add it the way DatabaseSeeder does.
+    $this->seed(\Database\Seeders\MedicationDowntimePermissionsSeeder::class);
 });
 
 function medicationTaskGrant(User $actor, array $keys, bool $allowed = true): void
