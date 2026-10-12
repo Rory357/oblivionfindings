@@ -1,6 +1,6 @@
-import { Network, UsersRound } from 'lucide-react';
+import { BadgeCheck, Network, UsersRound } from 'lucide-react';
 import { useRow } from './_sections';
-import { GroupGrid, GroupRow, Note, OnOff, SettingGroup } from './_ui';
+import { Choice, GroupGrid, GroupRow, Note, OnOff, SettingGroup } from './_ui';
 
 export type ConnectedStatus = Record<
     string,
@@ -153,6 +153,50 @@ export function ConnectedServicesSettings({
                             }
                         />
                     ))}
+                </SettingGroup>
+                {/* EA-104 (Stephan, 10 Oct): how strictly outside prescribers are checked. */}
+                <SettingGroup
+                    icon={BadgeCheck}
+                    title="Outside prescribers"
+                    caption="Structured by default"
+                >
+                    <GroupRow
+                        id="connected.prescriber_registration_check"
+                        label={label('prescriber_registration_check')}
+                        state={state('prescriber_registration_check')}
+                        hidden={
+                            !shown(
+                                show,
+                                q,
+                                'prescriber_registration_check',
+                                label('prescriber_registration_check'),
+                                'prescriber registration check council MCNZ NCNZ register scope structured note',
+                            )
+                        }
+                        hint={
+                            value('prescriber_registration_check') === 'note'
+                                ? 'A free-text note of how identity and registration were checked.'
+                                : 'Council, registration number, scope of practice and the date checked on the public register, with a yearly re-check reminder. Records made before this show “Needs structured check”; they keep working.'
+                        }
+                        control={
+                            <Choice
+                                value={
+                                    value('prescriber_registration_check') ===
+                                    'note'
+                                        ? 'note'
+                                        : 'structured'
+                                }
+                                onChange={(v) =>
+                                    edit('prescriber_registration_check', v)
+                                }
+                                options={[
+                                    ['structured', 'Structured'],
+                                    ['note', 'Note only'],
+                                ]}
+                                disabled={disabled}
+                            />
+                        }
+                    />
                 </SettingGroup>
             </GroupGrid>
         </div>

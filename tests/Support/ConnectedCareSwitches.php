@@ -26,6 +26,12 @@ final class ConnectedCareSwitches
         self::set($keys, 'off');
     }
 
+    /** A setting with named options (e.g. prescriber_registration_check = note). */
+    public static function value(string $key, string $value): void
+    {
+        self::set([$key], $value);
+    }
+
     /** @param list<string> $keys */
     private static function set(array $keys, string $value): void
     {

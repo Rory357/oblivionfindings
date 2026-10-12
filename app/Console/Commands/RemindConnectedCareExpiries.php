@@ -47,6 +47,21 @@ class RemindConnectedCareExpiries extends Command
                     '/emar/connected-care#access');
             }
         }
+        // EA-104: the yearly re-check of a structured registration check.
+        if ($settings->switchedOn(ConnectedCareSettings::PORTAL) && Schema::hasColumn('medication_external_clinicians', 'register_checked_at')) {
+            $rechecks = MedicationExternalClinician::query()->with('user:id,name')->whereNull('revoked_at')
+                ->where('registration_check', 'structured')->whereNotNull('register_checked_at')
+                ->whereDate('register_checked_at', '<=', now()->subYear()->addDays(self::DAYS_AHEAD)->toDateString())->orderBy('id')->get();
+            foreach ($rechecks as $identity) {
+                $due = $identity->register_checked_at->copy()->addYear();
+                $sent += $this->remind(array_values(array_unique(array_filter([(int) $identity->register_checked_by, (int) $identity->verified_by]))),
+                    'register-recheck:'.$identity->id.':'.$due->toDateString(),
+                    'Prescriber registration re-check due',
+                    sprintf('Check %s on the %s public register again by %s, and record the new check.', $identity->user?->name ?? 'this prescriber',
+                        ConnectedCareSettings::COUNCILS[$identity->registration_authority] ?? $identity->registration_authority, $this->day($due)),
+                    '/emar/connected-care#access');
+            }
+        }
         if ($settings->switchedOn(ConnectedCareSettings::CATALOGUE) && Schema::hasTable('medicine_catalogue_sources')) {
             $sources = MedicineCatalogueSource::query()->where('status', 'reviewed')
                 ->where('expires_at', '>', now())->where('expires_at', '<=', $until)->orderBy('id')->get();
