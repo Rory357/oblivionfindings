@@ -458,7 +458,7 @@ export default function Review({ period, summary, shifts }: Props) {
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Operations', href: '/operations' },
+                { title: 'Workforce', href: backHref },
                 {
                     title: t('rostering.title', 'Rostering'),
                     href: backHref,

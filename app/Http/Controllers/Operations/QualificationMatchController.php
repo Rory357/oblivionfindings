@@ -289,7 +289,7 @@ class QualificationMatchController extends Controller
         abort_unless($auth && $this->canAccessQualifications($auth), 403);
 
         $shift = $this->siteAccess->applyShiftScope(Shift::query(), $auth, ['shifts.manageAny'])
-            ->with(['staff.staffTrainingRecords', 'staff.staffCredentials', 'client'])
+            ->with(['staff:id,name', 'client:id,first_name,last_name'])
             ->findOrFail($shift);
 
         $requirements = $this->visibleRequirementsQuery($auth)
@@ -326,7 +326,12 @@ class QualificationMatchController extends Controller
             }
 
             $results[] = [
-                'requirement' => $req,
+                'requirement' => [
+                    'id' => (int) $req->id,
+                    'qualification_name' => $req->qualification_name,
+                    'qualification_type' => $req->qualification_type,
+                    'description' => $req->description,
+                ],
                 'mapping' => $mapping,
                 'met' => $met,
                 'is_mandatory' => $mandatory,
@@ -340,7 +345,20 @@ class QualificationMatchController extends Controller
             ->every('met', true);
 
         return inertia('operations/qualifications/CheckShift', [
-            'shift' => $shift,
+            'shift' => [
+                'id' => (int) $shift->id,
+                'starts_at' => $shift->starts_at?->toJSON(),
+                'ends_at' => $shift->ends_at?->toJSON(),
+                'staff' => $shift->staff ? [
+                    'id' => (int) $shift->staff->id,
+                    'name' => $shift->staff->name,
+                ] : null,
+                'client' => $shift->client ? [
+                    'id' => (int) $shift->client->id,
+                    'first_name' => $shift->client->first_name,
+                    'last_name' => $shift->client->last_name,
+                ] : null,
+            ],
             'results' => $results,
             'allMandatoryMet' => $allMandatoryMet,
             'hasBlocks' => collect($results)->contains('severity', 'block'),

@@ -2195,6 +2195,66 @@ export default function RosteringIndex(props: Props) {
             </PageHeaderStatusChip>
         );
 
+    const headerPrimaryAction =
+        props.rosteringFeatures.publish && props.canPublishRoster ? (
+            <PageHeaderPrimaryButton
+                icon={CheckCircle2}
+                disabled={
+                    !props.rosterPeriod ||
+                    publishBlockCount > 0 ||
+                    props.rosterPeriod.status === 'archived'
+                }
+                title={
+                    !props.rosterPeriod
+                        ? 'Pick a site to publish its week'
+                        : publishBlockCount > 0
+                          ? `${publishBlockCount} blocker${publishBlockCount === 1 ? '' : 's'} must be resolved`
+                          : undefined
+                }
+                className="disabled:pointer-events-none disabled:opacity-50"
+                onClick={() =>
+                    postPeriodAction(canRepublish ? 'republish' : 'publish')
+                }
+                data-test="rostering-confirm-publish"
+                data-testid="rostering-confirm-publish"
+            >
+                {canRepublish ? 'Re-publish' : 'Publish week'}
+            </PageHeaderPrimaryButton>
+        ) : null;
+    const headerSecondaryActions = (
+        <>
+            <PageHeaderSearch
+                value={gridSearch}
+                onChange={setGridSearch}
+                placeholder="Search staff and sites…"
+            />
+            <PageHeaderGlassButton
+                icon={AlertTriangle}
+                aria-label="Conflict queue"
+                title="Conflict queue for this week"
+                onClick={() => router.visit(conflictQueueHref)}
+            />
+            {props.rosteringFeatures.auto_schedule &&
+            props.canAutoScheduleRoster ? (
+                <PageHeaderGlassButton
+                    icon={Wand2}
+                    disabled={!props.filters.site_id}
+                    title={
+                        !props.filters.site_id
+                            ? 'Pick a site before generating suggestions'
+                            : undefined
+                    }
+                    className="disabled:pointer-events-none disabled:opacity-50"
+                    onClick={generateSuggestions}
+                    data-test="rostering-suggest-assignments"
+                    data-testid="rostering-suggest-assignments"
+                >
+                    Auto-schedule
+                </PageHeaderGlassButton>
+            ) : null}
+        </>
+    );
+
     const header = (
         <WorkforcePageHeader
             icon={CalendarDays}
@@ -2207,65 +2267,13 @@ export default function RosteringIndex(props: Props) {
             } on leave`}
             actions={
                 <>
-                    <PageHeaderSearch
-                        value={gridSearch}
-                        onChange={setGridSearch}
-                        placeholder="Search staff and sites…"
-                    />
-                    <PageHeaderGlassButton
-                        icon={AlertTriangle}
-                        aria-label="Conflict queue"
-                        title="Conflict queue for this week"
-                        onClick={() => router.visit(conflictQueueHref)}
-                    />
-                    {props.rosteringFeatures.auto_schedule &&
-                    props.canAutoScheduleRoster ? (
-                        <PageHeaderGlassButton
-                            icon={Wand2}
-                            disabled={!props.filters.site_id}
-                            title={
-                                !props.filters.site_id
-                                    ? 'Pick a site before generating suggestions'
-                                    : undefined
-                            }
-                            className="disabled:pointer-events-none disabled:opacity-50"
-                            onClick={generateSuggestions}
-                            data-test="rostering-suggest-assignments"
-                            data-testid="rostering-suggest-assignments"
-                        >
-                            Auto-schedule
-                        </PageHeaderGlassButton>
-                    ) : null}
-                    {props.rosteringFeatures.publish &&
-                    props.canPublishRoster ? (
-                        <PageHeaderPrimaryButton
-                            icon={CheckCircle2}
-                            disabled={
-                                !props.rosterPeriod ||
-                                publishBlockCount > 0 ||
-                                props.rosterPeriod.status === 'archived'
-                            }
-                            title={
-                                !props.rosterPeriod
-                                    ? 'Pick a site to publish its week'
-                                    : publishBlockCount > 0
-                                      ? `${publishBlockCount} blocker${publishBlockCount === 1 ? '' : 's'} must be resolved`
-                                      : undefined
-                            }
-                            className="disabled:pointer-events-none disabled:opacity-50"
-                            onClick={() =>
-                                postPeriodAction(
-                                    canRepublish ? 'republish' : 'publish',
-                                )
-                            }
-                            data-test="rostering-confirm-publish"
-                            data-testid="rostering-confirm-publish"
-                        >
-                            {canRepublish ? 'Re-publish' : 'Publish week'}
-                        </PageHeaderPrimaryButton>
-                    ) : null}
+                    {headerSecondaryActions}
+                    {headerPrimaryAction}
                 </>
             }
+            mobilePrimaryAction={headerPrimaryAction}
+            mobileSecondaryActions={headerSecondaryActions}
+            mobileSummary={`${range.startLabel} → ${range.endLabel}`}
             meters={
                 <>
                     <PageHeaderMeterBlock

@@ -585,6 +585,21 @@ export default function ShiftsIndex({
     const singleStatus =
         heroStatusFilter.length === 1 ? heroStatusFilter[0] : 'all';
 
+    const headerPrimaryAction = canCreate ? (
+        <PageHeaderPrimaryButton icon={UserPlus} onClick={() => openCreate()}>
+            Add shift
+        </PageHeaderPrimaryButton>
+    ) : null;
+    const headerSecondaryActions = (
+        <>
+            <PageHeaderSearch
+                value={q}
+                onChange={setQ}
+                placeholder={`Search ${shiftPlural.toLowerCase()}…`}
+            />
+        </>
+    );
+
     const header = (
         <WorkforcePageHeader
             icon={Calendar}
@@ -595,21 +610,13 @@ export default function ShiftsIndex({
             } · ${stats.staff} staff · ${stats.hours}h scheduled`}
             actions={
                 <>
-                    <PageHeaderSearch
-                        value={q}
-                        onChange={setQ}
-                        placeholder={`Search ${shiftPlural.toLowerCase()}…`}
-                    />
-                    {canCreate ? (
-                        <PageHeaderPrimaryButton
-                            icon={UserPlus}
-                            onClick={() => openCreate()}
-                        >
-                            Add shift
-                        </PageHeaderPrimaryButton>
-                    ) : null}
+                    {headerSecondaryActions}
+                    {headerPrimaryAction}
                 </>
             }
+            mobilePrimaryAction={headerPrimaryAction}
+            mobileSecondaryActions={headerSecondaryActions}
+            mobileSummary={weekLabel(filters.from, filters.to)}
             meters={
                 <>
                     <PageHeaderMeterBlock

@@ -1278,6 +1278,67 @@ export default function AttendanceIndex({
     const nextLab = weekLabel(addDaysWP(weekStartDate, 7));
     const curLab = weekLabel(weekStartDate);
 
+    const headerPrimaryAction =
+        viewedStaff || !canClock ? null : openSession ? (
+            <PageHeaderPrimaryButton
+                icon={LogOut}
+                onClick={() => setClockOutOpen(true)}
+                data-test="attendance-clock-out"
+            >
+                Clock out
+            </PageHeaderPrimaryButton>
+        ) : (
+            <PageHeaderPrimaryButton
+                icon={LogIn}
+                onClick={() => setClockInOpen(true)}
+                data-test="attendance-clock-in"
+            >
+                Clock in
+            </PageHeaderPrimaryButton>
+        );
+    const headerSecondaryActions =
+        viewedStaff || !canClock ? null : (
+            <>
+                {openSession ? (
+                    <>
+                        <PageHeaderGlassButton
+                            onClick={onBreak ? endBreak : startBreak}
+                            data-test={
+                                onBreak
+                                    ? 'attendance-end-break'
+                                    : 'attendance-start-break'
+                            }
+                        >
+                            <Coffee className="mr-1 h-4 w-4" />
+                            {onBreak ? 'End break' : 'Start break'}
+                        </PageHeaderGlassButton>
+                        {canCreateHandovers ? (
+                            <PageHeaderGlassButton
+                                onClick={() => openHandoverWizard()}
+                                data-test="attendance-handover"
+                            >
+                                <ArrowLeftRight className="mr-1 h-4 w-4" />
+                                Handover
+                            </PageHeaderGlassButton>
+                        ) : null}
+                    </>
+                ) : null}
+                <PageHeaderGlassButton
+                    aria-label="Fix a missed clock-out"
+                    title={
+                        fixCandidates.length
+                            ? 'Fix a missed clock-out'
+                            : 'No open sessions to correct'
+                    }
+                    disabled={!fixCandidates.length}
+                    onClick={() => setFixSessions(fixCandidates)}
+                    data-test="attendance-fix-clock-out"
+                >
+                    <Wrench className="h-4 w-4" />
+                </PageHeaderGlassButton>
+            </>
+        );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Attendance" />
@@ -1293,73 +1354,14 @@ export default function AttendanceIndex({
                     }
                     subline={`${selectedPeriod} · Clock sessions, breaks and recorded timesheet links`}
                     actions={
-                        viewedStaff || !canClock ? null : (
-                            <>
-                                {openSession ? (
-                                    <>
-                                        <PageHeaderPrimaryButton
-                                            icon={LogOut}
-                                            onClick={() =>
-                                                setClockOutOpen(true)
-                                            }
-                                            data-test="attendance-clock-out"
-                                        >
-                                            Clock out
-                                        </PageHeaderPrimaryButton>
-                                        <PageHeaderGlassButton
-                                            onClick={
-                                                onBreak ? endBreak : startBreak
-                                            }
-                                            data-test={
-                                                onBreak
-                                                    ? 'attendance-end-break'
-                                                    : 'attendance-start-break'
-                                            }
-                                        >
-                                            <Coffee className="mr-1 h-4 w-4" />
-                                            {onBreak
-                                                ? 'End break'
-                                                : 'Start break'}
-                                        </PageHeaderGlassButton>
-                                        {canCreateHandovers ? (
-                                            <PageHeaderGlassButton
-                                                onClick={() =>
-                                                    openHandoverWizard()
-                                                }
-                                                data-test="attendance-handover"
-                                            >
-                                                <ArrowLeftRight className="mr-1 h-4 w-4" />
-                                                Handover
-                                            </PageHeaderGlassButton>
-                                        ) : null}
-                                    </>
-                                ) : (
-                                    <PageHeaderPrimaryButton
-                                        icon={LogIn}
-                                        onClick={() => setClockInOpen(true)}
-                                        data-test="attendance-clock-in"
-                                    >
-                                        Clock in
-                                    </PageHeaderPrimaryButton>
-                                )}
-                                <PageHeaderGlassButton
-                                    aria-label="Fix a missed clock-out"
-                                    title={
-                                        fixCandidates.length
-                                            ? 'Fix a missed clock-out'
-                                            : 'No open sessions to correct'
-                                    }
-                                    disabled={!fixCandidates.length}
-                                    onClick={() =>
-                                        setFixSessions(fixCandidates)
-                                    }
-                                    data-test="attendance-fix-clock-out"
-                                >
-                                    <Wrench className="h-4 w-4" />
-                                </PageHeaderGlassButton>
-                            </>
-                        )
+                        <>
+                            {headerPrimaryAction}
+                            {headerSecondaryActions}
+                        </>
                     }
+                    mobilePrimaryAction={headerPrimaryAction}
+                    mobileSecondaryActions={headerSecondaryActions}
+                    mobileSummary={selectedPeriod}
                     meters={
                         <>
                             <PageHeaderMeterBlock

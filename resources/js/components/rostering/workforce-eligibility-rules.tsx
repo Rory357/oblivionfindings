@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/select';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { formatDateTimeInZone } from '@/lib/datetime';
 import { router } from '@inertiajs/react';
 import { History, Loader2 } from 'lucide-react';
@@ -178,6 +179,23 @@ export function WorkforceEligibilityRules({
     onUncertainChange: (uncertain: boolean) => void;
     onShow: () => void;
 }) {
+    const mobile = useIsMobile();
+    const reviewTrigger = useRef<HTMLButtonElement>(null);
+    const historyTrigger = useRef<HTMLButtonElement>(null);
+    const sectionHeading = useRef<HTMLHeadingElement>(null);
+    const returnFocus = (event: Event, trigger: HTMLButtonElement | null) => {
+        const target =
+            trigger &&
+            !trigger.disabled &&
+            trigger.isConnected &&
+            trigger.getClientRects().length
+                ? trigger
+                : sectionHeading.current;
+        if (target?.isConnected && target.getClientRects().length) {
+            event.preventDefault();
+            target.focus();
+        }
+    };
     const [saved, setSaved] = useState(rules),
         [draft, setDraft] = useState<EligibilityValues>(rules.values);
     const [reason, setReason] = useState(''),
@@ -329,7 +347,12 @@ export function WorkforceEligibilityRules({
     const errorNotice = error ? (
         <SettingsNotice role="alert">
             {error}{' '}
-            <Button variant="link" onClick={reloadSaved} disabled={processing}>
+            <Button
+                className="max-md:h-auto max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
+                variant="link"
+                onClick={reloadSaved}
+                disabled={processing}
+            >
                 Check current qualification rule
             </Button>
         </SettingsNotice>
@@ -339,7 +362,11 @@ export function WorkforceEligibilityRules({
             {!visible && hasDraft ? (
                 <SettingsNotice>
                     You have an unsaved qualification rule.{' '}
-                    <Button variant="link" onClick={onShow}>
+                    <Button
+                        className="max-md:h-auto max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
+                        variant="link"
+                        onClick={onShow}
+                    >
                         Review qualification rule
                     </Button>
                 </SettingsNotice>
@@ -357,7 +384,11 @@ export function WorkforceEligibilityRules({
                 <Card className="gap-0 overflow-hidden p-0">
                     <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
                         <div>
-                            <h2 className="text-section-title">
+                            <h2
+                                ref={sectionHeading}
+                                tabIndex={-1}
+                                className="text-section-title frontline-focus"
+                            >
                                 Qualification requirements
                             </h2>
                             <p className="text-caption mt-1">
@@ -372,8 +403,10 @@ export function WorkforceEligibilityRules({
                         </div>
                         {rules.can_view_history && rules.urls.history ? (
                             <Button
+                                className="max-md:h-auto max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
                                 variant="outline"
                                 onClick={() => setHistoryPage(1)}
+                                ref={historyTrigger}
                             >
                                 <History className="mr-2 size-4" />
                                 Change history
@@ -434,7 +467,7 @@ export function WorkforceEligibilityRules({
                                         >
                                             <SelectTrigger
                                                 id={field.id}
-                                                className="h-auto min-h-9 w-full max-w-sm text-left whitespace-normal"
+                                                className="h-auto min-h-9 w-full max-w-sm text-left whitespace-normal max-md:min-h-[44px]"
                                             >
                                                 <SelectValue />
                                             </SelectTrigger>
@@ -472,7 +505,7 @@ export function WorkforceEligibilityRules({
                     </p>
                 </Card>
                 {canEdit ? (
-                    <Card className="sticky bottom-3 z-20 flex-row flex-wrap items-center justify-between gap-4 p-4 shadow-md">
+                    <Card className="flex-row flex-wrap items-center justify-between gap-4 p-4 shadow-md md:sticky md:bottom-3 md:z-20">
                         <div>
                             <p className="text-body font-semibold">
                                 {dirty
@@ -485,6 +518,7 @@ export function WorkforceEligibilityRules({
                         </div>
                         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                             <Button
+                                className="max-md:h-auto max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
                                 variant="outline"
                                 disabled={!hasDraft || locked}
                                 onClick={discard}
@@ -492,8 +526,10 @@ export function WorkforceEligibilityRules({
                                 Discard qualification changes
                             </Button>
                             <Button
+                                className="max-md:h-auto max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
                                 disabled={!dirty || locked}
                                 onClick={() => setReview(true)}
+                                ref={reviewTrigger}
                             >
                                 Review qualification rule
                             </Button>
@@ -504,7 +540,11 @@ export function WorkforceEligibilityRules({
             {review ? (
                 <SettingsModal
                     frontline
+                    scrollHeader={mobile}
                     title="Review qualification rule"
+                    onCloseAutoFocus={(event) =>
+                        returnFocus(event, reviewTrigger.current)
+                    }
                     description="Review qualification warnings and the default choices for new House requirements."
                     onClose={() => {
                         if (!command.pending.current) setReview(false);
@@ -512,6 +552,7 @@ export function WorkforceEligibilityRules({
                     footer={
                         <>
                             <Button
+                                className="max-md:h-auto max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
                                 variant="outline"
                                 disabled={processing}
                                 onClick={() => setReview(false)}
@@ -519,6 +560,7 @@ export function WorkforceEligibilityRules({
                                 Keep editing
                             </Button>
                             <Button
+                                className="max-md:h-auto max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
                                 onClick={save}
                                 disabled={
                                     locked ||
@@ -571,7 +613,11 @@ export function WorkforceEligibilityRules({
             rules.urls.history ? (
                 <SettingsModal
                     frontline
+                    scrollHeader={mobile}
                     title="Qualification rule change history"
+                    onCloseAutoFocus={(event) =>
+                        returnFocus(event, historyTrigger.current)
+                    }
                     description="Saved changes to qualification warnings and House requirement defaults."
                     onClose={() => setHistoryPage(null)}
                 >
@@ -582,6 +628,7 @@ export function WorkforceEligibilityRules({
                         <SettingsNotice role="alert">
                             {historyError}{' '}
                             <Button
+                                className="max-md:h-auto max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
                                 variant="link"
                                 onClick={() =>
                                     setHistoryAttempt((value) => value + 1)
@@ -636,8 +683,9 @@ export function WorkforceEligibilityRules({
                                     </div>
                                 ))
                             )}
-                            <div className="flex justify-between gap-2">
+                            <div className="flex justify-between gap-2 max-md:flex-wrap">
                                 <Button
+                                    className="max-md:h-auto max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
                                     variant="outline"
                                     disabled={history.current_page <= 1}
                                     onClick={() =>
@@ -647,6 +695,7 @@ export function WorkforceEligibilityRules({
                                     Previous
                                 </Button>
                                 <Button
+                                    className="max-md:h-auto max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
                                     variant="outline"
                                     disabled={
                                         history.current_page >=

@@ -79,6 +79,16 @@ describe('inline application navigation', () => {
             'Availability',
             { staff: { availabilityUpdateSelf: true } },
         ],
+        [
+            '/operations/qualifications?site_id=3',
+            'Qualifications',
+            { rostering: { viewAny: true } },
+        ],
+        [
+            '/operations/qualifications/check/17',
+            'Qualifications',
+            { rostering: { viewAny: true } },
+        ],
     ])(
         'opens only Workforce automatically on %s',
         async (url, label, workforceCan) => {
