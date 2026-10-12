@@ -83,8 +83,9 @@ export function ConnectedServicesSettings({
         <div className="space-y-5">
             <Note>
                 Each service shares medication information outside the eMAR, so
-                each one is off until you switch it on. Switching one on asks
-                for a reason. A service that isn’t set up stays off.
+                each one is off until you switch it on. Switching one on is
+                shown as loosening a check when you review your changes. A
+                service that isn’t set up can’t be switched on.
             </Note>
             <GroupGrid>
                 <SettingGroup

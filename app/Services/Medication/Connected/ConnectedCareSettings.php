@@ -15,7 +15,7 @@ use Illuminate\Container\Attributes\Scoped;
  *
  * Each optional third-party feature has its own switch, off until an
  * organisation turns it on (switching one on shares medication data
- * outside the eMAR, so it counts as loosening and asks for a reason). A
+ * outside the eMAR, so it counts as loosening and is flagged in review). A
  * switched-on feature only runs when it is also configured: the pharmacy
  * bridge needs the installation's partner and its platform switch, and
  * protected backups need the reviewed PDF encryption — never without it.
@@ -105,7 +105,7 @@ final class ConnectedCareSettings
             $check(self::TWO_PERSON_IDENTITY, 'A second person grants access to a prescriber someone verified'),
             $check(self::TWO_PERSON_CATALOGUE, 'A second person reviews a catalogue source'),
             $check(self::TWO_PERSON_HANDOVER, 'A second person reviews a provider handover'),
-            // Structured is the default; Note only is the loosening (it asks for a reason).
+            // Structured is the default; Note only is the loosening (flagged in review).
             new Definition(
                 group: self::GROUP,
                 key: self::REGISTRATION_CHECK,
