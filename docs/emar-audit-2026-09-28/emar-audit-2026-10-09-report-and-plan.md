@@ -440,3 +440,12 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
   - Now: EA-136 conflicting pharmacy acceptance; the EA-138 alert sources; EA-025 proposal follow-up, All Tasks provider and the Requests list.
   - After Lane C's C9 lands: the row and MAR markers.
   - After Lane A and C10 land: EA-106 correction delegation.
+- **Lane C3 LIVE: merge `36c4d6445`**
+  - Orders that have been checked owe doses. A stopped order keeps its check and closes its open work.
+  - One allergy matcher is shared by the order check and the dose check.
+  - Orders are written only through P04. The old prescriber-order register is read only, and its write routes answer 409 or redirect to Orders. Order create and edit on the person profile go through MedicationLegacyOrderBridge.
+  - The medication CSV import is refused and its button is gone (EA-023). For Stephan to note: re-importing an order list now goes through Orders.
+  - Gates: 41 + 181 passed. Two concurrency tests timed out under RAM load and passed when re-run alone.
+- **Lane B:** EA-136, EA-138 (alerts) and EA-025 (alert and Requests tab) were already live in B10. Still to come:
+  - an EA-136 "Check for a duplicate supply" follow-up;
+  - an EA-025 All Tasks provider. Main approved its one line in TaskAggregator, inside the medication block, away from Codex's workforce and H&S edits.
