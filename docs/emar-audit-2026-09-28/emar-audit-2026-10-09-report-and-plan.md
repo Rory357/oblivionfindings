@@ -429,3 +429,14 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
   - Still in Lane C, re-running on new hashes: C3a–c, C8 (one test regex fix), C9a–e, C7, C10.
   - Main reviewed C10's dead-code removal (about 20k lines). No render string, import or screen on main still uses the removed pages. The guided-round dose endpoint is called only by stale offline items, which now get a 409 refusal.
   - Follow-up added: **EA-106 correction delegation**. The person-rule check on API corrections was reverted because correction-only actors failed it.
+- **Lane B follow-ups LIVE: `5f9250386` (fast-forward from 459e87cbc)**
+  - B5: the shift summary covers every person on the shift whom the viewer may read, and controlled doses stay hidden from non-controlled readers.
+  - Respite: restraint pickers, compliance counts and safeguarding detail follow the viewer's houses; the alert cache is no longer shared between viewers.
+  - EA-104: new setting `medications.connected.prescriber_registration_check` (Structured by default; Note only counts as loosening). The person who records a check becomes the verifier.
+  - EA-141: personal backup passphrases. qpdf gets its arguments over stdin, and the template and owner secret are encrypted at rest.
+  - Gates: 40 + 81 + 268 passed, vitest 49, tsc and eslint 0. B10 walk screenshots taken at 1440 px.
+  - **Site action:** on a server with qpdf installed, open one real backup with a passphrase.
+- **Lane B next:**
+  - Now: EA-136 conflicting pharmacy acceptance; the EA-138 alert sources; EA-025 proposal follow-up, All Tasks provider and the Requests list.
+  - After Lane C's C9 lands: the row and MAR markers.
+  - After Lane A and C10 land: EA-106 correction delegation.
