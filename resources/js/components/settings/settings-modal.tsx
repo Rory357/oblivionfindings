@@ -23,6 +23,7 @@ export function SettingsModal({
     onCloseAutoFocus,
     width = 480,
     frontline = false,
+    scrollHeader = false,
 }: {
     title: string;
     description: ReactNode;
@@ -33,13 +34,25 @@ export function SettingsModal({
     /** The popup guide's width tokens: 480 (default), 720 or 900 px. */
     width?: 480 | 720 | 900;
     frontline?: boolean;
+    /** Let long headings scroll with the body when screen or text space is limited. */
+    scrollHeader?: boolean;
 }) {
+    const heading = (
+        <div className="shrink-0 border-b p-5 pr-12">
+            <DialogTitle>{title}</DialogTitle>
+            <DialogDescription className="mt-2">
+                {description}
+            </DialogDescription>
+        </div>
+    );
+
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent
                 className={cn(
                     'flex max-h-[88vh] flex-col overflow-hidden p-0',
                     frontline && 'frontline-dialog',
+                    scrollHeader && 'gap-0',
                 )}
                 style={{
                     width: `min(92vw, ${width}px)`,
@@ -47,15 +60,19 @@ export function SettingsModal({
                 }}
                 onCloseAutoFocus={onCloseAutoFocus}
             >
-                <div className="shrink-0 border-b p-5 pr-12">
-                    <DialogTitle>{title}</DialogTitle>
-                    <DialogDescription className="mt-2">
-                        {description}
-                    </DialogDescription>
-                </div>
-                <div className="min-h-0 space-y-4 overflow-y-auto p-5">
-                    {children}
-                </div>
+                {scrollHeader ? (
+                    <div className="min-h-0 flex-1 overflow-y-auto">
+                        {heading}
+                        <div className="space-y-4 p-5">{children}</div>
+                    </div>
+                ) : (
+                    <>
+                        {heading}
+                        <div className="min-h-0 space-y-4 overflow-y-auto p-5">
+                            {children}
+                        </div>
+                    </>
+                )}
                 <DialogFooter
                     className={cn(
                         'shrink-0 border-t bg-muted/30 p-4',

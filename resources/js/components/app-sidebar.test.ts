@@ -356,6 +356,18 @@ describe('app sidebar workforce navigation', () => {
         expect(catalog.map((item) => item.section)).not.toContain('Operations');
     });
 
+    it('keeps Operations absent for workforce readers without roster access', () => {
+        const catalog = buildNavSearchCatalog({
+            can: {
+                shifts: { viewAny: true },
+                timesheets: { viewAssigned: true },
+            },
+        });
+
+        expect(catalog.map((item) => item.section)).toContain('Workforce');
+        expect(catalog.map((item) => item.section)).not.toContain('Operations');
+    });
+
     it('shows shift handovers for every workflow capability and hides them from unrelated workforce permissions', () => {
         const workflowCapabilities = [
             { handovers: { viewAny: true } },
@@ -653,3 +665,30 @@ it('shows a single Workforce settings entry only with roster access', () => {
         }).some((item) => item.href === '/operations/workforce-settings'),
     ).toBe(false);
 });
+
+it.each([
+    [{ rostering: { viewAny: true } }, true],
+    [{ qualifications: { viewAny: true } }, false],
+    [
+        {
+            rostering: { viewAny: true },
+            qualifications: { viewAny: true },
+        },
+        true,
+    ],
+    [{}, false],
+])(
+    'matches Qualifications navigation to its installed roster read gate for %j',
+    (can, visible) => {
+        const qualifications = buildNavSearchCatalog({ can }).filter(
+            (item) => item.href === '/operations/qualifications',
+        );
+        expect(qualifications).toHaveLength(visible ? 1 : 0);
+        if (visible) {
+            expect(qualifications[0]).toMatchObject({
+                label: 'Qualifications',
+                section: 'Workforce',
+            });
+        }
+    },
+);
