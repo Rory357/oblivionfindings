@@ -86,7 +86,10 @@ class MedicineCatalogueBindingService
 
     private function dto(User $actor, ClientMedication $medicine): array
     {
-        $base = ['medicine_version' => (int) $medicine->version, 'can_manage' => $actor->canDo('medications.catalogue.manage') && $actor->canDo('medications.stock.update')];
+        // C11: staff pack photos are the primary picture. A catalogue picture
+        // (and any catalogue UI) appears only once a reviewed source exists.
+        $base = ['medicine_version' => (int) $medicine->version, 'can_manage' => $actor->canDo('medications.catalogue.manage') && $actor->canDo('medications.stock.update'),
+            'catalogue_configured' => \App\Services\Medication\Stock\PackPhotoReader::catalogueConfigured()];
         $binding = MedicineCatalogueBinding::query()->where('client_medication_id', $medicine->id)->orderByDesc('id')->lockForUpdate()->first();
         if (! $binding) {
             return $base + ['status' => 'unavailable', 'message' => 'No package-label product has been confirmed for this medicine.'];

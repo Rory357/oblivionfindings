@@ -1,4 +1,4 @@
-import { FileText, ShieldCheck } from 'lucide-react';
+import { ClipboardCheck, FileText, ShieldCheck } from 'lucide-react';
 import { useRow } from './_sections';
 import { Choice, GroupGrid, GroupRow, Note, OnOff, SettingGroup } from './_ui';
 
@@ -20,6 +20,17 @@ export function RecordsReporting({ q, show }: { q: string; show: string }) {
                 {value('sac') === 'on' && ['sac_death', 'sac_moderate', 'sac_minor'].map((key) => <GroupRow key={key} id={`records.${key}`} label={def(key)?.label ?? key} state={state(key) === 'changed' ? 'changed' : state('sac')}><Choice value={value(key)} onChange={(v) => edit(key, v)} options={options(key)} disabled={disabled} /></GroupRow>)}
                 {value('sac') === 'on' && <GroupRow id="records.severe" label="Severe or permanent harm" hint="The closer chooses SAC 1 or SAC 2. Nothing is preselected." />}
             </SettingGroup>
+            <PaperRecordsGroup q={q} show={show} />
         </GroupGrid>
     </div>;
+}
+
+/** Lane C1 (D2, EA-001): paper doses posted before pack tracking started. */
+function PaperRecordsGroup({ q, show }: { q: string; show: string }) {
+    const { s, value, edit, state, disabled, shown } = useRow('downtimeRecords');
+    const label = s.definitions.downtimeRecords?.recount_before_finish?.label ?? 'Count the stock before a downtime is finished';
+    if (!s.definitions.downtimeRecords) return null;
+    return <SettingGroup icon={ClipboardCheck} title="Paper records" caption="After a downtime">
+        <GroupRow id="records.recount_before_finish" label={label} state={state('recount_before_finish')} hidden={!shown(show, q, 'recount_before_finish', label, 'downtime paper recount')} control={<OnOff id="records.recount_before_finish" checked={value('recount_before_finish') === 'yes'} onChange={(v) => edit('recount_before_finish', v ? 'yes' : 'no')} disabled={disabled} />} hint="A paper dose given before pack tracking started is posted without pack evidence, and its stock is always flagged for a count. When this is on, the downtime can’t be finished until that count is done. When it’s off, the count waits in Follow-ups." />
+    </SettingGroup>;
 }

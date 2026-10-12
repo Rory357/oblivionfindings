@@ -120,9 +120,68 @@ final class DowntimeService
             if ($downtime->doses()->whereNotIn('id', $entered)->exists()) {
                 throw ValidationException::withMessages(['finish' => 'Collect the facts for every listed paper dose before finishing. No missing outcome is assumed.']);
             }
+            // D2 (Lane C1): doses posted without pack evidence wait for their
+            // counted recount when the organisation asks for it.
+            if (app(DowntimeSettings::class)->recountBeforeFinish()) {
+                $waiting = app(PaperStockTracking::class)->outstandingRecounts((int) $downtime->id);
+                if ($waiting->isNotEmpty()) {
+                    throw ValidationException::withMessages(['finish' => 'Count the stock first: '.PaperStockTracking::describe($waiting)
+                        .'. Their paper doses were given before pack tracking started, so the count settles the stock. Then finish this downtime.']);
+                }
+            }
             $downtime->update(['finished_at' => CarbonImmutable::now('UTC'), 'finished_by' => $actor->id]);
             $this->events->record($downtime, 'collection_finished', $actor, facts: ['paper_entries' => $downtime->entries()->count()]);
         }, 5);
+    }
+
+    /**
+     * EA-095 (Lane C1, approved P10): the list's three meters, counted across
+     * everything the viewer can open — not just the page shown.
+     *  - to_enter: listed paper doses with no facts yet (leads only; open downtimes)
+     *  - to_confirm: entries waiting for the giver or witness — the viewer's
+     *    own for staff, every readable entry for leads
+     *  - this_month: downtimes started this NZ month
+     * Controlled entries stay out for viewers without controlled access.
+     *
+     * @param  list<int>  $siteIds
+     * @return array{to_enter: int, to_confirm: int, this_month: int}
+     */
+    public function listMeters(User $actor, array $siteIds): array
+    {
+        $manager = $this->access->manages($actor);
+        $controlled = $actor->canDo('medications.controlled.view');
+        $clientIds = collect($siteIds)->flatMap(fn ($id) => $this->access->clients($actor, (int) $id))->values()->all();
+        $visible = fn ($row): bool => $controlled || ! ($row->snapshot['controlled'] ?? false);
+        $own = fn ($q) => $q->where(fn ($q) => $q->where('given_by', $actor->id)->orWhere('witness_id', $actor->id));
+        $downtimes = fn () => MedicationDowntime::query()->whereIn('site_id', $siteIds)
+            ->when(! $manager, fn ($q) => $q->whereHas('entries', $own));
+
+        $toEnter = $manager ? MedicationDowntimeDose::query()
+            ->whereIn('downtime_id', $downtimes()->whereNull('finished_at')->select('id'))
+            ->whereIn('client_id', $clientIds)
+            ->whereNotIn('id', MedicationPaperEntry::query()->whereNotNull('downtime_dose_id')->select('downtime_dose_id'))
+            ->whereNotIn('id', DB::table('medication_downtime_resolutions')->select('downtime_dose_id'))
+            ->when(! $controlled, fn ($q) => $q->whereNotIn('client_medication_id', ClientMedication::withTrashed()->where('controlled_drug', true)->select('id')))
+            ->get(['id', 'snapshot'])->filter($visible)->count() : 0;
+
+        $toConfirm = MedicationPaperEntry::query()
+            ->whereIn('downtime_id', $downtimes()->select('id'))
+            ->whereIn('client_id', $clientIds)
+            ->when(! $manager, $own)
+            ->whereDoesntHave('posting')
+            ->with('confirmations')->get()->filter($visible)
+            ->filter(function (MedicationPaperEntry $entry) use ($manager, $actor): bool {
+                $giverDue = ! $entry->confirmations->contains('kind', 'giver');
+                $witnessDue = $entry->witness_id !== null && ! $entry->confirmations->contains('kind', 'witness');
+
+                return $manager ? ($giverDue || $witnessDue)
+                    : (($giverDue && (int) $entry->given_by === (int) $actor->id) || ($witnessDue && (int) $entry->witness_id === (int) $actor->id));
+            })->count();
+
+        $monthStart = CarbonImmutable::now('Pacific/Auckland')->startOfMonth()->utc();
+
+        return ['to_enter' => $toEnter, 'to_confirm' => $toConfirm,
+            'this_month' => $downtimes()->where('started_at', '>=', $monthStart)->count()];
     }
 
     /** P08a adapter: stable identity and deep link, without a second tasks store. */

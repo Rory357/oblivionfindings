@@ -478,11 +478,23 @@ final class MedicationStockService
         }
     }
 
+    /**
+     * EA-073 (Lane C2): a held medicine (Orders › Hold) can still be
+     * delivered, received into stock and the register, and reordered — the
+     * pharmacy often supplies during a short hold. Giving it stays blocked by
+     * the order itself. A stopped or replaced order can't receive.
+     */
     private function assertActive(ClientMedication $medication): void
     {
-        if (! $medication->active || $medication->state !== 'active' || $medication->superseded_by !== null) {
-            throw ValidationException::withMessages(['client_medication_id' => 'This medicine is no longer active. Check the current order before receiving.']);
+        if (! self::receivable($medication)) {
+            throw ValidationException::withMessages(['client_medication_id' => 'This medicine has been stopped. Return the delivery to the pharmacy, or check the current order before receiving.']);
         }
+    }
+
+    public static function receivable(ClientMedication $medication): bool
+    {
+        return $medication->superseded_by === null
+            && (($medication->active && $medication->state === 'active') || $medication->state === 'paused');
     }
 
     public function stockChangedAfterCommit(): void

@@ -9,7 +9,9 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\Downtime\DowntimeAccess;
 use App\Services\Medication\Downtime\DowntimeService;
+use App\Services\Medication\Downtime\DowntimeSettings;
 use App\Services\Medication\Downtime\PaperEntryService;
+use App\Services\Medication\Downtime\PaperStockTracking;
 use App\Services\Medication\Recording\DoseRecordingRequirements;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
@@ -38,7 +40,9 @@ class MedicationDowntimeController extends Controller
 
         return Inertia::render('emar/downtime/index', [
             'downtimes' => $rows, 'sites' => Site::query()->whereIn('id', $ids)->get(['id', 'name']),
-            'can_manage' => $manager, 'can_make_pack' => $actor->canDo('medications.reports.export'),
+            'can_manage' => $manager, 'can_make_pack' => $this->access->canMakePack($actor),
+            // EA-095: counted across the viewer's whole scope, not this page.
+            'meters' => $this->downtimes->listMeters($actor, $ids),
             'today' => now('Pacific/Auckland')->toDateString(), 'tomorrow' => now('Pacific/Auckland')->addDay()->toDateString(),
         ]);
     }
@@ -135,7 +139,16 @@ class MedicationDowntimeController extends Controller
             'observation_choices' => collect(DoseRecordingRequirements::OBSERVATIONS)->map(fn ($choice, $key) => ['key' => $key, ...$choice])->values()->all(),
             'prn_orders' => $prn, 'staff' => $staff, 'actor_id' => (int) $actor->id, 'can_manage' => $manager,
             'open_paper_entry' => $entries->contains('id', (int) $request->query('paper_entry')) ? (int) $request->query('paper_entry') : null,
-            'can_finish' => $manager && $row->finished_at === null && ! $row->doses()->whereNotIn('id', $enteredTargetIds)->exists(),
+            // D2 (Lane C1): posted paper doses whose stock still needs its counted recount.
+            'recounts' => $manager ? app(PaperStockTracking::class)->outstandingRecounts((int) $row->id)
+                ->filter(fn ($entry) => $entries->contains('id', $entry->id))
+                ->map(fn ($entry) => ['paper_entry_id' => (int) $entry->id, 'person' => $entry->snapshot['person'] ?? null,
+                    'medicine' => $entry->snapshot['medicine'] ?? null, 'controlled' => (bool) ($entry->snapshot['controlled'] ?? false),
+                    'url' => PaperStockTracking::recountUrl(ClientMedication::withTrashed()->findOrFail($entry->client_medication_id))])
+                ->unique(fn ($item) => $item['url'])->values()->all() : [],
+            'recount_before_finish' => $recountFirst = app(DowntimeSettings::class)->recountBeforeFinish(),
+            'can_finish' => $manager && $row->finished_at === null && ! $row->doses()->whereNotIn('id', $enteredTargetIds)->exists()
+                && ! ($recountFirst && app(PaperStockTracking::class)->outstandingRecounts((int) $row->id)->isNotEmpty()),
             'controlled_notice' => ! $canControlled ? 'Controlled paper entries and scans are omitted. Ask the house lead with controlled-medicine access.' : null,
         ]);
     }
@@ -149,13 +162,17 @@ class MedicationDowntimeController extends Controller
 
     public function resolve(Request $request, int $downtime, int $dose)
     {
-        $data = $request->validate(['kind' => 'required|in:clinical,paper', 'record_id' => 'required|integer|min:1',
+        // EA-028 (Lane C1): order_changed is a lead's review of signed paper
+        // whose order changed after the downtime was listed.
+        $data = $request->validate(['kind' => 'required|in:clinical,paper,order_changed', 'record_id' => 'required_unless:kind,order_changed|nullable|integer|min:1',
             'reason' => 'required|string|max:4000', 'accountable_confirmation' => 'accepted']);
         $row = $this->access->downtime($request->user(), $downtime);
         $target = $row->doses()->findOrFail($dose);
-        $this->paper->resolveDuplicate($request->user(), $row, $target, $data['kind'], (int) $data['record_id'], $data['reason']);
+        $this->paper->resolveDuplicate($request->user(), $row, $target, $data['kind'], (int) ($data['record_id'] ?? 0), $data['reason']);
 
-        return back()->with('success', 'The duplicate was reviewed and linked to existing evidence. No dose was posted or changed.');
+        return back()->with('success', $data['kind'] === 'order_changed'
+            ? 'Your review of the changed order is recorded. This listed dose no longer holds up finishing; no dose was posted.'
+            : 'The duplicate was reviewed and linked to existing evidence. No dose was posted or changed.');
     }
 
     public function sheet(Request $request, int $downtime, int $sheet)

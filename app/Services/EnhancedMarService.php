@@ -1430,7 +1430,10 @@ class EnhancedMarService
                     }
                 }
 
-                $historicalStock = $historicalPaper !== null && ($data['status'] ?? null) === 'given'
+                // D2 (Lane C1): a paper dose from before pack tracking started
+                // posts clinically only; the stock is flagged for a counted recount.
+                $untrackedPaper = ($paperStockEvidence['settlement'] ?? null) === \App\Services\Medication\Downtime\PaperStockTracking::SETTLEMENT;
+                $historicalStock = $historicalPaper !== null && ($data['status'] ?? null) === 'given' && ! $untrackedPaper
                     ? app(MedicationStockService::class)->validateHistoricalEvidence($medication, $paperStockEvidence, true) : null;
 
                 if ($transitStock !== null && ($data['status'] ?? null) === 'given') {
@@ -1457,7 +1460,7 @@ class EnhancedMarService
                 }
 
                 // Live stock checks retain their current-balance semantics.
-                if ($medication->controlled_drug && $historicalStock === null && $transitStock === null) {
+                if ($medication->controlled_drug && $historicalStock === null && $transitStock === null && ! $untrackedPaper) {
                     $medication->load(['stock' => function ($q) {
                         $q->lockForUpdate();
                     }]);
@@ -1513,7 +1516,7 @@ class EnhancedMarService
                 // including when the rollout flag is subsequently disabled.
                 // Unstarted legacy stock is not migrated by a clinical dose.
                 $ordinaryStockQuantity = null;
-                if (! $medication->controlled_drug && ($data['status'] ?? null) === 'given' && $historicalStock === null && $transitStock === null) {
+                if (! $medication->controlled_drug && ($data['status'] ?? null) === 'given' && $historicalStock === null && $transitStock === null && ! $untrackedPaper) {
                     $ordinaryStock = $medication->stock()->lockForUpdate()->first();
                     if ($ordinaryStock?->lots_started_at !== null) {
                         if (blank($ordinaryStock->unit)) {
@@ -1658,7 +1661,7 @@ class EnhancedMarService
                 // new second clinical record with a medication name in notes.
 
                 // Handle controlled drug register entry
-                if ($medication->controlled_drug && $admin->status === 'given' && $transitStock === null) {
+                if ($medication->controlled_drug && $admin->status === 'given' && $transitStock === null && ! $untrackedPaper) {
                     $admin->setRelation('medication', $medication);
                     if ($historicalStock !== null) {
                         $entries = app(MedicationStockService::class)->controlledHistoricalEntries($admin, $lockedActor, $historicalStock, $lockedAuthorizationUsers->get((int) $admin->witnessed_by));

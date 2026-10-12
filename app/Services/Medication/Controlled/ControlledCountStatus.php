@@ -27,7 +27,7 @@ final class ControlledCountStatus
             ClientControlledDrugEntry::query()->where('entry_type', 'balance_check')
                 ->whereNotNull('witnessed_by')->where('recorded_at', '<=', now()->utc())
                 ->whereIn('client_medication_id', collect($medicationIds)->all()),
-            $siteIds, false,
+            $siteIds, false, true,
         );
         $times = (clone $base)->selectRaw('client_medication_id AS medicine_id, MAX(recorded_at) AS latest_at')
             ->groupBy('client_medication_id');
@@ -42,17 +42,29 @@ final class ControlledCountStatus
     /** Approved sites, with historical stock retained until physically cleared. */
     public function relevantMedicines(?int $siteId = null, bool $currentRead = false): Collection
     {
+        $openSite = fn ($site) => $site->where('is_active', true)
+            ->where(fn ($q) => $q->where('archived', false)->orWhereNull('archived'))->whereNull('archived_at');
+
+        // EA-012: an archived person's controlled stock keeps its count
+        // schedule at an open house until it is cleared (stock below).
+        // EA-012 follow-up: a house closed before the guard keeps the count
+        // schedule for stock still on hand there, until it is cleared.
+        $closedSite = fn ($site) => $site->where(fn ($closed) => $closed->where('is_active', false)
+            ->orWhere('archived', true)->orWhereNotNull('archived_at'));
+
         return ClientMedication::withTrashed()->controlled()
-            ->whereHas('client.site', fn ($site) => $site->where('is_active', true)
-                ->where(fn ($q) => $q->where('archived', false)->orWhereNull('archived'))->whereNull('archived_at'))
-            ->when($siteId !== null, fn ($q) => $q->whereHas('client', fn ($client) => $client->where('site_id', $siteId)))
-            ->where(fn ($q) => $q->where(fn ($active) => $active->active())
+            ->where(fn ($owner) => $owner->whereHas('client.site', $openSite)
+                ->orWhereHas('client', fn ($client) => $client->onlyTrashed()->whereHas('site', $openSite))
+                ->orWhere(fn ($closedHouse) => $closedHouse->whereHas('client', fn ($client) => $client->withTrashed()->whereHas('site', $closedSite))
+                    ->whereHas('stock', fn ($stock) => $stock->where('on_hand', '>', 0))))
+            ->when($siteId !== null, fn ($q) => $q->whereHas('client', fn ($client) => $client->withTrashed()->where('site_id', $siteId)))
+            ->where(fn ($q) => $q->where(fn ($active) => $active->active()->whereHas('client'))
                 // The outer medicine lock does not make this subquery a current
                 // read. A committed historical correction can restore stock
                 // after publication has established its older read view.
                 ->orWhereHas('stock', fn ($stock) => $stock->where('on_hand', '>', 0)
                     ->when($currentRead, fn ($query) => $query->lock('for share nowait'))))
-            ->with(['client.site', 'stock' => fn ($query) => $currentRead ? $query->lock('for share nowait') : $query])
+            ->with(['client' => fn ($query) => $query->withTrashed()->with('site'), 'stock' => fn ($query) => $currentRead ? $query->lock('for share nowait') : $query])
             ->when($currentRead, fn ($query) => $query->lock('for share nowait'))->get();
     }
 

@@ -117,6 +117,49 @@ export default function TimesheetsHero({
             'Matching approved records; payment is separate',
         ],
     ];
+    const headerPrimaryAction = canCreate && (
+        <PageHeaderPrimaryButton
+            icon={Plus}
+            disabled={loading}
+            onClick={onCreateTimesheet}
+        >
+            Create timesheet
+        </PageHeaderPrimaryButton>
+    );
+    const headerSecondaryActions = (
+        <>
+            <form
+                className="w-full min-w-0 basis-full sm:w-auto sm:flex-1 sm:basis-auto"
+                onSubmit={(event) => {
+                    event.preventDefault();
+                    onSearchSubmit();
+                }}
+            >
+                <fieldset
+                    disabled={loading}
+                    className="flex min-w-0 flex-wrap gap-2"
+                >
+                    <PageHeaderSearch
+                        value={filters.search}
+                        onChange={onSearch}
+                        placeholder="Search names or location"
+                        className="min-w-0"
+                    />
+                    <PageHeaderGlassButton type="submit" icon={Search}>
+                        Search
+                    </PageHeaderGlassButton>
+                </fieldset>
+            </form>
+            {canReviewAdjustments && (
+                <PageHeaderGlassButton asChild icon={ClipboardCheck}>
+                    <Link href="/operations/timesheets/payroll-adjustments">
+                        Payroll adjustments
+                    </Link>
+                </PageHeaderGlassButton>
+            )}
+        </>
+    );
+
     return (
         <>
             <WorkforcePageHeader
@@ -126,52 +169,13 @@ export default function TimesheetsHero({
                 subline={`${period} · ${summary.evidence.timezone} · Review recorded work, hours and approval decisions`}
                 actions={
                     <>
-                        <form
-                            className="w-full min-w-0 basis-full sm:w-auto sm:flex-1 sm:basis-auto"
-                            onSubmit={(event) => {
-                                event.preventDefault();
-                                onSearchSubmit();
-                            }}
-                        >
-                            <fieldset
-                                disabled={loading}
-                                className="flex min-w-0 flex-wrap gap-2"
-                            >
-                                <PageHeaderSearch
-                                    value={filters.search}
-                                    onChange={onSearch}
-                                    placeholder="Search names or location"
-                                    className="min-w-0"
-                                />
-                                <PageHeaderGlassButton
-                                    type="submit"
-                                    icon={Search}
-                                >
-                                    Search
-                                </PageHeaderGlassButton>
-                            </fieldset>
-                        </form>
-                        {canReviewAdjustments && (
-                            <PageHeaderGlassButton
-                                asChild
-                                icon={ClipboardCheck}
-                            >
-                                <Link href="/operations/timesheets/payroll-adjustments">
-                                    Payroll adjustments
-                                </Link>
-                            </PageHeaderGlassButton>
-                        )}
-                        {canCreate && (
-                            <PageHeaderPrimaryButton
-                                icon={Plus}
-                                disabled={loading}
-                                onClick={onCreateTimesheet}
-                            >
-                                Create timesheet
-                            </PageHeaderPrimaryButton>
-                        )}
+                        {headerSecondaryActions}
+                        {headerPrimaryAction}
                     </>
                 }
+                mobilePrimaryAction={headerPrimaryAction}
+                mobileSecondaryActions={headerSecondaryActions}
+                mobileSummary={period}
                 meters={
                     <div className="grid w-full min-w-0 grid-cols-2 gap-2 lg:grid-cols-4">
                         {meters.map(([tab, label, caption]) => (

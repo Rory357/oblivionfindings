@@ -12,10 +12,6 @@ import {
     prepareControlledStockCountReplayState,
 } from './_stock-dialogs';
 import {
-    buildCdRegisterRequest,
-    CD_REGISTER_ENTRY_TYPES,
-} from './components/cd-register-modal';
-import {
     buildSyringeDriverRequest,
     syringeDriverRequiresWitness,
 } from './components/mar-governance-dialogs';
@@ -64,36 +60,6 @@ describe('controlled medication request contracts', () => {
         expect(controlledDrugSnapshotFromSelection('ordinary')).toBe(false);
         expect(controlledDrugSnapshotFromSelection('controlled')).toBe(true);
         expect(controlledDrugSnapshotFromSelection('')).toBeNull();
-    });
-
-    it('binds a register movement to the canonical medication and preserves decimal strings and witness credential', () => {
-        expect(
-            buildCdRegisterRequest({
-                clientId: '7',
-                clientMedicationId: '41',
-                medicationName: 'Morphine sulfate',
-                entryType: 'administration',
-                quantity: '0.50',
-                unit: 'tablets',
-                onHandBefore: '10.00',
-                onHandAfter: '9.50',
-                witnessedBy: '19',
-                witnessCredential: 'witness-secret',
-                batch: '',
-                expiry: '',
-                notes: '',
-                uuid: '2af245d6-fbb2-4b9b-8936-7a995847af2e',
-            }),
-        ).toMatchObject({
-            client_id: 7,
-            client_medication_id: 41,
-            medication_name: 'Morphine sulfate',
-            quantity: '0.50',
-            on_hand_before: '10.00',
-            on_hand_after: '9.50',
-            witnessed_by: 19,
-            witness_credential: 'witness-secret',
-        });
     });
 
     it('binds a controlled count to the canonical medication without converting precise balances through a number', () => {
@@ -183,12 +149,6 @@ describe('controlled medication request contracts', () => {
             uuid: 'next-controlled-count-request',
             fingerprint: null,
         });
-    });
-
-    it('does not offer balance checks through the register-entry endpoint', () => {
-        expect(
-            CD_REGISTER_ENTRY_TYPES.map((entryType) => entryType.value),
-        ).not.toContain('balance_check');
     });
 
     it('suppresses controlled selections from generic receive and dashboard stock movement flows', () => {

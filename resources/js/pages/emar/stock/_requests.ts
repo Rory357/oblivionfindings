@@ -34,10 +34,18 @@ export function useStockCommand() {
         // it must not turn the same stock instruction into another receipt.
         const body = JSON.stringify(
             Object.fromEntries(
-                Object.entries(data).filter(
-                    ([key]) => key !== 'witness_credential',
-                ),
+                Object.entries(data)
+                    .filter(([key]) => key !== 'witness_credential')
+                    .map(([key, value]) => [
+                        key,
+                        value instanceof File
+                            ? `file:${value.name}:${value.size}:${value.lastModified}`
+                            : value,
+                    ]),
             ),
+        );
+        const hasFile = Object.values(data).some(
+            (value) => value instanceof File,
         );
         if (unresolved.current && last.current?.body !== body) {
             setErrors({
@@ -50,17 +58,20 @@ export function useStockCommand() {
         if (last.current?.body !== body)
             last.current = { body, uuid: crypto.randomUUID() };
         try {
+            // C11: a pack photo travels with its receipt (multipart), so a
+            // required photo and the stock it shows save together.
             const response = await fetch('/emar/stock/packs/commands', {
                 method: 'POST',
                 credentials: 'same-origin',
-                headers: {
-                    ...csrfHeaders(),
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    ...data,
-                    request_uuid: last.current.uuid,
-                }),
+                headers: hasFile
+                    ? csrfHeaders()
+                    : { ...csrfHeaders(), 'Content-Type': 'application/json' },
+                body: hasFile
+                    ? toFormData({ ...data, request_uuid: last.current.uuid })
+                    : JSON.stringify({
+                          ...data,
+                          request_uuid: last.current.uuid,
+                      }),
             });
             const result = await response.json();
             if (!response.ok || result.success !== true) {
@@ -108,4 +119,27 @@ export function useStockCommand() {
         }
     };
     return { saving, errors, run, uncertain };
+}
+
+/**
+ * Laravel-style multipart fields: nested keys as `packs[0][quantity]`,
+ * booleans as 1/0, and null as an empty value (the server reads it as null).
+ */
+export function toFormData(data: Record<string, unknown>): FormData {
+    const form = new FormData();
+    const add = (key: string, value: unknown) => {
+        if (value === null || value === undefined) form.append(key, '');
+        else if (value instanceof File) form.append(key, value);
+        else if (Array.isArray(value))
+            value.forEach((entry, index) => add(`${key}[${index}]`, entry));
+        else if (typeof value === 'object')
+            Object.entries(value as Record<string, unknown>).forEach(
+                ([child, entry]) => add(`${key}[${child}]`, entry),
+            );
+        else if (typeof value === 'boolean')
+            form.append(key, value ? '1' : '0');
+        else form.append(key, String(value));
+    };
+    Object.entries(data).forEach(([key, value]) => add(key, value));
+    return form;
 }

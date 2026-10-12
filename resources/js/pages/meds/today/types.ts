@@ -383,6 +383,8 @@ export interface MedsTodayProps {
         record_controlled: boolean;
         view_controlled: boolean;
         manage_stock: boolean;
+        /** Approved P06 Q5: medications.stock.receive or stock.update. */
+        receive_stock?: boolean;
     };
     has_shift_context: boolean;
     /** People on the worker's shift whose medicines show once they're clocked in to it. */

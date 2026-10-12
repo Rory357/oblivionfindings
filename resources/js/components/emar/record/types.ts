@@ -56,6 +56,21 @@ export interface RecordMedicine {
     started: string | null;
     verified: { at: string; by: string | null } | null;
     stopped: { at: string; by: string | null; reason: string | null } | null;
+    /** C11: the latest staff photo (or a bound reference image), else null. */
+    pack_photo?: RecordPackPhotoSummary | null;
+}
+
+/** C11: the picture shown for a medicine (PackPhotoReader payload). */
+export interface RecordPackPhotoSummary {
+    kind: 'staff' | 'reference';
+    url: string;
+    taken_at: string | null;
+    taken_by: string | null;
+    pack: string | null;
+    pharmacy: string | null;
+    pack_changed?: boolean;
+    now_pack?: string | null;
+    source?: string | null;
 }
 
 /** A controlled medicine shown to a reader without controlled-medicine access. */
@@ -87,6 +102,8 @@ export interface RecordMedicineDetail {
         at: string | null;
         by: string | null;
     }[];
+    /** C11: the photo staff see when recording. */
+    pack_photo?: RecordPackPhotoSummary | null;
 }
 
 export interface RecordSupportPlan {

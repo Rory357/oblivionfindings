@@ -27,9 +27,10 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/datetime';
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Check,
     ClipboardCheck,
@@ -54,6 +55,7 @@ import type {
     Downtime,
     PaperEntry,
     PrnOrder,
+    Recount,
     RecoveryStock,
     Staff,
 } from './types';
@@ -69,6 +71,8 @@ type Props = {
     open_paper_entry: number | null;
     can_manage: boolean;
     can_finish: boolean;
+    recounts?: Recount[];
+    recount_before_finish?: boolean;
     controlled_notice: string | null;
     sheets_concealed: boolean;
     sheets: { id: number; mime_type: string; url: string }[];
@@ -91,10 +95,14 @@ export default function DowntimeShow({
     open_paper_entry,
     can_manage,
     can_finish,
+    recounts = [],
+    recount_before_finish = true,
     controlled_notice,
     sheets_concealed,
     sheets,
 }: Props) {
+    // EA-045: the Home-rooted Medication trail, then this downtime.
+    const breadcrumbs = useEmarBreadcrumbs();
     const [view, setView] = useState<'paper' | 'facts'>('paper');
     const [capture, setCapture] = useState<{ dose: Dose | null } | null>(null);
     const [selected, setSelected] = useState<PaperEntry | null>(
@@ -299,9 +307,7 @@ export default function DowntimeShow({
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Home', href: '/dashboard' },
-                { title: 'Medication', href: '/emar' },
-                { title: 'Downtime & paper records', href: '/emar/downtime' },
+                ...breadcrumbs,
                 {
                     title: `DT-${downtime.id}`,
                     href: `/emar/downtime/${downtime.id}`,
@@ -635,8 +641,61 @@ export default function DowntimeShow({
                                     <p className="text-subtle">
                                         {can_finish
                                             ? 'Confirmations and clinical reconciliation remain due afterwards.'
-                                            : 'Every listed paper dose needs its actual facts first, including concealed entries for the authorised lead.'}
+                                            : missing.length ||
+                                                !recount_before_finish ||
+                                                !recounts.length
+                                              ? 'Every listed paper dose needs its actual facts first, including concealed entries for the authorised lead.'
+                                              : 'Count the stock below first. Your organisation asks for the count before a downtime is finished.'}
                                     </p>
+                                    {recounts.length > 0 && (
+                                        <div className="w-full space-y-2">
+                                            <p className="font-medium">
+                                                Stock to count
+                                            </p>
+                                            <p className="text-subtle">
+                                                These paper doses were given
+                                                before pack tracking started.
+                                                They were posted without pack
+                                                evidence, so a count settles the
+                                                stock.
+                                                {recount_before_finish
+                                                    ? ''
+                                                    : ' Each count also waits in Follow-ups.'}
+                                            </p>
+                                            <ul className="divide-y rounded-lg border">
+                                                {recounts.map((recount) => (
+                                                    <li
+                                                        key={recount.url}
+                                                        className="flex flex-wrap items-center justify-between gap-3 p-3"
+                                                    >
+                                                        <span>
+                                                            {recount.medicine ??
+                                                                'A medicine'}{' '}
+                                                            ·{' '}
+                                                            {recount.person ??
+                                                                'a person'}
+                                                            {recount.controlled
+                                                                ? ' · witnessed register count'
+                                                                : ''}
+                                                        </span>
+                                                        <Button
+                                                            variant="outline"
+                                                            className="frontline-tap"
+                                                            asChild
+                                                        >
+                                                            <Link
+                                                                href={
+                                                                    recount.url
+                                                                }
+                                                            >
+                                                                Count the stock
+                                                            </Link>
+                                                        </Button>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
                                 </Card>
                             )}
                         </>
@@ -749,6 +808,19 @@ export default function DowntimeShow({
                                 stock={selected.stock_evidence}
                                 doseUnit={selected.snapshot.dose_unit}
                             />
+                            {selected.reconciliation.untracked_stock && (
+                                <p className="rounded-lg border border-status-info bg-status-info-bg p-3 text-status-info-foreground">
+                                    Pack tracking hadn’t started for this
+                                    medicine at the paper time. The dose posts
+                                    without pack evidence: nothing is taken off
+                                    stock
+                                    {selected.snapshot.controlled
+                                        ? ' or the register'
+                                        : ''}
+                                    , and the medicine is flagged for a counted
+                                    recount.
+                                </p>
+                            )}
                             {(!!selected.reconciliation.missing_evidence
                                 ?.length ||
                                 !!selected.reconciliation.missing_actual_fields
