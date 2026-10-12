@@ -235,7 +235,7 @@ class LaneAOfflineReplayTest extends TestCase
         $this->actingAs($this->worker->fresh())->postJson('/meds/today/offline-review', $report($controlled))->assertNotFound();
         // The same report for an ordinary order is taken (authority is current).
         $this->postJson('/meds/today/offline-review', $report($order))->assertOk()->assertJsonPath('status', 'reported');
-        MedicationFollowup::query()->delete();
+        $this->assertSame(1, MedicationFollowup::count());
 
         // Clocked out: the house is still in their access, but they can't record for the person now.
         Shift::query()->where('user_id', $this->worker->id)->update([
@@ -243,7 +243,7 @@ class LaneAOfflineReplayTest extends TestCase
         ]);
         Cache::flush();
         $this->actingAs($this->worker->fresh())->postJson('/meds/today/offline-review', $report($order))->assertNotFound();
-        $this->assertSame(0, MedicationFollowup::count());
+        $this->assertSame(1, MedicationFollowup::count());
     }
 
     /**
