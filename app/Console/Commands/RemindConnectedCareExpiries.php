@@ -2,10 +2,13 @@
 
 namespace App\Console\Commands;
 
+use App\Models\MedicationBackupPassphrase;
+use App\Models\MedicationBackupRecipient;
 use App\Models\MedicationExternalClinician;
 use App\Models\MedicationExternalGrant;
 use App\Models\MedicineCatalogueSource;
 use App\Models\User;
+use App\Notifications\BackupPassphraseReminderNotification;
 use App\Notifications\ConnectedCareExpiryNotification;
 use App\Services\Medication\Connected\ConnectedCareSettings;
 use Illuminate\Console\Command;
@@ -60,6 +63,21 @@ class RemindConnectedCareExpiries extends Command
                     sprintf('Check %s on the %s public register again by %s, and record the new check.', $identity->user?->name ?? 'this prescriber',
                         ConnectedCareSettings::COUNCILS[$identity->registration_authority] ?? $identity->registration_authority, $this->day($due)),
                     '/emar/connected-care#access');
+            }
+        }
+        // EA-141: approved backup recipients without their own passphrase, weekly.
+        if ($settings->switchedOn(ConnectedCareSettings::BACKUPS) && Schema::hasTable('medication_backup_passphrases')) {
+            $week = now((string) config('app.worker_timezone', 'Pacific/Auckland'))->format('o-\WW');
+            $waiting = MedicationBackupRecipient::query()->whereNull('revoked_at')
+                ->whereNotIn('user_id', MedicationBackupPassphrase::query()->select('user_id'))->distinct()->pluck('user_id');
+            foreach (User::query()->whereIn('id', $waiting)->whereNotNull('approved_at')->get() as $recipient) {
+                $key = 'backup-passphrase:'.$recipient->id.':'.$week;
+                $already = DatabaseNotification::query()->where('notifiable_type', $recipient->getMorphClass())->where('notifiable_id', $recipient->id)
+                    ->where('type', BackupPassphraseReminderNotification::class)->where('data->reminder_key', $key)->exists();
+                if (! $already) {
+                    $recipient->notify(new BackupPassphraseReminderNotification($key));
+                    $sent++;
+                }
             }
         }
         if ($settings->switchedOn(ConnectedCareSettings::CATALOGUE) && Schema::hasTable('medicine_catalogue_sources')) {
