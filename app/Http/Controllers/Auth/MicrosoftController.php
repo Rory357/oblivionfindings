@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Domain\Hr\Services\EmployeeIntakeService;
+use App\Exceptions\SsoNotStaffAccountException;
 use App\Http\Controllers\Controller;
 use App\Models\Identity;
 use App\Models\Role;
@@ -13,6 +14,7 @@ use App\Services\SsoAuthenticationService;
 use App\Services\SsoConfigurationService;
 use App\Services\SsoGroupMappingLockService;
 use GuzzleHttp\Exception\GuzzleException;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -36,6 +38,8 @@ class MicrosoftController extends Controller
         $provider = $this->provider();
         try {
             $authentication = app(SsoAuthenticationService::class)->callback(request(), $provider);
+        } catch (SsoNotStaffAccountException $notStaff) {
+            return $this->notStaffAccount($notStaff);
         } catch (InvalidStateException) {
             return redirect()->route('login')->withErrors([$provider => 'This sign-in attempt expired or changed. Start sign-in again.']);
         } catch (GuzzleException) {
@@ -101,7 +105,45 @@ class MicrosoftController extends Controller
         $domain = Str::after($email, '@');
         abort_unless($domain === $orgDomain, 403, 'Microsoft SSO is restricted to the organization.');
 
-        [$user, $loggedIn] = DB::transaction(function () use ($email, $m, $provider, $authentication): array {
+        try {
+            [$user, $loggedIn] = $this->publishStaffSignIn($email, $m, $provider, $authentication);
+        } catch (SsoNotStaffAccountException $notStaff) {
+            return $this->notStaffAccount($notStaff);
+        }
+
+        if (! $loggedIn) {
+            return redirect()
+                ->route('login')
+                ->with('success', 'Thanks for signing up! Your account is awaiting approval.')
+                ->with('awaitingApproval', true);
+        }
+
+        if ($user->two_factor_secret && $user->two_factor_confirmed_at) {
+            request()->session()->put(['login.id' => $user->id, 'login.remember' => true, 'url.intended' => '/dashboard']);
+
+            return redirect()->route('two-factor.login');
+        }
+
+        Auth::login($user, remember: true);
+        request()->session()->regenerate();
+
+        return redirect()->intended('/dashboard');
+    }
+
+    /** Sends a family member (or anyone outside the organisation) back to staff sign-in with an explanation. */
+    private function notStaffAccount(SsoNotStaffAccountException $exception): RedirectResponse
+    {
+        return redirect()->route('login')->with('ssoNotStaffEmail', $exception->email);
+    }
+
+    /**
+     * Finds or provisions the staff account for a verified organisation email.
+     *
+     * @return array{0: User, 1: bool}
+     */
+    private function publishStaffSignIn(string $email, mixed $m, string $provider, array $authentication): array
+    {
+        return DB::transaction(function () use ($email, $m, $provider, $authentication): array {
             app(SsoGroupMappingLockService::class)->lockMappingSet();
             app(SsoAuthenticationService::class)->assertCurrent($provider, 'staff', $authentication['configuration_fingerprint']);
             $provisioning = app(SsoConfigurationService::class)->provisioning();
@@ -123,7 +165,10 @@ class MicrosoftController extends Controller
                 abort_unless(strtolower(trim((string) $user->email)) === $email, 409, 'The account email changed. Please retry sign-in.');
                 $identity = Identity::query()->where('provider', $provider)->where('provider_user_id', $m->getId())->lockForUpdate()->first();
                 abort_if($identity && (int) $identity->user_id !== (int) $user->id, 403);
-                abort_if($user->hasRole('client', 'next_of_kin') || in_array($user->role, ['client', 'next_of_kin'], true), 403, 'Use the portal sign-in for this account.');
+                if ($user->isPortalAccount()) {
+                    // A family portal account: explain and point to the family portal.
+                    throw new SsoNotStaffAccountException($email);
+                }
                 // Mutable email cannot attach a new subject to approved access.
                 abort_if(! $identity && ($user->approved_at || ! $provisioning['auto_link_existing']), 403, 'Sign in using an existing method and link this provider from your profile first.');
                 $lockedDefaultRole = Role::query()->whereKey($defaultRoleId)->lockForUpdate()->first();
@@ -175,22 +220,5 @@ class MicrosoftController extends Controller
 
             return [$user, false];
         }, 3);
-
-        if (! $loggedIn) {
-            return redirect()
-                ->route('login')
-                ->with('success', 'Thanks for signing up! Your account is awaiting approval.');
-        }
-
-        if ($user->two_factor_secret && $user->two_factor_confirmed_at) {
-            request()->session()->put(['login.id' => $user->id, 'login.remember' => true, 'url.intended' => '/dashboard']);
-
-            return redirect()->route('two-factor.login');
-        }
-
-        Auth::login($user, remember: true);
-        request()->session()->regenerate();
-
-        return redirect()->intended('/dashboard');
     }
 }

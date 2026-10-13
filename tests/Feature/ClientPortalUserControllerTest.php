@@ -10,6 +10,7 @@ use App\Models\OpsMessage;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Notifications\PortalInvitationNotification;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -37,7 +38,7 @@ class ClientPortalUserControllerTest extends TestCase
         ]);
     }
 
-    public function test_portal_user_store_can_create_missing_next_of_kin_user_and_send_password_email(): void
+    public function test_portal_user_store_can_create_missing_next_of_kin_user_and_send_invitation_email(): void
     {
         Notification::fake();
 
@@ -57,7 +58,19 @@ class ClientPortalUserControllerTest extends TestCase
         $this->assertTrue($this->client->portalUsers()->whereKey($user->id)->exists());
         $this->assertEquals('sister', $this->client->portalUsers()->whereKey($user->id)->first()->pivot->relation);
 
-        Notification::assertSentTo($user, ResetPassword::class);
+        // A family portal invitation (7 days), not a generic password reset.
+        Notification::assertSentTo($user, PortalInvitationNotification::class, function (PortalInvitationNotification $notification) {
+            return $notification->inviterName === $this->admin->name
+                && $notification->clientFirstName === $this->client->first_name
+                && str_contains($notification->acceptUrl, '/portal/invite/');
+        });
+        Notification::assertNotSentTo($user, ResetPassword::class);
+        $this->assertDatabaseHas('portal_invitations', [
+            'user_id' => $user->id,
+            'client_id' => $this->client->id,
+            'invited_by' => $this->admin->id,
+            'accepted_at' => null,
+        ]);
     }
 
     public function test_portal_user_store_first_step_returns_user_not_found_error_when_email_missing(): void

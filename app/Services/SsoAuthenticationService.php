@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\SsoNotStaffAccountException;
 use App\Models\AuditLog;
 use App\Models\Identity;
 use App\Models\User;
@@ -37,8 +38,20 @@ class SsoAuthenticationService
             'link_binding' => $link ? $this->identityBinding($request->user(), $provider) : null,
         ]);
 
+        // The email-first staff sign-in passes the typed address on, so people
+        // don't type it twice. Only an address in the organisation's domain.
+        $hint = strtolower(trim((string) $request->query('login_hint', '')));
+        $hintParameters = $audience === 'staff' && ! $link && $config['domain'] !== ''
+            && filter_var($hint, FILTER_VALIDATE_EMAIL) && str_ends_with($hint, '@'.$config['domain'])
+            ? ['login_hint' => $hint]
+            : [];
+
         return $this->driver($provider, $config, $audience)
-            ->with($provider === 'microsoft' ? ['prompt' => 'select_account'] : ['prompt' => 'select_account', ...($audience === 'staff' ? ['hd' => $config['domain']] : [])])
+            ->with([
+                'prompt' => 'select_account',
+                ...($provider === 'google' && $audience === 'staff' ? ['hd' => $config['domain']] : []),
+                ...$hintParameters,
+            ])
             ->redirect();
     }
 
@@ -66,12 +79,20 @@ class SsoAuthenticationService
         abort_unless(filter_var($email, FILTER_VALIDATE_EMAIL), 401, 'The provider did not return a valid email address.');
         if ($provider === 'google') {
             abort_unless(($user->user['email_verified'] ?? false) === true, 403, 'Google must verify this email address.');
-            if ($audience === 'staff') {
-                abort_unless(strtolower((string) ($user->user['hd'] ?? '')) === $config['domain'], 403, 'Google sign-in is restricted to the configured Workspace domain.');
-            }
         }
         if ($audience === 'staff') {
-            abort_unless($config['domain'] !== '' && substr(strrchr($email, '@') ?: '', 1) === $config['domain'], 403, 'Staff sign-in is restricted to the configured organisation domain.');
+            abort_unless($config['domain'] !== '', 403, 'Staff sign-in is restricted to the configured organisation domain.');
+            // An address outside the organisation (typically a family member's
+            // personal account) is not a staff account: explain, don't 403.
+            if (substr(strrchr($email, '@') ?: '', 1) !== $config['domain']) {
+                abort_if(($flow['link_user_id'] ?? null) !== null, 403, 'Staff sign-in is restricted to the configured organisation domain.');
+
+                throw new SsoNotStaffAccountException($email);
+            }
+            if ($provider === 'google') {
+                // The email suffix alone never proves Workspace membership.
+                abort_unless(strtolower((string) ($user->user['hd'] ?? '')) === $config['domain'], 403, 'Google sign-in is restricted to the configured Workspace domain.');
+            }
         }
 
         return ['user' => $user, 'link_user_id' => $flow['link_user_id'] ?? null, 'link_binding' => $flow['link_binding'] ?? null, 'configuration_fingerprint' => $this->fingerprint($config)];

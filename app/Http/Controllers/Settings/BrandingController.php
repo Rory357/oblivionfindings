@@ -21,6 +21,7 @@ class BrandingController extends Controller
         $brandingTagline = AppSetting::query()->where('key', 'branding.tagline')->value('value');
         $brandingReportSubtitle = AppSetting::query()->where('key', 'branding.report_subtitle')->value('value');
         $logoPath = AppSetting::query()->where('key', 'branding.logo_path')->value('value');
+        $logoDarkPath = AppSetting::query()->where('key', 'branding.logo_dark_path')->value('value');
         $faviconPath = AppSetting::query()->where('key', 'branding.favicon_path')->value('value');
 
         // Email & Report branding
@@ -49,6 +50,7 @@ class BrandingController extends Controller
                 'tagline' => is_string($brandingTagline) ? $brandingTagline : null,
                 'report_subtitle' => is_string($brandingReportSubtitle) ? $brandingReportSubtitle : null,
                 'logoUrl' => $logoPath ? Storage::disk('public')->url($logoPath) : null,
+                'logoDarkUrl' => $logoDarkPath ? Storage::disk('public')->url($logoDarkPath) : null,
                 'faviconUrl' => $faviconPath ? Storage::disk('public')->url($faviconPath) : null,
                 'email_header_colour' => is_string($emailHeaderColour) ? $emailHeaderColour : null,
                 'email_footer_text' => is_string($emailFooterText) ? $emailFooterText : null,
@@ -85,6 +87,8 @@ class BrandingController extends Controller
 
             'logo' => ['nullable', 'file', 'image', 'max:2048'],
             'remove_logo' => ['nullable', 'boolean'],
+            'logo_dark' => ['nullable', 'file', 'image', 'max:2048'],
+            'remove_logo_dark' => ['nullable', 'boolean'],
             'favicon' => ['nullable', 'file', 'image', 'max:512'],
             'remove_favicon' => ['nullable', 'boolean'],
         ]);
@@ -146,6 +150,24 @@ class BrandingController extends Controller
 
             $path = $request->file('logo')->store('branding', 'public');
             AppSetting::updateOrCreate(['key' => 'branding.logo_path'], ['value' => $path]);
+        }
+
+        // Logo for dark backgrounds (sign-in brand half, dark mode) upload / removal
+        $removeLogoDark = (bool) ($data['remove_logo_dark'] ?? false);
+        $existingLogoDarkPath = AppSetting::query()->where('key', 'branding.logo_dark_path')->value('value');
+
+        if ($removeLogoDark && $existingLogoDarkPath) {
+            Storage::disk('public')->delete($existingLogoDarkPath);
+            AppSetting::query()->where('key', 'branding.logo_dark_path')->delete();
+        }
+
+        if ($request->hasFile('logo_dark')) {
+            if ($existingLogoDarkPath) {
+                Storage::disk('public')->delete($existingLogoDarkPath);
+            }
+
+            $path = $request->file('logo_dark')->store('branding', 'public');
+            AppSetting::updateOrCreate(['key' => 'branding.logo_dark_path'], ['value' => $path]);
         }
 
         // Favicon upload / removal

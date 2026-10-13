@@ -31,14 +31,28 @@ function asToastText(value: unknown): string | null {
     return null;
 }
 
+/**
+ * The Journey sign-in and account screens show every message in their own
+ * designed notices and panels (approved 13 Oct 2026); a toast would repeat
+ * them, and in rawer words ("These credentials do not match our records").
+ */
+function ownsItsMessages(component: string): boolean {
+    return (
+        component.startsWith('auth/') ||
+        component === 'portal/login' ||
+        component === 'portal/invitation'
+    );
+}
+
 export default function FlashToaster() {
     const page = usePage();
     const props = page.props as {
         flash?: Flash;
         errors?: Record<string, unknown>;
     };
-    const flash = props.flash as Flash | undefined;
-    const errors = props.errors;
+    const quiet = ownsItsMessages(page.component);
+    const flash = quiet ? undefined : (props.flash as Flash | undefined);
+    const errors = quiet ? undefined : props.errors;
     // Shift Notes owns confirmation in its command dialog after matching the
     // committed receipt. A generic redirect message must not bypass that check.
     const rawSuccess = asToastText(flash?.success);

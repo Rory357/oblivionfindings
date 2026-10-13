@@ -120,6 +120,7 @@ return [
             'description' => 'Tāurua tō īmēra me tō kupuhipa ki raro nei hei takiuru',
             'head' => 'Takiuru',
             'submit' => 'Takiuru',
+            'continue' => 'Haere tonu',
             'remember' => 'Maumahara ki ahau',
             'no_account' => 'Kāore anō he pūkete?',
             'sign_up' => 'Rēhita',

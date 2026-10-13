@@ -11,6 +11,15 @@ const alertVariants = cva(
         default: "bg-background text-foreground",
         destructive:
           "text-destructive-foreground [&>svg]:text-current *:data-[slot=alert-description]:text-destructive-foreground/80",
+        // Toned notices on the verified status token pairs (DESIGN.md §Status).
+        critical:
+          "border-transparent bg-status-critical-bg text-status-critical *:data-[slot=alert-description]:text-current",
+        warning:
+          "border-transparent bg-status-warning-bg text-status-warning *:data-[slot=alert-description]:text-current",
+        info:
+          "border-transparent bg-status-info-bg text-status-info *:data-[slot=alert-description]:text-current",
+        success:
+          "border-transparent bg-status-success-bg text-status-success *:data-[slot=alert-description]:text-current",
       },
     },
     defaultVariants: {

@@ -2,6 +2,7 @@
 
 @import 'tw-animate-css';
 @import './maintenance-date-time.css';
+@import './journey-auth.css';
 
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
@@ -157,6 +158,15 @@
     --color-brand-deep: var(--brand-deep);
     --color-brand-tint-deep: var(--brand-tint-deep);
     --color-text-faint: var(--text-faint);
+
+    /* Journey brand (sign-in pages; resources/css/journey-auth.css) */
+    --color-journey-ink: var(--journey-ink);
+    --color-journey-ink-muted: var(--journey-ink-muted);
+    --color-journey-paper: var(--journey-paper);
+    --color-journey-lavender: var(--journey-lavender);
+    --color-journey-lilac: var(--journey-lilac);
+    --color-journey-surface: var(--journey-surface);
+    --color-journey-field: var(--journey-field);
 }
 
 :root {
@@ -449,6 +459,22 @@
     --brand-tint-deep: oklch(from var(--primary) 0.88 0.07 h);
     --text-faint: oklch(from var(--foreground) 0.46 c h);
 
+    /* Journey brand palette (Oblivion Care "Journey" identity, design proposal
+       3 Oct 2026). Derived from --primary so Settings › Branding recolours the
+       sign-in pages too: with --primary #7040D6 these reproduce the brand's
+       near-black #141019, lavender #D6B9FF and white #FCFAFF exactly. */
+    --journey-ink: oklch(from var(--primary) 0.182 0.019 calc(h + 13));
+    --journey-paper: oklch(from var(--primary) 0.988 0.007 calc(h + 12));
+    --journey-lavender: oklch(
+        from var(--primary) 0.834 calc(c * 0.468) calc(h + 11.5)
+    );
+    /* Text on ink that isn't white: ≥ 7:1 on --journey-ink for every hue. */
+    --journey-ink-muted: oklch(from var(--journey-lavender) 0.8 calc(c * 0.35) h);
+    --journey-lilac: oklch(from var(--journey-lavender) 0.94 calc(c * 0.3) h);
+    /* The form half of the sign-in pages and its input fill. */
+    --journey-surface: var(--journey-paper);
+    --journey-field: oklch(from var(--journey-paper) 0.982 c h);
+
     /* Map tokens — themable. Status colours (online/offline/idle/moving) stay
        semantic and remain hardcoded inside leaflet-map.tsx. */
     --map-marker-house: var(--primary);
@@ -583,6 +609,10 @@
     --brand-deep: oklch(from var(--primary) calc(l + 0.06) c h);
     --brand-tint-deep: oklch(from var(--primary) 0.42 0.1 h);
     --text-faint: oklch(from var(--foreground) 0.5 c h);
+
+    /* Journey sign-in pages in dark mode: the form half turns dark too. */
+    --journey-surface: oklch(from var(--primary) 0.165 0.018 calc(h + 12));
+    --journey-field: oklch(from var(--primary) 0.2 0.022 calc(h + 12));
 }
 
 @layer base {

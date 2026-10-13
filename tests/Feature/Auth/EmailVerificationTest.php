@@ -31,9 +31,11 @@ test('unverified app user is denied a representative verified route regardless o
 test('verified app user is allowed through a representative verified route', function () {
     $user = User::factory()->create();
 
+    // /dashboard renders the role Overview since 753a7f396 (it used to
+    // redirect staff to My Day); either way it is not the verification notice.
     $this->actingAs($user)
         ->get(route('dashboard'))
-        ->assertRedirect(route('my-day'));
+        ->assertOk();
 });
 
 test('email can be verified', function () {

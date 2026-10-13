@@ -1,18 +1,25 @@
-import AuthLayoutTemplate from '@/layouts/auth/auth-simple-layout';
+import AuthJourneyLayout from '@/layouts/auth/auth-journey-layout';
 
+/**
+ * Generic auth page wrapper (register and any page without its own design):
+ * the approved Journey half-and-half layout with a plain title block.
+ */
 export default function AuthLayout({
     children,
     title,
     description,
-    ...props
 }: {
     children: React.ReactNode;
     title: string;
     description: string;
 }) {
     return (
-        <AuthLayoutTemplate title={title} description={description} {...props}>
+        <AuthJourneyLayout title={title}>
+            <div className="flex flex-col gap-1.5">
+                <h1 className="journey-title">{title}</h1>
+                <p className="journey-subtitle">{description}</p>
+            </div>
             {children}
-        </AuthLayoutTemplate>
+        </AuthJourneyLayout>
     );
 }

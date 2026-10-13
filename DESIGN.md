@@ -74,7 +74,7 @@ New status key? Add it to `status-colors.ts` once; it's used on 50+ pages.
 |---|---|
 | Admin/back-office pages | `layouts/app-layout.tsx` (sidebar) + `components/page-shell.tsx` for the title/description/actions header |
 | Frontline/staff mobile pages | `layouts/staff-page-shell.tsx` (+ `staff-bottom-nav`, `.staff-shell-content`, `.frontline-sticky-footer`, `.frontline-header-inset` safe-area helpers from `app.css`) |
-| Auth screens | `layouts/auth/*` |
+| Auth screens | `layouts/auth/auth-journey-layout.tsx` (the Journey half-and-half; see Recurring patterns) |
 | Settings pages | `layouts/settings/layout.tsx` |
 | Marketing pages | `layouts/marketing-layout.tsx` |
 
@@ -149,6 +149,23 @@ meter row).
 ---
 
 ## Recurring patterns — where the canonical version lives
+
+- **Sign-in and account screens: the Journey half-and-half (approved
+  2026-10-13).** Every sign-in, password, verification, invitation and
+  signed-out screen uses `layouts/auth/auth-journey-layout.tsx`. It has a brand
+  half (staff: ink; family: lilac, ink in dark mode) with the NZ islands
+  `JourneyMark`, a two-line headline and the identity from `BrandLockup`, and a
+  plain form half. Styles live in `resources/css/journey-auth.css`; colours
+  are the `--journey-*` tokens, derived from `--primary` so
+  Settings › Branding recolours them. Identity follows branding: no custom
+  branding shows the Journey mark and "oblivion care"; an uploaded logo shows
+  that logo (its "logo for dark backgrounds" version on ink); a custom name
+  alone shows the name without our mark, with "Powered by oblivion care". The
+  islands artwork stays for every client. Staff sign-in asks for the email
+  first and sends organisation domains to their provider. Family sign-in
+  offers the emailed sign-in link first. The journey animation plays once,
+  only while a sign-in is sent. Mockups: the "Sign-in redesign" canvas
+  (claude.ai/artifact/TKAEX7134Dgt5zp7ehDuHn), boards marked "chosen".
 
 - **Calendars — always the Site Calendar style** (approved 2026-09-13).
   `resources/js/pages/sites/calendar/SiteCalendar.tsx` and `_parts.tsx`
@@ -336,6 +353,12 @@ meter row).
 These are recurring mistakes. Recognise and avoid them; each has burned us
 before.
 
+- **Generic sign-in screens** (corrected 2026-10-13: "this does not look
+  unique to us") — sign-in or account pages built from stock auth layouts, a
+  photo background, plain token cards or the shell's ring wordmark. Brand-facing
+  screens use the Oblivion Care Journey identity through
+  `auth-journey-layout.tsx` (Recurring patterns). Don't add a giant stacked
+  wordmark (rejected as Option D) or looping decorative motion.
 - **Raw palette classes / inline hex** — bypasses rebranding; ESLint blocks it.
 - **Hardcoded hues inside CSS utilities** — ESLint only sees classNames, so
   hex hiding in `app.css` rules or `style={{}}` props escapes it. Known
