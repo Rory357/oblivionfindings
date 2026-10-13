@@ -476,3 +476,10 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
     - encrypted page history, so Back after sign-out lands on /login.
   - **Gates:** Pest 103 + 392/393, vitest 179, tsc and eslint 0. The 1 failure is the load-sensitive worker-start timeout, which passed when run alone.
   - **Lane A next:** server-side check of the "I've checked the label" tick (missing → 422 `label_checked`; a queued dose is parked for the lead), then A5–A9 and A8.
+- **Lane B, EA-136 and EA-025 follow-ups LIVE: merge `4cb4bca65`.**
+  - A pharmacy acceptance that contradicts recorded contact raises a lead "Check for a duplicate supply" follow-up.
+  - Submitted prescriber requests appear in All Tasks for order managers at the person's house, following the person rule, until someone decides them. TaskAggregator gained one line.
+  - Main resolved the follow-up type lists so both `offline_review` and `duplicate_supply` are kept.
+  - Gates: 151 + 128 passed.
+  - **Environment:** tests were blocked from 14:45 to 19:25 because free RAM stayed under the lock's 5.5 GB floor (Chrome, Claude sessions and ChatGPT). Stephan closed apps.
+  - **Codex checkpoint `30aafb208` broke every Inertia page** (missing LeaveReviewReceipt). `01fc068a6` fixed it.
