@@ -13,6 +13,9 @@ use App\Domain\Hr\Notifications\AnnouncementPublishedNotification;
 use App\Domain\Hr\Notifications\AnnouncementReminderNotification;
 use App\Domain\Hr\Services\AnnouncementAudienceResolver;
 use App\Domain\Hr\Services\AnnouncementInboxBridge;
+use App\Domain\Hr\Services\AnnouncementReadState;
+use App\Domain\Hr\Services\AnnouncementRecurrence;
+use App\Domain\Hr\Services\AnnouncementRepeatEditing;
 use App\Domain\Hr\Services\FeedService;
 use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
@@ -143,6 +146,14 @@ class AnnouncementController extends Controller
         return redirect()->route('hr.announcements.index');
     }
 
+    public function editData(Request $request, HrAnnouncement $announcement)
+    {
+        abort_unless($this->canManageAnnouncements($request->user()), 403);
+        $announcement->load(['creator:id,name', 'targets', 'attachments']);
+
+        return response()->json($this->detailPayload($announcement, false))->header('Cache-Control', 'private, no-store');
+    }
+
     /* ================================================================== */
     /*  Create / update / lifecycle */
     /* ================================================================== */
@@ -169,6 +180,7 @@ class AnnouncementController extends Controller
                 'recurrence_ends_at' => $data['recurrence_ends_at'],
                 'is_pinned' => $data['is_pinned'],
                 'requires_acknowledgement' => $data['requires_acknowledgement'],
+                'push_to_bell' => $data['push_to_bell'],
             ]);
 
             $this->syncTargets($announcement, $data['targets']);
@@ -187,10 +199,13 @@ class AnnouncementController extends Controller
     {
         $user = $request->user();
         abort_unless($this->canManageAnnouncements($user), 403);
-        $data = $this->validatePayload($request);
+        $data = $this->validatePayload($request, $announcement);
         $wasPublished = $announcement->status === 'published';
 
         DB::transaction(function () use ($announcement, $data, $request, $user, $wasPublished) {
+            $announcement = HrAnnouncement::whereKey($announcement->id)->lockForUpdate()->firstOrFail();
+            $before = clone $announcement;
+            $wasPublished = $announcement->status === 'published';
             $announcement->update([
                 'title' => $data['title'],
                 'content' => $data['content'],
@@ -205,11 +220,13 @@ class AnnouncementController extends Controller
                 'recurrence_ends_at' => $data['recurrence_ends_at'],
                 'is_pinned' => $data['is_pinned'],
                 'requires_acknowledgement' => $data['requires_acknowledgement'],
+                'push_to_bell' => $data['push_to_bell'],
             ]);
 
             $this->syncTargets($announcement, $data['targets']);
             $this->storeAttachments($announcement, $request, $user->id);
 
+            app(AnnouncementRepeatEditing::class)->synchronise($announcement, $before);
             $this->afterSave($announcement, $user->id, $data['push_to_bell'], wasPublished: $wasPublished);
         });
 
@@ -221,7 +238,7 @@ class AnnouncementController extends Controller
     {
         $user = $request->user();
         abort_unless($this->canManageAnnouncements($user), 403);
-        $announcement->update(['status' => 'archived']);
+        $announcement->forceFill(['status' => 'archived', 'recurrence_cancelled_at' => null])->save();
         $this->bridge->withdraw($announcement);
 
         return redirect()->back()->with('success', 'Announcement archived.');
@@ -231,14 +248,17 @@ class AnnouncementController extends Controller
     {
         $user = $request->user();
         abort_unless($this->canManageAnnouncements($user), 403);
-        $announcement = HrAnnouncement::withTrashed()->findOrFail($id);
-
-        if ($announcement->trashed()) {
-            $announcement->restore();
-        }
-
-        $announcement->update(['status' => $this->statusFromDates($announcement)]);
-        $this->afterSave($announcement->fresh('targets'), $user->id, true, wasPublished: false);
+        DB::transaction(function () use ($id, $user) {
+            $announcement = HrAnnouncement::withTrashed()->whereKey($id)->lockForUpdate()->firstOrFail();
+            $before = clone $announcement;
+            $wasPublished = ! $announcement->trashed() && $announcement->status === 'published';
+            if ($announcement->trashed()) {
+                $announcement->restore();
+            }
+            $announcement->update(['status' => $this->statusFromDates($announcement)]);
+            app(AnnouncementRepeatEditing::class)->synchronise($announcement, $before);
+            $this->afterSave($announcement->fresh('targets'), $user->id, $announcement->push_to_bell, wasPublished: $wasPublished);
+        });
 
         return redirect()->back()->with('success', 'Announcement restored.');
     }
@@ -247,9 +267,14 @@ class AnnouncementController extends Controller
     {
         $user = $request->user();
         abort_unless($this->canManageAnnouncements($user), 403);
-        $wasPublished = $announcement->status === 'published';
-        $announcement->update(['status' => 'published', 'published_at' => now()]);
-        $this->afterSave($announcement->fresh('targets'), $user->id, true, wasPublished: $wasPublished);
+        DB::transaction(function () use ($announcement, $user) {
+            $announcement = HrAnnouncement::whereKey($announcement->id)->lockForUpdate()->firstOrFail();
+            $before = clone $announcement;
+            $wasPublished = $announcement->status === 'published';
+            $announcement->update(['status' => 'published', 'published_at' => $wasPublished ? $announcement->published_at : now()]);
+            app(AnnouncementRepeatEditing::class)->synchronise($announcement, $before);
+            $this->afterSave($announcement->fresh('targets'), $user->id, $announcement->push_to_bell, wasPublished: $wasPublished);
+        });
 
         return redirect()->back()->with('success', 'Announcement published.');
     }
@@ -298,6 +323,7 @@ class AnnouncementController extends Controller
             'can' => [
                 'manage' => $canManage,
                 'react' => (bool) $user->canDo('hr.recognition.give'),
+                'confirm' => app(AnnouncementReadState::class)->canConfirm($announcement, $user),
             ],
         ]);
     }
@@ -312,10 +338,9 @@ class AnnouncementController extends Controller
         abort_unless($this->canViewAnnouncements($user), 403);
         $this->assertAnnouncementVisibleTo($announcement, $user);
 
-        HrAnnouncementAcknowledgement::firstOrCreate(
-            ['announcement_id' => $announcement->id, 'user_id' => $user->id],
-            ['acknowledged_at' => now()],
-        );
+        abort_unless(app(AnnouncementReadState::class)->canConfirm($announcement, $user), 404);
+        $data = $request->validate(['version' => 'required|string|size:64']);
+        app(AnnouncementReadState::class)->confirm($announcement, $user, $data['version']);
 
         return redirect()->back()->with('success', 'Announcement acknowledged.');
     }
@@ -330,16 +355,8 @@ class AnnouncementController extends Controller
         $recipient = User::query()->find($data['user_id']);
         abort_unless($recipient && $this->resolver->includesCurrentUser($announcement, $recipient), 404);
 
-        // Record the manager override (actor + subject) on the ack row so the
-        // roster can show "marked by a manager" and the action is auditable.
-        $ack = HrAnnouncementAcknowledgement::firstOrCreate(
-            ['announcement_id' => $announcement->id, 'user_id' => $data['user_id']],
-            ['acknowledged_at' => now()],
-        );
-
-        if ($ack->wasRecentlyCreated && $ack->isFillable('acknowledged_by')) {
-            $ack->update(['acknowledged_by' => $user->id]);
-        }
+        $version = $request->validate(['version' => 'required|string|size:64']);
+        app(AnnouncementReadState::class)->confirm($announcement, $recipient, $version['version'], $user);
 
         return redirect()->back()->with('success', 'Marked acknowledged.');
     }
@@ -438,30 +455,35 @@ class AnnouncementController extends Controller
 
         $count = 0;
         foreach ($announcements as $announcement) {
-            switch ($data['action']) {
-                case 'pin':
-                    $announcement->update(['is_pinned' => true]);
-                    break;
-                case 'unpin':
-                    $announcement->update(['is_pinned' => false]);
-                    break;
-                case 'archive':
-                    $announcement->update(['status' => 'archived']);
-                    $this->bridge->withdraw($announcement);
-                    break;
-                case 'publish':
-                    $wasPublished = $announcement->status === 'published';
-                    $announcement->update(['status' => 'published', 'published_at' => $announcement->published_at ?? now()]);
-                    $this->afterSave($announcement, $user->id, true, wasPublished: $wasPublished);
-                    break;
-                case 'delete':
-                    $this->bridge->withdraw($announcement);
-                    $announcement->delete();
-                    break;
-                case 'remind':
-                    $this->sendReminders($announcement, $user->id, null);
-                    break;
-            }
+            DB::transaction(function () use ($announcement, $data, $user) {
+                $announcement = HrAnnouncement::whereKey($announcement->id)->lockForUpdate()->firstOrFail();
+                switch ($data['action']) {
+                    case 'pin':
+                        $announcement->update(['is_pinned' => true]);
+                        break;
+                    case 'unpin':
+                        $announcement->update(['is_pinned' => false]);
+                        break;
+                    case 'archive':
+                        $announcement->forceFill(['status' => 'archived', 'recurrence_cancelled_at' => null])->save();
+                        $this->bridge->withdraw($announcement);
+                        break;
+                    case 'publish':
+                        $before = clone $announcement;
+                        $wasPublished = $announcement->status === 'published';
+                        $announcement->update(['status' => 'published', 'published_at' => $wasPublished ? $announcement->published_at : now()]);
+                        app(AnnouncementRepeatEditing::class)->synchronise($announcement, $before);
+                        $this->afterSave($announcement, $user->id, $announcement->push_to_bell, wasPublished: $wasPublished);
+                        break;
+                    case 'delete':
+                        $this->bridge->withdraw($announcement);
+                        $announcement->delete();
+                        break;
+                    case 'remind':
+                        $this->sendReminders($announcement, $user->id, null);
+                        break;
+                }
+            });
             $count++;
         }
 
@@ -584,7 +606,7 @@ class AnnouncementController extends Controller
     /**
      * @return array<string,mixed>
      */
-    private function validatePayload(Request $request): array
+    private function validatePayload(Request $request, ?HrAnnouncement $announcement = null): array
     {
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -616,6 +638,9 @@ class AnnouncementController extends Controller
                 $targets = $this->normaliseTargets([
                     ['type' => $legacyType, 'value' => $request->input('target_value')],
                 ], strict: true);
+            } elseif (! $request->exists('target_audience') && $announcement) {
+                $savedTargets = $announcement->targets()->get(['type', 'value'])->toArray();
+                $targets = $this->normaliseTargets($savedTargets ?: [['type' => $announcement->target_audience, 'value' => $announcement->target_value]], strict: true);
             }
         }
         if (empty($targets)) {
@@ -623,19 +648,26 @@ class AnnouncementController extends Controller
         }
 
         $intent = $validated['intent'] ?? 'publish';
-        $publishedAt = ! empty($validated['published_at']) ? Carbon::parse($validated['published_at']) : null;
+        $publishedAt = ! empty($validated['published_at']) ? Carbon::parse($validated['published_at'])->utc() : null;
 
         // Derive lifecycle status from the intent + schedule.
         if ($intent === 'draft') {
             $status = 'draft';
-            $publishedAt = $publishedAt; // may be null
-        } elseif ($intent === 'schedule' && $publishedAt && $publishedAt->isFuture()) {
+        } elseif ($intent === 'schedule') {
+            if (! $publishedAt || ! $publishedAt->isFuture()) {
+                throw ValidationException::withMessages(['published_at' => 'Choose a future publication time, or choose Publish now.']);
+            }
             $status = 'scheduled';
         } else {
             $status = 'published';
-            $publishedAt = $publishedAt && $publishedAt->isPast() ? $publishedAt : ($publishedAt ?? now());
-            if (! $publishedAt) {
-                $publishedAt = now();
+            $publishedAt ??= $announcement?->status === 'published' ? ($announcement->published_at ?? now()) : now();
+        }
+
+        $dates = [];
+        foreach (['expires_at', 'ack_deadline', 'recurrence_ends_at'] as $field) {
+            $dates[$field] = ! empty($validated[$field]) ? Carbon::parse($validated[$field])->utc() : null;
+            if ($status !== 'draft' && $dates[$field] && $publishedAt && $dates[$field]->lte($publishedAt)) {
+                throw ValidationException::withMessages([$field => 'Choose a date after the publication time.']);
             }
         }
 
@@ -651,13 +683,13 @@ class AnnouncementController extends Controller
             'legacy_audience' => $first['type'] === 'user' ? 'all' : $first['type'],
             'legacy_value' => $first['type'] === 'all' ? null : $first['value'],
             'published_at' => $publishedAt,
-            'expires_at' => ! empty($validated['expires_at']) ? Carbon::parse($validated['expires_at']) : null,
-            'ack_deadline' => ! empty($validated['ack_deadline']) ? Carbon::parse($validated['ack_deadline']) : null,
+            'expires_at' => $dates['expires_at'],
+            'ack_deadline' => $dates['ack_deadline'],
             'recurrence' => $validated['recurrence'] ?? null,
-            'recurrence_ends_at' => ! empty($validated['recurrence_ends_at']) ? Carbon::parse($validated['recurrence_ends_at']) : null,
+            'recurrence_ends_at' => $dates['recurrence_ends_at'],
             'is_pinned' => (bool) ($validated['is_pinned'] ?? false),
             'requires_acknowledgement' => (bool) ($validated['requires_acknowledgement'] ?? false),
-            'push_to_bell' => (bool) ($validated['push_to_bell'] ?? in_array($validated['priority'], ['high', 'urgent'], true)),
+            'push_to_bell' => (bool) ($validated['push_to_bell'] ?? $announcement?->push_to_bell ?? in_array($validated['priority'], ['high', 'urgent'], true)),
         ];
     }
 
@@ -800,10 +832,13 @@ class AnnouncementController extends Controller
             }
 
             if (! $wasPublished) {
-                $notification = new AnnouncementPublishedNotification($announcement->fresh());
+                $notification = (new AnnouncementPublishedNotification($announcement->fresh()))->afterCommit();
                 $this->resolver->resolveForAnnouncement($announcement, $creatorId)
                     ->each(fn ($recipient) => $recipient->notify($notification));
             }
+            app(AnnouncementRecurrence::class)->scheduleNext($announcement->fresh());
+        } else {
+            $this->bridge->withdraw($announcement);
         }
     }
 
@@ -818,6 +853,9 @@ class AnnouncementController extends Controller
 
     private function sendReminders(HrAnnouncement $announcement, int $actorId, ?array $userIds): int
     {
+        if ($announcement->status !== 'published' || ! $announcement->published_at?->lte(now()) || ($announcement->expires_at && ! $announcement->expires_at->isFuture()) || ! $announcement->requires_acknowledgement) {
+            return 0;
+        }
         $recipients = $this->resolver->resolveForAnnouncement($announcement);
 
         $acknowledgedIds = $announcement->acknowledgements()->pluck('user_id')->all();
@@ -1011,6 +1049,9 @@ class AnnouncementController extends Controller
             'by_site' => $bySite,
             'by_role' => $byRole,
             'roster' => $roster,
+            'version' => app(AnnouncementReadState::class)->token($announcement),
+            'can_confirm' => $announcement->requires_acknowledgement && $announcement->status === 'published' && $announcement->published_at?->lte(now()) && (! $announcement->expires_at || $announcement->expires_at->isFuture()),
+            'history' => $announcement->acknowledgementHistory()->where('read_version', '<', $announcement->read_version)->with('user:id,name')->orderByDesc('acknowledged_at')->get()->map(fn ($ack) => ['name' => $ack->user?->name ?? 'Former colleague', 'version' => $ack->read_version, 'acknowledged_at' => $ack->acknowledged_at->toIso8601String(), 'marked_by_manager' => $ack->acknowledged_by !== null])->all(),
         ];
     }
 
@@ -1179,7 +1220,7 @@ class AnnouncementController extends Controller
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->values();
-        $acknowledged = HrAnnouncementAcknowledgement::query()
+        $acknowledged = HrAnnouncementAcknowledgement::query()->current()
             ->where('user_id', $user->id)
             ->whereIn('announcement_id', $requiredIds)
             ->count();
@@ -1227,6 +1268,7 @@ class AnnouncementController extends Controller
             'sites' => [],
             'departments' => [],
             'roles' => [],
+            'people' => [],
         ];
     }
 
@@ -1303,18 +1345,23 @@ class AnnouncementController extends Controller
 
     private function detailPayload(HrAnnouncement $a, bool $includeAcknowledgements): array
     {
+        $targets = ($a->relationLoaded('targets') ? $a->targets : $a->targets()->get())
+            ->map(fn ($t) => ['type' => $t->type, 'value' => $t->value])->all();
+
         return [
             'id' => $a->id,
             'title' => $a->title,
             'content' => $a->content,
+            'version' => app(AnnouncementReadState::class)->token($a),
+            'read_version' => $a->read_version,
+            'push_to_bell' => $a->push_to_bell,
             'priority' => $a->priority,
             'status' => $a->status,
             'is_pinned' => (bool) $a->is_pinned,
             'requires_acknowledgement' => (bool) $a->requires_acknowledgement,
             'audience' => $this->audienceSummary($a),
             'audience_size' => $this->resolver->resolveForAnnouncement($a)->count(),
-            'targets' => ($a->relationLoaded('targets') ? $a->targets : $a->targets()->get())
-                ->map(fn ($t) => ['type' => $t->type, 'value' => $t->value])->all(),
+            'targets' => $targets ?: [['type' => $a->target_audience ?: 'all', 'value' => $a->target_value]],
             'recurrence' => $a->recurrence,
             'recurrence_ends_at' => optional($a->recurrence_ends_at)->toIso8601String(),
             'published_at' => optional($a->published_at)->toIso8601String(),
@@ -1380,6 +1427,9 @@ class AnnouncementController extends Controller
         if ($type === 'site' && is_numeric($value)) {
             return Site::find((int) $value)?->name ?? "Site #{$value}";
         }
+        if ($type === 'user' && ctype_digit($value)) {
+            return $this->currentStaff->currentUsersQuery()->whereKey((int) $value)->value('name') ?? 'Former colleague';
+        }
 
         return $value;
     }
@@ -1422,6 +1472,8 @@ class AnnouncementController extends Controller
             'sites' => $sites,
             'departments' => $departments,
             'roles' => $roles,
+            'people' => $this->currentStaff->currentUsersQuery()->orderBy('name')->get(['users.id', 'users.name'])
+                ->map(fn ($person) => ['key' => (string) $person->id, 'label' => $person->name, 'count' => 1])->all(),
         ];
     }
 

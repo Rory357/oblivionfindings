@@ -6,6 +6,7 @@ use App\Domain\Clinical\Services\ClinicalSiteAccessService;
 use App\Domain\Finance\Services\FinanceHubCountsService;
 use App\Domain\Governance\Models\PerformanceReview;
 use App\Domain\Governance\Services\BoardPackAccessService;
+use App\Domain\Hr\Services\LeaveReviewReceipt;
 use App\Domain\It\ItModuleNavigation;
 use App\Models\Announcement;
 use App\Models\AppSetting;
@@ -310,6 +311,7 @@ class HandleInertiaRequests extends Middleware
             // Flash messages for global toasts
             'flash' => [
                 'attendance_result' => fn () => $request->session()->get('attendance_result'),
+                'leave_review_result' => fn () => LeaveReviewReceipt::forRequester($request),
                 'staff_availability_result' => fn () => $request->session()->get('staff_availability_result'),
                 'workforce_settings_result' => function () use ($request) {
                     $outcome = $request->session()->get('workforce_settings_result');
@@ -598,6 +600,9 @@ class HandleInertiaRequests extends Middleware
     protected function buildUserPermissions($user): array
     {
         return [
+            'companyHub' => [
+                'view' => app(\App\Domain\CompanyHub\Services\HubAccess::class)->canEnter($user),
+            ],
             'sites' => [
                 'viewAny' => $user->canDo('sites.viewAny'),
                 'viewAll' => $user->canDo('sites.viewAll'),

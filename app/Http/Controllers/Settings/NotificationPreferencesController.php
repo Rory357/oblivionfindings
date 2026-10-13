@@ -54,7 +54,12 @@ class NotificationPreferencesController extends Controller
                 'enabled' => $event['effective']['inapp'] || $event['effective']['email'],
                 ...$event['effective'], 'push' => false,
             ]]))->all(),
-            'roleDefaults' => $rolePrefs->toBase()->groupBy('key')->map(function ($items) {
+            'roleDefaults' => $rolePrefs->toBase()->groupBy('key')->map(function ($items, $key) {
+                if ($key === 'hr.calendar.reminder') {
+                    return ['enabled' => $items->contains(fn ($p) => $p->enabled),
+                        'inapp' => $items->contains(fn ($p) => $p->enabled && $p->channel_inapp),
+                        'email' => $items->contains(fn ($p) => $p->enabled && $p->channel_email), 'push' => false];
+                }
                 // Any role enables => enabled, otherwise disabled.
                 $enabled = $items->contains(fn ($p) => (bool) $p->enabled === true);
                 $inapp = $items->contains(fn ($p) => (bool) $p->channel_inapp === true);

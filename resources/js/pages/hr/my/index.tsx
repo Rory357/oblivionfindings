@@ -613,7 +613,6 @@ export default function MyHrIndex({
     const [cleared, setCleared] = useState<Set<string>>(new Set());
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [congrats, setCongrats] = useState<Set<number>>(new Set());
-    const [acked, setAcked] = useState<Set<number>>(new Set());
     const [aroundView, setAroundView] = useState<AroundView | null>(null);
     const [leaveOpen, setLeaveOpen] = useState(false);
 
@@ -699,21 +698,8 @@ export default function MyHrIndex({
     }
 
     function acknowledge(id: number) {
-        router.post(
-            `/hr/announcements/${id}/acknowledge`,
-            {},
-            {
-                preserveScroll: true,
-                preserveState: true,
-                onSuccess: () => {
-                    setAcked((p) => new Set(p).add(id));
-                    toast.info('Acknowledged ✓', {
-                        description: "Thanks — noted that you've seen it.",
-                    });
-                },
-                onError: () => toast.error('Could not acknowledge'),
-            },
-        );
+        const notice = announcements.find((item) => item.id === id);
+        if (notice) router.visit(notice.read_url);
     }
 
     const workedPct = Math.min(
@@ -1149,8 +1135,7 @@ export default function MyHrIndex({
                                 <Empty>All caught up.</Empty>
                             ) : (
                                 announcements.slice(0, 2).map((a) => {
-                                    const seen =
-                                        acked.has(a.id) || a.acknowledged;
+                                    const seen = a.acknowledged;
                                     return (
                                         <div
                                             key={a.id}
@@ -1180,7 +1165,7 @@ export default function MyHrIndex({
                                             >
                                                 {seen
                                                     ? 'Seen ✓'
-                                                    : 'Acknowledge'}
+                                                    : 'Read notice'}
                                             </button>
                                         </div>
                                     );
@@ -1210,7 +1195,6 @@ export default function MyHrIndex({
                 whosOut={overview.whosOut}
                 announcements={announcements}
                 congrats={congrats}
-                acked={acked}
                 canViewFeed={canViewFeed}
                 onCongratulate={congratulate}
                 onAcknowledge={acknowledge}
