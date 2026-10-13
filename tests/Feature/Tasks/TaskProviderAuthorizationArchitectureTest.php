@@ -39,6 +39,7 @@ use App\Services\Tasks\Providers\MedicationErrorProvider;
 use App\Services\Tasks\Providers\MedicationFollowupProvider;
 use App\Services\Tasks\Providers\MedicationPaperGiverConfirmationProvider;
 use App\Services\Tasks\Providers\MedicationPaperWitnessConfirmationProvider;
+use App\Services\Tasks\Providers\MedicationPrescriberRequestProvider;
 use App\Services\Tasks\Providers\MedicationReviewChangeProvider;
 use App\Services\Tasks\Providers\MedicationReviewProvider;
 use App\Services\Tasks\Providers\MedicationRoundProvider;
@@ -59,7 +60,7 @@ use Illuminate\Support\Facades\Route;
 it('registers every task source behind exactly one authorization boundary', function () {
     $providers = TaskAggregator::defaultProviders();
 
-    expect($providers)->toHaveCount(40);
+    expect($providers)->toHaveCount(41);
     expect(collect($providers)->mapWithKeys(fn (TaskProvider $provider): array => [
         $provider::class => $provider->sourceKey(),
     ])->all())->toBe([
@@ -92,6 +93,7 @@ it('registers every task source behind exactly one authorization boundary', func
         MedicationEmergencyAccessReviewProvider::class => 'med_emergency_review',
         MedicationPaperGiverConfirmationProvider::class => 'med_paper_giver',
         MedicationPaperWitnessConfirmationProvider::class => 'med_paper_witness',
+        MedicationPrescriberRequestProvider::class => 'med_prescriber_request',
         MedicationRoundProvider::class => 'medication-round',
         CdLossReportProvider::class => 'cd_loss',
         DataBreachProvider::class => 'breach',

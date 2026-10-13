@@ -856,6 +856,7 @@ function taskRbacMatrix(): array
         'med_emergency_review' => ['visible' => [], 'hidden' => []],
         'med_paper_giver' => ['visible' => [], 'hidden' => []],
         'med_paper_witness' => ['visible' => [], 'hidden' => []],
+        'med_prescriber_request' => ['visible' => [], 'hidden' => []],
         'medication-round' => ['visible' => [], 'hidden' => []],
         'cd_loss' => $pair('cd_loss', $cdLossA, $cdLossB, 'CDL-91001', 'CDL-92001'),
         'breach' => ['visible' => [['id' => 'breach-'.$breach->id, 'source' => 'breach', 'numeric_id' => (int) $breach->id, 'token' => 'DBR-93001']], 'hidden' => []],
