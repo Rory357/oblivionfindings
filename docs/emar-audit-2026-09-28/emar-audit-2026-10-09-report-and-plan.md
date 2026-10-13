@@ -489,3 +489,19 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
   - The tick is kept as the audit row `medications.dose.label_checked`.
   - Gates: Pest 106/106, vitest 48, eslint 0.
   - **Main has 7 tsc errors, all non-eMAR, from Codex `01fc068a6`:** workforce restriction-approver-settings.test.tsx:135, handovers-hero.tsx:222, and 5 Security & Devices tests that import an uncommitted `.endpoint-tools` fixture.
+- **14 Oct: decisions and findings**
+  - **A8 Away cap, decided by Main under delegation.** D6 targets a forgotten return.
+    - Leave: the cap counts from the planned end (ends_on) plus the cap hours, or from departure if there is no planned end.
+    - Respite: the cap counts from the booking's planned end plus the cap hours.
+    - Hospital: after the cap hours, a lead follow-up "Record the discharge, or confirm they're still in hospital". Doses stay Away while the admission is open; "still in hospital" re-arms the follow-up.
+    - New setting `medications.away.hospital_no_discharge`: `follow_up` (default) or `owed_after_cap` (stricter).
+  - **Lane A A5–A9 red overnight, cause found.**
+    - "From yesterday" read days the projection doesn't hold, which owed doses due before the order existed. Fixed to read yesterday only when the projection holds it.
+    - The DST tests used the wrong UTC day.
+    - A9 intentionally changes two OverdueDoseAlerts tests to the EA-041 rule.
+    - The Away tests recorded departures in the future.
+  - **Overview `753a7f396` (another session) removed the dashboard's `emarWidgets`.**
+    - The new Overview shows no medication data (no leak).
+    - 5 eMAR tests that read emarWidgets are red on main. Lane C is updating them to assert the Overview carries no medication data.
+    - **For Stephan:** the home Overview no longer shows medication "due now" or alert counts.
+  - **Memory:** free RAM fell to about 1 GB at 06:45. ChatGPT and Codex use about 6 GB, plus about 4 GB of Codex node helpers. Main archived the finished destructive-alerts session.
