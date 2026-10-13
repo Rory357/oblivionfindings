@@ -28,7 +28,7 @@ import {
     Pill,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { ReadingState } from './reading';
+import { ReadingState, StaleNotice } from './reading';
 import { SectionCard } from './ui';
 import { useRecordJson } from './use-record-json';
 
@@ -116,9 +116,9 @@ function WeekChart({
     date: string | null;
     onChange: (date: string | null, week: boolean) => void;
 }) {
-    const { data, load, reload } = useRecordJson<{ days: MedicationDay[] }>(
-        `/emar/clients/${clientId}/record/week${date ? `?date=${date}` : ''}`,
-    );
+    const { data, load, reload, stale, loadedAt } = useRecordJson<{
+        days: MedicationDay[];
+    }>(`/emar/clients/${clientId}/record/week${date ? `?date=${date}` : ''}`);
     const [detail, setDetail] = useState<{
         day: MedicationDay;
         medicine: DayMedicine;
@@ -202,6 +202,7 @@ function WeekChart({
                 </>
             }
         >
+            <StaleNotice stale={stale} loadedAt={loadedAt} reload={reload} />
             <p className="text-caption text-muted-foreground">
                 {formatDateOnly(data.days[0].date)} –{' '}
                 {formatDateOnly(last.date)} · Pacific/Auckland
@@ -290,7 +291,7 @@ function WeekChart({
                                                 <Button
                                                     key={dose.key}
                                                     variant="outline"
-                                                    className="min-h-11 w-full flex-col items-start px-2 py-2 whitespace-normal"
+                                                    className="frontline-tap w-full flex-col items-start px-2 py-2 whitespace-normal"
                                                     onClick={() => {
                                                         if (
                                                             day.date ===

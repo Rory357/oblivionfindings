@@ -18,7 +18,6 @@ import {
     Shield,
     ShieldCheck,
     ToggleRight,
-    UserCheck,
     Users,
     type LucideIcon,
 } from 'lucide-react';
@@ -28,13 +27,6 @@ export const SET_VIEWS: Record<
     ViewKey,
     { label: string; secs: [string, string][] }
 > = {
-    connections: {
-        label: 'Connected services',
-        secs: [
-            ['overview', 'Overview'],
-            ['services', 'Switches and checks'],
-        ],
-    },
     rules: {
         label: 'Medication rules',
         secs: [
@@ -82,6 +74,15 @@ export const SET_VIEWS: Record<
         secs: [
             ['decide', 'Still to decide'],
             ['changes', 'All changes'],
+        ],
+    },
+    // EA-163/EA-164 (Lane C9): after the approved P11 views, so Settings
+    // opens on Medication rules. Approve-or-hide is Stephan's (§2A.6).
+    connections: {
+        label: 'Connected services',
+        secs: [
+            ['overview', 'Overview'],
+            ['services', 'Switches and checks'],
         ],
     },
 };

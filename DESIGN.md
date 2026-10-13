@@ -714,6 +714,9 @@ before.
   ancestor. Check any tap target by measuring the rendered px
   (`getBoundingClientRect`, or `elementFromPoint` 21 px from the centre
   for `.frontline-hit`), not by its class name or a "44px" comment.
+  Guardrail: `design/no-rem-tap-floor` rejects `min-h-11` / `min-w-11` in
+  the medication screens (`pages/emar`, `components/emar`, `pages/meds`;
+  EA-210, 2026-10-10).
 - **Personal contact details copied into work fields** (corrected
   2026-10-02, Settings › Profile). A generic "Phone number" field saved the
   user's own number and also copied it into the HR work phone, which the

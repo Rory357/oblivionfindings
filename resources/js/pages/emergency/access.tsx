@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Label } from '@/components/ui/label';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge } from '@/components/ui/status-badge';
 import {
     Table,
@@ -47,7 +48,7 @@ import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/datetime';
 import { emergencyTimeLeft } from '@/lib/emergency-access';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import {
     Clock,
     History,
@@ -80,6 +81,7 @@ type Pagination = {
     total: number;
     prev_page_url: string | null;
     next_page_url: string | null;
+    links?: { url: string | null; label: string; active: boolean }[];
 };
 type Props = {
     query: string;
@@ -573,30 +575,13 @@ export default function AccessPage(props: Props) {
                             Page {pagination.current_page} of{' '}
                             {pagination.last_page} · {pagination.total} grants
                         </p>
-                        <div className="flex gap-2">
-                            {pagination.prev_page_url && (
-                                <Button asChild variant="outline">
-                                    <Link
-                                        href={pagination.prev_page_url}
-                                        preserveState
-                                        preserveScroll
-                                    >
-                                        Previous
-                                    </Link>
-                                </Button>
-                            )}
-                            {pagination.next_page_url && (
-                                <Button asChild variant="outline">
-                                    <Link
-                                        href={pagination.next_page_url}
-                                        preserveState
-                                        preserveScroll
-                                    >
-                                        Next
-                                    </Link>
-                                </Button>
-                            )}
-                        </div>
+                        {/* EA-207 (Lane C9): jump to any page, not only Next. */}
+                        <LaravelPagination
+                            links={pagination.links ?? []}
+                            lastPage={pagination.last_page}
+                            preserveState
+                            preserveScroll
+                        />
                     </div>
                 )}
             </div>

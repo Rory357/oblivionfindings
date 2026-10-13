@@ -211,7 +211,7 @@ export function OverrideFollowupDialog({
                 footerStart={
                     <Button
                         variant="outline"
-                        className="min-h-11"
+                        className="frontline-tap"
                         disabled={saving || uncertain}
                         onClick={step ? () => setStep(step - 1) : close}
                     >
@@ -220,7 +220,7 @@ export function OverrideFollowupDialog({
                 }
                 footerEnd={
                     <Button
-                        className="min-h-11"
+                        className="frontline-tap"
                         disabled={
                             saving ||
                             !override.can_signoff ||
@@ -251,7 +251,10 @@ export function OverrideFollowupDialog({
                             title="Follow-up signed off"
                             blurb={`${signed.length} dose(s) checked and signed off. The witnessed counts and sign-offs remain in the history.`}
                             actions={
-                                <Button className="min-h-11" onClick={onClose}>
+                                <Button
+                                    className="frontline-tap"
+                                    onClick={onClose}
+                                >
                                     Done
                                 </Button>
                             }
@@ -357,7 +360,7 @@ export function OverrideFollowupDialog({
                                     override.can_signoff ? (
                                         <Button
                                             variant="outline"
-                                            className="min-h-11"
+                                            className="frontline-tap"
                                             onClick={() => setCounting(true)}
                                             disabled={medicines.some(
                                                 (medicine) =>
@@ -375,7 +378,7 @@ export function OverrideFollowupDialog({
                                 {doses.map((dose) => (
                                     <div
                                         key={dose.administration_id}
-                                        className="flex min-h-11 items-start gap-3 rounded-lg border p-4"
+                                        className="frontline-tap flex items-start gap-3 rounded-lg border p-4"
                                     >
                                         <Checkbox
                                             id={`followup-dose-${dose.administration_id}`}

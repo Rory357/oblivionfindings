@@ -361,7 +361,7 @@ export function ReviewPicker({
                         aria-expanded={open}
                         aria-invalid={!!error}
                         aria-describedby={error ? `${id}-error` : undefined}
-                        className="frontline-tap h-auto min-h-11 w-full justify-between gap-2 text-left"
+                        className="frontline-tap h-auto w-full justify-between gap-2 text-left"
                     >
                         <span className="min-w-0">
                             <span className="block truncate">

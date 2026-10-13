@@ -25,7 +25,7 @@ final class MedicationJourney
             return null;
         }
 
-        foreach (['/my-day', '/meds/today', '/emar', '/operations/clients', '/clients', '/operations/shifts', '/operations/handovers', '/attendance', '/tasks', '/sites', '/calendar', '/my-calendar', '/health-clinical'] as $prefix) {
+        foreach (['/my-day', '/meds/today', '/emar', '/operations/clients', '/clients', '/operations/shifts', '/operations/handovers', '/attendance', '/tasks', '/medication-followups', '/sites', '/calendar', '/my-calendar', '/health-clinical'] as $prefix) {
             if ($path === $prefix || str_starts_with($path, $prefix.'/')) {
                 // A return location describes one source, never a nested chain.
                 $query = array_values(array_filter(explode('&', $url['query'] ?? ''),

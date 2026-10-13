@@ -724,16 +724,9 @@ export default function Destructions({
 
                 {activeTab === 'reports' && (
                     <div className="flex flex-col gap-4">
-                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                            <StatCard
-                                label="Live records"
-                                value={liveFiltered.length}
-                                hint={
-                                    isFiltered
-                                        ? 'Matching filters'
-                                        : 'Excludes voided'
-                                }
-                            />
+                        {/* EA-228 (Lane C9): the header meters already give the
+                            live and 30-day counts; only the breakdowns repeat here. */}
+                        <div className="grid gap-4 sm:grid-cols-2">
                             <StatCard
                                 label="Controlled-drug disposals"
                                 value={
@@ -743,15 +736,6 @@ export default function Destructions({
                                 hint={
                                     isFiltered ? 'Matching filters' : 'All time'
                                 }
-                            />
-                            <StatCard
-                                label="Destroyed (30 days)"
-                                value={
-                                    liveFiltered.filter((d) =>
-                                        withinDays(d.destroyed_at, 30),
-                                    ).length
-                                }
-                                hint="Rolling"
                             />
                             <StatCard
                                 label="Voided records"
@@ -1015,7 +999,7 @@ function StatCard({
             <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                 {label}
             </div>
-            <div className="mt-1 text-2xl font-bold tabular-nums">{value}</div>
+            <div className="text-page-title mt-1 tabular-nums">{value}</div>
             {hint && (
                 <div className="text-xs text-muted-foreground">{hint}</div>
             )}

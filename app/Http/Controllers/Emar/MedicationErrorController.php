@@ -216,8 +216,36 @@ class MedicationErrorController extends Controller
             return ['week' => $start->format('d M'), 'count' => (clone $q)->count(), 'near_miss' => (clone $q)->where('reached_client', 'no')->count()];
         });
 
+        // EA-154 (Lane C9): the approved P08b meters — harm, actions due and
+        // incidents ready to close — counted in the same read scope.
+        $open = (clone $base)->whereIn('status', ['reported', 'investigating', 'resolved']);
+        // Actions count on errors still being worked (investigating or at actions).
+        $errorIds = (clone $base)->whereIn('status', ['investigating', 'resolved'])->pluck('medication_errors.id');
+        $openActions = \App\Models\MedicationErrorAction::query()->whereIn('medication_error_id', $errorIds)->whereNull('completed_at');
+        $dueSoon = (clone $openActions)->whereNotNull('due_at')->where('due_at', '<=', now()->addDays(7));
+        $mine = (clone $base)->where(fn ($q) => $q->where('reported_by', $actor->id)
+            ->orWhereHas('entries', fn ($entries) => $entries->where('kind', 'account')->where('actor_id', $actor->id)));
+        $iso = fn ($value) => $value ? CarbonImmutable::parse($value)->toIso8601String() : null;
+        $meters = [
+            'triage_overdue' => (clone $base)->where('status', 'reported')->where('triage_due_at', '<', now())->count(),
+            'triage_next_due' => $iso((clone $base)->where('status', 'reported')->min('triage_due_at')),
+            'open_with_harm' => (clone $open)->where('reached_client', 'yes')->whereIn('harm_level', ['minor', 'moderate', 'severe', 'death'])->count(),
+            'open_moderate_or_worse' => (clone $open)->where('reached_client', 'yes')->whereIn('harm_level', ['moderate', 'severe', 'death'])->count(),
+            'investigation_next_due' => $iso((clone $base)->where('status', 'investigating')->min('investigation_due_at')),
+            'actions_due' => (clone $dueSoon)->count(),
+            'actions_overdue' => (clone $openActions)->whereNotNull('due_at')->where('due_at', '<', now())->count(),
+            'actions_next_due' => $iso((clone $dueSoon)->min('due_at')),
+            'incidents_ready' => (clone $base)->where(fn ($q) => $q->where('workflow_stage', 'closed')
+                ->orWhere(fn ($legacy) => $legacy->whereNull('workflow_stage')->where('status', 'closed')))
+                ->whereHas('incident', fn ($q) => $q->where('status', '!=', 'closed'))->count(),
+            'can_close_incidents' => $actor->canDo('incidents.approve'),
+            'mine_open' => (clone $mine)->where('status', '!=', 'closed')->count(),
+            'mine_closed' => (clone $mine)->where('status', 'closed')->count(),
+            'closed_recent' => (clone $recent)->where('status', 'closed')->count(),
+        ];
+
         return Inertia::render('emar/MedicationErrors', [
-            'errors' => $errors, 'detail' => $detail,
+            'errors' => $errors, 'detail' => $detail, 'meters' => $meters,
             'pagination' => ['links' => $page->linkCollection(), 'total' => $page->total(), 'from' => $page->firstItem(), 'to' => $page->lastItem(), 'last_page' => $page->lastPage()],
             'filters' => ['tab' => $tab, 'q' => $request->input('q', ''), 'reach' => $request->input('reach', 'all'), 'site_id' => $siteFilter],
             'stats' => [

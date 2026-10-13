@@ -14,7 +14,19 @@ export interface RecordPerson {
     service: string | null;
 }
 
+/** EA-110: today's doses from the same schedule as Meds today; null when the day's history is unavailable. */
+export interface RecordDoseMeters {
+    scheduled: number;
+    due: number;
+    due_until: string | null;
+    late: number;
+    oldest_late: string | null;
+    recorded: number;
+    so_far: number;
+}
+
 export interface RecordMeters {
+    doses?: RecordDoseMeters | null;
     medicines: {
         count: number;
         hidden: number;
@@ -129,7 +141,11 @@ export type RecordPageProps =
               manage_orders: boolean;
               view_controlled: boolean;
               view_audit: boolean;
+              /** EA-110: reports.view + reports.export (Print MAR). */
+              print?: boolean;
           };
+          /** The NZ day, for Print MAR's ranges. */
+          today?: string;
           as_at: string;
       }
     | { unavailable: 'no_access' | 'not_found' };

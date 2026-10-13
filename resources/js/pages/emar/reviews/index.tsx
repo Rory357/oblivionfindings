@@ -27,9 +27,11 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatTime } from '@/lib/datetime';
-import { Head, router } from '@inertiajs/react';
+import { emarScopedHref } from '@/lib/emar-navigation';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     ArrowUpRight,
     CalendarClock,
@@ -110,6 +112,9 @@ const VIEW_TITLES: Record<ReviewView, string> = {
 type ChangeRow = { review: Review; item: ReviewItem };
 
 export default function ReviewsPage(props: ReviewPageProps) {
+    const page = usePage();
+    // EA-079 (Lane C8): Home-rooted, in the rail's own labels.
+    const breadcrumbs = useEmarBreadcrumbs();
     const {
         reviews,
         meters,
@@ -543,14 +548,7 @@ export default function ReviewsPage(props: ReviewPageProps) {
             ? `${reviews.from}–${reviews.to} of ${reviews.total} reviews`
             : `${reviews.total} reviews`;
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Home', href: '/dashboard' },
-                { title: 'Medication', href: '/emar/mar' },
-                { title: 'Orders & reviews', href: '/emar/prescriptions' },
-                { title: 'Medication reviews', href: '/emar/reviews' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Medication reviews" />
             <div className="flex min-w-0 flex-col gap-5">
                 <PageHeader
@@ -714,8 +712,12 @@ export default function ReviewsPage(props: ReviewPageProps) {
                             onSelect={(value) =>
                                 value === 'reviews'
                                     ? navigate({ view: 'due' })
-                                    : router.visit(
-                                          `/emar/prescriptions${value === 'orders' ? '' : `?view=${value}`}`,
+                                    : // EA-134 (Lane C8): keep the house and person.
+                                      router.visit(
+                                          emarScopedHref(
+                                              `/emar/prescriptions${value === 'orders' ? '' : `?view=${value}`}`,
+                                              page.url,
+                                          ),
                                       )
                             }
                         />
