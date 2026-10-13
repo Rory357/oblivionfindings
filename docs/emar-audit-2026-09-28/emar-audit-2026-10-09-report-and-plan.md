@@ -460,3 +460,19 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
   - Gates: c8b 42 passed, vitest 75; c9 43 passed; full eMAR vitest 500/500; tsc and eslint 0.
   - Still in Lane C, green but waiting for Lane A to land: C7 NZ-day reports, C10 cleanup, C9f (remaining P02 filters), C9g (MAR charts per house with an Allergies column), C9h (EA-156 staff eligibility witness view).
   - **Decision (Main):** a queued offline round item refused by the retired guided-round writer raises Lane A's `offline_review` lead follow-up, so no offline dose is silently lost. A live tap only gets the 409.
+- **Lane A LIVE: merge `167c346f0`** (345bdca5b over 8348aeb47)
+  - **A1:** as-needed, controlled-pack and Withheld › Other doses save.
+  - **A2:** a dose records the order the dialog showed. The dialog shows order changes.
+  - **A3:** offline doses are never silently discarded or misattributed. Refused replays raise an `offline_review` lead follow-up.
+  - **A4:** the service worker keeps no medication data.
+  - **A10:** a worker on shift records for everyone at the house they support. A resident they don't support shows "Not assigned to you".
+  - **A11:** pack photo in the recording dialog, with one Medicine photos tab (merged with C11).
+  - **Review fixes 1–7:**
+    - another worker's stranded items hidden on a shared device;
+    - replay max-age enforced on the API too;
+    - order identity;
+    - offline-review authority;
+    - captured_by on every action;
+    - encrypted page history, so Back after sign-out lands on /login.
+  - **Gates:** Pest 103 + 392/393, vitest 179, tsc and eslint 0. The 1 failure is the load-sensitive worker-start timeout, which passed when run alone.
+  - **Lane A next:** server-side check of the "I've checked the label" tick (missing → 422 `label_checked`; a queued dose is parked for the lead), then A5–A9 and A8.
