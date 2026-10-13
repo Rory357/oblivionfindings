@@ -68,7 +68,9 @@ export function HandoversHero({
     counts: HeroCounts;
     search: string;
     onSearch: (value: string) => void;
-    filters: Filters;
+    // Status is a server filter too, but changes only through onStatus so
+    // the page can leave the board view (board lists every status).
+    filters: Filters & { status: StatusTab };
     onFilter: (next: Partial<Filters>) => void;
     catalogue: Catalogue;
     onNewHandover: () => void;
