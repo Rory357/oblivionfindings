@@ -129,7 +129,7 @@ export function HistoricalAuditExportDialog({
                     {done ? (
                         <Button
                             autoFocus
-                            className="min-h-11"
+                            className="frontline-tap"
                             onClick={onClose}
                         >
                             Done
@@ -137,7 +137,7 @@ export function HistoricalAuditExportDialog({
                     ) : (
                         <>
                             <Button
-                                className="min-h-11"
+                                className="frontline-tap"
                                 variant="outline"
                                 onClick={onClose}
                                 disabled={busy}
@@ -145,7 +145,7 @@ export function HistoricalAuditExportDialog({
                                 Cancel
                             </Button>
                             <Button
-                                className="min-h-11"
+                                className="frontline-tap"
                                 onClick={download}
                                 disabled={
                                     busy ||

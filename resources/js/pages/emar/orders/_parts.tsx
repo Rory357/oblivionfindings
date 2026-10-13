@@ -33,6 +33,16 @@ export function Note({ children }: { children: ReactNode }) {
         </div>
     );
 }
+/**
+ * EA-052 (Lane C3): the order check and the dose check use one matcher —
+ * names, the built-in drug classes and any reviewed class rules.
+ */
+export function classMatchingText(classMatching: string): string {
+    return classMatching === 'configured'
+        ? 'Drug-class matching: the built-in classes (penicillins, sulfonamides, salicylates and NSAIDs) and your organisation’s reviewed class rules. Still check the prescription against every recorded allergy.'
+        : 'Drug-class matching: the built-in classes (penicillins, sulfonamides, salicylates and NSAIDs). Other classes aren’t matched, so check the prescription against every recorded allergy.';
+}
+
 export function Errors({ errors }: { errors: Record<string, string> }) {
     const messages = [...new Set(Object.values(errors).filter(Boolean))];
     return messages.length ? (

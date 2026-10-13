@@ -67,6 +67,31 @@ final class MedicationReviewOrderAdapter
         AuditLogger::logOrFail('medications.review.order_entered', $review, ['actor_id' => $actor->id, 'event_id' => $event->id]);
     }
 
+    /**
+     * EA-114 (Lane C3): a version entered from an agreed recommendation was
+     * sent back. The recommendation returns to "Agreed — to enter in Orders"
+     * (tasks and the changes-to-make meter pick it up again) and the review
+     * history keeps what happened. A stop's cessation link is never undone.
+     */
+    public function releaseSentBackVersion(User $actor, MedicationOrderVersion $version, string $reason): void
+    {
+        if (DB::transactionLevel() < 1) {
+            throw new \LogicException('Release a sent-back version inside the P04 source transaction.');
+        }
+        $items = MedicationReviewItem::query()->where('client_id', $version->client_id)
+            ->where('linked_order_version_id', $version->id)->where('outcome', '!=', 'stop')->lockForUpdate()->get();
+        foreach ($items as $item) {
+            $item->forceFill(['linked_order_version_id' => null,
+                'linked_replacement_order_version_id' => $item->outcome === 'swap' ? null : $item->linked_replacement_order_version_id])->save();
+            $review = MedicationReview::query()->whereKey($item->review_id)->where('client_id', $item->client_id)->lockForUpdate()->firstOrFail();
+            $review->forceFill(['revision' => $review->revision + 1])->save();
+            $event = MedicationReviewEvent::query()->create(['review_id' => $review->id, 'client_id' => $review->client_id,
+                'actor_id' => $actor->id, 'event' => 'order_sent_back',
+                'details' => ['item_id' => $item->id, 'order_version_id' => $version->id, 'reason' => $reason, 'state' => 'Agreed — to enter in Orders'], 'created_at' => now()]);
+            AuditLogger::logOrFail('medications.review.order_sent_back', $review, ['actor_id' => $actor->id, 'event_id' => $event->id]);
+        }
+    }
+
     /** Cessation evidence is separate from a replacement waiting to be checked. */
     public function linkStoppedVersion(User $actor, MedicationReviewItem $lockedItem, MedicationOrderVersion $version): void
     {

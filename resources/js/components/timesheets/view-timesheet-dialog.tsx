@@ -206,18 +206,28 @@ export default function ViewTimesheetDialog({
     onOpenChange,
     canApprove = false,
     canSubmit,
+    writeCoordination,
+    additionalContent,
+    onReviewAction,
 }: {
     open: boolean;
     timesheet: ViewTimesheetRow | null;
     onOpenChange: (open: boolean) => void;
     canApprove?: boolean;
     canSubmit?: boolean;
+    writeCoordination?: Parameters<typeof TimesheetActionDialog>[0]['writeCoordination'];
+    additionalContent?: React.ReactNode;
+    onReviewAction?: (row: ViewTimesheetRow, action: TimesheetReviewAction) => void;
 }) {
     const [reasonAction, setReasonAction] =
         useState<TimesheetReviewAction | null>(null);
 
     if (!timesheet) return null;
     const t = timesheet;
+    const requestReview = (action: TimesheetReviewAction) => {
+        if (onReviewAction) onReviewAction(t, action);
+        else setReasonAction(action);
+    };
     const maySubmit =
         (canSubmit ?? Boolean(t.can_submit ?? t.can_mutate)) &&
         ['draft', 'returned'].includes(t.status);
@@ -679,6 +689,7 @@ export default function ViewTimesheetDialog({
                             </section>
                         </aside>
                     </div>
+                    {additionalContent ? <div className="border-t border-border bg-background p-4">{additionalContent}</div> : null}
                 </div>
 
                 <footer className="shrink-0 border-t border-border bg-background p-3.5 [&_button]:min-h-[44px]">
@@ -704,7 +715,7 @@ export default function ViewTimesheetDialog({
                                         size="sm"
                                         className="gap-1.5 border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
                                         onClick={() =>
-                                            setReasonAction('reject')
+                                            requestReview('reject')
                                         }
                                         disabled={reasonAction !== null}
                                     >
@@ -715,7 +726,7 @@ export default function ViewTimesheetDialog({
                                         size="sm"
                                         className="gap-1.5 border-status-warning/30 text-status-warning hover:bg-status-warning-bg"
                                         onClick={() =>
-                                            setReasonAction('return')
+                                            requestReview('return')
                                         }
                                         disabled={reasonAction !== null}
                                     >
@@ -726,7 +737,7 @@ export default function ViewTimesheetDialog({
                                         size="sm"
                                         className="gap-1.5"
                                         onClick={() =>
-                                            setReasonAction('approve')
+                                            requestReview('approve')
                                         }
                                         disabled={reasonAction !== null}
                                     >
@@ -739,7 +750,7 @@ export default function ViewTimesheetDialog({
                                 <Button
                                     size="sm"
                                     className="gap-1.5"
-                                    onClick={() => setReasonAction('submit')}
+                                    onClick={() => requestReview('submit')}
                                     disabled={reasonAction !== null}
                                 >
                                     <Send className="h-4 w-4" /> Submit for
@@ -762,6 +773,7 @@ export default function ViewTimesheetDialog({
                     open
                     action={reasonAction}
                     record={t}
+                    writeCoordination={writeCoordination}
                     canAct={
                         reasonAction === 'submit'
                             ? maySubmit

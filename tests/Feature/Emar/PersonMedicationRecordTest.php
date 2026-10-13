@@ -184,12 +184,56 @@ class PersonMedicationRecordTest extends TestCase
             $this->assertSame('2026-10-03', $query['date']);
             $this->assertSame($source, $query['return_to']);
         }
+        // The rows follow the chosen day; the header's Due now / Late /
+        // Recorded today meters are always today's (approved P02, EA-111).
         $this->actingAs($this->reader)->get('/emar/mar?date=2026-10-04')->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page->where('filters.date', '2026-10-04')
-                ->has('page.data', 3)->where('meters.due', 0)->where('meters.overdue', 0)
+                ->has('page.data', 3)->where('page.data.0.due', 0)->where('page.data.0.overdue', 0)
+                ->where('meters.due', 1)->where('meters.overdue', 1)
                 ->where('page.data.0.can_record', false));
         $this->getJson('/emar/mar?date=2026-10-05')->assertUnprocessable()->assertJsonValidationErrors('date');
         $this->getJson('/emar/mar?work=foreign')->assertUnprocessable()->assertJsonValidationErrors('work');
+    }
+
+    /** EA-111 (Lane C9): the approved hub meters, and Needs help as a Show filter with its reason. */
+    public function test_hub_meters_and_needs_help_follow_todays_schedule(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-10-02 00:00', 'Pacific/Auckland')->utc());
+        $people = [];
+        foreach (['Due person' => '09:15', 'Late person' => '08:00', 'Blocked person' => '09:20'] as $name => $time) {
+            $person = Client::factory()->create(['site_id' => $this->site->id, 'first_name' => $name]);
+            $person->supportWorkers()->attach($this->reader->id);
+            $order = $this->medicine($name.' medicine', ['client_id' => $person->id, 'dose_times' => [$time], 'approval_status' => 'verified']);
+            DB::transaction(fn () => app(DoseSlotGenerator::class)->generate($order, '2026-10-03', '2026-10-04', CarbonImmutable::now()));
+            $people[$name] = [$person, $order];
+        }
+        // A change to the blocked person's order waits for its check.
+        DB::table('medication_dose_slots')->where('client_medication_id', $people['Blocked person'][1]->id)->update(['order_change_pending' => 1]);
+        Carbon::setTestNow(Carbon::parse('2026-10-03 09:30', 'Pacific/Auckland')->utc());
+
+        $this->actingAs($this->reader)->get('/emar/mar?'.http_build_query(['site_id' => $this->site->id, 'work' => 'help']))->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('filters.work', 'help')->has('page.data', 1)
+                ->where('page.data.0.client_id', $people['Blocked person'][0]->id)->where('page.data.0.help', 1)
+                ->where('page.data.0.help_reason', 'A change to the order is waiting to be checked')
+                ->where('meters.due', 1)->where('meters.due_people', 1)->where('meters.overdue', 1)->where('meters.help', 1)
+                // Staff doses due so far: the due and the late one; the blocked dose isn't owed yet.
+                ->where('meters.so_far', 2)->where('meters.recorded', 0)->where('meters.as_needed', 0));
+    }
+
+    /** EA-110 (Lane C9): the record header's Due now, Late and Recorded today for one person. */
+    public function test_record_header_counts_the_persons_doses_today(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-10-02 00:00', 'Pacific/Auckland')->utc());
+        $order = $this->medicine('Three times daily medicine', ['dose_times' => ['08:00', '09:15', '12:00'], 'approval_status' => 'verified']);
+        DB::transaction(fn () => app(DoseSlotGenerator::class)->generate($order, '2026-10-03', '2026-10-04', CarbonImmutable::now()));
+        Carbon::setTestNow(Carbon::parse('2026-10-03 09:30', 'Pacific/Auckland')->utc());
+
+        $this->actingAs($this->reader)->get('/emar/mar?client_id='.$this->person->id)->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page->component('emar/record/show')
+                ->where('meters.doses.scheduled', 3)->where('meters.doses.due', 1)->where('meters.doses.late', 1)
+                ->where('meters.doses.so_far', 2)->where('meters.doses.recorded', 0)
+                ->whereNot('meters.doses.due_until', null)->whereNot('meters.doses.oldest_late', null)
+                ->where('can.print', false)->where('today', '2026-10-03'));
     }
 
     public function test_medicine_rows_keep_canonical_person_house_date_and_filtered_return_location(): void
@@ -239,6 +283,29 @@ class PersonMedicationRecordTest extends TestCase
         $this->assertSame('history', $query['tab']);
         $this->assertSame('2026-10-02', $query['date']);
         $this->assertSame($source, $query['return_to']);
+    }
+
+    /** EA-109 (Lane C9): History's Range and Outcome filters are applied by the server, in NZ days. */
+    public function test_history_range_and_outcome_filters(): void
+    {
+        $order = $this->medicine('As needed medicine', ['is_prn' => true]);
+        foreach ([['given', '2026-09-28 08:00'], ['refused', '2026-09-20 08:00'], ['given', '2026-08-01 08:00']] as [$status, $at]) {
+            ClientMedicationAdministration::query()->create([
+                'client_id' => $this->person->id, 'client_medication_id' => $order->id, 'administered_by' => $this->reader->id,
+                'status' => $status, 'administered_at' => Carbon::parse($at, 'Pacific/Auckland')->utc(), 'dose_given' => '1 tablet',
+                'reason' => $status === 'refused' ? 'Declined' : null,
+            ]);
+        }
+        $count = fn (string $query) => $this->actingAs($this->reader)->getJson($this->url('/history?view=doses&'.$query))->assertOk()->json('page.total');
+
+        $this->assertSame(1, $count('range=7d'));
+        $this->assertSame(2, $count('range=30d'));
+        $this->assertSame(3, $count('range=all'));
+        $this->assertSame(3, $count(''), 'Without a range the history stays complete.');
+        $this->assertSame(1, $count('range=30d&outcome=notgiven'));
+        $this->assertSame(2, $count('range=all&outcome=given'));
+        $this->assertSame(0, $count('range=all&outcome=corrected'));
+        $this->getJson($this->url('/history?range=1y'))->assertUnprocessable()->assertJsonValidationErrors('range');
     }
 
     public function test_changes_page_combines_retained_audits_with_new_events_and_conceals_controlled_facts(): void

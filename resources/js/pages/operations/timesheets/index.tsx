@@ -57,7 +57,7 @@ import {
     Users,
     XCircle,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 // ─────────────────────────────────────────────────────────────────────
 // Types
@@ -607,10 +607,17 @@ export default function TimesheetsIndex({
     } | null>(null);
     const [viewing, setViewing] = useState<TimesheetRow | null>(null);
     const [editing, setEditing] = useState<TimesheetRow | null>(null);
+    const [editingOpen, setEditingOpen] = useState(false);
+    const [reasonOpen, setReasonOpen] = useState(false);
     const [reasonTarget, setReasonTarget] = useState<{
         action: TimesheetReviewAction;
         row: TimesheetRow;
     } | null>(null);
+    // Event callbacks retained by a viewer must read the committed current cohort.
+    const dialogContext = useRef({ rows: timesheets.data, canApprove });
+    useLayoutEffect(() => {
+        dialogContext.current = { rows: timesheets.data, canApprove };
+    }, [timesheets.data, canApprove]);
     const [createOpen, setCreateOpen] = useState(false);
     const [initialShiftId, setInitialShiftId] = useState<number | null>(null);
     const [selectedApprovalIds, setSelectedApprovalIds] = useState<number[]>(
@@ -636,7 +643,7 @@ export default function TimesheetsIndex({
         const editId = params.get('edit');
         if (editId) {
             const row = timesheets.data.find((r) => String(r.id) === editId);
-            if (row && canEditTimesheetRow(row)) setEditing(row);
+            if (row && canEditTimesheetRow(row)) openEditing(row);
             else if (row) setViewing(row);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -675,6 +682,8 @@ export default function TimesheetsIndex({
     const currentReason = timesheets.data.find(
         (row) => row.id === reasonTarget?.row.id,
     );
+    const currentMenuRow = timesheets.data.find((row) => row.id === menu?.row.id);
+    const currentHoverRow = timesheets.data.find((row) => row.id === hover?.row.id);
     const reasonAllowed = Boolean(
         currentReason?.can_mutate &&
         (reasonTarget?.action === 'submit'
@@ -686,6 +695,27 @@ export default function TimesheetsIndex({
                     ? currentReason.can_reject === true
                     : currentReason.can_return === true)),
     );
+
+    function openEditing(row: TimesheetRow) {
+        const current = dialogContext.current.rows.find((candidate) => candidate.id === row.id);
+        if (!current || !canEditTimesheetRow(current)) return;
+        setEditing(current);
+        setEditingOpen(true);
+    }
+
+    function openReview(row: ViewTimesheetRow, action: TimesheetReviewAction) {
+        const context = dialogContext.current;
+        const current = context.rows.find((candidate) => candidate.id === row.id);
+        if (!current?.can_mutate) return;
+        const allowed = action === 'submit'
+            ? current.can_submit === true
+            : context.canApprove && (action === 'approve'
+                ? current.can_approve === true
+                : action === 'reject' ? current.can_reject === true : current.can_return === true);
+        if (!allowed) return;
+        setReasonTarget({ action, row: current });
+        setReasonOpen(true);
+    }
 
     function toggleApprovalSelection(id: number, checked: boolean) {
         setSelectedApprovalIds((current) =>
@@ -753,7 +783,7 @@ export default function TimesheetsIndex({
                 setViewing(row);
                 return;
             case 'edit':
-                if (canEditTimesheetRow(row)) setEditing(row);
+                if (canEditTimesheetRow(row)) openEditing(row);
                 else setViewing(row);
                 return;
             case 'shift':
@@ -771,7 +801,7 @@ export default function TimesheetsIndex({
             case 'approve':
             case 'return':
             case 'reject':
-                setReasonTarget({ action: id, row });
+                openReview(row, id);
                 return;
             case 'archive':
                 router.post(
@@ -1465,17 +1495,20 @@ export default function TimesheetsIndex({
                     </nav>
 
                     <ContextMenu
-                        menu={menu}
+                        menu={menu && currentMenuRow ? { ...menu, row: currentMenuRow } : null}
                         onClose={() => setMenu(null)}
                         onAction={handleAction}
                     />
-                    <HoverPopover hover={hover} timezone={evidence.timezone} />
+                    <HoverPopover
+                        hover={hover && currentHoverRow ? { ...hover, row: currentHoverRow } : null}
+                        timezone={evidence.timezone}
+                    />
                 </section>
             </PageShell>
 
             <ViewTimesheetDialog
-                open={!!viewing}
-                timesheet={currentViewed ?? viewing}
+                open={Boolean(viewing && currentViewed)}
+                timesheet={currentViewed ?? null}
                 onOpenChange={(o) => !o && setViewing(null)}
                 canApprove={Boolean(
                     canApprove &&
@@ -1484,10 +1517,11 @@ export default function TimesheetsIndex({
                     currentViewed.status === 'submitted',
                 )}
                 canSubmit={Boolean(currentViewed?.can_submit === true)}
+                onReviewAction={openReview}
             />
             <EditTimesheetDialog
-                open={!!editing}
-                timesheet={editing as EditTimesheetRow | null}
+                open={editingOpen}
+                timesheet={(currentEdited ?? null) as EditTimesheetRow | null}
                 canEdit={Boolean(
                     currentEdited &&
                     canEditTimesheetRow(currentEdited) &&
@@ -1495,7 +1529,7 @@ export default function TimesheetsIndex({
                         timesheetEditContext(currentEdited) &&
                     ['draft', 'returned'].includes(currentEdited.status),
                 )}
-                onOpenChange={(o) => !o && setEditing(null)}
+                onOpenChange={setEditingOpen}
                 clients={clients}
                 workerTimezone={evidence.timezone}
                 canSubmit={currentEdited?.can_resubmit === true}
@@ -1511,15 +1545,13 @@ export default function TimesheetsIndex({
                 canSubmit={canSubmit}
                 workerTimezone={evidence.timezone}
             />
-            {reasonTarget && (
-                <TimesheetActionDialog
-                    open
-                    action={reasonTarget.action}
-                    record={currentReason ?? reasonTarget.row}
-                    canAct={reasonAllowed}
-                    onOpenChange={(open) => !open && setReasonTarget(null)}
-                />
-            )}
+            <TimesheetActionDialog
+                open={reasonOpen}
+                action={reasonTarget?.action ?? null}
+                record={currentReason ?? null}
+                canAct={reasonAllowed}
+                onOpenChange={setReasonOpen}
+            />
         </AppLayout>
     );
 }

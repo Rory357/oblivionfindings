@@ -370,11 +370,11 @@ export function MarTab({
                                                         !day.can.record ||
                                                         recordable.length === 0
                                                     }
-                                                    title={
-                                                        recordReason ??
-                                                        (recordable.length === 0
-                                                            ? 'Nothing due right now'
-                                                            : undefined)
+                                                    aria-describedby={
+                                                        recordReason ||
+                                                        recordable.length === 0
+                                                            ? 'mar-record-reason'
+                                                            : undefined
                                                     }
                                                 >
                                                     <Plus className="size-4" />
@@ -431,6 +431,19 @@ export function MarTab({
                                         </DropdownMenu>
                                     ) : null}
                                 </div>
+                                {/* EA-187 (Lane C9): why recording is unavailable,
+                                    shown — a disabled button's tooltip never is. */}
+                                {day &&
+                                day.can.record_reason !== 'no_permission' &&
+                                (recordReason || recordable.length === 0) ? (
+                                    <p
+                                        id="mar-record-reason"
+                                        className="text-caption text-muted-foreground"
+                                    >
+                                        {recordReason ??
+                                            'Nothing due right now.'}
+                                    </p>
+                                ) : null}
                             </div>
                         ) : null}
 

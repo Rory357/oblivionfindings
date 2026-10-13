@@ -101,7 +101,7 @@ final class MedicationReportDataset
                     : ($recorded->isEmpty() ? 'not_started' : ($recorded->count() < $owed->count() ? 'not_completed'
                         : ($recorded->contains(fn ($slot) => $slot['recorded_late'] || CarbonImmutable::parse($slot['outcome_at'])->gt($end)) ? 'late' : 'on_time'))));
 
-                return ['reference' => 'round:'.$round->id, 'date' => $round->round_date->toDateString(), 'site' => $clients->firstWhere('site_id', $round->site_id)?->site?->name ?? '', 'round' => $round->name, 'status' => $status, 'due' => $owed->count(), 'recorded' => $recorded->count(), 'away' => $eligible->where('state', 'away')->count(), 'window_ends_at' => $end?->toIso8601String(), 'href' => '/emar/rounds?date='.$round->round_date->toDateString().'&site_id='.$round->site_id];
+                return ['reference' => 'round:'.$round->id, 'date' => $round->round_date->toDateString(), 'site' => $clients->firstWhere('site_id', $round->site_id)?->site?->name ?? '', 'round' => $round->name, 'status' => $status, 'due' => $owed->count(), 'recorded' => $recorded->count(), 'away' => $eligible->where('state', 'away')->count(), 'window_ends_at' => $end?->toIso8601String(), 'href' => '/meds/today?'.http_build_query(['view' => 'rounds', 'date' => $round->round_date->toDateString(), 'site_id' => $round->site_id])];
             })->filter(fn ($row) => $row['due'] > 0 || $row['away'] > 0)->values();
             $counts = $rows->countBy('status');
             $ended = array_sum(array_map(fn ($key) => $counts[$key] ?? 0, ['on_time', 'late', 'not_completed', 'not_started']));

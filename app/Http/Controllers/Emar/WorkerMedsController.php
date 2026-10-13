@@ -230,7 +230,10 @@ class WorkerMedsController extends Controller
             'my_eligibility' => app(StaffEligibilityRegister::class)->myEligibility($user),
             'board_can' => [
                 'export_round' => app(MedicationReportAccess::class)->canExport($user, 'doses'),
-                'view_emar' => $user->canDo('medications.view'),
+                // EA-168 (Lane C8): finance-only users don't get the MAR hub link.
+                'view_emar' => $user->canDo('medications.view') && ! ($user->canDo('medications.stock.update')
+                    && ! $user->canDo('medications.orders.manage') && ! $user->canDo('medications.orders.verify')
+                    && ! $user->canDo('medications.settings.manage') && ! $user->canDo('medications.audit.view')),
                 'view_audit' => $user->canDo('medications.audit.view'),
                 'record_administration' => $user->canDo('medications.administer.record'),
                 'record_controlled' => $user->canDo('medications.controlled.record'),
@@ -270,7 +273,8 @@ class WorkerMedsController extends Controller
                 : Inertia::optional(fn () => $this->activityPageFor($request, $assignedClientIds, $now, $includeControlled)),
             'board_extra_can' => [
                 'report_error' => $user->canDo('medications.administer.record'),
-                'view_handovers' => $user->canDo('medications.view'),
+                // EA-044 (Lane C8): only people who can open the handover workflow.
+                'view_handovers' => app(\App\Services\ShiftHandoverService::class)->canAccessWorkflow($user),
             ],
             // Whose medication record (MAR) the row menus may offer to open.
             'mar_client_ids' => $user->canDo('medications.view')

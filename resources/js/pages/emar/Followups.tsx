@@ -18,6 +18,7 @@ import {
     PageHeaderStatusChip,
 } from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import { useOfflineQueueState } from '@/hooks/use-offline-queue';
 import AppLayout from '@/layouts/app-layout';
@@ -36,6 +37,7 @@ type Props = {
         total: number;
         from: number | null;
         to: number | null;
+        links?: { url: string | null; label: string; active: boolean }[];
     };
     meters: {
         open: number;
@@ -371,31 +373,12 @@ export default function Followups({
                             {followups.from ?? 0}–{followups.to ?? 0} of{' '}
                             {followups.total}
                         </span>
-                        <div className="flex gap-2">
-                            <Button
-                                variant="outline"
-                                className="frontline-tap"
-                                disabled={followups.current_page <= 1}
-                                onClick={() =>
-                                    go({ page: followups.current_page - 1 })
-                                }
-                            >
-                                Previous
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="frontline-tap"
-                                disabled={
-                                    followups.current_page >=
-                                    followups.last_page
-                                }
-                                onClick={() =>
-                                    go({ page: followups.current_page + 1 })
-                                }
-                            >
-                                Next
-                            </Button>
-                        </div>
+                        {/* EA-207 (Lane C9): the shared paginator, filters kept. */}
+                        <LaravelPagination
+                            links={followups.links ?? []}
+                            lastPage={followups.last_page}
+                            preserveScroll
+                        />
                     </nav>
                 )}
             </div>

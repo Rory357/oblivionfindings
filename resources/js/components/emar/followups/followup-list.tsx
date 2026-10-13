@@ -1,14 +1,3 @@
-import { Link } from '@inertiajs/react';
-import {
-    AlertTriangle,
-    CheckCircle2,
-    ClipboardList,
-    Clock3,
-    Eye,
-    History,
-    UserRoundCog,
-} from 'lucide-react';
-import { useState } from 'react';
 import {
     EntityContextMenu,
     EntityKebab,
@@ -21,6 +10,18 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useOfflineQueueState } from '@/hooks/use-offline-queue';
 import { formatDateTime } from '@/lib/datetime';
+import { withMedicationReturn } from '@/lib/medication-navigation';
+import { Link } from '@inertiajs/react';
+import {
+    AlertTriangle,
+    CheckCircle2,
+    ClipboardList,
+    Clock3,
+    Eye,
+    History,
+    UserRoundCog,
+} from 'lucide-react';
+import { useState } from 'react';
 import { followupSourceUrl, type MedicationFollowup } from './types';
 
 export function FollowupStatus({
@@ -148,7 +149,15 @@ export function MedicationFollowupList({
                   {
                       label: 'Open medication record',
                       icon: ClipboardList,
-                      onClick: () => window.location.assign(row.record_url!),
+                      // EA-192 (Lane C8): the record offers the way back here.
+                      onClick: () =>
+                          window.location.assign(
+                              withMedicationReturn(
+                                  row.record_url!,
+                                  window.location.pathname +
+                                      window.location.search,
+                              ),
+                          ),
                   },
               ]
             : []),

@@ -182,6 +182,12 @@ const settingsManage = flag('settingsManage');
 const breakGlass = flag('breakGlass');
 const safetyAccess = any(hasLeadCapability, auditView, breakGlass);
 const settingsReader = any(settingsManage, auditView);
+/**
+ * Finance-only: stock and reports work with no lead, audit or recording
+ * capability (the MAR hub and protected backups leave them out).
+ */
+const financeOnly: Visibility = (can) =>
+    stockUpdate(can) && !hasLeadCapability(can) && !auditView(can);
 const settingsAccess = any(
     settingsReader,
     flag('ordersManage'),
@@ -240,7 +246,9 @@ export const EMAR_HUBS: EmarHub[] = [
         key: 'today',
         label: 'Meds today',
         icon: Pill,
-        visible: any(view, administer, hasLeadCapability),
+        // Approved P00: people who record doses and leads. Finance and the
+        // auditor land on their own hubs, not the shift board (EA-127, EA-168).
+        visible: any(administer, hasLeadCapability),
         ownRail: true,
         views: [
             {
@@ -258,6 +266,14 @@ export const EMAR_HUBS: EmarHub[] = [
                 visible: any(view, administer),
                 aliases: ['/emar/rounds'],
             },
+            // Approved P00 order (EA-209); the Meds today rail follows it.
+            {
+                key: 'asneeded',
+                label: 'As-needed',
+                href: '/meds/today?view=asneeded',
+                icon: Pill,
+                visible: any(view, administer),
+            },
             {
                 key: 'followups',
                 label: 'Follow-ups',
@@ -266,11 +282,11 @@ export const EMAR_HUBS: EmarHub[] = [
                 visible: any(view, administer),
             },
             {
-                key: 'asneeded',
-                label: 'As-needed',
-                href: '/meds/today?view=asneeded',
-                icon: Pill,
-                visible: any(view, administer),
+                key: 'controlled',
+                label: 'Controlled checks',
+                href: '/meds/today?view=controlled',
+                icon: ShieldCheck,
+                visible: controlledView,
             },
             {
                 key: 'stockalerts',
@@ -286,13 +302,6 @@ export const EMAR_HUBS: EmarHub[] = [
                 icon: Activity,
                 visible: any(view, administer),
             },
-            {
-                key: 'controlled',
-                label: 'Controlled checks',
-                href: '/meds/today?view=controlled',
-                icon: ShieldCheck,
-                visible: controlledView,
-            },
         ],
     },
     {
@@ -301,9 +310,7 @@ export const EMAR_HUBS: EmarHub[] = [
         icon: ClipboardList,
         // Anyone with medications.view except frontline and finance-only roles.
         visible: (can) =>
-            view(can) &&
-            hasManagerCapability(can) &&
-            !(stockUpdate(can) && !hasLeadCapability(can) && !auditView(can)),
+            view(can) && hasManagerCapability(can) && !financeOnly(can),
         views: [
             {
                 key: 'charts',
@@ -347,21 +354,22 @@ export const EMAR_HUBS: EmarHub[] = [
         views: [
             {
                 key: 'prescriptions',
-                label: 'Prescriptions',
+                // Approved P04 rail labels (EA-134).
+                label: 'Orders',
                 href: '/emar/prescriptions',
                 icon: FileText,
                 visible: view,
             },
             {
                 key: 'to-check',
-                label: 'Orders to check',
+                label: 'To check',
                 href: '/emar/prescriptions?view=to_check',
                 icon: ShieldCheck,
                 visible: view,
             },
             {
                 key: 'covert',
-                label: 'Covert giving',
+                label: 'Covert',
                 href: '/emar/prescriptions?view=covert',
                 icon: ShieldCheck,
                 visible: view,
@@ -407,25 +415,22 @@ export const EMAR_HUBS: EmarHub[] = [
             (controlledView(can) && hasManagerCapability(can)),
         views: [
             {
+                // Approved P06: the Stock hub is the landing (Lane C8/C11).
+                // The older stock page's URLs belong to the same views.
                 key: 'stock',
                 label: 'Stock',
-                href: '/emar/stock',
-                icon: Package,
-                visible: all(view, stockUpdate),
-            },
-            {
-                key: 'orders',
-                label: 'Pharmacy orders',
-                href: '/emar/stock?view=orders',
-                icon: Package,
-                visible: all(view, stockUpdate),
-            },
-            {
-                key: 'packs',
-                label: 'Packs & counts',
                 href: '/emar/stock/packs',
                 icon: Package,
                 visible: all(view, stockUpdate),
+                aliases: ['/emar/stock'],
+            },
+            {
+                key: 'orders',
+                label: 'Deliveries & orders',
+                href: '/emar/stock/packs?view=orders',
+                icon: Package,
+                visible: all(view, stockUpdate),
+                aliases: ['/emar/stock?view=orders'],
             },
             {
                 key: 'discrepancies',
@@ -523,13 +528,13 @@ export const EMAR_HUBS: EmarHub[] = [
                 visible: all(view, any(hasLeadCapability, administer)),
             },
             {
-                // Request and active grants. Review for audit.view holders
-                // (NF-12) joins when P10 builds it; the route is break-glass.
+                // Request and running grants (break-glass) and the review queue
+                // for audit.view reviewers (approved P00/P10, NF-12; EA-128, EA-159).
                 key: 'emergency',
                 label: 'Emergency access',
                 href: '/emar/emergency-access',
                 icon: Lock,
-                visible: breakGlass,
+                visible: any(breakGlass, auditView),
             },
         ],
     },
@@ -575,15 +580,17 @@ export const EMAR_HUBS: EmarHub[] = [
                 href: '/emar/backups',
                 icon: Lock,
                 // EA-144: only while backups run; recipients (report exporters)
-                // still reach their passwords. Finance-only users are refused.
-                visible: all(
-                    view,
-                    any(
-                        flag('backupsManage'),
-                        all(reportsView, flag('reportsExport')),
-                    ),
-                    runs('protected_backups'),
-                ),
+                // still reach their passwords. EA-221 (Lane C8): finance-only
+                // users can never receive a backup.
+                visible: (can) =>
+                    all(
+                        view,
+                        any(
+                            flag('backupsManage'),
+                            all(reportsView, flag('reportsExport')),
+                        ),
+                        runs('protected_backups'),
+                    )(can) && !financeOnly(can),
             },
         ],
     },
@@ -678,6 +685,25 @@ export function visibleEmarHubs(can: Can): EmarHub[] {
 }
 
 /** The first view this viewer may open — never a denied page. */
+/**
+ * Put a page's own rail items in its hub's approved order (EA-209: the Meds
+ * today rail follows the hub map and search). Unknown keys keep their place
+ * at the end.
+ */
+export function inEmarHubOrder<T extends { key: string }>(
+    hubKey: EmarHubKey,
+    items: T[],
+): T[] {
+    const order = (
+        EMAR_HUBS.find((hub) => hub.key === hubKey)?.views ?? []
+    ).map((view) => view.key);
+    const rank = (key: string) => {
+        const index = order.indexOf(key);
+        return index === -1 ? order.length : index;
+    };
+    return [...items].sort((a, b) => rank(a.key) - rank(b.key));
+}
+
 export function emarHubLanding(hub: EmarHub, can: Can): string | null {
     return visibleEmarViews(hub, can)[0]?.href ?? null;
 }

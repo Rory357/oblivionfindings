@@ -160,6 +160,12 @@ class ClientMedication extends Model
             if ($medication->publishingCheckedPrescription || ! $medication->isDirty(self::VERIFICATION_SENSITIVE_FIELDS)) {
                 return;
             }
+            // EA-132 (Lane C3): stopping an order sets its end date; the
+            // stopped order keeps the check and checker it was given under.
+            if ($medication->isDirty('state') && $medication->state === 'ceased'
+                && array_values(array_intersect(array_keys($medication->getDirty()), self::VERIFICATION_SENSITIVE_FIELDS)) === ['end_date']) {
+                return;
+            }
 
             $medication->forceFill([
                 'approval_status' => 'pending_verification',

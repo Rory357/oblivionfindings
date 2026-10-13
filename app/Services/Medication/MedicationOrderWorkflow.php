@@ -124,7 +124,9 @@ final class MedicationOrderWorkflow
                 return MedicationOrderRevision::query()->where('medication_order_version_id', $replay->id)->firstOrFail();
             }
             if ($medication === null) {
-                if ($recommendation?->outcome === 'swap') {
+                // EA-114: a swap whose replacement was sent back already stopped
+                // the old order; re-entering the replacement doesn't stop it again.
+                if ($recommendation?->outcome === 'swap' && $recommendation->linked_stopped_order_version_id === null) {
                     $stopReason = Validator::make($input, ['stop_reason' => 'required|string|max:255', 'confirm_swap' => 'required|accepted'])->validate()['stop_reason'];
                     $old = ClientMedication::query()->whereKey($recommendation->client_medication_id)->where('client_id', $client->id)->firstOrFail();
                     $this->assertControlled($actor, $old);
@@ -262,6 +264,8 @@ final class MedicationOrderWorkflow
             if ($medication->approval_status !== 'verified') {
                 $medication->forceFill(['approval_status' => 'rejected', 'rejection_reason' => $reason])->save();
             }
+            // EA-114 (Lane C3): an agreed review change waits to be entered again.
+            app(MedicationReviewOrderAdapter::class)->releaseSentBackVersion($actor, $revision->version, $reason);
             $this->action($actor, $medication, 'sent_back', ['reason' => $reason], $revision);
 
             return $revision;

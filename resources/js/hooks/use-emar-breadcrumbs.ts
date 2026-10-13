@@ -15,7 +15,9 @@ import type { BreadcrumbItem } from '@/types';
  */
 export function useEmarBreadcrumbs(currentUrl?: string): BreadcrumbItem[] {
     const page = usePage<{ auth?: { can?: EmarNavigationPermissions } }>();
-    return emarBreadcrumbs(currentUrl ?? page.url, page.props.auth?.can);
+    // A page rendered without an address (isolated renders) falls back to
+    // the Medication root rather than failing.
+    return emarBreadcrumbs(currentUrl ?? page.url ?? '', page.props.auth?.can);
 }
 
 /** The trail for a person's medication record (`emarRecordBreadcrumbs`). */

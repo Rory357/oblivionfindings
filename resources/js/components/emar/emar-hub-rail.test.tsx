@@ -90,15 +90,26 @@ describe('EmarHubRail', () => {
     });
 
     it('lists only the views the viewer may open, plus the page itself', () => {
+        // An audit.view reviewer also has the emergency-access review queue
+        // (Lane C8, EA-128/EA-159).
         at('/emar/errors', auditor);
         render(<EmarHubRail />);
-        expect(tabs()).toEqual(['Follow-ups', 'Medication errors']);
+        expect(tabs()).toEqual([
+            'Follow-ups',
+            'Medication errors',
+            'Emergency access',
+        ]);
         cleanup();
 
         // Overview is lead-only, but the server let this person open it.
         at('/emar', auditor);
         render(<EmarHubRail />);
-        expect(tabs()).toEqual(['Overview', 'Follow-ups', 'Medication errors']);
+        expect(tabs()).toEqual([
+            'Overview',
+            'Follow-ups',
+            'Medication errors',
+            'Emergency access',
+        ]);
     });
 
     it('renders nothing for hubs with their own rail or outside the module', () => {
@@ -136,10 +147,10 @@ describe('EmarHubRail', () => {
         ).toBe('true');
         expect(
             screen
-                .getByRole('tab', { name: 'Prescriptions' })
+                .getByRole('tab', { name: 'Orders' })
                 .getAttribute('aria-selected'),
         ).toBe('false');
-        fireEvent.click(screen.getByRole('tab', { name: 'Orders to check' }));
+        fireEvent.click(screen.getByRole('tab', { name: 'To check' }));
         expect(fixture.visit).toHaveBeenCalledWith(
             '/emar/prescriptions?view=to_check&site_id=2',
         );
@@ -158,10 +169,10 @@ describe('EmarHubRail', () => {
         expect(header?.contains(tablist)).toBe(true);
     });
 
-    it('opens pack counts from stock without losing the selected house', () => {
+    it('opens the Stock hub from deliveries without losing the selected house', () => {
         at('/emar/stock?site_id=2&view=orders', coordinator);
         render(<EmarHubRail />);
-        fireEvent.click(screen.getByRole('tab', { name: 'Packs & counts' }));
+        fireEvent.click(screen.getByRole('tab', { name: 'Stock' }));
         expect(fixture.visit).toHaveBeenCalledWith(
             '/emar/stock/packs?site_id=2',
         );
@@ -170,7 +181,7 @@ describe('EmarHubRail', () => {
     it('keeps a just-selected person when opening packs before the filter response returns', () => {
         at('/emar/stock?site_id=2&client_id=3&view=orders', coordinator);
         render(<EmarHubRail scope={{ site_id: 2, client_id: 7 }} />);
-        fireEvent.click(screen.getByRole('tab', { name: 'Packs & counts' }));
+        fireEvent.click(screen.getByRole('tab', { name: 'Stock' }));
         expect(fixture.visit).toHaveBeenCalledWith(
             '/emar/stock/packs?site_id=2&client_id=7',
         );
@@ -179,7 +190,11 @@ describe('EmarHubRail', () => {
     it('does not restore cleared person or house filters from an earlier response', () => {
         at('/emar/stock?site_id=2&client_id=3', coordinator);
         render(<EmarHubRail scope={{ site_id: null, client_id: null }} />);
-        fireEvent.click(screen.getByRole('tab', { name: 'Packs & counts' }));
-        expect(fixture.visit).toHaveBeenCalledWith('/emar/stock/packs');
+        fireEvent.click(
+            screen.getByRole('tab', { name: 'Deliveries & orders' }),
+        );
+        expect(fixture.visit).toHaveBeenCalledWith(
+            '/emar/stock/packs?view=orders',
+        );
     });
 });

@@ -8,20 +8,46 @@ export type RecordLoad = 'loading' | 'ready' | 'error' | 'forbidden';
  * profile pattern: the page carries the summary, each section loads its
  * own records). Reloads when `refreshKey` changes and on demand. A null
  * `url` loads nothing.
+ *
+ * EA-208 (Lane C9): a reload of the same section keeps what is on screen
+ * (`refreshing`), and a failed reload keeps it too, marked `stale` with
+ * the time it was loaded — like Meds today. Only a different URL (another
+ * person or section) starts empty.
  */
 export function useRecordJson<T>(url: string | null, refreshKey = '') {
     const [state, setState] = useState<{
         url: string | null;
         data: T | null;
         load: RecordLoad;
-    }>({ url: null, data: null, load: 'loading' });
+        refreshing: boolean;
+        stale: boolean;
+        loadedAt: number | null;
+    }>({
+        url: null,
+        data: null,
+        load: 'loading',
+        refreshing: false,
+        stale: false,
+        loadedAt: null,
+    });
     const [nonce, setNonce] = useState(0);
 
     useEffect(() => {
         if (!url) return;
         const controller = new AbortController();
         let cancelled = false;
-        setState({ url, data: null, load: 'loading' });
+        setState((previous) =>
+            previous.url === url && previous.data !== null
+                ? { ...previous, refreshing: true }
+                : {
+                      url,
+                      data: null,
+                      load: 'loading',
+                      refreshing: false,
+                      stale: false,
+                      loadedAt: null,
+                  },
+        );
         fetch(url, {
             signal: controller.signal,
             credentials: 'same-origin',
@@ -34,20 +60,35 @@ export function useRecordJson<T>(url: string | null, refreshKey = '') {
                         status: response.status,
                     });
                 const data = (await response.json()) as T;
-                if (!cancelled) setState({ url, data, load: 'ready' });
+                if (!cancelled)
+                    setState({
+                        url,
+                        data,
+                        load: 'ready',
+                        refreshing: false,
+                        stale: false,
+                        loadedAt: Date.now(),
+                    });
             })
             .catch((error: unknown) => {
                 if (cancelled || (error as Error)?.name === 'AbortError')
                     return;
                 const status = (error as { status?: number })?.status;
-                setState({
-                    url,
-                    data: null,
-                    load:
-                        status === 401 || status === 403 || status === 404
-                            ? 'forbidden'
-                            : 'error',
-                });
+                const forbidden =
+                    status === 401 || status === 403 || status === 404;
+                setState((previous) =>
+                    // A failed refresh keeps the last records, marked stale.
+                    !forbidden && previous.url === url && previous.data !== null
+                        ? { ...previous, refreshing: false, stale: true }
+                        : {
+                              url,
+                              data: null,
+                              load: forbidden ? 'forbidden' : 'error',
+                              refreshing: false,
+                              stale: false,
+                              loadedAt: null,
+                          },
+                );
             });
         return () => {
             cancelled = true;
@@ -65,6 +106,9 @@ export function useRecordJson<T>(url: string | null, refreshKey = '') {
     return {
         data: state.url === url ? state.data : null,
         load: state.url === url ? state.load : ('loading' as RecordLoad),
+        refreshing: state.url === url && state.refreshing,
+        stale: state.url === url && state.stale,
+        loadedAt: state.url === url ? state.loadedAt : null,
         reload,
     };
 }
