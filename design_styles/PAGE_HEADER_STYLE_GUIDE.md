@@ -286,6 +286,15 @@ types/regions/status/archived + Cards–Table; a profile gets
 date-range/staff; a dashboard gets whatever it filters by. All fields
 in the row share the same height — no odd one out.
 
+**Comfortable dropdowns — Overview pilot** (approved by Stephan
+2026-10-13): `PageHeaderFilterSelect size="comfortable"` draws a 38px
+glass dropdown (12px text, 14px leading icon, radius 10) for a page
+whose filter row holds only a few scope choices — the role Overview's
+role, site and period. It is opt-in and piloted on the Overview only;
+every field in that row uses it, so heights still match. Don't restyle
+the 23px chip per page to get this look — pass the prop. Whether it
+becomes the default everywhere is Stephan's decision.
+
 **Every rail view carries its own pills** (reinforced 2026-09-08): on
 a page whose rail switches views, EACH tab supplies real filter pills
 for its own content — a queue gets its queue filters, a report view its

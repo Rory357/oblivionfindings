@@ -353,7 +353,10 @@ final class OverviewData
         $this->blocks['focus'] = $this->ready($worker ? 'Continue your care work in My Day' : 'Upcoming rostered work', $worker ? '/my-day' : $href, array_slice($rows, 0, 1));
         $this->blocks['focus']['title'] = $worker ? 'Your next shift' : 'The next shift';
         $this->blocks['focus']['actionLabel'] = $worker ? 'Open My Day' : 'Open team roster';
-        $this->blocks['focus']['empty'] = 'No upcoming shift is recorded in this view.';
+        $this->blocks['focus']['empty'] = $worker ? 'Nothing is rostered for you in the next 14 days. New shifts appear here once they are published.' : 'No shifts are rostered in the next 14 days.';
+        if (! $rows) {
+            $this->blocks['focus']['headline'] = 'No shift scheduled';
+        }
         $this->metrics[] = ['label' => $worker ? 'Your shifts' : 'Scheduled shifts', 'value' => $count, 'caption' => 'Selected reporting period', 'href' => $href, 'series' => array_column($this->blocks['trend']['series'], 'value')];
         $completed = (clone $selected)->where('status', 'completed')->count();
         $this->metrics[] = ['label' => 'Completed shifts', 'value' => $completed, 'total' => $count, 'caption' => 'Of shifts in this period', 'href' => $href];
@@ -376,7 +379,7 @@ final class OverviewData
             $this->addAttention($worker ? 'Timesheets to finish' : 'Timesheets ready for review', $pending, $sheetHref);
             $this->blocks['lead-approvals'] = $this->ready('Current timesheet queue', $sheetHref, [['label' => 'Timesheets', 'value' => $pending]], $pending);
             if ($worker) {
-                $this->metrics[] = ['label' => 'Timesheet', 'value' => $pending, 'caption' => 'Drafts and returns ready for your review', 'href' => $sheetHref];
+                $this->metrics[] = ['label' => 'Timesheet', 'value' => $pending, 'caption' => 'Drafts and returns to review', 'href' => $sheetHref];
             }
         }
         if (! $worker && ($this->user->canDo('incidents.viewAny') || $this->user->canDo('incidents.viewAssigned'))) {
@@ -440,7 +443,7 @@ final class OverviewData
             ->get(['starts_at', 'ends_at']);
         $hours = round($week->sum(fn ($shift) => max(0, $shift->starts_at->diffInMinutes($shift->ends_at)) / 60), 1);
         $this->metrics = [
-            ['label' => 'Shift tasks', 'value' => $done, 'display' => $done.' of '.$total, 'instrument' => 'bar', 'percent' => $total ? round($done / $total * 100) : null, 'caption' => $total ? ($total - $done).' still to do today' : 'No tasks recorded on your shifts today', 'href' => '/my-day'],
+            ['label' => 'Shift tasks', 'value' => $done, 'display' => $done.' of '.$total, 'instrument' => 'bar', 'percent' => $total ? round($done / $total * 100) : null, 'caption' => $total ? ($total - $done).' still to do today' : 'No tasks on your shifts today', 'href' => '/my-day'],
             ['label' => 'This week', 'value' => $hours, 'display' => $hours.'h', 'caption' => $week->count().' scheduled shifts · before breaks', 'href' => '/my-calendar'],
         ];
         $first = $this->blocks['focus']['rows'][0] ?? null;
@@ -550,7 +553,7 @@ final class OverviewData
         $this->blocks['attention']['reviewTotal'] = $total;
         $this->blocks['attention']['reviewQueues'] = array_values(array_filter($queues, fn ($queue) => $queue['value'] > 0));
         $this->blocks['focus'] = $this->ready('Specific requests you can open and review', '/dashboard', array_slice($reviews, 0, 1), $total);
-        $this->blocks['focus'] += ['title' => 'Your decision queue', 'actionLabel' => 'Review decision queue', 'actionTarget' => 'attention', 'headline' => $total.' '.($total === 1 ? 'review' : 'reviews'), 'focusTag' => 'Ready for review', 'focusMeta' => [$sources.' permitted review '.Str::plural('queue', $sources), count($this->siteIds).' '.Str::plural('site', count($this->siteIds)).' in view'], 'empty' => $sources ? 'No submitted decisions are waiting in your permitted queues.' : 'Review permissions are required to see decision requests.'];
+        $this->blocks['focus'] += ['title' => 'Your decision queue', 'actionLabel' => 'Review decision queue', 'actionTarget' => 'attention', 'headline' => $total ? $total.' '.($total === 1 ? 'review' : 'reviews') : 'Nothing to review', 'focusTag' => 'Ready for review', 'focusMeta' => [$sources.' permitted review '.Str::plural('queue', $sources), count($this->siteIds).' '.Str::plural('site', count($this->siteIds)).' in view'], 'empty' => $sources ? 'No submitted decisions are waiting in your permitted queues.' : 'Review permissions are required to see decision requests.'];
         if (! $sources) {
             $this->blocks['focus']['state'] = 'restricted';
             $this->blocks['focus']['message'] = $this->blocks['focus']['empty'];
@@ -589,11 +592,13 @@ final class OverviewData
             ->where('status', 'in_progress')->where('actual_starts_at', '<=', now())->whereNull('actual_ends_at');
         $onDuty = (clone $dutyShifts)->distinct()->count('user_id');
         $dutyBySite = (clone $dutyShifts)->select('site_id')->selectRaw('COUNT(DISTINCT user_id) AS aggregate')->groupBy('site_id')->pluck('aggregate', 'site_id');
-        $initials = $scope->staff($this->user)->whereIn('users.id', (clone $dutyShifts)->select('user_id'))->orderBy('name')->limit(3)->pluck('name')
+        $onDutyStaff = $scope->staff($this->user)->whereIn('users.id', (clone $dutyShifts)->select('user_id'))->orderBy('name')->limit(3)->get(['users.id', 'users.name']);
+        $initials = $onDutyStaff->pluck('name')
             ->map(fn ($name) => collect(preg_split('/\s+/u', trim($name)))->filter()->take(2)->map(fn ($word) => mb_strtoupper(mb_substr($word, 0, 1)))->implode(''))->all();
+        $people = $onDutyStaff->map(fn ($staff) => ['id' => $staff->id, 'name' => $staff->name, 'detail' => 'On shift now'])->all();
         $this->metrics = [
             ['label' => 'Shift coverage', 'value' => $known ? $assigned : null, 'display' => $known ? $assigned.' / '.$need : '—', 'instrument' => 'bar', 'percent' => $known ? round($assigned / $need * 100) : null, 'caption' => ! $known ? ($coverage['unassessed'] ? 'Some coverage cannot be assessed' : 'No staffing requirements recorded') : ($coverage['gaps'] ? $coverage['gaps'].' windows need staffing review' : 'Assigned positions / recorded requirements'), 'href' => $href],
-            ['label' => 'On duty', 'value' => $onDuty, 'caption' => 'Started shifts · not yet ended', 'avatars' => $initials, 'href' => $href],
+            ['label' => 'On duty', 'value' => $onDuty, 'caption' => 'Started shifts · not yet ended', 'avatars' => $initials, 'people' => $people, 'href' => $href],
         ];
         $this->addAttention('Staffing windows need cover', $coverage['gaps'], $href, 'critical', 'Review the gaps and role cover shown on your coverage board.');
         if ($coverage['unassessed']) {
@@ -642,7 +647,10 @@ final class OverviewData
         $href = '/operations/handovers';
         $this->blocks['lead-handover'] = $this->ready('Recorded handovers · next 14 days', $href, $rows, $handovers->count());
         $this->blocks['focus'] = $this->ready('Next recorded handover across your teams', $href, array_slice($rows, 0, 1));
-        $this->blocks['focus'] += ['title' => 'The next handover', 'focusTag' => 'Handover', 'actionLabel' => 'Review handover', 'empty' => 'No upcoming handover is recorded in your permitted view.'];
+        $this->blocks['focus'] += ['title' => 'The next handover', 'focusTag' => 'Handover', 'actionLabel' => 'Review handover', 'emptyActionLabel' => 'Open handovers', 'empty' => 'No handover is recorded for your teams in the next 14 days.'];
+        if (! $rows) {
+            $this->blocks['focus']['headline'] = 'No handover due';
+        }
         $this->blocks['agenda'] = $this->ready('Upcoming recorded handovers and rostered shifts', $href, collect([...$rows, ...($this->blocks['agenda']['rows'] ?? [])])->sortBy('date')->take(6)->values()->all());
     }
 
@@ -652,7 +660,7 @@ final class OverviewData
         $count = (clone $query)->count();
         $href = $this->user->canDo('hr.employees.viewAny') ? '/hr/employees' : '/hr/analytics';
         $this->metrics = [
-            ['label' => 'Active workforce', 'value' => $count, 'caption' => 'Current approved staff · primary site', 'href' => $href],
+            ['label' => 'Active workforce', 'value' => $count, 'caption' => 'Approved staff · primary site', 'href' => $href],
             ['label' => 'Training current', 'value' => null, 'caption' => 'Compliance permission required', 'href' => $href],
             ['label' => 'Open vacancies', 'value' => null, 'caption' => 'Recruitment permission required', 'href' => $href],
         ];
@@ -735,7 +743,7 @@ final class OverviewData
         $count = $profiles->count();
         $href = '/hr/onboarding';
         $this->blocks['focus'] = $this->ready('Starting over the next 14 days', $href, $count ? [['label' => 'Starting over the next 14 days', 'detail' => 'Open onboarding for the people, owners and remaining steps.', 'href' => $href]] : [], $count);
-        $this->blocks['focus'] += ['title' => 'Joining the team', 'headline' => $count.' new '.($count === 1 ? 'starter' : 'starters'), 'focusTag' => 'Onboarding', 'focusMeta' => [$complete.' '.Str::plural('checklist', $complete).' complete', ($count - $complete).' '.($count - $complete === 1 ? 'needs' : 'need').' preparation'], 'actionLabel' => 'Review onboarding', 'empty' => 'No new starters are recorded in the next 14 days.'];
+        $this->blocks['focus'] += ['title' => 'Joining the team', 'headline' => $count ? $count.' new '.($count === 1 ? 'starter' : 'starters') : 'No new starters', 'emptyActionLabel' => 'Open onboarding', 'focusTag' => 'Onboarding', 'focusMeta' => [$complete.' '.Str::plural('checklist', $complete).' complete', ($count - $complete).' '.($count - $complete === 1 ? 'needs' : 'need').' preparation'], 'actionLabel' => 'Review onboarding', 'empty' => 'No new starters are recorded in the next 14 days.'];
         $this->addAttention('New starters need onboarding', $count - $complete, $href, 'warning');
         $this->mergePeopleDeadlines($profiles->sortBy('start_date')->take(6)->map(fn ($profile) => ['label' => 'New starter begins', 'date' => $profile->start_date->toDateString(), 'status' => 'Start date', 'href' => $href])->all());
     }
@@ -815,7 +823,7 @@ final class OverviewData
         $rows = collect($counts)->map(fn ($value, $label) => ['label' => $label, 'value' => $value])->values()->all();
         $this->blocks['distribution'] = $this->ready('Staff with all applicable training requirements current', '/hr/compliance', $rows, $total);
         $this->blocks['distribution'] += ['title' => 'Mandatory training', 'footnote' => 'Each staff member counted once', 'measurementKnown' => $configured > 0];
-        $this->metrics[1] = ['label' => 'Training current', 'value' => $configured ? $counts['Current'] : null, 'total' => $configured ? $total : 0, 'display' => $configured ? round($counts['Current'] / $total * 100).'%' : '—', 'instrumentCaption' => $configured ? $counts['Current'].' of '.$total.' staff' : 'Not assessed', 'caption' => $counts['Not configured'] ? $counts['Not configured'].' '.($counts['Not configured'] === 1 ? 'staff member has' : 'staff have').' no training requirements set' : 'All applicable training requirements', 'href' => '/hr/compliance'];
+        $this->metrics[1] = ['label' => 'Training current', 'value' => $configured ? $counts['Current'] : null, 'total' => $configured ? $total : 0, 'display' => $configured ? round($counts['Current'] / $total * 100).'%' : '—', 'instrumentCaption' => $configured ? $counts['Current'].' of '.$total.' staff' : 'Not assessed', 'caption' => $counts['Not configured'] ? $counts['Not configured'].' '.($counts['Not configured'] === 1 ? 'staff member has' : 'staff have').' no requirements set' : 'All applicable training requirements', 'href' => '/hr/compliance'];
         $this->addAttention('Staff training needs follow-up', $counts['Needs follow-up'], '/hr/compliance', 'warning');
         $this->blocks['hr-documents'] = $this->ready('Upcoming compliance requirement renewals', '/hr/compliance', collect($renewals)->sortBy('date')->take(6)->values()->all(), count($renewals));
         $this->mergePeopleDeadlines($renewals);
@@ -882,7 +890,7 @@ final class OverviewData
         $measured = $met + ($outcomes['breached'] ?? 0);
         $this->metrics[] = ['label' => 'Response target', 'value' => $measured ? $met : null, 'total' => $measured,
             'display' => $measured ? round($met / $measured * 100).'%' : '—', 'instrumentCaption' => $measured ? $met.' of '.$measured.' on time' : 'No measured deadlines',
-            'caption' => 'First responses due so far · selected period', 'href' => '/it'];
+            'caption' => 'First responses due so far', 'href' => '/it'];
         $waiting = (clone $open)->whereNotNull('assigned_to_user_id')->where('status', 'waiting')->count();
         $this->blocks['distribution'] = $this->ready('Current open work · each ticket counted once', $href, [
             ['label' => 'In progress', 'value' => $n - $waiting - $unassigned], ['label' => 'Waiting', 'value' => $waiting], ['label' => 'Unassigned', 'value' => $unassigned],
@@ -905,7 +913,10 @@ final class OverviewData
         $rows = $next ? [['label' => $next->reference ?: 'Support request', 'date' => $deadline, 'status' => Str::headline($next->priority),
             'detail' => $deadline ? 'First response deadline · '.Str::headline($clock['state']) : ($confirmedResponse ? 'Awaiting IT · no measured next-response deadline' : 'Check who needs to respond next · responsibility not recorded'), 'href' => '/it/tickets/'.$next->id]] : [];
         $this->blocks['focus'] = $this->ready('Awaiting IT · measured first-response deadlines first', $href, $rows);
-        $this->blocks['focus'] += ['title' => 'Your next response', 'actionLabel' => 'Review support request', 'focusTag' => $next ? Str::headline($next->priority) : 'Response queue'];
+        $this->blocks['focus'] += ['title' => 'Your next response', 'actionLabel' => 'Review support request', 'emptyActionLabel' => 'Open service desk', 'focusTag' => $next ? Str::headline($next->priority) : 'Response queue', 'empty' => 'No support requests are waiting for an IT response.'];
+        if (! $next) {
+            $this->blocks['focus']['headline'] = 'No responses due';
+        }
         if ($next && ! $deadline) {
             $this->blocks['focus']['headline'] = $confirmedResponse ? 'Response needed' : 'Review needed';
         }
@@ -914,6 +925,14 @@ final class OverviewData
         $planned = (clone $changes)->with('ticket:id,reference')->orderBy('maintenance_starts_at')->limit(6)->get()->map(fn ($change) => [
             'label' => ($change->ticket->reference ?: 'IT change').' · planned change', 'date' => $change->maintenance_starts_at->toIso8601String(), 'end' => $change->maintenance_ends_at?->toIso8601String(),
             'status' => Str::headline($change->change_type), 'href' => '/it/changes/'.$change->id,
+            // Restricted changes keep their risk out of the overview.
+            'actionLabel' => 'Open change', 'facts' => array_values(array_filter([
+                ['label' => 'Request', 'value' => $change->ticket->reference ?: 'Not recorded'],
+                ['label' => 'Change type', 'value' => Str::headline($change->change_type)],
+                ! $change->is_restricted && $change->risk_level ? ['label' => 'Risk', 'value' => Str::headline($change->risk_level)] : null,
+                ['label' => 'Starts', 'dateTime' => $change->maintenance_starts_at->toIso8601String()],
+                ['label' => 'Ends', 'dateTime' => $change->maintenance_ends_at?->toIso8601String(), 'value' => $change->maintenance_ends_at ? null : 'Not recorded'],
+            ])),
         ])->all();
         $this->blocks['agenda'] = $this->ready('Scheduled changes · next 30 days', '/it/changes', $planned, (clone $changes)->count());
         $this->blocks['agenda']['title'] = 'Planned IT work';
@@ -949,7 +968,7 @@ final class OverviewData
         $total = $devices->count();
         $known = $canMonitor && $total > 0;
         $this->metrics[1] = ['label' => 'Devices reporting', 'value' => $known ? $reporting : null, 'instrument' => 'bar', 'display' => $known ? round($reporting / $total * 100).'%' : '—',
-            'percent' => $known ? round($reporting / $total * 100) : null, 'caption' => $canMonitor ? $reporting.' of '.$total.' deployed devices have fresh observations' : 'Monitoring permission required', 'href' => '/security-devices'];
+            'percent' => $known ? round($reporting / $total * 100) : null, 'caption' => $canMonitor ? $reporting.' of '.$total.' devices reporting recently' : 'Monitoring permission required', 'href' => '/security-devices'];
         $rows = collect($this->sites)->whereIn('id', $this->siteIds)->map(function ($site) use ($devicesBySite, $freshness, $canMonitor, $history) {
             $items = $devicesBySite[$site['id']];
             $fresh = $items->filter(fn ($device) => ($freshness[$device->id] ?? null) === 'fresh')->count();
@@ -959,7 +978,12 @@ final class OverviewData
 
             return ['label' => $site['name'], 'value' => $items->count(), 'status' => $unknown ? 'Not assessed' : ($attention || $fresh < $items->count() ? 'Needs attention' : 'Reporting'),
                 'tone' => $critical ? 'critical' : (! $unknown && ($attention || $fresh < $items->count()) ? 'warning' : 'neutral'),
-                'detail' => $canMonitor ? $fresh.' reporting · '.$items->count().' deployed '.Str::plural('device', $items->count()) : 'Device monitoring permission required', 'history' => $history[$site['id']] ?? null, 'href' => '/security-devices/sites/'.$site['id']];
+                'detail' => $canMonitor ? $fresh.' reporting · '.$items->count().' deployed '.Str::plural('device', $items->count()) : 'Device monitoring permission required', 'history' => $history[$site['id']] ?? null, 'href' => '/security-devices/sites/'.$site['id'],
+                'actionLabel' => 'Open site devices', 'facts' => $canMonitor ? [
+                    ['label' => 'Deployed devices', 'value' => (string) $items->count()],
+                    ['label' => 'Reporting recently', 'value' => (string) $fresh],
+                    ['label' => 'Needing attention', 'value' => (string) $items->filter(fn ($device) => in_array($device->health_status?->value, ['critical', 'warning', 'unknown'], true) || $device->status?->value !== 'active')->count()],
+                ] : null];
         })->values()->all();
         $this->blocks['sites'] = $this->ready('Current device observations · permitted sites', '/security-devices', $rows, $total);
         $this->blocks['sites'] += ['title' => 'Service health', 'presentation' => 'service-health', 'footnote' => 'Recorded connectivity checks · 24 hourly windows · current hour partial'];
@@ -1022,6 +1046,14 @@ final class OverviewData
                 'label' => $risk->title, 'detail' => $risk->riskOwner?->name ?: 'Owner not assigned', 'date' => $risk->next_review_date?->toDateString(),
                 'status' => $risk->isCritical() ? 'Critical' : ($risk->isHigh() ? 'High' : ($risk->isMedium() ? 'Medium' : 'Low')),
                 'tone' => $risk->isCritical() ? 'critical' : ($risk->isHigh() ? 'warning' : 'neutral'), 'href' => '/governance/risks/'.$risk->id,
+                'actionLabel' => 'Open risk', 'facts' => array_values(array_filter([
+                    $risk->risk_reference ? ['label' => 'Reference', 'value' => $risk->risk_reference] : null,
+                    $risk->category ? ['label' => 'Category', 'value' => Str::headline($risk->category)] : null,
+                    ['label' => 'Owner', 'value' => $risk->riskOwner?->name ?: 'Not assigned'],
+                    $risk->residual_score !== null ? ['label' => 'Residual score', 'value' => $risk->residual_score.($risk->within_appetite === null ? '' : ($risk->within_appetite ? ' · within appetite' : ' · above appetite'))] : null,
+                    $risk->risk_committee ? ['label' => 'Committee', 'value' => Str::headline($risk->risk_committee)] : null,
+                    ['label' => 'Next review', 'date' => $risk->next_review_date?->toDateString(), 'value' => $risk->next_review_date ? null : 'Not scheduled'],
+                ])),
             ])->all();
             $riskSection = ['title' => 'Risks to watch', 'caption' => 'Current residual rating', 'state' => 'ready', 'rows' => $riskRows];
             $reviewRows = (clone $risks)->whereNotNull('next_review_date')->orderBy('next_review_date')->limit(6)->get()->map(fn ($risk) => ['label' => $risk->title, 'date' => $risk->next_review_date->toDateString(), 'status' => 'Risk review', 'href' => '/governance/risks/'.$risk->id])->all();
@@ -1033,7 +1065,7 @@ final class OverviewData
             $total = (clone $obligations)->count();
             $onTime = (clone $obligations)->onTime($today)->count();
             $this->metrics[1] = ['label' => 'Obligations on time', 'value' => $total ? $onTime : null, 'display' => $total ? round($onTime / $total * 100).'%' : '—', 'instrument' => 'bar', 'percent' => $total ? round($onTime / $total * 100) : null,
-                'caption' => $onTime.' of '.$total.' complete or not overdue · selected period', 'href' => '/governance/compliance'];
+                'caption' => $onTime.' of '.$total.' on time this period', 'href' => '/governance/compliance'];
             $this->addAttention('Compliance obligations overdue', ComplianceObligation::query()->overdue($today)->count(), '/governance/compliance', 'warning');
             $exceptions = ComplianceObligation::query()->counted()->whereDate('due_date', '<=', ComplianceObligation::dueSoonUntil($today))
                 ->where(fn ($q) => $q->where(fn ($q) => $q->where('evidence_required', true)->where('evidence_provided', false))
@@ -1042,6 +1074,12 @@ final class OverviewData
                 'label' => $item->obligation_title, 'detail' => $item->owner?->name ?: 'Owner not assigned', 'date' => $item->due_date->toDateString(),
                 'status' => $item->evidence_required && ! $item->evidence_provided ? 'Awaiting evidence' : 'Awaiting sign-off',
                 'tone' => $item->due_date->toDateString() < $today ? 'critical' : 'warning', 'href' => '/governance/compliance/'.$item->id,
+                'actionLabel' => 'Open obligation', 'facts' => [
+                    ['label' => 'Owner', 'value' => $item->owner?->name ?: 'Not assigned'],
+                    ['label' => 'Due', 'date' => $item->due_date->toDateString()],
+                    ['label' => 'Evidence', 'value' => ! $item->evidence_required ? 'Not required' : ($item->evidence_provided ? 'Provided' : 'Still needed')],
+                    ['label' => 'Sign-off', 'value' => ! $item->sign_off_required ? 'Not required' : ($item->signed_off_at ? 'Signed off' : 'Still needed')],
+                ],
             ])->all();
             $evidenceSection = ['title' => 'Assurance evidence', 'caption' => 'Due within 30 days, including overdue', 'state' => 'ready', 'rows' => $evidenceRows];
             $this->blocks['governance-assurance'] = $this->ready('Required evidence and sign-off still outstanding', '/governance/compliance', $evidenceRows, (clone $exceptions)->count());
@@ -1062,6 +1100,12 @@ final class OverviewData
                 'label' => $goal->title, 'value' => $goal->progress_pct === null ? null : (float) $goal->progress_pct, 'target' => 100,
                 'status' => Str::headline($goal->status), 'tone' => $goal->status === 'at_risk' ? 'warning' : 'neutral',
                 'detail' => $goal->leadExecutive?->name ?: 'Owner not assigned', 'href' => '/governance/strategy/'.$goal->strategic_plan_id,
+                'actionLabel' => 'Open strategic plan', 'facts' => array_values(array_filter([
+                    ['label' => 'Lead', 'value' => $goal->leadExecutive?->name ?: 'Not assigned'],
+                    $goal->pillar ? ['label' => 'Pillar', 'value' => Str::headline($goal->pillar)] : null,
+                    $goal->timeframe ? ['label' => 'Timeframe', 'value' => Str::headline($goal->timeframe)] : null,
+                    ['label' => 'Recorded progress', 'value' => $goal->progress_pct === null ? 'Not recorded' : round((float) $goal->progress_pct).'%'],
+                ])),
             ])->all();
             $this->blocks['sites'] = $this->ready('Current approved plans · recorded progress', '/governance/strategy', $rows, (clone $goals)->count());
             $this->blocks['sites'] += ['title' => 'Strategic priorities', 'presentation' => 'priorities'];
@@ -1083,7 +1127,10 @@ final class OverviewData
                 'label' => $next->title, 'date' => $next->scheduled_at->toIso8601String(), 'end' => $next->duration_minutes ? $next->scheduled_at->copy()->addMinutes($next->duration_minutes)->toIso8601String() : null,
                 'detail' => $packs ? $packs.' board pack available in your view' : 'No board papers available in your view', 'href' => '/governance/meetings/'.$next->id,
             ]] : []);
-            $this->blocks['focus'] += ['title' => 'Next board meeting', 'focusTag' => 'Board preparation', 'actionLabel' => 'Open meeting', 'empty' => 'No upcoming board meeting is available in your permitted view.'];
+            $this->blocks['focus'] += ['title' => 'Next board meeting', 'focusTag' => 'Board preparation', 'actionLabel' => 'Open meeting', 'emptyActionLabel' => 'Open meetings', 'empty' => 'No board meeting is scheduled in your view yet.'];
+            if (! $next) {
+                $this->blocks['focus']['headline'] = 'No meeting scheduled';
+            }
             if ($next) {
                 $localMeeting = $next->scheduled_at->copy()->setTimezone($this->start->timezone);
                 $this->blocks['focus']['headline'] = $localMeeting->format('j F');

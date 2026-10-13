@@ -31,7 +31,7 @@ final class DashboardController extends Controller
 
         return inertia('dashboard', [
             'overview' => app(OverviewData::class)->build($user, $role, $range, $site),
-            'role' => $role, 'roles' => $this->access->roles($user),
+            'role' => $role, 'roles' => $this->access->roles($user), 'defaultRole' => $this->access->defaultRole($user),
             'sites' => $this->access->sites($user, $role), 'filters' => ['range' => $range, 'site' => $site],
             'preference' => $this->access->preference($user, $role),
         ]);

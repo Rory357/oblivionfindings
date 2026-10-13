@@ -317,6 +317,18 @@ meter row).
   `size-3.5` in dense chrome; default stroke. Icon-only controls always
   carry an `aria-label`.
 - **Stat/KPI cards** — `components/ops-stat-card.tsx` / `fleet-stat-card.tsx`.
+- **Role overview pilot (approved by Stephan 2026-10-13).** The six-role
+  Overview (`features/overview/`) is the reference for editable dashboards:
+  block cards (title + subtitle, ⋯ menu, footer note + "View details ↗"),
+  the drag/resize block grid, the block library and read-only detail
+  panels (a row with facts opens a 480px panel whose one action links to
+  the module). Light mode uses the app tokens. Two overview-only choices
+  are piloted there and are candidates for the whole app — Stephan
+  decides: the **graphite dark palette** and the **calm categorical chart
+  palette** (both as oklch tokens at the top of `workspace.css`), and the
+  **comfortable 38px header dropdowns** (`PageHeaderFilterSelect
+  size="comfortable"`, PAGE_HEADER_STYLE_GUIDE.md §6). Status colours
+  there always use the app's verified pairs.
 - **Multi-step flows** — `WizardShell` (see entity add/edit above).
   `components/wizard-stepper.tsx` is **legacy** — do not use it in new work.
 - **Forms** — shadcn `<Input>`/`<Select>`/`<Textarea>`; dense native-element
@@ -610,6 +622,22 @@ before.
   `gap-[15px]`/`space-y-6`. Spacing INSIDE a card (its own
   padding and micro-layout) is unaffected. Existing pages migrate via
   conformance sweep probe 17.
+- **Page-scoped token forks** (corrected 2026-10-13, role Overview) — a
+  feature stylesheet that redefines `--background`, `--card`,
+  `--foreground`, `--border`, the `--status-*` pairs or the font with hex
+  values inside its own scope (the Overview shipped 50 of them). The page
+  silently stops following theme, dark-mode and contrast fixes, and its
+  status badges lose the verified pairs. A feature may add its own
+  derived tokens (`--ov-soft: color-mix(… var(--primary) …)`), but core
+  and status tokens come from `app.css`; a deliberate palette pilot is
+  written as oklch tokens, documented here, and approved by Stephan.
+  ESLint cannot see CSS, so check `*.css` files for `#` colours by hand.
+- **Pixel font sizes in feature CSS** (corrected 2026-10-13, role
+  Overview) — `font-size: 11px` ignores the user's text-size setting
+  (`--base-font-size`, 13/14/16px), and 8–10px text was unreadable on the
+  Overview. Use the typography helpers, or `calc(Nrem / 14)` in a
+  stylesheet (N px at the default size), never below the `.text-caption`
+  size (10.5px at default).
 - **Non-existent colour tokens** — utilities like `bg-warning/20` or
   `text-warning-foreground` reference a `warning` token that isn't in the
   `@theme` registry, so they silently render as nothing. The real tokens

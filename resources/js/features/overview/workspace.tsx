@@ -1,8 +1,8 @@
-/* eslint-disable no-restricted-syntax -- The approved puzzle controls and library cards use custom button geometry; form actions use the shared Button. */
 import {
     PageHeader,
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
+    PageHeaderMeterAvatars,
     PageHeaderMeterBar,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
@@ -11,13 +11,21 @@ import {
     PageHeaderMeterSpark,
     PageHeaderPrimaryButton,
     PageHeaderRail,
+    PageHeaderSearchTrigger,
     PageHeaderStatusChip,
 } from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Label } from '@/components/ui/label';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { Toggle } from '@/components/ui/toggle';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
@@ -38,7 +46,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { formatDate, formatTime } from '@/lib/datetime';
+import { formatDate, formatDateTime, formatTime } from '@/lib/datetime';
 import {
     DndContext,
     KeyboardSensor,
@@ -85,6 +93,7 @@ import {
     Sparkles,
     Star,
     Trash2,
+    TriangleAlert,
     Undo2,
     UsersRound,
     X,
@@ -101,10 +110,16 @@ import {
     type ReactNode,
 } from 'react';
 import { toast } from 'sonner';
-import { BlockContent } from './block-content';
+import {
+    BlockContent,
+    BlockSketch,
+    ConnectionHistoryStrip,
+    OverviewDetailContext,
+} from './block-content';
 import {
     catalog,
     defaultBlocks,
+    fillRows,
     moveBlock,
     tidyBlocks,
     writeOverview,
@@ -116,6 +131,7 @@ import {
     type OverviewProps,
     type Range,
     type Role,
+    type Row,
 } from './types';
 import './workspace.css';
 
@@ -304,12 +320,14 @@ function PuzzleBlock({
                         </span>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <button
-                                    className="ov-icon-button"
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="ov-tool-button"
                                     aria-label={`Size and position of ${title}`}
                                 >
-                                    <MoreHorizontal size={18} />
-                                </button>
+                                    <MoreHorizontal />
+                                </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>
@@ -346,13 +364,15 @@ function PuzzleBlock({
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
-                        <button
-                            className="ov-icon-button"
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="ov-tool-button"
                             aria-label={`Remove ${title}`}
                             onClick={onRemove}
                         >
-                            <X size={16} />
-                        </button>
+                            <X />
+                        </Button>
                     </div>
                 )}
                 <header className="ov-card-head">
@@ -361,17 +381,19 @@ function PuzzleBlock({
                         <p>{data?.subtitle ?? meta.description}</p>
                     </div>
                     {data?.state === 'proposed' ? (
-                        <span className="ov-proposal">Proposed</span>
+                        <StatusBadge variant="neutral">Proposed</StatusBadge>
                     ) : (
                         !editing && (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <button
-                                        className="ov-icon-button"
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="ov-tool-button"
                                         aria-label={`Options for ${title}`}
                                     >
-                                        <MoreHorizontal size={17} />
-                                    </button>
+                                        <MoreHorizontal />
+                                    </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                     {data?.href && (
@@ -460,7 +482,8 @@ function PuzzleBlock({
                         (data.total ?? 0) > 0 ||
                         data.rows.length > 0 ||
                         (data.reviewTotal ?? 0) > 0) ? (
-                        <button onClick={onExpand}>
+                        // eslint-disable-next-line no-restricted-syntax -- styled as the footer's text link, like its sibling <Link>s
+                        <button type="button" onClick={onExpand}>
                             View all {data?.total ?? 0}{' '}
                             {data?.total === 1 ? 'item' : 'items'}{' '}
                             <ArrowRight size={14} />
@@ -554,6 +577,7 @@ export default function OverviewWorkspace(props: OverviewProps) {
 function Workspace({
     role,
     roles,
+    defaultRole,
     sites,
     filters,
     overview,
@@ -605,6 +629,8 @@ function Workspace({
     const [announcement, setAnnouncement] = useState('');
     const [scopes, setScopes] = useState<Record<string, OverviewData>>({});
     const [refreshing, setRefreshing] = useState(false);
+    const [isDefault, setIsDefault] = useState(defaultRole === role);
+    const [detailRow, setDetailRow] = useState<Row | null>(null);
     const board = useRef<HTMLDivElement>(null);
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 7 } }),
@@ -613,6 +639,8 @@ function Workspace({
         }),
     );
     const editing = draft !== null;
+    // Warnings stay in Needs attention; only critical work is called urgent.
+    const urgentNow = overview.urgent.filter((row) => row.tone === 'critical');
     const scopeKey = [
         ...new Set(
             current.blocks
@@ -905,13 +933,25 @@ function Workspace({
                 ),
         [roleMeta, query, category, favoritesOnly, availableOnly, current],
     );
+    // Needs attention follows the approved mockup: the full priority list,
+    // the next step beside it, then the upcoming dates.
+    const attentionView: BlockLayout[] = [
+        { id: 'attention', span: 8, height: 0, site: 'page' },
+        { id: 'focus', span: 4, height: 0, site: 'page' },
+        { id: 'agenda', span: 12, height: 0, site: 'page' },
+    ];
     const shown =
         tab === 'attention'
-            ? [{ id: 'attention', span: 12, height: 0, site: 'page' }]
+            ? attentionView.filter((b) =>
+                  roleMeta.blocks.some((m) => m.id === b.id),
+              )
             : tab === 'insights'
-              ? current.blocks.filter((b) =>
-                    ['trend', 'donut', 'bars', 'progress'].includes(
-                        roleMeta.blocks.find((m) => m.id === b.id)?.kind ?? '',
+              ? fillRows(
+                    current.blocks.filter((b) =>
+                        ['trend', 'donut', 'bars', 'progress'].includes(
+                            roleMeta.blocks.find((m) => m.id === b.id)?.kind ??
+                                '',
+                        ),
                     ),
                 )
               : current.blocks;
@@ -932,6 +972,21 @@ function Workspace({
         governance: 'Board workspace',
     }[role];
     const previewMeta = roleMeta.blocks.find((b) => b.id === previewId);
+    const needle = query.trim().toLowerCase();
+    const foundSteps =
+        dialog === 'find'
+            ? overview.urgent.filter((r) =>
+                  r.label.toLowerCase().includes(needle),
+              )
+            : [];
+    const foundBlocks =
+        dialog === 'find'
+            ? roleMeta.blocks.filter(
+                  (b) =>
+                      current.blocks.some((c) => c.id === b.id) &&
+                      b.title.toLowerCase().includes(needle),
+              )
+            : [];
     return (
         <div
             className="ov-workspace"
@@ -971,10 +1026,7 @@ function Workspace({
                 }
                 title="Overview"
                 titleChip={
-                    <PageHeaderStatusChip
-                        variant="neutral"
-                        className="ov-role-chip"
-                    >
+                    <PageHeaderStatusChip variant="neutral">
                         {roleMeta.name}
                     </PageHeaderStatusChip>
                 }
@@ -982,12 +1034,10 @@ function Workspace({
                 actions={
                     !editing && (
                         <>
-                            <PageHeaderGlassButton
-                                onClick={() => startDialog('find')}
-                                aria-label="Find in overview"
-                            >
-                                <Search size={16} />
-                            </PageHeaderGlassButton>
+                            <PageHeaderSearchTrigger
+                                placeholder="Find in overview…"
+                                onOpen={() => startDialog('find')}
+                            />
                             <PageHeaderGlassButton onClick={edit}>
                                 <LayoutDashboard size={16} />
                                 Edit layout
@@ -1033,9 +1083,14 @@ function Workspace({
                             {...(m.href
                                 ? { href: m.href }
                                 : { onClick: () => setTab('attention') })}
+                            // OverviewData always places Needs attention second.
                             tone={
-                                i === 1 && overview.urgent.length
-                                    ? 'warning'
+                                i === 1
+                                    ? urgentNow.length
+                                        ? 'critical'
+                                        : overview.urgent.length
+                                          ? 'warning'
+                                          : 'brand'
                                     : 'brand'
                             }
                         >
@@ -1053,19 +1108,18 @@ function Workspace({
                                     <span>—</span>
                                     {m.instrumentCaption ?? 'No records yet'}
                                 </span>
-                            ) : m.avatars?.length ? (
+                            ) : m.people?.length ? (
                                 <div className="ov-duty-meter">
                                     <PageHeaderMeterBig>
                                         {m.value ?? '—'}
                                     </PageHeaderMeterBig>
-                                    <span
-                                        className="ov-duty-avatars"
-                                        aria-label="On-duty team initials"
-                                    >
-                                        {m.avatars.map((initials, index) => (
-                                            <span key={index}>{initials}</span>
-                                        ))}
-                                    </span>
+                                    <PageHeaderMeterAvatars
+                                        people={m.people}
+                                        overflow={Math.max(
+                                            0,
+                                            (m.value ?? 0) - m.people.length,
+                                        )}
+                                    />
                                 </div>
                             ) : (
                                 <PageHeaderMeterBig>
@@ -1092,6 +1146,7 @@ function Workspace({
                             </span>
                             {roles.length > 1 && (
                                 <PageHeaderFilterSelect
+                                    size="comfortable"
                                     icon={UsersRound}
                                     label={roleMeta.name}
                                     value={role}
@@ -1108,6 +1163,7 @@ function Workspace({
                             )}
                             {role !== 'governance' && (
                                 <PageHeaderFilterSelect
+                                    size="comfortable"
                                     icon={Building2}
                                     label="All permitted sites"
                                     value={filters.site}
@@ -1125,6 +1181,7 @@ function Workspace({
                                 />
                             )}
                             <PageHeaderFilterSelect
+                                size="comfortable"
                                 icon={CalendarDays}
                                 label={rangeLabels[filters.range]}
                                 value={filters.range}
@@ -1153,7 +1210,7 @@ function Workspace({
                                     key: 'attention',
                                     label: 'Needs attention',
                                     count: overview.blocks.attention.total ?? 0,
-                                    alert: overview.urgent.length > 0,
+                                    alert: urgentNow.length > 0,
                                 },
                                 {
                                     key: 'insights',
@@ -1171,23 +1228,26 @@ function Workspace({
                     )
                 }
             />
-            {overview.urgent.length > 0 && (
-                <div className="ov-urgent">
-                    <ShieldCheck size={18} />
+            {urgentNow.length > 0 && (
+                <div className="ov-urgent" role="status">
+                    <TriangleAlert size={18} aria-hidden="true" />
                     <strong>
-                        {overview.urgent.length === 1
-                            ? '1 priority needs attention'
-                            : `${overview.urgent.length} priorities need attention`}
+                        {urgentNow.length === 1
+                            ? '1 urgent item'
+                            : `${urgentNow.length} urgent items`}
                     </strong>
-                    <span>{overview.urgent[0].label}</span>
-                    <button
+                    <span>{urgentNow[0].label}</span>
+                    <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => {
                             if (editing) startDialog('find');
                             else setTab('attention');
                         }}
                     >
-                        Review now <ArrowUpRight size={15} />
-                    </button>
+                        Review now
+                        <ArrowUpRight />
+                    </Button>
                 </div>
             )}
             {overview.partial && (
@@ -1209,26 +1269,39 @@ function Workspace({
             )}
             {!editing && (
                 <div className="ov-context">
-                    <button
-                        className="ov-context-priorities"
-                        onClick={() => setTab('attention')}
-                    >
-                        <Check size={14} />
-                        {overview.partial
-                            ? 'Some summaries need a refresh'
-                            : overview.blocks.attention.total
-                              ? `${overview.blocks.attention.total} ${overview.blocks.attention.total === 1 ? 'item needs' : 'items need'} your review`
-                              : 'No outstanding priorities in this view'}
-                        <ArrowRight size={13} />
-                    </button>
+                    {overview.partial || overview.blocks.attention.total ? (
+                        // eslint-disable-next-line no-restricted-syntax -- a quiet text link in the status line, not a button
+                        <button
+                            type="button"
+                            className="ov-context-priorities"
+                            onClick={() => setTab('attention')}
+                        >
+                            {overview.partial
+                                ? 'Some summaries need a refresh'
+                                : `${overview.blocks.attention.total} ${overview.blocks.attention.total === 1 ? 'item needs' : 'items need'} your review`}
+                            <ArrowRight size={13} />
+                        </button>
+                    ) : (
+                        <span className="ov-context-priorities">
+                            <Check size={14} />
+                            You’re up to date
+                        </span>
+                    )}
                     <span>
                         {formatDate(overview.period.start)} –{' '}
                         {formatDate(overview.period.end)}
                     </span>
-                    <button onClick={refresh} disabled={refreshing}>
+                    {/* eslint-disable-next-line no-restricted-syntax -- the "Updated" timestamp doubles as a quiet refresh link */}
+                    <button
+                        type="button"
+                        className="ov-context-refresh"
+                        onClick={refresh}
+                        disabled={refreshing}
+                        aria-label={`Refresh · updated ${formatTime(overview.updatedAt)}`}
+                    >
                         <RefreshCw
                             size={13}
-                            className={refreshing ? 'ov-loading' : ''}
+                            className={refreshing ? 'animate-spin' : undefined}
                         />
                         Updated {formatTime(overview.updatedAt)}
                     </button>
@@ -1274,51 +1347,60 @@ function Workspace({
                     </div>
                     <div className="ov-editor-secondary" inert={saving}>
                         <span>Drag to arrange · Resize a corner</span>
-                        <div
+                        <ToggleGroup
+                            type="single"
+                            variant="outline"
+                            size="sm"
                             className="ov-density"
                             aria-label="Information density"
+                            value={current.density}
+                            onValueChange={(d) => {
+                                if (d === 'balanced' || d === 'compact')
+                                    change({ ...current, density: d });
+                            }}
                         >
-                            {(['balanced', 'compact'] as const).map((d) => (
-                                <button
-                                    key={d}
-                                    aria-pressed={current.density === d}
-                                    onClick={() =>
-                                        change({ ...current, density: d })
-                                    }
-                                >
-                                    {d === 'balanced' ? 'Balanced' : 'Compact'}
-                                </button>
-                            ))}
-                        </div>
-                        <button
-                            className="ov-icon-button"
+                            <ToggleGroupItem value="balanced">
+                                Balanced
+                            </ToggleGroupItem>
+                            <ToggleGroupItem value="compact">
+                                Compact
+                            </ToggleGroupItem>
+                        </ToggleGroup>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="ov-tool-button"
                             aria-label="Undo layout change"
                             disabled={!history.length}
                             onClick={undo}
                         >
-                            <Undo2 size={17} />
-                        </button>
-                        <button
-                            className="ov-icon-button"
+                            <Undo2 />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="ov-tool-button"
                             aria-label="Redo layout change"
                             disabled={!future.length}
                             onClick={redo}
                         >
-                            <Redo2 size={17} />
-                        </button>
-                        <button className="ov-text-button" onClick={tidy}>
-                            <Sparkles size={15} />
+                            <Redo2 />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={tidy}>
+                            <Sparkles />
                             Tidy layout
-                        </button>
-                        <button
-                            className="ov-text-button"
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => startDialog('saved')}
                         >
-                            <BookOpen size={15} />
+                            <BookOpen />
                             Saved layouts
-                        </button>
-                        <button
-                            className="ov-text-button"
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() =>
                                 change(
                                     {
@@ -1330,9 +1412,9 @@ function Workspace({
                                 )
                             }
                         >
-                            <RotateCcw size={15} />
+                            <RotateCcw />
                             Restore defaults
-                        </button>
+                        </Button>
                     </div>
                     {error && (
                         <p role="alert" className="ov-save-error">
@@ -1348,6 +1430,9 @@ function Workspace({
                 role={editing ? 'region' : undefined}
                 aria-label={editing ? 'Scrollable dashboard layout' : undefined}
             >
+                <OverviewDetailContext.Provider
+                    value={editing ? null : setDetailRow}
+                >
                 <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
@@ -1410,7 +1495,9 @@ function Workspace({
                                 );
                             })}
                             {editing && (
+                                // eslint-disable-next-line no-restricted-syntax -- an empty grid slot that opens the block library
                                 <button
+                                    type="button"
                                     className="ov-add-tile"
                                     onClick={() => startDialog('library')}
                                 >
@@ -1426,6 +1513,7 @@ function Workspace({
                         </div>
                     </SortableContext>
                 </DndContext>
+                </OverviewDetailContext.Provider>
                 {!shown.length && !editing && (
                     <div className="ov-board-empty">
                         <LayoutDashboard />
@@ -1448,28 +1536,39 @@ function Workspace({
                 ) : (
                     <span>Live records · {overview.scope}</span>
                 )}
-                {!editing && (
-                    <button
-                        onClick={async () => {
-                            try {
-                                await writeOverview('/dashboard/default-role', {
-                                    role,
-                                });
-                                toast.success(
-                                    `${roleMeta.name} is your default overview`,
-                                );
-                            } catch (e) {
-                                toast.error(
-                                    e instanceof Error
-                                        ? e.message
-                                        : 'Could not save default',
-                                );
-                            }
-                        }}
-                    >
-                        Make this my default view
-                    </button>
-                )}
+                {!editing && roles.length > 1 &&
+                    (isDefault ? (
+                        <span className="ov-default-note">
+                            <Check size={13} />
+                            {roleMeta.name} opens first when you sign in
+                        </span>
+                    ) : (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={async () => {
+                                try {
+                                    await writeOverview(
+                                        '/dashboard/default-role',
+                                        { role },
+                                    );
+                                    setIsDefault(true);
+                                    toast.success(
+                                        `${roleMeta.name} is now your default overview`,
+                                    );
+                                } catch (e) {
+                                    toast.error(
+                                        e instanceof Error
+                                            ? e.message
+                                            : 'Could not save default',
+                                    );
+                                }
+                            }}
+                        >
+                            <Star />
+                            Open {roleMeta.name} first
+                        </Button>
+                    ))}
             </footer>
             <div className="sr-only" role="status" aria-live="polite">
                 {announcement}
@@ -1485,15 +1584,22 @@ function Workspace({
             >
                 <DialogContent
                     className={`ov-dialog ${dialog === 'library' && !previewId ? 'ov-library-dialog' : ''}`}
+                    // POPUP_STYLE_GUIDE width tokens: long form for the
+                    // library grid, standard form for everything else.
+                    style={
+                        dialog === 'library' && !previewId
+                            ? { maxWidth: 'min(92vw, 900px)', width: 'min(92vw, 900px)' }
+                            : { maxWidth: 'min(92vw, 720px)', width: 'min(92vw, 720px)' }
+                    }
                 >
                     <DialogHeader>
                         <DialogTitle>
                             {previewMeta
                                 ? previewMeta.title
                                 : dialog === 'library'
-                                  ? 'Make room for what matters'
+                                  ? 'Choose your blocks'
                                   : dialog === 'starters'
-                                    ? 'A useful place to start'
+                                    ? 'Starter layouts'
                                     : dialog === 'saved'
                                       ? 'Your saved arrangements'
                                       : 'Find in your overview'}
@@ -1501,7 +1607,7 @@ function Workspace({
                         <DialogDescription>
                             {previewMeta
                                 ? 'Block preview'
-                                : `${roleMeta.name} · ${dialog === 'library' ? '20 useful blocks. Choose what belongs in your day.' : dialog === 'starters' ? 'Three focused arrangements' : dialog === 'saved' ? 'Keep up to three arrangements for this role' : 'Jump to a summary or review urgent work'}`}
+                                : `${roleMeta.name} · ${dialog === 'library' ? `${roleMeta.blocks.length} choices · ${roleMeta.blocks.length - current.blocks.length} available to add` : dialog === 'starters' ? `${roleMeta.starters.length} focused arrangements` : dialog === 'saved' ? 'Keep up to three arrangements for this role' : 'Jump to a summary or review urgent work'}`}
                         </DialogDescription>
                     </DialogHeader>
                     {dialog === 'library' && !previewMeta && (
@@ -1527,46 +1633,54 @@ function Workspace({
                                 </Button>
                             </div>
                             <div className="ov-library-filters">
-                                {[
-                                    'All',
-                                    ...new Set(
-                                        roleMeta.blocks.map((b) => b.category),
-                                    ),
-                                ].map((c) => (
-                                    <button
-                                        key={c}
-                                        aria-pressed={category === c}
-                                        onClick={() => setCategory(c)}
-                                    >
-                                        {c}{' '}
-                                        <span>
-                                            {c === 'All'
-                                                ? roleMeta.blocks.length
-                                                : roleMeta.blocks.filter(
-                                                      (b) => b.category === c,
-                                                  ).length}
-                                        </span>
-                                    </button>
-                                ))}
-                                <button
-                                    aria-pressed={favoritesOnly}
-                                    onClick={() =>
-                                        setFavoritesOnly(!favoritesOnly)
-                                    }
+                                <ToggleGroup
+                                    type="single"
+                                    size="sm"
+                                    aria-label="Block category"
+                                    value={category}
+                                    onValueChange={(c) => c && setCategory(c)}
                                 >
-                                    <Star size={14} />
+                                    {[
+                                        'All',
+                                        ...new Set(
+                                            roleMeta.blocks.map(
+                                                (b) => b.category,
+                                            ),
+                                        ),
+                                    ].map((c) => (
+                                        <ToggleGroupItem key={c} value={c}>
+                                            {c}
+                                            <span className="ov-filter-count">
+                                                {c === 'All'
+                                                    ? roleMeta.blocks.length
+                                                    : roleMeta.blocks.filter(
+                                                          (b) =>
+                                                              b.category === c,
+                                                      ).length}
+                                            </span>
+                                        </ToggleGroupItem>
+                                    ))}
+                                </ToggleGroup>
+                                <Toggle
+                                    size="sm"
+                                    pressed={favoritesOnly}
+                                    onPressedChange={setFavoritesOnly}
+                                >
+                                    <Star />
                                     Favourites
-                                </button>
-                                <label>
-                                    <input
-                                        type="checkbox"
+                                </Toggle>
+                                <div className="ov-available-only">
+                                    <Checkbox
+                                        id="overview-available-only"
                                         checked={availableOnly}
-                                        onChange={(e) =>
-                                            setAvailableOnly(e.target.checked)
+                                        onCheckedChange={(checked) =>
+                                            setAvailableOnly(checked === true)
                                         }
                                     />
-                                    Not on my overview
-                                </label>
+                                    <Label htmlFor="overview-available-only">
+                                        Not on my overview
+                                    </Label>
+                                </div>
                             </div>
                             <div className="ov-library-grid">
                                 {library.map((meta) => {
@@ -1583,8 +1697,10 @@ function Workspace({
                                                 <span className="ov-eyebrow">
                                                     {meta.category}
                                                 </span>
-                                                <button
-                                                    className="ov-icon-button"
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="ov-tool-button"
                                                     aria-label={`${current.favorites.includes(meta.id) ? 'Unfavourite' : 'Favourite'} ${meta.title}`}
                                                     aria-pressed={current.favorites.includes(
                                                         meta.id,
@@ -1594,7 +1710,6 @@ function Workspace({
                                                     }
                                                 >
                                                     <Star
-                                                        size={17}
                                                         fill={
                                                             current.favorites.includes(
                                                                 meta.id,
@@ -1603,9 +1718,11 @@ function Workspace({
                                                                 : 'none'
                                                         }
                                                     />
-                                                </button>
+                                                </Button>
                                             </div>
+                                            {/* eslint-disable-next-line no-restricted-syntax -- a thumbnail tile that opens the full preview */}
                                             <button
+                                                type="button"
                                                 className="ov-preview-thumb"
                                                 aria-label={`Preview ${meta.title}`}
                                                 onClick={() =>
@@ -1613,7 +1730,7 @@ function Workspace({
                                                 }
                                             >
                                                 {data?.state === 'ready' &&
-                                                data.total !== null ? (
+                                                data.total ? (
                                                     <>
                                                         <strong>
                                                             {data.total}
@@ -1640,8 +1757,8 @@ function Workspace({
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <LayoutDashboard
-                                                            size={29}
+                                                        <BlockSketch
+                                                            kind={meta.kind}
                                                         />
                                                         <span>
                                                             {data?.state ===
@@ -1652,7 +1769,7 @@ function Workspace({
                                                                   ? 'Temporarily unavailable'
                                                                   : data?.state ===
                                                                       'ready'
-                                                                    ? 'No measurement available'
+                                                                    ? 'Nothing recorded yet'
                                                                     : 'Proposed summary'}
                                                         </span>
                                                     </>
@@ -1661,14 +1778,15 @@ function Workspace({
                                             <h3>{meta.title}</h3>
                                             <p>{meta.description}</p>
                                             <div className="ov-library-card-footer">
-                                                <button
-                                                    className="ov-text-button"
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
                                                     onClick={() =>
                                                         setPreviewId(meta.id)
                                                     }
                                                 >
                                                     Preview
-                                                </button>
+                                                </Button>
                                                 <Button
                                                     size="sm"
                                                     variant={
@@ -1765,7 +1883,8 @@ function Workspace({
                                         <LayoutTemplate className="ov-starter-icon" />
                                         <div>
                                             <span className="ov-eyebrow">
-                                                6 BLOCKS · SUGGESTED
+                                                {starter.ids.length} blocks ·
+                                                Suggested
                                             </span>
                                             <h3>{starter.name}</h3>
                                             <p>{starter.description}</p>
@@ -1848,8 +1967,10 @@ function Workspace({
                                         >
                                             Use layout
                                         </Button>
-                                        <button
-                                            className="ov-icon-button"
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="ov-tool-button"
                                             aria-label={`Remove saved layout ${copy.name}`}
                                             onClick={() =>
                                                 change(
@@ -1864,8 +1985,8 @@ function Workspace({
                                                 )
                                             }
                                         >
-                                            <Trash2 size={16} />
-                                        </button>
+                                            <Trash2 />
+                                        </Button>
                                     </article>
                                 ))}
                             </div>
@@ -1913,39 +2034,38 @@ function Workspace({
                                 onChange={(e) => setQuery(e.target.value)}
                             />
                             <div className="ov-find-results">
-                                {overview.urgent
-                                    .filter((r) =>
-                                        r.label
-                                            .toLowerCase()
-                                            .includes(query.toLowerCase()),
-                                    )
-                                    .map((row) => (
-                                        <div
-                                            key={row.label}
-                                            className="ov-find-urgent"
-                                        >
-                                            <ShieldCheck size={18} />
-                                            <strong>{row.label}</strong>
-                                            {row.href && (
-                                                <a href={row.href}>
-                                                    Open workspace{' '}
-                                                    <ArrowUpRight size={14} />
-                                                </a>
-                                            )}
-                                        </div>
-                                    ))}
-                                {roleMeta.blocks
-                                    .filter(
-                                        (b) =>
-                                            current.blocks.some(
-                                                (c) => c.id === b.id,
-                                            ) &&
-                                            b.title
-                                                .toLowerCase()
-                                                .includes(query.toLowerCase()),
-                                    )
-                                    .map((meta) => (
+                                {foundSteps.map((row) => (
+                                    <div
+                                        key={row.label}
+                                        className="ov-find-urgent"
+                                        data-tone={row.tone}
+                                    >
+                                        <TriangleAlert size={18} />
+                                        <strong>{row.label}</strong>
+                                        {row.href && (
+                                            <Link
+                                                href={row.href}
+                                                onClick={() => setDialog(null)}
+                                            >
+                                                {row.actionLabel ??
+                                                    'Open workspace'}
+                                                <ArrowUpRight size={14} />
+                                            </Link>
+                                        )}
+                                    </div>
+                                ))}
+                                {!foundSteps.length && !foundBlocks.length && (
+                                    <EmptyState
+                                        variant="compact"
+                                        icon={Search}
+                                        heading="Nothing matches"
+                                        description="Try another word, or open Edit layout to add a block."
+                                    />
+                                )}
+                                {foundBlocks.map((meta) => (
+                                        // eslint-disable-next-line no-restricted-syntax -- a result row that scrolls to its block
                                         <button
+                                            type="button"
                                             key={meta.id}
                                             onClick={() => {
                                                 setTab('overview');
@@ -1971,6 +2091,88 @@ function Workspace({
                         </>
                     )}
                 </DialogContent>
+            </Dialog>
+            <Dialog
+                open={detailRow !== null}
+                onOpenChange={(open) => {
+                    if (!open) setDetailRow(null);
+                }}
+            >
+                {detailRow && (
+                    <DialogContent
+                        className="ov-dialog ov-detail"
+                        // POPUP_STYLE_GUIDE width token: read-only detail.
+                        style={{
+                            maxWidth: 'min(92vw, 480px)',
+                            width: 'min(92vw, 480px)',
+                        }}
+                    >
+                        <DialogHeader>
+                            <DialogTitle>{detailRow.label}</DialogTitle>
+                            {detailRow.detail && (
+                                <DialogDescription>
+                                    {detailRow.detail}
+                                </DialogDescription>
+                            )}
+                        </DialogHeader>
+                        {detailRow.status && (
+                            <StatusBadge
+                                className="w-fit"
+                                variant={
+                                    detailRow.tone === 'critical'
+                                        ? 'critical'
+                                        : detailRow.tone === 'warning'
+                                          ? 'warning'
+                                          : 'neutral'
+                                }
+                            >
+                                {detailRow.status}
+                            </StatusBadge>
+                        )}
+                        {!!detailRow.facts?.length && (
+                            <dl className="ov-detail-facts">
+                                {detailRow.facts.map((fact) => (
+                                    <div key={fact.label}>
+                                        <dt>{fact.label}</dt>
+                                        <dd>
+                                            {fact.date
+                                                ? formatDate(fact.date)
+                                                : fact.dateTime
+                                                  ? formatDateTime(
+                                                        fact.dateTime,
+                                                    )
+                                                  : (fact.value ??
+                                                    'Not recorded')}
+                                        </dd>
+                                    </div>
+                                ))}
+                            </dl>
+                        )}
+                        {!!detailRow.history?.length && (
+                            <div className="ov-detail-history">
+                                <strong>Connection checks · last 24 hours</strong>
+                                <ConnectionHistoryStrip row={detailRow} />
+                            </div>
+                        )}
+                        <DialogFooter>
+                            <Button
+                                variant="outline"
+                                onClick={() => setDetailRow(null)}
+                            >
+                                Close
+                            </Button>
+                            {detailRow.href && (
+                                <Button asChild>
+                                    <Link href={detailRow.href}>
+                                        {detailRow.actionLabel ??
+                                            'Open record'}
+                                        <ArrowUpRight />
+                                    </Link>
+                                </Button>
+                            )}
+                        </DialogFooter>
+                    </DialogContent>
+                )}
             </Dialog>
         </div>
     );
