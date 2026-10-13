@@ -174,4 +174,39 @@ describe('person medication record context', () => {
             ),
         ).toEqual({ client_id: '10', date: '2026-10-03', site_id: '3' });
     });
+
+    it('marks a waiting prescriber request, with the way to decide it only for deciders (EA-025)', () => {
+        const page = render(<PersonMedicationRecord {...props} />);
+        expect(
+            screen.queryByText('A prescriber request is waiting'),
+        ).not.toBeInTheDocument();
+        page.rerender(
+            <PersonMedicationRecord
+                {...props}
+                prescriber_requests={{ count: 2, url: null, can_decide: false }}
+            />,
+        );
+        expect(
+            screen.getByText('2 prescriber requests are waiting'),
+        ).toBeVisible();
+        expect(
+            screen.queryByRole('link', { name: 'Open in Connected care' }),
+        ).not.toBeInTheDocument();
+        page.rerender(
+            <PersonMedicationRecord
+                {...props}
+                prescriber_requests={{
+                    count: 1,
+                    url: '/emar/connected-care?client_id=10#requests',
+                    can_decide: true,
+                }}
+            />,
+        );
+        expect(
+            screen.getByText('A prescriber request is waiting'),
+        ).toBeVisible();
+        expect(
+            screen.getByRole('link', { name: 'Open in Connected care' }),
+        ).toHaveAttribute('href', '/emar/connected-care?client_id=10#requests');
+    });
 });

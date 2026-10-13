@@ -147,5 +147,15 @@ export type RecordPageProps =
           /** The NZ day, for Print MAR's ranges. */
           today?: string;
           as_at: string;
+          /**
+           * EA-025: outside prescriber requests waiting for a decision. Null
+           * when none wait or the prescriber portal is off. `url` opens them
+           * in Connected care, for people who decide requests.
+           */
+          prescriber_requests?: {
+              count: number;
+              url: string | null;
+              can_decide: boolean;
+          } | null;
       }
     | { unavailable: 'no_access' | 'not_found' };

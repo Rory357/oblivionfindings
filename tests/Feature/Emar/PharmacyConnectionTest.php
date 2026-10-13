@@ -844,6 +844,35 @@ final class PharmacyConnectionTest extends TestCase
         $this->assertStringNotContainsString('ZZZ1234', (string) $alert->message.$alert->short_message);
     }
 
+    /** EA-138 (UI): the Pharmacy orders list shows where each connected send stands. */
+    public function test_ea138_pharmacy_order_rows_show_the_connected_send_state(): void
+    {
+        $rows = fn () => collect($this->actingAs($this->fixture['actor'])->get(route('emar.stock', ['view' => 'orders']))->assertOk()
+            ->inertiaProps('pharmacyOrders'));
+        $this->assertNull($rows()->firstWhere('id', $this->fixture['order']->id)['dispatch']);
+
+        $dispatch = $this->queue();
+        app(PharmacyDispatchService::class)->send($dispatch->id);
+        $this->ack($dispatch, 'rejected')->assertOk();
+        $state = $rows()->firstWhere('id', $this->fixture['order']->id)['dispatch'];
+        $this->assertSame(['rejected', 'critical', 'Pharmacy declined'], [$state['state'], $state['tone'], $state['short_label']]);
+    }
+
+    /** EA-136 + EA-138 (UI): a pharmacy answer after a manual check is flagged on the row. */
+    public function test_ea138_a_contradicting_acceptance_is_flagged_on_the_order_row(): void
+    {
+        Http::fake(fn () => throw new ConnectionException('Synthetic uncertain transport'));
+        $dispatch = $this->queue();
+        app(PharmacyDispatchService::class)->send($dispatch->id);
+        $this->actingAs($this->fixture['actor'])->postJson($this->dispatchUrl($dispatch).'/resolve', ['request_uuid' => (string) Str::uuid(),
+            'expected_state' => 'unknown', 'confirmed_not_received' => true, 'reference' => 'CALL-SYNTHETIC-3'])->assertOk();
+        $this->ack($dispatch)->assertOk()->assertJsonPath('code', 'contradicts_recorded_check');
+
+        $state = collect($this->actingAs($this->fixture['actor'])->get(route('emar.stock', ['view' => 'orders']))->assertOk()
+            ->inertiaProps('pharmacyOrders'))->firstWhere('id', $this->fixture['order']->id)['dispatch'];
+        $this->assertSame(['warning', 'Accepted — check'], [$state['tone'], $state['short_label']]);
+    }
+
     private function queue(): MedicationPharmacyDispatch
     {
         $this->actingAs($this->fixture['actor'])->postJson($this->orderUrl().'/dispatch', $this->sendInput())

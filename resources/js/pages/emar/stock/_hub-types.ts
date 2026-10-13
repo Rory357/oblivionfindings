@@ -31,6 +31,17 @@ export type PharmacyOrderRow = {
     delivered_at: string | null;
     batch_number: string | null;
     batch_expiry: string | null;
+    /**
+     * EA-138: where the connected pharmacy send for this order stands, when
+     * it was sent through the pharmacy bridge. `note` says what to check.
+     */
+    dispatch?: {
+        state: string;
+        label: string;
+        short_label: string;
+        tone: 'success' | 'warning' | 'critical' | 'info' | 'neutral';
+        note: string | null;
+    } | null;
 };
 
 export const PHARMACY_NEXT_LABEL: Record<string, string> = {

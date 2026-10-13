@@ -1,6 +1,10 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { controlledColumns, PharmacyOrderDetail } from './_hub-tables';
+import {
+    controlledColumns,
+    pharmacyColumns,
+    PharmacyOrderDetail,
+} from './_hub-tables';
 import type { ControlledRegisterRow, PharmacyOrderRow } from './_hub-types';
 
 afterEach(cleanup);
@@ -110,5 +114,37 @@ describe('Stock evidence display', () => {
             screen.getByRole('button', { name: 'Mark confirmed' }),
         ).toBeEnabled();
         expect(screen.getAllByRole('listitem')).toHaveLength(5);
+    });
+
+    it('shows where a connected pharmacy send stands on the order row (EA-138)', () => {
+        const status = pharmacyColumns.find(
+            (column) => column.key === 'status',
+        )!;
+        const row = {
+            id: 7,
+            status: 'submitted',
+            dispatch: null,
+        } as PharmacyOrderRow;
+        const { rerender } = render(<>{status.cell(row)}</>);
+        expect(
+            screen.queryByTestId('pharmacy-dispatch-state'),
+        ).not.toBeInTheDocument();
+        rerender(
+            <>
+                {status.cell({
+                    ...row,
+                    dispatch: {
+                        state: 'sent',
+                        label: 'Pharmacy accepted after a manual check',
+                        short_label: 'Accepted — check',
+                        tone: 'warning',
+                        note: 'Check the pharmacy is not now holding two orders for this medicine.',
+                    },
+                })}
+            </>,
+        );
+        expect(screen.getByTestId('pharmacy-dispatch-state')).toHaveTextContent(
+            /Accepted — check.*not now holding two orders/,
+        );
     });
 });
