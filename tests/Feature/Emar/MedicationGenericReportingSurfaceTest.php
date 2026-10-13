@@ -18,10 +18,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\AssertsOverviewHasNoMedicationData;
 use Tests\TestCase;
 
 class MedicationGenericReportingSurfaceTest extends TestCase
 {
+    use AssertsOverviewHasNoMedicationData;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -100,17 +102,9 @@ class MedicationGenericReportingSurfaceTest extends TestCase
             collect($medicationRows)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all(),
         );
 
-        // Dose numbers come from the dose-slot projection (C6a, P09): every
-        // reader counts the same doses, controlled ones included (P09 Q6) —
-        // the unrecorded 09:00 doses of the controlled stock medicine, the
-        // replacement order and the unverified order (its verified version
-        // stays in effect, P01). At 10:00 their windows (to 10:00, inclusive)
-        // are still open: due now, none overdue yet. The ordinary and the
-        // deleted controlled 09:00 doses are recorded (missed).
-        $dashboard = $this->actingAs($ordinary)->get(route('dashboard'))->assertOk();
-        $this->assertSame(3, $dashboard->inertiaProps('emarWidgets.dueNow'));
-        $this->assertSame(0, $dashboard->inertiaProps('emarWidgets.overdue'));
-        $this->assertSame(1, $dashboard->inertiaProps('emarWidgets.lowStock'));
+        // The home Overview carries no medication data (753a7f396 removed the
+        // eMAR widget); the dose numbers below are the eMAR pages' own.
+        $this->assertOverviewHasNoMedicationData($this->actingAs($ordinary)->get(route('dashboard')));
 
         // The MAR numbers (C6h) count a scheduled dose once its window has
         // ended — at 10:01 — and count controlled doses for every reader (P09
@@ -208,10 +202,8 @@ class MedicationGenericReportingSurfaceTest extends TestCase
         $this->assertSame(2, $controlledReports->inertiaProps('kpis.missedMeds7d'));
         $this->assertSame(1, $controlledReports->inertiaProps('kpis.openDiscrepancies'));
 
-        $controlledDashboard = $this->actingAs($controlledReader)->get(route('dashboard'))->assertOk();
-        // The same dose numbers as the ordinary reader (controlled doses count for everyone).
-        $this->assertSame(3, $controlledDashboard->inertiaProps('emarWidgets.dueNow'));
-        $this->assertSame(2, $controlledDashboard->inertiaProps('emarWidgets.lowStock'));
+        // Nor for a controlled-medicine reader: the home Overview carries no medication data.
+        $this->assertOverviewHasNoMedicationData($this->actingAs($controlledReader)->get(route('dashboard')));
 
         // The same MAR numbers as the ordinary reader (P09 Q6).
         Carbon::setTestNow(Carbon::parse('2026-05-21 10:01:00', 'Pacific/Auckland')->utc());
