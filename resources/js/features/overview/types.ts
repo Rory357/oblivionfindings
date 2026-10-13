@@ -283,9 +283,12 @@ export async function writeOverview(url: string, body: unknown) {
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok)
-        throw new Error(
-            result.message ??
-                'Could not save. Your changes are still here; please try again.',
+        throw Object.assign(
+            new Error(
+                result.message ??
+                    'Could not save. Your changes are still here; please try again.',
+            ),
+            { status: response.status, data: result },
         );
     return result;
 }

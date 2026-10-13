@@ -63,7 +63,15 @@ final class DashboardController extends Controller
             $previous = $request->user()->uiPreferences()->where('key', 'overview.workspace.'.$role)->first();
             $revision = $previous ? hash('sha256', json_encode($previous->value)) : null;
             if ($request->validated('revision') !== $revision) {
-                return response()->json(['message' => 'This layout changed in another tab. Reload before saving. Your draft is still here.'], 409);
+                // Send the newer layout so the editor can offer to keep the
+                // draft (save over it) or use the other tab's layout.
+                $latest = $this->access->preference($request->user(), $role);
+
+                return response()->json([
+                    'message' => 'This layout was changed in another tab. Your changes are still here.',
+                    'revision' => $latest['revision'],
+                    'value' => $latest['value'],
+                ], 409);
             }
             $value = $request->validated('value');
             $stored = $request->user()->uiPreferences()->updateOrCreate(['key' => 'overview.workspace.'.$role], ['value' => $value]);

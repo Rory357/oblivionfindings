@@ -1,6 +1,6 @@
 {
     "worker": {
-        "name": "Support Worker",
+        "name": "Support worker",
         "icon": "heart-handshake",
         "description": "Your shift, your next steps, your week.",
         "range": "today",
@@ -63,7 +63,7 @@
             {
                 "id": "updates",
                 "title": "Latest updates",
-                "description": "Recent changes in your permitted work.",
+                "description": "Recent changes in your work.",
                 "category": "Actions",
                 "kind": "list",
                 "span": 4,
@@ -152,7 +152,7 @@
                 "icon": "file-heart",
                 "kind": "list",
                 "span": 6,
-                "next": "Open the permitted care record in My Day and read the current plan before providing support.",
+                "next": "Open the care record in My Day and read the current plan before providing support.",
                 "module": "My Day"
             },
             {
@@ -251,7 +251,7 @@
         ]
     },
     "lead": {
-        "name": "Team Lead",
+        "name": "Team lead",
         "icon": "users-round",
         "description": "Coverage, care and follow-through across your teams.",
         "range": "today",
@@ -314,7 +314,7 @@
             {
                 "id": "updates",
                 "title": "Latest updates",
-                "description": "Recent changes in your permitted work.",
+                "description": "Recent changes in your work.",
                 "category": "Actions",
                 "kind": "list",
                 "span": 4,
@@ -414,7 +414,7 @@
                 "icon": "notebook-pen",
                 "kind": "progress",
                 "span": 6,
-                "next": "Follow up missing notes with the responsible worker through the permitted care workspace.",
+                "next": "Follow up missing notes with the responsible worker through the care workspace.",
                 "module": "Team care records"
             },
             {
@@ -520,7 +520,7 @@
             {
                 "id": "focus",
                 "title": "Your decision queue",
-                "description": "Open specific submitted requests in your permitted review queues.",
+                "description": "Open the requests submitted for your review.",
                 "category": "Actions",
                 "kind": "focus",
                 "span": 4,
@@ -565,7 +565,7 @@
             {
                 "id": "updates",
                 "title": "Latest updates",
-                "description": "Recent changes in your permitted work.",
+                "description": "Recent changes in your work.",
                 "category": "Actions",
                 "kind": "list",
                 "span": 4,
@@ -654,7 +654,7 @@
                 "icon": "target",
                 "kind": "progress",
                 "span": 6,
-                "next": "Review aggregate coverage with the site lead and arrange outstanding reviews in the permitted care workspace.",
+                "next": "Review aggregate coverage with the site lead and arrange outstanding reviews in the care workspace.",
                 "module": "Service quality reports"
             },
             {
@@ -682,7 +682,7 @@
             {
                 "id": "manager-resources",
                 "title": "Cross-site resource requests",
-                "description": "Coordinate equipment and practical help between permitted sites.",
+                "description": "Coordinate equipment and practical help between your sites.",
                 "category": "Actions",
                 "icon": "arrow-left-right",
                 "kind": "list",
@@ -798,7 +798,7 @@
             {
                 "id": "sites",
                 "title": "Recruitment pipeline",
-                "description": "Active candidates · all permitted sites",
+                "description": "Active candidates · all your sites",
                 "category": "Insights",
                 "kind": "bars",
                 "span": 8,
@@ -816,7 +816,7 @@
             {
                 "id": "updates",
                 "title": "Latest updates",
-                "description": "Recent changes in your permitted work.",
+                "description": "Recent changes in your work.",
                 "category": "Actions",
                 "kind": "list",
                 "span": 4,
@@ -839,7 +839,7 @@
                 "icon": "user-check",
                 "kind": "list",
                 "span": 6,
-                "next": "Open the permitted employee record to prepare the review with their manager.",
+                "next": "Open the employee record to prepare the review with their manager.",
                 "module": "Employee reviews"
             },
             {
@@ -850,7 +850,7 @@
                 "icon": "files",
                 "kind": "donut",
                 "span": 4,
-                "next": "Open the permitted document register and request the required renewal.",
+                "next": "Open the document register and request the required renewal.",
                 "module": "Staff documents"
             },
             {
@@ -878,12 +878,12 @@
             {
                 "id": "hr-workforce",
                 "title": "Workforce mix",
-                "description": "Understand employment arrangements across permitted sites.",
+                "description": "Understand employment arrangements across your sites.",
                 "category": "Insights",
                 "icon": "users-round",
                 "kind": "donut",
                 "span": 4,
-                "next": "Open the workforce report to inspect the permitted aggregate breakdown.",
+                "next": "Open the workforce report to inspect the aggregate breakdown.",
                 "module": "Workforce reports"
             },
             {
@@ -894,7 +894,7 @@
                 "icon": "door-open",
                 "kind": "list",
                 "span": 6,
-                "next": "Check the permitted leaver checklist and confirm the responsible teams.",
+                "next": "Check the leaver checklist and confirm the responsible teams.",
                 "module": "Leaver checklists"
             },
             {
@@ -916,7 +916,7 @@
                 "icon": "clipboard-list",
                 "kind": "list",
                 "span": 6,
-                "next": "Open the permitted record and verify supporting approval before passing the change to payroll.",
+                "next": "Open the record and verify supporting approval before passing the change to payroll.",
                 "module": "Payroll preparation"
             },
             {
@@ -949,7 +949,7 @@
                 "icon": "messages-square",
                 "kind": "list",
                 "span": 6,
-                "next": "Ask the responsible manager to arrange outstanding sessions; discussion notes stay in the permitted record.",
+                "next": "Ask the responsible manager to arrange outstanding sessions; discussion notes stay in the record.",
                 "module": "Supervision reports"
             },
             {
@@ -960,7 +960,7 @@
                 "icon": "network",
                 "kind": "donut",
                 "span": 4,
-                "next": "Review application sources alongside the campaign’s permitted recruitment measures.",
+                "next": "Review application sources alongside the campaign’s recruitment measures.",
                 "module": "Recruitment reports"
             }
         ],
@@ -1022,7 +1022,7 @@
             {
                 "id": "focus",
                 "title": "Your next response",
-                "description": "Your permitted response queue and recorded first-response deadline.",
+                "description": "Your response queue and recorded first-response deadline.",
                 "category": "Actions",
                 "kind": "focus",
                 "span": 4,
@@ -1049,7 +1049,7 @@
             {
                 "id": "sites",
                 "title": "Service health",
-                "description": "Current device observations across your permitted sites.",
+                "description": "Current device observations across your sites.",
                 "category": "Insights",
                 "kind": "bars",
                 "span": 8,
@@ -1067,7 +1067,7 @@
             {
                 "id": "updates",
                 "title": "Latest updates",
-                "description": "Recent changes in your permitted work.",
+                "description": "Recent changes in your work.",
                 "category": "Actions",
                 "kind": "list",
                 "span": 4,
@@ -1107,7 +1107,7 @@
             {
                 "id": "it-access",
                 "title": "Access request queue",
-                "description": "See requests by type before opening permitted records.",
+                "description": "See requests by type before opening the records.",
                 "category": "Actions",
                 "icon": "key-round",
                 "kind": "bars",
@@ -1123,7 +1123,7 @@
                 "icon": "laptop",
                 "kind": "list",
                 "span": 6,
-                "next": "Review the permitted asset record and confirm the next lifecycle action.",
+                "next": "Review the asset record and confirm the next lifecycle action.",
                 "module": "IT asset register"
             },
             {
@@ -1178,7 +1178,7 @@
                 "icon": "list-checks",
                 "kind": "progress",
                 "span": 6,
-                "next": "Review missing ownership, location or support details in the permitted asset register.",
+                "next": "Review missing ownership, location or support details in the asset register.",
                 "module": "IT asset register"
             },
             {
@@ -1273,7 +1273,7 @@
             {
                 "id": "focus",
                 "title": "Next board meeting",
-                "description": "Your next permitted board meeting and available papers.",
+                "description": "Your next board meeting and available papers.",
                 "category": "Actions",
                 "kind": "focus",
                 "span": 4,
@@ -1318,7 +1318,7 @@
             {
                 "id": "updates",
                 "title": "Latest updates",
-                "description": "Recent changes in your permitted work.",
+                "description": "Recent changes in your work.",
                 "category": "Actions",
                 "kind": "list",
                 "span": 4,
@@ -1363,7 +1363,7 @@
                 "icon": "landmark",
                 "kind": "list",
                 "span": 6,
-                "next": "Read the permitted committee paper and identify the decision or assurance requested.",
+                "next": "Read the committee paper and identify the decision or assurance requested.",
                 "module": "Committee papers"
             },
             {
@@ -1429,7 +1429,7 @@
                 "icon": "messages-square",
                 "kind": "list",
                 "span": 6,
-                "next": "Review the engagement purpose and approved summary; personal contributions remain in the permitted record.",
+                "next": "Review the engagement purpose and approved summary; personal contributions remain in the record.",
                 "module": "Governance engagement"
             },
             {
@@ -1451,7 +1451,7 @@
                 "icon": "stamp",
                 "kind": "list",
                 "span": 6,
-                "next": "Open the permitted decision record and check it against the current delegation schedule.",
+                "next": "Open the decision record and check it against the current delegation schedule.",
                 "module": "Delegated decisions"
             },
             {

@@ -342,7 +342,7 @@ final class OverviewConnectedBlocks
         $query = SiteFeedback::query()->whereIn('site_id', $this->siteIds($user, $sites))->whereIn('status', ['new', 'acknowledged', 'in_progress']);
         $this->changes($query, 'Site feedback', '/sites');
 
-        return $this->ready('Open feedback · selected permitted sites', '/sites', $this->groups($query), $query->count(), 'Counts only · feedback text and respondent details stay in the site workspace');
+        return $this->ready('Open feedback · selected sites', '/sites', $this->groups($query), $query->count(), 'Counts only · feedback text and respondent details stay in the site workspace');
     }
 
     private function quality(User $user, array $sites): array
@@ -380,7 +380,7 @@ final class OverviewConnectedBlocks
             'detail' => 'Responses / current eligible recipients', 'href' => $href.'/surveys/'.$survey->id,
         ])->values()->all();
 
-        return $this->ready('Published and closed surveys · full permitted audience only', $href, $rows, $surveys->count(), 'Participation counts only; recipient counts reflect current staff, so historical rates may differ');
+        return $this->ready('Published and closed surveys you can see in full', $href, $rows, $surveys->count(), 'Participation counts only; recipient counts reflect current staff, so historical rates may differ');
     }
 
     private function payroll(User $user, array $sites): array
@@ -412,7 +412,7 @@ final class OverviewConnectedBlocks
         $href = '/hr/goals?tab=development';
         $this->changes($query, 'Development plan', $href);
 
-        return $this->ready('Open development plans · permitted current staff', $href, $this->groups($query), $query->count(), 'Recorded development work; personal objectives and review notes remain in HR');
+        return $this->ready('Open development plans · current staff', $href, $this->groups($query), $query->count(), 'Recorded development work; personal objectives and review notes remain in HR');
     }
 
     private function initiatives(User $user, array $sites, bool $organisation): Builder
@@ -471,7 +471,7 @@ final class OverviewConnectedBlocks
             'label' => 'Strategic dependency #'.$r->id, 'date' => $r->due_date?->toDateString(), 'status' => Str::headline($r->status), 'detail' => Str::headline($r->risk_level).' recorded risk', 'href' => $href.'/'.$r->initiative_id,
         ])->all();
 
-        return $this->ready('Recorded roadmap dependencies · permitted board view', $href, $rows, $total);
+        return $this->ready('Recorded roadmap dependencies · board view', $href, $rows, $total);
     }
 
     private function audit(User $user): array

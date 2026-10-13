@@ -72,7 +72,7 @@ final class OverviewOptionalBlocks
             'detail' => 'Last saved · open Daily Notes to continue', 'href' => '/operations/clients/'.$note->client_id.'?tab=progress_notes',
         ])->all();
 
-        return $this->ready('Your saved daily notes · selected permitted sites', '/operations/clients', $rows, $total, 'Own drafts only · note contents stay in the client workspace');
+        return $this->ready('Your saved daily notes · selected sites', '/operations/clients', $rows, $total, 'Own drafts only · note contents stay in the client workspace');
     }
 
     public function supervision(User $user, array $siteIds): array
@@ -123,7 +123,7 @@ final class OverviewOptionalBlocks
                 'href' => '/hr/offboarding/'.$checklist->id,
             ])->all();
 
-        return $this->ready('Open offboarding checklists · permitted staff', '/hr/offboarding', $rows, $total, 'Practical handover tasks · departure reasons stay in HR');
+        return $this->ready('Open offboarding checklists · your staff', '/hr/offboarding', $rows, $total, 'Practical handover tasks · departure reasons stay in HR');
     }
 
     public function maintenance(User $user, array $siteIds): array

@@ -89,7 +89,7 @@ const statusFilters = [
     { value: 'blocked', label: 'Blocked' },
     { value: 'completed', label: 'Completed' },
     { value: 'cancelled', label: 'Cancelled' },
-    { value: 'all', label: 'All records' },
+    { value: 'all', label: 'All plans' },
 ];
 type Definition = {
     kind: string;
@@ -295,7 +295,7 @@ export function PlanEditor({
                             {definition.title} ·{' '}
                             {definition.scope === 'personal'
                                 ? 'Only you can see this plan'
-                                : 'Visible within this workspace’s permitted audience'}
+                                : 'Visible to people with access to this workspace'}
                         </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={save} className="grid gap-4">
@@ -828,10 +828,10 @@ export default function WorkPlans(props: Props) {
                     {definition.scope === 'site' && (
                         <PageHeaderFilterSelect
                             icon={Building2}
-                            label="All permitted sites"
+                            label="All your sites"
                             value={String(filters.site ?? 'all')}
                             options={[
-                                { value: 'all', label: 'All permitted sites' },
+                                { value: 'all', label: 'All your sites' },
                                 ...sites.map((site) => ({
                                     value: String(site.id),
                                     label: site.name,
@@ -939,7 +939,7 @@ export default function WorkPlans(props: Props) {
                                         personName: plan.owner.name,
                                         personIcon: UserRound,
                                         primary: plan.owner.name,
-                                        secondary: `Owner · version ${plan.version}`,
+                                        secondary: 'Plan owner',
                                     }}
                                     openLabel={
                                         canWrite ? 'Open plan' : 'View details'
