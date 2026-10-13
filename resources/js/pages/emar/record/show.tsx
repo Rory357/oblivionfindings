@@ -127,7 +127,7 @@ function PrescriberRequestsNotice({
     return (
         <Alert
             role="status"
-            className="border-status-warning bg-status-warning-bg text-status-warning-foreground"
+            className="border-status-warning/30 bg-status-warning-bg text-status-warning-foreground"
             data-testid="prescriber-requests-notice"
         >
             <AlertTriangle />
