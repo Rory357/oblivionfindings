@@ -1181,6 +1181,12 @@ function RecordDoseForm({
             live_recording_context: req.live_recording_context ?? undefined,
             // EA-008: the order shown here; the server refuses a "given" if it changed.
             order_fingerprint: req.order_fingerprint ?? undefined,
+            // A11: the server checks the label tick too (no photo of the pack).
+            label_checked:
+                givenLike &&
+                packLabelTickNeeded(req.pack_photo, req.pack_photo_policy)
+                    ? f.labelChecked === true
+                    : undefined,
             client_medication_id: req.order.id,
             administered_at: givenLike ? `${f.when}:00` : `${nowLocal}:00`,
             notes: f.note.trim() || null,
@@ -1563,6 +1569,7 @@ function RecordDoseForm({
         quantity_administered: 'stockQuantity',
         pack_lines: 'packLines',
         cd_balance: 'cdBalance',
+        label_checked: 'labelChecked',
         amount_mode: 'amount',
         blood_glucose_level: 'obs-blood_glucose_level',
         pulse_bpm: 'obs-pulse_bpm',
@@ -1628,7 +1635,10 @@ function RecordDoseForm({
         if (Object.keys(fieldErrors).length) {
             setPhase('edit');
             setErrors(fieldErrors);
-            setF((x) => ({ ...x, step: fieldErrors.scan ? 0 : 1 }));
+            setF((x) => ({
+                ...x,
+                step: fieldErrors.scan || fieldErrors.labelChecked ? 0 : 1,
+            }));
             focusFirst(fieldErrors);
             return;
         }
@@ -1767,6 +1777,7 @@ function RecordDoseForm({
                 medicine={med}
                 labelChecked={f.labelChecked === true}
                 onLabelChecked={(v) => set({ labelChecked: v })}
+                error={errors.labelChecked}
             />
             <KV
                 rows={[

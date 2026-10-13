@@ -786,6 +786,27 @@ final class PharmacyConnectionTest extends TestCase
         $this->assertTrue(\App\Models\MedicationAlert::query()->where('type', 'pharmacyOrder')->where('client_id', $this->fixture['order']->client_id)->exists());
     }
 
+    /** EA-136: a contradicting late acceptance opens a "Check for a duplicate supply" follow-up, once. */
+    public function test_ea136_contradicting_acceptance_opens_one_duplicate_supply_follow_up(): void
+    {
+        Http::fake(fn () => throw new ConnectionException('Synthetic uncertain transport'));
+        $dispatch = $this->queue();
+        app(PharmacyDispatchService::class)->send($dispatch->id);
+        $this->actingAs($this->fixture['actor'])->postJson($this->dispatchUrl($dispatch).'/resolve', ['request_uuid' => (string) Str::uuid(),
+            'expected_state' => 'unknown', 'confirmed_not_received' => true, 'reference' => 'CALL-SYNTHETIC-2'])->assertOk();
+
+        $this->ack($dispatch)->assertOk()->assertJsonPath('code', 'contradicts_recorded_check');
+        $this->ack($dispatch)->assertOk()->assertJsonPath('duplicate', true);
+
+        $followups = \App\Models\MedicationFollowup::query()->where('type', 'duplicate_supply')->get();
+        $this->assertCount(1, $followups);
+        $this->assertSame((int) $this->fixture['order']->client_id, (int) $followups->first()->client_id);
+        $this->assertSame((int) $this->fixture['order']->client_medication_id, (int) $followups->first()->client_medication_id);
+        $this->assertSame('open', $followups->first()->state);
+        $this->assertSame('duplicate-supply:'.$dispatch->id, $followups->first()->source_key);
+        $this->assertTrue(\App\Models\MedicationFollowup::query()->whereKey($followups->first()->id)->whereNull('completed_at')->exists());
+    }
+
     /** EA-137 (a): with the bridge switched off, a signed acceptance is evidence only. */
     public function test_b10_switched_off_bridge_keeps_acknowledgments_as_evidence_without_changing_orders(): void
     {

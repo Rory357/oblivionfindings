@@ -408,6 +408,15 @@ before.
   `design/band-text-token`); both bands also redefine
   `primary-foreground` inside themselves, so page content in their slots
   reads white too. Brands are never blocked for this.
+- **Fill foregrounds off their fill** (fixed 2026-10-13) — `*-foreground`
+  tokens are for text on their solid fill, not on cards: the destructive
+  `<Alert>` used `text-destructive-foreground` (white in light mode) on a
+  card and rendered white on white. Error text on a light surface uses the
+  critical status pair (`bg-status-critical-bg` +
+  `text-status-critical-foreground`, icon `text-status-critical`), as the
+  `Alert` destructive variant now does. ESLint
+  (`design/no-destructive-foreground-off-fill`) requires `bg-destructive`
+  in the same class string.
 - **Ad-hoc `text-2xl`/`text-xl` headings** — use the typography helpers.
 - **`dark:` colour pairs on token-styled elements** — redundant and drifts.
 - **Pinning a fixed hue to a module** (e.g. `bg-purple-500` for HR) — use

@@ -132,7 +132,7 @@ describe('work restriction approver settings presentation', () => {
     it('closes the editor without discarding the controlled draft', () => {
         render(<RestrictionApproverSettings {...props} />);
         openEditor();
-        fireEvent.click(screen.getAllByRole('button', { name: 'Close', exact: true })[0]);
+        fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]);
         openEditor();
         expect(screen.getByLabelText('Reason for this change')).toHaveValue(props.reason);
         expect(props.onSelectionChange).not.toHaveBeenCalled();

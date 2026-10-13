@@ -1578,6 +1578,49 @@ describe('RecordDoseDialog (P01)', () => {
         expect(screen.getByRole('button', { name: /continue/i })).toBeEnabled();
     });
 
+    it('sends the label tick, and shows the server’s refusal back at the tick (A11)', async () => {
+        submitMock.mockRejectedValueOnce({
+            isAxiosError: true,
+            response: {
+                status: 422,
+                data: {
+                    success: false,
+                    error: 'There’s no photo of this pack, so tick “I’ve checked the label” once you’ve checked it against the order.',
+                    error_field: 'label_checked',
+                    sync: { status: 'rejected' },
+                },
+            },
+        });
+        open(
+            requirements({
+                pack_photo: null,
+                pack_photo_policy: { show: true, no_photo: 'tick' },
+            }),
+        );
+        await screen.findByText('Losartan 50mg');
+        fireEvent.click(
+            screen.getByRole('checkbox', { name: /I’ve checked the label/ }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+        fireEvent.click(await screen.findByRole('button', { name: /^Given/ }));
+        fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+        fireEvent.click(
+            screen.getByRole('button', { name: /^record outcome$/i }),
+        );
+        await waitFor(() => expect(submitMock).toHaveBeenCalledOnce());
+        expect(submitMock.mock.calls[0][1]).toMatchObject({
+            label_checked: true,
+        });
+
+        // Back on Safety checks, at the tick, with the server's words.
+        expect(
+            await screen.findByText(/so tick “I’ve checked the label”/),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('checkbox', { name: /I’ve checked the label/ }),
+        ).toBeInTheDocument();
+    });
+
     it('shows no photo card until the server sends photos, and a warning never blocks (A11)', async () => {
         const { unmount } = open(requirements());
         await screen.findByText('Losartan 50mg');

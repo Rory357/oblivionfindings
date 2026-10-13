@@ -8,6 +8,7 @@ import {
     permittedFileUrl,
     type PreviewFile,
 } from '@/components/files/file-preview-dialog';
+import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -49,6 +50,7 @@ export function PackPhotoCard({
     medicine,
     labelChecked,
     onLabelChecked,
+    error,
 }: {
     /** undefined: the server doesn't send photos yet — nothing is shown. */
     photo: PackPhoto | null | undefined;
@@ -56,6 +58,8 @@ export function PackPhotoCard({
     medicine: string;
     labelChecked: boolean;
     onLabelChecked: (checked: boolean) => void;
+    /** The server's refusal when a required tick was missing. */
+    error?: string;
 }) {
     const [open, setOpen] = useState<PreviewFile | null>(null);
     if (photo === undefined || policy?.show === false) return null;
@@ -102,6 +106,7 @@ export function PackPhotoCard({
                             </Label>
                         </div>
                     ) : null}
+                    {tick ? <InputError message={error} /> : null}
                 </div>
             </div>
         );

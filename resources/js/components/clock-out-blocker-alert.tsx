@@ -14,13 +14,12 @@ export default function ClockOutBlockerAlert({
 
     return (
         <Alert
-            variant="destructive"
             data-test="clock-out-blockers"
             className="border-status-warning/30 bg-status-warning-bg text-status-warning"
         >
             <AlertTriangle aria-hidden />
             <AlertTitle>Before you can end this shift</AlertTitle>
-            <AlertDescription>
+            <AlertDescription className="text-status-warning">
                 <ul className="list-disc pl-4">
                     {blockers.map((blocker) => (
                         <li key={blocker.key}>
