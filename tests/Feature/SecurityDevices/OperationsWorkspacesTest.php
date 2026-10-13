@@ -327,6 +327,7 @@ class OperationsWorkspacesTest extends TestCase
             $page->component('security-devices/maintenance');
             $workspace = $page->toArray()['props']['workspace'];
 
+            $this->assertSame((int) $this->admin->id, $workspace['actor_id']);
             $this->assertSame('calibration', $workspace['active_tab']);
             $this->assertSame(1, $workspace['summary']['overdue']);
             $this->assertSame(1, $workspace['summary']['due_soon']);

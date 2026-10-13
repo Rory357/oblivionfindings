@@ -23,6 +23,7 @@ import { Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Clock,
+    HeartHandshake,
     Menu,
     MessageSquareText,
     ShieldAlert,
@@ -202,6 +203,17 @@ export function AppHeader({
                         </Link>
                     )}
                     <GlobalQueryBar variant="icon" />
+                    {can?.companyHub?.view && (
+                        <Link
+                            href="/company-hub"
+                            prefetch
+                            aria-label="Company Hub"
+                            title="Company Hub"
+                            className={cn(INK_ICON_BUTTON, 'frontline-hit')}
+                        >
+                            <HeartHandshake className="size-5" />
+                        </Link>
+                    )}
                     {canMessages && (
                         <Link
                             href="/operations/messages"

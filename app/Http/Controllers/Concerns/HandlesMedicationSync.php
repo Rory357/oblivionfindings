@@ -50,6 +50,18 @@ trait HandlesMedicationSync
                 'regex:/\S/u',
             ],
             'queued_offline' => ['nullable', 'boolean'],
+            // eMAR Lane A3 (EA-047): a saved dose is bound to the worker who
+            // recorded it on the device. Sent under anyone else's session (a
+            // stale tab on a shared PC), it is refused, never recorded as theirs.
+            'captured_by_user_id' => [
+                'nullable',
+                'integer',
+                function (string $attribute, mixed $value, Closure $fail) use ($request): void {
+                    if ((int) $value !== (int) $request->user()?->getAuthIdentifier()) {
+                        $fail('This was saved on this device by another worker, so it can’t be sent under your name. It sends when they sign in on this device.');
+                    }
+                },
+            ],
         ];
     }
 

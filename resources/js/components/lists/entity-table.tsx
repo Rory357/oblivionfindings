@@ -77,7 +77,7 @@ export interface EntityTableProps<T> {
     actionsFor: (row: T) => MenuItem[];
     onOpen?: (row: T) => void;
     /** A real identity link; optional so existing row activation is unchanged. */
-    hrefFor?: (row: T) => string;
+    hrefFor?: (row: T) => string | null | undefined;
     selection?: {
         keys: ReadonlySet<string | number>;
         onToggle: (row: T, checked: boolean) => void;
@@ -178,6 +178,7 @@ export function EntityTable<T>({
                     {rows.map((row) => {
                         const key = rowKey(row);
                         const id = identity(row);
+                        const href = hrefFor?.(row);
                         const selected =
                             (selection?.keys ?? selectedKeys)?.has(key) ??
                             false;
@@ -188,7 +189,7 @@ export function EntityTable<T>({
                                 key={key}
                                 role="row"
                                 tabIndex={
-                                    !hrefFor && (onOpen || selectMode)
+                                    !href && (onOpen || selectMode)
                                         ? 0
                                         : undefined
                                 }
@@ -270,10 +271,10 @@ export function EntityTable<T>({
                                     )}
                                     <span className="min-w-0">
                                         <span className="flex items-center gap-1.5">
-                                            {hrefFor ? (
+                                            {href ? (
                                                 <Link
                                                     aria-label={id.linkLabel}
-                                                    href={hrefFor(row)}
+                                                    href={href}
                                                     onClick={(event) =>
                                                         event.stopPropagation()
                                                     }

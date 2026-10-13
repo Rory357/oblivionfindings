@@ -5,6 +5,7 @@ import LeafletMap, {
 import { OperationalStateBadge } from '@/components/security-devices/estate-operations';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { ReviewRow } from '@/components/wizard/shell';
 import { formatDateTime, formatRelative } from '@/lib/datetime';
 import { Link } from '@inertiajs/react';
 import {
@@ -260,7 +261,7 @@ function Overview({ data }: { data: TrackingWorkspaceData }) {
                             </p>
                         ) : null}
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="space-y-0">
                         <Summary
                             label="tracking devices"
                             value={inventory.total}
@@ -386,13 +387,14 @@ function Summary({
     value: number;
     bounded: boolean;
 }) {
+    const factLabel = label.replace(/^./, (character) =>
+        character.toUpperCase(),
+    );
     return (
-        <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
-            <p className="text-lg font-bold">
-                {value} {label}
-                {bounded ? ' shown' : ''}
-            </p>
-        </div>
+        <ReviewRow
+            label={factLabel + (bounded ? ' shown' : '')}
+            value={value}
+        />
     );
 }
 

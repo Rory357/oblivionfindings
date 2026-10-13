@@ -1,5 +1,6 @@
 import { PageHero, PageTabs } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import { CollectorInstallationDialog } from '@/components/security-devices/collector-installation-dialog';
 import {
     CollectorEnrollmentDialog,
     CollectorRevocationDialog,
@@ -23,7 +24,8 @@ import {
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import type { SharedData } from '@/types';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     Cable,
@@ -385,6 +387,8 @@ export default function DiscoveryCollectors({
 }) {
     const [activeTab, setActiveTab] = useState(workspace.active_tab);
     const [enrollmentOpen, setEnrollmentOpen] = useState(false);
+    const [installationOpen, setInstallationOpen] = useState(false);
+    const actorId = usePage<SharedData>().props.auth.user.id;
     const [replacementCollector, setReplacementCollector] =
         useState<CollectorLifecycleTarget | null>(null);
     const [revocationCollector, setRevocationCollector] =
@@ -616,12 +620,9 @@ export default function DiscoveryCollectors({
                             workspace.collector_management.sites.length ? (
                                 <Button
                                     type="button"
-                                    onClick={() => {
-                                        setReplacementCollector(null);
-                                        setEnrollmentOpen(true);
-                                    }}
+                                    onClick={() => setInstallationOpen(true)}
                                 >
-                                    Enrol remote collector
+                                    Set up collector
                                 </Button>
                             ) : null}
                         </CardHeader>
@@ -1038,6 +1039,14 @@ export default function DiscoveryCollectors({
                     onIssued={refreshCollectors}
                 />
             ) : null}
+            {workspace.collector_management.can_manage && (
+                <CollectorInstallationDialog
+                    open={installationOpen}
+                    onClose={() => setInstallationOpen(false)}
+                    sites={workspace.collector_management.sites}
+                    actorId={actorId}
+                />
+            )}
             <CollectorRevocationDialog
                 open={revocationCollector !== null}
                 onOpenChange={(open) => {

@@ -1,0 +1,38 @@
+{
+  "kind": "coordinator_read_only_source_review",
+  "candidate": "C:/Users/steph/.codex/worktrees/health-safety-workspace/oblivionfindings",
+  "packet": "docs/health-safety-audit-2026-10-07/participation-source-read-ownership-2026-10-13.json",
+  "packet_sha256": "2761D6B9F18511B6E59E67EABB89CC0E83FFC42420E94A02EF73AF0FFADD1568",
+  "pins": {"checked": 42, "matched": 39, "changed": 3},
+  "changed": {
+    "app/Services/HealthSafety/WorkerParticipationAccessService.php": "3B6CD138F0CA6C12EEBF19EF7D34623095E32EA25348CA0AADBFE0BD5D002D02",
+    "storage/logs/hs-overview-recovery-vitest-runner.ps1": "DAEF2FF3574BD9546EDC3E73DEC0288E4E09B6CE89344B78FA249ECC5B30B20E",
+    ".playwright-cli/hs-process-classifier.ps1": "C6465FC35025B04D72F534EFC026825B5BA2F60DB96DAF1568114A44282180E1"
+  },
+  "read_scope": "Full participation viewer boundary and its five prepared tests; unchanged canonical PageLayout; WorkerParticipationRegisterReadService index/focus/rows/relations/metrics through line208; controller index delegation; index meter and filter wiring; metric test declaration/coverage search. No full AccessService, evidence/download or current calendar source audit.",
+  "source_closure": {
+    "id": "HS-PARTICIPATION-DRILLDOWN-01",
+    "status": "NARROW_SOURCE_MISMATCH_ADDRESSED_RUNTIME_UNVERIFIED",
+    "pins": {
+      "header": "4F57163B03803E8BCB1D465F18C0727C86CC17B7F3508833ADB229DC60C7A432",
+      "index": "2EFA98CE0B36867268EBB1F3A020B2BC55F5B01F5A85BCA98E6699D200117D2D",
+      "register": "F58C503DBAA665F62E74CE55C097B1B2B05441974E3A8E08C2FB539F0FAC51F9",
+      "controller": "E7EAD1B5EF3D74657B73E891BFD4EAD1A36172B3996379B32A0F0B33BBD53E88",
+      "metric_test": "9D527F354E55D58ADD325A32BDEB6C87DED2E83635CDF8093CD53DD9D19585A0"
+    },
+    "evidence": "All meetings uses tabCounts.meetings and period=all, keeping committee/quarter facts in caption. Actions link filters noncancelled meetings with positive actions count; headline counts meetings and caption sums their items. Minutes predicate matches NULL or empty path on completed meetings. Training predicate matches active under-two-day representatives. Rows and metric operands use same query family/current context/Site. Tab switch clears incompatible focus. No actual query/HTTP/browser acceptance; current source authorization continues under active owner. Twelve prospective metric cases remain unrun."
+  },
+  "new_finding": {
+    "id": "HS-PARTICIPATION-UNAVAILABLE-HEADER-01",
+    "status": "OPEN_OWNER_NOTIFIED",
+    "priority": "P2",
+    "file": "resources/js/pages/health-safety/worker-participation/participation-viewer-boundary.tsx",
+    "source_sha256": "73131BBF768649E3CEAF051BE7089B7E37310872AB6700551609C7314E8F0E81",
+    "canonical_layout_sha256": "8F131A51363BE62C2805C42B825CD7525774961C4D5CC2D8A06ECE500DC61310",
+    "problem": "Unavailable/account-change branch passes unsupported header prop to PageLayout. Its API renders hero only, so the PageHeader is omitted and semantic typing should reject the call. Prepared tests assert mask/reload but not header.",
+    "action": "Use existing hero slot at this call; retain mask/Home breadcrumb. Assert visible page heading with real PageLayout and verify affected semantic types/component checks when admitted; do not alter shared API."
+  },
+  "limits": "Source pins and authored scenarios are not executed tests. Owner packet records11 syntax/format files,106 pure runner helper checks and145 component forecast; no R9-R12 application admission. Original R4 84/84 remains historical. Full current privacy, read/write recovery, download stream/HEAD, query ceiling, migration, browser, mobile, accessibility, integration and Rory acceptance remain open.",
+  "ownership": "H&S active calendar/notification/metric source and restricted-state work remains with existing owner. No duplicate source audit or app edits. Both human implementation holds retained. CR/WF unchanged idle; no restart.",
+  "message": "One concise finding/action/acceptance message with narrow metric source-closure evidence sent to H&S; no acknowledgement-only request."
+}

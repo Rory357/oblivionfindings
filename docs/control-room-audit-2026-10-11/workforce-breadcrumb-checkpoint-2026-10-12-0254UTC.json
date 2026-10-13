@@ -1,0 +1,28 @@
+{
+  "reviewed_at_utc": "2026-10-12T02:54:29Z",
+  "status": "THREE_LITERAL_NAVIGATION_FIXES_COMMITTED_SEPARATE_TEST_JOB_HELD",
+  "commit": "bf1301095cfb514553709bfed99b63cfc3122fc0",
+  "parent_verified": "Read complete commit diff: exactly three files, three insertions/three deletions. Local HEAD and origin/main tracking ref both resolve to this commit; no parent fetch/push/staging performed.",
+  "paths": [
+    "resources/js/pages/operations/rostering/publish/Diff.tsx",
+    "resources/js/pages/operations/rostering/publish/Review.tsx",
+    "resources/js/pages/operations/rostering/suggestions/Show.tsx"
+  ],
+  "behaviour": "Replace incorrect Operations breadcrumb with Workforce. Review/Diff preserve existing backHref; suggestion Show uses existing /operations/rostering route. No permission, writer, global sidebar/header implementation changed.",
+  "limits": "Owner reports successful GitHub main push and prior clean path checks; parent checked local tracking refs only. Deployed assets and browser behaviour unverified. No new test required for this literal low-impact change. Broader Workforce/Rostering acceptance remains incomplete.",
+  "separate_test_result": {
+    "path": "test-results/timesheet-retention-actual-r7c-20261012/result.json",
+    "sha256": "73ABD49F7B2736C59A5AC7DAFD4446F967CA9BF207EF3403162A02FB1C808F72",
+    "state": "HELD_OR_FAILED",
+    "started": false,
+    "actual_counts": null,
+    "after_read_complete": true,
+    "free_mib": 1936,
+    "cpu_percent": 77,
+    "heavy_peer_ids": [255584, 172400, 381124],
+    "product_applied": false,
+    "unknown_hosts_classified_idle": false,
+    "interpretation": "Current measured memory/CPU and known peers fail the R7 guard. Prior peer exit does not establish a current free slot. No test child, test passage or deployment inferred."
+  },
+  "coordination": "No new decision or repeat owner message. Workforce waits for a fresh admitted gap and continues independent authorised work; other owners and protected previews untouched. All three scopes incomplete; heartbeat ACTIVE."
+}

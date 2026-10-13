@@ -74,6 +74,7 @@ describe('Security & Devices navigation contract', () => {
             ],
             [
                 ['Discovery & collectors', '/security-devices/discovery'],
+                ['Agent downloads', '/security-devices/agent-downloads'],
                 ['Integrations', '/security-devices/integrations'],
                 ['Settings & audit', '/security-devices/settings'],
             ],
@@ -115,11 +116,13 @@ describe('Security & Devices navigation contract', () => {
             'Maintenance',
         ]);
 
-        expect(
-            buildSecurityDevicesNavigationGroups({
-                integrationsManage: true,
-            }),
-        ).toEqual([]);
+        const collectorManager = buildSecurityDevicesNavigationGroups({
+            integrationsManage: true,
+        });
+        expect(collectorManager.map((group) => group.label)).toEqual(['Setup']);
+        expect(collectorManager[0]?.items.map((item) => item.href)).toEqual([
+            '/security-devices/agent-downloads',
+        ]);
 
         const commandAdminOnly = buildSecurityDevicesNavigationGroups({
             commandsAdmin: true,
@@ -127,7 +130,10 @@ describe('Security & Devices navigation contract', () => {
         expect(commandAdminOnly.map((group) => group.label)).toEqual(['Setup']);
         expect(
             commandAdminOnly[0]?.items.map((item) => [item.title, item.href]),
-        ).toEqual([['Settings & audit', '/security-devices/settings']]);
+        ).toEqual([
+            ['Agent downloads', '/security-devices/agent-downloads'],
+            ['Settings & audit', '/security-devices/settings'],
+        ]);
 
         const monitoringManagerOnly = buildSecurityDevicesNavigationGroups({
             monitoringManage: true,

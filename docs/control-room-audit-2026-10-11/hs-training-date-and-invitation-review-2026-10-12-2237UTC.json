@@ -1,0 +1,29 @@
+{
+  "kind": "coordinator_read_only_checkpoint",
+  "candidate": "C:/Users/steph/.codex/worktrees/health-safety-workspace/oblivionfindings",
+  "packet": "docs/health-safety-audit-2026-10-07/participation-reported-training-source-2026-10-13.json",
+  "packet_sha256": "047C951A22990E61198970E0F1B40687F1CD6156AA0A2F685F8D0B4F7EE7BDD5",
+  "pins": {"checked": 48, "matched": 48, "drift": 0},
+  "reviewed_training_source": {
+    "controller_sha256": "7139ACDB42FB824A3C07B4A962101D6304452F54F9D7610DEB823B83514E01BC",
+    "scope": "Read store/update representative and obligation helper; searched complete controller for StaffCredential/syncTrained references, none remain. Reported date/day fields and obligation calls remain. Inspected cumulative/reported/annual-unconfirmed form and header labels. This confirms removal of this direct automatic HR-credential writer, not all source writes or observer behavior.",
+    "prepared_cases": "Eight credential feature methods and four component cases remain UNRUN. Historical credential correction and cumulative-day-based annual obligation generation remain explicitly open; no existing credentials deleted/reclassified and no HR files changed by coordinator."
+  },
+  "scheduling_evidence": {
+    "packet_sha256": "5616B5488FC6B34E8537D760D2D3933B2520144FBAE2B557FEE83A7DBC62E3B8",
+    "source_sha256": "AE2E92675D8B685DB7175BF01507727FA2D0285CB3D0BC42A9B73934D18A6EFD",
+    "test_sha256": "E2EE18016AD84044AB4335F001B57AE5F4ABB8AB1A937DCA113239E9F555B498",
+    "log_sha256": "A7517857BEF1925AE87AF3B21C684A83F750100B9D642A6D631B234CC5E068A3",
+    "observed": "Owner-saved complete stdout reports session12407 exit0,50tests/78assertions,0.070seconds/36MiB. Pure normalizer only, explicit bootstrap, no app/database/cache. Two preceding bootstrap failures retained. Parent read and hash-matched log/source/test and read full normalizer; did not rerun or independently inspect original terminal marker.",
+    "behavior_in_source": "Explicit configured local timezone/minute input, real calendar date validation, skipped DST refusal, repeated time requires valid applicable offset, historical second-offset precision check, bounded UTC storage year; unmarked input retains existing contract.",
+    "limits": "Not a native scheduling/rollback/notification/database/UI/browser pass. Integration of non-UTC storage hydration, original legacy timestamps and full clock roundtrip still open."
+  },
+  "other_packets": "Creation civil-date/atomicity and calendar connected-consumer packets read for scoped summaries only; no complete source or runtime acceptance. New notification url key is reported for newly generated notices only; historical copies/source privacy/retry remain open.",
+  "invitation_decision": {
+    "question": "call_ec97b31a3b124e2795e0e9955cd698bf",
+    "read_evidence": "Read turns01a131b8,01a1320f,01a13235 and active01a1323e; no direct human answer observed. Saved recovery document still calls question pending.",
+    "guidance_sent": "Label minimum view an implementation assumption, not approved human decision. Continue preparation within existing invitation authority; no new entitlement while pending. If identical existing canonical notice/invitation authority covers fields/audience, document it before connecting route. Named invitee/current source/Site and withdrawn/guessed-ID checks; private register/agenda restrictions and both explicit holds remain.",
+    "user_question": "Existing question retained; no duplicate question or inferred approval."
+  },
+  "coordination": "CR unchanged idle; WF notLoaded with same completed R5 acknowledgement, not finished or ownership released; H&S active invitation/notification work. One material boundary message sent. No application edits, test/build/DB/browser/process probes, provider calls or idle chat restarts."
+}

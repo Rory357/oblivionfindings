@@ -53,11 +53,14 @@ final class MedicationFollowupService
         'reconciliation_query' => 'Reconciliation query', 'review_watch' => 'Medication review watch item',
         'stock_discrepancy' => 'Stock discrepancy follow-up',
         'covert_review' => 'Review covert authorisation',
+        // eMAR audit Lane A3: a dose saved on a device that didn't reach the chart.
+        'offline_review' => 'Dose saved on a device, not recorded',
         'duplicate_supply' => 'Check for a duplicate supply',
     ];
 
     public const LEAD_TYPES = ['unconfirmed', 'partial', 'disputed', 'override', 'countersign', 'handover', 'reconciliation',
-        'reassess_support', 'order_check', 'written_confirmation', 'second_check', 'reconciliation_query', 'stock_discrepancy', 'covert_review', 'duplicate_supply'];
+        'reassess_support', 'order_check', 'written_confirmation', 'second_check', 'reconciliation_query', 'stock_discrepancy', 'covert_review',
+        'offline_review', 'duplicate_supply'];
 
     public const SOURCE_OWNED_TYPES = ['confirm', 'override', 'countersign', 'reconciliation',
         'reassess_support', 'order_check', 'written_confirmation', 'second_check', 'reconciliation_query', 'stock_discrepancy', 'covert_review'];

@@ -136,6 +136,8 @@ class EstateOperationsPresenter
         }
 
         return [
+            'actor_id' => $viewer->id,
+            'as_of' => $context['asOf']->toISOString(),
             'stats' => $stats,
             'domainSummary' => $domainSummary,
             'healthSummary' => $healthSummary,
@@ -511,6 +513,7 @@ class EstateOperationsPresenter
     /** @return array<string, mixed> */
     private function context(User $viewer, ?array $onlySiteIds = null): array
     {
+        $asOf = now();
         $canIt = $viewer->canDo('it.view');
         $canViewModule = $viewer->canDo('securityDevices.viewAny');
         $canViewDevices = $canViewModule && $viewer->canDo('securityDevices.devices.view');
@@ -549,11 +552,11 @@ class EstateOperationsPresenter
 
         $activeEvents = ! $canViewEvents || $deviceIds->isEmpty()
             ? collect()
-            : DeviceEvent::query()
+            : $this->access->applyTemporalEventCustodyScope(DeviceEvent::query(), $viewer)
                 ->with('device:id,name')
                 ->whereIn('device_id', $deviceIds)
                 ->whereIn('severity', ['critical', 'warning'])
-                ->where('occurred_at', '>=', now()->subHours(self::ACTIVE_EVENT_WINDOW_HOURS))
+                ->whereBetween('occurred_at', [$asOf->copy()->subHours(self::ACTIVE_EVENT_WINDOW_HOURS), $asOf])
                 ->get();
 
         $maintenance = ! $canViewMaintenance || $deviceIds->isEmpty()
@@ -592,6 +595,7 @@ class EstateOperationsPresenter
         $readableAlertIds = $this->controlRoomAccess->readableIds($alerts, $viewer);
 
         return compact(
+            'asOf',
             'sites',
             'devices',
             'deviceSiteMap',

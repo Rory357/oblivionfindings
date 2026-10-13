@@ -9,6 +9,7 @@ use App\Domain\Hr\Notifications\AnnouncementPublishedNotification;
 use App\Domain\Hr\Notifications\AnnouncementReminderNotification;
 use App\Domain\Hr\Services\AnnouncementAudienceResolver;
 use App\Domain\Hr\Services\AnnouncementInboxBridge;
+use App\Domain\Hr\Services\AnnouncementReadState;
 use App\Models\Announcement;
 use App\Models\Permission;
 use App\Models\Role;
@@ -305,7 +306,7 @@ test('manager mark-acknowledged override records the actor', function () {
     ]);
     $a->targets()->create(['type' => 'all', 'value' => null]);
 
-    $this->actingAs($this->hr)->post("/hr/announcements/{$a->id}/acknowledge-for", ['user_id' => $this->worker->id])->assertRedirect();
+    $this->actingAs($this->hr)->post("/hr/announcements/{$a->id}/acknowledge-for", ['user_id' => $this->worker->id, 'version' => app(AnnouncementReadState::class)->token($a->fresh())])->assertRedirect();
 
     $this->assertDatabaseHas('hr_announcement_acknowledgements', [
         'announcement_id' => $a->id, 'user_id' => $this->worker->id, 'acknowledged_by' => $this->hr->id,
@@ -556,7 +557,7 @@ test('a current staff member in an announcement audience can show acknowledge an
     ]);
 
     $this->actingAs($this->worker)->get("/hr/announcements/{$announcement->id}")->assertOk();
-    $this->actingAs($this->worker)->post("/hr/announcements/{$announcement->id}/acknowledge")->assertRedirect();
+    $this->actingAs($this->worker)->post("/hr/announcements/{$announcement->id}/acknowledge", ['version' => app(AnnouncementReadState::class)->token($announcement->fresh())])->assertRedirect();
     $this->actingAs($this->worker)->get("/hr/announcements/attachments/{$attachment->id}")->assertOk();
 
     $this->assertDatabaseHas('hr_announcement_acknowledgements', [

@@ -732,7 +732,7 @@ class WorkerMedsTodayPayloadTest extends TestCase
         $this->assertSame(0, $response->inertiaProps('hidden_controlled_doses'));
         $this->assertCount(1, $response->inertiaProps('off_shift'));
         $this->assertSame($offShift->id, $response->inertiaProps('off_shift.0.client_id'));
-        $this->assertSame('notOnShift', $response->inertiaProps('off_shift.0.req.block_all'));
+        $this->assertSame('notClockedIn', $response->inertiaProps('off_shift.0.req.block_all'));
         $this->assertSame($before, $this->personSelectionEvidence());
     }
 
@@ -852,17 +852,22 @@ class WorkerMedsTodayPayloadTest extends TestCase
             'medications.stock.update', 'medications.audit.view', 'medications.reports.view', 'medications.reports.export',
         ]);
         $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        // EA-006 (D1): a shift at a house covers everyone there the worker
+        // supports, so the off-shift person lives at another of their houses.
+        $otherSite = Site::factory()->create(['is_active' => true, 'archived' => false]);
         HrEmployeeProfile::factory()->create([
-            'user_id' => $worker->id, 'primary_site_id' => $site->id, 'secondary_site_ids' => [],
+            'user_id' => $worker->id, 'primary_site_id' => $site->id, 'secondary_site_ids' => [$otherSite->id],
             'start_date' => now()->subMonth(), 'end_date' => null, 'is_active' => true,
         ]);
         $context = ServiceContext::factory()->create(['site_id' => $site->id, 'is_active' => true]);
+        $otherContext = ServiceContext::factory()->create(['site_id' => $otherSite->id, 'is_active' => true]);
         $people = [];
         $orders = [];
         foreach (['Aroha', 'Hemi', 'Mere'] as $index => $name) {
             $person = Client::factory()->create([
                 'first_name' => $name, 'last_name' => 'Filter fixture', 'preferred_name' => null,
-                'site_id' => $site->id, 'service_context_id' => $context->id, 'status' => 'active',
+                'site_id' => $index < 2 ? $site->id : $otherSite->id,
+                'service_context_id' => $index < 2 ? $context->id : $otherContext->id, 'status' => 'active',
             ]);
             $person->supportWorkers()->attach($worker->id);
             $people[] = $person;

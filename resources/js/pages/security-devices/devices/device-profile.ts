@@ -1,4 +1,7 @@
+import type { CctvNavigation } from '@/components/security-devices/cctv-navigation-actions';
 import type { ControlRoomAlertAccess } from '@/components/security-devices/permission-destinations';
+import type { RestartRequest } from '@/pages/it/remote-support/restart-request-state';
+import type { SoftwareRequest } from '@/pages/it/remote-support/software-request-state';
 
 export type DeviceProfileSectionKey =
     | 'health'
@@ -47,6 +50,7 @@ type Capability = {
 };
 
 export type DeviceProfile = {
+    cctv?: CctvNavigation;
     header: {
         identity: {
             id: number;
@@ -208,6 +212,7 @@ export type DeviceProfile = {
         createdAt: string | null;
     }>;
     management: {
+        actorId?: number;
         visible: boolean;
         actions: Array<{
             key: string;
@@ -227,6 +232,7 @@ export type DeviceProfile = {
             executionMode:
                 | 'central_runtime'
                 | 'collector_runtime'
+                | 'endpoint_runtime'
                 | 'unavailable';
             executionGuidance: string;
             allowed: boolean;
@@ -260,6 +266,8 @@ export type DeviceProfile = {
             id: number;
             uuid: string;
             capability: string;
+            restart?: RestartRequest | null;
+            software?: SoftwareRequest | null;
             label: string;
             status: string;
             risk: string;

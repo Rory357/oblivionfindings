@@ -8,6 +8,7 @@ use App\Domain\It\Enums\ItTicketDraftPurpose;
 use App\Domain\It\Exceptions\ItTicketCommandConflict;
 use App\Domain\It\Exceptions\ItTicketCommandUnavailable;
 use App\Domain\It\ItStaffDirectory;
+use App\Domain\Obli\ObliComputerIntakeContext;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Asset;
@@ -84,7 +85,7 @@ final class ItTicketIntakeService
      * @param  array<string, mixed>  $data
      * @param  array<int, UploadedFile>  $attachments
      */
-    public function createCommand(User $actor, array $data, array $attachments = [], ItTicketCommandChannel $channel = ItTicketCommandChannel::Browser, ?ItAttachmentWriteContext $attachmentContext = null): ItTicketCreationResult
+    public function createCommand(User $actor, array $data, array $attachments = [], ItTicketCommandChannel $channel = ItTicketCommandChannel::Browser, ?ItAttachmentWriteContext $attachmentContext = null, ?ObliComputerIntakeContext $computerContext = null): ItTicketCreationResult
     {
         $requestUuid = $data['request_uuid'] ?? null;
         if (! is_string($requestUuid) || ! Str::isUuid($requestUuid)) {
@@ -94,8 +95,11 @@ final class ItTicketIntakeService
         }
 
         $attachmentContext?->assertActive();
+        if ($computerContext !== null) {
+            $data['device_id'] = $computerContext->device($actor, $data, $channel)->id;
+        }
 
-        return $this->performCreate($actor, $data, $attachments, strtolower($requestUuid), $channel, $attachmentContext);
+        return $this->performCreate($actor, $data, $attachments, strtolower($requestUuid), $channel, $attachmentContext, computerContext: $computerContext);
     }
 
     public function recoverCommand(User $actor, string $requestUuid, ItTicketCommandChannel $channel = ItTicketCommandChannel::Browser): ItTicketCreationResult
@@ -138,6 +142,7 @@ final class ItTicketIntakeService
         ?ItAttachmentWriteContext $attachmentContext = null,
         ?int $catalogItemId = null,
         ?int $catalogVersionId = null,
+        ?ObliComputerIntakeContext $computerContext = null,
     ): ItTicketCreationResult {
         $storedPaths = [];
         $attachmentReservations = [];
@@ -148,10 +153,10 @@ final class ItTicketIntakeService
         $preparedResult = null;
 
         try {
-            return DB::transaction(function () use ($actor, $data, $attachments, $requestUuid, $requestHash, $channel, $attachmentContext, $catalogItemId, $catalogVersionId, &$storedPaths, &$attachmentReservations, &$preparedResult): ItTicketCreationResult {
+            return DB::transaction(function () use ($actor, $data, $attachments, $requestUuid, $requestHash, $channel, $attachmentContext, $catalogItemId, $catalogVersionId, $computerContext, &$storedPaths, &$attachmentReservations, &$preparedResult): ItTicketCreationResult {
                 // Existing actor lock also serializes concurrent commands from
                 // this browser identity; the unique index is the final boundary.
-                $currentEvidence = $channel === ItTicketCommandChannel::ServiceApi;
+                $currentEvidence = in_array($channel, [ItTicketCommandChannel::ServiceApi, ItTicketCommandChannel::Obli], true);
                 $actor = $currentEvidence
                     ? app(AuthorizationEvidenceLockService::class)->lockForUser($actor, ['*'])
                     : User::query()->whereKey($actor->getKey())->lockForUpdate()->firstOrFail();
@@ -249,10 +254,9 @@ final class ItTicketIntakeService
                     throw new AuthorizationException('The selected Asset is not available in this ticket scope.');
                 }
 
-                $deviceId = $isAgent ? $this->nullableId($data['device_id'] ?? null) : null;
-                $device = $deviceId !== null
-                    ? $this->visibleDevice($actor, $deviceId)
-                    : null;
+                $device = $computerContext?->device($actor, $data, $channel);
+                $deviceId = $device?->id ?? ($isAgent ? $this->nullableId($data['device_id'] ?? null) : null);
+                $device ??= $deviceId !== null ? $this->visibleDevice($actor, $deviceId) : null;
                 if ($device !== null) {
                     $this->deviceContext->assertAvailableInScope(
                         $device,
@@ -295,6 +299,7 @@ final class ItTicketIntakeService
                     'workflow_state' => 'submitted',
                     'source' => match ($channel) {
                         ItTicketCommandChannel::Email => 'email',
+                        ItTicketCommandChannel::Obli => 'portal',
                         ItTicketCommandChannel::ServiceApi => 'system',
                         default => $isAgent ? 'agent' : 'portal',
                     },
@@ -314,7 +319,14 @@ final class ItTicketIntakeService
                 $attachmentContext?->remember($attachmentReservations);
                 $this->attachmentStorage->storeReservedDirect($ticket, $attachments, $actor, $attachmentReservations, $storedPaths);
                 if ($device !== null) {
-                    $this->deviceContext->linkAtIntake($ticket, $device, $actor);
+                    if ($computerContext) {
+                        // Bind the pending canonical CREATE receipt before the narrowly authorized link.
+                        abort_unless($receipt && ! $receipt->committed_at, 403);
+                        $receipt->forceFill(['it_ticket_id' => $ticket->id])->save();
+                        app(ItTicketLinkService::class)->linkVerifiedLocalComputerAtIntake($ticket, $computerContext, $actor);
+                    } else {
+                        $this->deviceContext->linkAtIntake($ticket, $device, $actor);
+                    }
                 }
 
                 ItTicketEvent::record($ticket, 'created', $actor->id, array_filter([
@@ -322,7 +334,7 @@ final class ItTicketIntakeService
                     ...($catalogue ? ['catalog_item_id' => $catalogue->id,
                         'catalog_version_id' => $catalogue->published_version_id,
                         'form_schema_version' => $catalogue->form_schema_version] : []),
-                    ...($channel === ItTicketCommandChannel::ServiceApi ? ['source_channel' => $channel->value] : []),
+                    ...(in_array($channel, [ItTicketCommandChannel::ServiceApi, ItTicketCommandChannel::Obli], true) ? ['source_channel' => $channel->value] : []),
                     'command_receipt_id' => $receipt?->id,
                     'assigned_to_user_id' => $assigneeId,
                     'device_id' => $deviceId,

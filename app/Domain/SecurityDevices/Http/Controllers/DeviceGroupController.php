@@ -8,6 +8,7 @@ use App\Domain\SecurityDevices\Models\DeviceGroup;
 use App\Domain\SecurityDevices\Services\DeviceGroupAutoRuleService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Validator;
@@ -152,6 +153,10 @@ class DeviceGroupController extends Controller
 
         $group = DeviceGroup::create($validated);
 
+        if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+            return $this->wizardSaveReply($request, $group);
+        }
+
         return redirect()->route('security-devices.device-groups.show', $group)
             ->with('success', "Group '{$group->name}' created.");
     }
@@ -185,6 +190,10 @@ class DeviceGroupController extends Controller
         $validated = array_merge($validated, $this->validateAutoRules($request));
 
         $group->update($validated);
+
+        if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+            return $this->wizardSaveReply($request, $group);
+        }
 
         return redirect()->route('security-devices.device-groups.show', $group)
             ->with('success', "Group '{$group->name}' updated.");
@@ -312,6 +321,23 @@ class DeviceGroupController extends Controller
         $group->devices()->detach($device->id);
 
         return back()->with('success', 'Device removed from group.');
+    }
+
+    private function wizardSaveReply(Request $request, DeviceGroup $group): JsonResponse
+    {
+        $group->refresh();
+
+        return response()->json([
+            'saved' => true,
+            'saved_by' => $request->user()->id,
+            'group' => [
+                'id' => $group->id,
+                'name' => $group->name,
+                'type' => $group->type,
+                'description' => $group->description,
+                'auto_rules' => is_array($group->auto_rules) ? $group->auto_rules : null,
+            ],
+        ])->header('Cache-Control', 'private, no-store');
     }
 
     private function assertCanManageGroups(User $user): void

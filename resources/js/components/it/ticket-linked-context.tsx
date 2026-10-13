@@ -47,6 +47,7 @@ export interface TicketLinkedDevice {
     access: LinkedWorkspaceAccess;
     is_monitoring_evidence: boolean;
     can_unlink: boolean;
+    remote_support_href?: string | null;
 }
 
 export interface TicketLinkedAsset {
@@ -623,6 +624,21 @@ export function TicketLinkedContext({
                                                 device.last_seen_at,
                                             )}
                                         </span>
+                                        {device.remote_support_href && (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                asChild
+                                            >
+                                                <Link
+                                                    href={
+                                                        device.remote_support_href
+                                                    }
+                                                >
+                                                    Remote support &amp; Obli
+                                                </Link>
+                                            </Button>
+                                        )}
                                         {canChangeDevices &&
                                         device.can_unlink ? (
                                             <Button

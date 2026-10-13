@@ -32,4 +32,31 @@ describe('ClockOutBlockerAlert', () => {
         expect(screen.getByText('Finish shift tasks')).toBeVisible();
         expect(screen.getByText('Sign medication records')).toBeVisible();
     });
+
+    it('keeps its amber warning styling without critical colours leaking in', () => {
+        render(
+            <ClockOutBlockerAlert
+                blockers={[
+                    {
+                        key: 'tasks_pending',
+                        label: 'Finish shift tasks',
+                        detail: '1 shift task is still open.',
+                        count: 1,
+                        action_url: '#shift-tasks',
+                        blocking: true,
+                    },
+                ]}
+            />,
+        );
+
+        const alert = screen.getByRole('alert');
+        expect(alert.className).toContain('bg-status-warning-bg');
+        expect(alert.className).not.toContain('status-critical');
+
+        const description = screen
+            .getByText('Finish shift tasks')
+            .closest('[data-slot="alert-description"]');
+        expect(description?.className).toContain('text-status-warning');
+        expect(description?.className).not.toContain('text-muted-foreground');
+    });
 });

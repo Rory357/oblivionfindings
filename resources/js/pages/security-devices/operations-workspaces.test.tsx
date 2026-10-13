@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
     CollectorCard,
@@ -14,6 +14,27 @@ import {
     type MonitorRow,
 } from './monitoring';
 
+vi.mock('@inertiajs/react', async () => {
+    const actual =
+        await vi.importActual<typeof import('@inertiajs/react')>(
+            '@inertiajs/react',
+        );
+    return {
+        ...actual,
+        usePage: () => ({
+            props: {
+                auth: {
+                    user: { id: 7 },
+                    can: {
+                        'securityDevices.events.view': true,
+                        'securityDevices.devices.view': true,
+                        'securityDevices.integrations.manage': false,
+                    },
+                },
+            },
+        }),
+    };
+});
 const remoteMonitor: MonitorRow = {
     id: 11,
     name: 'Remote SNMP',
@@ -402,11 +423,9 @@ describe('Security & Devices operations workspaces', () => {
             />,
         );
 
-        expect(
-            screen.getByText('Delivery contracts & recovery'),
-        ).toBeInTheDocument();
-        expect(screen.getAllByText('Current v2')).toHaveLength(2);
-        expect(screen.getAllByText(/Accepts v1, 2/)).toHaveLength(2);
+        expect(screen.getByText('Delivery versions')).toBeInTheDocument();
+        expect(screen.getAllByText('v2')).toHaveLength(3);
+        expect(screen.getAllByText('Accepted 1, 2')).toHaveLength(3);
         expect(
             screen.getByText(/Reconcile actual state before any retry/),
         ).toBeInTheDocument();

@@ -1,0 +1,82 @@
+{
+  "reviewedAtUtc": "2026-10-12T17:35:35Z",
+  "candidate": "C:/Users/steph/.codex/worktrees/health-safety-workspace/oblivionfindings",
+  "state": "NO_NEW_APPLICATION_TEST_PASS; EXISTING_HUMAN_APPROVAL_REQUEST_PENDING",
+  "savedRunReceipts": [
+    {
+      "revision": 5,
+      "sha256": "A062D0F1B071748C9599DE070676002BBBE89218C38C526186C5E835D1340323",
+      "gateExit": 75,
+      "testExit": null,
+      "childStarted": false,
+      "reason": "ENVIRONMENT_RESTORE_FAILED",
+      "resourceObservationValid": false,
+      "reportedBeforeAfterFiles": 36833,
+      "reportedPostAudit": "zero_drift",
+      "environmentRestored": false,
+      "mutexReleased": true
+    },
+    {
+      "revision": 6,
+      "sha256": "5934ED72CB8E1A33069D069ED648FC6F25EC3F157E2F1D2D04CBA750ECB681D8",
+      "gateExit": 75,
+      "testExit": null,
+      "childStarted": false,
+      "reason": "RESOURCE_OR_PROCESS_HOLD",
+      "resourceObservationValid": false,
+      "reportedBeforeAfterFiles": 0,
+      "reportedPostAudit": "not_started",
+      "environmentRestored": true,
+      "mutexReleased": true
+    },
+    {
+      "revision": 7,
+      "sha256": "9691EC38B0CF152B70D81521B1345ECE65CCD66BB77B3BF19270BDE207111993",
+      "gateExit": 75,
+      "testExit": null,
+      "childStarted": false,
+      "reason": "RESOURCE_OR_PROCESS_HOLD",
+      "resourceObservationValid": true,
+      "savedFreeGiB": 1.7709503173828125,
+      "savedCpu": 16,
+      "savedHeavyCount": 1,
+      "savedNativeCount": 1,
+      "savedUnknownCount": 38,
+      "reportedPostAudit": "not_started",
+      "environmentRestored": true,
+      "mutexReleased": true
+    },
+    {
+      "revision": 8,
+      "sha256": "C8642BD6F943B18B62DDA31CA7E26EB2755296A9A016197BE417782208F80484",
+      "gateExit": 75,
+      "testExit": null,
+      "childStarted": false,
+      "reason": "RESOURCE_OR_PROCESS_HOLD",
+      "resourceObservationValid": true,
+      "savedFreeGiB": 6.061466217041016,
+      "savedCpu": 37,
+      "savedHeavyCount": 0,
+      "savedNativeCount": 0,
+      "savedUnknownCount": 35,
+      "reportedPostAudit": "not_started",
+      "environmentRestored": true,
+      "mutexReleased": true
+    }
+  ],
+  "runLimits": "Actual saved admission JSON read and hashed; no live resource/process probe. All four runs started zero test children and have null outcomes; stream completion is false/not applicable to a never-started child. No newer component/SQL/browser pass. Parent did not rehash36833 inputs. Historical84/84 remains R4-only. Current runner D831DD67A6DBA08D3963CA5881AA5B2494D3297BD06A9F3EE51282E38E09DDA5 differs from the previously source-reviewed3EC385D6; this check did not certify its complete successor code or runtime cleanup.",
+  "approval": {
+    "state": "PENDING_DIRECT_HUMAN_ANSWER_IN_EXISTING_HS_CHAT; NO_DUPLICATE_ASYNC_QUESTION",
+    "threadId": "01a11476-f5fc-72b2-b6d4-ba7e1188f514",
+    "questionObservedInTurn": "01a1304b-d282-7f52-bcc2-55f1d77d026e",
+    "document": "docs/health-safety-audit-2026-10-07/HS-COMMAND-SOURCE-COMPOSITION-PREPARATION-2026-10-13.md",
+    "documentSha256": "EE3AE4E9BCF957C8A9609698D409FDD3C0617D88D103E7D71DD4D0407FA2EF1D",
+    "question": "May I add the incident source checks to the actual investigation, corrective-action, evidence and WorkSafe writes? This keeps existing permissions and audit history, adds no new access grants, and rolls back a change if access is lost.",
+    "rejectionReasonFromSavedPreparation": "This adds complex authorization and mutation-guard infrastructure affecting security-sensitive H&S writes, but the trusted user transcript does not explicitly authorize this exact implementation or its broad side effects.",
+    "scope": "Bounded four controllers, two request transports, five reachable services and six opt-in model instance seams, with new HsSourceCommandContext and HasHealthSafetyCommandSourceGuard. Preserve canonical permissions/Sites, source identities, model events/audits, default caller behavior, rollback, recipient eligibility and WorkSafe decisions. Preparation document is reviewable scope, not implementation/test evidence.",
+    "proposedContextFilePresent": false,
+    "proposedTraitFilePresent": false,
+    "coordinatorAction": "Record and surface the existing specific approval request; no approval inferred from chat steering and no workaround/retry/substitute write guard. Other authorised work continues."
+  },
+  "ongoingWork": "H&S actively correcting misleading missing metrics/compliance labels and canonical period/Site incident-register links. Parent did not duplicate that source audit. CR58 idle and WF59 notLoaded unchanged, no new messages/questions or restarts. Single-organisation, conditional H&S, six-destination and Rory requirements unchanged. Overall scopes incomplete."
+}

@@ -565,6 +565,7 @@ class FeedService
                     'id' => $a->id,
                     'title' => $a->title,
                     'content' => $a->content,
+                    'version' => app(AnnouncementReadState::class)->token($a),
                     'priority' => $a->priority,
                     'is_pinned' => (bool) $a->is_pinned,
                     'requires_acknowledgement' => (bool) $a->requires_acknowledgement,
@@ -580,6 +581,8 @@ class FeedService
                     'reactions' => $reactions[$a->id] ?? ['counts' => array_fill_keys(self::REACTION_EMOJIS, 0), 'mine' => []],
                     'replies' => $replies[$a->id] ?? [],
                     'created_at' => $a->published_at?->diffForHumans() ?? $a->created_at?->diffForHumans(),
+                    'published_at_iso' => ($a->published_at ?? $a->created_at)->toIso8601String(),
+                    'updated_at_iso' => ($a->updated_at ?? $a->published_at ?? $a->created_at)->toIso8601String(),
                 ];
             })
             ->all();
@@ -634,6 +637,11 @@ class FeedService
         // Birthdays — date_of_birth is encrypted; decrypt, find next birthday ≤ 30 days.
         $birthdays = HrEmployeeProfile::query()
             ->whereIn('user_id', $currentUserIds)
+            ->whereExists(function ($query) {
+                $query->selectRaw('1')->from('hub_celebration_settings')
+                    ->whereColumn('hub_celebration_settings.user_id', 'hr_employee_profiles.user_id')
+                    ->where('birthday_enabled', true);
+            })
             ->whereNotNull('date_of_birth')
             ->with('user:id,name')
             ->get()

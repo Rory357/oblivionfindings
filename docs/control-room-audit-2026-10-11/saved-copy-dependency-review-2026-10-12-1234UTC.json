@@ -1,0 +1,70 @@
+{
+  "reviewedAtUtc": "2026-10-12T12:34:00Z",
+  "clientDate": "2026-10-13 Pacific/Auckland",
+  "scope": "CR request for complete canonical H&S saved-copy consumer dependency closure",
+  "receipt": "C:/Users/steph/.codex/worktrees/health-safety-workspace/oblivionfindings/docs/health-safety-audit-2026-10-07/incident-saved-copy-live-consumer-source-2026-10-13.json",
+  "comparisonToControlRoomCandidate": {
+    "pins": 21,
+    "byteIdentical": 8,
+    "absent": 10,
+    "divergent": 3,
+    "note": "Independent comparison includes both test fixture classes. Owner's initial message reversed identical/absent counts; corrected totals sent to both owners.",
+    "absentPaths": [
+      "app/Services/Incidents/IncidentSavedCopyService.php",
+      "tests/Feature/Incidents/IncidentSavedCopyTest.php",
+      "app/Models/IncidentSavedCopy.php",
+      "database/migrations/2026_10_12_200900_create_incident_saved_copies.php",
+      "app/Services/Incidents/IncidentIndependenceIntakeService.php",
+      "app/Services/Incidents/IncidentIndependenceBindingSql.php",
+      "app/Services/Incidents/IncidentIndependenceValues.php",
+      "app/Services/Incidents/IncidentRoutingSettings.php",
+      "tests/Feature/Incidents/IncidentIndependenceTestCase.php",
+      "tests/Feature/Incidents/IncidentRoutingTestCase.php"
+    ]
+  },
+  "additionalPresentInHsAbsentInCr": [
+    "app/Services/Incidents/IncidentIndependencePolicySettings.php",
+    "app/Services/Incidents/IncidentIndependenceCaptureAccess.php",
+    "app/Models/HealthSafetySettingChange.php",
+    "app/Models/IncidentIndependentHandlingDeclaration.php",
+    "app/Models/IncidentIndependentHandlingExclusion.php"
+  ],
+  "sharedFiles": [
+    {
+      "path": "app/Models/User.php",
+      "mainAndCrSha256": "66C3C4AF62FAAEFD7BC22EF11EC2541EE1BDD96D997C0B4682672C162F4DB23A",
+      "hsSha256": "6F2A380B2D42BFD1CD6446C3D8B4E359520CCAB379C8D9D4F1ACC87E9B64F395",
+      "fullDiffRead": "Only roles() custom pivot using(RoleUser::class) differs. MAIN/CR have it; H&S older baseline lacks it. Whole-file transplant would remove membership refresh."
+    },
+    {
+      "path": "app/Domain/Hr/Services/HrCurrentStaffService.php",
+      "mainAndCrSha256": "C8DDA69E30BE46DCEB53124B44A85BBF41CBD249A81A3D42217CB15066B31E54",
+      "hsSha256": "BA764A5819557ED067954D7E081EB501B074C7E929C0A8A1AE188D4E39CBCC11",
+      "fullDiffRead": "One timezone fallback expression differs; preserve MAIN/CR worker_timezone ?: app.timezone fallback."
+    },
+    {
+      "path": "app/Services/UserSiteAccessService.php",
+      "mainAndCrSha256": "71C52F709C5CBE6DD40A5BA078E8208924C36B8458F5E60EC4D12024C31116CE",
+      "hsSha256": "D5DF9DCE73EB23918762357AB219CCAD957BD9A094FCAE0079DDB4F94F53E022",
+      "fullDiffRead": "Optional CurrentAuthorizationReads in historical HR scope and its profile query, plus three timezone expression differences. Require only needed rebased hunks; retain unrelated current behavior and canonical ownership."
+    }
+  ],
+  "rolePivot": {
+    "path": "app/Models/RoleUser.php",
+    "mainSha256": "EAEFFEBEBACA8351C899DD2EAFB1E7F773FC43518E064BC41D57D9D962372411",
+    "parentRead": "Complete small class read: saved/deleted callbacks dispatch WorkforceEligibilityRefresh::membershipChanged for the affected user."
+  },
+  "decision": {
+    "status": "COMPLETE_DEPENDENCY_PACKAGE_PENDING",
+    "owner": "H&S supplies minimal versioned canonical container/constructor/model/SQL-schema closure and separate whole-test fixture closure. CR owns destination/export/writer delta. Workforce retains canonical HR/Site seam ownership.",
+    "package": "Direct/transitive paths and pins, existing/new status, required additive migrations and prerequisite order; only necessary rebased shared hunks. Preserve RoleUser and timezone fallback. No whole-file/whole-checkout transplant, parallel policy, automatic grant, historical origin inference or migration execution.",
+    "nextGate": "Review complete dependency and consumer composition against current owners; then isolated native/privacy/query verification. CR can continue its owned source proposal while mounting/native acceptance awaits complete closure. No blanket freeze.",
+    "messages": "One concrete dependency request to H&S and one verified decision/count correction to CR. No messages to unrelated owners; Workforce review deferred until a specific necessary shared hunk is supplied."
+  },
+  "threadCursors": {
+    "controlRoom": "a8154e4a-be4a-449b-a690-548c53e7eaf3:53",
+    "healthSafety": "397c65f1-5741-4ae3-8949-b22ac31e1a7e:68"
+  },
+  "limits": "Read-only source/manifest/file existence/hash/diff review. No tests, bootstrap, SQL, schema, builds, browser, process changes, shared source edits or release acceptance.",
+  "overall": "INCOMPLETE"
+}

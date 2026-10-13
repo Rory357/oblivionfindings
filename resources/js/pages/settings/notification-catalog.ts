@@ -14,6 +14,11 @@ export type NotificationModuleGroup = NotificationModule & {
 };
 
 export const NOTIFICATION_META: Record<string, NotificationMeta> = {
+    'hr.calendar.reminder': {
+        name: 'Company event reminders',
+        description:
+            'Reminders selected by an event organiser. Quiet time and email summaries apply; expired reminders are skipped. Email summaries run at 8 am New Zealand time (Monday for weekly). Push is not used.',
+    },
     'timesheets.created': {
         name: 'Timesheet Created',
         description: 'When a new timesheet is created',
@@ -90,6 +95,11 @@ export const NOTIFICATION_META: Record<string, NotificationMeta> = {
 };
 
 export const NOTIFICATION_MODULES: Record<string, NotificationModule> = {
+    company: {
+        label: 'Company Hub',
+        colour: 'violet',
+        keys: ['hr.calendar.reminder'],
+    },
     operations: {
         label: 'Operations',
         colour: 'violet',

@@ -426,4 +426,64 @@ class DeviceGroupControllerTest extends TestCase
         $this->assertContains($privateMember->id, $memberIds);
         $this->assertNotContains($privateCandidate->id, $memberIds);
     }
+
+    public function test_wizard_save_create_returns_confirmed_record_without_changing_membership(): void
+    {
+        $rules = ['match' => 'all', 'conditions' => [['field' => 'domain', 'op' => 'equals', 'value' => 'security']]];
+        $response = $this->actingAs($this->admin)->postJson('/security-devices/device-groups', [
+            'name' => 'Wizard created group', 'type' => 'functional', 'description' => 'Approved equipment', 'auto_rules' => $rules,
+        ])->assertOk()->assertJsonPath('saved', true)->assertJsonPath('saved_by', $this->admin->id)
+            ->assertJsonPath('group.name', 'Wizard created group')->assertJsonPath('group.type', 'functional')
+            ->assertJsonPath('group.auto_rules.match', 'all')
+            ->assertJsonPath('group.auto_rules.conditions.0.field', 'domain')
+            ->assertJsonPath('group.auto_rules.conditions.0.op', 'equals')
+            ->assertJsonPath('group.auto_rules.conditions.0.value', 'security');
+        $group = DeviceGroup::findOrFail($response->json('group.id'));
+        $this->assertSame('Approved equipment', $group->description);
+        $this->assertSame(0, $group->devices()->count());
+        $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
+    }
+
+    public function test_wizard_save_update_confirms_exact_group_and_retains_membership(): void
+    {
+        $group = DeviceGroup::create(['name' => 'Wizard edit group', 'type' => 'custom']);
+        $device = Device::factory()->create();
+        $group->devices()->attach($device);
+        $this->actingAs($this->admin)->putJson('/security-devices/device-groups/'.$group->id, [
+            'name' => 'Wizard updated group', 'type' => 'location', 'description' => '', 'auto_rules' => null,
+        ])->assertOk()->assertJsonPath('saved', true)->assertJsonPath('group.id', $group->id)
+            ->assertJsonPath('group.name', 'Wizard updated group')->assertJsonPath('group.description', null)
+            ->assertJsonPath('group.auto_rules', null);
+        $this->assertSame([$device->id], $group->devices()->pluck('devices.id')->all());
+    }
+
+    public function test_wizard_save_denial_does_not_create_or_update_records(): void
+    {
+        $group = DeviceGroup::create(['name' => 'Wizard protected group', 'type' => 'custom']);
+        $this->actingAs($this->viewer)->postJson('/security-devices/device-groups', ['name' => 'Wizard denied new'])->assertForbidden();
+        $this->actingAs($this->viewer)->putJson('/security-devices/device-groups/'.$group->id, ['name' => 'Wizard denied update'])->assertForbidden();
+        $this->assertSame('Wizard protected group', $group->fresh()->name);
+        $this->assertDatabaseMissing('device_groups', ['name' => 'Wizard denied new']);
+    }
+
+    public function test_wizard_save_validation_returns_errors_and_leaves_record_unchanged(): void
+    {
+        $group = DeviceGroup::create(['name' => 'Wizard validation group', 'type' => 'custom']);
+        $this->actingAs($this->admin)->putJson('/security-devices/device-groups/'.$group->id, [
+            'name' => '', 'type' => 'custom',
+        ])->assertUnprocessable()->assertJsonValidationErrors('name');
+        $this->actingAs($this->admin)->postJson('/security-devices/device-groups', [
+            'name' => 'Wizard invalid rules', 'auto_rules' => ['match' => 'all', 'conditions' => [['field' => 'site_id', 'op' => 'equals', 'value' => '1']]],
+        ])->assertUnprocessable()->assertJsonValidationErrors('auto_rules.conditions.0.field');
+        $this->assertSame('Wizard validation group', $group->fresh()->name);
+        $this->assertDatabaseMissing('device_groups', ['name' => 'Wizard invalid rules']);
+    }
+
+    public function test_wizard_save_keeps_inertia_redirect_when_json_accept_is_present(): void
+    {
+        $response = $this->actingAs($this->admin)->withHeaders(['X-Inertia' => 'true', 'Accept' => 'application/json'])
+            ->post('/security-devices/device-groups', ['name' => 'Wizard legacy redirect']);
+        $group = DeviceGroup::where('name', 'Wizard legacy redirect')->firstOrFail();
+        $response->assertRedirect('/security-devices/device-groups/'.$group->id);
+    }
 }

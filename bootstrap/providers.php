@@ -1,11 +1,21 @@
 <?php
 
+use App\Providers\AppServiceProvider;
+use App\Providers\AuthServiceProvider;
+use App\Providers\EventServiceProvider;
+use App\Providers\FortifyServiceProvider;
+use App\Providers\LlmServiceProvider;
+use App\Providers\MedicationSupportServiceProvider;
+use App\Providers\ObliServiceProvider;
+use App\Providers\WorkforceEligibilityServiceProvider;
+
 return [
-    App\Providers\AppServiceProvider::class,
-    App\Providers\AuthServiceProvider::class,
-    App\Providers\EventServiceProvider::class,
-    App\Providers\MedicationSupportServiceProvider::class,
-    App\Providers\WorkforceEligibilityServiceProvider::class,
-    App\Providers\FortifyServiceProvider::class,
-    App\Providers\LlmServiceProvider::class,
+    ObliServiceProvider::class,
+    AppServiceProvider::class,
+    AuthServiceProvider::class,
+    EventServiceProvider::class,
+    MedicationSupportServiceProvider::class,
+    WorkforceEligibilityServiceProvider::class,
+    FortifyServiceProvider::class,
+    LlmServiceProvider::class,
 ];

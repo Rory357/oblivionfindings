@@ -6,7 +6,6 @@ import {
     PageHeaderMeterCaption,
     PageHeaderMeterDonut,
     PageHeaderPrimaryButton,
-    PageHeaderRail,
     type PageHeaderRailItem,
     PageHeaderSearch,
     PageHeaderStatusChip,
@@ -71,6 +70,12 @@ import {
     EligibilityRefreshPanel,
 } from '@/components/rostering/eligibility-refresh-panel';
 import { TemplateLibrary } from '@/components/rostering/template-library';
+import { rosterShiftListUrl } from '@/components/rostering/roster-shift-list-url';
+import {
+    RosterWorkspaceRail,
+    RosterWorkspaceViewSelect,
+    type RosterView,
+} from '@/components/rostering/roster-workspace-navigation';
 import { TEMPLATE_READ_KEYS } from '@/components/rostering/use-template-command';
 import ViewTimesheetDialog, {
     type ViewTimesheetRow,
@@ -426,17 +431,7 @@ type Props = {
     >;
 };
 
-type RosterTab =
-    | 'shifts'
-    | 'calendar'
-    | 'open'
-    | 'coverage'
-    | 'timeoff'
-    | 'availability'
-    | 'capacity'
-    | 'analytics'
-    | 'templates'
-    | 'recurring';
+type RosterTab = RosterView;
 
 const ROSTER_TABS: RosterTab[] = [
     'shifts',
@@ -2162,7 +2157,11 @@ export default function RosteringIndex(props: Props) {
 
     const railItems: PageHeaderRailItem<RosterTab>[] = tabItems.map((item) => ({
         key: item.id as RosterTab,
-        label: item.label,
+        label: item.id === 'coverage'
+            ? activeShiftCount > 0
+                ? `${item.label} · ${coverageRate}% of shifts assigned`
+                : `${item.label} · No active shifts`
+            : item.label,
         icon: item.icon,
         count:
             typeof (item as { badge?: unknown }).badge === 'number'
@@ -2356,6 +2355,32 @@ export default function RosteringIndex(props: Props) {
             }
             filters={
                 <>
+                    <RosterWorkspaceViewSelect
+                        views={railItems}
+                        value={tab}
+                        onSelect={handleTabChange}
+                        onOpenConflicts={() => router.visit(conflictQueueHref)}
+                        onOpenShiftList={
+                            auth?.can?.shifts?.viewAny === true
+                                ? () => router.visit(rosterShiftListUrl({
+                                    from: ymd(weekStartDate),
+                                    to: ymd(addDaysWP(weekStartDate, 6)),
+                                    siteIds: props.filters.site_ids?.length
+                                        ? props.filters.site_ids
+                                        : props.filters.site_id
+                                          ? [props.filters.site_id]
+                                          : [],
+                                    staffId: props.filters.staff_id ?? null,
+                                    clientId: props.filters.client_id ?? null,
+                                }))
+                                : undefined
+                        }
+                        onOpenQualifications={
+                            auth?.can?.rostering?.viewAny === true
+                                ? () => router.visit('/operations/qualifications')
+                                : undefined
+                        }
+                    />
                     <PageHeaderFilterButton
                         icon={ChevronLeft}
                         aria-label={`Previous week (${prevLab})`}
@@ -2407,11 +2432,10 @@ export default function RosteringIndex(props: Props) {
                 </>
             }
             rail={
-                <PageHeaderRail
-                    items={railItems}
+                <RosterWorkspaceRail
+                    views={railItems}
                     value={tab}
-                    onSelect={(key) => handleTabChange(key)}
-                    ariaLabel="Roster views"
+                    onSelect={handleTabChange}
                 />
             }
         />
@@ -2953,9 +2977,7 @@ export default function RosteringIndex(props: Props) {
                 <ReassignDialog
                     open={Boolean(reassignShift)}
                     shift={reassignShift}
-                    canOverride={Boolean(
-                        auth?.can?.shifts?.overrideEligibility ?? true,
-                    )}
+                    canOverride={auth?.can?.shifts?.overrideEligibility === true}
                     onOpenChange={(open) => {
                         if (!open) setReassignShift(null);
                     }}

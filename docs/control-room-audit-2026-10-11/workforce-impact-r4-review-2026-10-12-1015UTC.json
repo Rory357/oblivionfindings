@@ -1,0 +1,70 @@
+{
+  "reviewed_at_utc": "2026-10-12T10:14:55Z",
+  "reviewer": "coordinator",
+  "packet": "test-results/workforce-work-restriction-decision-integration-proposal-r4-20261012",
+  "manifest_sha256": "3C237DB434B72D1791A92DF3EE1BF9EB7725A65646CAB8EE1B093A5EB466FA85",
+  "independent_review_sha256": "03E0E5191B858327DE4CFEACFDC4363D16750419E4BBD17FECBFBA331B9D4F2F",
+  "independent_proof_sha256": "E466212D70E73E0BBE437690D68B8730126DF679EB0113B31A050F3DEE099E15",
+  "status": "PRIOR_H4_CORRECTION_RETAINED; NEW_POSTCOMMIT_EXPOSURE_SOURCE_HOLD",
+  "parent_checks": {
+    "packet_files": 20,
+    "packet_drift": [],
+    "read": [
+      "Complete R3-to-R4 two-file delta",
+      "Independent review, report, file proof and packet source proof",
+      "Actual candidate confirm, targetTransaction and requireRoot paths",
+      "Installed Laravel ManagesTransactions::commit implementation"
+    ],
+    "vendor_transaction_sha256": "BB71E1CBE34F3F88A65E7AD192ADE967A0F5B8C360E480197ED054BA8F11419C",
+    "impact_sha256": "57DB46748D4C6F4B7E8EDBCB6425BCB69B4D43DFC01070ED646DE5BE5C67B0FF",
+    "test_sha256": "A11DF0D1F664EDCA06365C83D03D6373186283F8F916F53A4B68088EE0DCEB4F",
+    "not_repeated": "Full 171-pin independent audit, raw inverse reconstruction, runtime or process/capacity checks."
+  },
+  "finding": {
+    "id": "WF-IMPACT-POSTCOMMIT-01",
+    "priority": 1,
+    "file": "proposed/app/Domain/Hr/Services/WorkRestrictionImpactService.php",
+    "lines": [
+      197,
+      199,
+      273,
+      278,
+      296,
+      298
+    ],
+    "title": "Confirmation can expose private impact details after ordinary postcommit access withdrawal",
+    "evidence": "The private delegate repeats target authority only for TransactionCommitting. Installed commit runs transaction-manager afterCommit callbacks and TransactionCommitted listeners afterward. targetTransaction checks root/dispatcher after those callbacks, then confirm returns the earlier verified impact_id and binding_hash without another current target check.",
+    "trigger": "A reached ordinary listener on the confirmation root's TransactionCommitted event, or an afterCommit callback registered during confirmation, withdraws current Shift read or approved Site access while keeping original actor, connection, PDO and root identity intact.",
+    "impact": "The saved impact is retained but its private ID/hash can be returned to an actor who no longer has the required current target access.",
+    "action": "Add minimal callback-free current-target admission after all ordinary confirmation commit callbacks and before private return. Deny as not_confirmed without exposing ID/hash, claiming rollback or authorising resend.",
+    "acceptance": [
+      "Reached confirmation-root TransactionCommitted withdrawal with only not_confirmed and original impact retained",
+      "Reached confirmation afterCommit withdrawal with the same retained-record/private-response result",
+      "Unchanged authorised confirmation",
+      "Existing precommit refusal/rollback and own/publication/manager positives retained"
+    ],
+    "scope": "Ordinary postcommit target-access withdrawal; does not request raw-PDO ABA/full root-generation or durable-witness redesign."
+  },
+  "retained": {
+    "source_only_prior_findings": [
+      "Original immutable actor correction",
+      "H4 target check after normal read callbacks and ordinary committing listeners"
+    ],
+    "prospective_cases": 78,
+    "all_unrun": true,
+    "actual_count": null,
+    "actual_inventory": null,
+    "original_packets_and_holds": "Retained; R4 reviewer closure remains evidence for its bounded earlier scope."
+  },
+  "runtime_or_application_changes_by_coordinator": false,
+  "workflow_or_rory_acceptance": false,
+  "communication": {
+    "thread_id": "01a108fc-c419-7861-a22e-e5d4b7f26fd1",
+    "one_correction_sent": true,
+    "acknowledged": true,
+    "cursor": "e0c8a0b2-b660-47e3-befc-dcedd2dd9dbe:54",
+    "active_turn": "01a12f9b-adbb-74c0-982e-96fd04c8e186",
+    "model_or_goal_settings_changed": false
+  },
+  "heartbeat": "ACTIVE"
+}

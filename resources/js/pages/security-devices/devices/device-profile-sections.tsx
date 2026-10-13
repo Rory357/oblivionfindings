@@ -26,6 +26,11 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { formatDate, formatDateTime, formatRelative } from '@/lib/datetime';
 import { formatReadableOperationalState } from '@/lib/readable-operational-state';
+import { RestartRequestState } from '@/pages/it/remote-support/restart-request-state';
+import { restartTimeUtc } from '@/pages/it/remote-support/restart-schedule';
+import { SoftwareRequestState } from '@/pages/it/remote-support/software-request-state';
+import { uuidPattern } from '@/pages/security-devices/software/_contracts';
+import { SoftwarePackagePicker } from '@/pages/security-devices/software/_package-picker';
 import { Link, router } from '@inertiajs/react';
 import {
     Activity,
@@ -82,6 +87,19 @@ function stateBadgeVariant(
 
 type ManagementAction = DeviceProfile['management']['actions'][number];
 type CommandHistory = DeviceProfile['management']['history'][number];
+type CommandSubmission = {
+    expected_actor_id?: number;
+    capability: string;
+    parameters: Record<string, string | number>;
+    reason: string;
+    idempotency_key: string;
+    impact_acknowledged: boolean;
+    confirmation_text?: string;
+    it_change_id?: number;
+    break_glass?: boolean;
+    break_glass_reason?: string;
+    break_glass_reviewer_user_id?: number;
+};
 
 const managementGroups: Array<{
     key: ManagementAction['group'];
@@ -108,7 +126,23 @@ const managementGroups: Array<{
     },
 ];
 
-export function DeviceManagementSection({
+export function DeviceManagementSection(props: {
+    profile: DeviceProfile;
+    deviceId: number;
+}) {
+    return (
+        <DeviceManagementWorkspace
+            key={
+                props.deviceId +
+                ':' +
+                (props.profile.management.actorId ?? 'legacy')
+            }
+            {...props}
+        />
+    );
+}
+
+function DeviceManagementWorkspace({
     profile,
     deviceId,
 }: {
@@ -116,6 +150,10 @@ export function DeviceManagementSection({
     deviceId: number;
 }) {
     const management = profile.management;
+    const [pendingSubmission, setPendingSubmission] = useState<{
+        action: ManagementAction;
+        body: CommandSubmission;
+    } | null>(null);
     const [selectedAction, setSelectedAction] =
         useState<ManagementAction | null>(null);
     const [parameters, setParameters] = useState<Record<string, string>>({});
@@ -147,6 +185,13 @@ export function DeviceManagementSection({
             action: ManagementAction,
             parameterOverrides: Record<string, string> = {},
         ) => {
+            if (pendingSubmission) {
+                setSelectedAction(pendingSubmission.action);
+                setRequestError(
+                    'The earlier request has not been confirmed. Retry that same request or check its command history.',
+                );
+                return;
+            }
             setSelectedAction(action);
             setReason('');
             setImpactAcknowledged(false);
@@ -177,7 +222,11 @@ export function DeviceManagementSection({
                 ),
             );
         },
-        [management.breakGlassReviewers, management.changeOptions],
+        [
+            management.breakGlassReviewers,
+            management.changeOptions,
+            pendingSubmission,
+        ],
     );
 
     useEffect(() => {
@@ -196,6 +245,11 @@ export function DeviceManagementSection({
         if (action && (!action.requiresStepUp || management.stepUpCurrent)) {
             const parameterOverrides = Object.fromEntries(
                 action.parameters.flatMap((parameter) => {
+                    if (
+                        action.key === 'endpoint.software.install' &&
+                        parameter.name === 'package_uuid'
+                    )
+                        return [];
                     const requestedValue = query.get(
                         `command_${parameter.name}`,
                     );
@@ -213,7 +267,52 @@ export function DeviceManagementSection({
     }, [management.actions, management.stepUpCurrent, openAction]);
 
     const requestAction = () => {
-        if (!selectedAction) return;
+        if (!selectedAction || submitting) return;
+        if (
+            [
+                'endpoint.service.manage',
+                'endpoint.computer.restart',
+                'endpoint.software.install',
+            ].includes(selectedAction.key) &&
+            (!Number.isSafeInteger(management.actorId) ||
+                (management.actorId ?? 0) < 1)
+        ) {
+            setRequestError(
+                'Your account could not be confirmed. Refresh this device before requesting an action.',
+            );
+            return;
+        }
+        if (
+            selectedAction.key === 'endpoint.software.install' &&
+            !pendingSubmission &&
+            !uuidPattern.test(parameters.package_uuid ?? '')
+        ) {
+            setRequestError(
+                'Choose an approved software release before requesting installation.',
+            );
+            return;
+        }
+        let restartAt: string | null = null;
+        if (
+            selectedAction.key === 'endpoint.computer.restart' &&
+            !pendingSubmission
+        ) {
+            restartAt = restartTimeUtc(parameters.execute_at ?? '');
+            const warning = Number(parameters.warning_seconds);
+            if (
+                !restartAt ||
+                !Number.isSafeInteger(warning) ||
+                warning < 60 ||
+                warning > 3600 ||
+                Date.parse(restartAt) <= Date.now() + warning * 1000 ||
+                Date.parse(restartAt) > Date.now() + 86400000
+            ) {
+                setRequestError(
+                    'Choose a New Zealand time within the next 24 hours, leaving at least the warning period. A time repeated or skipped by a clock change cannot be used.',
+                );
+                return;
+            }
+        }
         const suffix =
             typeof crypto !== 'undefined' && crypto.randomUUID
                 ? crypto.randomUUID()
@@ -223,43 +322,65 @@ export function DeviceManagementSection({
                 parameter.name,
                 parameter.type === 'integer'
                     ? Number(parameters[parameter.name])
-                    : parameters[parameter.name],
+                    : selectedAction.key === 'endpoint.computer.restart' &&
+                        parameter.name === 'execute_at'
+                      ? (restartAt ?? parameters[parameter.name])
+                      : parameters[parameter.name],
             ]),
         );
+        const body: CommandSubmission = pendingSubmission?.body ?? {
+            ...(management.actorId
+                ? { expected_actor_id: management.actorId }
+                : {}),
+            capability: selectedAction.key,
+            parameters: normalized,
+            reason,
+            idempotency_key: `command_${deviceId}_${suffix}`,
+            impact_acknowledged: impactAcknowledged,
+            ...(selectedAction.confirmationMode === 'type_device_name'
+                ? { confirmation_text: confirmationText }
+                : {}),
+            ...(selectedAction.requiresChange && !useBreakGlass
+                ? { it_change_id: Number(itChangeId) }
+                : {}),
+            ...(useBreakGlass
+                ? {
+                      break_glass: true,
+                      break_glass_reason: breakGlassReason,
+                      break_glass_reviewer_user_id:
+                          Number(breakGlassReviewerId),
+                  }
+                : {}),
+        };
+        setPendingSubmission({ action: selectedAction, body });
         setSubmitting(true);
         setRequestError(null);
+        let answered = false;
         router.post(
-            `/security-devices/devices/${deviceId}/commands`,
-            {
-                capability: selectedAction.key,
-                parameters: normalized,
-                reason,
-                idempotency_key: `command_${deviceId}_${suffix}`,
-                impact_acknowledged: impactAcknowledged,
-                ...(selectedAction.confirmationMode === 'type_device_name'
-                    ? { confirmation_text: confirmationText }
-                    : {}),
-                ...(selectedAction.requiresChange && !useBreakGlass
-                    ? { it_change_id: Number(itChangeId) }
-                    : {}),
-                ...(useBreakGlass
-                    ? {
-                          break_glass: true,
-                          break_glass_reason: breakGlassReason,
-                          break_glass_reviewer_user_id:
-                              Number(breakGlassReviewerId),
-                      }
-                    : {}),
-            },
+            '/security-devices/devices/' + deviceId + '/commands',
+            body,
             {
                 preserveScroll: true,
-                onSuccess: () => setSelectedAction(null),
-                onError: (errors) =>
+                onSuccess: () => {
+                    answered = true;
+                    setPendingSubmission(null);
+                    setSelectedAction(null);
+                },
+                onError: (errors) => {
+                    answered = true;
+                    setPendingSubmission(null);
                     setRequestError(
                         Object.values(errors)[0] ??
                             'The command request could not be created.',
-                    ),
-                onFinish: () => setSubmitting(false),
+                    );
+                },
+                onFinish: () => {
+                    setSubmitting(false);
+                    if (!answered)
+                        setRequestError(
+                            'No confirmation was received. Retry the same request; its details are kept unchanged to avoid creating another action.',
+                        );
+                },
             },
         );
     };
@@ -435,10 +556,11 @@ export function DeviceManagementSection({
                                                                     action.risk,
                                                                 )}{' '}
                                                                 risk ·{' '}
-                                                                {
-                                                                    action.expiresAfterSeconds
-                                                                }
-                                                                s request window
+                                                                {action.key ===
+                                                                'endpoint.computer.restart'
+                                                                    ? 'Ends 5 seconds after the scheduled time'
+                                                                    : action.expiresAfterSeconds +
+                                                                      's request window'}
                                                             </p>
                                                         </div>
                                                         <Badge
@@ -471,9 +593,12 @@ export function DeviceManagementSection({
                                                             'collector_runtime'
                                                                 ? 'Remote Site collector'
                                                                 : action.executionMode ===
-                                                                    'central_runtime'
-                                                                  ? 'Main application over the Site network'
-                                                                  : 'No approved execution route'}
+                                                                    'endpoint_runtime'
+                                                                  ? 'Windows computer agent'
+                                                                  : action.executionMode ===
+                                                                      'central_runtime'
+                                                                    ? 'Main application over the Site network'
+                                                                    : 'No approved execution route'}
                                                         </p>
                                                         <p className="mt-1 text-muted-foreground">
                                                             {
@@ -628,18 +753,40 @@ export function DeviceManagementSection({
                                 </div>
                                 <p className="mt-3 text-sm">{command.reason}</p>
                                 <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-3">
-                                    <CommandDetail
-                                        label="Expected state"
-                                        value={formatSafeState(
-                                            command.expectedState,
-                                        )}
-                                    />
-                                    <CommandDetail
-                                        label="Approved parameters"
-                                        value={formatSafeState(
-                                            command.safeParameters,
-                                        )}
-                                    />
+                                    {command.restart ? (
+                                        <CommandDetail
+                                            label="Expected result"
+                                            value="Computer restarts and checks in"
+                                        />
+                                    ) : command.software ? (
+                                        <CommandDetail
+                                            label="Expected result"
+                                            value={
+                                                (command.software.packageName ??
+                                                    'Approved software') +
+                                                (command.software.productVersion
+                                                    ? ' · ' +
+                                                      command.software
+                                                          .productVersion
+                                                    : '')
+                                            }
+                                        />
+                                    ) : (
+                                        <>
+                                            <CommandDetail
+                                                label="Expected state"
+                                                value={formatSafeState(
+                                                    command.expectedState,
+                                                )}
+                                            />
+                                            <CommandDetail
+                                                label="Approved parameters"
+                                                value={formatSafeState(
+                                                    command.safeParameters,
+                                                )}
+                                            />
+                                        </>
+                                    )}
                                     <CommandDetail
                                         label="Request expires"
                                         value={formatDateTime(
@@ -649,11 +796,16 @@ export function DeviceManagementSection({
                                     <CommandDetail
                                         label="Execution route"
                                         value={
-                                            command.executionRoute
-                                                ? humanise(
-                                                      command.executionRoute,
-                                                  )
-                                                : 'Not dispatched'
+                                            (command.restart ||
+                                                command.software) &&
+                                            command.executionRoute ===
+                                                'endpoint'
+                                                ? 'Windows computer agent'
+                                                : command.executionRoute
+                                                  ? humanise(
+                                                        command.executionRoute,
+                                                    )
+                                                  : 'Not dispatched'
                                         }
                                     />
                                     {command.confirmationMode &&
@@ -673,6 +825,80 @@ export function DeviceManagementSection({
                                     <p className="mt-2 text-xs text-muted-foreground">
                                         Approved by {command.approvedBy}
                                     </p>
+                                )}
+                                {command.restart && (
+                                    <RestartRequestState
+                                        key={
+                                            command.id +
+                                            ':' +
+                                            command.restart.state
+                                        }
+                                        restart={command.restart}
+                                        actorId={management.actorId}
+                                        deviceId={deviceId}
+                                        commandId={command.id}
+                                    />
+                                )}
+                                {command.software && (
+                                    <SoftwareRequestState
+                                        software={command.software}
+                                        onArrangeRestart={(() => {
+                                            const action =
+                                                management.actions.find(
+                                                    (item) =>
+                                                        item.key ===
+                                                            'endpoint.computer.restart' &&
+                                                        item.available &&
+                                                        (!item.requiresStepUp ||
+                                                            management.stepUpCurrent),
+                                                );
+                                            return action
+                                                ? () => openAction(action)
+                                                : undefined;
+                                        })()}
+                                    />
+                                )}
+                                {(command.restart || command.software) && (
+                                    <>
+                                        {(command.restart?.state ??
+                                            command.software?.state) ===
+                                            'confirmed' &&
+                                            command.latestReconciliation
+                                                ?.outcome === 'matched' && (
+                                                <p className="text-caption mt-2 text-muted-foreground">
+                                                    Verification received:{' '}
+                                                    {formatDateTime(
+                                                        command
+                                                            .latestReconciliation
+                                                            .observedAt,
+                                                    )}
+                                                </p>
+                                            )}
+                                        {[
+                                            'failed',
+                                            'uncertain',
+                                            'expired',
+                                        ].includes(
+                                            command.restart?.state ??
+                                                command.software?.state ??
+                                                '',
+                                        ) &&
+                                            command.latestAttempt
+                                                ?.safeFailureReason &&
+                                            command.latestAttempt
+                                                .safeFailureReason !==
+                                                command.safeFailureReason && (
+                                                <p className="text-caption mt-2 text-destructive">
+                                                    {
+                                                        command.latestAttempt
+                                                            .safeFailureReason
+                                                    }
+                                                </p>
+                                            )}
+                                        <CommandTechnicalDetails
+                                            command={command}
+                                        />
+                                    </>
                                 )}
                                 <ItChangeDestination change={command.change} />
                                 {command.breakGlass && (
@@ -758,71 +984,96 @@ export function DeviceManagementSection({
                                         )}
                                     </div>
                                 )}
-                                {command.latestAttempt && (
-                                    <div className="mt-3 rounded-lg bg-muted/50 p-3 text-xs">
-                                        <p className="font-medium">
-                                            Execution attempt{' '}
-                                            {command.latestAttempt.number} ·{' '}
-                                            {humanise(
-                                                command.latestAttempt.status,
-                                            )}
-                                        </p>
-                                        <p className="mt-1 text-muted-foreground">
-                                            {humanise(
-                                                command.latestAttempt.runtime,
-                                            )}{' '}
-                                            runtime
-                                            {command.latestAttempt.completedAt
-                                                ? ` · ${formatDateTime(command.latestAttempt.completedAt)}`
-                                                : ''}
-                                        </p>
-                                        {Object.keys(
-                                            command.latestAttempt.safeResult,
-                                        ).length > 0 && (
+                                {!command.restart &&
+                                    !command.software &&
+                                    command.latestAttempt && (
+                                        <div className="mt-3 rounded-lg bg-muted/50 p-3 text-xs">
+                                            <p className="font-medium">
+                                                Execution attempt{' '}
+                                                {command.latestAttempt.number} ·{' '}
+                                                {humanise(
+                                                    command.latestAttempt
+                                                        .status,
+                                                )}
+                                            </p>
                                             <p className="mt-1 text-muted-foreground">
-                                                Safe result:{' '}
-                                                {formatSafeState(
+                                                {humanise(
                                                     command.latestAttempt
-                                                        .safeResult,
-                                                )}
+                                                        .runtime,
+                                                )}{' '}
+                                                runtime
+                                                {command.latestAttempt
+                                                    .completedAt
+                                                    ? ` · ${formatDateTime(command.latestAttempt.completedAt)}`
+                                                    : ''}
                                             </p>
-                                        )}
-                                        {command.latestAttempt
-                                            .safeFailureReason && (
-                                            <p className="mt-1 text-destructive">
-                                                {
-                                                    command.latestAttempt
-                                                        .safeFailureReason
-                                                }
-                                            </p>
-                                        )}
-                                    </div>
-                                )}
-                                {command.latestReconciliation && (
-                                    <div className="mt-3 rounded-lg border p-3 text-xs">
-                                        <p className="font-medium">
-                                            Fresh-state verification ·{' '}
-                                            {humanise(
-                                                command.latestReconciliation
-                                                    .outcome,
+                                            {Object.keys(
+                                                command.latestAttempt
+                                                    .safeResult,
+                                            ).length > 0 && (
+                                                <p className="mt-1 text-muted-foreground">
+                                                    Safe result:{' '}
+                                                    {formatSafeState(
+                                                        command.latestAttempt
+                                                            .safeResult,
+                                                    )}
+                                                </p>
                                             )}
-                                        </p>
-                                        <p className="mt-1 text-muted-foreground">
-                                            {command.latestReconciliation
-                                                .safeEvidenceSummary ??
-                                                formatSafeState(
+                                            {command.latestAttempt
+                                                .safeFailureReason && (
+                                                <p className="mt-1 text-destructive">
+                                                    {
+                                                        command.latestAttempt
+                                                            .safeFailureReason
+                                                    }
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                {!command.restart &&
+                                    !command.software &&
+                                    command.latestReconciliation && (
+                                        <div className="mt-3 rounded-lg border p-3 text-xs">
+                                            <p className="font-medium">
+                                                Fresh-state verification ·{' '}
+                                                {humanise(
                                                     command.latestReconciliation
-                                                        .observedState,
+                                                        .outcome,
                                                 )}
-                                        </p>
-                                    </div>
+                                            </p>
+                                            <p className="mt-1 text-muted-foreground">
+                                                {command.latestReconciliation
+                                                    .safeEvidenceSummary ??
+                                                    formatSafeState(
+                                                        command
+                                                            .latestReconciliation
+                                                            .observedState,
+                                                    )}
+                                            </p>
+                                        </div>
+                                    )}
+                                {((!command.restart && !command.software) ||
+                                    [
+                                        'requested',
+                                        'awaiting_step_up',
+                                        'awaiting_approval',
+                                        'awaiting_change',
+                                        'ready',
+                                        'queued',
+                                        'blocked',
+                                        'rejected',
+                                        'failed',
+                                        'mismatch',
+                                    ].includes(command.status)) && (
+                                    <>
+                                        <div className="mt-3 rounded-lg border-l-4 border-l-primary bg-muted/30 p-3 text-sm">
+                                            <span className="font-medium">
+                                                Next action:
+                                            </span>{' '}
+                                            {command.nextAction}
+                                        </div>
+                                    </>
                                 )}
-                                <div className="mt-3 rounded-lg border-l-4 border-l-primary bg-muted/30 p-3 text-sm">
-                                    <span className="font-medium">
-                                        Next action:
-                                    </span>{' '}
-                                    {command.nextAction}
-                                </div>
                                 <div className="mt-3 flex flex-wrap gap-2">
                                     <Button size="sm" variant="outline" asChild>
                                         <a href={command.evidenceExportHref}>
@@ -893,7 +1144,10 @@ export function DeviceManagementSection({
                             state matches the expected result.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4">
+                    <fieldset
+                        disabled={submitting || pendingSubmission !== null}
+                        className="space-y-4"
+                    >
                         {selectedAction && (
                             <div className="rounded-lg border bg-muted/30 p-3">
                                 <dl className="grid gap-2 text-xs sm:grid-cols-2">
@@ -942,7 +1196,12 @@ export function DeviceManagementSection({
                                     />
                                     <CommandDetail
                                         label="Request expires"
-                                        value={`${Math.ceil(selectedAction.expiresAfterSeconds / 60)} minute window`}
+                                        value={
+                                            selectedAction.key ===
+                                            'endpoint.computer.restart'
+                                                ? 'Until 5 seconds after the approved restart time'
+                                                : `${Math.ceil(selectedAction.expiresAfterSeconds / 60)} minute window`
+                                        }
                                     />
                                     <CommandDetail
                                         label="Execution path"
@@ -951,9 +1210,12 @@ export function DeviceManagementSection({
                                             'central_runtime'
                                                 ? 'Oblivion central runtime'
                                                 : selectedAction.executionMode ===
-                                                    'collector_runtime'
-                                                  ? 'Remote Site collector'
-                                                  : 'Not available'
+                                                    'endpoint_runtime'
+                                                  ? 'Windows computer agent'
+                                                  : selectedAction.executionMode ===
+                                                      'collector_runtime'
+                                                    ? 'Remote Site collector'
+                                                    : 'Not available'
                                         }
                                         detail={
                                             selectedAction.executionGuidance
@@ -1051,9 +1313,31 @@ export function DeviceManagementSection({
                                     htmlFor={`command-${parameter.name}`}
                                     className="text-sm font-medium"
                                 >
-                                    {parameter.label}
+                                    {selectedAction?.key ===
+                                        'endpoint.computer.restart' &&
+                                    parameter.name === 'execute_at'
+                                        ? 'Scheduled restart (New Zealand time)'
+                                        : parameter.label}
                                 </label>
-                                {parameter.options.length > 0 ? (
+                                {selectedAction?.key ===
+                                    'endpoint.software.install' &&
+                                parameter.name === 'package_uuid' ? (
+                                    <SoftwarePackagePicker
+                                        actorId={management.actorId}
+                                        deviceId={deviceId}
+                                        value={parameters.package_uuid ?? ''}
+                                        disabled={
+                                            submitting ||
+                                            pendingSubmission !== null
+                                        }
+                                        onChange={(uuid) =>
+                                            setParameters((current) => ({
+                                                ...current,
+                                                package_uuid: uuid,
+                                            }))
+                                        }
+                                    />
+                                ) : parameter.options.length > 0 ? (
                                     <select
                                         id={`command-${parameter.name}`}
                                         value={parameters[parameter.name] ?? ''}
@@ -1243,6 +1527,12 @@ export function DeviceManagementSection({
                             </label>
                             <textarea
                                 id="command-reason"
+                                maxLength={
+                                    selectedAction?.key ===
+                                    'endpoint.service.manage'
+                                        ? 500
+                                        : 1000
+                                }
                                 rows={4}
                                 value={reason}
                                 onChange={(event) =>
@@ -1257,7 +1547,7 @@ export function DeviceManagementSection({
                                 {requestError}
                             </p>
                         )}
-                    </div>
+                    </fieldset>
                     <DialogFooter>
                         <Button
                             variant="outline"
@@ -1285,7 +1575,11 @@ export function DeviceManagementSection({
                                         !breakGlassReviewerId))
                             }
                         >
-                            {submitting ? 'Creating…' : 'Create request'}
+                            {submitting
+                                ? 'Confirming…'
+                                : pendingSubmission
+                                  ? 'Retry same request'
+                                  : 'Create request'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -1552,6 +1846,87 @@ function humanise(value: string | null | undefined): string {
 
 function formatSafeState(state: Record<string, unknown>): string {
     return formatReadableOperationalState(state);
+}
+
+function CommandTechnicalDetails({ command }: { command: CommandHistory }) {
+    return (
+        <details className="mt-3 min-w-0 rounded-lg border p-3">
+            <summary className="frontline-focus text-caption cursor-pointer font-medium">
+                Technical details
+            </summary>
+            <div className="text-caption mt-3 min-w-0 space-y-3 [overflow-wrap:anywhere]">
+                <p className="text-muted-foreground">
+                    Recorded execution stages may precede the current result
+                    shown above.
+                </p>
+                <dl className="grid min-w-0 gap-2 sm:grid-cols-2">
+                    <CommandDetail
+                        label="Expected state"
+                        value={formatSafeState(command.expectedState)}
+                    />
+                    <CommandDetail
+                        label="Approved parameters"
+                        value={formatSafeState(command.safeParameters)}
+                    />
+                    {command.latestAttempt && (
+                        <>
+                            <CommandDetail
+                                label={
+                                    'Recorded attempt ' +
+                                    command.latestAttempt.number
+                                }
+                                value={humanise(command.latestAttempt.status)}
+                            />
+                            <CommandDetail
+                                label="Recorded Windows result"
+                                value={formatSafeState(
+                                    command.latestAttempt.safeResult,
+                                )}
+                            />
+                        </>
+                    )}
+                    {command.latestAttempt?.safeFailureReason && (
+                        <CommandDetail
+                            label="Recorded failure"
+                            value={command.latestAttempt.safeFailureReason}
+                        />
+                    )}
+                    {command.latestAttempt?.completedAt && (
+                        <CommandDetail
+                            label="Execution receipt received"
+                            value={formatDateTime(
+                                command.latestAttempt.completedAt,
+                            )}
+                        />
+                    )}
+                    {command.latestReconciliation?.safeEvidenceSummary && (
+                        <CommandDetail
+                            label="Verification evidence"
+                            value={
+                                command.latestReconciliation.safeEvidenceSummary
+                            }
+                        />
+                    )}
+                    {command.latestReconciliation && (
+                        <>
+                            <CommandDetail
+                                label="Verification result"
+                                value={humanise(
+                                    command.latestReconciliation.outcome,
+                                )}
+                            />
+                            <CommandDetail
+                                label="Verified state"
+                                value={formatSafeState(
+                                    command.latestReconciliation.observedState,
+                                )}
+                            />
+                        </>
+                    )}
+                </dl>
+            </div>
+        </details>
+    );
 }
 
 function CommandDetail({

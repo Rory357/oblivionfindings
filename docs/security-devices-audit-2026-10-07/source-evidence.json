@@ -1,0 +1,246 @@
+[
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\Hr\\Services\\AttendanceService.php",
+    "sha256": "7095021AE3BDB4C6F001A523CB8406DCCEE77D718940D824C1974B3557AE9622"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\Hr\\Services\\AttendanceTimeEntryProjector.php",
+    "sha256": "8AEF9291DD64121D6B045526EC314C82D2134BB6F773C65503E5D5FC2F9A8105"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\Monitoring\\Enums\\MonitorKind.php",
+    "sha256": "E2CC08E6D83C2422B13EEB6E61E2B20C67215086B862BD529E4EA35DC4A4C220"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\Monitoring\\Services\\MonitoringIncidentEvidenceService.php",
+    "sha256": "2C43F7386E7C1C8AA3B47A6DCB072AD8415BE6DC2FD4AF4618467912252FF87A"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\Monitoring\\Topology\\Services\\NativeSnmpTopologyProjector.php",
+    "sha256": "19DBD2F3C24AB3F6893538CE284422932867EF94A9E484A5E43E2CD29BE83BED"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\Monitoring\\Topology\\Services\\TopologySnapshotBuilder.php",
+    "sha256": "70618824C869CDBB366917DE3608D8124CE99363FB76E288115A97ADC0340DFD"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\SecurityDevices\\AccessControl\\Services\\AccessControlLifecycleService.php",
+    "sha256": "BFB58FCA43834E678F0854C316E66C72890444DC6E7B5D5636A9D50DA7E2499D"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\SecurityDevices\\Management\\Adapters\\QueclinkTrackingCommandAdapter.php",
+    "sha256": "DB73C03020D968BEC58A4C7D9BE30C5B42A2401AC86F8BE567C7508818C0AD99"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\SecurityDevices\\Management\\Adapters\\UnifiAccessCommandAdapter.php",
+    "sha256": "F2B0DD690E8F8CD4FD0CA3C3D17032FA003CCAFAAA990BAB24AFA6AEAA947CF5"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\SecurityDevices\\Presenters\\SecurityWorkspacePresenter.php",
+    "sha256": "EC776067E4725DD5B4ADBEE33CDF29B8A853EAAF101A864F64CEC1FFEE64393A"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\SecurityDevices\\Services\\DeviceAssignmentService.php",
+    "sha256": "F7F94E197516F8D8F1214AAD1087B62A75B60BF850F62A41900E1594793DA427"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\SecurityDevices\\Services\\PersonalTrackingPrivacyService.php",
+    "sha256": "6C8E70BA78E977DB9AF2A2CADD3C5162254658E9653C45957080F42436FBF019"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Domain\\SecurityDevices\\Services\\SecurityDevicesAccessService.php",
+    "sha256": "05450DC3B02CBB58E36CBD6735B6BBF331F91D6F5996DFB6630214E539110E81"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Http\\Controllers\\Api\\WebhookReceiverController.php",
+    "sha256": "C9DB9912A3CB15A784256305779237182F7FC8D45E5239170B76E385C91739BE"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Providers\\AppServiceProvider.php",
+    "sha256": "0129D143FE20F52F11034A223C370961955AEDFE679E25EE751307CB483A2A1D"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Services\\ControlRoom\\SensorIncidentBridgeService.php",
+    "sha256": "64BF4EB2DE1852AC64679A99BF88B1E4AF22FDD253106E481F81573B60E640C8"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Services\\ControlRoom\\SignalProcessingService.php",
+    "sha256": "8038EE1C9D1099609BC023F25426D9304B3DDB62B3A81E400AEFB236C5111874"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Services\\Integration\\Adapters\\MilesightAdapter.php",
+    "sha256": "DF033C022A0A4227A8BDF3349C04D34BF5431B3FFE05580F1D3E3FFE453B41EC"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Services\\Integration\\IntegrationSignalNormaliser.php",
+    "sha256": "DDEE0D368F1271B72F5555000732CD8E53F1D4D96A9961BCDA3666D28547352B"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Services\\Integration\\ProviderEventProjector.php",
+    "sha256": "B06A6AC832B0162604409CAB54FAC11FEAD9E72F2273B0B8B9C17A99D4EAA1BD"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\app\\Services\\Tracking\\PeopleLocationService.php",
+    "sha256": "F2176F1CF9806C63D4A5B1AF590D9E1E8AE16565831E760E095416C1CCF23ACF"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\collector\\README.md",
+    "sha256": "2685ABA8D0D91EF140DBC9009CEA1C5A43B5810BE2C89462162CAA7B2CF4513E"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\config\\features.php",
+    "sha256": "81A275707FBC1C2C758709A1DFDF840D2156EF56D43A548658A9DD3F426CC842"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\config\\monitoring.php",
+    "sha256": "BC79FEE71C62D574D4997138BE1779ADC6BC7479FE7150AC1765DB3325F604FE"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\config\\security_devices.php",
+    "sha256": "345138149B93685AD3D1C95D1143D3A6A239B59E6A7F26B0CE10F5D43A6945BE"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\database\\migrations\\2026_04_10_230000_seed_integration_signal_rules.php",
+    "sha256": "83476B33A25F278925F465BB431034EA8AA683E90DF729CD3FD4BA8D543741FC"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\APP_SHELL_STYLE_GUIDE.md",
+    "sha256": "4F433617E4D0DF8B51795F6CEB0DBB125913803949DE8FB421E7DD9624469201"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\BUTTON_STYLE_GUIDE.md",
+    "sha256": "B2C52B1997B02D96606E436C2DFC9950445C1E30B1280AE48BD11884AF443406"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\CALENDAR_STYLE_GUIDE.md",
+    "sha256": "FB7E7D123BF3171D731A37AD558CAF7F4C885A404F6C5313C6F950684164BB72"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\DESIGN_TOKENS.md",
+    "sha256": "A77C13BEA5B95B02F55F8C3E126944694315296568F7BE1B5B41F5D51EA1A111"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\FILE_PREVIEW_STYLE_GUIDE.md",
+    "sha256": "4CC1A821B7F032CF2A26ACAC7531B710AF07C9DFA1B2BAED7058FB92C53349FF"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\LIST_STYLE_GUIDE.md",
+    "sha256": "8556272C978704B80FB8A445DF2EC975B9D98E4487C8CE9A3244D89C794B81D6"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\LOADER_STYLE_GUIDE.md",
+    "sha256": "CC20485E6E42E0A848B8CACC8AC6124E5E5A01206D966DE6EBBBDEC39DBE2A91"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\MAP_GEOFENCING_STYLE_GUIDE.md",
+    "sha256": "810ED32D26452B54B96B6B24AC4557BD4ADAE96CEE8E7CDD6AA95C978A087FCE"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\NAVIGATION_STYLE_GUIDE.md",
+    "sha256": "F7B4B7B6EDB41A77521EBFD7858111836B0D6E441A88D19819D884B22B205B38"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\PAGE_HEADER_STYLE_GUIDE.md",
+    "sha256": "BD5C1CB094319125F52919591FC289CA9B781EBF813BA2C90D15355FA5ED0AE5"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\POPUP_STYLE_GUIDE.md",
+    "sha256": "E65CDB6A97A63DD2B56C9D4D1378EC622CDF169FAC33831BBA1AFDAABF79F450"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\WORK_RECORD_STYLE_GUIDE.md",
+    "sha256": "66908EF279682E2C9EB67412150B39FDBB403B2C8DE2C41E25260E07FCD5AA29"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\DESIGN.md",
+    "sha256": "1F5F482092D53C9B7CB5C9185B6B52AD67FC34F7B275CC0718F683377A7CC8BD"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\health-safety-audit-2026-10-07\\DELIVERY-PLAN.md",
+    "sha256": "EC70D9D1E21334D145E87376491D29D4E0BEBDABBB6BDD2C0934DE2DC08B0F34"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\health-safety-audit-2026-10-07\\INCIDENT-RECONSTRUCTION.md",
+    "sha256": "386F107E4AFD895DEC4C1E9C824775AE7BB84466BF07C5213095734E76A21F13"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\it-support-security-devices-completion-goal.md",
+    "sha256": "4D6D74B59246DE2D1A047A0EA50EE14C3EA57F824ED1AB8A78F7D778C7663589"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\security-devices-audit-2026-10-07\\AUDIT.md",
+    "sha256": "6A7183447C9B9A6FA20A1A78CBB5E1B44CBD2ECC1053FB84CB1ACEC5A219CE5B"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\security-devices-audit-2026-10-07\\collector-tests.txt",
+    "sha256": "07ED495C284140D2A889E0A7F66A89B2CD3703EDA91837A6CAACAF14F5EAE8EC"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\security-devices-audit-2026-10-07\\DEVELOPMENT-PILOT.md",
+    "sha256": "B54CE427E124994AA05D001CA19A6EA0DECA37E4FB8D2C6B9F31A1984C4F651A"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\security-devices-audit-2026-10-07\\INCIDENT-RECONSTRUCTION-HANDOFF.md",
+    "sha256": "272B0703BB5C9052EAFFEA13EF995252ED941D52E6A8B6DE6FDE266C9D2A4AF8"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\security-devices-audit-2026-10-07\\MARKET-RESEARCH.md",
+    "sha256": "44E9138CFA2AECDE5E64A27895B772625C45781078F9516655FF2407D7350C33"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\security-devices-audit-2026-10-07\\protocol-unit-tests.txt",
+    "sha256": "CD93E2C65F91F01A9E54A2C4FC2E5FD54F0631EA13D9F07C42D1C49E34DDD35A"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\security-devices-audit-2026-10-07\\QUESTIONS.md",
+    "sha256": "8F4E510416DE4CA00995688E6FF15F02F176A46BF45AE6D627190D83F202C2EA"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\security-devices-audit-2026-10-07\\RORY-CONFORMANCE.md",
+    "sha256": "3F873C5B6C4D73523103AD7D01392C2F1800802D27595B7F17D732EBCD059A8B"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\security-devices-audit-2026-10-07\\TARGET-SCOPE.md",
+    "sha256": "86E4BF9F8FCE74E9CAF02924A7519B9D56B0C1F95E7F523022013EFA5B15602B"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\security-devices-audit-2026-10-07\\VERIFICATION.md",
+    "sha256": "506D025262F494C47A52A74F579AC98EDEA9565E382F6A4F6F3931C7A963C04D"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\security-devices-next-session.md",
+    "sha256": "2A2D14B67579468E5662AF0CE84B1127537E4D5721DB30B18A7D823592F137BE"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\components\\security-devices\\security-workspace.tsx",
+    "sha256": "DAE16A09CCC31E16DE66DEE371D4F3B905350C0754CDC841EBF30DDA51BE5A1B"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\components\\security-devices\\topology-map.tsx",
+    "sha256": "FD780E668B0D8E365B7790BFD90B80D7B2505F388C8F44514F0CC91CFC0EFB82"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\pages\\home.tsx",
+    "sha256": "C2EBB27E06EBEFEE6F017B1D1BAC7A6C0C0C3824CBFC96FD849EB3B6B5EB996D"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\pages\\my-day\\index.tsx",
+    "sha256": "A7FFBE43F5ACCFF621EC486334828EE4D008993D018B2FE1F20B0D0D5EDFB37E"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\resources\\js\\pages\\smart-monitoring.tsx",
+    "sha256": "3B7D2380EEFC2D52ACC0021AC139DB49A75F85F71FBC64C88D7C93D608FDC60B"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\routes\\console.php",
+    "sha256": "035D77F82C7298F9D9DAE3C2560BE5B2CD26BF9E552CF0389920272298B75BDB"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\routes\\hr.php",
+    "sha256": "4E75ADFD4C4887BBA9DCC4ECD85EDDA6B7900BA3FE74C1E8D9B639F22632840D"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\routes\\security-devices.php",
+    "sha256": "D21AC85CD5D29903002D9D79A3B6BBEC9255ED1CDEB512857A16C032512B2942"
+  }
+]

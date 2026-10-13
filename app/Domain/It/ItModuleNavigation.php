@@ -2,8 +2,10 @@
 
 namespace App\Domain\It;
 
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwarePackages;
 use App\Models\User;
 use App\Services\Sites\SiteCredentialAccess;
+use App\Services\Sites\VendorCommercialAccess;
 
 final class ItModuleNavigation
 {
@@ -29,6 +31,8 @@ final class ItModuleNavigation
         $serviceDesk = array_values(array_filter([
             $canView ? self::item('Overview', '/it', 'layout-dashboard') : null,
             $canView ? self::item('Tickets & queues', '/it?tab=tickets', 'inbox') : null,
+            app(Services\ItRemoteSupportAccess::class)->canOpen($user)
+                ? self::item('Remote support', '/it/remote-support', 'monitor') : null,
             $canRequest ? self::item('My requests', '/it?tab=my-tickets', 'circle-user-round') : null,
             ! $canView && ($canKnowledge || $canRequest) ? self::item($canKnowledge ? 'Knowledge & Documentation' : 'Guides', '/it/knowledge', 'library') : null,
         ]));
@@ -41,6 +45,7 @@ final class ItModuleNavigation
                     $canRequest
                         ? self::item('Service catalogue', '/it?tab=catalog', 'book-open')
                         : null,
+                    EndpointSoftwarePackages::canOpen($user) ? self::item('Approved software', '/security-devices/software', 'package-check') : null,
                     self::item('Provisioning', '/it/provisioning', 'package-check'),
                     self::item('Work planning', '/it/work', 'calendar-clock'),
                     self::item('Knowledge & Documentation', '/it/knowledge', 'library'),
@@ -91,7 +96,7 @@ final class ItModuleNavigation
     {
         return [
             'vendors' => $user->isApproved() && $user->canDo('vendors.view'),
-            'contracts' => app(\App\Services\Sites\VendorCommercialAccess::class)->capable($user),
+            'contracts' => app(VendorCommercialAccess::class)->capable($user),
             'credentials' => $user->isApproved() && ($user->canDo('credentials.view')
                 || app(SiteCredentialAccess::class)->query($user, 'view')->exists()),
         ];

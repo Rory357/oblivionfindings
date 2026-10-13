@@ -1,0 +1,54 @@
+{
+  "reviewed_at_utc": "2026-10-11T19:50:01Z",
+  "candidate_root": "C:/Users/steph/.codex/worktrees/health-safety-workspace/oblivionfindings",
+  "scope": "Bounded H&S dashboard source and exposure shared-owner handoff",
+  "observation_sha256": "C85848E5028F986DD703869CE7E35F035690C9321C910645EC8966AB0B06B9C0",
+  "observation_is_freeze": false,
+  "selected_pin_checks": {
+    "count": 19,
+    "matched": 17,
+    "moving_sources": [
+      {
+        "path": "resources/js/pages/health-safety/components/worklists.tsx",
+        "observed_sha256": "DFA6419A8CB2F00DB4DA7B2DA7BF63F64DA551150858B57C532AB53BC7738935",
+        "current_sha256": "9FF866F0C0EFC686096829B4E0A7BA5ACA2177093895CD1C4B748C008BD1994C"
+      },
+      {
+        "path": "resources/js/pages/health-safety/components/worklists.test.tsx",
+        "observed_sha256": "3B39223BDD38BAE0B5E180F058115C40A979EF590E350AFEBBBF590F948A6172",
+        "current_sha256": "E19C46B5007F88D169E38CA945F5864B1DD221B78ADD068F8CDE168325A49516"
+      }
+    ]
+  },
+  "source_findings": [
+    {
+      "status": "CORRECTION_SENT",
+      "path": "resources/js/pages/health-safety/components/command-centre-hero.tsx",
+      "lines": [77, 93],
+      "finding": "Meters use bare register links despite selected Site/date measures. Incidents and near-miss ratio lose selected from/to/site, although the actual IncidentController accepts site_id/from/to/tab. Existing header tests encode the unfiltered links.",
+      "action": "Map each metric to its actual matching destination filter contract, preserving applicable Site/period/status and distinguishing fixed-window/rate detail from general register navigation. Do not invent unsupported parameters.",
+      "acceptance": "Nondefault Site and custom dates reach the same current authorized scope; fixed-window/rate captions remain truthful. Update actual destination expectations and retain browser verification as pending."
+    },
+    {
+      "status": "CORRECTION_SENT",
+      "path": "resources/js/pages/health-safety/components/worklists.tsx",
+      "lines": [613, 620],
+      "finding": "Remaining text-sm/font-bold section title and text-[11.5px] subtitle bypass DESIGN.md typography helpers.",
+      "action": "Use prescribed shared section/subtle/caption typography helpers while retaining shared card geometry."
+    }
+  ],
+  "reviewed_structure": [
+    "Shared PageHeader, Home breadcrumbs, PageLayout without duplicate outer padding, lens-selected six-meter row, filters and connected primary rail.",
+    "Shared EntityCard/StatusBadge/menu and primary permanent action/event/register links; optional summary/menu resolves from current props.",
+    "Explicit current-preview search description, current counts/source-state retained, restricted PPE withheld.",
+    "Investigation event_id comes from the existing admitted parent relation after related Site/source scope.",
+    "SafeOperationalData D01F1A82 source-specific scalar receipt whitelist and private source request protection sampled; current/original exposure HsEvent source family retained. No AuditLogger or unrelated ownership conflict found."
+  ],
+  "owner_notified": "01a11476-f5fc-72b2-b6d4-ba7e1188f514",
+  "pending": [
+    "H&S owns historical root_before/current exposure-context admission, private canonical reader/envelope and permanent pages.",
+    "Unmounted AuditLogView/three-caller proposal and NEW200300 HSE projection remain under owner review; no parent implementation acceptance.",
+    "CR R23 specific source correction accepted separately; actual canonical source ownership invalidation for ControlRoomAlert.notes/context still pending.",
+    "All executable checks, native/database/browser/keyboard/phone verification remain UNRUN; no MAIN adoption or runtime admission."
+  ]
+}

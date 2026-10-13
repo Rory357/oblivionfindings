@@ -13,6 +13,7 @@ import {
     EditDeviceDialog,
     useEditDeviceDialogState,
 } from '@/components/security-devices/add-device-dialog';
+import { CctvNavigationActions } from '@/components/security-devices/cctv-navigation-actions';
 import {
     DeviceDocumentHistory,
     type DeviceDocumentHistoryItem,
@@ -71,6 +72,7 @@ import {
     Wrench,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { InstallationProfileDialog } from './_installation-dialog';
 import type { DeviceProfile, DeviceProfileSectionKey } from './device-profile';
 import {
     DeviceProfileGroupNavigation,
@@ -168,6 +170,7 @@ type HistoricalRelationship = Relationship & {
 type TargetEntity = { id: number; name: string; [key: string]: unknown };
 
 type Props = {
+    endpoint_setup?: { actor_id: number } | null;
     device: DeviceDetail;
     profile: DeviceProfile;
     activeAssignment: Assignment | null;
@@ -281,6 +284,7 @@ function targetTypeLabel(t: string): string {
 // ── Component ─────────────────────────────────────────────────────
 
 export default function DeviceShow({
+    endpoint_setup = null,
     device,
     profile,
     activeAssignment,
@@ -313,6 +317,7 @@ export default function DeviceShow({
     const editDeviceDialog = useEditDeviceDialogState();
     const [releaseOpen, setReleaseOpen] = useState(false);
     const [decommissionOpen, setDecommissionOpen] = useState(false);
+    const [installationOpen, setInstallationOpen] = useState(false);
     useEffect(() => {
         const syncSectionFromUrl = () => {
             const requested = new URLSearchParams(window.location.search).get(
@@ -848,7 +853,20 @@ export default function DeviceShow({
                     badges={heroBadges}
                     stats={heroStats}
                     actions={
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
+                            <CctvNavigationActions
+                                cameraId={device.id}
+                                navigation={profile.cctv}
+                            />
+                            {endpoint_setup && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setInstallationOpen(true)}
+                                >
+                                    Set up Obli
+                                </Button>
+                            )}
                             {can.update && (
                                 <Button
                                     variant="outline"
@@ -2855,6 +2873,14 @@ export default function DeviceShow({
                     confirmText="Decommission device"
                 />
             </PageShell>
+            {endpoint_setup && (
+                <InstallationProfileDialog
+                    open={installationOpen}
+                    onClose={() => setInstallationOpen(false)}
+                    deviceId={device.id}
+                    actorId={endpoint_setup.actor_id}
+                />
+            )}
         </AppLayout>
     );
 }

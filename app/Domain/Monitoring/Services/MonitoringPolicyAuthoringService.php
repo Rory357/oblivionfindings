@@ -391,6 +391,8 @@ final class MonitoringPolicyAuthoringService
         return DB::transaction(function () use ($actor, $values): MonitoringMaintenanceWindow {
             $this->lockSite((int) $values['site_id']);
             $this->assertMaintenanceScope($values);
+            app(MaintenanceHistory::class)->storage();
+            app(MaintenanceOverlap::class)->assertAvailable($values);
             $window = MonitoringMaintenanceWindow::query()->create([
                 ...$values,
                 'status' => 'active',
@@ -398,7 +400,8 @@ final class MonitoringPolicyAuthoringService
                 'created_by_user_id' => $actor->id,
                 'updated_by_user_id' => $actor->id,
             ]);
-            $this->audit->write('monitoring.maintenance.created', $window, $actor, $this->auditContext($window));
+            $revision = app(MaintenanceHistory::class)->record($window, $actor, 'create', null, $values['reason']);
+            $this->audit->write('monitoring.maintenance.created', $window, $actor, [...$this->auditContext($window), 'revision_id' => $revision->id, 'effective_from' => $revision->effective_from->format('Y-m-d\TH:i:s.u\Z')]);
 
             return $window->fresh();
         }, 3);
@@ -423,12 +426,15 @@ final class MonitoringPolicyAuthoringService
             ]);
             $this->lockSite((int) $values['site_id']);
             $this->assertMaintenanceScope($values);
+            app(MaintenanceOverlap::class)->assertAvailable($values, (int) $locked->id);
+            $previous = app(MaintenanceHistory::class)->before($locked, $actor, $values['reason']);
             $locked->forceFill([
                 ...$values,
                 'version' => $locked->version + 1,
                 'updated_by_user_id' => $actor->id,
             ])->save();
-            $this->audit->write('monitoring.maintenance.updated', $locked, $actor, $this->auditContext($locked));
+            $revision = app(MaintenanceHistory::class)->record($locked, $actor, 'update', $previous, $values['reason']);
+            $this->audit->write('monitoring.maintenance.updated', $locked, $actor, [...$this->auditContext($locked), 'revision_id' => $revision->id, 'supersedes_id' => $previous->id, 'effective_from' => $revision->effective_from->format('Y-m-d\TH:i:s.u\Z')]);
 
             return $locked->fresh();
         }, 3);
@@ -448,6 +454,8 @@ final class MonitoringPolicyAuthoringService
             if ($locked->status !== 'active') {
                 $this->fail('status', 'Only an active maintenance window can be cancelled.');
             }
+            $this->lockSite((int) $locked->site_id);
+            $previous = app(MaintenanceHistory::class)->before($locked, $actor, $reason);
             $locked->forceFill([
                 'status' => 'cancelled',
                 'version' => $locked->version + 1,
@@ -456,9 +464,10 @@ final class MonitoringPolicyAuthoringService
                 'cancelled_by_user_id' => $actor->id,
                 'cancellation_reason' => $reason,
             ])->save();
+            $revision = app(MaintenanceHistory::class)->record($locked, $actor, 'cancel', $previous, $reason);
             $this->audit->write('monitoring.maintenance.cancelled', $locked, $actor, [
                 ...$this->auditContext($locked),
-                'reason_recorded' => true,
+                'reason_recorded' => true, 'revision_id' => $revision->id, 'supersedes_id' => $previous->id, 'effective_from' => $revision->effective_from->format('Y-m-d\TH:i:s.u\Z'),
             ]);
 
             return $locked->fresh();
@@ -961,7 +970,7 @@ final class MonitoringPolicyAuthoringService
     {
         return $window->only([
             'site_id', 'monitor_id', 'device_id', 'name', 'starts_at', 'ends_at',
-            'recurrence', 'recurrence_until', 'timezone', 'reason',
+            'recurrence', 'recurrence_until', 'timezone', 'dst_overlap', 'dst_gap', 'reason',
         ]);
     }
 

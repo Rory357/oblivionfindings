@@ -585,6 +585,16 @@ function buildIconNavItems({
                   } as IconNavItem,
               ]
             : []),
+        ...(can?.companyHub?.view
+            ? [
+                  {
+                      id: 'company-hub',
+                      icon: MessageSquareText,
+                      label: 'Company Hub',
+                      href: '/company-hub',
+                  } as IconNavItem,
+              ]
+            : []),
         {
             id: 'my-day',
             icon: CheckCircle2,
@@ -916,6 +926,12 @@ function buildItSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             items: [
                 ...(can?.it?.view || can?.it?.request
                     ? [{ title: 'Service desk', href: '/it', icon: Server }]
+                    : []),
+                ...(can?.it?.approved_software
+                    ? [{ title: 'Approved software', href: '/security-devices/software', icon: Package }]
+                    : []),
+                ...(can?.it?.remote_support
+                    ? [{ title: 'Remote support', href: '/it/remote-support', icon: Server }]
                     : []),
                 ...(can?.it?.view ||
                 can?.it?.request ||

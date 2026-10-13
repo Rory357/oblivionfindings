@@ -3,6 +3,10 @@
 namespace App\Domain\SecurityDevices\Management\Services;
 
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartAuthority;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartContract;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointServiceAuthority;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwareAuthority;
 use App\Domain\SecurityDevices\Management\Data\ClientLocationCommandOrigin;
 use App\Domain\SecurityDevices\Management\Data\CommandCapabilityDefinition;
 use App\Domain\SecurityDevices\Management\Data\CommandRequestInput;
@@ -174,7 +178,7 @@ final class DeviceCommandRequestService
             'reason' => $reason,
             'idempotency_key' => $idempotencyKey,
         ], [
-            'reason' => ['required', 'string', 'min:10', 'max:1000'],
+            'reason' => ['required', 'string', 'min:10', ...($capability->key === 'endpoint.computer.restart' ? ['not_regex:/[\p{Cc}\p{Cf}]/u'] : []), 'max:'.(in_array($capability->key, ['endpoint.service.manage', 'endpoint.computer.restart', 'endpoint.software.install'], true) ? 500 : 1000)],
             'idempotency_key' => ['required', 'string', 'max:128', 'regex:/^[A-Za-z0-9:_-]+$/'],
         ])->validate();
 
@@ -216,7 +220,7 @@ final class DeviceCommandRequestService
                 'it_change_id' => 'This action requires a current approved IT Change linked to this Device and Site.',
             ]);
         }
-        if (! $input->breakGlass && ! $capability->requiresChange && $input->itChangeId !== null) {
+        if (! $input->breakGlass && ! $capability->requiresChange && $input->itChangeId !== null && ! in_array($capability->key, ['endpoint.service.manage', 'endpoint.computer.restart', 'endpoint.software.install'], true)) {
             throw ValidationException::withMessages([
                 'it_change_id' => 'This action does not use an IT Change maintenance window.',
             ]);
@@ -251,7 +255,8 @@ final class DeviceCommandRequestService
             return $resumed;
         }
 
-        $expiresAt = $now->addSeconds($capability->expiresAfterSeconds);
+        $restartExpiry = $capability->key === 'endpoint.computer.restart' ? EndpointRestartContract::requestedExpiry($parameters) : null;
+        $expiresAt = $restartExpiry ?? $now->addSeconds($capability->expiresAfterSeconds);
         if ($input->breakGlass) {
             $breakGlassExpiry = $now->addSeconds(max(30, (int) config('security_devices.break_glass_max_age_seconds', 120)));
             if ($breakGlassExpiry->lessThan($expiresAt)) {
@@ -261,13 +266,18 @@ final class DeviceCommandRequestService
         if ($change?->maintenance_ends_at !== null && $change->maintenance_ends_at->lessThan($expiresAt)) {
             $expiresAt = CarbonImmutable::instance($change->maintenance_ends_at);
         }
+        if ($restartExpiry && $expiresAt->lessThan($restartExpiry)) {
+            throw ValidationException::withMessages(['it_change_id' => 'The approved maintenance window must include the complete restart deadline.']);
+        }
         $status = $this->initialStatus(
             $capability,
             $stepUpConfirmedAt !== null,
             $change !== null,
             $input->breakGlass,
         );
-        $expectedState = $this->expectedState->resolve($capability->key, $parameters);
+        $expectedState = $capability->key === 'endpoint.service.manage'
+            ? app(EndpointServiceAuthority::class)->bind($device, $actor, $parameters)
+            : ($capability->key === 'endpoint.computer.restart' ? app(EndpointRestartAuthority::class)->bind($device, $actor, $parameters) : ($capability->key === 'endpoint.software.install' ? app(EndpointSoftwareAuthority::class)->bind($device, $actor, $parameters) : $this->expectedState->resolve($capability->key, $parameters)));
         $safeSummary = Arr::only($parameters, $capability->safeSummaryFields);
         $commandUuid = (string) Str::orderedUuid();
         $payload = new CommandSigningPayload(

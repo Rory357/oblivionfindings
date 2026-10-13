@@ -126,10 +126,10 @@ describe('NetworkItWorkspacePanels', () => {
                 name: 'Network operations at a glance',
             }),
         ).toBeInTheDocument();
-        expect(screen.getByText('8 devices')).toBeInTheDocument();
-        expect(screen.getByText('3 authorised sites')).toBeInTheDocument();
-        expect(screen.getByText('2 WAN paths identified')).toBeInTheDocument();
-        expect(screen.getByText('6 monitored devices')).toBeInTheDocument();
+        expectFact('Devices', '8');
+        expectFact('Authorised sites', '3');
+        expectFact('WAN paths identified', '2');
+        expectFact('Monitored devices', '6');
         expect(
             screen.getByRole('heading', {
                 name: 'Native monitoring, honest evidence',
@@ -213,15 +213,20 @@ describe('NetworkItWorkspacePanels', () => {
         ).toBeInTheDocument();
         expect(
             screen.getByRole('link', {
-                name: /^Edge gatewayKauri House · Healthy$/,
+                name: 'Edge gateway',
             }),
         ).toBeInTheDocument();
         expect(
             screen.getByRole('link', {
-                name: /^Core switchKauri House · Warning$/,
+                name: 'Core switch',
             }),
         ).toBeInTheDocument();
-        expect(screen.getByText('WAN1')).toBeInTheDocument();
+        expect(
+            within(screen.getByRole('article')).getByText('WAN1'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Inspect Edge gateway' }),
+        ).toBeInTheDocument();
         expect(
             screen.getByText('1 device has no known relationship'),
         ).toBeInTheDocument();
@@ -568,3 +573,56 @@ describe('NetworkItWorkspacePanels', () => {
         ).not.toBeInTheDocument();
     });
 });
+
+it('labels omitted graph relationships as view-local when inventory is limited', () => {
+    render(
+        <NetworkItWorkspacePanels
+            data={{
+                ...base,
+                activeTab: {
+                    ...base.activeTab,
+                    key: 'map',
+                    topology: {
+                        ...base.activeTab.topology,
+                        state: 'partial',
+                        label: 'Showing a limited device view',
+                        unlinkedCount: 1,
+                        inventory: {
+                            pageKey: 'limited',
+                            siteId: null,
+                            sites: [],
+                            search: '',
+                            shown: 1,
+                            total: 101,
+                            limit: 100,
+                            previousHref: null,
+                            nextHref:
+                                '/security-devices/network-it?tab=map&map_device_cursor=next',
+                            resetHref: '/security-devices/network-it?tab=map',
+                            positionReset: false,
+                            isPartial: true,
+                        },
+                    },
+                },
+            }}
+        />,
+    );
+    expect(
+        screen.getByText('1 device has no relationship shown in this view'),
+    ).toBeInTheDocument();
+    expect(
+        screen.queryByText('1 device has no known relationship'),
+    ).not.toBeInTheDocument();
+    expect(
+        screen.getByText(
+            'Connections and paths include only devices shown here. A device may have other connections outside this view.',
+        ),
+    ).toBeInTheDocument();
+});
+
+function expectFact(label: string, value: string) {
+    const labelElement = screen.getByText(label, { exact: true });
+    expect(
+        within(labelElement.parentElement!).getByText(value, { exact: true }),
+    ).toBeInTheDocument();
+}

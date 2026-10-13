@@ -281,11 +281,14 @@ export function formatDateTimeInZone(
  * datetime-local strings in the worker timezone before storing UTC; slicing
  * the raw ISO string instead shows UTC wall time (12 hours out).
  */
-export function toDatetimeLocal(value: DateInput): string {
+export function toDatetimeLocal(
+    value: DateInput,
+    timeZone = WORKER_TIMEZONE,
+): string {
     const d = toDate(value);
     if (!d) return '';
     const parts = new Intl.DateTimeFormat('en-CA', {
-        timeZone: WORKER_TIMEZONE,
+        timeZone,
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -304,33 +307,66 @@ const workerOffsetFormatter = new Intl.DateTimeFormat('en', {
     timeZoneName: 'longOffset',
 });
 
-export function workerTimeOffset(instant: string): string {
+export function timeOffsetInZone(
+    instant: string,
+    timeZone = WORKER_TIMEZONE,
+): string {
     const date = new Date(instant);
     if (!Number.isFinite(date.getTime())) return '';
-    return (
-        workerOffsetFormatter
-            .formatToParts(date)
-            .find((part) => part.type === 'timeZoneName')
-            ?.value.replace('GMT', '') || '+00:00'
-    );
+    try {
+        const formatter =
+            timeZone === WORKER_TIMEZONE
+                ? workerOffsetFormatter
+                : new Intl.DateTimeFormat('en', {
+                      timeZone,
+                      timeZoneName: 'longOffset',
+                  });
+        return (
+            formatter
+                .formatToParts(date)
+                .find((part) => part.type === 'timeZoneName')
+                ?.value.replace('GMT', '') || '+00:00'
+        );
+    } catch {
+        return '';
+    }
 }
 
-/** Zero choices is a skipped spring time; two choices is a repeated autumn time. */
-export function workerTimeOffsets(local: string): string[] {
+/** Exact local minute choices, ordered first to last; no guessed gap/fold. */
+export function timeOffsetsInZone(
+    local: string,
+    timeZone = WORKER_TIMEZONE,
+): string[] {
     if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(local)) return [];
     const nominal = Date.parse(`${local}:00Z`);
     if (!Number.isFinite(nominal)) return [];
     const candidates = new Set(
-        [-86400000, 0, 86400000].map((delta) =>
-            workerTimeOffset(new Date(nominal + delta).toISOString()),
+        [-172800000, 0, 172800000].map((delta) =>
+            timeOffsetInZone(new Date(nominal + delta).toISOString(), timeZone),
         ),
     );
-    return [...candidates]
-        .filter((offset) => toDatetimeLocal(`${local}:00${offset}`) === local)
-        .sort(
-            (a, b) =>
-                Date.parse(`${local}:00${a}`) - Date.parse(`${local}:00${b}`),
-        );
+    try {
+        return [...candidates]
+            .filter(
+                (offset) =>
+                    offset !== '' &&
+                    toDatetimeLocal(`${local}:00${offset}`, timeZone) === local,
+            )
+            .sort(
+                (a, b) =>
+                    Date.parse(`${local}:00${a}`) -
+                    Date.parse(`${local}:00${b}`),
+            );
+    } catch {
+        return [];
+    }
+}
+
+export function workerTimeOffset(instant: string): string {
+    return timeOffsetInZone(instant);
+}
+export function workerTimeOffsets(local: string): string[] {
+    return timeOffsetsInZone(local);
 }
 
 /**

@@ -51,6 +51,7 @@ type ShellProps = {
     children: ReactNode;
     showNavigation?: boolean;
     showSummary?: boolean;
+    showFreshness?: boolean;
 };
 
 type SummaryItem = {
@@ -89,20 +90,14 @@ export function WorkspaceSummary({
             label: 'Need attention',
             value: summary.attention,
             icon: TriangleAlert,
-            tone:
-                summary.attention > 0
-                    ? 'text-amber-700 dark:text-amber-300'
-                    : undefined,
+            tone: summary.attention > 0 ? 'text-status-warning' : undefined,
         },
         { label: 'Monitored', value: summary.monitored, icon: MonitorCheck },
         {
             label: 'Unmonitored',
             value: summary.unmonitored,
             icon: MonitorOff,
-            tone:
-                summary.unmonitored > 0
-                    ? 'text-amber-700 dark:text-amber-300'
-                    : undefined,
+            tone: summary.unmonitored > 0 ? 'text-status-warning' : undefined,
         },
     ];
 
@@ -119,7 +114,7 @@ export function WorkspaceSummary({
                                     {item.label}
                                 </p>
                                 <p
-                                    className={`mt-1 text-2xl font-bold ${item.tone ?? ''}`}
+                                    className={`text-page-title mt-1 tabular-nums ${item.tone ?? ''}`}
                                 >
                                     {item.value}
                                 </p>
@@ -263,6 +258,7 @@ export function SecurityDevicesWorkspaceShell({
     children,
     showNavigation = true,
     showSummary = true,
+    showFreshness = true,
 }: ShellProps) {
     const activeTab =
         workspace.tabs.find((tab) => tab.key === workspace.activeTab) ??
@@ -273,7 +269,7 @@ export function SecurityDevicesWorkspaceShell({
             : `${activeTab.description.replace(/\.$/, '')} is not configured for this workspace yet.`;
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-5">
             {showNavigation ? (
                 <SecurityDevicesWorkspaceTabs
                     workspace={workspace}
@@ -284,7 +280,9 @@ export function SecurityDevicesWorkspaceShell({
             {showSummary ? (
                 <WorkspaceSummary summary={workspace.summary} />
             ) : null}
-            <WorkspaceFreshness freshness={workspace.freshness} />
+            {showFreshness ? (
+                <WorkspaceFreshness freshness={workspace.freshness} />
+            ) : null}
 
             {workspace.activeTabState === 'available' ? (
                 children
@@ -296,7 +294,7 @@ export function SecurityDevicesWorkspaceShell({
                                 ? 'Permission required'
                                 : 'Capability not configured'}
                         </Badge>
-                        <h2 className="text-lg font-semibold">
+                        <h2 className="text-section-title">
                             {activeTab.label}
                         </h2>
                         <p className="max-w-2xl text-sm text-muted-foreground">
