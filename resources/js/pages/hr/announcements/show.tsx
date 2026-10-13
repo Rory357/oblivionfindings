@@ -8,6 +8,7 @@ import {
 import PageShell from '@/components/page-shell';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
+import { WORKER_TIMEZONE } from '@/lib/datetime';
 import { Head, router, useForm } from '@inertiajs/react';
 import {
     AlertCircle,
@@ -58,6 +59,8 @@ type Announcement = {
     id: number;
     title: string;
     content: string;
+    version: string;
+    push_to_bell: boolean;
     priority: Priority;
     status: string;
     is_pinned: boolean;
@@ -66,6 +69,7 @@ type Announcement = {
     audience_size: number;
     targets: { type: string; value: string | null }[];
     recurrence: string | null;
+    recurrence_ends_at: string | null;
     published_at: string | null;
     expires_at: string | null;
     ack_deadline: string | null;
@@ -80,6 +84,12 @@ type Tracking = {
     outstanding: number;
     ack_pct: number;
     roster: RosterRow[];
+    history: {
+        name: string;
+        version: number;
+        acknowledged_at: string;
+        marked_by_manager: boolean;
+    }[];
 } | null;
 
 type ReplyItem = {
@@ -98,7 +108,7 @@ type Props = {
     reactions: Reactions;
     replies: ReplyItem[];
     reactionEmojis: string[];
-    can: { manage: boolean; react: boolean };
+    can: { manage: boolean; react: boolean; confirm: boolean };
 };
 
 const EMOJI: Record<string, string> = { heart: '❤️', party: '🎉', hands: '🙌' };
@@ -134,6 +144,7 @@ function fmtDateTime(value?: string | null) {
     return Number.isNaN(d.getTime())
         ? value
         : d.toLocaleString('en-NZ', {
+              timeZone: WORKER_TIMEZONE,
               day: '2-digit',
               month: 'short',
               year: 'numeric',
@@ -201,8 +212,10 @@ export default function AnnouncementShow({
         content: announcement.content,
         priority: announcement.priority,
         status: announcement.status,
+        push_to_bell: announcement.push_to_bell,
         targets: announcement.targets as AnnouncementWizardInitial['targets'],
         recurrence: announcement.recurrence,
+        recurrence_ends_at: announcement.recurrence_ends_at,
         published_at: announcement.published_at,
         expires_at: announcement.expires_at,
         ack_deadline: announcement.ack_deadline,
@@ -390,6 +403,7 @@ export default function AnnouncementShow({
 
                         {/* acknowledge CTA */}
                         {announcement.requires_acknowledgement &&
+                            can.confirm &&
                             !staffView && (
                                 <div className="flex items-center justify-between rounded-2xl border border-border bg-card p-5 shadow-sm">
                                     <div>
@@ -411,7 +425,10 @@ export default function AnnouncementShow({
                                             onClick={() =>
                                                 post(
                                                     `/hr/announcements/${announcement.id}/acknowledge`,
-                                                    {},
+                                                    {
+                                                        version:
+                                                            announcement.version,
+                                                    },
                                                     'Acknowledged',
                                                 )
                                             }
@@ -538,50 +555,64 @@ export default function AnnouncementShow({
                             <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                                 <div className="flex items-center justify-between">
                                     <div className="text-[13px] font-bold">
-                                        Acknowledgement
+                                        {announcement.requires_acknowledgement
+                                            ? 'Acknowledgement'
+                                            : 'Audience'}
                                     </div>
-                                    <button
-                                        onClick={() =>
-                                            window.open(
-                                                `/hr/announcements/${announcement.id}/tracking/export`,
-                                                '_blank',
-                                            )
-                                        }
-                                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
-                                    >
-                                        <FileDown className="h-3.5 w-3.5" />{' '}
-                                        Export
-                                    </button>
-                                </div>
-                                <div className="mt-3 flex items-center gap-4">
-                                    <div
-                                        className="relative grid h-20 w-20 place-items-center rounded-full"
-                                        style={{
-                                            background: `conic-gradient(var(--status-success) 0% ${tracking.ack_pct}%, var(--muted) ${tracking.ack_pct}% 100%)`,
-                                        }}
-                                    >
-                                        <div className="absolute inset-2.5 grid place-items-center rounded-full bg-card">
-                                            <span className="text-lg font-bold">
-                                                {tracking.ack_pct}%
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div className="text-xs leading-relaxed">
-                                        <div>
-                                            <b>{tracking.acknowledged}</b>{' '}
-                                            acknowledged
-                                        </div>
-                                        <div
-                                            style={{ color: 'var(--hr-amber)' }}
+                                    {announcement.requires_acknowledgement && (
+                                        <button
+                                            onClick={() =>
+                                                window.open(
+                                                    `/hr/announcements/${announcement.id}/tracking/export`,
+                                                    '_blank',
+                                                )
+                                            }
+                                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
                                         >
-                                            <b>{tracking.outstanding}</b>{' '}
-                                            outstanding
+                                            <FileDown className="h-3.5 w-3.5" />{' '}
+                                            Export
+                                        </button>
+                                    )}
+                                </div>
+                                {announcement.requires_acknowledgement ? (
+                                    <div className="mt-3 flex items-center gap-4">
+                                        <div
+                                            className="relative grid h-20 w-20 place-items-center rounded-full"
+                                            style={{
+                                                background: `conic-gradient(var(--status-success) 0% ${tracking.ack_pct}%, var(--muted) ${tracking.ack_pct}% 100%)`,
+                                            }}
+                                        >
+                                            <div className="absolute inset-2.5 grid place-items-center rounded-full bg-card">
+                                                <span className="text-lg font-bold">
+                                                    {tracking.ack_pct}%
+                                                </span>
+                                            </div>
                                         </div>
-                                        <div className="text-muted-foreground">
-                                            {tracking.total} recipients
+                                        <div className="text-xs leading-relaxed">
+                                            <div>
+                                                <b>{tracking.acknowledged}</b>{' '}
+                                                acknowledged
+                                            </div>
+                                            <div
+                                                style={{
+                                                    color: 'var(--hr-amber)',
+                                                }}
+                                            >
+                                                <b>{tracking.outstanding}</b>{' '}
+                                                outstanding
+                                            </div>
+                                            <div className="text-muted-foreground">
+                                                {tracking.total} recipients
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
+                                ) : (
+                                    <p className="mt-3 text-sm text-muted-foreground">
+                                        {tracking.total} recipients · Read
+                                        confirmation is not required for this
+                                        notice.
+                                    </p>
+                                )}
                             </div>
 
                             <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
@@ -609,32 +640,33 @@ export default function AnnouncementShow({
                                                     {p.role} · {p.site}
                                                 </span>
                                             </span>
-                                            {p.status === 'acknowledged' ? (
-                                                <StatusBadge
-                                                    variant="success"
-                                                    size="sm"
-                                                >
-                                                    Acked
-                                                </StatusBadge>
-                                            ) : (
-                                                <button
-                                                    onClick={() =>
-                                                        post(
-                                                            `/hr/announcements/${announcement.id}/remind`,
-                                                            {
-                                                                user_ids: [
-                                                                    p.id,
-                                                                ],
-                                                            },
-                                                            'Reminder sent',
-                                                        )
-                                                    }
-                                                    className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-[10px] font-semibold hover:bg-accent"
-                                                >
-                                                    <BellRing className="h-3 w-3" />{' '}
-                                                    Remind
-                                                </button>
-                                            )}
+                                            {announcement.requires_acknowledgement &&
+                                                (p.status === 'acknowledged' ? (
+                                                    <StatusBadge
+                                                        variant="success"
+                                                        size="sm"
+                                                    >
+                                                        Acked
+                                                    </StatusBadge>
+                                                ) : (
+                                                    <button
+                                                        onClick={() =>
+                                                            post(
+                                                                `/hr/announcements/${announcement.id}/remind`,
+                                                                {
+                                                                    user_ids: [
+                                                                        p.id,
+                                                                    ],
+                                                                },
+                                                                'Reminder sent',
+                                                            )
+                                                        }
+                                                        className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-[10px] font-semibold hover:bg-accent"
+                                                    >
+                                                        <BellRing className="h-3 w-3" />{' '}
+                                                        Remind
+                                                    </button>
+                                                ))}
                                         </div>
                                     ))}
                                 </div>
@@ -642,9 +674,35 @@ export default function AnnouncementShow({
                         </div>
                     )}
                 </div>
+                {can.manage && tracking && tracking.history.length > 0 && (
+                    <details className="rounded-xl border border-border bg-card p-4">
+                        <summary className="cursor-pointer font-semibold">
+                            Earlier read confirmations (
+                            {tracking.history.length})
+                        </summary>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                            These records are kept for reference. They do not
+                            confirm the current version.
+                        </p>
+                        <ul className="mt-3 space-y-2 text-sm">
+                            {tracking.history.map((receipt, index) => (
+                                <li key={index}>
+                                    {receipt.name} ·{' '}
+                                    {receipt.version
+                                        ? 'Version ' + receipt.version
+                                        : 'Earlier record — version unknown'}{' '}
+                                    · {fmtDateTime(receipt.acknowledged_at)}
+                                    {receipt.marked_by_manager
+                                        ? ' · recorded by a manager'
+                                        : ''}
+                                </li>
+                            ))}
+                        </ul>
+                    </details>
+                )}
             </PageShell>
 
-            {can.manage && segments && (
+            {can.manage && segments && editOpen && (
                 <AnnouncementWizard
                     open={editOpen}
                     onClose={() => setEditOpen(false)}

@@ -134,7 +134,7 @@ test('editing one occurrence of a series stores an override', function () {
     ]);
 
     $this->actingAs($this->hr)
-        ->put("/hr/calendar/events/{$event->id}", [
+        ->put("/hr/calendar/events/{$event->id}", ['edit_version' => $event->fresh()->edit_version,
             'title' => 'Standup (moved)',
             'event_type' => 'team',
             'starts_at' => '2026-07-15 10:00:00',
@@ -197,7 +197,7 @@ test('splitting a recurring series carries its audience and reminders forward', 
     ]);
 
     $this->actingAs($this->hr)
-        ->put("/hr/calendar/events/{$event->id}", [
+        ->put("/hr/calendar/events/{$event->id}", ['edit_version' => $event->fresh()->edit_version,
             'title' => 'Updated private supervision',
             'scope' => 'following',
             'occurrence_date' => '2026-07-15',
@@ -211,7 +211,7 @@ test('splitting a recurring series carries its audience and reminders forward', 
 
     expect($newSeries->attendees()->where('user_id', $invitee->id)->value('rsvp_status'))->toBe('yes')
         ->and($newSeries->reminders()->where('offset_minutes', 30)->exists())->toBeTrue()
-        ->and($event->fresh()->recurrence_until?->toDateString())->toBe('2026-07-14');
+        ->and($event->fresh()->recurrence_until?->format('Y-m-d H:i:s'))->toBe('2026-07-15 08:59:59');
 });
 
 test('an event can invite specific people who can then RSVP', function () {
@@ -351,7 +351,7 @@ test('an attachment uploads to the private disk, surfaces in the feed and downlo
     ]);
 
     $response = $this->actingAs($this->hr)
-        ->post("/hr/calendar/events/{$event->id}/attachments", [
+        ->post("/hr/calendar/events/{$event->id}/attachments", ['edit_version' => $event->fresh()->edit_version,
             'file' => UploadedFile::fake()->create('agenda.pdf', 80, 'application/pdf'),
         ])
         ->assertOk();
@@ -388,7 +388,7 @@ test('the attachment upload rejects disallowed mime types', function () {
     ]);
 
     $this->actingAs($this->hr)
-        ->post("/hr/calendar/events/{$event->id}/attachments", [
+        ->post("/hr/calendar/events/{$event->id}/attachments", ['edit_version' => $event->fresh()->edit_version,
             'file' => UploadedFile::fake()->create('malware.exe', 10),
         ])
         ->assertSessionHasErrors('file');

@@ -62,7 +62,7 @@ test('calendar removal archives and restores the event without deleting retained
     ]);
 
     $this->actingAs($this->hr)
-        ->delete("/hr/calendar/events/{$event->id}", ['archive_reason' => 'Created in error'])
+        ->delete("/hr/calendar/events/{$event->id}", ['edit_version' => $event->fresh()->edit_version, 'archive_reason' => 'Created in error'])
         ->assertSessionHas('success');
 
     $archived = $event->fresh();
@@ -84,7 +84,7 @@ test('calendar removal archives and restores the event without deleting retained
             ->where('archivedEvents.0.archive_reason', 'Created in error'));
 
     $this->actingAs($this->hr)
-        ->put("/hr/calendar/events/{$event->id}", ['title' => 'Must restore first'])
+        ->put("/hr/calendar/events/{$event->id}", ['edit_version' => $event->fresh()->edit_version, 'title' => 'Must restore first'])
         ->assertStatus(409);
 
     $from = now()->startOfMonth()->toDateString();

@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
         $this->call(ItServiceCatalogSeeder::class);
         $this->call(ItProvisioningTemplateSeeder::class);
         $this->call(SeedHrPermissionsSeeder::class);
+        $this->call(CompanyHubPermissionsSeeder::class);
         $this->call(OperationsPermissionsSeeder::class);
         $this->call(FinancePermissionsSeeder::class);
         $this->call(SeedCalendarPermissionsSeeder::class);

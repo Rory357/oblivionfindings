@@ -285,8 +285,7 @@ class MyHrController extends Controller
             ->orderByDesc('is_pinned')
             ->orderByDesc('published_at')
             ->lazy(100)
-            ->filter(fn (HrAnnouncement $announcement) => (int) $announcement->created_by === (int) $user->id
-                || $this->announcementAudiences->includesCurrentUser($announcement, $user))
+            ->filter(fn (HrAnnouncement $announcement) => $this->announcementAudiences->includesCurrentUser($announcement, $user))
             ->take(12)
             ->collect()
             ->map(fn (HrAnnouncement $a) => [
@@ -300,6 +299,7 @@ class MyHrController extends Controller
                     $a->published_at?->isoFormat('D MMM'),
                 ]))),
                 'acknowledged' => (bool) $a->acknowledged,
+                'read_url' => $user->canDo('hr.announcements.view') ? '/hr/announcements/'.$a->id : '/company-hub?view=updates&announcement='.$a->id,
             ])
             ->values();
 

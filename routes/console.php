@@ -290,8 +290,8 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->weeklyOn(1, '08:00');
 
-// HR calendar event reminders: every minute, fire any reminder whose lead time
-// lands in the last minute (de-duped via last_sent_at).
+// HR calendar reminders: stage durable per-recipient work, recover missed runs
+// and retry delivery while each event is still current.
 app(Schedule::class)
     ->command('hr:dispatch-calendar-reminders')
     ->everyMinute()
@@ -1021,3 +1021,10 @@ Artisan::command('workforce:recover-eligibility-refresh', function () {
     $this->info((string) app(WorkforceEligibilityRefresh::class)->recover());
 })->purpose('Recover pending or interrupted workforce eligibility checks');
 app(Schedule::class)->command('workforce:recover-eligibility-refresh')->everyMinute()->withoutOverlapping();
+
+app(Schedule::class)->command('company-hub:deliver-notices')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
+
+Artisan::command('company-hub:prune-search-insights', function () {
+    $this->info((string) app(\App\Domain\CompanyHub\Services\HubSearchInsights::class)->prune());
+})->purpose('Remove Company Hub search topic totals older than 90 calendar days');
+app(Schedule::class)->command('company-hub:prune-search-insights')->dailyAt('02:10')->timezone('Pacific/Auckland')->withoutOverlapping();

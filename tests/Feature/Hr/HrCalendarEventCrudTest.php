@@ -52,7 +52,7 @@ test('an HR calendar event can be updated and archived', function () {
     ]);
 
     $this->actingAs($this->hr)
-        ->put("/hr/calendar/events/{$event->id}", [
+        ->put("/hr/calendar/events/{$event->id}", ['edit_version' => $event->fresh()->edit_version,
             'title' => 'Renamed',
             'event_type' => 'training',
             'starts_at' => $event->starts_at->toDateTimeString(),
@@ -64,7 +64,7 @@ test('an HR calendar event can be updated and archived', function () {
     expect($event->fresh()->event_type)->toBe('training');
 
     $this->actingAs($this->hr)
-        ->delete("/hr/calendar/events/{$event->id}")
+        ->delete("/hr/calendar/events/{$event->id}", ['edit_version' => $event->fresh()->edit_version])
         ->assertRedirect();
 
     $this->assertDatabaseHas('hr_calendar_events', ['id' => $event->id]);

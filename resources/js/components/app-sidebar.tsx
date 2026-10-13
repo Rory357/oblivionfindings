@@ -585,6 +585,16 @@ function buildIconNavItems({
                   } as IconNavItem,
               ]
             : []),
+        ...(can?.companyHub?.view
+            ? [
+                  {
+                      id: 'company-hub',
+                      icon: MessageSquareText,
+                      label: 'Company Hub',
+                      href: '/company-hub',
+                  } as IconNavItem,
+              ]
+            : []),
         {
             id: 'my-day',
             icon: CheckCircle2,

@@ -26,6 +26,8 @@ class HrCalendarEvent extends Model
         'is_all_day',
         'rrule',
         'recurrence_until',
+        'recurrence_timezone',
+        'hub_content',
         'recurrence_parent_id',
         'is_exception',
         'exception_date',
@@ -46,6 +48,7 @@ class HrCalendarEvent extends Model
         'is_all_day' => 'boolean',
         'recurrence_until' => 'datetime',
         'is_exception' => 'boolean',
+        'hub_content' => 'array',
         'exception_date' => 'date',
         'archived_at' => 'datetime',
     ];
