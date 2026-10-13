@@ -1,0 +1,34 @@
+{
+  "reviewed_at_utc": "2026-10-12T02:42:24Z",
+  "status": "CONCRETE_COMPETING_TEST_HOLD_NO_CHILD_STARTED",
+  "source": "Authorised Workforce completed-work report; parent read saved results and relevant runner guard/cleanup source only.",
+  "runner": "test-results/run-timesheet-retention-checks-r7-20261012.ps1",
+  "runner_sha256": "CA08E5CD31092E353A013F82827525E16A19CDC84BA01A24D7E2AAB4EBB183AD",
+  "results": [
+    {"path": "test-results/timesheet-retention-actual-r7a-20261012/result.json", "sha256": "0113488987739C8E5FEA082B6FB5B40A54D42720D90F9AD096997FD01214857B"},
+    {"path": "test-results/timesheet-retention-actual-r7b-20261012/result.json", "sha256": "44C4EAFDFA8C215A3FFBB9F218A1D19FAC295913399343C4E43F455B62D88D36"}
+  ],
+  "verified_saved_result": {
+    "both_state": "HELD_OR_FAILED",
+    "both_started": false,
+    "both_actual_counts": null,
+    "both_after_read_complete": true,
+    "r7b_free_mib": 5027,
+    "r7b_cpu_percent": 11,
+    "r7b_heavy_peer_ids": [290920],
+    "r7b_unknown_node_observations": 56,
+    "unknown_hosts_classified_idle": false,
+    "r7b_input_pin_count": 483,
+    "own_pid": null,
+    "product_applied": false,
+    "php_database_build_browser": false,
+    "worker_count": 1,
+    "max_heap_mib": 1024,
+    "deadline_seconds": 60,
+    "note": "No output stream was started; output_streams_closed=false is not an executed-test failure. No test pass or host absence inferred."
+  },
+  "owner_report_only": "Owner identifies the competitor as the same live Herd PHP84 test PID290920, parent43916, birth2026-10-12T02:33:28.067061Z using authoritative outside-sandbox metadata and a private command match. Sandbox Get-Process absence was not treated as authoritative. Parent did not probe this process or disclose its raw command.",
+  "source_observation": "R7 uses unchanged heavy/native-first classifier; its concrete guard checks free>=4096MiB, CPU<70 and no heavy peer. Cleanup holds its own Process instance only; no peer adoption/termination. Original failures and prior hold receipts retained. This is not independent full runner or host-safety certification.",
+  "next": "Workforce remains sole runtime owner and waits for a natural gap before a fresh complete guard. No relaxed known-job admission, duplicate coordinator probe, infrastructure recycle, restart or new permission request. Independent source work remains authorised.",
+  "coordination": "No repeated owner message needed; no cursor advancement invented. Three scopes remain incomplete and heartbeat ACTIVE."
+}

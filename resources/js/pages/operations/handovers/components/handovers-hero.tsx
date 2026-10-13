@@ -1,5 +1,6 @@
 import {
     PageHeaderFilterButton,
+    PageHeaderFilterSelect,
     PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
@@ -216,6 +217,23 @@ export function HandoversHero({
                         disabled={loading}
                         className="flex w-full min-w-0 flex-wrap items-center justify-end gap-1.5"
                     >
+                        <PageHeaderFilterSelect
+                            label="Handover status"
+                            value={filters.status}
+                            options={stats.map(([value, label, count]) => {
+                                const statusLabel =
+                                    value === 'all'
+                                        ? 'All handovers'
+                                        : value === 'submitted'
+                                          ? 'Awaiting acknowledgement'
+                                          : label;
+                                return {
+                                    value,
+                                    label: `${statusLabel} · ${count}`,
+                                };
+                            })}
+                            onChange={(status) => onStatus(status as StatusTab)}
+                        />
                         <div className="flex flex-wrap items-center gap-1.5">
                             <PageHeaderFilterButton
                                 icon={ChevronLeft}

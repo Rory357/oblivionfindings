@@ -1,0 +1,86 @@
+{
+  "reviewed_at_utc": "2026-10-12T10:44:09Z",
+  "candidate": "C:/Users/steph/.codex/worktrees/control-room-delivery/oblivionfindings",
+  "receipt": "docs/control-room-audit-2026-10-11/reports-source-increment-r35b.json",
+  "receipt_sha256": "04B382772C63D5CD03583E3B43CFFEFD9477D5A522CB7F35B8C8D36350634504",
+  "status": "FIGURES_CORRECTIONS_ADDRESSED_IN_SOURCE; RORY_FOLLOWUPS_AND_EXPORT_PRIVACY_OPEN; RUNTIME_UNRUN",
+  "parent_hash_verification": {
+    "product": 5,
+    "evidence": 9,
+    "before": 5,
+    "differences": []
+  },
+  "parent_source_review": {
+    "read": [
+      "Full report controller/exporter",
+      "Complete changed service/controller/frontend/native-test deltas",
+      "New Reports component test file",
+      "Existing slaCompliance/cycle scope/duration calculator",
+      "Rory DESIGN.md applicable spacing and scroll/table rules",
+      "Saved actual held syntax/formatter result fields"
+    ],
+    "backend_preservation": {
+      "service_outside_one_grouped_field_byte_exact": true,
+      "controller_outside_projection_byte_exact": true
+    },
+    "figures": "All returned daily dates rendered with definite bar height, visible counts/dates, local keyboard-focusable scrolling and matching expandable table. Existing valid cycle averages populate severity timings; measured zero/fractions survive, null/missing says Not measured. Export and meter URLs preserve current Site/custom dates.",
+    "limits": "No independent full 3178-input image rehash, source parser/style/runtime/SQL/PDO/native/browser tests or deployed stats500 diagnosis.",
+    "design_support": "Existing shared CommandCentrePage/PageShell/Home breadcrumb retained; semantic tokens and shared Table used. This is not whole-header/layout/browser acceptance."
+  },
+  "findings": [
+    {
+      "id": "CR-REPORTS-RORY-01",
+      "priority": 2,
+      "file": "resources/js/pages/control-room/reports.tsx",
+      "lines": [
+        246,
+        337
+      ],
+      "issue": "External mt-4/grid gap-4 remains in two report card rows.",
+      "requirement": "DESIGN.md:829-835 requires20px between sections/cards, using canonical5-scale/shared layout without doubled spacing."
+    },
+    {
+      "id": "CR-REPORTS-RORY-02",
+      "priority": 2,
+      "file": "resources/js/pages/control-room/reports.tsx",
+      "issue": "New daily chart overflow area omits scrollbar-pretty.",
+      "requirement": "DESIGN.md:311-314 requires shared themed scrollbar on custom scroll surfaces; verify long period/narrow/zoom/keyboard without body overflow."
+    }
+  ],
+  "export_seam": {
+    "file": "app/Http/Controllers/ControlRoom/ControlRoomReportController.php",
+    "line": 199,
+    "evidence": "CSV encodes substr($alert->notes ?? '',0,200) directly following current role/Site/controlled-medication scope.",
+    "owner": "CR owns exporter composition; H&S owns canonical source/read/copy admission contract.",
+    "action": "Added this ControlRoomAlert.notes consumer to already pending H&S API handoff. Bind actual canonical alert/source provenance and current viewer, return admitted safe text or unavailable; no raw fallback/origin backfill/parallel predicate. Preserve permitted rows where only source text is denied; canonical row denial remains authoritative.",
+    "privacy_accepted": false
+  },
+  "authored_controls": {
+    "native_report_test_methods": 29,
+    "new_native_methods": 2,
+    "new_frontend_cases": 4,
+    "total_frontend_queue_cases": 37,
+    "whole_frontend_suites": 7,
+    "all_unrun": true
+  },
+  "actual_checks": {
+    "whitespace_exit": 0,
+    "whitespace_parent_rerun": false,
+    "syntax_children_started": 0,
+    "syntax_checked_files": 0,
+    "syntax_after_read_complete": true,
+    "formatter_started": false,
+    "formatter_exit": null,
+    "formatter_after_read_complete": true,
+    "runtime_acceptance": false
+  },
+  "communication": {
+    "cr_correction_sent_once": true,
+    "hs_csv_consumer_sent_once": true,
+    "cr_cursor": "a8154e4a-be4a-449b-a690-548c53e7eaf3:47",
+    "hs_cursor": "397c65f1-5741-4ae3-8949-b22ac31e1a7e:63"
+  },
+  "application_edit_or_test_by_coordinator": false,
+  "source_adopted_or_deployed": false,
+  "heartbeat": "ACTIVE"
+}

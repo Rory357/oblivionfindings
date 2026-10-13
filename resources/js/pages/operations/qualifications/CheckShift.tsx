@@ -1,5 +1,4 @@
 import {
-    PageHeader,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
@@ -11,6 +10,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { WorkforcePageHeader } from '@/components/workforce/workforce-page-header';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTimeInZone } from '@/lib/datetime';
 import { Head, Link, usePage } from '@inertiajs/react';
@@ -106,8 +106,16 @@ export default function QualificationCheckShift({
         );
     }, [results, search]);
 
+    const headerSearch = (
+        <PageHeaderSearch
+            value={search}
+            onChange={setSearch}
+            placeholder="Search requirements…"
+        />
+    );
+
     const header = (
-        <PageHeader
+        <WorkforcePageHeader
             variant="profile"
             backHref={`/operations/shifts/${shift.id}`}
             icon={ShieldCheck}
@@ -138,13 +146,10 @@ export default function QualificationCheckShift({
                 </PageHeaderStatusChip>
             }
             subline={sublineParts.join(' · ') + ' · ' + timezone}
-            actions={
-                <PageHeaderSearch
-                    value={search}
-                    onChange={setSearch}
-                    placeholder="Search requirements…"
-                />
-            }
+            actions={headerSearch}
+            mobileSummary="Qualification check"
+            mobilePrimaryAction={null}
+            mobileSecondaryActions={headerSearch}
             meters={
                 <>
                     {results.length > 0 ? (
@@ -189,7 +194,7 @@ export default function QualificationCheckShift({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Operations', href: '/operations' },
+                { title: 'Workforce', href: '/operations/rostering' },
                 { title: 'Shifts', href: '/operations/shifts' },
                 {
                     title: `Shift #${shift.id}`,

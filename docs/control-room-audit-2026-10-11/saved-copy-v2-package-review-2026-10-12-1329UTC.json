@@ -1,0 +1,61 @@
+{
+  "reviewedAtUtc": "2026-10-12T13:29:00Z",
+  "clientDate": "2026-10-13 Pacific/Auckland",
+  "packageRoot": "C:/Users/steph/.codex/worktrees/health-safety-workspace/oblivionfindings/docs/health-safety-audit-2026-10-07",
+  "status": "EXPANDED_SOURCE_PACKAGE_REVIEWED_FOR_CONSUMER_COMPOSITION_NOT_RUNTIME_CLOSURE",
+  "packagePins": {
+    "v1Checksums": "5C8CC524A51DE5D4C85128C9DDEC8286BA81EA22C25DBD4ED042F7C19104E6A2",
+    "v1Manifest": "444C77866A0320D68CBB9F09B318186E4069DAB417E31FB445AB1C65BDB0CE92",
+    "v2Checksums": "E0053CE7C87B91A734C1DAFF4DA12408CFE2D84B15DED6564D850D46AF35AAEE",
+    "v2Manifest": "D0F28D77F2E1EC441AA2C087A8696F0286EAA380F5AD3EA1F60EFE67F9DAEB7D",
+    "v2SourceMap": "A4960330C4D7548F4E33AEA3619B35DA7A5DC09DDF9AC482FFEB23AB6D824677",
+    "v2Readme": "E9318CE896F30E695052E7411DB06AAEE4EB5A0F59E2F6919EF503AC10A058C4",
+    "v2RequiredInstall": "A4393809001BAC87A94C687A6449B94D5E3F0FF3826D0C1B4C3E6AD3D85FB60D"
+  },
+  "parentVerification": {
+    "immutableV1Checksums": 35,
+    "v2Checksums": 8,
+    "mappedPayloads": 24,
+    "mappedCurrentSourcePins": 24,
+    "drift": 0,
+    "serviceWholeInverseExact": true,
+    "sourceRead": "Read both complete v1-to-v2 service/test diffs, README, required-install and shared-helper instructions. Independently reversed the two timezone expressions to reproduce the entire v1 service. Read four full production migration files, including up/down. No automatic grants or source ownership/independence/copy provenance backfill in their up paths. No migrations executed.",
+    "limits": "Did not independently prove every transitive provider/observer/container/fixture dependency, SQL execution, applied schema, rollback, event/queue lifecycle, query ceiling or mounted CR destination workflow. Hash equality is not runtime closure certification."
+  },
+  "currentSource": {
+    "savedCopyService": "57F6185B4F65317A7C1C47A09997B84FFAFF6E95101564E3DB99A1C44D73C235",
+    "wholeTest": "A6FCC0E633160AE345711C72E7705741CE8C8E78086EC0EAD92FB27DB2A7514B",
+    "nativeDeclarations": 47,
+    "nativeStatus": "UNRUN",
+    "timezoneDelta": "Capture and final lifetime guard now use existing worker_timezone ?: app.timezone/UTC fallback. Three new parameterized declarations cover null/empty worker timezone at a date boundary and before-query/final-callback mutation. Syntax only; no claim for arbitrary config mutation after SQL compilation."
+  },
+  "compositionDecision": {
+    "sourceMap": "Use22 retained v1 payloads and2 v2 replacements;24 mapped paths separate13 runtime services/models, whole-test fixtures, four production migrations and one test-fixture routing migration.",
+    "productionMigrations": [
+      "2026_10_07_190000_add_accountable_incident_ownership.php",
+      "2026_10_08_180500_create_health_safety_approval_policy_settings.php",
+      "2026_10_12_200800_add_incident_independent_handling.php",
+      "2026_10_12_200900_create_incident_saved_copies.php"
+    ],
+    "excludedInventory": "The106-file schema-baseline inventory is not the install list.",
+    "sharedFiles": "Preserve current MAIN/CR User/Role/RoleUser, eligibility dispatch, stronger CR AuditLogger, Shift quarantine, ClientIncident, SafeOperationalData and canonical shared baselines. H&S HR now matches MAIN/CR; Site's optional historical-HR reads hunk is explicitly not needed for this path. No direct use found in13 mapped runtime payloads; no Workforce shared edit requested.",
+    "owner": "CR reviews/minimally composes its destination/export/writer against versioned dependencies. H&S retains canonical source helpers and index. No whole-checkout or shared-file transplant, policy clone, automatic grant, provenance backfill or live schema action.",
+    "stillRequired": "Independent current CR destination and immutable original target/origin admission on actual SELECT before hydration, full bytes before CSV prefix/encoding, separate mixed/operator provenance, same-text writer invalidation and preservation of independently permitted operational rows. Full closure and native/browser/privacy/query evidence remain open."
+  },
+  "hsOtherCheckpoint": {
+    "receipt": "incident-command-recovery-source-r3-2026-10-13.json",
+    "sha256": "062865627F933EBCA38412B59A1D2F81BE22DE1090C2321AFEB9F13C68FFC82B",
+    "matchedCurrentPins": 8,
+    "drift": 0,
+    "claims": "Recorded finite frontend syntax/format and standalone PHP syntax only.24 record-action and47 saved-copy declarations remain unrun. Later overview calendar increment and active protected Journey/H&S-event work explicitly excluded; no inherited runtime acceptance."
+  },
+  "coordination": {
+    "controlRoomCapacityFailure": "Cursor54, turn01a13010-8ae9-77e2-9157-bd656c475637 failed with Selected model is at capacity. No model switch or repetitive retry.",
+    "newDelivery": "One concrete v2 completed-package handoff sent with unchanged model/settings. Subsequent compact snapshot55 shows active turn01a1304c-cb2e-7890-b65b-fd2da4644766 with completed command marker; not evidence of integration success.",
+    "controlRoomCursor": "a8154e4a-be4a-449b-a690-548c53e7eaf3:55",
+    "workforce": "Idle unchanged at e0c8a0b2-b660-47e3-befc-dcedd2dd9dbe:58; no new result/question/restart.",
+    "healthSafety": "Active at397c65f1-5741-4ae3-8949-b22ac31e1a7e:69, turn01a1303a-5f9b-7033-b8a6-a79223bdeeec. Calendar source and retained failure review underway."
+  },
+  "actions": "One meaningful package message to each affected authorised owner. No coordinator runtime/tests/build/database/browser/process probe, application edit, infrastructure/peer stop or model change. Existing isolated admission remains distinct from a blanket hold.",
+  "overall": "INCOMPLETE"
+}

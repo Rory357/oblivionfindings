@@ -1,0 +1,42 @@
+{
+  "reviewedAtUtc": "2026-10-12T15:27:49Z",
+  "candidate": "C:/Users/steph/.codex/worktrees/health-safety-workspace/oblivionfindings",
+  "state": "SAVED_CANDIDATE_COMPONENT_PASS_CONFIRMED; RUNNER_CORRECTION_OPEN; NO_FULL_ACCEPTANCE",
+  "evidence": {
+    "resultPath": "storage/logs/hs-overview-recovery-vitest-r4-results.json",
+    "resultSha256": "2CF7DB1AC805EA3A1C2583C92EA09E102D060F7D2657DFCFB96A88A951A4AE76",
+    "receiptSha256": "A21E0AC71C74CBC837381147A6E8B08684942EB437D6AA983D2E2A9ED8F33864",
+    "inputManifestSha256": "8E85EAA6C0F1A6AB492FCE16DF8EA3E5B3E87C844F39A64DDCDC834263E68F6E",
+    "logSha256": "EAFF251467EF4BE9505798058F092878E6B190733E56721014E2955DD15024CD",
+    "runnerSha256": "8AFDE558AF33C433FC82DEA40C7A385D019E1625C06F7BBCEA6043D2E4E9F0FF",
+    "isolatedConfigSha256": "3F6A75858E47EE67F81FCA4DA250264DE980F12F1325184F5A944BA6122AF367",
+    "success": true,
+    "exitCode": 0,
+    "totalTests": 84,
+    "passed": 84,
+    "failed": 0,
+    "pending": 0,
+    "suiteCounts": {
+      "incident-record-action-dialog.test.tsx": 38,
+      "incident-response-request-dialog.test.tsx": 22,
+      "analytics-header.test.tsx": 8,
+      "command-centre-hero.test.tsx": 16
+    },
+    "savedReceiptInputFiles": 5023,
+    "savedReceiptInputDrift": 0,
+    "independentlyMatchedCurrentSelectedPins": 15,
+    "selectedCurrentPinDrift": 0,
+    "pinScope": "Four tested components and their test files; shared LeaveCalendarRange; date-time field/test/time picker; isolated/original Vitest configs and runner. Parent did not rehash all5023 inputs.",
+    "runnerLimitsPresent": "Shared zero-wait mutex with finally release; one worker/no file parallelism; parent256MiB/worker512MiB; saved input pre/post hashes. Receipt records5668MiB admission memory."
+  },
+  "finding": {
+    "id": "HS-RUNNER-GUARDS-01",
+    "state": "OPEN; OWNER_NOTIFIED",
+    "file": "storage/logs/hs-overview-recovery-vitest-runner.ps1",
+    "observed": "The full runner only checks free memory once and filters a narrow php/node verification-command regex before a blocking launch. It does not implement the existing two-sample CPU/memory requirement, complete heavy-first process/child classification retaining unknowns, hard job deadline/runtime resource watch, or explicit own-child/stream completion evidence.",
+    "impact": "Saved84 component passes remain valid evidence for that candidate run; this runner does not meet the already agreed resource/admission protocol for further verification launches.",
+    "action": "Owner to reuse established classifier/guard infrastructure and restore controls before its next verification launch. Preserve mutex, one worker, heaps, original config semantics and input checks. No unchanged-suite rerun requested solely for this repair; independent source work continues.",
+    "acceptance": "Fresh complete observations; invalid/missing/unsafe observations hold before child; finite admitted run has hard deadline/resource supervision, only own-child cleanup and saved final exit/stream/after-read evidence."
+  },
+  "limits": "No coordinator tests, DB/build, browser, resource/process probes or source edits. Current H&S privacy-aware metrics/page states remain actively owned and were not duplicated here. These component results do not certify backend/privacy/query limits, integration, real keyboard/zoom/browser flows, all pages or complete Rory compliance. All three delivery scopes remain incomplete."
+}

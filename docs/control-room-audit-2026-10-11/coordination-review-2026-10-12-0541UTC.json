@@ -1,0 +1,40 @@
+{
+  "reviewed_at_utc": "2026-10-12T05:41:29Z",
+  "trigger": "Direct human continue; preserve approved scope and independent implementation ownership.",
+  "approved_scope_sha256": "579791F57A66C790541BF347E40C158103D4FC3863ECEAB9D0C6039F58652BF3",
+  "prior_status_sha256": "8A07BC5856918F08FC56D76D6650A279F30A731263C489520C28BBCC231CDF93",
+  "cursors": {
+    "control_room": "a8154e4a-be4a-449b-a690-548c53e7eaf3:34",
+    "workforce": "e0c8a0b2-b660-47e3-befc-dcedd2dd9dbe:37",
+    "health_safety": "397c65f1-5741-4ae3-8949-b22ac31e1a7e:54"
+  },
+  "active_turns": {
+    "control_room": "01a12ea1-169f-74c3-b60c-09e513fb97c1",
+    "workforce": "01a12e9c-a1b8-79b0-8946-b9cb7b7391c1",
+    "health_safety": "01a12e9d-7f2d-7542-9bb2-87c4ff22c922"
+  },
+  "finding": "CR current delivery still carried the obsolete blanket coordinator hold; the 02:08 correction had only reached then-active WF/HS. This was a coordination gap, not new human or automatic-review prohibition.",
+  "action": "Sent one substantive policy correction and owned navigation/header/Settings/duty/report continuation to CR, preserving appropriate finite-job resource admission, separate native/DB/build/browser gates, Workforce natural-window priority, shared source ownership, and all historical failures. CR acknowledged and is active. No empty continuation sent to WF/HS, already resumed by human.",
+  "source_observations": [
+    {
+      "path": "C:/Users/steph/.codex/worktrees/control-room-delivery/oblivionfindings/docs/control-room-audit-2026-10-11/DELIVERY-STATUS.txt",
+      "sha256": "D34BE3FFAAEA6A1AC5252039C03EF87D03B7A0286592D8294A40F18E63239C0D",
+      "finding": "R23 source-only; outdated blanket runtime wording and unresolved H&S canonical source/writer/notification dependencies. No integration or runtime pass."
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/control-room-delivery/oblivionfindings/resources/js/lib/control-room-navigation.ts",
+      "sha256": "DD5340E2E1A38DE342FAC4C6F1D4BA29A709D25BCD075595F007E3AAB3A69FC9",
+      "finding": "Six approved destination definitions exist in isolated source; no full role-route or integrated navigation acceptance."
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/control-room-delivery/oblivionfindings/resources/js/components/command-centre/command-centre-page.tsx",
+      "sha256": "730E8CBE1E599093D0D8160AED561834E112E790EAD4D414F3A9A23B6DB15293",
+      "finding": "Shared PageHeader, internal filters/meters and connected rail are used. Sample Settings/Duty/Reports consumers include Home breadcrumbs. Actual browser geometry/forms/keyboard/zoom/workflow still unverified."
+    }
+  ],
+  "other_progress": "WF/HS latest human continue messages were directly read. Prior turns failed; owners report backend usage limits and are continuing saved frontend/backend fixes. No new completed packet or updated actual Timesheets pass accepted here.",
+  "ownership": "H&S remains sole permanent incident/response/source privacy and combined five-consumer notification owner; CR owns adapter/operational work; WF owns planned staffing/HR. Preserve Company Hub global seams, Devices sources and eMAR previews.",
+  "parent_actions": "Read-only source and bounded evidence review, one authorised CR message, coordinator docs. No app edits, tests/builds/DB/browser/process/resource probes, provider/live writes or deployment.",
+  "next_gate": "Completed owned CR frontend increment with actual guarded results; WF current-source checks and backend composition; stable H&S canonical source/API/writer and combined notification proposal. Then minimal integration and full design/workflow/browser acceptance.",
+  "completion": "All three scopes incomplete; Rory compliance partial and unverified end to end; hourly heartbeat ACTIVE."
+}

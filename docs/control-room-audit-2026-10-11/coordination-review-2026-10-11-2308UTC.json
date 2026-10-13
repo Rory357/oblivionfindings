@@ -1,0 +1,62 @@
+{
+  "reviewed_at_utc": "2026-10-11T23:08:12Z",
+  "kind": "Hourly coordination: Workforce source correction and pending navigation choice",
+  "cursors": {
+    "cr": "a8154e4a-be4a-449b-a690-548c53e7eaf3:31",
+    "wf": "e0c8a0b2-b660-47e3-befc-dcedd2dd9dbe:28",
+    "hs": "397c65f1-5741-4ae3-8949-b22ac31e1a7e:46"
+  },
+  "statuses": {
+    "cr": "notLoaded; same previously completed R23 acknowledgement, no restart",
+    "wf": "active; final authority repair across seven timesheet actions",
+    "hs": "active; partial correction timestamp preservation and sealed unproven historical incident links"
+  },
+  "navigation": {
+    "original_plan": "docs/workforce-audit-2026-10-05/navigation.md",
+    "sha256": "52537D48530B05EDCDF914B5234B9DAF93B7C980EECAF8F5F6DC608E3D89D7B0",
+    "conflict_receipt": "test-results/workforce-navigation-settings-count-conflict-20261012.json",
+    "receipt_sha256": "8E1E1FECA68A07EE33FD598B2BB79208CFC391A36DD77816DB0B91A099311ADC",
+    "six_destinations": [
+      "Rostering",
+      "Available shifts",
+      "Attendance",
+      "Timesheets",
+      "Handovers",
+      "Shift notes"
+    ],
+    "issue": "Original six-destination map omits separately requested Workforce settings. Existing question asks human seven entries or six with distinct Shift notes tab inside Handovers.",
+    "state": "Human answer pending; no navigation change, count reapproval, feature removal or rendered role-count acceptance. Coordinator does not answer the human's pending choice or ask it again."
+  },
+  "wf_preparation": {
+    "manifest": "test-results/workforce-timesheet-preparation-context-proposal-20261012/manifest.json",
+    "manifest_sha256": "3DB9B272F93F3B5512DAC35754001CE3914390710D63F0243052985FDEFD5F79",
+    "independent_review": "test-results/workforce-timesheet-preparation-context-independent-review-20261012/review.json",
+    "review_sha256": "C9C76176582C37A975F72A909812F4513DB5AA778300BE534BE589B6AEF18CBA",
+    "packet_pins": 29,
+    "packet_matched": 29,
+    "dependencies": 72,
+    "dependencies_matched": 72,
+    "reviewed": [
+      "Read complete finite parent delta and actual useTimesheetCommand preparation/finish/sole dispatch boundary.",
+      "Hash failure or observed changed/restored/unmounted preparation uses knownNotSent before any router dispatch. It clears pending/busy/held rather than inventing an uncertain server write.",
+      "Wizard includes canSave/canSubmit and existing timesheetEditContext; action includes canAct. Drafts retained; surviving create grant permits editing after submit-only withdrawal.",
+      "Nine new prospective controls inspected alongside retained whole suites; mocked digest is only an async barrier."
+    ],
+    "source_cases": 53,
+    "actual_framework_count": null,
+    "status": "No additional concrete blocker found in bounded source delta; UNAPPLIED/UNRUN, not full workflow acceptance.",
+    "pending": [
+      "Page-wide synchronous admission and two-way legacy/correction ownership.",
+      "Backend final-current authority after all normal callbacks for seven actions.",
+      "Full immutable paired producer/HTTP/source/root/UUID/audit/receipt/recovery.",
+      "Transient unknown drafts, direct bulk/partial outcomes, same-path read interruption and real browser/role/navigation acceptance."
+    ]
+  },
+  "hs": {
+    "owner_reported": "Destination checks mounted in isolated candidate; private index withholds unconfirmed original association and missing wellbeing rows/totals, preserving authorized capture. Latest timestamp-only correction and old-history sealing under active owner review.",
+    "acceptance": "No new complete handoff or execution evidence reviewed this pass.",
+    "approval": "Existing rejected private-audit guard question remains pending; no approval inferred."
+  },
+  "action": "One WF message conveyed finite source review, retained pending human menu choice, and read-only reporting alternative. No H&S/CR duplicate guidance or restart. No model/settings changes.",
+  "limits": "No runtime, application-source edits, providers, infrastructure, MAIN adoption or completion. All scopes incomplete; runtime HOLD and heartbeat ACTIVE."
+}

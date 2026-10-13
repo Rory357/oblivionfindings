@@ -37,8 +37,8 @@ use App\Services\ShiftCoverageService;
 use App\Services\ShiftSignalService;
 use App\Services\ShiftStaffEligibilityService;
 use App\Services\UserSiteAccessService;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -751,6 +751,12 @@ class RosteringController extends Controller
             'coverageSites' => $coverageSites,
             'coverageAlerts' => $coverageAlerts,
             'recurringCoverageAlignment' => $recurringCoverageAlignment,
+            'timeOffWindow' => [
+                'timezone' => (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC'),
+                'starts_at' => $queryWeekStart->toIso8601String(),
+                'ends_at' => $queryWeekEnd->toIso8601String(),
+                'leave_lookahead_ends_at' => $leaveLookaheadEnd->toIso8601String(),
+            ],
             'timeOffs' => $timeOffs->map(fn ($b) => [
                 'id' => $b->id,
                 'user_id' => $b->user_id,
@@ -758,8 +764,13 @@ class RosteringController extends Controller
                 'starts_at' => optional($b->starts_at)->toIso8601String(),
                 'ends_at' => optional($b->ends_at)->toIso8601String(),
                 'type' => $b->type,
+                'period' => $b->period,
+                'hr_leave_request_id' => $b->hr_leave_request_id === null ? null : (int) $b->hr_leave_request_id,
+                // Independent unavailability has no canonical charged-hours amount.
+                'hours_requested' => null,
+                'selected_week_hours' => null,
                 'label' => $b->label,
-                'notes' => $b->notes,
+                'notes' => $b->hr_leave_request_id !== null ? null : $b->notes,
             ])->values(),
             'staffAvailabilitySummary' => $isAvailabilityTab
                 ? $this->buildAvailabilitySummary($auth, $availabilityWeekStart, $availabilityWeekEnd,
@@ -779,6 +790,9 @@ class RosteringController extends Controller
                     'leave_type' => $l->leave_type,
                     'reason' => (LeaveService::isSensitiveLeaveType($l->leave_type) && ! $canSeeSensitiveLeave && $l->user_id !== $auth->id) ? null : $l->reason,
                     'status' => $l->status,
+                    'period' => $l->period,
+                    'hours_requested' => $l->hours_requested === null ? null : (float) $l->hours_requested,
+                    'selected_week_hours' => $this->selectedWeekLeaveHours($l, $queryWeekStart, $queryWeekEnd),
                     'starts_at' => $l->starts_at?->toIso8601String(),
                     'ends_at' => $l->ends_at?->toIso8601String(),
                 ])->values(),
@@ -790,6 +804,9 @@ class RosteringController extends Controller
                     'leave_type' => $l->leave_type,
                     'reason' => (LeaveService::isSensitiveLeaveType($l->leave_type) && ! $canSeeSensitiveLeave && $l->user_id !== $auth->id) ? null : $l->reason,
                     'status' => $l->status,
+                    'period' => $l->period,
+                    'hours_requested' => $l->hours_requested === null ? null : (float) $l->hours_requested,
+                    'selected_week_hours' => $this->selectedWeekLeaveHours($l, $queryWeekStart, $queryWeekEnd),
                     'starts_at' => $l->starts_at?->toIso8601String(),
                     'ends_at' => $l->ends_at?->toIso8601String(),
                 ])->values(),
@@ -1799,5 +1816,21 @@ class RosteringController extends Controller
         }
 
         return $result;
+    }
+
+    /** Aggregate request hours cannot be prorated from dates or a half-day label. */
+    private function selectedWeekLeaveHours(HrLeaveRequest $leave, Carbon $start, Carbon $end): ?float
+    {
+        if (! $leave->starts_at || ! $leave->ends_at || $leave->ends_at->lessThanOrEqualTo($leave->starts_at)) {
+            return null;
+        }
+        if ($leave->ends_at->lessThanOrEqualTo($start) || $leave->starts_at->greaterThanOrEqualTo($end)) {
+            return 0.0;
+        }
+        if ($leave->starts_at->lessThan($start) || $leave->ends_at->greaterThan($end) || $leave->hours_requested === null) {
+            return null;
+        }
+
+        return (float) $leave->hours_requested;
     }
 }

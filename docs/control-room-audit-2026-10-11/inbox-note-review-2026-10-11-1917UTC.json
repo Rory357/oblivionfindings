@@ -1,0 +1,42 @@
+{
+  "reviewed_at_utc": "2026-10-11T19:17:36Z",
+  "scope": "R22 allocated Control Room notification and operator root-note source seams",
+  "candidate_root": "C:/Users/steph/.codex/worktrees/control-room-delivery/oblivionfindings",
+  "manifest_sha256": "CDCE6EEE69CB806C59314BC8C35EFEA07000452DD4E6B0A907D6BC8AF322EC0B",
+  "shared_patch_sha256": "2255E2BA18A3887541B43B67CF0166AAD5E288F7F4B0340F85F96F05FE6E8771",
+  "source_checks_receipt_sha256": "77207954CC663B85C8261B3329C6116E2660E151B352F0FDE9F4DB7919930E32",
+  "parent_pin_check": {
+    "selected_dependencies": 12,
+    "composed_files": 38,
+    "preserved_foundations": 9,
+    "whole_cr_suites": 69,
+    "whole_shared_suites": 4,
+    "source_receipts": 33,
+    "total": 165,
+    "drift": [],
+    "main_unchanged_files": 6,
+    "main_drift": []
+  },
+  "source_review": {
+    "notification_adapter": "No new concrete blocker found in finite source review; current permission preparation, class-or-semantic classification, recipient/current staff/module/Site scope before counts/limits, canonical operational projection and all six shared consumer deltas inspected. Runtime and full source composition remain unverified.",
+    "operator_reader": "Actual persisted decision/general note, actor, alert, exact binary content and digest checked by shared display/search predicate; null-only root fill and invalid-origin denial inspected. Canonical H&S source-writer invalidation remains pending.",
+    "operator_writer": "CORRECTION_REQUIRED",
+    "finding": {
+      "path": "app/Services/ControlRoom/ControlRoomAlertLifecycleService.php",
+      "lines": [332, 348, 350, 360, 914, 927, 929, 938],
+      "problem": "resolve verifies note/selected alert fields before SLA and audit writes, never proves the appended activity, then refreshes without checking the result. appendOperatorNote checks save and note before audit without proving actual activity or final state. Successful callbacks can change/drop history or alter the note/root/resolution after the last assertion and still commit as success.",
+      "required_change": "Capture intended tuples before callbacks and verify actual activity linkage, preserved prior history, persisted note and applicable resolution/root fields in a read-only suffix after all normal writes/audit, inside the governing transaction. Throw on mismatch; no normal writes after verification.",
+      "acceptance": "Reached successful-save callbacks dropping/changing activity and late audit callbacks mutating note/root/resolution must roll back the complete command. Retain existing veto, retry, null-only and source-root preservation cases.",
+      "owner_notified": "01a12a29-0449-7150-ba1e-0a66a970110e",
+      "status": "sent; successor pending"
+    }
+  },
+  "limits": [
+    "File reads and hashes only; no application changes or parent runtime checks.",
+    "Owner syntax/style/whitespace/patch receipts are source checks, not execution of authored suites.",
+    "31 new authored methods and all affected whole suites remain UNRUN.",
+    "H&S same-text source ownership invalidation and canonical exposure API are pending.",
+    "Shared patch unapplied; combined main composition and workflow/browser acceptance pending.",
+    "Runtime hold unchanged; all approved scopes incomplete."
+  ]
+}

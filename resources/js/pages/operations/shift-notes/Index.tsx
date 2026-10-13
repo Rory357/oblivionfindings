@@ -6,7 +6,6 @@ import {
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
     PageHeaderPrimaryButton,
-    PageHeaderRail,
     type PageHeaderRailItem,
     PageHeaderSearch,
     PageHeaderViewToggle,
@@ -22,6 +21,7 @@ import { ErrorState } from '@/components/ui/error-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { LoadingState } from '@/components/ui/loading-state';
 import { WorkforcePageHeader } from '@/components/workforce/workforce-page-header';
+import { CommunicationWorkspaceRail } from '@/components/workforce/communication-workspace-rail';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatDateTimeInZone } from '@/lib/datetime';
 import { Head } from '@inertiajs/react';
@@ -336,6 +336,17 @@ export default function ShiftNotesIndex({
                             disabled={query.loading}
                             className="flex w-full min-w-0 flex-wrap items-center justify-end gap-1.5"
                         >
+                            <PageHeaderFilterSelect
+                                label="Note status"
+                                value={filters.status}
+                                options={rails.map(({ key, label, count }) => ({
+                                    value: key,
+                                    label: `${label} · ${count}`,
+                                }))}
+                                onChange={(status) =>
+                                    query.change({ status: status as StatusTab })
+                                }
+                            />
                             <PageHeaderFilterButton
                                 icon={ChevronLeft}
                                 aria-label="Previous week"
@@ -461,17 +472,12 @@ export default function ShiftNotesIndex({
                         </fieldset>
                     }
                     rail={
-                        <fieldset
+                        <CommunicationWorkspaceRail
+                            active="notes"
+                            week={loadedFilters.week}
+                            site={loadedFilters.site_id}
                             disabled={query.loading}
-                            className="w-full min-w-0"
-                        >
-                            <PageHeaderRail
-                                items={rails}
-                                value={filters.status}
-                                onSelect={(status) => query.change({ status })}
-                                ariaLabel="Note views"
-                            />
-                        </fieldset>
+                        />
                     }
                 />
                 {pickerOpen && (

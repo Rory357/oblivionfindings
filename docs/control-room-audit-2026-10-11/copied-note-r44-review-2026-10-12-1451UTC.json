@@ -1,0 +1,41 @@
+{
+  "reviewedAtUtc": "2026-10-12T14:51:13Z",
+  "finding": "CR-COPY-ORIGIN-01",
+  "state": "SOURCE_CLOSED_FOR_UNAPPLIED_R44_ONLY",
+  "candidate": "C:/Users/steph/.codex/worktrees/control-room-delivery/oblivionfindings",
+  "packet": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r44",
+  "manifestSha256": "69A66DFE5CB67C3CE70C37A20666AB3125B4734AF5202E4D59E73706B6A3548F",
+  "patchSha256": "C61A3F7D9484E0F5F6D01A9A635C42365657949892C02083BF25D48947A738CE",
+  "readerSha256": "627D2A85FCE299C8CBABCA9EBAB23321E814D18214EF922EF121B329AB918092",
+  "testSha256": "1F8A1D4F1C0E1AC0D676A6C98602DDEBB151183B345C1269A126EF70F2E37285",
+  "independentSourceReview": {
+    "successorPinsMatched": 10,
+    "drift": 0,
+    "baseManifestSha256": "0BABF79888F40932CFE713FD78C23289637D828232B4936F0C9C45A94D4068D7",
+    "baseManifestUnchanged": true,
+    "baseReaderSha256": "C56732F3A4E969612F4A2718AA29C94A5CD953D2CEF75134692DC3AE92D40CF2",
+    "baseTestSha256": "302C1A27CFD872FA301145AFB52162613FF849DCDE683C81D3F6E5D926565B3A",
+    "completeTwoFileDiffRead": true,
+    "readerInverse": "Removed exactly one added JSON_CONTAINS_PATH root_note_origin absence conjunct; whole normalized R41 reader reproduced exactly.",
+    "testInverse": "Removed exactly two added native methods; whole normalized R41 test class reproduced exactly, retaining previous18 methods/provider rows.",
+    "otherThreeOwnedFiles": "Hashes unchanged from reviewed R41.",
+    "correction": "Copied branch applies root_note_origin absence on the actual Notes SELECT and its identical final exists clone.",
+    "authoredAcceptance": "Pre-body conflict injection requires zero Notes model hydration with blank Notes and row retained. Post-body injection requires one hydration, final blank Notes and row retained. Both use actual query-builder mutations; not executed."
+  },
+  "executionEvidence": {
+    "parserResultSha256": "5BAD4F850490637E1EF781B5F12C18E40D755751AD2DE0B2BF39C4DA894A2F9E",
+    "parserState": "HELD_OR_FAILED before child",
+    "compilerChildrenStarted": 0,
+    "parsedFiles": 0,
+    "afterReadComplete": true,
+    "ownChildExitConfirmed": true,
+    "streamsClosed": true,
+    "applicationDatabaseMigrationNativeTestsStarted": false,
+    "wholeNewNativeDeclarations": 20,
+    "canonicalSavedCopyDeclarations": 47,
+    "existingReportsDeclarations": 29,
+    "nativeExecution": "ALL_UNRUN",
+    "runtimeAcceptance": false
+  },
+  "limits": "No product application, source-policy alteration, producer activation, SQL/native/browser/resource run or integration by coordinator. Parent did not rerun patch application or all53 R41 pins; those were reviewed at14:37 and the relevant immutable predecessor/owned hashes were matched here. Original-target/current-authority/all-reader/dependency/runtime/integration/Stats/Rory/full-workflow gates remain. Overall three scopes INCOMPLETE."
+}

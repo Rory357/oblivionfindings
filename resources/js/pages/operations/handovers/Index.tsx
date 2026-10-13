@@ -1,12 +1,11 @@
 import { AddClientDialog } from '@/components/clients/add-client-dialog';
-import { PageHeaderRail } from '@/components/page';
+import { CommunicationWorkspaceRail } from '@/components/workforce/communication-workspace-rail';
 import PageShell from '@/components/page-shell';
 import { ErrorState } from '@/components/ui/error-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { LoadingState } from '@/components/ui/loading-state';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { CheckCircle2, ListChecks, Pencil, Send } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -220,41 +219,12 @@ function HandoversBody({
                     rangeLabel={rangeLabel}
                     readNotice={readNotice}
                     rail={
-                        <fieldset
+                        <CommunicationWorkspaceRail
+                            active="handovers"
+                            week={serverFilters.week}
+                            site={serverFilters.site}
                             disabled={query.loading}
-                            className="w-full min-w-0"
-                        >
-                            <PageHeaderRail
-                                value={filters.status}
-                                onSelect={selectStatus}
-                                items={[
-                                    {
-                                        key: 'all',
-                                        label: 'All',
-                                        icon: ListChecks,
-                                        count: counts.total,
-                                    },
-                                    {
-                                        key: 'draft',
-                                        label: 'Drafts',
-                                        icon: Pencil,
-                                        count: counts.draft,
-                                    },
-                                    {
-                                        key: 'submitted',
-                                        label: 'Awaiting acknowledgement',
-                                        icon: Send,
-                                        count: counts.submitted,
-                                    },
-                                    {
-                                        key: 'acknowledged',
-                                        label: 'Acknowledged',
-                                        icon: CheckCircle2,
-                                        count: counts.acknowledged,
-                                    },
-                                ]}
-                            />
-                        </fieldset>
+                        />
                     }
                 />
                 <div className="space-y-4" aria-busy={query.loading}>
@@ -274,7 +244,7 @@ function HandoversBody({
                                 <div className="space-y-3">
                                     <p className="text-caption">
                                         Board columns show records on this page.
-                                        Use the status tabs to see every
+                                        Use the status filter to see every
                                         matching handover in that status.
                                     </p>
                                     <BoardView

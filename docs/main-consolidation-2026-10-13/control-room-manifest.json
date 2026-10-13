@@ -1,0 +1,2975 @@
+{
+  "name": "control-room",
+  "source_root": "C:\\Users\\steph\\.codex\\worktrees\\control-room-delivery\\oblivionfindings",
+  "status": "PRESERVED_CANDIDATE_NOT_RUNTIME_INTEGRATED",
+  "base_commit": "ce50e22f5b5b85fdd1bf42a8401ec31015deae80",
+  "base_in_origin_main_history": true,
+  "tracked_paths": [
+    "app/Console/Commands/EscalatePendingNotifications.php",
+    "app/Http/Controllers/ControlRoom/ControlRoomAlertController.php",
+    "app/Http/Controllers/ControlRoom/ControlRoomEscalationController.php",
+    "app/Http/Controllers/ControlRoom/ControlRoomHandoverController.php",
+    "app/Http/Controllers/ControlRoom/ControlRoomIncidentController.php",
+    "app/Http/Controllers/ControlRoom/ControlRoomMyTasksController.php",
+    "app/Http/Controllers/ControlRoom/ControlRoomReportController.php",
+    "app/Http/Controllers/ControlRoom/ControlRoomSettingsController.php",
+    "app/Http/Controllers/ControlRoom/ControlRoomShiftController.php",
+    "app/Http/Controllers/ControlRoom/ControlRoomStatsController.php",
+    "app/Http/Controllers/MyTasksController.php",
+    "app/Http/Controllers/NotificationInboxController.php",
+    "app/Http/Controllers/Portal/PortalNotificationController.php",
+    "app/Http/Middleware/HandleInertiaRequests.php",
+    "app/Jobs/Notifications/DeliverControlRoomAlertNotificationJob.php",
+    "app/Models/BehaviourSupportPlan.php",
+    "app/Models/ControlRoom/OperatorNote.php",
+    "app/Models/ControlRoom/Signal.php",
+    "app/Models/RestraintEvent.php",
+    "app/Models/WorkplaceInjury.php",
+    "app/Notifications/ControlRoomAlertNotification.php",
+    "app/Services/AuditLogger.php",
+    "app/Services/ControlRoom/AlertAutomationService.php",
+    "app/Services/ControlRoom/AlertPriorityService.php",
+    "app/Services/ControlRoom/AlertWorklistPresenter.php",
+    "app/Services/ControlRoom/AlertWorklistQuery.php",
+    "app/Services/ControlRoom/AlertWorkspaceService.php",
+    "app/Services/ControlRoom/ControlRoomAlertLifecycleService.php",
+    "app/Services/ControlRoom/ControlRoomDeskService.php",
+    "app/Services/ControlRoom/ControlRoomHandoverScopeService.php",
+    "app/Services/ControlRoom/ControlRoomNotificationService.php",
+    "app/Services/ControlRoom/ControlRoomPreparedHandoverSnapshotService.php",
+    "app/Services/ControlRoom/ControlRoomReportService.php",
+    "app/Services/ControlRoom/ControlRoomShiftHandoverService.php",
+    "app/Services/ControlRoom/SignalProcessingService.php",
+    "app/Services/HealthSafety/HsVisibilityService.php",
+    "app/Services/Incidents/IncidentJourneyPresenter.php",
+    "app/Services/Incidents/IncidentJourneyService.php",
+    "resources/js/components/app-sidebar.tsx",
+    "resources/js/components/command-centre/command-centre-page.test.tsx",
+    "resources/js/components/command-centre/command-centre-page.tsx",
+    "resources/js/pages/control-room/broadcast-show.tsx",
+    "resources/js/pages/control-room/broadcast.tsx",
+    "resources/js/pages/control-room/devices/index.tsx",
+    "resources/js/pages/control-room/devices/show.tsx",
+    "resources/js/pages/control-room/map.tsx",
+    "resources/js/pages/control-room/messaging.tsx",
+    "resources/js/pages/control-room/my-tasks.tsx",
+    "resources/js/pages/control-room/playbooks/index.tsx",
+    "resources/js/pages/control-room/playbooks/show.tsx",
+    "resources/js/pages/control-room/reports.tsx",
+    "resources/js/pages/control-room/settings.tsx",
+    "resources/js/pages/control-room/shifts.tsx",
+    "resources/js/pages/control-room/shifts/handover.test.tsx",
+    "resources/js/pages/control-room/shifts/handover.tsx",
+    "resources/js/pages/control-room/sla/breaches.tsx",
+    "resources/js/pages/control-room/sla/index.tsx",
+    "resources/js/pages/control-room/stats.tsx",
+    "routes/control-room.php",
+    "routes/portal.php",
+    "tests/Feature/ControlRoom/ControlRoomDeskTest.php",
+    "tests/Feature/ControlRoom/ControlRoomEscalationControllerTest.php",
+    "tests/Feature/ControlRoom/ControlRoomReportControllerTest.php",
+    "tests/Feature/ControlRoom/ControlRoomSafetyHandoverTest.php",
+    "tests/Feature/ControlRoom/ControlRoomSettingsControllerTest.php",
+    "tests/Feature/ControlRoom/ControlRoomStatsControllerTest.php",
+    "tests/Feature/ControlRoom/SignalOutboxControllerTest.php",
+    "tests/Unit/ControlRoom/AlertPriorityServiceTest.php",
+    "tests/Unit/ControlRoom/SignalProcessingServiceTest.php"
+  ],
+  "untracked_paths": [
+    "app/Http/Controllers/ControlRoom/ControlRoomReportingDecisionController.php",
+    "app/Models/BehaviourSupportPlanVersion.php",
+    "app/Models/ControlRoom/AlertReportingDecision.php",
+    "app/Models/WorkplaceInjurySourceVersion.php",
+    "app/Services/ControlRoom/AlertReportingPolicy.php",
+    "app/Services/ControlRoom/AlertReportingService.php",
+    "app/Services/ControlRoom/ControlRoomAcceptedHandoverHistoryService.php",
+    "app/Services/ControlRoom/ControlRoomAcceptedHandoverNoteService.php",
+    "app/Services/ControlRoom/ControlRoomDatabaseNotificationAccessService.php",
+    "app/Services/ControlRoom/ControlRoomFleetOutboxService.php",
+    "app/Services/ControlRoom/ControlRoomGovernanceReadService.php",
+    "app/Services/ControlRoom/ControlRoomHandoverReadAccessService.php",
+    "app/Services/ControlRoom/ControlRoomOperatorNoteOriginService.php",
+    "app/Services/ControlRoom/ControlRoomOperatorNoteReadService.php",
+    "app/Services/ControlRoom/ControlRoomOperatorRootNoteService.php",
+    "app/Services/ControlRoom/ControlRoomRecipientEligibilityService.php",
+    "app/Services/ControlRoom/ControlRoomSettingsRevisionService.php",
+    "app/Services/ControlRoom/ControlRoomSourceContentService.php",
+    "app/Services/HealthSafety/FirstAidAccessService.php",
+    "app/Services/HealthSafety/HealthSafetyReadContext.php",
+    "app/Services/HealthSafety/HsEventAccessService.php",
+    "app/Services/HealthSafety/InjuryAccessService.php",
+    "app/Services/HealthSafety/InjurySourceProjectionService.php",
+    "app/Services/HealthSafety/RestraintAccessService.php",
+    "app/Services/HealthSafety/RestraintCommandValues.php",
+    "app/Services/Incidents/IncidentAccessService.php",
+    "database/migrations/2026_10_08_180500_create_health_safety_approval_policy_settings.php",
+    "database/migrations/2026_10_08_180600_version_behaviour_support_plans.php",
+    "database/migrations/2026_10_08_180700_add_restraint_event_source_commands.php",
+    "database/migrations/2026_10_11_150000_create_control_room_alert_reporting_decisions.php",
+    "database/migrations/2026_10_11_160000_add_control_room_settings_revisions.php",
+    "database/migrations/2026_10_12_190000_create_workplace_injury_source_history.php",
+    "database/migrations/2026_10_12_230000_add_control_room_operator_note_origin.php",
+    "docs/control-room-audit-2026-10-11/DATABASE-NOTIFICATION-CONSUMER-INVENTORY.txt",
+    "docs/control-room-audit-2026-10-11/DELIVERY-STATUS-r18-integration-history.txt",
+    "docs/control-room-audit-2026-10-11/DELIVERY-STATUS-r19-before-remaining-consumers.txt",
+    "docs/control-room-audit-2026-10-11/DELIVERY-STATUS-r21-before-inbox-notes.txt",
+    "docs/control-room-audit-2026-10-11/DELIVERY-STATUS-r22.txt",
+    "docs/control-room-audit-2026-10-11/DELIVERY-STATUS-r23.txt",
+    "docs/control-room-audit-2026-10-11/DELIVERY-STATUS-r25.txt",
+    "docs/control-room-audit-2026-10-11/DELIVERY-STATUS-r26-before-config.txt",
+    "docs/control-room-audit-2026-10-11/DELIVERY-STATUS.txt",
+    "docs/control-room-audit-2026-10-11/HS-READ-INTEGRATION-SEAMS-r21.txt",
+    "docs/control-room-audit-2026-10-11/HS-READ-INTEGRATION-SEAMS-r22.txt",
+    "docs/control-room-audit-2026-10-11/HS-READ-INTEGRATION-SEAMS.txt",
+    "docs/control-room-audit-2026-10-11/INJURY-CONSUMER-HANDOFF.txt",
+    "docs/control-room-audit-2026-10-11/NOTIFICATION-PERSISTENCE-REPAIR.txt",
+    "docs/control-room-audit-2026-10-11/OPERATOR-ROOT-NOTE-CONTRACT.txt",
+    "docs/control-room-audit-2026-10-11/OUTBOX-ACCESS-SEAM.txt",
+    "docs/control-room-audit-2026-10-11/REPORTING-DTO-PROPOSAL.txt",
+    "docs/control-room-audit-2026-10-11/SIDEBAR-INTEGRATION.txt",
+    "docs/control-room-audit-2026-10-11/accepted-history-before-r26.json",
+    "docs/control-room-audit-2026-10-11/accepted-history-before-r26/app/Http/Controllers/ControlRoom/ControlRoomHandoverController.php",
+    "docs/control-room-audit-2026-10-11/accepted-history-before-r26/app/Http/Controllers/ControlRoom/ControlRoomShiftController.php",
+    "docs/control-room-audit-2026-10-11/accepted-history-before-r26/docs/control-room-audit-2026-10-11/DELIVERY-STATUS.txt",
+    "docs/control-room-audit-2026-10-11/accepted-history-before-r26/resources/js/pages/control-room/shifts.test.tsx",
+    "docs/control-room-audit-2026-10-11/accepted-history-before-r26/resources/js/pages/control-room/shifts.tsx",
+    "docs/control-room-audit-2026-10-11/accepted-history-before-r26/resources/js/pages/control-room/shifts/handover.test.tsx",
+    "docs/control-room-audit-2026-10-11/accepted-history-before-r26/resources/js/pages/control-room/shifts/handover.tsx",
+    "docs/control-room-audit-2026-10-11/accepted-history-config-supplement-r28.json",
+    "docs/control-room-audit-2026-10-11/accepted-history-source-increment-r26.json",
+    "docs/control-room-audit-2026-10-11/accepted-history-syntax-attempt-r26.json",
+    "docs/control-room-audit-2026-10-11/accepted-note-before-r29.json",
+    "docs/control-room-audit-2026-10-11/accepted-note-before-r29/app/Http/Controllers/ControlRoom/ControlRoomHandoverController.php",
+    "docs/control-room-audit-2026-10-11/accepted-note-before-r29/app/Http/Controllers/ControlRoom/ControlRoomShiftController.php",
+    "docs/control-room-audit-2026-10-11/accepted-note-before-r29/app/Models/ControlRoom/OperatorNote.php",
+    "docs/control-room-audit-2026-10-11/accepted-note-before-r29/app/Services/ControlRoom/ControlRoomAlertLifecycleService.php",
+    "docs/control-room-audit-2026-10-11/accepted-note-before-r29/app/Services/ControlRoom/ControlRoomPreparedHandoverSnapshotService.php",
+    "docs/control-room-audit-2026-10-11/accepted-note-before-r29/app/Services/ControlRoom/ControlRoomShiftHandoverService.php",
+    "docs/control-room-audit-2026-10-11/accepted-note-before-r29/docs/control-room-audit-2026-10-11/DELIVERY-STATUS.txt",
+    "docs/control-room-audit-2026-10-11/accepted-note-before-r29/resources/js/pages/control-room/shifts/accepted-handover-history.tsx",
+    "docs/control-room-audit-2026-10-11/accepted-note-before-r29/resources/js/pages/control-room/shifts/handover.test.tsx",
+    "docs/control-room-audit-2026-10-11/accepted-note-before-r29/resources/js/pages/control-room/shifts/handover.tsx",
+    "docs/control-room-audit-2026-10-11/accepted-note-before-r29/tests/Feature/ControlRoom/ControlRoomAcceptedHandoverHistoryTest.php",
+    "docs/control-room-audit-2026-10-11/accepted-note-before-r29/tests/Feature/ControlRoom/ControlRoomOperatorRootNoteTest.php",
+    "docs/control-room-audit-2026-10-11/accepted-note-source-increment-r29.json",
+    "docs/control-room-audit-2026-10-11/accepted-note-syntax-r29-inputs.json",
+    "docs/control-room-audit-2026-10-11/accepted-note-syntax-r29-result.json",
+    "docs/control-room-audit-2026-10-11/accepted-note-syntax-r31-inputs.json",
+    "docs/control-room-audit-2026-10-11/accepted-note-syntax-r31-result.json",
+    "docs/control-room-audit-2026-10-11/accepted-note-syntax-r32-inputs.json",
+    "docs/control-room-audit-2026-10-11/accepted-note-syntax-r32-result.json",
+    "docs/control-room-audit-2026-10-11/accepted-note-syntax-r33-inputs.json",
+    "docs/control-room-audit-2026-10-11/accepted-note-syntax-r33-result.json",
+    "docs/control-room-audit-2026-10-11/accepted-note-syntax-r34-inputs.json",
+    "docs/control-room-audit-2026-10-11/accepted-note-syntax-r34-result.json",
+    "docs/control-room-audit-2026-10-11/accepted-note-syntax-r35-inputs.json",
+    "docs/control-room-audit-2026-10-11/accepted-note-syntax-r35-result.json",
+    "docs/control-room-audit-2026-10-11/check-launcher-source-cases.ps1",
+    "docs/control-room-audit-2026-10-11/check-reporting-schema-identifiers.php",
+    "docs/control-room-audit-2026-10-11/check-settings-schema.php",
+    "docs/control-room-audit-2026-10-11/control-room-resource-proof.ps1",
+    "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r21.json",
+    "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r22.json",
+    "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r23.json",
+    "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r25.json",
+    "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r26.json",
+    "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r29.json",
+    "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r31.json",
+    "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r34.json",
+    "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r35.json",
+    "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r37.json",
+    "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r40-reviewed.json",
+    "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r40.json",
+    "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r41-at-r44.json",
+    "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r41.json",
+    "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r44.json",
+    "docs/control-room-audit-2026-10-11/coordinator-report-dispatch.json",
+    "docs/control-room-audit-2026-10-11/coordinator-report-r29.txt",
+    "docs/control-room-audit-2026-10-11/coordinator-report-r31.txt",
+    "docs/control-room-audit-2026-10-11/coordinator-report-r34.txt",
+    "docs/control-room-audit-2026-10-11/coordinator-report-r35.txt",
+    "docs/control-room-audit-2026-10-11/coordinator-report-r37.txt",
+    "docs/control-room-audit-2026-10-11/coordinator-report-r40.txt",
+    "docs/control-room-audit-2026-10-11/coordinator-report-r41.txt",
+    "docs/control-room-audit-2026-10-11/coordinator-report-r44.txt",
+    "docs/control-room-audit-2026-10-11/copied-alert-conflict-syntax-r44-inputs.json",
+    "docs/control-room-audit-2026-10-11/copied-alert-conflict-syntax-r44-result.json",
+    "docs/control-room-audit-2026-10-11/copied-alert-syntax-r41-inputs.json",
+    "docs/control-room-audit-2026-10-11/copied-alert-syntax-r41-result.json",
+    "docs/control-room-audit-2026-10-11/copied-alert-syntax-r42-inputs.json",
+    "docs/control-room-audit-2026-10-11/copied-alert-syntax-r42-result.json",
+    "docs/control-room-audit-2026-10-11/copied-alert-syntax-r43-inputs.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r10-delta.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r11-delta.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r12-delta-initial.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r12-delta.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r13-delta.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r14-delta.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r15-delta.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r16-delta.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r17-delta-initial.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r17-delta.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r18-preliminary.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r18.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r19.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r2.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r20.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r21.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r3-initial.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r3.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r4-delta.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r5-delta.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r6-delta.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r7-delta.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r7-initial.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r8-delta.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r8-initial.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks-r9-delta.json",
+    "docs/control-room-audit-2026-10-11/current-source-checks.json",
+    "docs/control-room-audit-2026-10-11/current-source-style-r18-format.json",
+    "docs/control-room-audit-2026-10-11/current-source-style-r18-initial.json",
+    "docs/control-room-audit-2026-10-11/current-source-style-r19-format.json",
+    "docs/control-room-audit-2026-10-11/current-source-style-r20-format.json",
+    "docs/control-room-audit-2026-10-11/current-source-style-r21-format.json",
+    "docs/control-room-audit-2026-10-11/delivery-status-at-r40-dispatch.txt",
+    "docs/control-room-audit-2026-10-11/delivery-status-before-r40.txt",
+    "docs/control-room-audit-2026-10-11/duty-header-before-r24/docs/control-room-audit-2026-10-11/DELIVERY-STATUS.txt",
+    "docs/control-room-audit-2026-10-11/duty-header-before-r24/resources/js/pages/control-room/shifts.tsx",
+    "docs/control-room-audit-2026-10-11/duty-header-before-r24/resources/js/pages/control-room/shifts/handover.test.tsx",
+    "docs/control-room-audit-2026-10-11/duty-header-before-r24/resources/js/pages/control-room/shifts/handover.tsx",
+    "docs/control-room-audit-2026-10-11/duty-header-source-increment-r25.json",
+    "docs/control-room-audit-2026-10-11/duty-note-before-r31.json",
+    "docs/control-room-audit-2026-10-11/duty-note-before-r31/app/Http/Controllers/ControlRoom/ControlRoomHandoverController.php",
+    "docs/control-room-audit-2026-10-11/duty-note-before-r31/app/Http/Controllers/ControlRoom/ControlRoomShiftController.php",
+    "docs/control-room-audit-2026-10-11/duty-note-before-r31/app/Services/ControlRoom/ControlRoomAcceptedHandoverNoteService.php",
+    "docs/control-room-audit-2026-10-11/duty-note-before-r31/app/Services/ControlRoom/ControlRoomShiftHandoverService.php",
+    "docs/control-room-audit-2026-10-11/duty-note-before-r31/docs/control-room-audit-2026-10-11/DELIVERY-STATUS.txt",
+    "docs/control-room-audit-2026-10-11/duty-note-before-r31/resources/js/pages/control-room/shifts.test.tsx",
+    "docs/control-room-audit-2026-10-11/duty-note-before-r31/resources/js/pages/control-room/shifts.tsx",
+    "docs/control-room-audit-2026-10-11/duty-note-before-r31/resources/js/pages/control-room/shifts/handover.test.tsx",
+    "docs/control-room-audit-2026-10-11/duty-note-before-r31/resources/js/pages/control-room/shifts/handover.tsx",
+    "docs/control-room-audit-2026-10-11/duty-note-before-r31/tests/Feature/ControlRoom/ControlRoomAcceptedHandoverHistoryTest.php",
+    "docs/control-room-audit-2026-10-11/duty-note-source-increment-r31.json",
+    "docs/control-room-audit-2026-10-11/duty-note-source-increment-r31b.json",
+    "docs/control-room-audit-2026-10-11/finalize-operator-final-tuple-source-r23.ps1",
+    "docs/control-room-audit-2026-10-11/frontend-readiness-r1.json",
+    "docs/control-room-audit-2026-10-11/frontend-readiness-r2.json",
+    "docs/control-room-audit-2026-10-11/frontend-readiness-r3.json",
+    "docs/control-room-audit-2026-10-11/frontend-readiness-r4.json",
+    "docs/control-room-audit-2026-10-11/frontend-readiness-r5.json",
+    "docs/control-room-audit-2026-10-11/frontend-readiness-r6.json",
+    "docs/control-room-audit-2026-10-11/frontend-readiness-r7-before-my-day.json",
+    "docs/control-room-audit-2026-10-11/frontend-readiness.json",
+    "docs/control-room-audit-2026-10-11/hs-foundation-incorporation.json",
+    "docs/control-room-audit-2026-10-11/hs-journey-presenter-read-hunk.json",
+    "docs/control-room-audit-2026-10-11/hs-journey-read-hunk.json",
+    "docs/control-room-audit-2026-10-11/hs-read-consumer-before.json",
+    "docs/control-room-audit-2026-10-11/hs-read-integration-source-candidate-r19.json",
+    "docs/control-room-audit-2026-10-11/hs-read-integration-source-candidate-r21.json",
+    "docs/control-room-audit-2026-10-11/hs-read-integration-source-candidate-r22.json",
+    "docs/control-room-audit-2026-10-11/hs-read-integration-source-candidate-r23.json",
+    "docs/control-room-audit-2026-10-11/hs-read-integration-source-candidate.json",
+    "docs/control-room-audit-2026-10-11/hs-read-owned-check-paths.json",
+    "docs/control-room-audit-2026-10-11/hs-read-transfer-before.json",
+    "docs/control-room-audit-2026-10-11/hs-read-transfer-dependencies.json",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Http/Controllers/ControlRoom/ControlRoomAlertController.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Http/Controllers/ControlRoom/ControlRoomEscalationController.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Http/Controllers/ControlRoom/ControlRoomHandoverController.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Http/Controllers/ControlRoom/ControlRoomIncidentController.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Http/Controllers/ControlRoom/ControlRoomMyTasksController.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Models/BehaviourSupportPlan.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Models/RestraintEvent.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Models/WorkplaceInjury.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/AlertReportingPolicy.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/AlertReportingService.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/AlertWorklistPresenter.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/AlertWorklistQuery.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/AlertWorkspaceService.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/ControlRoomDeskService.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/ControlRoomGovernanceReadService.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/ControlRoomHandoverScopeService.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/ControlRoomNotificationService.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/ControlRoomRecipientEligibilityService.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/ControlRoomShiftHandoverService.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/ControlRoomSourceContentService.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/HealthSafety/HealthSafetyReadContext.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/HealthSafety/HsEventAccessService.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/HealthSafety/HsVisibilityService.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/Incidents/IncidentJourneyPresenter.php",
+    "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/Incidents/IncidentJourneyService.php",
+    "docs/control-room-audit-2026-10-11/hs-visibility-read-transfer.json",
+    "docs/control-room-audit-2026-10-11/inbox-note-before-files/app/Console/Commands/EscalatePendingNotifications.php",
+    "docs/control-room-audit-2026-10-11/inbox-note-before-files/app/Http/Controllers/MyTasksController.php",
+    "docs/control-room-audit-2026-10-11/inbox-note-before-files/app/Http/Controllers/NotificationInboxController.php",
+    "docs/control-room-audit-2026-10-11/inbox-note-before-files/app/Http/Controllers/Portal/PortalNotificationController.php",
+    "docs/control-room-audit-2026-10-11/inbox-note-before-files/app/Http/Middleware/HandleInertiaRequests.php",
+    "docs/control-room-audit-2026-10-11/inbox-note-before-files/app/Services/ControlRoom/ControlRoomAlertLifecycleService.php",
+    "docs/control-room-audit-2026-10-11/inbox-note-before-files/app/Services/ControlRoom/ControlRoomGovernanceReadService.php",
+    "docs/control-room-audit-2026-10-11/inbox-note-before-files/app/Services/ControlRoom/ControlRoomSourceContentService.php",
+    "docs/control-room-audit-2026-10-11/inbox-note-before-files/routes/portal.php",
+    "docs/control-room-audit-2026-10-11/inbox-note-before.json",
+    "docs/control-room-audit-2026-10-11/inbox-note-main-integration.patch",
+    "docs/control-room-audit-2026-10-11/inbox-note-package-pin-check-r22.json",
+    "docs/control-room-audit-2026-10-11/inbox-note-source-checks-r22.json",
+    "docs/control-room-audit-2026-10-11/inbox-note-source-format-r22.json",
+    "docs/control-room-audit-2026-10-11/inbox-note-source-style-r22.json",
+    "docs/control-room-audit-2026-10-11/inbox-note-style-proposed-MyTasks.php",
+    "docs/control-room-audit-2026-10-11/launcher-source-cases-initial.json",
+    "docs/control-room-audit-2026-10-11/launcher-source-cases.json",
+    "docs/control-room-audit-2026-10-11/live-response-shell-proposal-r40/DO-NOT-APPLY.txt",
+    "docs/control-room-audit-2026-10-11/live-response-shell-proposal-r40/index-shell.patch",
+    "docs/control-room-audit-2026-10-11/live-response-shell-proposal-r40/index.after.tsx",
+    "docs/control-room-audit-2026-10-11/live-response-shell-proposal-r40/index.before.tsx",
+    "docs/control-room-audit-2026-10-11/map-layout-before-r40/map.tsx",
+    "docs/control-room-audit-2026-10-11/map-shell-source-r40.json",
+    "docs/control-room-audit-2026-10-11/my-day-link-source-before.json",
+    "docs/control-room-audit-2026-10-11/my-day-link-source-checks.json",
+    "docs/control-room-audit-2026-10-11/native-progress.php",
+    "docs/control-room-audit-2026-10-11/note-baseline-before-r34.json",
+    "docs/control-room-audit-2026-10-11/note-baseline-before-r34/app/Services/ControlRoom/ControlRoomShiftHandoverService.php",
+    "docs/control-room-audit-2026-10-11/note-baseline-before-r34/docs/control-room-audit-2026-10-11/DELIVERY-STATUS.txt",
+    "docs/control-room-audit-2026-10-11/note-baseline-before-r34/tests/Feature/ControlRoom/ControlRoomAcceptedHandoverHistoryTest.php",
+    "docs/control-room-audit-2026-10-11/note-baseline-source-increment-r34.json",
+    "docs/control-room-audit-2026-10-11/operator-final-tuple-before-files/app/Services/ControlRoom/ControlRoomAlertLifecycleService.php",
+    "docs/control-room-audit-2026-10-11/operator-final-tuple-before-files/tests/Feature/ControlRoom/ControlRoomOperatorRootNoteTest.php",
+    "docs/control-room-audit-2026-10-11/operator-final-tuple-before-r23.json",
+    "docs/control-room-audit-2026-10-11/operator-final-tuple-package-pin-check-r23.json",
+    "docs/control-room-audit-2026-10-11/operator-final-tuple-parent-source-review-r23.json",
+    "docs/control-room-audit-2026-10-11/operator-final-tuple-r23.patch",
+    "docs/control-room-audit-2026-10-11/operator-final-tuple-source-checks-r23.json",
+    "docs/control-room-audit-2026-10-11/operator-final-tuple-style-r23.json",
+    "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r24.json",
+    "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r25.json",
+    "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r27.json",
+    "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r28.json",
+    "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r30.json",
+    "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r31.json",
+    "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r32.json",
+    "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r35.json",
+    "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r36.json",
+    "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r37.json",
+    "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r38.json",
+    "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r39.json",
+    "docs/control-room-audit-2026-10-11/owned-frontend-r24.vitest.config.ts",
+    "docs/control-room-audit-2026-10-11/owned-frontend-r25.vitest.config.ts",
+    "docs/control-room-audit-2026-10-11/owned-frontend-r27.vitest.config.ts",
+    "docs/control-room-audit-2026-10-11/owned-frontend-r28.vitest.config.ts",
+    "docs/control-room-audit-2026-10-11/owned-frontend-r30.vitest.config.ts",
+    "docs/control-room-audit-2026-10-11/owned-frontend-r31.vitest.config.ts",
+    "docs/control-room-audit-2026-10-11/owned-frontend-r32.vitest.config.ts",
+    "docs/control-room-audit-2026-10-11/owned-frontend-r35.vitest.config.ts",
+    "docs/control-room-audit-2026-10-11/owned-frontend-r36.vitest.config.ts",
+    "docs/control-room-audit-2026-10-11/owned-frontend-r37.vitest.config.ts",
+    "docs/control-room-audit-2026-10-11/owned-frontend-r38.vitest.config.ts",
+    "docs/control-room-audit-2026-10-11/owned-frontend-r39.vitest.config.ts",
+    "docs/control-room-audit-2026-10-11/package-duty-note-r31.ps1",
+    "docs/control-room-audit-2026-10-11/package-duty-note-r31b.ps1",
+    "docs/control-room-audit-2026-10-11/package-note-baseline-r34.ps1",
+    "docs/control-room-audit-2026-10-11/package-note-source-r29.ps1",
+    "docs/control-room-audit-2026-10-11/prepare-inbox-note-source-r22.ps1",
+    "docs/control-room-audit-2026-10-11/prepare-operator-final-tuple-source-r23.ps1",
+    "docs/control-room-audit-2026-10-11/reporting-schema-compiled.sql",
+    "docs/control-room-audit-2026-10-11/reporting-schema-identifiers.json",
+    "docs/control-room-audit-2026-10-11/reports-before-r35.json",
+    "docs/control-room-audit-2026-10-11/reports-before-r35/app/Http/Controllers/ControlRoom/ControlRoomReportController.php",
+    "docs/control-room-audit-2026-10-11/reports-before-r35/app/Services/ControlRoom/ControlRoomReportService.php",
+    "docs/control-room-audit-2026-10-11/reports-before-r35/docs/control-room-audit-2026-10-11/DELIVERY-STATUS.txt",
+    "docs/control-room-audit-2026-10-11/reports-before-r35/resources/js/pages/control-room/reports.tsx",
+    "docs/control-room-audit-2026-10-11/reports-before-r35/tests/Feature/ControlRoom/ControlRoomReportControllerTest.php",
+    "docs/control-room-audit-2026-10-11/reports-layout-before-r37.json",
+    "docs/control-room-audit-2026-10-11/reports-layout-before-r37/docs/control-room-audit-2026-10-11/DELIVERY-STATUS.txt",
+    "docs/control-room-audit-2026-10-11/reports-layout-before-r37/resources/js/pages/control-room/reports.tsx",
+    "docs/control-room-audit-2026-10-11/reports-layout-source-r37.json",
+    "docs/control-room-audit-2026-10-11/reports-layout-source-r37b.json",
+    "docs/control-room-audit-2026-10-11/reports-source-increment-r35.json",
+    "docs/control-room-audit-2026-10-11/reports-source-increment-r35b.json",
+    "docs/control-room-audit-2026-10-11/run-copy-conflict-syntax-r44.ps1",
+    "docs/control-room-audit-2026-10-11/run-copy-syntax-r41.ps1",
+    "docs/control-room-audit-2026-10-11/run-copy-syntax-r42.ps1",
+    "docs/control-room-audit-2026-10-11/run-copy-syntax-r43.ps1",
+    "docs/control-room-audit-2026-10-11/run-front-end-checks-r7-before-my-day.ps1",
+    "docs/control-room-audit-2026-10-11/run-front-end-checks.ps1",
+    "docs/control-room-audit-2026-10-11/run-note-syntax-r29.ps1",
+    "docs/control-room-audit-2026-10-11/run-note-syntax-r31.ps1",
+    "docs/control-room-audit-2026-10-11/run-note-syntax-r32.ps1",
+    "docs/control-room-audit-2026-10-11/run-note-syntax-r33.ps1",
+    "docs/control-room-audit-2026-10-11/run-note-syntax-r34.ps1",
+    "docs/control-room-audit-2026-10-11/run-note-syntax-r35.ps1",
+    "docs/control-room-audit-2026-10-11/run-owned-frontend-r24.ps1",
+    "docs/control-room-audit-2026-10-11/run-owned-frontend-r25.ps1",
+    "docs/control-room-audit-2026-10-11/run-owned-frontend-r27.ps1",
+    "docs/control-room-audit-2026-10-11/run-owned-frontend-r28.ps1",
+    "docs/control-room-audit-2026-10-11/run-owned-frontend-r30.ps1",
+    "docs/control-room-audit-2026-10-11/run-owned-frontend-r31.ps1",
+    "docs/control-room-audit-2026-10-11/run-owned-frontend-r32.ps1",
+    "docs/control-room-audit-2026-10-11/run-owned-frontend-r35.ps1",
+    "docs/control-room-audit-2026-10-11/run-owned-frontend-r36.ps1",
+    "docs/control-room-audit-2026-10-11/run-owned-frontend-r37.ps1",
+    "docs/control-room-audit-2026-10-11/run-owned-report-style-r38.ps1",
+    "docs/control-room-audit-2026-10-11/run-owned-report-style-r39.ps1",
+    "docs/control-room-audit-2026-10-11/run-priority-native.ps1",
+    "docs/control-room-audit-2026-10-11/runner-source-checks-r2.json",
+    "docs/control-room-audit-2026-10-11/runner-source-checks-r3.json",
+    "docs/control-room-audit-2026-10-11/runner-source-checks.json",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/README.txt",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/delivery-status.before.txt",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Jobs/DispatchIncidentOwnerDelivery.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Models/HealthSafetySettingChange.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Models/IncidentIndependentHandlingDeclaration.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Models/IncidentIndependentHandlingExclusion.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Models/IncidentSavedCopy.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Services/Incidents/IncidentAccessService.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Services/Incidents/IncidentIndependenceBindingSql.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Services/Incidents/IncidentIndependenceCaptureAccess.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Services/Incidents/IncidentIndependenceIntakeService.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Services/Incidents/IncidentIndependencePolicySettings.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Services/Incidents/IncidentIndependenceValues.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Services/Incidents/IncidentOwnerEligibility.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Services/Incidents/IncidentRoutingService.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Services/Incidents/IncidentRoutingSettings.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Services/Incidents/IncidentRoutingValues.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Services/Incidents/IncidentSavedCopyService.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/database/migrations/2026_10_07_190000_add_accountable_incident_ownership.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/database/migrations/2026_10_08_180500_create_health_safety_approval_policy_settings.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/database/migrations/2026_10_12_200700_create_incident_owner_routing.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/database/migrations/2026_10_12_200800_add_incident_independent_handling.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/database/migrations/2026_10_12_200900_create_incident_saved_copies.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/tests/Feature/Incidents/IncidentIndependenceTestCase.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/tests/Feature/Incidents/IncidentRoutingTestCase.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/tests/Feature/Incidents/IncidentSavedCopyTest.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependency-map.json",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/empty-before.txt",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/manifest.json",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/owned-consumer-writer.patch",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/report-controller.before.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/source/app/Http/Controllers/ControlRoom/ControlRoomReportController.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/source/app/Services/ControlRoom/ControlRoomCopiedAlertNoteService.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/source/app/Services/ControlRoom/ControlRoomIncidentNoteCopyWriter.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/source/app/Services/ControlRoom/ControlRoomNoteReadEvidence.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/source/tests/Feature/ControlRoom/ControlRoomCopiedAlertExportTest.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r44/README.txt",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r44/delivery-status-at-dispatch.txt",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r44/delivery-status.before.txt",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r44/manifest.json",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r44/origin-conflict-r44.patch",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r44/source/app/Http/Controllers/ControlRoom/ControlRoomReportController.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r44/source/app/Services/ControlRoom/ControlRoomCopiedAlertNoteService.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r44/source/app/Services/ControlRoom/ControlRoomIncidentNoteCopyWriter.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r44/source/app/Services/ControlRoom/ControlRoomNoteReadEvidence.php",
+    "docs/control-room-audit-2026-10-11/saved-copy-consumer-r44/source/tests/Feature/ControlRoom/ControlRoomCopiedAlertExportTest.php",
+    "docs/control-room-audit-2026-10-11/settings-schema-compiled.sql",
+    "docs/control-room-audit-2026-10-11/settings-schema-identifiers.json",
+    "docs/control-room-audit-2026-10-11/source-checks-r10-delta.log",
+    "docs/control-room-audit-2026-10-11/source-checks-r11-delta.log",
+    "docs/control-room-audit-2026-10-11/source-checks-r12-delta-format.log",
+    "docs/control-room-audit-2026-10-11/source-checks-r12-delta-initial.log",
+    "docs/control-room-audit-2026-10-11/source-checks-r12-delta.log",
+    "docs/control-room-audit-2026-10-11/source-checks-r13-delta.log",
+    "docs/control-room-audit-2026-10-11/source-checks-r14-delta.log",
+    "docs/control-room-audit-2026-10-11/source-checks-r15-delta.log",
+    "docs/control-room-audit-2026-10-11/source-checks-r16-delta.log",
+    "docs/control-room-audit-2026-10-11/source-checks-r2-initial.log",
+    "docs/control-room-audit-2026-10-11/source-checks-r3-initial.log",
+    "docs/control-room-audit-2026-10-11/source-checks-r3.log",
+    "docs/control-room-audit-2026-10-11/source-checks-r4-delta.log",
+    "docs/control-room-audit-2026-10-11/source-checks-r5-format.log",
+    "docs/control-room-audit-2026-10-11/source-checks-r5.log",
+    "docs/control-room-audit-2026-10-11/source-checks-r6.log",
+    "docs/control-room-audit-2026-10-11/source-checks-r7-initial.log",
+    "docs/control-room-audit-2026-10-11/source-checks-r7.log",
+    "docs/control-room-audit-2026-10-11/source-checks-r8-format.log",
+    "docs/control-room-audit-2026-10-11/source-checks-r8-initial.log",
+    "docs/control-room-audit-2026-10-11/source-checks-r8.log",
+    "docs/control-room-audit-2026-10-11/source-checks-r9-delta.log",
+    "docs/control-room-audit-2026-10-11/stats-diagnosis-read-evidence-r39.json",
+    "docs/control-room-audit-2026-10-11/verify-native-cleanup.php",
+    "resources/js/lib/control-room-navigation.test.ts",
+    "resources/js/lib/control-room-navigation.ts",
+    "resources/js/pages/control-room/_settings-dialogs.test.tsx",
+    "resources/js/pages/control-room/_settings-dialogs.tsx",
+    "resources/js/pages/control-room/_settings-time.test.ts",
+    "resources/js/pages/control-room/_settings-time.ts",
+    "resources/js/pages/control-room/_settings-types.ts",
+    "resources/js/pages/control-room/_settings-wizard.tsx",
+    "resources/js/pages/control-room/reports.test.tsx",
+    "resources/js/pages/control-room/shifts.test.tsx",
+    "resources/js/pages/control-room/shifts/accepted-handover-history.tsx",
+    "tests/Feature/ControlRoom/AlertReportingServiceTest.php",
+    "tests/Feature/ControlRoom/ControlRoomAcceptedHandoverHistoryTest.php",
+    "tests/Feature/ControlRoom/ControlRoomCurrentSourceReadTest.php",
+    "tests/Feature/ControlRoom/ControlRoomDatabaseNotificationReadTest.php",
+    "tests/Feature/ControlRoom/ControlRoomOperatorRootNoteTest.php",
+    "tests/Feature/ControlRoom/ControlRoomRecipientEligibilityTest.php"
+  ],
+  "extra_evidence_paths": [],
+  "files": [
+    {
+      "path": "app/Console/Commands/EscalatePendingNotifications.php",
+      "bytes": 7665,
+      "sha256": "e1a9fc8f42534c09ee6b66c52f2c05bdf9b64837b510232c87b72e87c616061c"
+    },
+    {
+      "path": "app/Http/Controllers/ControlRoom/ControlRoomAlertController.php",
+      "bytes": 49839,
+      "sha256": "23f6e7b07d9ad8c7de14a4e7899c2a2b23ac717daeaf6342123a5dc50823108c"
+    },
+    {
+      "path": "app/Http/Controllers/ControlRoom/ControlRoomEscalationController.php",
+      "bytes": 18975,
+      "sha256": "e540f845c2de644c1fe8d751c3b61a4fa88fc2f48f5fac3ef6ef4ea4b3d8249b"
+    },
+    {
+      "path": "app/Http/Controllers/ControlRoom/ControlRoomHandoverController.php",
+      "bytes": 15488,
+      "sha256": "b2a9ba104c7b57c8e5f03cd7a35fb365a0c444ca700b81327e183bd01ef61016"
+    },
+    {
+      "path": "app/Http/Controllers/ControlRoom/ControlRoomIncidentController.php",
+      "bytes": 31299,
+      "sha256": "bac20b206a903df74ac36f3550d0980fff9f0e41221d3c52be7184c0d5e8a9bf"
+    },
+    {
+      "path": "app/Http/Controllers/ControlRoom/ControlRoomMyTasksController.php",
+      "bytes": 7233,
+      "sha256": "d195337c0477c8c7c4af0d50923fbf33c57abb6e550c5b969dfe2b1b72353068"
+    },
+    {
+      "path": "app/Http/Controllers/ControlRoom/ControlRoomReportController.php",
+      "bytes": 11356,
+      "sha256": "2560dc53883e644a0c0334c236666fa7444c284c7e7d8d02e4a77cf9fd5767ed"
+    },
+    {
+      "path": "app/Http/Controllers/ControlRoom/ControlRoomReportingDecisionController.php",
+      "bytes": 1238,
+      "sha256": "423dd992cb1bf7b592d989a63d6345080cedec445a38c1b7afb2e414d66d5c77"
+    },
+    {
+      "path": "app/Http/Controllers/ControlRoom/ControlRoomSettingsController.php",
+      "bytes": 25493,
+      "sha256": "7258a9b63c6e1058faab14e5a37ae563cf5c7d54f5d85d296922d0bffda5c221"
+    },
+    {
+      "path": "app/Http/Controllers/ControlRoom/ControlRoomShiftController.php",
+      "bytes": 19600,
+      "sha256": "0d064e19ef2c44eea3bf92b923d05c8226f39bb8608e31b6288a4f8ce187dda9"
+    },
+    {
+      "path": "app/Http/Controllers/ControlRoom/ControlRoomStatsController.php",
+      "bytes": 11770,
+      "sha256": "0e3d06c42a22d0f92464aa5451c953c76e8ecb4294e57913ac1bbed5bde18577"
+    },
+    {
+      "path": "app/Http/Controllers/MyTasksController.php",
+      "bytes": 83380,
+      "sha256": "683aeb9ea3cd6360ec160f07811d349b26bcbea7442e79df1400270d67328431"
+    },
+    {
+      "path": "app/Http/Controllers/NotificationInboxController.php",
+      "bytes": 2224,
+      "sha256": "71fd31623e65ac3a22f36dfdaf0c07137add9cbfc560e4658941a6058c595be8"
+    },
+    {
+      "path": "app/Http/Controllers/Portal/PortalNotificationController.php",
+      "bytes": 2118,
+      "sha256": "4f665e878b8d4894a3cd3149c551bbd43d1fdf9a372b7d9a39347f7d12a4f77d"
+    },
+    {
+      "path": "app/Http/Middleware/HandleInertiaRequests.php",
+      "bytes": 72016,
+      "sha256": "340932f9d52968451c604b00c77296408e5577c4ade6153e2f4c759eac110395"
+    },
+    {
+      "path": "app/Jobs/Notifications/DeliverControlRoomAlertNotificationJob.php",
+      "bytes": 4101,
+      "sha256": "e0754827f3084cc9c15ae538d9b16f17cca677246c36930d5fdb09d040888af6"
+    },
+    {
+      "path": "app/Models/BehaviourSupportPlan.php",
+      "bytes": 2596,
+      "sha256": "4c3a37a0ebe72c09d6c80f43b3f2480e6a21e9ef6fb924a424999a0cf78c1d4d"
+    },
+    {
+      "path": "app/Models/BehaviourSupportPlanVersion.php",
+      "bytes": 1431,
+      "sha256": "73639b22b75e30c074eaa8e010f1355f5c86a7240624c89a2cb1c303f663503b"
+    },
+    {
+      "path": "app/Models/ControlRoom/AlertReportingDecision.php",
+      "bytes": 713,
+      "sha256": "726f4a65bb637dc474a3ac782ad4aa0550f1d656fde3e35b204c52d36bfe2d58"
+    },
+    {
+      "path": "app/Models/ControlRoom/OperatorNote.php",
+      "bytes": 1795,
+      "sha256": "2c70b167dae9454a0a5b43c5bcd79d83521715777e65fbce94a6b5fcbe7adfda"
+    },
+    {
+      "path": "app/Models/ControlRoom/Signal.php",
+      "bytes": 6069,
+      "sha256": "5ac190f5557a74264f367a60ff3d90a849abb5a5f1d5a78d0cfba91f61f9bb9a"
+    },
+    {
+      "path": "app/Models/RestraintEvent.php",
+      "bytes": 3610,
+      "sha256": "eb4ee069e9fe6a715fadd16d4fdda592c3bdbe936a885b9b084d68d2ac3908e0"
+    },
+    {
+      "path": "app/Models/WorkplaceInjury.php",
+      "bytes": 3704,
+      "sha256": "0d000655ef25e6f05c82eb75f0333947d5200c6f1d2257d0fc83856bb6c61cb7"
+    },
+    {
+      "path": "app/Models/WorkplaceInjurySourceVersion.php",
+      "bytes": 1093,
+      "sha256": "7acb6a911e9f61d88a6a8934643efb182a212e01bbfd0155df2d91daf8477593"
+    },
+    {
+      "path": "app/Notifications/ControlRoomAlertNotification.php",
+      "bytes": 2055,
+      "sha256": "8fcf2f7277864aa96906929c54b4f84f000747bc0f2b4e9ede7fe6d6800e737d"
+    },
+    {
+      "path": "app/Services/AuditLogger.php",
+      "bytes": 3118,
+      "sha256": "79bb0f1dd4e97a9caddce4e427427a0ac44cbe4f007966b1e314210b63a3241f"
+    },
+    {
+      "path": "app/Services/ControlRoom/AlertAutomationService.php",
+      "bytes": 10084,
+      "sha256": "5a4fa827496d97be553c19e2f3ce2175d7a4d87c5f9409d307493915fe4c5069"
+    },
+    {
+      "path": "app/Services/ControlRoom/AlertPriorityService.php",
+      "bytes": 6778,
+      "sha256": "4881bcdfa658e6d408f5d9044a6014d305ed4fc3b68c09dc56577a9a055c35d6"
+    },
+    {
+      "path": "app/Services/ControlRoom/AlertReportingPolicy.php",
+      "bytes": 12595,
+      "sha256": "bacf928de3782ac41a009a1d60fa6e33f158253d8b61a1dbc6421a9c887a30e4"
+    },
+    {
+      "path": "app/Services/ControlRoom/AlertReportingService.php",
+      "bytes": 19723,
+      "sha256": "15ae44885746608c4c81b9d94d029912d27ed4fa10c843582191eef72777a656"
+    },
+    {
+      "path": "app/Services/ControlRoom/AlertWorklistPresenter.php",
+      "bytes": 9265,
+      "sha256": "c79bc0796959f1d1224d483d4570850034d341b6395dea21a7b150b4ae4358ca"
+    },
+    {
+      "path": "app/Services/ControlRoom/AlertWorklistQuery.php",
+      "bytes": 19462,
+      "sha256": "f3ec8a497c1e713d75638e4d12b7dd8c485e2e97cb15a7a304d35087ab9c9009"
+    },
+    {
+      "path": "app/Services/ControlRoom/AlertWorkspaceService.php",
+      "bytes": 25507,
+      "sha256": "d1ad2de385c6f0369ec95e235a96d5e80e28a30e344f2e586bd9fcca11394326"
+    },
+    {
+      "path": "app/Services/ControlRoom/ControlRoomAcceptedHandoverHistoryService.php",
+      "bytes": 5321,
+      "sha256": "505c5b16a565b6a5048f43cffcc10380b3b9537217d65590f19ce7aa97da9280"
+    },
+    {
+      "path": "app/Services/ControlRoom/ControlRoomAcceptedHandoverNoteService.php",
+      "bytes": 532,
+      "sha256": "86f83e79182011423f6e9a03f95f504bd039111cd5404ffb68398ab0089d2d3f"
+    },
+    {
+      "path": "app/Services/ControlRoom/ControlRoomAlertLifecycleService.php",
+      "bytes": 65943,
+      "sha256": "7fd655942b7668576e7d472715e16714a107e80274ebe48098c476bdfb188507"
+    },
+    {
+      "path": "app/Services/ControlRoom/ControlRoomDatabaseNotificationAccessService.php",
+      "bytes": 9710,
+      "sha256": "65c0c661b58c1cbb5a225499e77580895e052347f8b20c4e0ae4bfa8c4f94af1"
+    },
+    {
+      "path": "app/Services/ControlRoom/ControlRoomDeskService.php",
+      "bytes": 26148,
+      "sha256": "a1c0d954d172309d30a66dfb341f8c3a6ab312e880be8fb5a539a72728e52299"
+    },
+    {
+      "path": "app/Services/ControlRoom/ControlRoomFleetOutboxService.php",
+      "bytes": 10991,
+      "sha256": "af842786cf9f2333212a5fed6b0d235e7f63ffb88f23fcbf105eee1c43d6d6ff"
+    },
+    {
+      "path": "app/Services/ControlRoom/ControlRoomGovernanceReadService.php",
+      "bytes": 14583,
+      "sha256": "6b5c1aa1a40721421e94845d7595d3fe03cad91e7053ea3309321dac80209c4e"
+    },
+    {
+      "path": "app/Services/ControlRoom/ControlRoomHandoverReadAccessService.php",
+      "bytes": 2018,
+      "sha256": "7228e864a2ffaae53ab16f10ef402510a3e60273102254b56a0448128da41be7"
+    },
+    {
+      "path": "app/Services/ControlRoom/ControlRoomHandoverScopeService.php",
+      "bytes": 19985,
+      "sha256": "343f35132af1935e1a97ec859c5328102632c6261b1dd1800a97ae2e660f1617"
+    },
+    {
+      "path": "app/Services/ControlRoom/ControlRoomNotificationService.php",
+      "bytes": 30364,
+      "sha256": "77d74887e92a672b6b809863386754f15ce9d06f701f57048b8f6401b1e6eccf"
+    },
+    {
+      "path": "app/Services/ControlRoom/ControlRoomOperatorNoteOriginService.php",
+      "bytes": 2673,
+      "sha256": "00981713ddbd529e3f26c523505c8e464a4c038c5362ed646f4ebd801ef4fea1"
+    },
+    {
+      "path": "app/Services/ControlRoom/ControlRoomOperatorNoteReadService.php",
+      "bytes": 9357,
+      "sha256": "f91d0f9d3ec3f8409a9f19de2e4d1da44ea717ac2b84657d54b1bce334ad8bc9"
+    },
+    {
+      "path": "app/Services/ControlRoom/ControlRoomOperatorRootNoteService.php",
+      "bytes": 3030,
+      "sha256": "bd42a0a13473f89c45cc1e6732712da461933ea63cdbc696ebc6dd67dc699d53"
+    },
+    {
+      "path": "app/Services/ControlRoom/ControlRoomPreparedHandoverSnapshotService.php",
+      "bytes": 20969,
+      "sha256": "a3ff5fb2315e6999af0004136348fa7ed4e8357871f9ba805dfd411d8a8b8846"
+    },
+    {
+      "path": "app/Services/ControlRoom/ControlRoomRecipientEligibilityService.php",
+      "bytes": 7726,
+      "sha256": "8989e23401643b22c08c140981d485390b3f1b6929dcf6b7461a39e38df049e7"
+    },
+    {
+      "path": "app/Services/ControlRoom/ControlRoomReportService.php",
+      "bytes": 28289,
+      "sha256": "aa1fb74ad733e5ca2a9ff644e19773d814fef87775dab87b0b9a437940880379"
+    },
+    {
+      "path": "app/Services/ControlRoom/ControlRoomSettingsRevisionService.php",
+      "bytes": 5236,
+      "sha256": "a3412e0022956bc083f405b891c91ec2d24a9153e7084b90daa9d21830ad5998"
+    },
+    {
+      "path": "app/Services/ControlRoom/ControlRoomShiftHandoverService.php",
+      "bytes": 23425,
+      "sha256": "862fd98d0b3ccd4f192b841e6dffcf7bc95eae9b9a164e8b1bcb691682c4c4f5"
+    },
+    {
+      "path": "app/Services/ControlRoom/ControlRoomSourceContentService.php",
+      "bytes": 33391,
+      "sha256": "562d2f26e088c577dea6afe94dda98c0226d49706bb1acfd8d2a9f283b4ae6a3"
+    },
+    {
+      "path": "app/Services/ControlRoom/SignalProcessingService.php",
+      "bytes": 96237,
+      "sha256": "b98b610a8b26b951176b41ed926adc56e0ca4eba1efe7da819c0a46fa9a6c363"
+    },
+    {
+      "path": "app/Services/HealthSafety/FirstAidAccessService.php",
+      "bytes": 18875,
+      "sha256": "c8e60c20e1831d55db2aee0c49ad3b4d4c09e01fe9d4b697473d41d4d3d79d89"
+    },
+    {
+      "path": "app/Services/HealthSafety/HealthSafetyReadContext.php",
+      "bytes": 11146,
+      "sha256": "8cc4d41263f7b22042fa17394dde2bb3197a90877b6da463277e01025282f0b6"
+    },
+    {
+      "path": "app/Services/HealthSafety/HsEventAccessService.php",
+      "bytes": 16785,
+      "sha256": "8da9911b9dfdcf780241d71e18e40640d587afdc1e4ee9a70006bb9e0f28fc83"
+    },
+    {
+      "path": "app/Services/HealthSafety/HsVisibilityService.php",
+      "bytes": 9810,
+      "sha256": "19566d8bba2c153cc06108874d09579ed5d3e4e62a9e1d99af4bfefd19734a87"
+    },
+    {
+      "path": "app/Services/HealthSafety/InjuryAccessService.php",
+      "bytes": 30250,
+      "sha256": "20e89f4ca51d8252581054d9b3c5033665740f17ac05fd7eb2e7c6139c92dc1b"
+    },
+    {
+      "path": "app/Services/HealthSafety/InjurySourceProjectionService.php",
+      "bytes": 13048,
+      "sha256": "6ccbccd7bf45ef5b272832f6fc2bc4f48fac2b3caf79455360f6587b751fbdb7"
+    },
+    {
+      "path": "app/Services/HealthSafety/RestraintAccessService.php",
+      "bytes": 14498,
+      "sha256": "40b6f5382780f0b90be2d5be75cef09ced9154f69567f6ed4b2b00525827216e"
+    },
+    {
+      "path": "app/Services/HealthSafety/RestraintCommandValues.php",
+      "bytes": 4138,
+      "sha256": "d47dfb84983534a522af7e22c45af6bed498dfc7aa4ffac54982d48b3812f7d8"
+    },
+    {
+      "path": "app/Services/Incidents/IncidentAccessService.php",
+      "bytes": 5460,
+      "sha256": "ad55da9833387ec490f4bc8b37d9b49ee0cf4d3870813869a02c075e0de6fbb9"
+    },
+    {
+      "path": "app/Services/Incidents/IncidentJourneyPresenter.php",
+      "bytes": 17225,
+      "sha256": "e260ee7d430254c7da97e51120f443c0a84a984f30a307a16c242ae0a5d326d2"
+    },
+    {
+      "path": "app/Services/Incidents/IncidentJourneyService.php",
+      "bytes": 68359,
+      "sha256": "1fa8b7eb3d977b794b76ca834e92a06dffae769746053b7b10c5c186e84565e3"
+    },
+    {
+      "path": "database/migrations/2026_10_08_180500_create_health_safety_approval_policy_settings.php",
+      "bytes": 2577,
+      "sha256": "b5c0b0f7effd0019f9ba686ca30d9b3e9a576cc5bd4346935330d7a7c99351d5"
+    },
+    {
+      "path": "database/migrations/2026_10_08_180600_version_behaviour_support_plans.php",
+      "bytes": 9445,
+      "sha256": "279c4133c23e0d334b9251a8a0f6df32b5aa170fa028f678ddd9a3c153e17d09"
+    },
+    {
+      "path": "database/migrations/2026_10_08_180700_add_restraint_event_source_commands.php",
+      "bytes": 9148,
+      "sha256": "05f9bad2ce713e30ef6f80c8f2df0d34dee004482230c3db43d4c6ea22f0b619"
+    },
+    {
+      "path": "database/migrations/2026_10_11_150000_create_control_room_alert_reporting_decisions.php",
+      "bytes": 1210,
+      "sha256": "37da0e6b81c855e0b8089873743632b7c0752bbd1f101657c420aa611cefce6e"
+    },
+    {
+      "path": "database/migrations/2026_10_11_160000_add_control_room_settings_revisions.php",
+      "bytes": 774,
+      "sha256": "0ff97aaa28a4acc3908276662bd82c90e1c1e9c954f14885b9e0ec86610a27e2"
+    },
+    {
+      "path": "database/migrations/2026_10_12_190000_create_workplace_injury_source_history.php",
+      "bytes": 7571,
+      "sha256": "4dba76553e0130e3ae0aaed6bad29bca0907c0f94eb90d6fc4576da0a100bf28"
+    },
+    {
+      "path": "database/migrations/2026_10_12_230000_add_control_room_operator_note_origin.php",
+      "bytes": 656,
+      "sha256": "d61fb5dbd6ccabe3c83ae1c98ebd794eb4ae63f5fcc117a803c75b8fae20e1fb"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/DATABASE-NOTIFICATION-CONSUMER-INVENTORY.txt",
+      "bytes": 3932,
+      "sha256": "959e3b3031e30170c3e5ae0a1815660e349d8d8fa5f157616f392de960cb9171"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/DELIVERY-STATUS-r18-integration-history.txt",
+      "bytes": 41184,
+      "sha256": "6ad479f03447c6f28e84d1691375c9f518a148c7fb709a22e7f049d7acaff5db"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/DELIVERY-STATUS-r19-before-remaining-consumers.txt",
+      "bytes": 8314,
+      "sha256": "8ab5f8acb01fa8fa099b8a60506602a0432bb617afaf23f2f32e893040d7830f"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/DELIVERY-STATUS-r21-before-inbox-notes.txt",
+      "bytes": 8789,
+      "sha256": "3e0c81354f4fac0e15968b033951acdf55effbd715a004593f46a1c2d9fde79a"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/DELIVERY-STATUS-r22.txt",
+      "bytes": 5907,
+      "sha256": "dce58780249fb1f21706b759a45155381c525b8c30d67a21a33a88beee32c937"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/DELIVERY-STATUS-r23.txt",
+      "bytes": 7086,
+      "sha256": "d34be3ffaaea6a1ac5252039c03ef87d03b7a0286592d8294a40f18e63239c0d"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/DELIVERY-STATUS-r25.txt",
+      "bytes": 5307,
+      "sha256": "9bbda70c74bd05c41f670d19be7a3439ec672c9933ecc776855e0289418ae467"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/DELIVERY-STATUS-r26-before-config.txt",
+      "bytes": 6080,
+      "sha256": "0e8f0119316e3b5cb5e945eee904292c8dd43d2eca0d8539be9bc1c5a6eaddca"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/DELIVERY-STATUS.txt",
+      "bytes": 17714,
+      "sha256": "a3468e459a3ed0948ece056cc43176a501efb839c942d810c7a32bb92bc73d54"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/HS-READ-INTEGRATION-SEAMS-r21.txt",
+      "bytes": 10386,
+      "sha256": "d29b7e061ad2a2b04fd4032f5e973bc2cd4c8515959809f5dba4e618a678a1b2"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/HS-READ-INTEGRATION-SEAMS-r22.txt",
+      "bytes": 5913,
+      "sha256": "164354e6ba55846acbd7578979c858cfe0c1b910df0d570ecb4e4451b99c02ed"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/HS-READ-INTEGRATION-SEAMS.txt",
+      "bytes": 7754,
+      "sha256": "7641037b97a63d9d5c9562f3b2d6f0ea0d28166cc577dca06fa8304174e120f9"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/INJURY-CONSUMER-HANDOFF.txt",
+      "bytes": 12485,
+      "sha256": "40006b480323b245b91955ab66d340acd0e00ddd56c4adfc8c56ad10e5e05fa3"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/NOTIFICATION-PERSISTENCE-REPAIR.txt",
+      "bytes": 5549,
+      "sha256": "acb8181df1b2be4e55a76b4fa05c69600118b2de9fa21e846857e6a631a83f25"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/OPERATOR-ROOT-NOTE-CONTRACT.txt",
+      "bytes": 2515,
+      "sha256": "a5547f6e1fad2f69323b36c7f71b07d5353b8db110f16a87a10e48da35114ce2"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/OUTBOX-ACCESS-SEAM.txt",
+      "bytes": 5915,
+      "sha256": "7a5fedf5fc231384603c478a142c80d45cdedb9a50e9286161e1e8b6173f4467"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/REPORTING-DTO-PROPOSAL.txt",
+      "bytes": 6326,
+      "sha256": "50ea84b16427d7d9556b0318591544063809433aff3e9f24911c2c1000578e3e"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/SIDEBAR-INTEGRATION.txt",
+      "bytes": 1211,
+      "sha256": "4abeccdc979272a557f105c7ce40409d3935ac5d4a1b78d5e139018282ce39fe"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-history-before-r26.json",
+      "bytes": 1154,
+      "sha256": "aaa40823127e76c2a34983b10bf5f4c8ecd172cdbdd4dbe825a4d44a9118e8ae"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-history-before-r26/app/Http/Controllers/ControlRoom/ControlRoomHandoverController.php",
+      "bytes": 12033,
+      "sha256": "81a8a37aa5056db69b84b32a1e937e5404f40c9f083ac95227e4b7abacc9a797"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-history-before-r26/app/Http/Controllers/ControlRoom/ControlRoomShiftController.php",
+      "bytes": 18276,
+      "sha256": "41edb2bd9d7a1bcc3a0919a3851f904358e8f2b2eabd5ce2b8fdc52ebdfd7012"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-history-before-r26/docs/control-room-audit-2026-10-11/DELIVERY-STATUS.txt",
+      "bytes": 5307,
+      "sha256": "9bbda70c74bd05c41f670d19be7a3439ec672c9933ecc776855e0289418ae467"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-history-before-r26/resources/js/pages/control-room/shifts.test.tsx",
+      "bytes": 4218,
+      "sha256": "86f27519b2f8dd8815f3b02a84455327dfb23d81f9072bc0e49abb7d39d55f52"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-history-before-r26/resources/js/pages/control-room/shifts.tsx",
+      "bytes": 69764,
+      "sha256": "ed6cd4eed1b4a960401db8d6c01b03710317e86be03bc5e7fea1ee6ebeaf817b"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-history-before-r26/resources/js/pages/control-room/shifts/handover.test.tsx",
+      "bytes": 8239,
+      "sha256": "b4daa735c9268ca54aa7c1094b93056dec8bf92b5f8941a50d631197ff150d5b"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-history-before-r26/resources/js/pages/control-room/shifts/handover.tsx",
+      "bytes": 68541,
+      "sha256": "cb8f11964c8978ebb871c135f923f35a8a0c9188db0c3c611a00baf72dc419c5"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-history-config-supplement-r28.json",
+      "bytes": 18939,
+      "sha256": "7146f25325aef809bd2a33abc3deaa3eab963def8daec9312a3f55819ed5a419"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-history-source-increment-r26.json",
+      "bytes": 23600,
+      "sha256": "98f3496fbab33eb648f37ba179707163d481b1003cad7a1eddc935f605ab587d"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-history-syntax-attempt-r26.json",
+      "bytes": 674,
+      "sha256": "dcec2fcf4fcd1c8e0972a7d92549c3a14bbc972e756d89ecc465d825da00221d"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-before-r29.json",
+      "bytes": 1691,
+      "sha256": "e2c485d105ac1f8f8f1ad727df76f3e0116ec5d00ad8d0161f4519b9a33091bb"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-before-r29/app/Http/Controllers/ControlRoom/ControlRoomHandoverController.php",
+      "bytes": 14946,
+      "sha256": "3d91a2f27e092d2e9cd511b1c5185eab6f3b74d5657e9a010532f8da7ec7ac89"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-before-r29/app/Http/Controllers/ControlRoom/ControlRoomShiftController.php",
+      "bytes": 18602,
+      "sha256": "3b9f11f08a4c355f265fb7785b6b3328d96b1aa9cbf49f15172424a67f70d3d9"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-before-r29/app/Models/ControlRoom/OperatorNote.php",
+      "bytes": 1730,
+      "sha256": "799280f7778ff5fc561b446da9dfcfdb242c65a8579b566b0efff50525bfbe1e"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-before-r29/app/Services/ControlRoom/ControlRoomAlertLifecycleService.php",
+      "bytes": 65626,
+      "sha256": "3718298bad3f1fa2e036c5de1b8ed4e087e583ee32f4576455a60af52ef1f0ef"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-before-r29/app/Services/ControlRoom/ControlRoomPreparedHandoverSnapshotService.php",
+      "bytes": 20334,
+      "sha256": "09bdb8c72a94cd389c10e85eafa67a920fb199e8693ba36bac6ad609a731e149"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-before-r29/app/Services/ControlRoom/ControlRoomShiftHandoverService.php",
+      "bytes": 20311,
+      "sha256": "23a0654201e85a4f6dc2b4298d4953ac3683f163141ddeaa6fc2203082a61e74"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-before-r29/docs/control-room-audit-2026-10-11/DELIVERY-STATUS.txt",
+      "bytes": 6934,
+      "sha256": "4859fe86ea45697e440acf97e3451077252536130e5d60c46a11311ff9099026"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-before-r29/resources/js/pages/control-room/shifts/accepted-handover-history.tsx",
+      "bytes": 7200,
+      "sha256": "b13fc06c29e26945e9e686ba9291d5c11155551dddf5362044c015955af0e7e7"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-before-r29/resources/js/pages/control-room/shifts/handover.test.tsx",
+      "bytes": 11514,
+      "sha256": "ce2a05eaa8d4ff4b1dec0ba311b678f2d5546099185482ed62ff2a680f24512f"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-before-r29/resources/js/pages/control-room/shifts/handover.tsx",
+      "bytes": 69091,
+      "sha256": "e043532430a4bc4c62140bd6c3bbf93711d93181a0ebdf9f85cf17dae515c4c1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-before-r29/tests/Feature/ControlRoom/ControlRoomAcceptedHandoverHistoryTest.php",
+      "bytes": 17987,
+      "sha256": "5e6a31f3d949302136f04eac9accbf27f4fc48cfbb68f90650577b82c31da30a"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-before-r29/tests/Feature/ControlRoom/ControlRoomOperatorRootNoteTest.php",
+      "bytes": 24367,
+      "sha256": "83c4486affd1d967ef093d3bf85b2af5b362c0b1ca2a9a4d11d5923a4b005207"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-source-increment-r29.json",
+      "bytes": 10102,
+      "sha256": "b00c2ee2a2e2c73998b6d9b346d9d95fe4b36488889264d5cb7d6532dfd59b6e"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-syntax-r29-inputs.json",
+      "bytes": 4549,
+      "sha256": "ba40c8563ce550044250640c60360a29bd3e065e0d74b57fd603ee5fe1de8960"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-syntax-r29-result.json",
+      "bytes": 1863,
+      "sha256": "90328d4c9b3b82c85de40a32c50b349075e16603861400f38d0c636f849a9856"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-syntax-r31-inputs.json",
+      "bytes": 4883,
+      "sha256": "a855c16a7e10f53472f2cc813c297d51559e1e627abdd8fc520e67a0a5b566f2"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-syntax-r31-result.json",
+      "bytes": 1915,
+      "sha256": "2fd6c3c7fc648ffa70571808592199f3714dd9d3429bc30304a6b85da91b2a22"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-syntax-r32-inputs.json",
+      "bytes": 4883,
+      "sha256": "eed1a261791584d624a9c0eabe245856186b93fb57a805e4acf63ab209b4d4ef"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-syntax-r32-result.json",
+      "bytes": 1881,
+      "sha256": "c8ca30b58e02b3b6568fb69dc3bc9c0916e8e289edb9875d267ebea5b58cc75b"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-syntax-r33-inputs.json",
+      "bytes": 4883,
+      "sha256": "1abc213f5fd9cbe13a1887cd5bf1a94419636f3673f9ff61e0cefe9806e69689"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-syntax-r33-result.json",
+      "bytes": 1864,
+      "sha256": "10e0a862121eed0cb7e0149358a23671dcb796f108e83c0f18d0db24a99fee3b"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-syntax-r34-inputs.json",
+      "bytes": 4883,
+      "sha256": "b2b42321623df98de8fd7cc92ba67a226b60128c15b79f771408194e4773763a"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-syntax-r34-result.json",
+      "bytes": 2032,
+      "sha256": "3dfde6b0e30ebe8960b27846d4b49cf1fdc79ec22e61dd50862874e64766c1d2"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-syntax-r35-inputs.json",
+      "bytes": 1841,
+      "sha256": "eced566ec217d76fc66438f869f6c08896271bd03e4ca65fafd6135ad92b108b"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/accepted-note-syntax-r35-result.json",
+      "bytes": 2067,
+      "sha256": "9ea24d93f5ed2cb0da6d9a88bc72d25ed367001bc92199ccd7d2a93dc1f9a3b9"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/check-launcher-source-cases.ps1",
+      "bytes": 5282,
+      "sha256": "01e6fbfd05fc466cac86b8ec81553b2adf6a0766cfe2f056a206dce6644e96d6"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/check-reporting-schema-identifiers.php",
+      "bytes": 2556,
+      "sha256": "dda2c9c5756c611af9f98a373ae5188e79f74c5829262a69dd4f8fb5dbbf7fc6"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/check-settings-schema.php",
+      "bytes": 2763,
+      "sha256": "09c88879349384469798ce8b993169662e9cd63f9796c6f515f59c250e8381ae"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/control-room-resource-proof.ps1",
+      "bytes": 4832,
+      "sha256": "8c6c156945d79d174702bf38a0acc96fb08d5b4c0abda3f4cad11799f8eb42cb"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r21.json",
+      "bytes": 848,
+      "sha256": "e556fb01462d4cdb5f8cc36ea6a11088bf97e8449ff47c5491c6381e12e95ff5"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r22.json",
+      "bytes": 1728,
+      "sha256": "ef125f3f83a522bc967b9bd510bf96bb039614f15a0ae19b2ba2ccad548b10c2"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r23.json",
+      "bytes": 6641,
+      "sha256": "d2785d0b6ae058630c73914a5096c5c64c54c0449f036f1ca7ee0dd273b5d399"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r25.json",
+      "bytes": 4679,
+      "sha256": "5468e144e81f1bf85343b4706c31cd2fc3bd0251dc85e360d5d9fa6877f5495e"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r26.json",
+      "bytes": 5904,
+      "sha256": "8e7f344158ec4d7fa7927965c82ce708d983f8ec3c38bc65285615df7f6d481a"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r29.json",
+      "bytes": 759,
+      "sha256": "cb4eaa12b75616da5f6d0d0b85c34e4628426ac3e9d398bc2cdc9e4aec641882"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r31.json",
+      "bytes": 777,
+      "sha256": "f9fefead02857b3d45ec7830dc6b615a8af9097749ca605ac309125b153a6317"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r34.json",
+      "bytes": 752,
+      "sha256": "fdfb3b42e86cac638521231df6019f6467ca81dc1dc2eac6acfc315993c65897"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r35.json",
+      "bytes": 754,
+      "sha256": "69984018dfa805700a1c264dcd46e0f93f73f37c11698fdb83972ebe41a2284d"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r37.json",
+      "bytes": 835,
+      "sha256": "c23429674d2f7eb7721c81b53bc354e89fadb07f9c82f9045d05ebcbf8f0c190"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r40-reviewed.json",
+      "bytes": 1194,
+      "sha256": "72327180618d56bf93aa6f9e763ac2a2c7b7050c0c050b3a3ea46615c5e8c663"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r40.json",
+      "bytes": 814,
+      "sha256": "e5d58f752612f539c0dd38488ad3169f6bd20d91681e7ce842e0a6156bf5b2ac"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r41-at-r44.json",
+      "bytes": 981,
+      "sha256": "a5b16c862a34eb7d209b191ddab24afd47f52595cccbd91887a8e7caa7f98a91"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r41.json",
+      "bytes": 981,
+      "sha256": "a5b16c862a34eb7d209b191ddab24afd47f52595cccbd91887a8e7caa7f98a91"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-dispatch-r44.json",
+      "bytes": 931,
+      "sha256": "a6cf1e147c3a16306b048425f15c8ff943e99f4d84e500c55c617d513a999a63"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-dispatch.json",
+      "bytes": 1174,
+      "sha256": "8e66aec1510fd8a2438d1a2a786fc8c5df985c38eef8c0e86f15fbc238319ab4"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-r29.txt",
+      "bytes": 3676,
+      "sha256": "420b02ed655213d14376f5a403c07c93358a537cd3aaa072aa66224c908ff775"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-r31.txt",
+      "bytes": 4132,
+      "sha256": "b8ead65e641c11891caf4b759aee95d5ac253352147ee6151fa253157aa54a93"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-r34.txt",
+      "bytes": 3251,
+      "sha256": "3a4b40535a16217d1174b1314d3178bff5d9518d4f224d9503b6d6a626ce8b28"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-r35.txt",
+      "bytes": 3256,
+      "sha256": "4b654accd9259c8f7564d48c2c95df6b0b1ec1213764e31299ef1a64a02bdf20"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-r37.txt",
+      "bytes": 2221,
+      "sha256": "1a18b49cf1a7e44ef0692aceacd6b74195f9f7927ca44fed79e78af4f1c0a500"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-r40.txt",
+      "bytes": 2649,
+      "sha256": "0b45ef692c8dfe4ffc390150f85c77917e4822801b7ddde80f0b6017048f9791"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-r41.txt",
+      "bytes": 4637,
+      "sha256": "f2d5d0bf8bbd1ad8bc65ceed0b1b779baac51a390ea2b49c5a1d690bdb6d86e0"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/coordinator-report-r44.txt",
+      "bytes": 2217,
+      "sha256": "a345b9e5f966ac562415a25457ce57bc3bd802ffac69bc1c6fa3428f6270c9cb"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/copied-alert-conflict-syntax-r44-inputs.json",
+      "bytes": 1805,
+      "sha256": "92fec7efa7d92ae53e174209413f77d527d5ef6b83e4b2f928044c28e61e3021"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/copied-alert-conflict-syntax-r44-result.json",
+      "bytes": 1730,
+      "sha256": "5bad4f850490637e1ef781b5f12c18e40d755751ad2de0b2bf39c4da894a2f9e"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/copied-alert-syntax-r41-inputs.json",
+      "bytes": 3193,
+      "sha256": "c53310aabf7e2fa1d88a4a59fa3398de089d3900347fe28cde2eddb68b7a5836"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/copied-alert-syntax-r41-result.json",
+      "bytes": 1630,
+      "sha256": "1c94df6353d56789afac33da3eb54b066333be31a156205675c6548361c2a6f5"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/copied-alert-syntax-r42-inputs.json",
+      "bytes": 3193,
+      "sha256": "2f9bad12978354435adc1b75491530b640718f83d5d127771644d1f3572e855a"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/copied-alert-syntax-r42-result.json",
+      "bytes": 1680,
+      "sha256": "7c6ea0eaf74194dcb37f20f11447ebbd9124962c6a4b11a62ae4acc2e002609e"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/copied-alert-syntax-r43-inputs.json",
+      "bytes": 3193,
+      "sha256": "2e96d419b174b63ef44b827d3b708ac57f9eb513adb654c0430666d9ff2a4288"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r10-delta.json",
+      "bytes": 1091,
+      "sha256": "46fa5d088c9e5975cddb93e724f0a3ae746785be740dbe2fa05119cc5213662a"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r11-delta.json",
+      "bytes": 696,
+      "sha256": "aa68275b4724cd6e6abe4be50077e1b2e85bb7bfeca7618c1ecfef08693a4b7c"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r12-delta-initial.json",
+      "bytes": 842,
+      "sha256": "bc5a46ef6747e41840a888d1f0cb0eab1863aa3219b726c55fdfb3527389eabc"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r12-delta.json",
+      "bytes": 842,
+      "sha256": "6bf7e649ade5ec1787d69bff1f19acc9d01e09112368774119ba8f85ebcf3b45"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r13-delta.json",
+      "bytes": 842,
+      "sha256": "69c89067eb0669fea6cab5663482badcfa2e6b6a0eca5884eef0dc4c42ab4bde"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r14-delta.json",
+      "bytes": 842,
+      "sha256": "798f4a4248ad00c17816386da140f1c251db12c0c4366ada3f315e6ecda3db85"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r15-delta.json",
+      "bytes": 1382,
+      "sha256": "27f67f690df41c8e335b1ed64931913f800aec45094e2d26813fe9bb7229531b"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r16-delta.json",
+      "bytes": 634,
+      "sha256": "c4242d95c695d4e6c86b7ff5f1502dc9395faeda167bb8b823ac4caa1ee483e5"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r17-delta-initial.json",
+      "bytes": 1582,
+      "sha256": "0aafa77da3c90e840a678dd0c3db9b1538d45629d52dddfec6820050e34b1851"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r17-delta.json",
+      "bytes": 1743,
+      "sha256": "086064b51d9f6550bbc0921d965a5a93797de409f68dfee1147aad955e4228ea"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r18-preliminary.json",
+      "bytes": 9271,
+      "sha256": "74e30dde80fb6419f7b7d3c82c2b4c28e0c52aaa737cd5bd6c3665e7859ed01a"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r18.json",
+      "bytes": 19101,
+      "sha256": "de2e3e8718865d586deeb5e18902f2c43cb1e408b3aa753e74d0635ddef7754d"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r19.json",
+      "bytes": 19103,
+      "sha256": "54fbd74c861b101e0f1967ef6495e3bb62455ef6bd46f30e2fa9e106ad126adc"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r2.json",
+      "bytes": 5041,
+      "sha256": "0aa01b20c792b7a99348261b3def57102cd4264f7ed82795837bb98c45d5ea37"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r20.json",
+      "bytes": 20234,
+      "sha256": "7930f022afd7168c0cf598b96bef0cb891bb7833c7af02e04a1e56fe15b692c0"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r21.json",
+      "bytes": 20271,
+      "sha256": "925e353a9b3f65dd4dbcb8553a5f90ecca318ea4857f3dd18a981541b5837917"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r3-initial.json",
+      "bytes": 6053,
+      "sha256": "7d65143c052e4c6d6f81f11d46c314ff4fa156a9d53dd4456c041f8ab77369d9"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r3.json",
+      "bytes": 6081,
+      "sha256": "eacd845de6e194bec64ba4813cdeb8a09f3cf8153661931b02d5b885043daa83"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r4-delta.json",
+      "bytes": 1233,
+      "sha256": "878e0cb3210a084568d72b52729db5aaa00790660f694a7037faf44813946b76"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r5-delta.json",
+      "bytes": 879,
+      "sha256": "edac3f7410f0985dc88b8af2685e2ad36a65687241a1967cd4f9a226e27a6a61"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r6-delta.json",
+      "bytes": 1149,
+      "sha256": "79a123ab1f7826c2a209cd01faed1745df29ef0e7aca543c9699945f96cbfc95"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r7-delta.json",
+      "bytes": 872,
+      "sha256": "49c27b48ca37fbc7cb36ef1bd99ec13f5859a7b384ea71f77cb544cbc5e488b7"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r7-initial.json",
+      "bytes": 872,
+      "sha256": "42d4e46177673883a53bf4630d2e77f4648f49d223218f20598496a0fb79b6f9"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r8-delta.json",
+      "bytes": 1106,
+      "sha256": "f13f9796b23012c277f99896f59baaa6ee77def047a1a24519c3f84422d81ace"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r8-initial.json",
+      "bytes": 1106,
+      "sha256": "486f7f88ff3b5454857ec832109334837a1c18c65fce147768fa729e2bd97124"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks-r9-delta.json",
+      "bytes": 647,
+      "sha256": "0ac9f1c767478a76e25d822664ad68f7d10119eaa952ce9feb3f9454eb9b171d"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-checks.json",
+      "bytes": 3434,
+      "sha256": "2b4422aaf8583b2b6b55d832f8c8d46ce3a96a07d46df46bda2c2be2fad0543a"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-style-r18-format.json",
+      "bytes": 4129,
+      "sha256": "0640c20645b8c1aff1ddd8678ccd877b5b542f3dc7881ec072ad6f652fd431e4"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-style-r18-initial.json",
+      "bytes": 8384,
+      "sha256": "faf6f93385b77c4440bc4fe8cef30e305bb80208e9a1dd19529966a81d932ae1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-style-r19-format.json",
+      "bytes": 1737,
+      "sha256": "01b93497e940345f62da2aae0614561481aea60994c9e9cbd5d4d40d4ca2aed7"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-style-r20-format.json",
+      "bytes": 2273,
+      "sha256": "b80f56569b4696ab09b5e23564d6b27366b2405ff5e8ed11e9f8af100df073c6"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/current-source-style-r21-format.json",
+      "bytes": 1888,
+      "sha256": "c10be35f1837c350c2e5f9f5513567a5cb07ea299fee5d1144ce0cfa6ad29a4c"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/delivery-status-at-r40-dispatch.txt",
+      "bytes": 11352,
+      "sha256": "e7246fe19e04f19eb060a36e3223ddd201998f62bc02fb7ecca097291c90931c"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/delivery-status-before-r40.txt",
+      "bytes": 9345,
+      "sha256": "7e0817ab96c9185907bc1649f79a1b87c549e8f34b391bb1efc45573fa594a99"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/duty-header-before-r24/docs/control-room-audit-2026-10-11/DELIVERY-STATUS.txt",
+      "bytes": 7086,
+      "sha256": "d34be3ffaaea6a1ac5252039c03ef87d03b7a0286592d8294a40f18e63239c0d"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/duty-header-before-r24/resources/js/pages/control-room/shifts.tsx",
+      "bytes": 67028,
+      "sha256": "2d14c91f1597221af0cfbe6e766819b7f1fe14637ddb77680e8d7401fcc1311f"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/duty-header-before-r24/resources/js/pages/control-room/shifts/handover.test.tsx",
+      "bytes": 7762,
+      "sha256": "12c6ab620591d2737d39abee69729aea628e8bbdfe0d23750d2e2e1ae8599e87"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/duty-header-before-r24/resources/js/pages/control-room/shifts/handover.tsx",
+      "bytes": 67875,
+      "sha256": "1d67a37191ff45bc10d9269dd4d6021a26595e8b6b368abfed1c23b538627014"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/duty-header-source-increment-r25.json",
+      "bytes": 40725,
+      "sha256": "0ceb804d42bd3fdddadba0ec42fe13955ff0335ea03986240e141c1a0b409840"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/duty-note-before-r31.json",
+      "bytes": 1677,
+      "sha256": "87bdbc3e572fe13423eb910e22668d8717c7164ddb0e9b98aa7f03f3af4af9ad"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/duty-note-before-r31/app/Http/Controllers/ControlRoom/ControlRoomHandoverController.php",
+      "bytes": 16344,
+      "sha256": "19f9eb1e1a36b7d57f533a31330f9386d3f7633d10aaa15efa78e3ea1cfa38c3"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/duty-note-before-r31/app/Http/Controllers/ControlRoom/ControlRoomShiftController.php",
+      "bytes": 20338,
+      "sha256": "e78a20cd616fab6e1b283a12b38be4b0d1781f5aeac939de4780444fa2893711"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/duty-note-before-r31/app/Services/ControlRoom/ControlRoomAcceptedHandoverNoteService.php",
+      "bytes": 6168,
+      "sha256": "5d9fef21b76767f1398ad26d6b3e8fbd58cb1d7a78569f7c4fae24b5c0911822"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/duty-note-before-r31/app/Services/ControlRoom/ControlRoomShiftHandoverService.php",
+      "bytes": 20417,
+      "sha256": "f91d3c9fba1d84eef7b46d3b7ec41ffc8552c9920b4d54712f0765394830541b"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/duty-note-before-r31/docs/control-room-audit-2026-10-11/DELIVERY-STATUS.txt",
+      "bytes": 6853,
+      "sha256": "dc1965b0129609236e0d445fab2ccd2c5e9feff392e5d1da8cde3ea55a71161d"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/duty-note-before-r31/resources/js/pages/control-room/shifts.test.tsx",
+      "bytes": 5716,
+      "sha256": "8fff5377890867b186b037b56b804c65a9f8f87fd8db12906db51df43f3f7ff1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/duty-note-before-r31/resources/js/pages/control-room/shifts.tsx",
+      "bytes": 61760,
+      "sha256": "e0f176f12b94cc0d662e7e74c8da7dea572d8499efc6388decce83ad8065eddb"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/duty-note-before-r31/resources/js/pages/control-room/shifts/handover.test.tsx",
+      "bytes": 13444,
+      "sha256": "29944d6a498ec5338f4cfcd9b2bdb0972abd78492b2b57b5e27e7c9cdfc6e81f"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/duty-note-before-r31/resources/js/pages/control-room/shifts/handover.tsx",
+      "bytes": 69219,
+      "sha256": "ba43fc4e3cbca44ecb22325a2b7997fb6941f89748017314a4700790949f6b2c"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/duty-note-before-r31/tests/Feature/ControlRoom/ControlRoomAcceptedHandoverHistoryTest.php",
+      "bytes": 28983,
+      "sha256": "54ba90d612e0f3d66271b800469a839fc8d6c328ed614629147a10ce58fdd633"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/duty-note-source-increment-r31.json",
+      "bytes": 13396,
+      "sha256": "8e08a6007a097dd739ab29897d16ae7cdbf5a20ca8d47b28b9b7abbb7edbdc90"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/duty-note-source-increment-r31b.json",
+      "bytes": 13397,
+      "sha256": "aa7c6ab13d8bd399bcb6c153751862f88e8c1c6283e82405b406c72c6aeb474f"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/finalize-operator-final-tuple-source-r23.ps1",
+      "bytes": 9962,
+      "sha256": "ebe609dff2eef7bf2f8f0b92ca312d5fa1593bbc35343b1a635b864af448f629"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/frontend-readiness-r1.json",
+      "bytes": 537224,
+      "sha256": "eff147f0ad571452e3a96c27dfdfe39c6ded7c05dd8867a95adf9213312eb815"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/frontend-readiness-r2.json",
+      "bytes": 538206,
+      "sha256": "2ea5e1862c0819cd908298ce03fce2877e6e5b8d96e1ede8bf39ffdbabb9bb62"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/frontend-readiness-r3.json",
+      "bytes": 538206,
+      "sha256": "985b9e2916922a3afbf1ea8df081775fde7b48766471b2b0a7588cb31fef7eb8"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/frontend-readiness-r4.json",
+      "bytes": 538206,
+      "sha256": "795c5e39eb7df35c229bfdbfaf7bc508107ab24b58a1e422a338493006729f8a"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/frontend-readiness-r5.json",
+      "bytes": 538254,
+      "sha256": "ede2fe744f944d5dcf45fc67928133e1f13192dd4774e6ed45112bd20c9e8ab0"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/frontend-readiness-r6.json",
+      "bytes": 539890,
+      "sha256": "9df68d1a8871458b65b10d2bbefe8ab8542879726469f9b0d3009889122d07d3"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/frontend-readiness-r7-before-my-day.json",
+      "bytes": 539890,
+      "sha256": "836768d1971292438158368492bd14d3b68ab5d7e06241cd2b6216f977980b85"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/frontend-readiness.json",
+      "bytes": 539943,
+      "sha256": "a658063016d86e91d49c223bdd9ffa38d7942e9c446259feb846a9420d40d0bc"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-foundation-incorporation.json",
+      "bytes": 2430,
+      "sha256": "8671347293174f70c413f15d708fefe2552dc5fe6e80b83c495630869e3e440a"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-journey-presenter-read-hunk.json",
+      "bytes": 482,
+      "sha256": "ca974de1c1921e23e34d131974a8069e484721cbd077ad28cb5c969f5a578d53"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-journey-read-hunk.json",
+      "bytes": 468,
+      "sha256": "98ddc435e2329f2d83d1a663197798a387160c08537300b7f8927b655956b88e"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-read-consumer-before.json",
+      "bytes": 5838,
+      "sha256": "ffae5b2334d1e03453bd3df04705d8c594b657e99919e0f1dd2471dc25409574"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-read-integration-source-candidate-r19.json",
+      "bytes": 124984,
+      "sha256": "28725faccfb7fa8434337923ff097716642feb6ce9283570452026a051c90259"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-read-integration-source-candidate-r21.json",
+      "bytes": 127673,
+      "sha256": "c2d53b9e7d140da3f2bc75b1050f9d3888fd454db9d5924fbf5cb90dbaea8c72"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-read-integration-source-candidate-r22.json",
+      "bytes": 148180,
+      "sha256": "cdce6eee69cb806c59314bc8c35efea07000452dd4e6b0a907d6bc8af322ec0b"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-read-integration-source-candidate-r23.json",
+      "bytes": 210043,
+      "sha256": "4f5fd43489e3c55118e0e92bdc8ac9db865304587d6d2c1d1bb806d0d1fa6014"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-read-integration-source-candidate.json",
+      "bytes": 210043,
+      "sha256": "4f5fd43489e3c55118e0e92bdc8ac9db865304587d6d2c1d1bb806d0d1fa6014"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-read-owned-check-paths.json",
+      "bytes": 2010,
+      "sha256": "5a9afbb9cbcdf274e081248561db921c1f5cafc1fe97b98c5c3575e208cc2e3c"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-read-transfer-before.json",
+      "bytes": 49245,
+      "sha256": "243d0976129f2dbf0773644e265fa80854ff44c7c120d8e83061c1b2abd4befe"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-read-transfer-dependencies.json",
+      "bytes": 5280,
+      "sha256": "df889ed6405a2ea6246dfd0ad4a6b746e5f2d143d4958cf9ac10941b77a2c9a3"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Http/Controllers/ControlRoom/ControlRoomAlertController.php",
+      "bytes": 48925,
+      "sha256": "48ea26acef3790d1a157d081ce1205e2c411baf1c898be647eb115d67ef5e456"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Http/Controllers/ControlRoom/ControlRoomEscalationController.php",
+      "bytes": 17388,
+      "sha256": "88f57ef2aaf6006d14c2d4dc9bf0a643fa581e8d3e83a3afe1cac423b28eb913"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Http/Controllers/ControlRoom/ControlRoomHandoverController.php",
+      "bytes": 10964,
+      "sha256": "a4a6fc95b4f3d08390ce8845b8b82f5ff47e785211e12f457f23d0ca31bee57a"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Http/Controllers/ControlRoom/ControlRoomIncidentController.php",
+      "bytes": 29105,
+      "sha256": "e556701ec0c19734d7c196182b808e1319e7c2c94d46445a31d75270728c06ed"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Http/Controllers/ControlRoom/ControlRoomMyTasksController.php",
+      "bytes": 6555,
+      "sha256": "d531cf7d6feb40c71063050d065a153ead2654066a616fa0fb5ad43005ed7d59"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Models/BehaviourSupportPlan.php",
+      "bytes": 2188,
+      "sha256": "44db7cabbdc9f94816d951f2d109c40ac4fe56f47ecb335f036e07238e30ec99"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Models/RestraintEvent.php",
+      "bytes": 2936,
+      "sha256": "68c06d6ba76c404cb9cd51c8dc411279e55580badb9deae8c212ab26edc291dd"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Models/WorkplaceInjury.php",
+      "bytes": 3235,
+      "sha256": "139f16df9559ab4b3ad581f82333aeae58c26c80cec83c0a8361c15744e8ebf4"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/AlertReportingPolicy.php",
+      "bytes": 11977,
+      "sha256": "d472edd5aab58d39f271e3c471a0001566fd2be8433fef156abc6300a3191f8d"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/AlertReportingService.php",
+      "bytes": 18432,
+      "sha256": "02681302e71f1d430585b5782fe3c1c44e20d47b5fa710317425993f5a55cc02"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/AlertWorklistPresenter.php",
+      "bytes": 7000,
+      "sha256": "b05d317364da9ed22931393fd756c17021825ac19a3756b023e2848ab0be2c1c"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/AlertWorklistQuery.php",
+      "bytes": 17041,
+      "sha256": "86ded5b563a17c2530f2aff88125dce6e41ee62588b0748ef3995e5b1c0ae684"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/AlertWorkspaceService.php",
+      "bytes": 23066,
+      "sha256": "bfaaf8cf80f2c46139f778fd25614616ec37ad642b7dd7e52f5800f16d2a5314"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/ControlRoomDeskService.php",
+      "bytes": 25236,
+      "sha256": "f59505dd478d0464bad4417fd45e21ce1daff5c2c8384989f45785b9f34ba357"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/ControlRoomGovernanceReadService.php",
+      "bytes": 5066,
+      "sha256": "83be426cb2044b70342ab54468e2c457d88bd9cf7ef50a0a3be80639faaae823"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/ControlRoomHandoverScopeService.php",
+      "bytes": 19746,
+      "sha256": "72f00da48fece8da86002ec95b72a355a86d859657a45dfa952a7c0ec33dfb69"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/ControlRoomNotificationService.php",
+      "bytes": 27181,
+      "sha256": "408168c9cf59893977c7cb709a13b993d09baaa9cd5921eb21f05bf5812e0968"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/ControlRoomRecipientEligibilityService.php",
+      "bytes": 6048,
+      "sha256": "05e29835e44acec5536d72f3a0f939f5f1ab1e1fc1d1cb6d1b1300264b9a51a7"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/ControlRoomShiftHandoverService.php",
+      "bytes": 20247,
+      "sha256": "f772112b569b20de97d39cf3929f93deb50d53df232436dc7967204ec9f607e9"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/ControlRoom/ControlRoomSourceContentService.php",
+      "bytes": 17392,
+      "sha256": "cb8ed37145b3d5d85f41ee8b109bed3dee0c61e4d0133d5f5e11ffb0f784f1e0"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/HealthSafety/HealthSafetyReadContext.php",
+      "bytes": 9488,
+      "sha256": "6869529180cba48a9986042c16903814402214c414637bc3acbacc72aaea76d4"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/HealthSafety/HsEventAccessService.php",
+      "bytes": 7384,
+      "sha256": "0b8319fbfe52aadfb61ccdb0d3bca9578c90c7f187ff34184b769357b349de53"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/HealthSafety/HsVisibilityService.php",
+      "bytes": 3245,
+      "sha256": "4acbbce13ad923e31fa153426fddba7882d6ddb7e296261d7c39145ba75afb24"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/Incidents/IncidentJourneyPresenter.php",
+      "bytes": 15671,
+      "sha256": "1c09b488ffedeaf28dc12e8a31607eeb57ad16f315097463662a9714e384a1f6"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-transfer-before-files/app/Services/Incidents/IncidentJourneyService.php",
+      "bytes": 65712,
+      "sha256": "5dd1205a19957ab7d88a1b4cbd6beb0b7c1f44d4fd00377b2098821d9be77df1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/hs-visibility-read-transfer.json",
+      "bytes": 573,
+      "sha256": "f31d9405aee17041fe9db3ab661ac08cfb4f3d5a3e5a25086805b878ed4c806a"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/inbox-note-before-files/app/Console/Commands/EscalatePendingNotifications.php",
+      "bytes": 7510,
+      "sha256": "5bc60d64640a1975b6b37ea9a24a4f501ad050ba1839212debd0be35ef062cb6"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/inbox-note-before-files/app/Http/Controllers/MyTasksController.php",
+      "bytes": 82904,
+      "sha256": "2c29a040565b697819fe4681e84e4e4635417a5a452120056d1ceb36fca95576"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/inbox-note-before-files/app/Http/Controllers/NotificationInboxController.php",
+      "bytes": 2680,
+      "sha256": "1f988e7bf744abd890653ab0eee0c163b4be677d622862319e985ecc9d4fcf0a"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/inbox-note-before-files/app/Http/Controllers/Portal/PortalNotificationController.php",
+      "bytes": 2143,
+      "sha256": "a47d5c8a1096bc9896ef47fa38fe5f3c3886b4326511737f6dce4eb4b0e31695"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/inbox-note-before-files/app/Http/Middleware/HandleInertiaRequests.php",
+      "bytes": 73082,
+      "sha256": "a979f4deda747aa8d9d12304dabc7cd19275ff488d86c227387701b4ad2f5409"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/inbox-note-before-files/app/Services/ControlRoom/ControlRoomAlertLifecycleService.php",
+      "bytes": 58778,
+      "sha256": "ccdd3472317117578c13e5ba6295f5df58484b4790525e2f670b55e51f5cd7c7"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/inbox-note-before-files/app/Services/ControlRoom/ControlRoomGovernanceReadService.php",
+      "bytes": 14064,
+      "sha256": "167dba36b2a94d954c337a58f3a2ef9122fd81c7c858cedf7382a05c42aa7653"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/inbox-note-before-files/app/Services/ControlRoom/ControlRoomSourceContentService.php",
+      "bytes": 32199,
+      "sha256": "5f07aac4778a29d2ce7dd3e13b577303373f4866bd7ded30569b8fa6398452ed"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/inbox-note-before-files/routes/portal.php",
+      "bytes": 18405,
+      "sha256": "b13e0ba71c6d87f6eae42a9b7ea377bb3d94266e1db393f2c0e23a8dd980acc4"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/inbox-note-before.json",
+      "bytes": 4065,
+      "sha256": "fb8c35000c48d6c107bf3b306a0a9578604241b1a5c2366eade17fc2b7f7bd5b"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/inbox-note-main-integration.patch",
+      "bytes": 17889,
+      "sha256": "2255e2ba18a3887541b43b67cf0166aad5e288f7f4b0340f85f96f05fe6e8771"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/inbox-note-package-pin-check-r22.json",
+      "bytes": 239,
+      "sha256": "5a82dcf8db4dc3eb66a843b76ce6f9fec0359e0a38757162039e0a62b8491c96"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/inbox-note-source-checks-r22.json",
+      "bytes": 10791,
+      "sha256": "77207954cc663b85c8261b3329c6116e2660e151b352f0fde9f4db7919930e32"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/inbox-note-source-format-r22.json",
+      "bytes": 2911,
+      "sha256": "e86304c8c72e047764fb3544966bd286add39de26e141c724dfa2c67b0e49000"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/inbox-note-source-style-r22.json",
+      "bytes": 3431,
+      "sha256": "e4a202ebb1143cb2b6a1e5be4fe145995cb54e772da1fe97eaf8972218af1d69"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/inbox-note-style-proposed-MyTasks.php",
+      "bytes": 83376,
+      "sha256": "5c1dcd9a0d34b9cd081a4dee61d4d8861f5747ed1234d700c15db23724e36e4c"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/launcher-source-cases-initial.json",
+      "bytes": 1718,
+      "sha256": "53c376f27c294e1fd5a1571ae73506e1371cc1d1d44199c99ea0bfa86a3e3276"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/launcher-source-cases.json",
+      "bytes": 1718,
+      "sha256": "b223956dd4cb8fff7df0deed387dff02bceb239f022c9166f6659c953c5e0611"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/live-response-shell-proposal-r40/DO-NOT-APPLY.txt",
+      "bytes": 1353,
+      "sha256": "100450fb1148fa1b2d3474fccf4e30238b999042d1a246cb7a96a08167435d41"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/live-response-shell-proposal-r40/index-shell.patch",
+      "bytes": 1199,
+      "sha256": "418dad754d6d4d9ba0e4fd1b9649707358462d23054366f3382fa4f6cc041057"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/live-response-shell-proposal-r40/index.after.tsx",
+      "bytes": 10261,
+      "sha256": "141d2f0a19f91b26b6ae205a537e486f90991a86899d7bb476f5eae94981b2bc"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/live-response-shell-proposal-r40/index.before.tsx",
+      "bytes": 10181,
+      "sha256": "9f0607bb292e58daae99801dd47a9e45b85e9f84df99df20bec330c7a93f2411"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/map-layout-before-r40/map.tsx",
+      "bytes": 46748,
+      "sha256": "7e2a640c98bbc943a8b902cf138a52395b3832cc14c5614c7d5ba585422e04d8"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/map-shell-source-r40.json",
+      "bytes": 2578,
+      "sha256": "6a1bc0b0ca518f2d6f64a8827dec83c90fdc0e2f5fccc6b78eebb0e768992d29"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/my-day-link-source-before.json",
+      "bytes": 362,
+      "sha256": "e4e974f9feedee28e7e160404f5c34d0d34e95a275e7cac2e409f2eec1c2ce46"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/my-day-link-source-checks.json",
+      "bytes": 1154,
+      "sha256": "2b8e163bfd5f3c85ea6e2b7b04ffc0f3bfde37dc1371f8d04975dbb0ac9bbacc"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/native-progress.php",
+      "bytes": 1260,
+      "sha256": "d905ceae56120c1ca002172ee349545751d5dc2b1ccdb4bad5ba0b34254291ba"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/note-baseline-before-r34.json",
+      "bytes": 515,
+      "sha256": "b9361e921e77faba20959cdaf994d41fd354875e38226aa5bcf29189e2552e84"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/note-baseline-before-r34/app/Services/ControlRoom/ControlRoomShiftHandoverService.php",
+      "bytes": 21108,
+      "sha256": "64e787febacba5a4d3f64bbd6b299235dec7e164972e510f17946b2b45e9a41d"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/note-baseline-before-r34/docs/control-room-audit-2026-10-11/DELIVERY-STATUS.txt",
+      "bytes": 6799,
+      "sha256": "95c3a62fc692926c0609451df2ecf57788084c05fc3f5ae2e4ec17101a5d5694"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/note-baseline-before-r34/tests/Feature/ControlRoom/ControlRoomAcceptedHandoverHistoryTest.php",
+      "bytes": 40050,
+      "sha256": "12d66de7638671a929235d19bb12a253e83f5694bb630aeee48f4deb9594934a"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/note-baseline-source-increment-r34.json",
+      "bytes": 11581,
+      "sha256": "6ca6a6706f8a4f033ea6db0e72fb6116e7acbf4cd90be2ff120d9b52217e52ef"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/operator-final-tuple-before-files/app/Services/ControlRoom/ControlRoomAlertLifecycleService.php",
+      "bytes": 61953,
+      "sha256": "e37f75fae622014eb635c0eaa9be4e9adc60c608853194fc45717ad26a253abd"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/operator-final-tuple-before-files/tests/Feature/ControlRoom/ControlRoomOperatorRootNoteTest.php",
+      "bytes": 10858,
+      "sha256": "b4c7edeb74ab1968141b3da2ca761722abab421b064c5790d5e2fbec4d10c6e8"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/operator-final-tuple-before-r23.json",
+      "bytes": 1001,
+      "sha256": "c7f661a86aa31e44ad1354977ca8d6217836d4a88fc089ed5bb510630e005bcb"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/operator-final-tuple-package-pin-check-r23.json",
+      "bytes": 1747,
+      "sha256": "a4520129f4def259f867ae78fc4c923c59915ef562596838a3e9d0ca52f9d691"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/operator-final-tuple-parent-source-review-r23.json",
+      "bytes": 1742,
+      "sha256": "2b7c6212b45c0804834d34b9b457dc2df3fb0a1b4764d39d3f8f46fa3dda32aa"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/operator-final-tuple-r23.patch",
+      "bytes": 29999,
+      "sha256": "5b2c0253915030deec28d62c635cfc96003652f5c38272304db81ca02edaca3c"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/operator-final-tuple-source-checks-r23.json",
+      "bytes": 54517,
+      "sha256": "977d3d6d9707a5616366997ddff67ff9828584f290abc854ef4efc715adba47a"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/operator-final-tuple-style-r23.json",
+      "bytes": 1025,
+      "sha256": "1d30eb32734638ec168a1417f499e33e1b6306d9e54a534a6341fa6c0d3b60a5"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r24.json",
+      "bytes": 806631,
+      "sha256": "b528e465ec3d83ffa97c2bc7e8eb60d99e175067104d0d5d89f4216df3d69eaa"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r25.json",
+      "bytes": 807180,
+      "sha256": "d85a690748cd243c81fe2d7523a6f397b2b5c0bd16ed9dd8603c0266f434c951"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r27.json",
+      "bytes": 807526,
+      "sha256": "1bb77b6730d8609f967a4d434a6e4e22dbc18d7033201d26c18e21f4b5f725d1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r28.json",
+      "bytes": 807526,
+      "sha256": "bf403b3ed07334e89bf615fef313036cdb829655b9356af512bc930200ce534a"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r30.json",
+      "bytes": 807526,
+      "sha256": "334e7e601e30b240a5eec6649ed20e6eb0d130fdf534f080829848d923199acb"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r31.json",
+      "bytes": 807526,
+      "sha256": "cff147b5184024c2a68ba778b0aea01c8eae57741caa76b1ea9ee0d4a775fc8c"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r32.json",
+      "bytes": 807526,
+      "sha256": "948ef497155c43134b523a4d19fb417c71f44539c9127426fec33848f12747d2"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r35.json",
+      "bytes": 807888,
+      "sha256": "e39577c2cc49ddc7bbc981d21c28a11bb5e4c4b847d40f704ae93f942b9f51f3"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r36.json",
+      "bytes": 807888,
+      "sha256": "cb6cebe38aa9ef27c1f590207e2c33e0a5db10ec20b4ad07b1438b648fe1bb06"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r37.json",
+      "bytes": 805368,
+      "sha256": "f56e5b96e45cf8abc8ac27de46daedc5201eaf0d8e4cda8ccd8573b6177e75d5"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r38.json",
+      "bytes": 805382,
+      "sha256": "94956e4b7dec1a4a7464a0fe04131a82bc82e4477c24486980b52f99764446da"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-inputs-r39.json",
+      "bytes": 805382,
+      "sha256": "9939e760758b65ad51d08694dd78198dc4249f44d12386a056d3aff30b43192c"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-r24.vitest.config.ts",
+      "bytes": 789,
+      "sha256": "cf9fb7fc61bdc5159336b0e14dc6313883d507f29cd63304e0799529f1dedcb0"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-r25.vitest.config.ts",
+      "bytes": 925,
+      "sha256": "f7d9b62dfca45d200f7a6f941657f4b0a3c0171333852b730bb479867ae0e1ff"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-r27.vitest.config.ts",
+      "bytes": 929,
+      "sha256": "fef75bd74cc4852d399f0859f13fb8575e7b65f9a0ce0a2997b3116c6bfd63c2"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-r28.vitest.config.ts",
+      "bytes": 1505,
+      "sha256": "ba55a230a512ac837f2cc98d5d42ae97fec07e6fed210167bdd629613f0ea9a9"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-r30.vitest.config.ts",
+      "bytes": 1505,
+      "sha256": "0c8041ac65518815d20284776df626eb2a6e6cc75f2738c4cb3409796bf4c124"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-r31.vitest.config.ts",
+      "bytes": 1505,
+      "sha256": "218aeb5d176fc5d55fa7ace5be5572672f4dacd51b462c09c677701ace022cb4"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-r32.vitest.config.ts",
+      "bytes": 1505,
+      "sha256": "b5762f4b4fb0f1229091b3b471c8774edbb3d45e8aa2df987c5643b853b18b81"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-r35.vitest.config.ts",
+      "bytes": 1505,
+      "sha256": "e8e1a937d267c9f1bdc2cbe74c1c6c66b49dfa65ea720aebd9d93503b9ba84f1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-r36.vitest.config.ts",
+      "bytes": 1505,
+      "sha256": "f537e8e32eccd2f522435f7dcf8ed27911ec90296f8b36930317f8a71466aa7b"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-r37.vitest.config.ts",
+      "bytes": 1505,
+      "sha256": "5d1c934e2cf726d19ec7b4594f3b56445efe521199ced0c8cfe5bca45fc96c28"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-r38.vitest.config.ts",
+      "bytes": 1505,
+      "sha256": "b81e40ab447ef8b62618bfb0496814a1f8607e5146bd35f1f7cd1eb8306b3949"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/owned-frontend-r39.vitest.config.ts",
+      "bytes": 1505,
+      "sha256": "0d957a36914867130274a1cc22ed3c313b78948452ca3d08325345706113ce9a"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/package-duty-note-r31.ps1",
+      "bytes": 11831,
+      "sha256": "895d5ed9e514628f1710596e0ebdcdf8a34eec3c4fd60211a3893991bbda292d"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/package-duty-note-r31b.ps1",
+      "bytes": 11849,
+      "sha256": "43ac3daf2478dc2b5f49087a1b002b2b395a13470ea9484e5afb3a0e69849e4e"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/package-note-baseline-r34.ps1",
+      "bytes": 10178,
+      "sha256": "87a53fa4129d444020fef2118dd453a0222d4a7973a46a6816adfd09d75eabbd"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/package-note-source-r29.ps1",
+      "bytes": 10631,
+      "sha256": "f7d171627ab6c020f84e41e325c8110072833c2dca0ef6a312f577937b84802a"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/prepare-inbox-note-source-r22.ps1",
+      "bytes": 12386,
+      "sha256": "f74e75967df9fdf417b573c98071b172f52e1af974ed729c365a2134228675d1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/prepare-operator-final-tuple-source-r23.ps1",
+      "bytes": 8948,
+      "sha256": "e2bab95bb109e8059bf0f5c5f38fa074e6c7c137948b12af6655bb8d5cc1ccfb"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/reporting-schema-compiled.sql",
+      "bytes": 1045,
+      "sha256": "47336bfe2cd3855484f3f6ea9df640a0760c31fe2912e3bd40966a2905ed20dc"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/reporting-schema-identifiers.json",
+      "bytes": 589,
+      "sha256": "51f54a096b72423473c784e9d4ca130dc656cae9ba46411c6aae7dd9d37c6d2b"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/reports-before-r35.json",
+      "bytes": 828,
+      "sha256": "8ec09fd623b7fcafc3190a5db36f3d0cbc429bca8879b8fe0ec8e27c874e213a"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/reports-before-r35/app/Http/Controllers/ControlRoom/ControlRoomReportController.php",
+      "bytes": 11194,
+      "sha256": "c106cb0e1becfe157641c6f008ddb90dae9543280ac0f14316646a8d4ad22559"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/reports-before-r35/app/Services/ControlRoom/ControlRoomReportService.php",
+      "bytes": 28181,
+      "sha256": "b2c0244812af0cf649e0dc6a254ba06865bc65cc71aa7c55ab51a5dd094167a6"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/reports-before-r35/docs/control-room-audit-2026-10-11/DELIVERY-STATUS.txt",
+      "bytes": 5815,
+      "sha256": "d7103a16dcf716acd63c0cd69631dfeef449dfbae613867a4732d429f35a2301"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/reports-before-r35/resources/js/pages/control-room/reports.tsx",
+      "bytes": 22018,
+      "sha256": "854aefb8de2120d0d94f95239055793667d072295f662016350c9b110e592458"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/reports-before-r35/tests/Feature/ControlRoom/ControlRoomReportControllerTest.php",
+      "bytes": 13438,
+      "sha256": "46067ed324c2278567ad508760648d41e559290d909c08958defcb3afea95709"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/reports-layout-before-r37.json",
+      "bytes": 320,
+      "sha256": "4d64536d01f5c9dbdac7748fe93745de055492b523bc6f808c4dcedc148b4a2c"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/reports-layout-before-r37/docs/control-room-audit-2026-10-11/DELIVERY-STATUS.txt",
+      "bytes": 5504,
+      "sha256": "fb37c3ee17de9c85f21aedee409ab484ca2f4e8ccc131575629c79c182f65dd1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/reports-layout-before-r37/resources/js/pages/control-room/reports.tsx",
+      "bytes": 23239,
+      "sha256": "c3214d1ee55459fb40311e99bac48ffb332c5ebff232672bca87485c76151de2"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/reports-layout-source-r37.json",
+      "bytes": 3270,
+      "sha256": "72d7ec3950b748555b8dd17160218d6561c0b8fbb2e35ed46c338bbad011222a"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/reports-layout-source-r37b.json",
+      "bytes": 5040,
+      "sha256": "1806ce8c042119dd06234ec6f755956cd7b00c15164cf2c488f68910a96447ce"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/reports-source-increment-r35.json",
+      "bytes": 5616,
+      "sha256": "3caca2f23375459d2d8674fdad3f2003a40990fdea881f498b9a043c0ecd6d5f"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/reports-source-increment-r35b.json",
+      "bytes": 5944,
+      "sha256": "04b382772c63d5cd03583e3b43cffefd9477d5a522cb7f35b8c8d36350634504"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-copy-conflict-syntax-r44.ps1",
+      "bytes": 8201,
+      "sha256": "bfbd9bcdc8fea36a40e327e5458dc22b5c28120e1f6ccc89734c4201c8b135b1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-copy-syntax-r41.ps1",
+      "bytes": 8587,
+      "sha256": "052624cc8a35af18970c69fc59dbda0511e3677ce8119ca9cc35d7eaec97fe22"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-copy-syntax-r42.ps1",
+      "bytes": 8587,
+      "sha256": "d51a28529238130188feb64323290ec42384828ae13060d02cdebc15d6982290"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-copy-syntax-r43.ps1",
+      "bytes": 8587,
+      "sha256": "9e3c777f7b27ff62dd082fe7f881744f8e27739404eef90c040e5507117d81d6"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-front-end-checks-r7-before-my-day.ps1",
+      "bytes": 11518,
+      "sha256": "1a836bc25aac3c0b5100227488062524c5398c69e924852d80ff159d656119b7"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-front-end-checks.ps1",
+      "bytes": 11570,
+      "sha256": "9b6e09351a55961e7446745b5f501a27fc568ff72e3d96649a91512f52e612b4"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-note-syntax-r29.ps1",
+      "bytes": 8700,
+      "sha256": "3511328e99560dfedd461dcb94ccf1abb9fb92abfd2d412deb077363bdefa370"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-note-syntax-r31.ps1",
+      "bytes": 8772,
+      "sha256": "01d8452dd5b9a06c650759c474a03bfa1e7f156497c40daf66a78000331b4e46"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-note-syntax-r32.ps1",
+      "bytes": 8772,
+      "sha256": "d84027dbec4c834dfa96b3b2daaae0842e076ee73e1ee717524b6d366679c089"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-note-syntax-r33.ps1",
+      "bytes": 8772,
+      "sha256": "3553c344c7179e2833af7f19fb9c3789d5995f435a50c24bd5af0e98c21caab1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-note-syntax-r34.ps1",
+      "bytes": 8772,
+      "sha256": "1e4dccb159238d4ae210ac042dba868712c3d203cca567ab8407dac839be73c2"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-note-syntax-r35.ps1",
+      "bytes": 8115,
+      "sha256": "38334afe091e41c55508481264d2040ebbad0289cfced81ec6094ac6f4b49a21"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-owned-frontend-r24.ps1",
+      "bytes": 14297,
+      "sha256": "76249a4f5ad0a8b49b07163d3371db4214599f54aaedace52bf261775cc7d194"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-owned-frontend-r25.ps1",
+      "bytes": 14657,
+      "sha256": "d2607d54f475a386eeb4219da2533515f32cd17309533618710000aec1c3d961"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-owned-frontend-r27.ps1",
+      "bytes": 14761,
+      "sha256": "3fe02a2c6db59130741d0c3735529430ec15e952c950d63efaea1af79e6dfbb9"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-owned-frontend-r28.ps1",
+      "bytes": 14761,
+      "sha256": "570819d0ffb867bc3a9112bf4c1d76da37f679ad3680d58d0076bf63a0049cbc"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-owned-frontend-r30.ps1",
+      "bytes": 14761,
+      "sha256": "2326fdb4a25de4e7f4a3a62da329927e4bedf2c084e8055a294b22f029296bdc"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-owned-frontend-r31.ps1",
+      "bytes": 14761,
+      "sha256": "64300cc695ad2c5c496f1c502f8d93979c9ed35b14583f6f3626cb7604f75b4a"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-owned-frontend-r32.ps1",
+      "bytes": 14761,
+      "sha256": "5d77e734ea0c0aa4d5cd8500364a5e6b8f621f2ffc8d2714d2d67312d8a1d1da"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-owned-frontend-r35.ps1",
+      "bytes": 14996,
+      "sha256": "2b577a480561ccb287bbcd7dd71acf6de2860880c2825538699eabe55bbefbf8"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-owned-frontend-r36.ps1",
+      "bytes": 14996,
+      "sha256": "6cc60464ea1a733aed106b52eb8982b76f7588ff9d2d5a42726811636a5642cb"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-owned-frontend-r37.ps1",
+      "bytes": 14708,
+      "sha256": "3ba0362cf4e8debd8a506be9a65ea838b0b554adb1409a92fde4d274dc43fc43"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-owned-report-style-r38.ps1",
+      "bytes": 14705,
+      "sha256": "e4e19ba20930e155d1f3c08964484ba90d83b092768af28bd10c08c5b2a8c02d"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-owned-report-style-r39.ps1",
+      "bytes": 14922,
+      "sha256": "5c34ed6a0f9f4b23b9fcd8a5acfe5d5f357fb116c92db7ea2339338d0f1744b8"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/run-priority-native.ps1",
+      "bytes": 7751,
+      "sha256": "29a629146de015e70c787f465ec963bc0188af2b0d5c9b2b667d1df9018827d1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/runner-source-checks-r2.json",
+      "bytes": 350,
+      "sha256": "ef62b4331cffdb7b2fcbdea8fa53b8c6dca8e8c122cf54eb64302297bb264106"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/runner-source-checks-r3.json",
+      "bytes": 1196,
+      "sha256": "6cc5b590c7fd53c13e35884c7c634df8d77c61c002a1a11b7b51f439feb7c47f"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/runner-source-checks.json",
+      "bytes": 467,
+      "sha256": "834987adcd562ef333e906d285a5070bdada4839658dd5c734ef8129f0a96438"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/README.txt",
+      "bytes": 5816,
+      "sha256": "d87cec5deeaa0b310a2f4385fcbb22267e7524da5bba9bebc63a6d39bbd62699"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/delivery-status.before.txt",
+      "bytes": 12528,
+      "sha256": "adc504fd21603171c000332beba8d019042e97ee8ad14aecd19b565de14ecad5"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Jobs/DispatchIncidentOwnerDelivery.php",
+      "bytes": 570,
+      "sha256": "ff5044608c9d5765c55a9ab3722684fa59a18d92250f20172c781a8d46ddbb05"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Models/HealthSafetySettingChange.php",
+      "bytes": 1222,
+      "sha256": "f2468af14d1de98590dae925154d540e39caeaf861487416327ccfbea58527ff"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Models/IncidentIndependentHandlingDeclaration.php",
+      "bytes": 1144,
+      "sha256": "eacc29fff4e9a8d276e17aa2e1bd17c31c1dadc095d67781a3c2b878129444ee"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Models/IncidentIndependentHandlingExclusion.php",
+      "bytes": 846,
+      "sha256": "de12dad7a014ae18838c9a859846e18f66444da3e68065f6eaf8ee14f9e61cce"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Models/IncidentSavedCopy.php",
+      "bytes": 966,
+      "sha256": "af697bf15d063988675b161d439cad95af9ee8431e3b881073dd87db7547a59a"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Services/Incidents/IncidentAccessService.php",
+      "bytes": 5460,
+      "sha256": "ad55da9833387ec490f4bc8b37d9b49ee0cf4d3870813869a02c075e0de6fbb9"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Services/Incidents/IncidentIndependenceBindingSql.php",
+      "bytes": 2429,
+      "sha256": "ef8d728e6eb52e47af046cb57674c92c893f9a620157916495bfe624944417a7"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Services/Incidents/IncidentIndependenceCaptureAccess.php",
+      "bytes": 4412,
+      "sha256": "46a75acdb625a4a30d8a3335fe8cfab54960b4a00e027194336cc888af489079"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Services/Incidents/IncidentIndependenceIntakeService.php",
+      "bytes": 39816,
+      "sha256": "3afd37c1310357bae07ec3b3eff2f8be70017186b4bb43fdb5ae9fba072a31e7"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Services/Incidents/IncidentIndependencePolicySettings.php",
+      "bytes": 15687,
+      "sha256": "aba77edc6c465bf7de40894ca4254dea7428d903cffa5b1a5b71fd2559778eb0"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Services/Incidents/IncidentIndependenceValues.php",
+      "bytes": 5542,
+      "sha256": "1b0b00725b3601e6dd0e10eab309da35b0da6a3007fad9ed6afb92a496d9569d"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Services/Incidents/IncidentOwnerEligibility.php",
+      "bytes": 3933,
+      "sha256": "59a027a8158f42bf895a9aef3d2c69795138d3df2bbda8b631c3450fc23990b0"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Services/Incidents/IncidentRoutingService.php",
+      "bytes": 23487,
+      "sha256": "675a7e0308698f5de9aff48dd7301725b3c097a912824a641eccf5b2e88c1acb"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Services/Incidents/IncidentRoutingSettings.php",
+      "bytes": 27769,
+      "sha256": "5710bc9d50400fa5637c5b5b8e0d33380f21b7e137878eeedcd747a3a194dba7"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Services/Incidents/IncidentRoutingValues.php",
+      "bytes": 8134,
+      "sha256": "9f5c04bb9749327209df11ba7bed466c8230dc1d4785101f5144b29231c1f175"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/app/Services/Incidents/IncidentSavedCopyService.php",
+      "bytes": 26310,
+      "sha256": "57f6185b4f65317a7c1c47a09997b84ffaff6e95101564e3db99a1c44d73c235"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/database/migrations/2026_10_07_190000_add_accountable_incident_ownership.php",
+      "bytes": 3972,
+      "sha256": "f5e427820619100eac0ceef516bfff68ddc63b3d0e00830d9e1173bc457acfe0"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/database/migrations/2026_10_08_180500_create_health_safety_approval_policy_settings.php",
+      "bytes": 2577,
+      "sha256": "b5c0b0f7effd0019f9ba686ca30d9b3e9a576cc5bd4346935330d7a7c99351d5"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/database/migrations/2026_10_12_200700_create_incident_owner_routing.php",
+      "bytes": 6027,
+      "sha256": "bb88cdb5acf8a515203fcd2cccb2a3c682cce4bbf204ddbcf82035684737d4e3"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/database/migrations/2026_10_12_200800_add_incident_independent_handling.php",
+      "bytes": 4436,
+      "sha256": "a1852480b1b2023540efb795338e1d6a302c14b9a42b3b214f24275914ac6125"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/database/migrations/2026_10_12_200900_create_incident_saved_copies.php",
+      "bytes": 2118,
+      "sha256": "be8ab0251bed81883bdf8fead52ab8219042d53edb2a7410ac0f61a7fb90be65"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/tests/Feature/Incidents/IncidentIndependenceTestCase.php",
+      "bytes": 2382,
+      "sha256": "c45cdd4584b3f2892abfa0d1c57260847656d475caf6d3277d35b583321471ca"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/tests/Feature/Incidents/IncidentRoutingTestCase.php",
+      "bytes": 6292,
+      "sha256": "754f16ba4d0a74a52f04a79e626315f9277849b0532de4f6fc22b5025ac3808f"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependencies/tests/Feature/Incidents/IncidentSavedCopyTest.php",
+      "bytes": 50693,
+      "sha256": "a6fcc0e633160ae345711c72e7705741ce8c8e78086ec0ead92fb27db2a7514b"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/dependency-map.json",
+      "bytes": 9527,
+      "sha256": "7b54c3ad7983aadb198ac6b3e5f246d54209cc2d2d8a8fd4f722471394461df5"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/empty-before.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/manifest.json",
+      "bytes": 17407,
+      "sha256": "0babf79888f40932cfe713fd78c23289637d828232b4936f0c9c45a94d4068d7"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/owned-consumer-writer.patch",
+      "bytes": 54053,
+      "sha256": "4243aa2169175439aa9434f0c78fce2a2709af320314ab9d0cec17ee0d1fb380"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/report-controller.before.php",
+      "bytes": 11356,
+      "sha256": "2560dc53883e644a0c0334c236666fa7444c284c7e7d8d02e4a77cf9fd5767ed"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/source/app/Http/Controllers/ControlRoom/ControlRoomReportController.php",
+      "bytes": 13749,
+      "sha256": "36ab1747f02a2608458dc3e6b559438ae490386f37e8d2b289da92990abf73a6"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/source/app/Services/ControlRoom/ControlRoomCopiedAlertNoteService.php",
+      "bytes": 10875,
+      "sha256": "c56732f3a4e969612f4a2718aa29c94a5cd953d2cef75134692dc3ae92d40cf2"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/source/app/Services/ControlRoom/ControlRoomIncidentNoteCopyWriter.php",
+      "bytes": 11829,
+      "sha256": "cba4d2f1a6ad34e0f09ea62ef07ceee303b1553d8bee4277838e94c0d85cd2d8"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/source/app/Services/ControlRoom/ControlRoomNoteReadEvidence.php",
+      "bytes": 7098,
+      "sha256": "669762d70efd6e97696f6fe634c9671273e6700f788a758f15974e4b065c9df7"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r41/source/tests/Feature/ControlRoom/ControlRoomCopiedAlertExportTest.php",
+      "bytes": 15400,
+      "sha256": "302c1a27cfd872fa301145afb52162613ff849dcde683c81d3f6e5d926565b3a"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r44/README.txt",
+      "bytes": 1693,
+      "sha256": "100f2715193da5823cb38ea70e73be2390f72939c91eefe1b00a7e105810118d"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r44/delivery-status-at-dispatch.txt",
+      "bytes": 16670,
+      "sha256": "ee7d02cd7b094b59fff66f059364eb2a47652532cfa34b538c04df4c26e40b7f"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r44/delivery-status.before.txt",
+      "bytes": 15356,
+      "sha256": "b1836dd20b6baa608004005c4da093f0220083c15fc0edacf1a2a9b1a9f44444"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r44/manifest.json",
+      "bytes": 3717,
+      "sha256": "69a66dfe5cb67c3ce70c37a20666ab3125b4734af5202e4d59e73706b6a3548f"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r44/origin-conflict-r44.patch",
+      "bytes": 3333,
+      "sha256": "c61a3f7d9484e0f5f6d01a9a635c42365657949892c02083bf25d48947a738ce"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r44/source/app/Http/Controllers/ControlRoom/ControlRoomReportController.php",
+      "bytes": 13749,
+      "sha256": "36ab1747f02a2608458dc3e6b559438ae490386f37e8d2b289da92990abf73a6"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r44/source/app/Services/ControlRoom/ControlRoomCopiedAlertNoteService.php",
+      "bytes": 11015,
+      "sha256": "627d2a85fce299c8cbabca9ebab23321e814d18214ef922ef121b329ab918092"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r44/source/app/Services/ControlRoom/ControlRoomIncidentNoteCopyWriter.php",
+      "bytes": 11829,
+      "sha256": "cba4d2f1a6ad34e0f09ea62ef07ceee303b1553d8bee4277838e94c0d85cd2d8"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r44/source/app/Services/ControlRoom/ControlRoomNoteReadEvidence.php",
+      "bytes": 7098,
+      "sha256": "669762d70efd6e97696f6fe634c9671273e6700f788a758f15974e4b065c9df7"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/saved-copy-consumer-r44/source/tests/Feature/ControlRoom/ControlRoomCopiedAlertExportTest.php",
+      "bytes": 16737,
+      "sha256": "1f8a1d4f1c0e1ac0d676a6c98602ddebb151183b345c1269a126ef70f2e37285"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/settings-schema-compiled.sql",
+      "bytes": 520,
+      "sha256": "9ccc9cf7cd59786f8617a215a7ed9b74ac2944c9cbc76a7b0503d9b8baefc17b"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/settings-schema-identifiers.json",
+      "bytes": 826,
+      "sha256": "1aef9c8b0cc629dca26739448744c86f6fe3a32c7fec369aa9c1ebd380c41c82"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/source-checks-r10-delta.log",
+      "bytes": 35,
+      "sha256": "acbf5da6385237b6f4cd342c4454d93f6c4df8bfcf1687838edb3b651981c4e1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/source-checks-r11-delta.log",
+      "bytes": 35,
+      "sha256": "acbf5da6385237b6f4cd342c4454d93f6c4df8bfcf1687838edb3b651981c4e1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/source-checks-r12-delta-format.log",
+      "bytes": 433,
+      "sha256": "78133318686e05f8df6180cf2dbb360d12edd8da15304783b3de1a37bcf73065"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/source-checks-r12-delta-initial.log",
+      "bytes": 432,
+      "sha256": "7ee64094bfe09439d4a25adb8f5862754bdd83d5692b1a34e6adfd428a92a811"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/source-checks-r12-delta.log",
+      "bytes": 35,
+      "sha256": "acbf5da6385237b6f4cd342c4454d93f6c4df8bfcf1687838edb3b651981c4e1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/source-checks-r13-delta.log",
+      "bytes": 35,
+      "sha256": "acbf5da6385237b6f4cd342c4454d93f6c4df8bfcf1687838edb3b651981c4e1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/source-checks-r14-delta.log",
+      "bytes": 35,
+      "sha256": "acbf5da6385237b6f4cd342c4454d93f6c4df8bfcf1687838edb3b651981c4e1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/source-checks-r15-delta.log",
+      "bytes": 35,
+      "sha256": "acbf5da6385237b6f4cd342c4454d93f6c4df8bfcf1687838edb3b651981c4e1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/source-checks-r16-delta.log",
+      "bytes": 35,
+      "sha256": "acbf5da6385237b6f4cd342c4454d93f6c4df8bfcf1687838edb3b651981c4e1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/source-checks-r2-initial.log",
+      "bytes": 3803,
+      "sha256": "e2f28a4a1a795603c302b318f7b1dc02aeb40829c557c6d8f6f1d1b884724fec"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/source-checks-r3-initial.log",
+      "bytes": 301,
+      "sha256": "1e81d6074e22416e7dea00165f628857a97bf948c79ed93c0e3145594cc16432"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/source-checks-r3.log",
+      "bytes": 35,
+      "sha256": "acbf5da6385237b6f4cd342c4454d93f6c4df8bfcf1687838edb3b651981c4e1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/source-checks-r4-delta.log",
+      "bytes": 35,
+      "sha256": "acbf5da6385237b6f4cd342c4454d93f6c4df8bfcf1687838edb3b651981c4e1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/source-checks-r5-format.log",
+      "bytes": 35,
+      "sha256": "acbf5da6385237b6f4cd342c4454d93f6c4df8bfcf1687838edb3b651981c4e1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/source-checks-r5.log",
+      "bytes": 35,
+      "sha256": "acbf5da6385237b6f4cd342c4454d93f6c4df8bfcf1687838edb3b651981c4e1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/source-checks-r6.log",
+      "bytes": 35,
+      "sha256": "acbf5da6385237b6f4cd342c4454d93f6c4df8bfcf1687838edb3b651981c4e1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/source-checks-r7-initial.log",
+      "bytes": 178,
+      "sha256": "e08ce63eca0593fe24add2e0ef7dcc635370e926b19004243666056e3248504e"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/source-checks-r7.log",
+      "bytes": 35,
+      "sha256": "acbf5da6385237b6f4cd342c4454d93f6c4df8bfcf1687838edb3b651981c4e1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/source-checks-r8-format.log",
+      "bytes": 274,
+      "sha256": "cd8d46df977de7789578feadf6b08798e81ba08705e8a580bd76c8921fb1bec4"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/source-checks-r8-initial.log",
+      "bytes": 273,
+      "sha256": "de70936ff50a289d88ee223ea9dffceaa33ce76793842b6f64422df4c37cbb8e"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/source-checks-r8.log",
+      "bytes": 35,
+      "sha256": "acbf5da6385237b6f4cd342c4454d93f6c4df8bfcf1687838edb3b651981c4e1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/source-checks-r9-delta.log",
+      "bytes": 35,
+      "sha256": "acbf5da6385237b6f4cd342c4454d93f6c4df8bfcf1687838edb3b651981c4e1"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/stats-diagnosis-read-evidence-r39.json",
+      "bytes": 2126,
+      "sha256": "84a0723c8773515cf35e7cd6c1f98e0159d837db0d61d167e03ecb333d78ad19"
+    },
+    {
+      "path": "docs/control-room-audit-2026-10-11/verify-native-cleanup.php",
+      "bytes": 1591,
+      "sha256": "ed5d6c42c25d72cbabc148eee0e067cb0f6580aa36e89d6de2e5a1cdbfa6533f"
+    },
+    {
+      "path": "resources/js/components/app-sidebar.tsx",
+      "bytes": 114903,
+      "sha256": "9c93d9b79c499ce2caf18f3bbebb73aa48e58a5afa599338f2e067ef33e54522"
+    },
+    {
+      "path": "resources/js/components/command-centre/command-centre-page.test.tsx",
+      "bytes": 4620,
+      "sha256": "93082765c89831b6b1080c2ae588c968c54553a93e6ffb1c9b35c1a33015a0be"
+    },
+    {
+      "path": "resources/js/components/command-centre/command-centre-page.tsx",
+      "bytes": 9579,
+      "sha256": "730e8cbe1e599093d0d8160aed561834e112e790ead4d414f3a9a23b6db15293"
+    },
+    {
+      "path": "resources/js/lib/control-room-navigation.test.ts",
+      "bytes": 5154,
+      "sha256": "6dc28913344e532bfd229a05f88c25b8855d5b32982b82b91f671b86b208c51f"
+    },
+    {
+      "path": "resources/js/lib/control-room-navigation.ts",
+      "bytes": 8741,
+      "sha256": "dd5340e2e1a38de342fac4c6f1d4ba29a709d25bcd075595f007e3aab3a69fc9"
+    },
+    {
+      "path": "resources/js/pages/control-room/_settings-dialogs.test.tsx",
+      "bytes": 12636,
+      "sha256": "6b84200f0223bccd7e7f733593c4a99c56c3787d53da0f5ceef0d7740006ebca"
+    },
+    {
+      "path": "resources/js/pages/control-room/_settings-dialogs.tsx",
+      "bytes": 64065,
+      "sha256": "e862c92dfb9dc69f496f441535fb37f8c0928cf84c3146c7748f25444526a0d5"
+    },
+    {
+      "path": "resources/js/pages/control-room/_settings-time.test.ts",
+      "bytes": 2110,
+      "sha256": "8adcc601152735ab1b132bd7c8c67b8d30d9cb2d61c511a60b11ff46189529d5"
+    },
+    {
+      "path": "resources/js/pages/control-room/_settings-time.ts",
+      "bytes": 1184,
+      "sha256": "5a5635f36a77bc08db0439c684d76806a69a6a7db42d3d866ea33f766c9ab573"
+    },
+    {
+      "path": "resources/js/pages/control-room/_settings-types.ts",
+      "bytes": 2285,
+      "sha256": "99f84d92a71e196fe55f49b15539ed8925d92c190b095e5d22898526a345be15"
+    },
+    {
+      "path": "resources/js/pages/control-room/_settings-wizard.tsx",
+      "bytes": 22053,
+      "sha256": "502e07e98aa876ebd825be4f5eca5888010688f6ad4e4de7ecac5dfa36e5c81e"
+    },
+    {
+      "path": "resources/js/pages/control-room/broadcast-show.tsx",
+      "bytes": 15874,
+      "sha256": "b6e19dec77314659b1f64dc5fe48995bf8a010cfa8efad210a6e0e552755bd9e"
+    },
+    {
+      "path": "resources/js/pages/control-room/broadcast.tsx",
+      "bytes": 20084,
+      "sha256": "6ac1ec787db0e3303fd13abd5bedcd6be9ba3a7b84a521d03ec106832b662d9a"
+    },
+    {
+      "path": "resources/js/pages/control-room/devices/index.tsx",
+      "bytes": 24889,
+      "sha256": "f2718014a0dbc6ba44e663f00c3756c933dd95e48a71e63b142738c361ea7eba"
+    },
+    {
+      "path": "resources/js/pages/control-room/devices/show.tsx",
+      "bytes": 29140,
+      "sha256": "0fbc84a8aaa1699252c74e6f8f3ba417640f18c99a946c254f0b3f1738054098"
+    },
+    {
+      "path": "resources/js/pages/control-room/map.tsx",
+      "bytes": 46776,
+      "sha256": "a894527eab51421c39c7193c8d21bbff8958114c576c011fa8f528fb6534e77e"
+    },
+    {
+      "path": "resources/js/pages/control-room/messaging.tsx",
+      "bytes": 39970,
+      "sha256": "e42bd8a6e6a989d2bc01b1c88595186782769ddb4d2ffcb3a3c4929f03218a92"
+    },
+    {
+      "path": "resources/js/pages/control-room/my-tasks.tsx",
+      "bytes": 26001,
+      "sha256": "1db53cd2e2d0e78ea1cbb87936ab4c52e5a4f0c135a2835bff055aeef7bc3ab6"
+    },
+    {
+      "path": "resources/js/pages/control-room/playbooks/index.tsx",
+      "bytes": 19939,
+      "sha256": "97efafe5fc7caf08556b8e96e8ab40e944055c44e93711fb72eb83abd99b15f2"
+    },
+    {
+      "path": "resources/js/pages/control-room/playbooks/show.tsx",
+      "bytes": 41559,
+      "sha256": "c581178c3ba5fd739fb3b8d617d7d42de4ec0c9a8848348aadc60dc538b5b881"
+    },
+    {
+      "path": "resources/js/pages/control-room/reports.test.tsx",
+      "bytes": 4530,
+      "sha256": "8220724ad20ac16cbf90a7acb19663071763c2efba1c3468d997a8dfc93bfc0e"
+    },
+    {
+      "path": "resources/js/pages/control-room/reports.tsx",
+      "bytes": 23413,
+      "sha256": "2063b49bd08a06f8aafc264a9eadf522db1209b11ed4608ad419e6436ff24143"
+    },
+    {
+      "path": "resources/js/pages/control-room/settings.tsx",
+      "bytes": 105123,
+      "sha256": "3a884b87aa2ac94ea3ea0d96fa8fe4861445c16f74453085867856d89421071c"
+    },
+    {
+      "path": "resources/js/pages/control-room/shifts.test.tsx",
+      "bytes": 7624,
+      "sha256": "77278cfeab62a6d0c0fb072e1a856c72d455ef238d42748af7e5e344acd1ae34"
+    },
+    {
+      "path": "resources/js/pages/control-room/shifts.tsx",
+      "bytes": 62325,
+      "sha256": "4c1598688eaa4d8fc40afde609dd3b0129df53fc16263deaf09627aa45a77e4a"
+    },
+    {
+      "path": "resources/js/pages/control-room/shifts/accepted-handover-history.tsx",
+      "bytes": 7768,
+      "sha256": "d0a72377b0838d2b383bb8037b50da1cf3bdc33dd325ed6592af65a49c70304c"
+    },
+    {
+      "path": "resources/js/pages/control-room/shifts/handover.test.tsx",
+      "bytes": 14969,
+      "sha256": "c93fa6e6e8342cbbeeb532dddd710f200fd81d3ca1105998e6df8e12b2c7ba66"
+    },
+    {
+      "path": "resources/js/pages/control-room/shifts/handover.tsx",
+      "bytes": 69822,
+      "sha256": "fb9c1bdf7cf75b97d4b7d5b7eb8ba124b00535fa7ca99898c2ed9ae085ab8971"
+    },
+    {
+      "path": "resources/js/pages/control-room/sla/breaches.tsx",
+      "bytes": 23201,
+      "sha256": "bc1f504d81fd1e1a2a827db8379cbf25a169bb1e1281f4dfee6780310f3ff1da"
+    },
+    {
+      "path": "resources/js/pages/control-room/sla/index.tsx",
+      "bytes": 47365,
+      "sha256": "baffbb6a8903b04d7c54810d22e00195078ee8816261a9adaa8ebdd5c8a5e9bd"
+    },
+    {
+      "path": "resources/js/pages/control-room/stats.tsx",
+      "bytes": 41250,
+      "sha256": "2c4f280ab4178881b3bc3d44ec61bd938839413e559e1fd0bedc9d3c0fc3efef"
+    },
+    {
+      "path": "routes/control-room.php",
+      "bytes": 28066,
+      "sha256": "00ab059100da60ee67d4e4bc4e330952b41743df5c1551ecb79a29351989a51a"
+    },
+    {
+      "path": "routes/portal.php",
+      "bytes": 18900,
+      "sha256": "f2632b038bf394b34a27252eb8c38006868c53f23f809d2149facacbd2f05919"
+    },
+    {
+      "path": "tests/Feature/ControlRoom/AlertReportingServiceTest.php",
+      "bytes": 19551,
+      "sha256": "bd123702616d56080b856add639065ad4181e42156d42d8112c88926cdd32084"
+    },
+    {
+      "path": "tests/Feature/ControlRoom/ControlRoomAcceptedHandoverHistoryTest.php",
+      "bytes": 44608,
+      "sha256": "c7a3bc762ac7010f580249c23c6c3a12914800d2b149f32ac28e649a48e4c49c"
+    },
+    {
+      "path": "tests/Feature/ControlRoom/ControlRoomCurrentSourceReadTest.php",
+      "bytes": 29843,
+      "sha256": "77de572a0bbfab6ec7dcd5639731956016a99a43a0612605cb8f2d59efe7ff43"
+    },
+    {
+      "path": "tests/Feature/ControlRoom/ControlRoomDatabaseNotificationReadTest.php",
+      "bytes": 19511,
+      "sha256": "f7b05e085ef45e57dcf1573150e01600952de4a4e9dd80cbe629cc683c4fb469"
+    },
+    {
+      "path": "tests/Feature/ControlRoom/ControlRoomDeskTest.php",
+      "bytes": 11357,
+      "sha256": "1fedd05a32c2da1e9afb3143bd3768adaf08c03b886e728dc403c9e4cd169e73"
+    },
+    {
+      "path": "tests/Feature/ControlRoom/ControlRoomEscalationControllerTest.php",
+      "bytes": 15826,
+      "sha256": "918ebeae02e935f6f6950b625736f25daca735557758f4e6853cbc794839bbc3"
+    },
+    {
+      "path": "tests/Feature/ControlRoom/ControlRoomOperatorRootNoteTest.php",
+      "bytes": 24534,
+      "sha256": "3c504f6ab04c3d68ea602797d9ad54ab235771a4d25cc98b4e497da5dfaef147"
+    },
+    {
+      "path": "tests/Feature/ControlRoom/ControlRoomRecipientEligibilityTest.php",
+      "bytes": 43082,
+      "sha256": "670054f76708cc32772ee7ed58990a58be029c970d1be2bd12bcc5ee3dd4920b"
+    },
+    {
+      "path": "tests/Feature/ControlRoom/ControlRoomReportControllerTest.php",
+      "bytes": 16318,
+      "sha256": "05699bd7f1b4252c4396eba74a03e431f632b97d3bfb4c56fed74cd7053901a0"
+    },
+    {
+      "path": "tests/Feature/ControlRoom/ControlRoomSafetyHandoverTest.php",
+      "bytes": 9755,
+      "sha256": "9414ff09eb2398ce2cd8fdaf22dfd350e4dbefa8d6ff4529393a7ed04331cea5"
+    },
+    {
+      "path": "tests/Feature/ControlRoom/ControlRoomSettingsControllerTest.php",
+      "bytes": 28643,
+      "sha256": "860d7d969ae93b48c0aa3d5dee581785439333e083e356aa291eeaf216a70cf3"
+    },
+    {
+      "path": "tests/Feature/ControlRoom/ControlRoomStatsControllerTest.php",
+      "bytes": 6022,
+      "sha256": "1ecc59a3c5235257aa2c8dea56193630ca61bf0ce107e9d42401eecd4981f5b9"
+    },
+    {
+      "path": "tests/Feature/ControlRoom/SignalOutboxControllerTest.php",
+      "bytes": 21847,
+      "sha256": "0a34ca4f92ceebb9100e7aa368f89eeb2f49c4d52ab09f1184c8a37c1d83bf6f"
+    },
+    {
+      "path": "tests/Unit/ControlRoom/AlertPriorityServiceTest.php",
+      "bytes": 6558,
+      "sha256": "107d77abe16e530e691ce19f12f6eea14b1f8436e3777fe26a2d41014813e6d4"
+    },
+    {
+      "path": "tests/Unit/ControlRoom/SignalProcessingServiceTest.php",
+      "bytes": 40597,
+      "sha256": "72f6ae0d2046234ec2bf75d8ca454e5bd8ddd64297090e8941eaa94d24a21d90"
+    }
+  ],
+  "deleted_paths": [],
+  "omissions": [],
+  "patch_sha256": "e2015d59842092d150b26437fa6621a1f301aad6edc152bc696d0f6fa8b9cf6f"
+}
