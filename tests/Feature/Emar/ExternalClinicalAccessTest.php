@@ -442,6 +442,33 @@ final class ExternalClinicalAccessTest extends TestCase
         $this->assertSame('note', MedicationExternalClinician::query()->findOrFail($id)->registration_check);
     }
 
+    /** EA-025: a waiting prescriber request is an All Tasks item for order managers at the person's house, until decided. */
+    public function test_ea025_a_waiting_prescriber_request_is_an_all_tasks_item_for_order_managers_until_decided(): void
+    {
+        $proposal = app(ExternalClinicalProposals::class)->submit($this->clinician, $this->person->id, [
+            'kind' => 'start', 'prescription' => $this->prescription(), 'reason' => 'Start for review', 'request_key' => 'ea025-task',
+        ], null);
+        $provider = app(\App\Services\Tasks\TaskAggregator::class)->providerFor('med_prescriber_request');
+        $this->assertNotNull($provider);
+        $this->assertSame(['med_prescriber_request-'.$proposal->id], collect($provider->authorizedTasks($this->manager))->pluck('id')->all());
+        $this->actingAs($this->manager)->getJson(route('tasks.detail', ['source' => 'med_prescriber_request', 'id' => $proposal->id]))->assertOk();
+
+        // Not an order manager, or another house: nothing.
+        $reader = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        $reader->permissionOverrides()->syncWithoutDetaching([Permission::query()->where('key', 'medications.view')->value('id') => ['allowed' => true]]);
+        HrEmployeeProfile::factory()->create(['user_id' => $reader->id, 'primary_site_id' => $this->site->id, 'secondary_site_ids' => [],
+            'start_date' => today()->subYear(), 'end_date' => null, 'is_active' => true]);
+        $this->assertSame([], $provider->authorizedTasks($reader->fresh()));
+        $elsewhere = $this->connectedStaff();
+        $elsewhere->hrEmployeeProfile->forceFill(['primary_site_id' => Site::factory()->create(['is_active' => true, 'archived' => false])->id])->save();
+        $this->assertSame([], $provider->authorizedTasks($elsewhere->fresh()));
+
+        $this->actingAs($this->manager)->postJson('/emar/connected-care/proposals/'.$proposal->id.'/decision', [
+            'decision' => 'reject', 'decision_note' => 'Please phone the house first.',
+        ])->assertSuccessful();
+        $this->assertSame([], $provider->authorizedTasks($this->manager->fresh()));
+    }
+
     private function allowGlobalIdentityWithdrawal(User $actor, string $permission): User
     {
         $definition = Permission::firstOrCreate(['key' => $permission], ['description' => 'Explicit synthetic all-sites authority', 'group' => 'clinical']);
