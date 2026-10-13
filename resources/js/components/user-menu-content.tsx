@@ -6,9 +6,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { UserInfo } from '@/components/user-info';
 import { useMobileNavigation } from '@/hooks/use-mobile-navigation';
+import { guardMedicationSignOut } from '@/lib/offline-queue';
 import { type User } from '@/types';
 import { Link, router } from '@inertiajs/react';
 import { Briefcase, LogOut, Settings } from 'lucide-react';
+import type { MouseEvent } from 'react';
 const logout = () => '/logout';
 const edit = () => '/settings/profile';
 
@@ -19,7 +21,10 @@ interface UserMenuContentProps {
 export function UserMenuContent({ user }: UserMenuContentProps) {
     const cleanup = useMobileNavigation();
 
-    const handleLogout = () => {
+    const handleLogout = (event: MouseEvent) => {
+        // eMAR (EA-048, EA-129): ask first while medication records are
+        // saved only on this device; otherwise clear what this worker left.
+        if (!guardMedicationSignOut(event)) return;
         cleanup();
         router.flushAll();
     };

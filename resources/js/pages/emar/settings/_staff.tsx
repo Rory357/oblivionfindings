@@ -405,6 +405,17 @@ export function StaffOverview({
                     title: 'Witness PINs',
                     lines: [
                         `Locks after ${pin('max_attempts')} wrong attempts, for ${pin('lockout_minutes')} minutes. ${pin('renewal_months') !== renewalOff ? `Renewed every ${pin('renewal_months')} months.` : 'No renewal.'}`,
+                        ...(s.definitions.forgotten?.forgotten_fallback
+                            ? [
+                                  savedValue(
+                                      s,
+                                      'forgotten',
+                                      'forgotten_fallback',
+                                  ) === 'yes'
+                                      ? `Forgotten PIN: allowed, except for controlled drugs. The colleague has ${savedValue(s, 'forgotten', 'confirm_minutes')} minutes to confirm.`
+                                      : 'Forgotten PIN: not allowed.',
+                              ]
+                            : []),
                     ],
                     cta: 'Review PIN rules',
                     onClick: () => go('staff', 'pins'),

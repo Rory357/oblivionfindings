@@ -13,7 +13,7 @@ class MedicationWorkflowDefaultsTest extends TestCase
 {
     public function test_completed_workflows_default_to_enabled_without_installation_overrides(): void
     {
-        $this->assertSame([true, true, true], $this->flags([]));
+        $this->assertSame([true, true], $this->flags([]));
     }
 
     #[DataProvider('individualOverrides')]
@@ -25,23 +25,40 @@ class MedicationWorkflowDefaultsTest extends TestCase
     public static function individualOverrides(): array
     {
         return [
-            'packs' => ['MEDICATION_STOCK_LOTS_ENABLED', [false, true, true]],
-            'forgotten PIN' => ['MEDICATION_FORGOTTEN_PIN_ENABLED', [true, false, true]],
-            'leave Away' => ['MEDICATION_AWAY_FROM_LEAVE', [true, true, false]],
+            'packs' => ['MEDICATION_STOCK_LOTS_ENABLED', [false, true]],
+            'leave Away' => ['MEDICATION_AWAY_FROM_LEAVE', [true, false]],
         ];
     }
 
-    public function test_all_three_installation_overrides_can_disable_the_workflows(): void
+    public function test_both_installation_overrides_can_disable_the_workflows(): void
     {
-        $this->assertSame([false, false, false], $this->flags([
+        $this->assertSame([false, false], $this->flags([
             'MEDICATION_STOCK_LOTS_ENABLED' => 'false',
-            'MEDICATION_FORGOTTEN_PIN_ENABLED' => 'false',
             'MEDICATION_AWAY_FROM_LEAVE' => 'false',
         ]));
     }
 
-    /** Load the actual config against a private in-memory environment, without changing process variables. */
+    /**
+     * Stephan, 9 Oct 2026: the forgotten-PIN fallback is an organisation
+     * setting, off until a manager switches it on. No installation variable
+     * switches it on behind the setting's back.
+     */
+    public function test_the_forgotten_pin_fallback_is_not_an_installation_switch(): void
+    {
+        $config = $this->config(['MEDICATION_FORGOTTEN_PIN_ENABLED' => 'true']);
+
+        $this->assertArrayNotHasKey('forgotten_fallback_enabled', $config['witness_pin']);
+    }
+
     private function flags(array $overrides): array
+    {
+        $config = $this->config($overrides);
+
+        return [$config['stock_lots_enabled'], $config['away']['from_leave']];
+    }
+
+    /** Load the actual config against a private in-memory environment, without changing process variables. */
+    private function config(array $overrides): array
     {
         $property = new ReflectionProperty(Env::class, 'repository');
         $original = $property->getValue();
@@ -51,9 +68,7 @@ class MedicationWorkflowDefaultsTest extends TestCase
         }
         $property->setValue(null, $repository);
         try {
-            $config = require __DIR__.'/../../../config/medications.php';
-
-            return [$config['stock_lots_enabled'], $config['witness_pin']['forgotten_fallback_enabled'], $config['away']['from_leave']];
+            return require __DIR__.'/../../../config/medications.php';
         } finally {
             $property->setValue(null, $original);
         }

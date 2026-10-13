@@ -8,6 +8,7 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
 use App\Models\MedicationCompetencyAssessment;
+use App\Models\MedicationFollowup;
 use App\Models\MedicationRound;
 use App\Models\Permission;
 use App\Models\Role;
@@ -15,6 +16,7 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\Recording\OfflineReplayReview;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -215,6 +217,35 @@ class GuidedRoundOfflineReplayTest extends TestCase
         }
 
         $this->assertDatabaseCount('client_medication_administrations', 0);
+    }
+
+    /** Review P1 (EA-131): a round dose the device saved longer ago than the limit is refused, whatever its flag. */
+    public function test_a_replayed_round_dose_older_than_the_limit_goes_to_review(): void
+    {
+        $scheduledFor = Carbon::now(config('app.worker_timezone', 'Pacific/Auckland'))->setTime(8, 0);
+        $url = "/emar/rounds/{$this->round->id}/guided/items/{$this->medication->id}";
+        $payload = [
+            'status' => 'given',
+            'scheduled_for' => $scheduledFor->toIso8601String(),
+            'client_request_uuid' => '7d0c4f0e-0f5f-4a55-9a59-3c3c1f3a2b11',
+            'queued_offline' => false,
+        ];
+
+        $this->actingAs($this->worker)
+            ->postJson($url, $payload, [OfflineReplayReview::REPLAY_HEADER => now()->subHours(13)->toIso8601String()])
+            ->assertUnprocessable()
+            ->assertJsonPath('error_field', 'queued_offline')
+            ->assertJsonPath('sync.status', 'rejected');
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertSame('too_old', MedicationFollowup::query()->where('type', 'offline_review')->sole()->context['reason_key']);
+
+        // Saved an hour ago: recorded as usual.
+        $this->actingAs($this->worker)
+            ->postJson($url, [...$payload, 'client_request_uuid' => '0b7b1f43-5d0e-4c57-8f0d-2a4b8b7f9e21'],
+                [OfflineReplayReview::REPLAY_HEADER => now()->subHour()->toIso8601String()])
+            ->assertOk()
+            ->assertJsonPath('sync.status', 'processed');
+        $this->assertDatabaseCount('client_medication_administrations', 1);
     }
 
     public function test_exact_queued_round_admin_replay_uses_capture_time_and_reaches_core_idempotency(): void

@@ -42,10 +42,12 @@ use Illuminate\Support\Str;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 class MedicationHistoricalRecoveryTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     private Site $site;
 

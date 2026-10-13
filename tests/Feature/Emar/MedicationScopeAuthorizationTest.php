@@ -28,10 +28,12 @@ use RuntimeException;
 use Symfony\Component\Process\Process;
 use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 class MedicationScopeAuthorizationTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     private User $worker;
 
@@ -141,6 +143,9 @@ class MedicationScopeAuthorizationTest extends TestCase
 
     public function test_a_shift_for_another_resident_at_the_same_site_does_not_authorize_the_action(): void
     {
+        // EA-006 (Stephan's D1): a shift at the house covers the residents the
+        // worker is assigned to support (LaneASharedHouseTest), never anyone else.
+        $this->client->supportWorkers()->detach($this->worker->id);
         $otherClient = Client::factory()->create([
             'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,

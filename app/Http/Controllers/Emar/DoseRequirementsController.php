@@ -42,7 +42,7 @@ class DoseRequirementsController extends Controller
         $dueAt = $this->owedDueTime($order, $scheduledFor);
         abort_unless($dueAt !== null, 404);
 
-        return response()->json($this->requirements->forScheduledDose($user, $order, $dueAt));
+        return response()->json($this->requirements->forScheduledDose($user, $order, $dueAt, renewReview: $this->renewReview($request)));
     }
 
     /** One as-needed order: GET /meds/today/prn/{medication}/requirements */
@@ -55,7 +55,19 @@ class DoseRequirementsController extends Controller
         abort_unless($order !== null && $order->is_prn, 404);
         $this->requirements->assertVisible($user, $order);
 
-        return response()->json($this->requirements->forAsNeeded($user, $order));
+        return response()->json($this->requirements->forAsNeeded($user, $order, renewReview: $this->renewReview($request)));
+    }
+
+    /**
+     * EA-060: an open dialog refreshing its expired connected review sends
+     * that review in a header (never the URL). It only keeps the first review
+     * time when it is this worker's own, signed, unchanged review.
+     */
+    private function renewReview(Request $request): ?string
+    {
+        $token = $request->header('X-Live-Recording-Context');
+
+        return is_string($token) && $token !== '' && strlen($token) <= 4096 ? $token : null;
     }
 
     /** The due time the order owes on that NZ day, matched to the minute. */

@@ -32,6 +32,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 /**
  * eMAR P01 C1 — the one recording contract on the server: what was given
@@ -44,6 +45,7 @@ use Tests\TestCase;
 class P01RecordingContractTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     private User $worker;
 
@@ -518,7 +520,9 @@ class P01RecordingContractTest extends TestCase
         // allergies, the order, a covert plan or colleagues.
         $this->assertSame(['kind', 'block_all', 'checked_at'], array_keys($blocked->json()));
 
-        // Aroha's worker, clocked in at the house on a shift for someone else.
+        // Clocked in at the house on a shift for someone else, and not
+        // assigned to support Aroha. (EA-006, D1: a house shift covers the
+        // people the worker supports, so an assigned worker could record.)
         $mele = Client::factory()->create([
             'first_name' => 'Mele',
             'site_id' => $this->site->id,
@@ -526,11 +530,11 @@ class P01RecordingContractTest extends TestCase
             'status' => 'active',
         ]);
         $tama = $this->staffAt($this->site, 'Tama Rewi');
-        $this->client->supportWorkers()->attach($tama->id);
+        $this->grant($tama, ['clients.viewAny']);
         $this->onShift($tama, $mele);
         $blocked = $this->requirements($order, '09:30', $tama)
             ->assertOk()
-            ->assertJsonPath('block_all.key', DoseRecordingRequirements::BLOCK_NOT_ON_SHIFT)
+            ->assertJsonPath('block_all.key', DoseRecordingRequirements::BLOCK_NOT_ASSIGNED)
             ->assertJsonPath('block_all.facts', ['house' => 'Kōwhai House']);
         $this->assertSame(['kind', 'block_all', 'checked_at'], array_keys($blocked->json()));
 

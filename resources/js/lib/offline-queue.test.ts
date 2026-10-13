@@ -18,7 +18,6 @@ import {
     __resetOfflineQueueRuntimeForTests,
     __setOfflineQueueStorageForTests,
     dismissRejectedOfflineSubmission,
-    dismissRejectedOfflineSubmissions,
     EphemeralCredentialQueueError,
     getPendingCount,
     OfflineQueueStorageError,
@@ -302,6 +301,8 @@ describe('offline queue', () => {
         expect(result).toEqual({
             status: 'requires_connection',
             clientRequestUuid: 'bd9fd3f4-0792-40b8-93fd-fe2e378f83cd',
+            // It left the browser, so it may have been saved (EA-149).
+            sent: true,
         });
         expect(storage.put).not.toHaveBeenCalled();
         expect(toast.info).not.toHaveBeenCalled();
@@ -528,7 +529,7 @@ describe('offline queue', () => {
         expect(mockedAxios).not.toHaveBeenCalled();
         expect(storage.items()).toEqual([item]);
         expect(toast.error).toHaveBeenCalledWith(
-            expect.stringContaining('another signed-in worker'),
+            expect.stringContaining('belongs to another worker'),
         );
 
         setOfflineQueueActor(101);
@@ -849,19 +850,33 @@ describe('offline queue', () => {
             });
             const storage = createStorage([refused, uncertain]);
             __setOfflineQueueStorageForTests(storage);
-            mockedAxios.mockResolvedValueOnce({
-                data: { success: true, sync: { status: 'synced' } },
-            });
+            mockedAxios.mockImplementation(async (config: { url: string }) =>
+                config.url === '/meds/today/offline-review'
+                    ? { data: { status: 'unavailable' } }
+                    : { data: { success: true, sync: { status: 'synced' } } },
+            );
 
             await retryOfflineSubmissionsNeedingAttention();
 
-            expect(mockedAxios).toHaveBeenCalledTimes(1);
-            expect(mockedAxios).toHaveBeenCalledWith(
-                expect.objectContaining({ data: uncertain.payload }),
+            // The refused item is never resent to its own endpoint; it is
+            // only reported for a lead follow-up (Lane A3, EA-049).
+            const resent = mockedAxios.mock.calls.filter(
+                ([config]) => config.url === refused.url,
             );
+            expect(resent).toHaveLength(1);
+            expect(resent[0][0]).toMatchObject({ data: uncertain.payload });
+            expect(
+                mockedAxios.mock.calls.filter(
+                    ([config]) => config.url === '/meds/today/offline-review',
+                ),
+            ).toHaveLength(1);
             expect(storage.items()).toEqual([refused]);
 
-            await dismissRejectedOfflineSubmissions();
+            // A refused dose is removed one at a time, after the worker says
+            // it is on paper or their lead knows; never by one "Dismiss".
+            await dismissRejectedOfflineSubmission(refused.id);
+            expect(storage.items()).toHaveLength(1);
+            await dismissRejectedOfflineSubmission(refused.id, 'told_lead');
             expect(storage.items()).toHaveLength(0);
         });
 

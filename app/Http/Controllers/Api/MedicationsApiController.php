@@ -1008,9 +1008,16 @@ class MedicationsApiController extends Controller
             $scheduledFor,
             isset($data['shift_id']) ? (int) $data['shift_id'] : null,
             null,
-            function (MedicationScopeDecision $scope) use ($data, $user, $submittedAdministrationAt) {
+            function (MedicationScopeDecision $scope) use ($request, $data, $user, $submittedAdministrationAt) {
                 $client = $scope->client;
                 $medication = $scope->medication;
+                // EA-131 (review P1): the same age limit for queued and replayed doses.
+                if ($tooOld = app(\App\Services\Medication\Recording\OfflineReplayReview::class)->refuseIfTooOld($request, $client, $medication, $user, $data)) {
+                    return response()->json($this->withMedicationSync(
+                        ['success' => false, 'message' => $tooOld, 'error' => $tooOld, 'error_field' => 'queued_offline', 'errors' => ['queued_offline' => [$tooOld]]],
+                        $data, 'rejected', false, $tooOld,
+                    ), 422);
+                }
                 $data['administered_at'] = $submittedAdministrationAt;
                 $data['shift_id'] = $scope->shiftId();
                 $data['scope_authorized'] = true;

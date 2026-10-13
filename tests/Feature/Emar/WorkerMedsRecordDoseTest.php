@@ -40,6 +40,7 @@ use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use RuntimeException;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 /**
  * Desktop medication board — scheduled-dose recording (Record Dose wizard),
@@ -48,6 +49,7 @@ use Tests\TestCase;
 class WorkerMedsRecordDoseTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     protected User $worker;
 

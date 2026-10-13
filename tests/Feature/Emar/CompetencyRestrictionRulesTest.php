@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Cache;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 use Database\Factories\UserFactory;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 /**
  * NF-03: the organisation's competency rules (restricted assessments, task
@@ -33,6 +34,7 @@ use Database\Factories\UserFactory;
 class CompetencyRestrictionRulesTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     protected User $worker;
 

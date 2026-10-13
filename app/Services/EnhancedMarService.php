@@ -23,6 +23,7 @@ use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Medication\Downtime\HistoricalPaperContext;
 use App\Services\Medication\Downtime\PaperAdministrationWriter;
+use App\Services\Medication\Downtime\PaperEntryService;
 use App\Services\Medication\Downtime\PaperReconciliationRules;
 use App\Services\Medication\Followups\MedicationFollowupService;
 use App\Services\Medication\ForgottenWitnessPinService;
@@ -966,14 +967,24 @@ class EnhancedMarService
 
                 $shift = null;
                 if ($shiftId !== null) {
+                    // EA-006 (D1): the worker's shift at the person's house
+                    // also counts when they're assigned to support the
+                    // person, whoever the shift names.
                     $shift = Shift::query()
                         ->whereKey($shiftId)
                         ->where('user_id', $userId)
-                        ->where('client_id', $client->id)
+                        ->where(function ($binding) use ($client, $userId): void {
+                            $binding->where('client_id', $client->id)
+                                ->orWhereExists(fn ($assigned) => $assigned->selectRaw('1')
+                                    ->from('client_user')
+                                    ->where('client_user.client_id', $client->id)
+                                    ->where('client_user.user_id', $userId));
+                        })
                         ->where(function ($query) use ($client): void {
                             $query
                                 ->where('site_id', $client->site_id)
-                                ->orWhereNull('site_id');
+                                ->orWhere(fn ($derived) => $derived->whereNull('site_id')
+                                    ->whereHas('client', fn ($clients) => $clients->where('site_id', $client->site_id)));
                         })
                         ->lockForUpdate()
                         ->first();
@@ -1265,6 +1276,21 @@ class EnhancedMarService
                     }
                 }
 
+                // EA-008: a "given" records the order the dialog showed. If the
+                // order was checked at a new version (or otherwise changed)
+                // while the dialog was open, nothing is saved: the worker sees
+                // the new instructions first. Exact replays resolved above.
+                if (($data['status'] ?? null) === 'given'
+                    && filled($data['order_fingerprint'] ?? null)
+                    && ! hash_equals((string) $data['order_fingerprint'], PaperEntryService::orderFingerprint($medication))) {
+                    return [
+                        'success' => false,
+                        'error_field' => 'order_changed',
+                        'error' => 'Order changed — check the new instructions',
+                        'order_changed' => true,
+                    ];
+                }
+
                 // Exact retained replay has resolved above. A connected form may
                 // retain its server-issued review time while checks are completed;
                 // an offline or earlier paper dose must never guess today's FEFO.
@@ -1410,15 +1436,21 @@ class EnhancedMarService
                             $client,
                             $medication,
                         );
-                        $this->rememberAdministrationReplay(
-                            $existing,
-                            $client,
-                            $medication,
-                            $userId,
-                            $shiftId,
-                            $clientRequestUuid,
-                            $requestFingerprint,
-                        );
+                        // EA-004: a dose saved on a device while someone else
+                        // recorded this one was NOT recorded. Its request is
+                        // never bound to their record, so sending it again
+                        // still says "someone else recorded this", not "sent".
+                        if (! (bool) ($data['queued_offline'] ?? false)) {
+                            $this->rememberAdministrationReplay(
+                                $existing,
+                                $client,
+                                $medication,
+                                $userId,
+                                $shiftId,
+                                $clientRequestUuid,
+                                $requestFingerprint,
+                            );
+                        }
 
                         return [
                             'success' => true,
@@ -2108,6 +2140,8 @@ class EnhancedMarService
             $data['witness_credential'],
             $data['scope_authorized'],
             $data['live_recording_context'],
+            // A precondition on the order shown, like the connected review.
+            $data['order_fingerprint'],
             $data['shift_id'],
         );
 
