@@ -483,3 +483,9 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
   - Gates: 151 + 128 passed.
   - **Environment:** tests were blocked from 14:45 to 19:25 because free RAM stayed under the lock's 5.5 GB floor (Chrome, Claude sessions and ChatGPT). Stephan closed apps.
   - **Codex checkpoint `30aafb208` broke every Inertia page** (missing LeaveReviewReceipt). `01fc068a6` fixed it.
+- **Lane A11 server label tick LIVE: merge `78a1fd45f`.**
+  - A required "I've checked the label" tick that is missing → 422 `label_checked`, and nothing is saved.
+  - A queued dose without the tick is parked for the lead.
+  - The tick is kept as the audit row `medications.dose.label_checked`.
+  - Gates: Pest 106/106, vitest 48, eslint 0.
+  - **Main has 7 tsc errors, all non-eMAR, from Codex `01fc068a6`:** workforce restriction-approver-settings.test.tsx:135, handovers-hero.tsx:222, and 5 Security & Devices tests that import an uncommitted `.endpoint-tools` fixture.
