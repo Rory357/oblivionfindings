@@ -1,6 +1,8 @@
-COORDINATION STATUS — 13 October 2026 12:41 NZ / 12 October 2026 23:41 UTC
+COORDINATION STATUS — main preservation checkpoint, 13 October 2026 NZ
 Coordinator: Audit control room workflows, 01a12a11-7c57-7d82-a75b-9c2c7c83df42.
-Heartbeat ACTIVE. All three scopes INCOMPLETE. No general programme pause. Two specific H&S implementations are held by direct human decision. Source, candidate, integrated and actually verified remain separate.
+Heartbeat PAUSED by direct human request to conserve usage after saving. All three scopes remain INCOMPLETE. Implementation owners supplied frozen preservation handoffs. Specific H&S holds remain. Source, candidate, integrated and actually verified remain separate.
+
+LATEST DELIVERY: checkpoint01fc068a69007980f750d80b1ea3d64051641720 was committed on local main and pushed successfully to origin/main. It preserves47 application files already present in main, audit records and3 hash-verified recovery archives containing11,348 candidate/proposal/evidence files. CR/H&S candidate overlays and unfinished Workforce proposals are saved as data, not fully runtime-integrated. Read docs/main-consolidation-2026-10-13/README.md and ARCHIVE-VERIFICATION.json before resuming. Generated dependencies/databases/caches and unrelated untracked work remain outside this checkpoint. The next action requires a fresh human request; do not resume hourly monitoring or restart frozen owners from stale instructions below.
 
 CONTRACT / HISTORY
 APPROVED-SCOPE.txt SHA43D450D9430235B4B35E29D509D8D20FDA1B37732AF4C5BBA9B0CF14B5CAF5D6; updated23:41 with verified direct human approval of scoped meeting invitation access and separate recipient selection. Latest human decisions override older checkpoints. Full source/evidence history through20:37 archived byte-exact at history/COORDINATION-2026-10-12-2037UTC.txt SHA393D6F6E954325B6BEAC00772D91B165E0E889FFB171365BCC2EE6EE7E00C8B8,44,991bytes. Earlier10:34 archive SHA CFA4E0BDA3A4815DBE3837E325ED9C6AAAA45D0584D621EEF9616D55A746B336 retains older details. Read relevant archived evidence before adoption; this compaction does not waive any open gate or reactivate obsolete blanket holds.

@@ -68,6 +68,14 @@ frozen source. Main's existing tracked diff passed `git diff --check`. No new
 application test, build, migration, browser or provider run was claimed during
 this preservation task.
 
-The user also explicitly requested that hourly coordination checks be paused
-after the save. The implementation candidates remain frozen for consolidation;
+The work was committed as `01fc068a69007980f750d80b1ea3d64051641720` and pushed
+successfully to GitHub main. The three verified archives contain 11,348 files.
+The coordinated application changes and documentation are committed; unrelated
+untracked work in the shared checkout remains untouched. Two historical notes
+retain their original extra EOF blank line so their original evidence bytes are
+not deliberately rewritten.
+
+The user explicitly requested that hourly coordination checks be paused after
+the save. Automation `coordinate-control-room-workforce-and-h-s` is now PAUSED.
+The implementation candidates remain frozen at their saved checkpoints;
 future work must begin from these saved checkpoints and current main.
