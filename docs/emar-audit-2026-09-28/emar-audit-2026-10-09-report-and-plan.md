@@ -449,3 +449,14 @@ eMAR is broadly built: all 14 approved designs exist in some form, and Codex fix
 - **Lane B:** EA-136, EA-138 (alerts) and EA-025 (alert and Requests tab) were already live in B10. Still to come:
   - an EA-136 "Check for a duplicate supply" follow-up;
   - an EA-025 All Tasks provider. Main approved its one line in TaskAggregator, inside the medication block, away from Codex's workforce and H&S edits.
+- **13 Oct, Lane C8 + C9a–e LIVE: merge `8348aeb47`** (over 753a7f396: workforce timesheets, Overview workspaces).
+  - Shipped:
+    - medication navigation follows the approved hub map;
+    - first UI pass against the approved mockups;
+    - row right-click and the shared paginator on medication lists;
+    - P08b meters on errors;
+    - P02 meters on the record and MAR hub headers;
+    - P02 header filters.
+  - Gates: c8b 42 passed, vitest 75; c9 43 passed; full eMAR vitest 500/500; tsc and eslint 0.
+  - Still in Lane C, green but waiting for Lane A to land: C7 NZ-day reports, C10 cleanup, C9f (remaining P02 filters), C9g (MAR charts per house with an Allergies column), C9h (EA-156 staff eligibility witness view).
+  - **Decision (Main):** a queued offline round item refused by the retired guided-round writer raises Lane A's `offline_review` lead follow-up, so no offline dose is silently lost. A live tap only gets the 409.
